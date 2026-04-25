@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Econ Workbench</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-kicker">Local Product Shell</span>
+          <h1>Econ Workbench</h1>
+          <p>从研究问题到论文草稿的本地优先产品骨架。</p>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-link is-active" data-view="dashboard">Dashboard</button>
+          <button class="nav-link" data-view="projects">Projects</button>
+          <button class="nav-link" data-view="workflow">Workflow</button>
+          <button class="nav-link" data-view="artifacts">Artifacts</button>
+          <button class="nav-link" data-view="drafts">Drafts</button>
+        </nav>
+
+        <div class="sidebar-card">
+          <h2>当前策略</h2>
+          <p>A 阶段引擎已嵌入，当前在做 C 版产品壳。</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Product Status</span>
+            <h2 id="topbar-title">Dashboard</h2>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh-button" class="ghost-button">刷新</button>
+          </div>
+        </header>
+
+        <section class="view is-active" id="view-dashboard">
+          <div class="metric-grid" id="metric-grid"></div>
+
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>项目概览</h3>
+                <span class="pill" id="status-pill">loading</span>
+              </div>
+              <div id="dashboard-projects" class="stack"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>当前选中项目</h3>
+                <span class="pill" id="selected-project-pill">none</span>
+              </div>
+              <div id="selected-project-summary" class="stack muted"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-projects">
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>项目列表</h3>
+                <span class="pill">Multi-project</span>
+              </div>
+              <div id="project-list" class="stack"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>创建新项目</h3>
+                <span class="pill">Wizard</span>
+              </div>
+              <form id="project-form" class="form-stack">
+                <label>
+                  <span>Slug</span>
+                  <input name="slug" placeholder="my-thesis-project" required />
+                </label>
+                <label>
+                  <span>标题</span>
+                  <input name="title" placeholder="我的论文项目" required />
+                </label>
+                <label>
+                  <span>研究问题</span>
+                  <textarea name="question" placeholder="effect of X on Y" required></textarea>
+                </label>
+                <button type="submit" class="primary-button">创建工作区</button>
+              </form>
+              <p id="project-form-result" class="form-result"></p>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-workflow">
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>执行操作</h3>
+                <span class="pill">Actions</span>
+              </div>
+              <div class="action-group">
+                <button id="run-dry-button" class="primary-button">Run Dry</button>
+                <button id="run-live-button" class="primary-button accent">Run Live</button>
+                <button id="orchestrate-button" class="primary-button">Orchestrate</button>
+                <button id="export-button" class="ghost-button">Export Word</button>
+              </div>
+              <pre id="execution-log" class="console-box">等待执行…</pre>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>阶段面板</h3>
+                <span class="pill">Pipeline</span>
+              </div>
+              <ol id="workflow-steps" class="workflow-list"></ol>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-artifacts">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>产物面板</h3>
+              <span class="pill">Traceable</span>
+            </div>
+            <div id="artifact-list" class="artifact-grid"></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-drafts">
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Markdown Draft</h3>
+                <span class="pill">Internal</span>
+              </div>
+              <pre id="markdown-preview" class="draft-box">暂无内容</pre>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Key Results / Orchestration</h3>
+                <span class="pill">Structured</span>
+              </div>
+              <pre id="results-preview" class="draft-box">暂无内容</pre>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

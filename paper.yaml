@@ -1,0 +1,55 @@
+project:
+  slug: undergraduate-thesis
+  title: "待定题目：经济学实证论文"
+  language: zh
+  final_output: docx
+  internal_formats:
+    - markdown
+    - latex
+
+research:
+  question: "effect of trained on wage"
+  contribution: "验证工作台能从一个最小经济学问题驱动到分析与草稿输出"
+  current_stage: question-definition
+  target_journey:
+    - question-definition
+    - data-readiness
+    - identification-design
+    - baseline-estimation
+    - robustness
+    - interpretation
+    - manuscript-drafting
+    - submission-prep
+
+data:
+  final_dataset: Data/Final/analysis_sample.csv
+  unit_of_analysis: "individual"
+  sample_definition: "synthetic sample for pipeline verification"
+  key_variables:
+    outcome:
+      - wage
+    treatment:
+      - trained
+    controls:
+      - edu
+      - experience
+    instruments: []
+
+methods:
+  baseline:
+    family: "ols"
+    candidates:
+      - ols
+      - did
+      - iv
+  robustness:
+    - partial-r2
+    - anderson-rubin
+    - liml
+    - jackknife-iv
+
+outputs:
+  markdown_draft: Manuscripts/generated/paper_draft.md
+  latex_draft: Manuscripts/generated/paper_draft.tex
+  results_index: Results/index.json
+  state_file: state/project_state.json

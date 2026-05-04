@@ -11,7 +11,11 @@ Product/state/*.json
 Product/workspaces/*
 !Product/workspaces/README.md
 state/runs/
-state/orchestration/
+state/orchestration/*
+!state/orchestration/source_registry.json
+!state/orchestration/argument_graph.json
+!state/orchestration/exploration_ledger.jsonl
+!state/orchestration/confirmation_ledger.jsonl
 
 # Data payloads
 Data/Raw/*

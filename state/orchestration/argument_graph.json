@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-05-03T00:00:00+08:00",
+  "schema_version": 1,
+  "nodes": [],
+  "edges": [],
+  "path_policy": {
+    "allow_partial_reuse": true,
+    "forbid_full_chain_copy": true,
+    "full_chain_fields": ["data", "identification", "outcome", "mechanism", "claim"]
+  }
+}

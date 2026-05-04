@@ -1,0 +1,40 @@
+{
+  "updated_at": "2026-05-03T00:00:00+08:00",
+  "policy": {
+    "raw_data_mutable": false,
+    "registered_sources_only": true,
+    "promotion_rule": "Copy selected source files into project workspaces; never mutate the desktop motherlode."
+  },
+  "sources": {
+    "datasets_root": {
+      "path": "/Users/mahaoxuan/Desktop/实证数据库",
+      "type": "raw_dataset_motherlode",
+      "status": "registered",
+      "mutable": false,
+      "notes": [
+        "External raw source pool.",
+        "Use read-only inventory, profiling, hashing, and project-specific copy promotion."
+      ]
+    },
+    "zotero_root": {
+      "path": "/Users/mahaoxuan/Zotero",
+      "type": "zotero_library_data_dir",
+      "status": "registered",
+      "mutable": false,
+      "notes": [
+        "Bibliographic truth source plus attachment pool.",
+        "Do not rewrite Zotero database or storage files from the empirical loop."
+      ]
+    },
+    "pdf_library_root": {
+      "path": "/Users/mahaoxuan/Desktop/论文核心素材库/1_文献/PDF原文",
+      "type": "curated_pdf_folder",
+      "status": "registered",
+      "mutable": false,
+      "notes": [
+        "Supplemental full-text reading pool.",
+        "Deduplicate semantically by title, DOI, and hash rather than filename."
+      ]
+    }
+  }
+}

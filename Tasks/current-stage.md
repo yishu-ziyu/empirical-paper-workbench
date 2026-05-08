@@ -1,13 +1,12 @@
 # 当前阶段
 
 - 研究题目：待定
-- 当前主线：Agent 集群式深度研究工作流设计与实现准备
+- 当前主线：Agent 集群式深度研究工作流 API 与前端完成动作已接通，第一执行 provider 选定为本地 Codex
 - 下一步：
-  - 按 `docs/agent-cluster-workflow-development-progress-2026-05-08.md` 增加 workflow schema 与 service
-  - 在 `Product/state/workflows/` 落地 JSON 状态
-  - 在 `Product/web/` 增加 Agent 集群列表、进度条与 hover 详情卡
-  - 先用 mock 子任务跑通 10 维度并行研究闭环
-  - 再接入真实数据源、文献源和 StatsPAI 方法设计
+  - 为工作流增加 `events.jsonl` 事件流
+  - 把 deterministic mock 子任务替换为显式 local Codex 执行步骤
+  - 第一批 local Codex adapter 优先接入本地 source inventory、Zotero/PDF 文献池和 StatsPAI 方法设计
+  - 启动本地产品服务并浏览器验证 Agent 集群 UI
 - 当前约束：
   - 原始数据不手改
   - 正文不直接从临时结果取数

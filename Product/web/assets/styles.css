@@ -292,6 +292,12 @@ textarea {
   flex: 1;
 }
 
+.error-banner.is-info {
+  background: rgba(30, 111, 98, 0.08);
+  border-color: rgba(30, 111, 98, 0.2);
+  color: var(--accent);
+}
+
 /* ============================================================
    Loading States
    ============================================================ */
@@ -586,6 +592,11 @@ textarea {
 .status-pill.status-failed {
   background: rgba(192, 57, 43, 0.1);
   color: #c0392b;
+}
+
+.status-pill.status-cancelled {
+  background: rgba(107, 91, 69, 0.12);
+  color: var(--muted);
 }
 
 /* --- Agent Hover Card --- */
@@ -908,6 +919,69 @@ textarea {
   flex-wrap: wrap;
 }
 
+.promote-target-select {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text);
+}
+
+/* --- Report Modal --- */
+.report-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(27, 23, 18, 0.28);
+}
+
+.report-modal-panel {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 56px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel-strong);
+  box-shadow: 0 28px 80px rgba(38, 25, 8, 0.22);
+  overflow: hidden;
+}
+
+.report-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.report-modal-header h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.report-modal-header p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.report-modal-body {
+  margin: 0;
+  padding: 20px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SFMono-Regular", "Menlo", monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  background: rgba(255, 251, 246, 0.72);
+}
+
 /* ============================================================
    Responsive
    ============================================================ */
@@ -980,6 +1054,10 @@ textarea {
 
   .completion-actions button {
     flex: 1;
+  }
+
+  .promote-target-select {
+    width: 100%;
   }
 
   .agent-hover-card {

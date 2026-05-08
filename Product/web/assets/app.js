@@ -18,7 +18,11 @@ const state = {
   // UI state
   isLoading: false,
   apiError: null,
+  apiNotice: null,
   useMock: false,
+  activeReport: null,
+  isReportModalOpen: false,
+  isPromoting: false,
 };
 
 const fallbackWorkflowSteps = [
@@ -41,7 +45,10 @@ async function fetchJson(url, options = {}) {
 
   if (!response.ok) {
     const message = payload?.error?.message || payload?.detail || JSON.stringify(payload);
-    throw new Error(`${response.status} ${message}`);
+    const error = new Error(`${response.status} ${message}`);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
   return payload;
 }
@@ -396,6 +403,9 @@ const api = {
     },
   },
   artifacts: {
+    async get(artifactId) {
+      return fetchJson(`/api/v1/artifacts/${artifactId}`);
+    },
     async promote(artifactId, target) {
       return fetchJson(`/api/v1/artifacts/${artifactId}/promote`, {
         method: "POST",
@@ -423,6 +433,7 @@ function getStatusLabel(status) {
     reviewing: "Reviewing",
     completed: "Completed",
     failed: "Failed",
+    cancelled: "Cancelled",
   };
   return map[status] || status;
 }
@@ -571,6 +582,7 @@ function renderAgentCluster() {
   renderAgentRows();
   renderCompletionCard();
   renderArtifactDrawer();
+  renderReportModal();
   updateComposerState();
 }
 
@@ -578,17 +590,22 @@ function renderErrorBanner() {
   const banner = document.getElementById("agent-cluster-error");
   if (!banner) return;
 
-  if (state.apiError) {
+  if (state.apiError || state.apiNotice) {
+    const isError = Boolean(state.apiError);
+    const message = state.apiError || state.apiNotice;
+    banner.classList.toggle("is-info", !isError);
     banner.style.display = "block";
     banner.innerHTML = `
-      <span>${escapeHtml(state.apiError)}</span>
+      <span>${escapeHtml(message)}</span>
       <button class="ghost-button" id="dismiss-error" style="padding: 4px 10px; font-size: 12px;">Dismiss</button>
     `;
     banner.querySelector("#dismiss-error")?.addEventListener("click", () => {
       state.apiError = null;
+      state.apiNotice = null;
       renderErrorBanner();
     });
   } else {
+    banner.classList.remove("is-info");
     banner.style.display = "none";
     banner.innerHTML = "";
   }
@@ -619,6 +636,7 @@ function renderWorkflowHeader() {
   const phaseEl = document.getElementById("workflow-phase");
   const progressEl = document.getElementById("workflow-progress");
   const countEl = document.getElementById("workflow-agent-count");
+  const cancelButton = document.getElementById("cancel-workflow-button");
 
   if (!workflow) {
     titleEl.textContent = "尚未启动研究";
@@ -626,6 +644,7 @@ function renderWorkflowHeader() {
     phaseEl.textContent = "-";
     progressEl.textContent = "0%";
     countEl.textContent = "0/10";
+    if (cancelButton) cancelButton.style.display = "none";
     return;
   }
 
@@ -636,6 +655,11 @@ function renderWorkflowHeader() {
 
   const completedCount = state.workflowTasks.filter((t) => t.status === "completed").length;
   countEl.textContent = `${completedCount}/${state.workflowTasks.length}`;
+  if (cancelButton) {
+    const canCancel = workflow.status === "running" || workflow.status === "queued";
+    cancelButton.style.display = canCancel ? "inline-flex" : "none";
+    cancelButton.disabled = state.isLoading;
+  }
 }
 
 function renderStageTimeline() {
@@ -746,6 +770,27 @@ function renderCompletionCard() {
   `;
 
   document.getElementById("completion-stats").innerHTML = statsHtml;
+
+  const reportButton = document.getElementById("view-report-button");
+  const promoteButton = document.getElementById("promote-artifacts-button");
+  if (reportButton) reportButton.disabled = state.isLoading;
+  if (promoteButton) {
+    promoteButton.disabled = state.isPromoting;
+    promoteButton.textContent = state.isPromoting ? "导出中..." : "导出到项目";
+  }
+
+  if (promoteButton && !document.getElementById("promote-target-select")) {
+    promoteButton.insertAdjacentHTML(
+      "beforebegin",
+      `
+        <select id="promote-target-select" class="promote-target-select">
+          <option value="manuscripts">Manuscripts</option>
+          <option value="results">Results</option>
+          <option value="submissions">Submissions</option>
+        </select>
+      `,
+    );
+  }
 }
 
 function renderAgentHoverCard(task) {
@@ -847,6 +892,24 @@ function renderArtifactDrawer() {
   content.innerHTML = html || "<p class=\"muted\">暂无产物</p>";
 }
 
+function renderReportModal() {
+  const modal = document.getElementById("report-modal");
+  const title = document.getElementById("report-modal-title");
+  const path = document.getElementById("report-modal-path");
+  const body = document.getElementById("report-modal-body");
+  if (!modal || !title || !path || !body) return;
+
+  if (!state.isReportModalOpen || !state.activeReport) {
+    modal.style.display = "none";
+    return;
+  }
+
+  modal.style.display = "flex";
+  title.textContent = "最终研究报告";
+  path.textContent = state.activeReport.path || "local preview";
+  body.textContent = state.activeReport.content || "";
+}
+
 function positionHoverCard(element) {
   const card = document.getElementById("agent-hover-card");
   const rect = element.getBoundingClientRect();
@@ -876,6 +939,20 @@ function escapeHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function buildMockReport() {
+  const taskLines = state.workflowTasks
+    .map(
+      (task) =>
+        `- ${String(task.dimension_number).padStart(2, "0")}. ${task.agent_name}: ${task.dimension} - ${task.status}`,
+    )
+    .join("\n");
+
+  return {
+    path: `mock://${state.selectedWorkflow?.id || "workflow"}/final_research_report.md`,
+    content: `# ${state.selectedWorkflow?.title || "Mock Workflow"}\n\n当前处于 Mock 模式，报告仅用于前端演示，不代表真实研究证据。\n\n## 任务矩阵\n${taskLines}\n`,
+  };
 }
 
 // --- Event Binding ---
@@ -924,6 +1001,12 @@ function mountAgentClusterEvents() {
     renderArtifactDrawer();
   });
 
+  document.getElementById("artifact-drawer-content")?.addEventListener("click", (event) => {
+    const item = event.target.closest(".artifact-item");
+    if (!item) return;
+    void openArtifactPreview(item.dataset.path);
+  });
+
   // Start workflow
   document.getElementById("start-workflow-button")?.addEventListener("click", () => {
     const input = document.getElementById("research-goal-input");
@@ -932,6 +1015,10 @@ function mountAgentClusterEvents() {
 
     void startWorkflow(goal);
     input.value = "";
+  });
+
+  document.getElementById("cancel-workflow-button")?.addEventListener("click", () => {
+    void cancelActiveWorkflow();
   });
 
   // Toggle mock mode (dev helper: Ctrl+M)
@@ -950,11 +1037,23 @@ function mountAgentClusterEvents() {
   });
 
   document.getElementById("view-report-button")?.addEventListener("click", () => {
-    alert("最终报告功能待后端实现");
+    void openWorkflowReport();
   });
 
   document.getElementById("promote-artifacts-button")?.addEventListener("click", () => {
-    alert("导出到项目功能待后端实现");
+    void promoteWorkflowArtifacts();
+  });
+
+  document.getElementById("close-report-modal")?.addEventListener("click", () => {
+    state.isReportModalOpen = false;
+    renderReportModal();
+  });
+
+  document.getElementById("report-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "report-modal") {
+      state.isReportModalOpen = false;
+      renderReportModal();
+    }
   });
 
   // Close drawer on backdrop click
@@ -968,9 +1067,156 @@ function mountAgentClusterEvents() {
 
 // --- Workflow Operations ---
 
+async function openWorkflowReport() {
+  if (!state.selectedWorkflow) {
+    state.apiError = "请先启动或选择一个工作流。";
+    renderAgentCluster();
+    return;
+  }
+
+  state.isLoading = true;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentCluster();
+
+  try {
+    const report = state.useMock
+      ? buildMockReport()
+      : await api.workflows.getReport(state.selectedWorkflow.id);
+    state.activeReport = report;
+    state.isReportModalOpen = true;
+  } catch (error) {
+    state.apiError = error.message;
+  } finally {
+    state.isLoading = false;
+    renderAgentCluster();
+  }
+}
+
+async function openArtifactPreview(path) {
+  if (!path) return;
+
+  const artifact = state.workflowArtifacts.find((item) => item.path === path);
+  state.isLoading = true;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentCluster();
+
+  try {
+    if (state.useMock || !artifact?.id) {
+      state.activeReport = {
+        path,
+        content: `# ${path.split("/").pop()}\n\n当前为 Mock 模式产物预览。真实内容需要通过 Real API 的 artifact endpoint 读取。`,
+      };
+    } else {
+      const response = await api.artifacts.get(artifact.id);
+      state.activeReport = {
+        path: response.artifact.path,
+        content: response.content || "后端未返回该产物正文。",
+      };
+    }
+    state.isReportModalOpen = true;
+  } catch (error) {
+    state.apiError = error.message;
+  } finally {
+    state.isLoading = false;
+    renderAgentCluster();
+  }
+}
+
+async function cancelActiveWorkflow() {
+  if (!state.selectedWorkflow) return;
+
+  state.isLoading = true;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentCluster();
+
+  try {
+    if (state.pollIntervalId) {
+      clearInterval(state.pollIntervalId);
+      state.pollIntervalId = null;
+    }
+
+    if (state.useMock) {
+      state.selectedWorkflow = {
+        ...state.selectedWorkflow,
+        status: "cancelled",
+        phase: "cancelled",
+        updated_at: new Date().toISOString(),
+      };
+      state.workflowTasks = state.workflowTasks.map((task) =>
+        task.status === "completed" ? task : { ...task, status: "cancelled" },
+      );
+    } else {
+      const response = await api.workflows.cancel(state.selectedWorkflow.id);
+      state.selectedWorkflow = response.workflow;
+      const bundle = await api.workflows.get(state.selectedWorkflow.id);
+      state.workflowTasks = bundle.tasks || state.workflowTasks;
+      state.workflowArtifacts = bundle.artifacts || state.workflowArtifacts;
+    }
+
+    state.isCompletionVisible = false;
+    state.apiNotice = "工作流已取消。";
+  } catch (error) {
+    state.apiError = error.message;
+  } finally {
+    state.isLoading = false;
+    renderAgentCluster();
+  }
+}
+
+async function promoteWorkflowArtifacts() {
+  if (!state.selectedWorkflow) {
+    state.apiError = "请先完成一个工作流，再导出产物。";
+    renderAgentCluster();
+    return;
+  }
+
+  if (state.useMock) {
+    state.apiError = "Mock 模式下不能导出到项目；请切换到 Real API 后使用后端产物。";
+    renderAgentCluster();
+    return;
+  }
+
+  const artifacts = state.workflowArtifacts.filter((artifact) => artifact.id);
+  if (artifacts.length === 0) {
+    state.apiError = "当前工作流还没有可导出的后端产物。";
+    renderAgentCluster();
+    return;
+  }
+
+  const target = document.getElementById("promote-target-select")?.value || "manuscripts";
+  state.isPromoting = true;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentCluster();
+
+  try {
+    const results = await Promise.allSettled(
+      artifacts.map((artifact) => api.artifacts.promote(artifact.id, target)),
+    );
+    const rejected = results.filter((result) => result.status === "rejected");
+    if (rejected.length > 0) {
+      throw new Error(
+        `${rejected.length}/${artifacts.length} 个产物未导出：${rejected[0].reason.message}`,
+      );
+    }
+
+    state.workflowArtifacts = results.map((result) => result.value.artifact);
+    state.apiNotice = `已导出 ${artifacts.length} 个产物到 ${target}。`;
+  } catch (error) {
+    state.apiError = error.message;
+  } finally {
+    state.isPromoting = false;
+    renderAgentCluster();
+  }
+}
+
 async function startWorkflow(title) {
   state.isLoading = true;
   state.apiError = null;
+  state.apiNotice = null;
   renderAgentCluster();
 
   try {
@@ -1040,6 +1286,15 @@ async function pollWorkflowStatus(workflowId) {
 
     renderAgentCluster();
   } catch (error) {
+    if (error.status === 404) {
+      if (state.pollIntervalId) {
+        clearInterval(state.pollIntervalId);
+        state.pollIntervalId = null;
+      }
+      state.apiError = "工作流已不存在，轮询已停止。";
+      renderAgentCluster();
+      return;
+    }
     console.error("Polling error:", error);
   }
 }

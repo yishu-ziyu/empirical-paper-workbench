@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from Product.backend.artifact_service import get_artifact, promote_artifact
+from Product.backend.codex_provider import local_codex_status
 from Product.backend.project_service import (
     create_workspace,
     execute_workbench_run,
@@ -26,6 +28,17 @@ from Product.backend.project_service import (
     run_pipeline,
 )
 from Product.backend.registry import ensure_registry, get_project_by_id
+from Product.backend.workflow_service import (
+    cancel_workflow,
+    create_workflow,
+    get_report,
+    get_task,
+    get_workflow_bundle,
+    list_workflows,
+    load_artifacts,
+    load_tasks,
+    start_workflow,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +86,15 @@ class WorkbenchRunPayload(BaseModel):
     user_goal: str = ""
 
 
+class CreateWorkflowPayload(BaseModel):
+    title: str = Field(min_length=1)
+    project_id: str | None = None
+
+
+class PromoteArtifactPayload(BaseModel):
+    target: str
+
+
 @app.get("/api/status")
 def api_status() -> dict:
     return {
@@ -90,6 +112,102 @@ def api_v1_health() -> dict:
         "service": "econ-paper-product-api",
         "version": "0.1.0",
     }
+
+
+@app.get("/api/v1/providers/local-codex")
+def api_v1_local_codex_provider() -> dict:
+    return local_codex_status()
+
+
+@app.post("/api/v1/workflows", status_code=201)
+def api_v1_create_workflow(payload: CreateWorkflowPayload) -> dict:
+    try:
+        return create_workflow(PRODUCT_ROOT, REPO_ROOT, payload.title, payload.project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {payload.project_id} does not exist.")
+
+
+@app.get("/api/v1/workflows")
+def api_v1_workflows() -> dict:
+    return {"items": list_workflows(PRODUCT_ROOT)}
+
+
+@app.get("/api/v1/workflows/{workflow_id}")
+def api_v1_workflow(workflow_id: str) -> dict:
+    try:
+        return get_workflow_bundle(PRODUCT_ROOT, REPO_ROOT, workflow_id)
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
+
+
+@app.post("/api/v1/workflows/{workflow_id}/start")
+def api_v1_start_workflow(workflow_id: str) -> dict:
+    try:
+        return start_workflow(PRODUCT_ROOT, REPO_ROOT, workflow_id)
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
+
+
+@app.post("/api/v1/workflows/{workflow_id}/cancel")
+def api_v1_cancel_workflow(workflow_id: str) -> dict:
+    try:
+        return cancel_workflow(PRODUCT_ROOT, workflow_id)
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
+
+
+@app.get("/api/v1/workflows/{workflow_id}/tasks")
+def api_v1_workflow_tasks(workflow_id: str) -> dict:
+    try:
+        return {"items": load_tasks(PRODUCT_ROOT, workflow_id)}
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
+
+
+@app.get("/api/v1/workflows/{workflow_id}/tasks/{task_id}")
+def api_v1_workflow_task(workflow_id: str, task_id: str) -> dict:
+    try:
+        return {"task": get_task(PRODUCT_ROOT, workflow_id, task_id)}
+    except KeyError as exc:
+        return error_response(404, "task_not_found", f"Task {task_id} does not exist.")
+
+
+@app.get("/api/v1/workflows/{workflow_id}/artifacts")
+def api_v1_workflow_artifacts(workflow_id: str) -> dict:
+    try:
+        return {"items": load_artifacts(PRODUCT_ROOT, workflow_id)}
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
+
+
+@app.get("/api/v1/artifacts/{artifact_id}")
+def api_v1_artifact(artifact_id: str) -> dict:
+    try:
+        return get_artifact(PRODUCT_ROOT, REPO_ROOT, artifact_id)
+    except KeyError as exc:
+        return error_response(404, "artifact_not_found", f"Artifact {artifact_id} does not exist.")
+
+
+@app.post("/api/v1/artifacts/{artifact_id}/promote")
+def api_v1_promote_artifact(artifact_id: str, payload: PromoteArtifactPayload) -> dict:
+    try:
+        return promote_artifact(PRODUCT_ROOT, REPO_ROOT, artifact_id, payload.target)
+    except ValueError as exc:
+        return error_response(400, "invalid_target", f"Unsupported promote target: {payload.target}.")
+    except PermissionError as exc:
+        return error_response(409, "promotion_blocked", str(exc))
+    except FileNotFoundError as exc:
+        return error_response(404, "artifact_file_missing", f"Artifact file does not exist: {exc}")
+    except KeyError as exc:
+        return error_response(404, "artifact_not_found", f"Artifact {artifact_id} does not exist.")
+
+
+@app.get("/api/v1/workflows/{workflow_id}/report")
+def api_v1_workflow_report(workflow_id: str) -> dict:
+    try:
+        return get_report(PRODUCT_ROOT, REPO_ROOT, workflow_id)
+    except KeyError as exc:
+        return error_response(404, "workflow_not_found", f"Workflow {workflow_id} does not exist.")
 
 
 @app.get("/api/v1/projects")

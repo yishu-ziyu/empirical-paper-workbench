@@ -356,28 +356,75 @@ Completed in this note:
 - Artifact placement policy was drafted.
 - Verification criteria were defined.
 
+Completed in Codex backend pass:
+
+- Added `Product/backend/workflow_schema.py`.
+- Added `Product/backend/workflow_service.py`.
+- Added `Product/backend/artifact_service.py`.
+- Added the `/api/v1/workflows/*` and `/api/v1/artifacts/*` routes in `Product/app.py`.
+- Implemented JSON-backed workflow persistence under `Product/state/workflows/`.
+- Implemented the 10-dimension `empirical_thesis_deep_research` task template.
+- Implemented deterministic task lifecycle progression:
+  - `queued`
+  - `planning`
+  - `researching`
+  - `synthesizing`
+  - `reviewing`
+  - `completed`
+- Implemented one markdown research-note artifact per completed child task.
+- Implemented `final_research_report.md` generation.
+- Implemented structured artifact lookup.
+- Implemented promote endpoint with a safety block: mock-evidence artifacts cannot be promoted into formal output folders.
+- Added `tests/test_agent_cluster_workflow_api.py` for the workflow API lifecycle.
+- Verified:
+  - `python3 -m unittest tests.test_agent_cluster_workflow_api`
+  - `python3 -m unittest tests.test_product_v1_local`
+
+Completed in Codex local-provider pass:
+
+- Replaced the completion-card placeholder alerts with real frontend actions.
+- Added a report modal that calls `GET /api/v1/workflows/{workflow_id}/report`.
+- Added artifact promotion UI targeting `manuscripts`, `results`, or `submissions`.
+- Added frontend handling for promotion failures; mock-evidence promotion now surfaces the backend safety block in the UI.
+- Added a report modal and inline favicon to keep browser verification free of unrelated `/favicon.ico` noise.
+- Added `Product/backend/codex_provider.py`.
+- Selected `local_codex` as the first workflow execution provider.
+- Added `GET /api/v1/providers/local-codex` to report local Codex CLI availability, path, version, and whether real execution is explicitly enabled.
+- Added `execution_provider` and `provider_status` to workflow records.
+- Kept local Codex task execution behind `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` so normal tests and polling do not start long-running Codex processes.
+- Verified:
+  - `node --check Product/web/assets/app.js`
+  - `python3 -m unittest tests.test_agent_cluster_workflow_api`
+  - `python3 -m unittest discover -s tests`
+  - Opened `http://127.0.0.1:8776/` with Playwright; page title loaded as `Econ Workbench` and no console error remained after adding the inline favicon.
+
+Completed in frontend edge-case pass:
+
+- `pollWorkflowStatus` now stops polling and shows a user-facing error if the workflow API returns 404.
+- The workflow header now exposes a Cancel button while the workflow is queued or running.
+- Cancel calls `POST /api/v1/workflows/{workflow_id}/cancel` in Real API mode and cancels local state in Mock mode.
+- Artifact Drawer items now open a preview by calling `GET /api/v1/artifacts/{artifact_id}` in Real API mode.
+- Mock artifact previews now show an explicit mock-only preview message.
+- Added `cancelled` status label and styling.
+- Verified:
+  - `node --check Product/web/assets/app.js`
+  - `python3 -m unittest tests.test_agent_cluster_workflow_api`
+  - `python3 -m unittest discover -s tests`
+
 Not implemented yet:
 
-- Workflow API endpoints.
-- Persistent `Product/state/workflows/` runtime.
-- Screenshot-like agent cluster UI.
+- Real research-agent execution.
+- Real literature/data inspection inside workflow tasks.
 - Hover detail cards.
-- Real parallel task execution.
-- Supervisor synthesis output.
 - Browser verification of the new workflow surface.
 
 ## Immediate Next Development Steps
 
-1. Add `workflow_schema.py` and `workflow_service.py`.
-2. Add `POST /api/workflows` and `GET /api/workflows/{id}`.
-3. Seed the `empirical_thesis_deep_research` template with 10 default tasks.
-4. Persist workflows under `Product/state/workflows/`.
-5. Extend `Product/web/index.html` with an Agent Cluster panel.
-6. Add hover detail cards and progress rendering.
-7. Generate mock markdown artifacts for all 10 tasks.
-8. Add final synthesis artifact once all tasks complete.
-9. Run backend tests.
-10. Start the local product server and verify the UI in browser.
+1. Add event logging under `Product/state/workflows/<workflow_id>/events.jsonl`.
+2. Replace deterministic mock task progression with explicit local Codex execution steps.
+3. Connect the first local Codex task adapter to local source inventory and StatsPAI vocabulary.
+4. Start the local product server and verify the Agent Cluster UI in browser.
+5. Decide whether mock-evidence artifacts should remain blocked from promotion or whether the UI should hide the promote button until real evidence exists.
 
 ## Risks and Constraints
 
@@ -401,4 +448,3 @@ The MVP is done when:
 - The workflow survives server restart.
 - The product can be opened locally and visually checked.
 - The implementation has tests for create/list/get workflow behavior.
-

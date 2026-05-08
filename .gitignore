@@ -8,6 +8,7 @@ __pycache__/
 
 # Product runtime state
 Product/state/*.json
+Product/state/workflows/
 Product/workspaces/*
 !Product/workspaces/README.md
 state/runs/
@@ -40,6 +41,10 @@ Results/index.json
 Results/json/*
 !Results/json/README.md
 state/*.json
+
+# Agent Cluster workflow outputs
+docs/workflows/
+!docs/workflows/.gitkeep
 
 # Temporary code / outputs
 Program/temp/*

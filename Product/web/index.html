@@ -19,6 +19,7 @@
           <button class="nav-link is-active" data-view="dashboard">Dashboard</button>
           <button class="nav-link" data-view="projects">Projects</button>
           <button class="nav-link" data-view="workflow">Workflow</button>
+          <button class="nav-link" data-view="agent-cluster">Agent Cluster</button>
           <button class="nav-link" data-view="artifacts">Artifacts</button>
           <button class="nav-link" data-view="drafts">Drafts</button>
         </nav>
@@ -120,6 +121,84 @@
               </div>
               <ol id="workflow-steps" class="workflow-list"></ol>
             </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-agent-cluster">
+          <!-- Error Banner -->
+          <div id="agent-cluster-error" class="error-banner" style="display: none;"></div>
+
+          <!-- Workflow Header -->
+          <div id="workflow-header" class="workflow-header">
+            <div class="workflow-header-main">
+              <span class="eyebrow">Research Workflow</span>
+              <h2 id="workflow-title">尚未启动研究</h2>
+              <p id="workflow-subtitle" class="muted">输入研究问题并点击启动</p>
+            </div>
+            <div class="workflow-header-meta">
+              <div class="meta-item">
+                <span class="meta-label">阶段</span>
+                <span id="workflow-phase" class="meta-value">-</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">总体进度</span>
+                <span id="workflow-progress" class="meta-value">0%</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Agents</span>
+                <span id="workflow-agent-count" class="meta-value">0/10</span>
+              </div>
+              <button id="toggle-artifact-drawer" class="ghost-button">产物</button>
+            </div>
+          </div>
+
+          <!-- Stage Timeline -->
+          <div id="stage-timeline" class="stage-timeline"></div>
+
+          <!-- Agent Cluster Panel -->
+          <div id="agent-cluster-panel" class="agent-cluster-panel"></div>
+
+          <!-- Completion Card (hidden by default) -->
+          <div id="completion-card" class="completion-card" style="display: none;">
+            <div class="completion-card-inner">
+              <div class="completion-icon">✓</div>
+              <div class="completion-content">
+                <h3>研究完成</h3>
+                <p id="completion-summary">所有 Agent 已完成并行研究</p>
+                <div class="completion-stats" id="completion-stats"></div>
+                <div class="completion-actions">
+                  <button id="view-report-button" class="primary-button">查看最终报告</button>
+                  <button id="promote-artifacts-button" class="ghost-button">导出到项目</button>
+                  <button id="dismiss-completion-button" class="ghost-button">关闭</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Composer Bar -->
+          <div class="composer-bar">
+            <div class="composer-bar-inner">
+              <input
+                id="research-goal-input"
+                type="text"
+                placeholder="输入研究问题，例如：工业机器人应用对劳动力市场匹配效率的影响..."
+              />
+              <button id="start-workflow-button" class="primary-button">启动研究</button>
+            </div>
+          </div>
+
+          <!-- Artifact Drawer (fixed, off-screen by default) -->
+          <div id="artifact-drawer" class="artifact-drawer">
+            <div class="artifact-drawer-header">
+              <h3>产物列表</h3>
+              <button id="close-artifact-drawer" class="ghost-button">关闭</button>
+            </div>
+            <div id="artifact-drawer-content" class="artifact-drawer-content"></div>
+          </div>
+
+          <!-- Hover Card (absolute positioned, hidden by default) -->
+          <div id="agent-hover-card" class="agent-hover-card" style="display: none;">
+            <div id="agent-hover-card-content"></div>
           </div>
         </section>
 

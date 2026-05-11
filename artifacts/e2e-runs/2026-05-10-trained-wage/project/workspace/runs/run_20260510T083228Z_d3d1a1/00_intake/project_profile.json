@@ -1,0 +1,17 @@
+{
+  "project_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/artifacts/e2e-runs/2026-05-10-trained-wage/project",
+  "layout": "generic_aer",
+  "title": "待定题目：经济学实证论文",
+  "research_question": "effect of trained on wage",
+  "paths": {
+    "data": "Data",
+    "code": "Program",
+    "results": "Results",
+    "manuscript": "Manuscripts",
+    "references": "Reference",
+    "workspace": "workspace",
+    "literature": "Reference",
+    "state": "state"
+  },
+  "known_logic": {}
+}

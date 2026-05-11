@@ -11,6 +11,12 @@ import yaml
 
 from .registry import add_project, get_project, get_project_by_id, list_projects
 from .orchestrator import orchestrate_project, run_workbench
+from .observability_service import (
+    load_observable_events,
+    load_observable_gates,
+    load_observable_steps,
+    load_run_observability,
+)
 from .run_store import create_run, get_run, list_runs, save_run
 
 
@@ -273,7 +279,7 @@ def execute_run(project: dict[str, Any], mode: str) -> dict[str, Any]:
     run["status"] = "running"
     save_run(root, run)
 
-    command = ["python3", "Program/run_paper.py", "--project-root", "."]
+    command = ["python3", "Program/run_paper.py", "--project-root", ".", "--run-id", run["id"]]
     if mode == "dry-run":
         command.append("--dry-run")
 
@@ -304,6 +310,12 @@ def execute_run(project: dict[str, Any], mode: str) -> dict[str, Any]:
             "results_index_path": "Results/index.json" if results_index_path.exists() else None,
             "artifact_count": len(artifact_paths),
             "artifact_paths": artifact_paths,
+            "observability": {
+                "manifest_path": f"state/runs/{run['id']}/run_manifest.json",
+                "steps_path": f"state/runs/{run['id']}/run_steps.json",
+                "events_path": f"state/runs/{run['id']}/run_events.jsonl",
+                "gates_path": f"state/runs/{run['id']}/gates.json",
+            },
             "state": {
                 "current_stage": state.get("current_stage") if state else None,
                 "last_run_mode": state.get("last_run_mode") if state else None,
@@ -323,6 +335,22 @@ def execute_run(project: dict[str, Any], mode: str) -> dict[str, Any]:
 
 def get_project_run(project: dict[str, Any], run_id: str) -> dict[str, Any]:
     return get_run(Path(project["project_root"]), run_id)
+
+
+def get_project_run_observability(project: dict[str, Any], run_id: str) -> dict[str, Any]:
+    return load_run_observability(Path(project["project_root"]), run_id)
+
+
+def get_project_run_events(project: dict[str, Any], run_id: str) -> dict[str, Any]:
+    return load_observable_events(Path(project["project_root"]), run_id)
+
+
+def get_project_run_steps(project: dict[str, Any], run_id: str) -> dict[str, Any]:
+    return load_observable_steps(Path(project["project_root"]), run_id)
+
+
+def get_project_run_gates(project: dict[str, Any], run_id: str) -> dict[str, Any]:
+    return load_observable_gates(Path(project["project_root"]), run_id)
 
 
 def list_project_runs(project: dict[str, Any]) -> list[dict[str, Any]]:

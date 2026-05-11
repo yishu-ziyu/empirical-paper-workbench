@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Econ Workbench</title>
+    <title>实证工作台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231e6f62'/%3E%3Cpath d='M4 11h8v1H4zm1-7h6v1H5zm0 3h6v1H5z' fill='white'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
@@ -11,45 +11,256 @@
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-kicker">Local Product Shell</span>
-          <h1>Econ Workbench</h1>
-          <p>从研究问题到论文草稿的本地优先产品骨架。</p>
+          <span class="brand-kicker">本地实证操作系统</span>
+          <h1>实证工作台</h1>
+          <p>从研究问题到论文草稿的本地优先工作台。</p>
         </div>
 
-        <nav class="nav">
-          <button class="nav-link is-active" data-view="dashboard">Dashboard</button>
-          <button class="nav-link" data-view="projects">Projects</button>
-          <button class="nav-link" data-view="workflow">Workflow</button>
-          <button class="nav-link" data-view="agent-cluster">Agent Cluster</button>
-          <button class="nav-link" data-view="artifacts">Artifacts</button>
-          <button class="nav-link" data-view="drafts">Drafts</button>
+        <nav class="nav nav-primary">
+          <button class="nav-link is-active" data-view="overview">研究总览</button>
+          <button class="nav-link" data-view="data-variables">数据与变量</button>
+          <button class="nav-link" data-view="research-design">研究设计</button>
+          <button class="nav-link" data-view="empirical-execution">实证执行</button>
+          <button class="nav-link" data-view="paper-draft">论文草稿</button>
+          <button class="nav-link" data-view="artifacts-replication">产物与复现</button>
+          <button class="nav-link" data-view="agent-console">Agent 控制台</button>
+        </nav>
+
+        <div class="nav-divider"></div>
+
+        <nav class="nav nav-secondary">
+          <button class="nav-link" data-view="dashboard">旧版：总览</button>
+          <button class="nav-link" data-view="projects">旧版：项目</button>
+          <button class="nav-link" data-view="workflow">旧版：工作流</button>
+          <button class="nav-link" data-view="agent-cluster">旧版：智能体集群</button>
+          <button class="nav-link" data-view="artifacts">旧版：产物</button>
+          <button class="nav-link" data-view="drafts">旧版：草稿</button>
         </nav>
 
         <div class="sidebar-card">
           <h2>当前策略</h2>
-          <p>A 阶段引擎已嵌入，当前在做 C 版产品壳。</p>
+          <p>研究引擎已接入。导航已按研究旅程重塑：数据 → 变量 → 识别 → 模型 → 稳健性 → 图表 → 正文 → 审阅 → 导出。</p>
         </div>
       </aside>
 
       <main class="main">
+        <!-- 全局研究旅程条 -->
+        <div id="journey-bar" class="journey-bar" style="display: none;">
+          <div class="journey-bar-inner" id="journey-bar-content"></div>
+        </div>
+
         <header class="topbar">
           <div>
-            <span class="eyebrow">Product Status</span>
-            <h2 id="topbar-title">Dashboard</h2>
+            <span class="eyebrow">工作台状态</span>
+            <h2 id="topbar-title">研究总览</h2>
           </div>
           <div class="topbar-actions">
             <button id="refresh-button" class="ghost-button">刷新</button>
           </div>
         </header>
 
-        <section class="view is-active" id="view-dashboard">
+        <!-- ===== 研究总览 ===== -->
+        <section class="view is-active" id="view-overview">
+          <div id="overview-error" class="error-banner" style="display: none;"></div>
+
+          <!-- 研究问题卡片 -->
+          <div class="research-question-card" id="research-question-card">
+            <div class="research-question-content">
+              <span class="eyebrow">研究问题</span>
+              <h2 id="overview-question">加载中...</h2>
+              <p class="muted" id="overview-project-meta"></p>
+            </div>
+          </div>
+
+          <!-- 阶段摘要网格 -->
+          <div class="stage-summary-grid" id="stage-summary-grid"></div>
+
+          <!-- 底部：风险 + 下一步 -->
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>关键风险</h3>
+                <span class="pill">待处理</span>
+              </div>
+              <div id="overview-risks" class="stack"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>下一步建议</h3>
+                <span class="pill">推荐</span>
+              </div>
+              <div id="overview-next-steps" class="stack"></div>
+            </section>
+          </div>
+
+          <!-- Agent 活动时间线 -->
+          <section class="panel" style="margin-top: 18px;">
+            <div class="panel-head">
+              <h3>Agent 活动时间线</h3>
+              <span class="pill">最近事件</span>
+            </div>
+            <div id="overview-events" class="event-timeline"></div>
+          </section>
+        </section>
+
+        <!-- ===== 数据与变量 ===== -->
+        <section class="view" id="view-data-variables">
+          <div id="data-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>数据与变量</h2>
+            <p class="muted">上传数据集、定义变量角色、查看数据质量</p>
+          </div>
+          <div class="panel" id="datasets-panel">
+            <div class="panel-head">
+              <h3>数据集</h3>
+              <span class="pill" id="datasets-count">0</span>
+            </div>
+            <div id="datasets-list" class="stack"></div>
+          </div>
+        </section>
+
+        <!-- ===== 研究设计 ===== -->
+        <section class="view" id="view-research-design">
+          <div id="design-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>研究设计</h2>
+            <p class="muted">识别策略、模型设定、Paper Outline</p>
+          </div>
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>研究问题</h3>
+                <span class="pill">当前</span>
+              </div>
+              <div id="design-question" class="stack"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>识别策略候选</h3>
+                <span class="pill">待选</span>
+              </div>
+              <div id="design-strategies" class="stack"></div>
+            </section>
+          </div>
+          <div class="panel" style="margin-top: 18px;">
+            <div class="panel-head">
+              <h3>待确认项</h3>
+              <span class="pill">HITL</span>
+            </div>
+            <div id="design-pending" class="stack"></div>
+          </div>
+        </section>
+
+        <!-- ===== 实证执行 ===== -->
+        <section class="view" id="view-empirical-execution">
+          <div class="page-header">
+            <h2>实证执行</h2>
+            <p class="muted">任务队列、代码执行、结果查看</p>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>执行状态</h3>
+              <span class="pill">Phase A 骨架</span>
+            </div>
+            <div class="empty-state">
+              <div class="empty-state-icon">▶</div>
+              <h4>实证执行将在 Phase C 接入</h4>
+              <p class="muted">当前阶段仅展示骨架，真实执行器（Codex / StatsPAI）尚未接入。</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 论文草稿 ===== -->
+        <section class="view" id="view-paper-draft">
+          <div id="draft-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>论文草稿</h2>
+            <p class="muted">章节管理、Markdown 编辑、修改建议</p>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>草稿文件</h3>
+              <span class="pill" id="drafts-count">0</span>
+            </div>
+            <div id="drafts-list" class="stack"></div>
+          </div>
+        </section>
+
+        <!-- ===== 产物与复现 ===== -->
+        <section class="view" id="view-artifacts-replication">
+          <div id="artifacts-replication-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>产物与复现</h2>
+            <p class="muted">产物浏览、Provenance 溯源、复现包生成</p>
+          </div>
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>产物列表</h3>
+                <span class="pill">Traceable</span>
+              </div>
+              <div id="artifacts-replication-list" class="stack"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Provenance 溯源</h3>
+                <span class="pill">Lineage</span>
+              </div>
+              <div id="provenance-panel" class="stack">
+                <p class="muted">点击产物查看溯源链</p>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ===== Agent 控制台 ===== -->
+        <section class="view" id="view-agent-console">
+          <div id="agent-console-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>Agent 控制台</h2>
+            <p class="muted">Agent 身份、权限、能力、成本、审计日志</p>
+          </div>
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Pipeline Roles</h3>
+                <span class="pill">流水线角色</span>
+              </div>
+              <div id="agent-pipeline-list" class="stack"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Research Dimension Agents</h3>
+                <span class="pill">研究维度</span>
+              </div>
+              <div id="agent-dimension-list" class="stack"></div>
+            </section>
+          </div>
+          <div class="panel" style="margin-top: 18px;">
+            <div class="panel-head">
+              <h3>Agent 详情</h3>
+              <span class="pill" id="agent-detail-id">未选择</span>
+            </div>
+            <div id="agent-detail-panel" class="stack">
+              <div class="empty-state">
+                <div class="empty-state-icon">🤖</div>
+                <h4>选择左侧 Agent 查看详情</h4>
+                <p class="muted">身份、权限、能力注册、成本和审计日志。</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 旧版页面（保留） ===== -->
+        <section class="view" id="view-dashboard">
           <div class="metric-grid" id="metric-grid"></div>
 
           <div class="panel-grid two-up">
             <section class="panel">
               <div class="panel-head">
                 <h3>项目概览</h3>
-                <span class="pill" id="status-pill">loading</span>
+                <span class="pill" id="status-pill">加载中</span>
               </div>
               <div id="dashboard-projects" class="stack"></div>
             </section>
@@ -57,7 +268,7 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>当前选中项目</h3>
-                <span class="pill" id="selected-project-pill">none</span>
+                <span class="pill" id="selected-project-pill">未选择</span>
               </div>
               <div id="selected-project-summary" class="stack muted"></div>
             </section>
@@ -69,7 +280,7 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>项目列表</h3>
-                <span class="pill">Multi-project</span>
+                <span class="pill">多项目</span>
               </div>
               <div id="project-list" class="stack"></div>
             </section>
@@ -77,11 +288,11 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>创建新项目</h3>
-                <span class="pill">Wizard</span>
+                <span class="pill">向导</span>
               </div>
               <form id="project-form" class="form-stack">
                 <label>
-                  <span>Slug</span>
+                  <span>项目标识</span>
                   <input name="slug" placeholder="my-thesis-project" required />
                 </label>
                 <label>
@@ -90,7 +301,7 @@
                 </label>
                 <label>
                   <span>研究问题</span>
-                  <textarea name="question" placeholder="effect of X on Y" required></textarea>
+                  <textarea name="question" placeholder="X 对 Y 的影响" required></textarea>
                 </label>
                 <button type="submit" class="primary-button">创建工作区</button>
               </form>
@@ -104,13 +315,13 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>执行操作</h3>
-                <span class="pill">Actions</span>
+                <span class="pill">操作</span>
               </div>
               <div class="action-group">
-                <button id="run-dry-button" class="primary-button">Run Dry</button>
-                <button id="run-live-button" class="primary-button accent">Run Live</button>
-                <button id="orchestrate-button" class="primary-button">Orchestrate</button>
-                <button id="export-button" class="ghost-button">Export Word</button>
+                <button id="run-dry-button" class="primary-button">试运行</button>
+                <button id="run-live-button" class="primary-button accent">正式运行</button>
+                <button id="orchestrate-button" class="primary-button">编排执行</button>
+                <button id="export-button" class="ghost-button">导出 Word</button>
               </div>
               <pre id="execution-log" class="console-box">等待执行…</pre>
             </section>
@@ -118,7 +329,7 @@
             <section class="panel">
               <div class="panel-head">
                 <h3>阶段面板</h3>
-                <span class="pill">Pipeline</span>
+                <span class="pill">阶段</span>
               </div>
               <ol id="workflow-steps" class="workflow-list"></ol>
             </section>
@@ -132,7 +343,7 @@
           <!-- Workflow Header -->
           <div id="workflow-header" class="workflow-header">
             <div class="workflow-header-main">
-              <span class="eyebrow">Research Workflow</span>
+              <span class="eyebrow">研究工作流</span>
               <h2 id="workflow-title">尚未启动研究</h2>
               <p id="workflow-subtitle" class="muted">输入研究问题并点击启动</p>
             </div>
@@ -146,7 +357,7 @@
                 <span id="workflow-progress" class="meta-value">0%</span>
               </div>
               <div class="meta-item">
-                <span class="meta-label">Agents</span>
+                <span class="meta-label">智能体</span>
                 <span id="workflow-agent-count" class="meta-value">0/10</span>
               </div>
               <button id="cancel-workflow-button" class="ghost-button" style="display: none;">取消</button>
@@ -196,6 +407,19 @@
               <button id="close-artifact-drawer" class="ghost-button">关闭</button>
             </div>
             <div id="artifact-drawer-content" class="artifact-drawer-content"></div>
+          </div>
+
+          <!-- Agent Detail Drawer (fixed, off-screen by default) -->
+          <div id="agent-detail-drawer" class="agent-detail-drawer" aria-hidden="true">
+            <div class="agent-detail-drawer-header">
+              <div class="drawer-header-left">
+                <button id="prev-agent-button" class="ghost-button" disabled>←</button>
+                <h3>Agent 工作详情</h3>
+                <button id="next-agent-button" class="ghost-button" disabled>→</button>
+              </div>
+              <button id="close-agent-detail-drawer" class="ghost-button">关闭</button>
+            </div>
+            <div id="agent-detail-drawer-content" class="agent-detail-drawer-content"></div>
           </div>
 
           <!-- Report Modal -->

@@ -1,0 +1,14 @@
+execution:
+  mode: dry-run
+  engine: statspai
+  export_intermediate: true
+  write_logs: true
+
+drafting:
+  markdown_template: Manuscripts/templates/paper.md.j2
+  latex_template: Manuscripts/templates/paper.tex.j2
+
+results:
+  json_dir: Results/json
+  logs_dir: Results/logs
+

@@ -1,0 +1,88 @@
+{
+  "draft": {
+    "question": "effect of trained on wage",
+    "sections": {
+      "Question": "> effect of trained on wage\n\n- **Outcome**: `wage`\n- **Treatment**: `trained`\n- **Design (auto-detected)**: `observational`\n",
+      "Data": "- Sample size: **12** rows, **4** columns.\n- Missingness: none detected in the analysis frame.\n- Outcome `wage`: mean=11.750, sd=1.118, median=11.550, n=12.\n- Treatment `trained` distribution: 0=6 (50.0%), 1=6 (50.0%)\n\nMean covariates by treatment arm:\n\n| covariate | 0 | 1 | std-diff |\n|---|---|---|---|\n| edu | 12.667 | 13.500 | 0.837 |\n| experience | 3.167 | 3.333 | 0.112 |",
+      "Identification": "**Verdict**: OK\n\n- [INFO] *power* — MDE at 80% power: 1.8084 (raw units); n_treated=6, n_control=6.",
+      "Estimator": "- **Method**: OLS with robust SE (baseline)\n- **Function**: `sp.regress()`\n- **Rationale**: Start with OLS as baseline. If endogeneity is a concern, follow up with matching or IV.\n- **Key assumptions**: E[ε|X]=0 (exogeneity), Correct functional form",
+      "Results": "- **trained**: 1.8505 (SE = 0.0573)",
+      "Robustness": "- Estimate: 1.8505\n- Ci Width: 0.2245",
+      "References": "_(No explicit citations attached — see `workflow.result.cite()` if available.)_"
+    },
+    "parsed_hints": {
+      "raw_question": "effect of trained on wage",
+      "treatment": "trained",
+      "y": "wage"
+    },
+    "citations": [],
+    "fmt": "markdown"
+  },
+  "workflow_design": "observational",
+  "workflow_verdict": "OK",
+  "robustness_findings": {
+    "estimate": 1.8505076802915557,
+    "ci_width": 0.22452622799630587
+  },
+  "result_payload": {
+    "method": "Least Squares",
+    "model_type": "OLS",
+    "dependent_var": "wage",
+    "n_obs": 12,
+    "coefficients": {
+      "Intercept": {
+        "estimate": 8.354595157510612,
+        "std_error": 0.7470079672295986,
+        "t_statistic": 11.184077712711682,
+        "p_value": 3.6596468255822856e-06,
+        "conf_low": 6.6319916960487,
+        "conf_high": 10.077198618972524
+      },
+      "trained": {
+        "estimate": 1.8505076802915557,
+        "std_error": 0.05727709897864946,
+        "t_statistic": 32.30798544775022,
+        "p_value": 9.179121907010312e-10,
+        "conf_low": 1.7184264531942917,
+        "conf_high": 1.9825889073888197
+      },
+      "edu": {
+        "estimate": 0.1405102837803055,
+        "std_error": 0.06345669155696886,
+        "t_statistic": 2.2142705573321773,
+        "p_value": 0.05769543155277734,
+        "conf_low": -0.005821109356439952,
+        "conf_high": 0.286841676917051
+      },
+      "experience": {
+        "estimate": 0.19440249934911183,
+        "std_error": 0.03548018789923286,
+        "t_statistic": 5.4791846058209615,
+        "p_value": 0.0005880241117730556,
+        "conf_low": 0.11258503933566005,
+        "conf_high": 0.2762199593625636
+      }
+    },
+    "diagnostics": {
+      "R-squared": 0.9928897304205817,
+      "Adj. R-squared": 0.9902233793282998,
+      "F-statistic": 372.37771623348664,
+      "Prob (F-statistic)": 6.272000252494081e-09,
+      "Log-Likelihood": 11.833235277731028,
+      "AIC": -49.72099535237419,
+      "BIC": -47.78136875322219
+    },
+    "glance": {
+      "method": "Least Squares",
+      "nobs": 12,
+      "r_squared": 0.9928897304205817,
+      "f_statistic": 372.37771623348664,
+      "f_p_value": 6.272000252494081e-09,
+      "aic": -49.72099535237419,
+      "bic": -47.78136875322219,
+      "log_likelihood": 11.833235277731028,
+      "df_resid": 8,
+      "df_model": 3
+    }
+  }
+}

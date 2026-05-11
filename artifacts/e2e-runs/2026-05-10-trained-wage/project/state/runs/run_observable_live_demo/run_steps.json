@@ -1,0 +1,130 @@
+{
+  "_meta": {
+    "evidence_level": "local_execution"
+  },
+  "run_id": "run_observable_live_demo",
+  "items": [
+    {
+      "id": "config_load",
+      "title": "Load project configuration",
+      "actor": "Runtime",
+      "description": "Read paper.yaml and analysis_config.yaml.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:43.339089+00:00",
+      "finished_at": "2026-05-10T08:55:43.342177+00:00",
+      "summary": "Project configuration loaded.",
+      "artifacts": [],
+      "metadata": {
+        "paper_config": "paper.yaml",
+        "analysis_config": "Program/config/analysis_config.yaml"
+      }
+    },
+    {
+      "id": "dataset_intake",
+      "title": "Inspect analysis dataset",
+      "actor": "DataAgent",
+      "description": "Check whether the configured analysis dataset is available.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:43.342369+00:00",
+      "finished_at": "2026-05-10T08:55:43.342525+00:00",
+      "summary": "Configured dataset was inspected.",
+      "artifacts": [],
+      "metadata": {
+        "dataset_path": "Data/Final/analysis_sample.csv",
+        "dataset_exists": true,
+        "unit_of_analysis": "individual",
+        "sample_definition": "synthetic sample for pipeline verification",
+        "key_variables": {
+          "outcome": [
+            "wage"
+          ],
+          "treatment": [
+            "trained"
+          ],
+          "controls": [
+            "edu",
+            "experience"
+          ],
+          "instruments": []
+        }
+      }
+    },
+    {
+      "id": "topic_confirmation",
+      "title": "Confirm research question",
+      "actor": "Supervisor",
+      "description": "Expose the detected research question and candidate variable roles for user review.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:43.342837+00:00",
+      "finished_at": "2026-05-10T08:55:43.343133+00:00",
+      "summary": "Research question was exposed for user confirmation.",
+      "artifacts": [],
+      "metadata": {
+        "research_question": "effect of trained on wage"
+      }
+    },
+    {
+      "id": "analysis_execution",
+      "title": "Execute empirical analysis",
+      "actor": "ExecutionAgent",
+      "description": "Run the configured empirical engine when live execution is allowed.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:43.343242+00:00",
+      "finished_at": "2026-05-10T08:55:57.172024+00:00",
+      "summary": "StatsPAI empirical analysis completed.",
+      "artifacts": [],
+      "metadata": {
+        "workflow_design": "observational",
+        "workflow_verdict": "OK"
+      }
+    },
+    {
+      "id": "draft_generation",
+      "title": "Generate research draft",
+      "actor": "ManuscriptAgent",
+      "description": "Write Markdown and LaTeX drafts from the current analysis context.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:57.172883+00:00",
+      "finished_at": "2026-05-10T08:55:57.173621+00:00",
+      "summary": "Draft artifacts were generated.",
+      "artifacts": [
+        "Manuscripts/generated/paper_draft.md",
+        "Manuscripts/generated/paper_draft.tex"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "state_index",
+      "title": "Persist state and index",
+      "actor": "ArtifactsAgent",
+      "description": "Write project state, result snapshots, and artifact index.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:57.173737+00:00",
+      "finished_at": "2026-05-10T08:55:57.174698+00:00",
+      "summary": "State and result index artifacts were persisted.",
+      "artifacts": [
+        "Results/json/project_snapshot.json",
+        "state/project_state.json",
+        "Results/index.json"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "finalization",
+      "title": "Finalize observable run",
+      "actor": "Supervisor",
+      "description": "Close the run and summarize HITL gates for the UI.",
+      "status": "completed",
+      "started_at": "2026-05-10T08:55:57.174842+00:00",
+      "finished_at": "2026-05-10T08:55:57.174999+00:00",
+      "summary": "Observable run summary is ready for frontend polling.",
+      "artifacts": [
+        "state/runs/run_observable_live_demo/run_manifest.json",
+        "state/runs/run_observable_live_demo/run_steps.json",
+        "state/runs/run_observable_live_demo/run_events.jsonl",
+        "state/runs/run_observable_live_demo/gates.json"
+      ],
+      "metadata": {}
+    }
+  ]
+}

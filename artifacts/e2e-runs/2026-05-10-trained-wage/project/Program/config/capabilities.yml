@@ -1,0 +1,9 @@
+capability_sources:
+  empirical_skills:
+    path: /Users/mahaoxuan/Desktop/经济学论文/Awesome-Agent-Skills-for-Empirical-Research
+    role: 方法模板、agent skills、实证流程知识库
+    required: true
+  statspai:
+    path: /Users/mahaoxuan/Desktop/经济学论文/StatsPAI
+    role: Python 计量、因果推断、诊断、稳健性执行引擎
+    required: true

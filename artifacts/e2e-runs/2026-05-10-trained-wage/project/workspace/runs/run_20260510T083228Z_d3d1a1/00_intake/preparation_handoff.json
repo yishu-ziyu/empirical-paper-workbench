@@ -1,0 +1,19 @@
+{
+  "run_id": "run_20260510T083228Z_d3d1a1",
+  "agent": "PreparationAgent",
+  "stage": "00_intake",
+  "inputs": [],
+  "outputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/00_intake/project_profile.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/00_intake/user_goal.md"
+  ],
+  "claims": [
+    "Project profile normalized for workbench execution."
+  ],
+  "risks": [],
+  "next_agent": "LiteratureAgent",
+  "status": "completed",
+  "metadata": {
+    "layout": "generic_aer"
+  }
+}

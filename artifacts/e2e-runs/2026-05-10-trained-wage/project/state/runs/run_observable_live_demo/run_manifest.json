@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "evidence_level": "local_execution"
+  },
+  "run_id": "run_observable_live_demo",
+  "mode": "live",
+  "status": "succeeded",
+  "project_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/artifacts/e2e-runs/2026-05-10-trained-wage/project",
+  "started_at": "2026-05-10T08:55:43.338492+00:00",
+  "finished_at": "2026-05-10T08:55:57.175137+00:00",
+  "paths": {
+    "manifest": "state/runs/run_observable_live_demo/run_manifest.json",
+    "steps": "state/runs/run_observable_live_demo/run_steps.json",
+    "events": "state/runs/run_observable_live_demo/run_events.jsonl",
+    "gates": "state/runs/run_observable_live_demo/gates.json"
+  },
+  "human_in_loop": {
+    "open_gate_count": 3,
+    "gates_path": "state/runs/run_observable_live_demo/gates.json"
+  }
+}

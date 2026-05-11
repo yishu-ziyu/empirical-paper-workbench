@@ -1,0 +1,132 @@
+{
+  "mode": "dry-run",
+  "detected_code_files": [
+    {
+      "name": "00_main_results.do",
+      "path": "Program/Analysis/00_main_results.do",
+      "suffix": ".do",
+      "size": 348
+    },
+    {
+      "name": "10_robustness_checks.do",
+      "path": "Program/Analysis/10_robustness_checks.do",
+      "suffix": ".do",
+      "size": 526
+    },
+    {
+      "name": "00_build_final_data.do",
+      "path": "Program/Clean/00_build_final_data.do",
+      "suffix": ".do",
+      "size": 355
+    },
+    {
+      "name": "export_docx.py",
+      "path": "Program/export_docx.py",
+      "suffix": ".py",
+      "size": 2491
+    },
+    {
+      "name": "master.do",
+      "path": "Program/master.do",
+      "suffix": ".do",
+      "size": 380
+    },
+    {
+      "name": "run_paper.py",
+      "path": "Program/run_paper.py",
+      "suffix": ".py",
+      "size": 5843
+    },
+    {
+      "name": "setup.do",
+      "path": "Program/setup.do",
+      "suffix": ".do",
+      "size": 620
+    },
+    {
+      "name": "__init__.py",
+      "path": "Program/workbench/__init__.py",
+      "suffix": ".py",
+      "size": 61
+    },
+    {
+      "name": "__init__.py",
+      "path": "Program/workbench/auto_empirical/__init__.py",
+      "suffix": ".py",
+      "size": 744
+    },
+    {
+      "name": "capabilities.py",
+      "path": "Program/workbench/auto_empirical/capabilities.py",
+      "suffix": ".py",
+      "size": 1296
+    },
+    {
+      "name": "evaluator.py",
+      "path": "Program/workbench/auto_empirical/evaluator.py",
+      "suffix": ".py",
+      "size": 1650
+    },
+    {
+      "name": "guards.py",
+      "path": "Program/workbench/auto_empirical/guards.py",
+      "suffix": ".py",
+      "size": 1990
+    },
+    {
+      "name": "ledger.py",
+      "path": "Program/workbench/auto_empirical/ledger.py",
+      "suffix": ".py",
+      "size": 930
+    },
+    {
+      "name": "registry.py",
+      "path": "Program/workbench/auto_empirical/registry.py",
+      "suffix": ".py",
+      "size": 2457
+    },
+    {
+      "name": "search_space.py",
+      "path": "Program/workbench/auto_empirical/search_space.py",
+      "suffix": ".py",
+      "size": 1190
+    },
+    {
+      "name": "config.py",
+      "path": "Program/workbench/config.py",
+      "suffix": ".py",
+      "size": 1048
+    },
+    {
+      "name": "drafts.py",
+      "path": "Program/workbench/drafts.py",
+      "suffix": ".py",
+      "size": 1141
+    },
+    {
+      "name": "export.py",
+      "path": "Program/workbench/export.py",
+      "suffix": ".py",
+      "size": 1493
+    },
+    {
+      "name": "results.py",
+      "path": "Program/workbench/results.py",
+      "suffix": ".py",
+      "size": 632
+    },
+    {
+      "name": "state.py",
+      "path": "Program/workbench/state.py",
+      "suffix": ".py",
+      "size": 1380
+    },
+    {
+      "name": "statspai_runner.py",
+      "path": "Program/workbench/statspai_runner.py",
+      "suffix": ".py",
+      "size": 1371
+    }
+  ],
+  "execution_policy": "audit existing scripts in dry-run"
+}

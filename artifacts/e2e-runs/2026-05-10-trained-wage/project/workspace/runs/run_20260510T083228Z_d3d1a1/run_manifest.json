@@ -1,0 +1,90 @@
+{
+  "run_id": "run_20260510T083228Z_d3d1a1",
+  "project_id": "待定题目：经济学实证论文",
+  "project_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/artifacts/e2e-runs/2026-05-10-trained-wage/project",
+  "run_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/artifacts/e2e-runs/2026-05-10-trained-wage/project/workspace/runs/run_20260510T083228Z_d3d1a1",
+  "mode": "dry-run",
+  "supervisor": {
+    "name": "Supervisor",
+    "status": "completed",
+    "created_at": "2026-05-10T08:32:28.421398+00:00",
+    "user_goal": "端到端验收：从用户上传训练-工资数据集开始，生成选题、运行实证分析、产出实践报告"
+  },
+  "agents": [
+    {
+      "name": "PreparationAgent",
+      "stage": "00_intake",
+      "status": "completed"
+    },
+    {
+      "name": "LiteratureAgent",
+      "stage": "02_literature",
+      "status": "completed"
+    },
+    {
+      "name": "ResearchStrategistAgent",
+      "stage": "03_strategy",
+      "status": "completed"
+    },
+    {
+      "name": "ModelingAgent",
+      "stage": "04_modeling",
+      "status": "completed"
+    },
+    {
+      "name": "VisualizationAgent",
+      "stage": "05_results",
+      "status": "completed"
+    },
+    {
+      "name": "WritingAgent",
+      "stage": "06_writing",
+      "status": "completed"
+    },
+    {
+      "name": "ReviewerAgent",
+      "stage": "07_review",
+      "status": "completed"
+    },
+    {
+      "name": "FormatterAgent",
+      "stage": "08_final",
+      "status": "completed"
+    }
+  ],
+  "review_loop": {
+    "writer": "WritingAgent",
+    "reviewer": "ReviewerAgent",
+    "decision": "revise_major",
+    "iterations": 1,
+    "status": "completed"
+  },
+  "artifacts": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/00_intake/project_profile.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/00_intake/user_goal.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/01_sources/source_inventory.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/01_sources/dataset_inventory.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/01_sources/literature_inventory.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/02_literature/literature_clusters.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/02_literature/core_literature_brief.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/02_literature/claim_evidence_map.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/research_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/identification_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/empirical_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/04_modeling/modeling_report.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/04_modeling/diagnostics_report.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/05_results/results_index.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/05_results/table_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/05_results/figure_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/06_writing/paper_draft.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/06_writing/section_status.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/review_report.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/revision_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/reviewer_decision.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/paper_draft.tex",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/paper_draft.docx",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/formatting_report.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/run_manifest.json"
+  ],
+  "status": "completed"
+}

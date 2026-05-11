@@ -1,0 +1,11 @@
+{
+  "sections_detected": [
+    "Manuscripts/en/README.md",
+    "Manuscripts/generated/README.md",
+    "Manuscripts/generated/paper_draft.md",
+    "Manuscripts/templates/README.md",
+    "Manuscripts/zh/README.md"
+  ],
+  "source_markdown": null,
+  "status": "drafted"
+}

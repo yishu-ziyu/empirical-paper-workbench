@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "name": "index.json",
+      "path": "Results/index.json",
+      "suffix": ".json",
+      "size": 920
+    },
+    {
+      "name": "analysis_result.json",
+      "path": "Results/json/analysis_result.json",
+      "suffix": ".json",
+      "size": 3529
+    },
+    {
+      "name": "project_snapshot.json",
+      "path": "Results/json/project_snapshot.json",
+      "suffix": ".json",
+      "size": 3596
+    }
+  ]
+}

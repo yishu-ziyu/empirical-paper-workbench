@@ -1,0 +1,37 @@
+{
+  "project_slug": "undergraduate-thesis",
+  "mode": "live",
+  "current_stage": "question-definition",
+  "artifacts": [
+    {
+      "kind": "json",
+      "path": "Results/json/project_snapshot.json",
+      "description": "Structured project snapshot",
+      "exists": true
+    },
+    {
+      "kind": "markdown",
+      "path": "Manuscripts/generated/paper_draft.md",
+      "description": "Generated draft in Markdown",
+      "exists": true
+    },
+    {
+      "kind": "latex",
+      "path": "Manuscripts/generated/paper_draft.tex",
+      "description": "Generated draft in LaTeX",
+      "exists": true
+    },
+    {
+      "kind": "log",
+      "path": "Results/logs/run_paper.log",
+      "description": "Pipeline execution log",
+      "exists": true
+    },
+    {
+      "kind": "json",
+      "path": "Results/json/analysis_result.json",
+      "description": "StatsPAI paper workflow output",
+      "exists": true
+    }
+  ]
+}

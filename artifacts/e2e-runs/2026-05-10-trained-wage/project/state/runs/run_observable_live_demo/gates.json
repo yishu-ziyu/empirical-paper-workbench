@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "evidence_level": "local_execution"
+  },
+  "run_id": "run_observable_live_demo",
+  "items": [
+    {
+      "id": "gate_dataset_fields",
+      "run_id": "run_observable_live_demo",
+      "step_id": "dataset_intake",
+      "title": "Confirm detected dataset fields",
+      "reason": "The system detected outcome, treatment, and controls from paper.yaml. A user can correct them before trusting downstream analysis.",
+      "status": "open",
+      "blocking": false,
+      "required_by": "analysis_execution",
+      "options": [
+        "accept_detected_fields",
+        "edit_variable_roles",
+        "pause_run"
+      ],
+      "created_at": "2026-05-10T08:55:43.342645+00:00",
+      "resolved_at": null,
+      "metadata": {
+        "dataset_path": "Data/Final/analysis_sample.csv",
+        "dataset_exists": true,
+        "unit_of_analysis": "individual",
+        "sample_definition": "synthetic sample for pipeline verification",
+        "key_variables": {
+          "outcome": [
+            "wage"
+          ],
+          "treatment": [
+            "trained"
+          ],
+          "controls": [
+            "edu",
+            "experience"
+          ],
+          "instruments": []
+        }
+      }
+    },
+    {
+      "id": "gate_research_question",
+      "run_id": "run_observable_live_demo",
+      "step_id": "topic_confirmation",
+      "title": "Confirm research question",
+      "reason": "The current pipeline is using the configured research question. A user can accept it or request a new candidate topic before execution.",
+      "status": "open",
+      "blocking": false,
+      "required_by": "draft_generation",
+      "options": [
+        "accept_question",
+        "request_topic_regeneration",
+        "edit_question"
+      ],
+      "created_at": "2026-05-10T08:55:43.342952+00:00",
+      "resolved_at": null,
+      "metadata": {
+        "research_question": "effect of trained on wage"
+      }
+    },
+    {
+      "id": "gate_identification_boundary",
+      "run_id": "run_observable_live_demo",
+      "step_id": "analysis_execution",
+      "title": "Confirm identification boundary",
+      "reason": "The executed design is observational. The user should confirm that the report will not overstate causal claims.",
+      "status": "open",
+      "blocking": false,
+      "required_by": "draft_generation",
+      "options": [
+        "accept_as_exploratory",
+        "revise_identification",
+        "supply_more_data"
+      ],
+      "created_at": "2026-05-10T08:55:57.172493+00:00",
+      "resolved_at": null,
+      "metadata": {
+        "workflow_design": "observational",
+        "workflow_verdict": "OK"
+      }
+    }
+  ]
+}

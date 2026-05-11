@@ -8,8 +8,16 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from Product.backend.agent_registry_service import get_agent_details, list_agents
 from Product.backend.artifact_service import get_artifact, promote_artifact
 from Product.backend.codex_provider import local_codex_status
+from Product.backend.draft_service import list_project_drafts
+from Product.backend.overview_service import (
+    get_project_design,
+    get_project_journey,
+    get_project_overview,
+    list_project_datasets,
+)
 from Product.backend.project_service import (
     create_workspace,
     execute_workbench_run,
@@ -18,6 +26,10 @@ from Product.backend.project_service import (
     get_project_api_view,
     get_project_detail_api_view,
     get_project_run,
+    get_project_run_events,
+    get_project_run_gates,
+    get_project_run_observability,
+    get_project_run_steps,
     get_workbench_run,
     load_project_list,
     load_project_snapshot,
@@ -27,6 +39,7 @@ from Product.backend.project_service import (
     run_orchestration,
     run_pipeline,
 )
+from Product.backend.provenance_service import get_artifact_provenance
 from Product.backend.registry import ensure_registry, get_project_by_id
 from Product.backend.workflow_service import (
     cancel_workflow,
@@ -119,6 +132,19 @@ def api_v1_local_codex_provider() -> dict:
     return local_codex_status()
 
 
+@app.get("/api/v1/agents")
+def api_v1_agents() -> dict:
+    return list_agents()
+
+
+@app.get("/api/v1/agents/{agent_id}/details")
+def api_v1_agent_details(agent_id: str) -> dict:
+    try:
+        return get_agent_details(agent_id)
+    except KeyError as exc:
+        return error_response(404, "agent_not_found", f"Agent {agent_id} does not exist.")
+
+
 @app.post("/api/v1/workflows", status_code=201)
 def api_v1_create_workflow(payload: CreateWorkflowPayload) -> dict:
     try:
@@ -188,6 +214,14 @@ def api_v1_artifact(artifact_id: str) -> dict:
         return error_response(404, "artifact_not_found", f"Artifact {artifact_id} does not exist.")
 
 
+@app.get("/api/v1/artifacts/{artifact_id}/provenance")
+def api_v1_artifact_provenance(artifact_id: str) -> dict:
+    try:
+        return get_artifact_provenance(PRODUCT_ROOT, artifact_id)
+    except KeyError as exc:
+        return error_response(404, "artifact_not_found", f"Artifact {artifact_id} does not exist.")
+
+
 @app.post("/api/v1/artifacts/{artifact_id}/promote")
 def api_v1_promote_artifact(artifact_id: str, payload: PromoteArtifactPayload) -> dict:
     try:
@@ -235,6 +269,46 @@ def api_v1_create_project(payload: CreateManagedProjectPayload) -> dict:
 def api_v1_project(project_id: str) -> dict:
     try:
         return get_project_detail_api_view(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/overview")
+def api_v1_project_overview(project_id: str) -> dict:
+    try:
+        return get_project_overview(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/journey")
+def api_v1_project_journey(project_id: str) -> dict:
+    try:
+        return get_project_journey(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/datasets")
+def api_v1_project_datasets(project_id: str) -> dict:
+    try:
+        return list_project_datasets(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/design")
+def api_v1_project_design(project_id: str) -> dict:
+    try:
+        return get_project_design(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/drafts")
+def api_v1_project_drafts(project_id: str) -> dict:
+    try:
+        return list_project_drafts(PRODUCT_ROOT, REPO_ROOT, project_id)
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
@@ -288,6 +362,54 @@ def api_v1_run(project_id: str, run_id: str) -> dict:
         return get_project_run(project, run_id)
     except KeyError as exc:
         return error_response(404, "run_not_found", f"Run {run_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/runs/{run_id}/observability")
+def api_v1_run_observability(project_id: str, run_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return get_project_run_observability(project, run_id)
+    except KeyError as exc:
+        return error_response(404, "run_not_found", f"Run {run_id} observability does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/runs/{run_id}/events")
+def api_v1_run_events(project_id: str, run_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return get_project_run_events(project, run_id)
+    except KeyError as exc:
+        return error_response(404, "run_not_found", f"Run {run_id} events do not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/runs/{run_id}/steps")
+def api_v1_run_steps(project_id: str, run_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return get_project_run_steps(project, run_id)
+    except KeyError as exc:
+        return error_response(404, "run_not_found", f"Run {run_id} steps do not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/runs/{run_id}/gates")
+def api_v1_run_gates(project_id: str, run_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return get_project_run_gates(project, run_id)
+    except KeyError as exc:
+        return error_response(404, "run_not_found", f"Run {run_id} gates do not exist.")
 
 
 @app.post("/api/v1/projects/{project_id}/export")

@@ -1,0 +1,28 @@
+{
+  "run_id": "run_20260510T083228Z_d3d1a1",
+  "agent": "FormatterAgent",
+  "stage": "08_final",
+  "inputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/06_writing/paper_draft.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/reviewer_decision.json"
+  ],
+  "outputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/paper_draft.tex",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/paper_draft.docx",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/08_final/formatting_report.md"
+  ],
+  "claims": [
+    "Word output path is recorded for the A experience."
+  ],
+  "risks": [
+    "Formatter status: dry-run"
+  ],
+  "next_agent": null,
+  "status": "completed",
+  "metadata": {
+    "formatting_result": {
+      "status": "dry-run",
+      "returncode": 0
+    }
+  }
+}

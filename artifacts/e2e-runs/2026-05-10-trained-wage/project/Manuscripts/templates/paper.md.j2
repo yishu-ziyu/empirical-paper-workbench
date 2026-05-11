@@ -1,0 +1,35 @@
+# {{ title }}
+
+## 研究问题
+
+{{ research_question }}
+
+## 研究贡献
+
+{{ contribution }}
+
+## 当前阶段
+
+- 当前阶段：`{{ current_stage }}`
+- 运行模式：`{{ mode }}`
+- 数据集路径：`{{ dataset_path }}`
+- 数据是否存在：`{{ dataset_exists }}`
+
+## 识别与估计候选
+
+{% for method in baseline_candidates -%}
+- {{ method }}
+{% endfor %}
+
+## 稳健性检查清单
+
+{% for check in robustness_checks -%}
+- {{ check }}
+{% endfor %}
+
+## 下一步
+
+1. 完善研究问题与变量角色。
+2. 把可用分析数据放到 `Data/Final/`。
+3. 接入 StatsPAI 运行基准估计与稳健性分析。
+

@@ -1,0 +1,26 @@
+{
+  "run_id": "run_20260510T083228Z_d3d1a1",
+  "agent": "ReviewerAgent",
+  "stage": "07_review",
+  "inputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/06_writing/paper_draft.md"
+  ],
+  "outputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/review_report.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/revision_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/07_review/reviewer_decision.json"
+  ],
+  "claims": [
+    "Reviewer is independent from WritingAgent."
+  ],
+  "risks": [
+    "写作源必须以 sections_v21 或 论文v2.1_完整版.md 为准，word_hqu_format 只作为旧 Word 导出链参考。",
+    "匹配效率、匹配质量代理、技能岗位错配三层边界需要在摘要、文献述评和结论中保持一致。",
+    "CLDS 机制结果不是 Bartik IV 主识别，必须写成补充机制证据，不能和 CFPS+Bartik IV 同等因果等级。",
+    "Bartik 排他性需要说明产业结构可能反映制造业基础、开放程度和发展路径，不能写成天然外生。",
+    "每个核心结论需要挂到表格、图形或结果索引。"
+  ],
+  "next_agent": "FormatterAgent",
+  "status": "completed",
+  "metadata": {}
+}

@@ -1,0 +1,24 @@
+{
+  "run_id": "run_20260510T083228Z_d3d1a1",
+  "agent": "ResearchStrategistAgent",
+  "stage": "03_strategy",
+  "inputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/00_intake/project_profile.json",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/02_literature/core_literature_brief.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/02_literature/claim_evidence_map.json"
+  ],
+  "outputs": [
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/research_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/identification_plan.md",
+    "workspace/runs/run_20260510T083228Z_d3d1a1/03_strategy/empirical_plan.md"
+  ],
+  "claims": [
+    "Bartik IV remains the main identification path for the first thesis run."
+  ],
+  "risks": [
+    "Weak-IV language must stay cautious in draft and handoff files."
+  ],
+  "next_agent": "ModelingAgent",
+  "status": "completed",
+  "metadata": {}
+}

@@ -1,0 +1,33 @@
+\section{研究问题}
+
+{{ research_question }}
+
+\section{研究贡献}
+
+{{ contribution }}
+
+\section{项目状态}
+
+\begin{itemize}
+  \item 当前阶段：{{ current_stage }}
+  \item 运行模式：{{ mode }}
+  \item 数据集路径：{{ dataset_path }}
+  \item 数据是否存在：{{ dataset_exists }}
+\end{itemize}
+
+\section{识别与估计候选}
+
+\begin{itemize}
+{% for method in baseline_candidates -%}
+  \item {{ method }}
+{% endfor %}
+\end{itemize}
+
+\section{稳健性检查清单}
+
+\begin{itemize}
+{% for check in robustness_checks -%}
+  \item {{ check }}
+{% endfor %}
+\end{itemize}
+

@@ -1,0 +1,49 @@
+{
+  "project_slug": "undergraduate-thesis",
+  "project_title": "待定题目：经济学实证论文",
+  "language": "zh",
+  "final_output": "docx",
+  "internal_formats": [
+    "markdown",
+    "latex"
+  ],
+  "research_question": "effect of trained on wage",
+  "current_stage": "question-definition",
+  "baseline_family": "ols",
+  "final_dataset": "Data/Final/analysis_sample.csv",
+  "dataset_exists": true,
+  "last_run_mode": "live",
+  "updated_at": "2026-05-10T08:55:57.174354+00:00",
+  "artifacts": [
+    {
+      "kind": "json",
+      "path": "Results/json/project_snapshot.json",
+      "description": "Structured project snapshot",
+      "exists": true
+    },
+    {
+      "kind": "markdown",
+      "path": "Manuscripts/generated/paper_draft.md",
+      "description": "Generated draft in Markdown",
+      "exists": true
+    },
+    {
+      "kind": "latex",
+      "path": "Manuscripts/generated/paper_draft.tex",
+      "description": "Generated draft in LaTeX",
+      "exists": true
+    },
+    {
+      "kind": "log",
+      "path": "Results/logs/run_paper.log",
+      "description": "Pipeline execution log",
+      "exists": true
+    },
+    {
+      "kind": "json",
+      "path": "Results/json/analysis_result.json",
+      "description": "StatsPAI paper workflow output",
+      "exists": true
+    }
+  ]
+}

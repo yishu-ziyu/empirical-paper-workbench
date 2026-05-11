@@ -11,6 +11,9 @@ const state = {
   workflowTasks: [],
   workflowArtifacts: [],
   hoverTaskId: null,
+  activeAgentTaskId: null,
+  agentDetailPreview: null,
+  agentDetailPreviewLoading: false,
   isArtifactDrawerOpen: false,
   isCompletionVisible: false,
   pollIntervalId: null,
@@ -23,6 +26,17 @@ const state = {
   activeReport: null,
   isReportModalOpen: false,
   isPromoting: false,
+
+  // V2 page state
+  overviewData: null,
+  journeyData: null,
+  datasetsData: null,
+  designData: null,
+  draftsData: null,
+  agentsData: null,
+  selectedAgentId: null,
+  agentDetailData: null,
+  provenanceData: null,
 };
 
 const fallbackWorkflowSteps = [
@@ -76,10 +90,10 @@ function renderMetrics() {
   const selected = state.selectedProject;
   const orchestration = selected?.latest_orchestration?.manifest;
   const metrics = [
-    { label: "Projects", value: state.projects.length },
-    { label: "Selected", value: selected ? selected.slug : "none" },
-    { label: "Draft Ready", value: selected?.artifacts?.markdown ? "yes" : "no" },
-    { label: "Review Loop", value: orchestration?.review_loop?.status ?? "none" },
+    { label: "项目数", value: state.projects.length },
+    { label: "当前项目", value: selected ? selected.slug : "未选择" },
+    { label: "草稿状态", value: selected?.artifacts?.markdown ? "已生成" : "未生成" },
+    { label: "审阅循环", value: orchestration?.review_loop?.status ?? "未启动" },
   ];
 
   document.getElementById("metric-grid").innerHTML = metrics
@@ -243,6 +257,12 @@ async function selectProject(projectId) {
   state.selectedProjectId = projectId;
   state.activeRun = null;
   await loadSelectedProject();
+  // Reload current V2 view data after project switch
+  const activeNav = document.querySelector(".nav-link.is-active");
+  const viewName = activeNav?.dataset.view;
+  if (viewName && isV2View(viewName)) {
+    await loadV2Data(viewName);
+  }
 }
 
 async function pollRun(projectId, runId) {
@@ -294,7 +314,30 @@ function mountNav() {
       const viewName = button.dataset.view;
       document.getElementById(`view-${viewName}`).classList.add("is-active");
       document.getElementById("topbar-title").textContent = button.textContent;
+
+      // V2 view handling
+      if (isV2View(viewName)) {
+        document.getElementById("journey-bar").style.display = "block";
+        void loadV2Data(viewName);
+      } else {
+        document.getElementById("journey-bar").style.display = "none";
+      }
     });
+  });
+
+  // Journey bar click navigation
+  document.getElementById("journey-bar")?.addEventListener("click", (event) => {
+    const stage = event.target.closest(".journey-stage");
+    if (!stage) return;
+    event.preventDefault();
+    const jumpView = stage.dataset.jumpView;
+    if (!jumpView) return;
+
+    // Find nav button
+    const navButton = document.querySelector(`.nav-link[data-view="${jumpView}"]`);
+    if (navButton) {
+      navButton.click();
+    }
   });
 }
 
@@ -416,8 +459,52 @@ const api = {
   },
 };
 
+// --- V2 API (Phase A GET endpoints) ---
+const v2api = {
+  overview: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/overview`);
+    },
+  },
+  journey: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/journey`);
+    },
+  },
+  datasets: {
+    async list(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/datasets`);
+    },
+  },
+  design: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/design`);
+    },
+  },
+  drafts: {
+    async list(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/drafts`);
+    },
+  },
+  agents: {
+    async list() {
+      return fetchJson(`/api/v1/agents`);
+    },
+    async get(agentId) {
+      return fetchJson(`/api/v1/agents/${agentId}/details`);
+    },
+  },
+  provenance: {
+    async get(artifactId) {
+      return fetchJson(`/api/v1/artifacts/${artifactId}/provenance`);
+    },
+  },
+};
+
+// ============================================================
+// Agent Cluster
+// ============================================================
 function getAvatarColor(index) {
-  return AGENT_AVATAR_COLORS[index % AGENT_AVATAR_COLORS.length];
 }
 
 function getAvatarInitial(name) {
@@ -582,6 +669,7 @@ function renderAgentCluster() {
   renderAgentRows();
   renderCompletionCard();
   renderArtifactDrawer();
+  renderAgentDetailDrawer();
   renderReportModal();
   updateComposerState();
 }
@@ -715,12 +803,16 @@ function renderAgentRows() {
       const statusClass = getStatusClass(task.status);
       const isCompleted = task.status === "completed";
       const isFailed = task.status === "failed";
+      const isActive = task.id === state.activeAgentTaskId;
       const progressPercent = Math.round(task.progress * 100);
 
       return `
         <div
-          class="agent-row ${isCompleted ? "is-completed" : ""} ${isFailed ? "is-failed" : ""}"
+          class="agent-row ${isCompleted ? "is-completed" : ""} ${isFailed ? "is-failed" : ""} ${isActive ? "is-active" : ""}"
           data-task-id="${task.id}"
+          role="button"
+          tabindex="0"
+          aria-label="打开 ${escapeHtml(task.agent_name)} 的工作详情"
         >
           <div class="agent-avatar" style="background: ${color}">${initial}</div>
           <div class="agent-row-info">
@@ -892,6 +984,155 @@ function renderArtifactDrawer() {
   content.innerHTML = html || "<p class=\"muted\">暂无产物</p>";
 }
 
+function getAgentGovernance(task) {
+  const provider = state.selectedWorkflow?.execution_provider || "local_codex";
+  const outputCount = task.outputs?.length || 0;
+  const progressPercent = Math.round((task.progress || 0) * 100);
+  const permissionStatus = task.status === "completed"
+    ? "仅可提交草稿产物；导出到正式项目仍需人工确认"
+    : "可读取项目上下文；未授予正式产物导出权限";
+
+  return {
+    costs: [
+      `执行提供方：${provider}`,
+      `当前进度：${progressPercent}%`,
+      `产物数量：${outputCount}`,
+    ],
+    permissions: [
+      "读取当前 workflow 与项目上下文",
+      "写入 docs/workflows 下的研究草稿",
+      permissionStatus,
+    ],
+    capabilities: [
+      task.role || "研究执行",
+      "结构化研究范围拆解",
+      "Markdown 研究产物生成",
+    ],
+  };
+}
+
+function renderAgentDetailDrawer() {
+  const drawer = document.getElementById("agent-detail-drawer");
+  const content = document.getElementById("agent-detail-drawer-content");
+  if (!drawer || !content) return;
+
+  const task = state.workflowTasks.find((item) => item.id === state.activeAgentTaskId);
+  if (!task) {
+    drawer.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    content.innerHTML = "";
+    return;
+  }
+
+  drawer.classList.add("is-open");
+  drawer.setAttribute("aria-hidden", "false");
+
+  // Update prev/next navigation button states
+  const currentIndex = state.workflowTasks.findIndex((item) => item.id === task.id);
+  const prevButton = document.getElementById("prev-agent-button");
+  const nextButton = document.getElementById("next-agent-button");
+  if (prevButton) prevButton.disabled = currentIndex <= 0;
+  if (nextButton) nextButton.disabled = currentIndex < 0 || currentIndex >= state.workflowTasks.length - 1;
+
+  const index = currentIndex;
+  const color = getAvatarColor(index);
+  const initial = getAvatarInitial(task.agent_name);
+  const progressPercent = Math.round((task.progress || 0) * 100);
+  const governance = getAgentGovernance(task);
+  const scopeList = (task.research_scope || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const evidenceGaps = (task.evidence_gaps || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const outputsHtml = task.outputs?.length
+    ? task.outputs.map((path) => `
+        <button class="agent-detail-output" data-path="${escapeHtml(path)}">
+          <span class="artifact-icon">📄</span>
+          <span>${escapeHtml(path.split("/").pop())}</span>
+        </button>
+      `).join("")
+    : "<p class=\"muted\">暂无最终产物</p>";
+
+  content.innerHTML = `
+    <div class="agent-detail-identity">
+      <div class="agent-avatar" style="background: ${color}">${initial}</div>
+      <div>
+        <p class="agent-detail-name">${escapeHtml(task.agent_name)} · ${escapeHtml(task.role || task.dimension)}</p>
+        <p class="muted">${escapeHtml(task.dimension)} · #${String(task.dimension_number).padStart(2, "0")}</p>
+      </div>
+    </div>
+
+    <section class="agent-detail-section">
+      <h4>当前工作</h4>
+      <div class="agent-detail-status">
+        <span class="status-pill ${getStatusClass(task.status)}">${getStatusLabel(task.status)}</span>
+        <span>${progressPercent}%</span>
+      </div>
+      <div class="agent-progress-bar">
+        <div class="agent-progress-fill" style="width: ${progressPercent}%"></div>
+      </div>
+      <p>${escapeHtml(task.summary || "等待研究状态更新。")}</p>
+    </section>
+
+    <section class="agent-detail-section">
+      <h4>研究范围</h4>
+      <ul class="agent-detail-list">${scopeList || "<li>暂无研究范围</li>"}</ul>
+    </section>
+
+    <section class="agent-detail-grid">
+      <div class="agent-detail-section">
+        <h4>成本追踪</h4>
+        <ul class="agent-detail-list">${governance.costs.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+      <div class="agent-detail-section">
+        <h4>权限</h4>
+        <ul class="agent-detail-list">${governance.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+      <div class="agent-detail-section">
+        <h4>能力注册</h4>
+        <ul class="agent-detail-list">${governance.capabilities.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+    </section>
+
+    ${evidenceGaps ? `
+      <section class="agent-detail-section">
+        <h4>证据缺口</h4>
+        <ul class="agent-detail-list">${evidenceGaps}</ul>
+      </section>
+    ` : ""}
+
+    <section class="agent-detail-section">
+      <h4>产物</h4>
+      <div class="agent-detail-outputs">${outputsHtml}</div>
+    </section>
+
+    <section class="agent-detail-section agent-detail-artifact-preview">
+      <h4>产物预览</h4>
+      ${task.outputs?.length ? renderAgentArtifactPreview() : '<p class="muted">暂无产物。等待研究完成后自动生成。</p>'}
+    </section>
+  `;
+}
+
+function renderAgentArtifactPreview() {
+  if (state.agentDetailPreviewLoading) {
+    return '<p class="muted">正在读取产物正文...</p>';
+  }
+
+  if (state.apiError) {
+    return `<p class="muted">无法读取产物正文：${escapeHtml(state.apiError)}</p>`;
+  }
+
+  if (!state.agentDetailPreview) {
+    return '<p class="muted">点击上方产物后在这里预览正文。</p>';
+  }
+
+  return `
+    <p class="muted">${escapeHtml(state.agentDetailPreview.path || "local preview")}</p>
+    <pre class="agent-detail-preview-body">${escapeHtml(state.agentDetailPreview.content || "暂无正文")}</pre>
+  `;
+}
+
 function renderReportModal() {
   const modal = document.getElementById("report-modal");
   const title = document.getElementById("report-modal-title");
@@ -990,6 +1231,19 @@ function mountAgentClusterEvents() {
     }, 300);
   }, true);
 
+  panel.addEventListener("click", (event) => {
+    const row = event.target.closest(".agent-row");
+    if (!row) return;
+    openAgentDetail(row.dataset.taskId);
+  });
+
+  panel.addEventListener("keydown", (event) => {
+    const row = event.target.closest(".agent-row");
+    if (!row || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    openAgentDetail(row.dataset.taskId);
+  });
+
   // Artifact drawer toggle
   document.getElementById("toggle-artifact-drawer")?.addEventListener("click", () => {
     state.isArtifactDrawerOpen = !state.isArtifactDrawerOpen;
@@ -1005,6 +1259,24 @@ function mountAgentClusterEvents() {
     const item = event.target.closest(".artifact-item");
     if (!item) return;
     void openArtifactPreview(item.dataset.path);
+  });
+
+  document.getElementById("close-agent-detail-drawer")?.addEventListener("click", () => {
+    closeAgentDetail();
+  });
+
+  document.getElementById("prev-agent-button")?.addEventListener("click", () => {
+    navigateToPrevAgent();
+  });
+
+  document.getElementById("next-agent-button")?.addEventListener("click", () => {
+    navigateToNextAgent();
+  });
+
+  document.getElementById("agent-detail-drawer-content")?.addEventListener("click", (event) => {
+    const output = event.target.closest(".agent-detail-output");
+    if (!output) return;
+    void openAgentArtifactPreview(output.dataset.path);
   });
 
   // Start workflow
@@ -1027,6 +1299,8 @@ function mountAgentClusterEvents() {
       e.preventDefault();
       state.useMock = !state.useMock;
       console.log(`[Dev] Mock mode: ${state.useMock ? "ON" : "OFF"}`);
+    } else if (e.key === "Escape" && state.activeAgentTaskId) {
+      closeAgentDetail();
     }
   });
 
@@ -1066,6 +1340,79 @@ function mountAgentClusterEvents() {
 }
 
 // --- Workflow Operations ---
+
+function openAgentDetail(taskId) {
+  if (!taskId) return;
+  const task = state.workflowTasks.find((item) => item.id === taskId);
+  if (!task) return;
+
+  state.activeAgentTaskId = taskId;
+  state.agentDetailPreview = null;
+  state.agentDetailPreviewLoading = false;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentDetailDrawer();
+  renderAgentRows();
+}
+
+function closeAgentDetail() {
+  state.activeAgentTaskId = null;
+  state.agentDetailPreview = null;
+  state.agentDetailPreviewLoading = false;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentDetailDrawer();
+  renderAgentRows();
+}
+
+function navigateToPrevAgent() {
+  if (!state.activeAgentTaskId) return;
+  const tasks = state.workflowTasks;
+  const currentIndex = tasks.findIndex((t) => t.id === state.activeAgentTaskId);
+  if (currentIndex > 0) {
+    openAgentDetail(tasks[currentIndex - 1].id);
+  }
+}
+
+function navigateToNextAgent() {
+  if (!state.activeAgentTaskId) return;
+  const tasks = state.workflowTasks;
+  const currentIndex = tasks.findIndex((t) => t.id === state.activeAgentTaskId);
+  if (currentIndex >= 0 && currentIndex < tasks.length - 1) {
+    openAgentDetail(tasks[currentIndex + 1].id);
+  }
+}
+
+async function openAgentArtifactPreview(path) {
+  if (!path || !state.activeAgentTaskId) return;
+
+  const artifact = state.workflowArtifacts.find((item) => item.path === path);
+  state.agentDetailPreviewLoading = true;
+  state.agentDetailPreview = null;
+  state.apiError = null;
+  state.apiNotice = null;
+  renderAgentDetailDrawer();
+
+  try {
+    if (state.useMock || !artifact?.id) {
+      state.agentDetailPreview = {
+        path,
+        content: `# ${path.split("/").pop()}\n\n当前为 Mock 模式产物预览。真实内容需要通过 Real API 的 artifact endpoint 读取。`,
+      };
+    } else {
+      const response = await api.artifacts.get(artifact.id);
+      state.agentDetailPreview = {
+        path: response.artifact.path,
+        content: response.content || "后端未返回该产物正文。",
+      };
+    }
+  } catch (error) {
+    state.apiError = error.message;
+  } finally {
+    state.agentDetailPreviewLoading = false;
+    renderAgentCluster();
+  }
+}
 
 async function openWorkflowReport() {
   if (!state.selectedWorkflow) {
@@ -1299,6 +1646,553 @@ async function pollWorkflowStatus(workflowId) {
   }
 }
 
+// ============================================================
+// V2 Page Rendering
+// ============================================================
+
+const V2_VIEWS = [
+  "overview", "data-variables", "research-design",
+  "empirical-execution", "paper-draft", "artifacts-replication", "agent-console",
+];
+
+function isV2View(viewName) {
+  return V2_VIEWS.includes(viewName);
+}
+
+function renderEvidenceBadge(meta) {
+  if (!meta || !meta.evidence_level) return "";
+  const level = meta.evidence_level;
+  const label = level === "mock" ? "演示数据" : level === "local_file" ? "本地文件" : level;
+  return `<span class="evidence-badge ${level}">${label}</span>`;
+}
+
+function renderEvidenceBanner(meta) {
+  if (!meta || meta.evidence_level !== "mock") return "";
+  return `
+    <div class="evidence-banner">
+      <span>⚠</span>
+      <span>当前展示的是演示数据（${meta.service || ""}），不代表真实研究结论。</span>
+    </div>
+  `;
+}
+
+function showV2Error(viewId, message) {
+  const el = document.getElementById(`${viewId}-error`);
+  if (!el) return;
+  el.style.display = "flex";
+  el.innerHTML = `<span>${escapeHtml(message)}</span><button class="ghost-button" style="padding:4px 10px;font-size:12px;" onclick="this.parentElement.style.display='none'">关闭</button>`;
+}
+
+function clearV2Error(viewId) {
+  const el = document.getElementById(`${viewId}-error`);
+  if (!el) return;
+  el.style.display = "none";
+  el.innerHTML = "";
+}
+
+function renderEmptyState(emptyState) {
+  if (!emptyState) return "";
+  return `
+    <div class="empty-state">
+      <div class="empty-state-icon">📭</div>
+      <h4>${escapeHtml(emptyState.title)}</h4>
+      <p class="muted">${escapeHtml(emptyState.description)}</p>
+      ${emptyState.next_action ? `<p class="muted" style="margin-top:8px;"><strong>下一步：</strong>${escapeHtml(emptyState.next_action)}</p>` : ""}
+    </div>
+  `;
+}
+
+// --- Journey Bar ---
+
+function renderJourneyBar() {
+  const container = document.getElementById("journey-bar");
+  const content = document.getElementById("journey-bar-content");
+  if (!container || !content) return;
+
+  const journey = state.journeyData;
+  if (!journey || !journey.stages) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  const stages = journey.stages;
+
+  content.innerHTML = stages.map((stage, index) => {
+    const statusClass = stage.status === "completed" ? "is-completed"
+      : stage.status === "in_progress" ? "is-current"
+      : stage.status === "pending_confirmation" ? "is-pending"
+      : stage.status === "failed" ? "is-failed"
+      : "";
+    const arrow = index < stages.length - 1 ? `<span class="journey-arrow">→</span>` : "";
+    return `
+      <a class="journey-stage ${statusClass}" href="${escapeHtml(stage.href || "#")}" data-jump-view="${escapeHtml(stage.href?.replace("#view-", "") || "")}">
+        <span class="journey-dot"></span>
+        <span class="journey-label">${escapeHtml(stage.name)}</span>
+      </a>
+      ${arrow}
+    `;
+  }).join("");
+}
+
+// --- Overview Page ---
+
+function renderOverview() {
+  const data = state.overviewData;
+  if (!data) {
+    document.getElementById("overview-question").textContent = "加载中...";
+    return;
+  }
+
+  clearV2Error("overview");
+
+  // Evidence banner
+  const bannerHtml = renderEvidenceBanner(data._meta);
+  const existingBanner = document.querySelector("#view-overview > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-overview").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  // Research question
+  document.getElementById("overview-question").textContent = data.research_question || data.project?.title || "未设置研究问题";
+  document.getElementById("overview-project-meta").textContent =
+    `项目：${data.project?.slug || ""} · 当前阶段：${data.current_stage || ""} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
+
+  // Stage summary cards
+  const summaries = data.stage_summaries || [];
+  document.getElementById("stage-summary-grid").innerHTML = summaries.map((summary) => {
+    const statusClass = summary.status === "completed" ? "is-completed"
+      : summary.status === "in_progress" ? "is-in-progress"
+      : summary.status === "pending_confirmation" ? "is-pending"
+      : "is-not-started";
+    const metrics = summary.metrics || [];
+    const metricsHtml = metrics.length
+      ? `<div class="stage-summary-metrics">
+          ${metrics.map((m) => `<div class="stage-summary-metric"><span class="stage-summary-metric-value">${escapeHtml(m.value)}</span><span class="stage-summary-metric-label">${escapeHtml(m.label)}</span></div>`).join("")}
+        </div>`
+      : `<div class="stage-summary-metrics"><span class="muted">暂无指标</span></div>`;
+    return `
+      <div class="stage-summary-card ${statusClass}">
+        <div class="stage-summary-header">
+          <h4 class="stage-summary-title">${escapeHtml(summary.title)}</h4>
+          ${summary.has_pending_action ? `<span class="pill" style="background:rgba(230,126,34,0.12);color:#e67e22;">需确认</span>` : ""}
+        </div>
+        ${metricsHtml}
+        <p class="stage-summary-hint">${escapeHtml(summary.summary || summary.next_step_hint || "")}</p>
+      </div>
+    `;
+  }).join("");
+
+  // Risks
+  const risks = data.risks || [];
+  document.getElementById("overview-risks").innerHTML = risks.length
+    ? risks.map((risk) => `
+        <div class="event-item">
+          <span style="color:${risk.level === "warning" ? "#e67e22" : "#c0392b"};font-size:16px;">${risk.level === "warning" ? "⚠" : "🚫"}</span>
+          <div class="event-item-content">${escapeHtml(risk.description)}</div>
+        </div>
+      `).join("")
+    : `<div class="event-item"><span>✓</span><div class="event-item-content">当前没有识别到关键风险。</div></div>`;
+
+  // Next steps
+  const steps = data.next_steps || [];
+  document.getElementById("overview-next-steps").innerHTML = steps.length
+    ? steps.map((step, i) => `
+        <div class="event-item">
+          <span style="color:var(--accent);font-weight:600;">${i + 1}.</span>
+          <div class="event-item-content">${escapeHtml(step.description)} ${step.action ? `· <strong>${escapeHtml(step.action)}</strong>` : ""}</div>
+        </div>
+      `).join("")
+    : `<div class="event-item"><span>→</span><div class="event-item-content">暂无明确下一步建议。</div></div>`;
+
+  // Events
+  const events = data.recent_events || [];
+  document.getElementById("overview-events").innerHTML = events.length
+    ? events.map((evt) => `
+        <div class="event-item">
+          <span class="event-item-time">${new Date(evt.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
+          <div class="event-item-content">
+            <span class="event-item-agent">${escapeHtml(evt.agent_name || evt.agent || "系统")}</span>
+            ${escapeHtml(evt.action || "")}
+            ${evt.result === "success" ? "✓" : evt.result === "failed" ? "✗" : ""}
+          </div>
+        </div>
+      `).join("")
+    : `<p class="muted">暂无最近事件</p>`;
+}
+
+// --- Data & Variables Page ---
+
+function renderDataVariables() {
+  const data = state.datasetsData;
+  if (!data) {
+    document.getElementById("datasets-list").innerHTML = "<p class='muted'>加载中...</p>";
+    return;
+  }
+
+  clearV2Error("data");
+
+  // Evidence banner
+  const bannerHtml = renderEvidenceBanner(data._meta);
+  const existingBanner = document.querySelector("#view-data-variables > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-data-variables").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  const items = data.items || [];
+  document.getElementById("datasets-count").textContent = items.length;
+
+  if (items.length === 0) {
+    document.getElementById("datasets-list").innerHTML = renderEmptyState(data.empty_state);
+  } else {
+    document.getElementById("datasets-list").innerHTML = items.map((ds) => `
+      <div class="project-card">
+        <strong>${escapeHtml(ds.name || ds.id)}</strong>
+        <div class="muted">${ds.row_count || 0} 行 · ${ds.column_count || 0} 列 · ${ds.file_type || "未知格式"}</div>
+      </div>
+    `).join("");
+  }
+}
+
+// --- Research Design Page ---
+
+function renderResearchDesign() {
+  const data = state.designData;
+  if (!data) {
+    document.getElementById("design-question").innerHTML = "<p class='muted'>加载中...</p>";
+    return;
+  }
+
+  clearV2Error("design");
+
+  // Evidence banner
+  const bannerHtml = renderEvidenceBanner(data._meta);
+  const existingBanner = document.querySelector("#view-research-design > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-research-design").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  // Question
+  document.getElementById("design-question").innerHTML = `
+    <div class="project-card">
+      <strong>${escapeHtml(data.research_question || "未设置")}</strong>
+      <div class="muted" style="margin-top:8px;">变量角色将在 Phase B 自动推断。</div>
+    </div>
+  `;
+
+  // Strategies
+  const strategies = data.strategies || [];
+  document.getElementById("design-strategies").innerHTML = strategies.map((s) => `
+    <div class="project-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>${escapeHtml(s.name)}</strong>
+        ${renderEvidenceBadge({ evidence_level: s.evidence_level })}
+      </div>
+      <div class="muted">状态：${s.status === "candidate" ? "候选方案" : s.status}</div>
+    </div>
+  `).join("");
+
+  // Pending confirmations
+  const pending = data.pending_confirmations || [];
+  document.getElementById("design-pending").innerHTML = pending.length
+    ? pending.map((p, i) => `
+        <div class="event-item">
+          <span style="color:#e67e22;font-weight:600;">${i + 1}.</span>
+          <div class="event-item-content">${escapeHtml(p)}</div>
+        </div>
+      `).join("")
+    : `<p class="muted">暂无待确认项</p>`;
+}
+
+// --- Paper Draft Page ---
+
+function renderPaperDraft() {
+  const data = state.draftsData;
+  if (!data) {
+    document.getElementById("drafts-list").innerHTML = "<p class='muted'>加载中...</p>";
+    return;
+  }
+
+  clearV2Error("draft");
+
+  // Evidence banner (local_file is good, but show it)
+  const bannerHtml = renderEvidenceBanner(data._meta);
+  const existingBanner = document.querySelector("#view-paper-draft > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-paper-draft").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  const items = data.items || [];
+  document.getElementById("drafts-count").textContent = items.length;
+
+  if (items.length === 0) {
+    document.getElementById("drafts-list").innerHTML = renderEmptyState(data.empty_state);
+  } else {
+    document.getElementById("drafts-list").innerHTML = items.map((draft) => `
+      <div class="project-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${escapeHtml(draft.title)}</strong>
+          <span class="pill">${draft.format || "md"}</span>
+        </div>
+        <div class="muted">${escapeHtml(draft.path)} · ${draft.status === "available" ? "✓ 可用" : draft.status}</div>
+      </div>
+    `).join("");
+  }
+}
+
+// --- Artifacts & Replication Page ---
+
+function renderArtifactsReplication() {
+  const artifacts = mergedArtifacts(state.selectedProject);
+  const container = document.getElementById("artifacts-replication-list");
+
+  if (artifacts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📦</div>
+        <h4>暂无产物</h4>
+        <p class="muted">运行工作流后将在此显示产物。</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = artifacts.map((artifact) => `
+    <div class="project-card" style="cursor:pointer;" data-artifact-id="${escapeHtml(artifact.path)}" onclick="loadProvenance('${escapeHtml(artifact.path)}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>${escapeHtml(artifact.kind)}</strong>
+        <span class="pill">🔍 查看溯源</span>
+      </div>
+      <div class="muted">${escapeHtml(artifact.path)}</div>
+      <div class="muted">${escapeHtml(artifact.description || "")}</div>
+    </div>
+  `).join("");
+}
+
+async function loadProvenance(artifactId) {
+  const panel = document.getElementById("provenance-panel");
+  if (!panel) return;
+
+  panel.innerHTML = "<p class='muted'>加载溯源链...</p>";
+
+  try {
+    const data = await v2api.provenance.get(artifactId);
+    state.provenanceData = data;
+
+    const lineage = data.lineage || [];
+    const promotion = data.promotion_policy || {};
+
+    panel.innerHTML = `
+      ${renderEvidenceBanner(data._meta)}
+      <div class="provenance-lineage">
+        ${lineage.map((step, i) => `
+          <div class="provenance-step">
+            <div class="provenance-step-number">${step.step || i + 1}</div>
+            <div class="provenance-step-content">
+              <div class="provenance-step-type">${escapeHtml(step.type)}</div>
+              <div class="provenance-step-desc">${escapeHtml(step.description)}</div>
+              <div class="provenance-step-actor">执行者：${escapeHtml(step.actor)} · ${new Date(step.timestamp).toLocaleString("zh-CN")}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      ${promotion.reason ? `
+        <div class="evidence-banner" style="margin-top:12px;">
+          <span>📋</span>
+          <span>提升策略：${promotion.allowed ? "允许提升" : escapeHtml(promotion.reason)}</span>
+        </div>
+      ` : ""}
+    `;
+  } catch (error) {
+    panel.innerHTML = `<div class="error-banner"><span>加载溯源失败：${escapeHtml(error.message)}</span></div>`;
+  }
+}
+
+// --- Agent Console Page ---
+
+function renderAgentConsole() {
+  const data = state.agentsData;
+  if (!data || !data.items) {
+    document.getElementById("agent-pipeline-list").innerHTML = "<p class='muted'>加载中...</p>";
+    document.getElementById("agent-dimension-list").innerHTML = "<p class='muted'>加载中...</p>";
+    return;
+  }
+
+  clearV2Error("agent-console");
+
+  // Evidence banner
+  const bannerHtml = renderEvidenceBanner(data._meta);
+  const existingBanner = document.querySelector("#view-agent-console > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-agent-console").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  const pipeline = data.items.filter((a) => a.role_type === "pipeline");
+  const dimension = data.items.filter((a) => a.role_type === "dimension");
+
+  const renderAgentCard = (agent) => {
+    const isSelected = state.selectedAgentId === agent.id;
+    const initial = agent.name ? agent.name.charAt(0) : "?";
+    const colors = ["#1e6f62", "#a14a18", "#2c5282", "#744210", "#553c9a"];
+    const color = colors[Math.abs(agent.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % colors.length];
+    return `
+      <div class="agent-console-card ${isSelected ? "is-selected" : ""}" data-agent-id="${escapeHtml(agent.id)}" onclick="selectAgent('${escapeHtml(agent.id)}')">
+        <div class="agent-console-avatar" style="background:${color}">${initial}</div>
+        <div class="agent-console-info">
+          <p class="agent-console-name">${escapeHtml(agent.name)}</p>
+          <p class="agent-console-role">${escapeHtml(agent.role)}</p>
+        </div>
+        <span class="agent-console-status">${escapeHtml(agent.status)}</span>
+      </div>
+    `;
+  };
+
+  document.getElementById("agent-pipeline-list").innerHTML = pipeline.length
+    ? pipeline.map(renderAgentCard).join("")
+    : "<p class='muted'>暂无 Pipeline Roles</p>";
+
+  document.getElementById("agent-dimension-list").innerHTML = dimension.length
+    ? dimension.map(renderAgentCard).join("")
+    : "<p class='muted'>暂无 Research Dimension Agents</p>";
+}
+
+async function selectAgent(agentId) {
+  state.selectedAgentId = agentId;
+  renderAgentConsole(); // re-render to update selection
+
+  const panel = document.getElementById("agent-detail-panel");
+  const idLabel = document.getElementById("agent-detail-id");
+  if (!panel || !idLabel) return;
+
+  idLabel.textContent = agentId;
+  panel.innerHTML = "<p class='muted'>加载详情...</p>";
+
+  try {
+    const data = await v2api.agents.get(agentId);
+    state.agentDetailData = data;
+
+    const agent = data.agent || {};
+    const identity = data.identity || {};
+    const permissions = data.permissions || [];
+    const capabilities = data.capabilities || [];
+    const cost = data.cost || {};
+    const audit = data.audit_log || [];
+
+    panel.innerHTML = `
+      ${renderEvidenceBanner(data._meta)}
+
+      <div class="agent-detail-section">
+        <h4>身份</h4>
+        <div class="project-card">
+          <strong>${escapeHtml(agent.name || identity.name || agentId)}</strong>
+          <div class="muted">角色：${escapeHtml(agent.role || identity.role || "")} · 类型：${escapeHtml(agent.role_type || identity.role_type || "")}</div>
+          <div class="muted">Provider：${escapeHtml(identity.provider || "local_codex")}</div>
+        </div>
+      </div>
+
+      <div class="agent-detail-section">
+        <h4>权限</h4>
+        ${permissions.length ? permissions.map((p) => `
+          <div class="permission-item">
+            <span>${escapeHtml(p.scope)}</span>
+            <span class="permission-level ${p.level === "requires_approval" ? "requires-approval" : p.level === "disabled_in_phase_a" ? "disabled" : ""}">${escapeHtml(p.level)}</span>
+          </div>
+        `).join("") : "<p class='muted'>暂无权限数据</p>"}
+      </div>
+
+      <div class="agent-detail-section">
+        <h4>能力注册</h4>
+        ${capabilities.length ? capabilities.map((c) => `
+          <div class="permission-item">
+            <span>${escapeHtml(c.name)} (${escapeHtml(c.id)})</span>
+            <span class="permission-level">${escapeHtml(c.status)}</span>
+          </div>
+        `).join("") : "<p class='muted'>暂无能力数据</p>"}
+      </div>
+
+      <div class="agent-detail-section">
+        <h4>成本追踪</h4>
+        <div class="project-card">
+          <div class="muted">Provider：${escapeHtml(cost.provider || "local_codex")}</div>
+          <div class="muted">预估 Token：${cost.estimated_tokens || 0}</div>
+          <div class="muted">预估成本：$${cost.estimated_cost_usd || 0}</div>
+          ${renderEvidenceBadge(cost)}
+        </div>
+      </div>
+
+      <div class="agent-detail-section">
+        <h4>审计日志</h4>
+        <div class="event-timeline">
+          ${audit.length ? audit.map((log) => `
+            <div class="event-item">
+              <span class="event-item-time">${new Date(log.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
+              <div class="event-item-content">
+                <strong>${escapeHtml(log.actor)}</strong> · ${escapeHtml(log.action)}
+                <div class="muted" style="margin-top:2px;">${escapeHtml(log.description || "")}</div>
+              </div>
+            </div>
+          `).join("") : "<p class='muted'>暂无审计日志</p>"}
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    panel.innerHTML = `<div class="error-banner"><span>加载 Agent 详情失败：${escapeHtml(error.message)}</span></div>`;
+  }
+}
+
+// --- Data Loading ---
+
+async function loadV2Data(viewName) {
+  if (!state.selectedProjectId) return;
+
+  const projectId = state.selectedProjectId;
+
+  try {
+    switch (viewName) {
+      case "overview":
+        state.overviewData = await v2api.overview.get(projectId);
+        state.journeyData = await v2api.journey.get(projectId);
+        renderOverview();
+        renderJourneyBar();
+        break;
+      case "data-variables":
+        state.datasetsData = await v2api.datasets.list(projectId);
+        renderDataVariables();
+        break;
+      case "research-design":
+        state.designData = await v2api.design.get(projectId);
+        renderResearchDesign();
+        break;
+      case "paper-draft":
+        state.draftsData = await v2api.drafts.list(projectId);
+        renderPaperDraft();
+        break;
+      case "artifacts-replication":
+        renderArtifactsReplication();
+        break;
+      case "agent-console":
+        state.agentsData = await v2api.agents.list();
+        renderAgentConsole();
+        break;
+      case "empirical-execution":
+        // Phase A skeleton only, no data to load
+        break;
+    }
+  } catch (error) {
+    console.error(`Failed to load ${viewName}:`, error);
+    const viewId = viewName.replace(/-/g, "");
+    showV2Error(viewId, `加载失败：${error.message}`);
+  }
+}
+
+// ============================================================
+// Agent Cluster
+// ============================================================
 async function boot() {
   mountNav();
   mountProjectSelection();
@@ -1306,6 +2200,10 @@ async function boot() {
   mountForm();
   mountAgentClusterEvents();
   await refreshProjects();
+  // Load default V2 view data
+  if (state.selectedProjectId) {
+    await loadV2Data("overview");
+  }
 }
 
 void boot();

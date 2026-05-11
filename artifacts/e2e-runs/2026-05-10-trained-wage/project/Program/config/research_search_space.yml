@@ -1,0 +1,65 @@
+datasets:
+  - key: cfps
+    source_hint: A001CFPS中国家庭追踪调查
+    unit_candidates: [individual, household, province_year]
+    role: general-purpose survey microdata
+  - key: clds
+    source_hint: A005CLDS中国劳动力动态调查数据
+    unit_candidates: [individual, worker, village, province_year]
+    role: labor dynamics, matching efficiency, skills, automation exposure
+  - key: cmds
+    source_hint: A019-中国流动人口动态监测CMDS数据2011-2018年
+    unit_candidates: [migrant, city_year, province_year]
+    role: migration and institutional-friction variants
+  - key: robot_exposure
+    source_hint: 外部源数据
+    unit_candidates: [industry_year, province_year, firm_year]
+    role: robot installation, robot density, and robot penetration exposure
+
+outcomes:
+  - key: matching_efficiency
+    families: [job_finding, job_transition, mismatch, search_friction]
+  - key: wage_skill_premium
+    families: [wage, skill_premium, wage_distribution]
+  - key: labor_reallocation
+    families: [employment_status, occupation_transition, informal_employment]
+
+designs:
+  - key: ols_fe
+    assumptions: [selection_on_observables, fixed_effect_absorption]
+  - key: did
+    assumptions: [parallel_trends, no_anticipation]
+  - key: event_study
+    assumptions: [pre_trend_check, stable_treatment_timing]
+  - key: bartik_shift_share
+    assumptions: [exogenous_shares_or_shocks, no_direct_shock_violation]
+  - key: iv
+    assumptions: [relevance, exclusion_restriction, monotonicity]
+  - key: matching
+    assumptions: [overlap, conditional_independence]
+
+robustness:
+  - alternative_robot_measure
+  - alternative_outcome_measure
+  - alternative_sample_window
+  - province_trend
+  - industry_trend
+  - placebo_year
+  - placebo_outcome
+  - leave_one_region_out
+  - spec_curve
+
+hard_constraints:
+  - raw data is read-only
+  - only registered local data sources may be used
+  - all explored specifications must be logged
+  - unfavorable or insignificant results must not be deleted
+  - exploration results must not be presented as confirmatory causal evidence
+
+scoring_weights:
+  data_feasibility: 0.25
+  identification_credibility: 0.25
+  literature_novelty: 0.15
+  result_stability: 0.15
+  mechanism_clarity: 0.10
+  writing_fit: 0.10

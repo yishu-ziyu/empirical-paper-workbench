@@ -1,0 +1,17 @@
+{
+  "claims": [
+    {
+      "claim": "Strict matching efficiency is not directly identified.",
+      "evidence": [
+        "05_reference/匹配效率概念与可测代理对照表.md"
+      ]
+    },
+    {
+      "claim": "The thesis should frame measurable outcomes as allocation quality, search-friction proxies, and mismatch.",
+      "evidence": [
+        "04_paper/sections_v21",
+        "05_reference"
+      ]
+    }
+  ]
+}

@@ -454,3 +454,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260513-p2e-eval`
 
 说明：Safari + Computer Use 验收确认“结果与草稿”页结果论断卡显示 `ols · n=12 · β=1.8505 · 标准误=0.0755 · p=8.83e-133 · 95% 置信区间 1.7026 ~ 1.9984 · 评估器通过`，并绑定 `run_a3674e9e78c6`。
+
+## 2026-05-13 P2-F Real Data Candidate Pool
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-real-data-catalog-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_external_data_catalog.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：`list_project_datasets()` 现在返回 `external_catalog`；新增 `build_external_data_catalog()`、`external_data_library_roots()`、`build_external_dataset_preview()`、`read_csv_preview_rows()` 和 `build_dataset_quality_profile_from_rows()`。
+- 默认真实数据根目录：`/Users/mahaoxuan/Desktop/实证数据库`。
+- 可覆盖环境变量：`EMPIRICAL_DATA_LIBRARY_ROOT`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：数据与设计页新增 `external-data-library-panel`，静态资源版本更新到 `20260513-p2f-realdata2`。
+- `Product/web/assets/app.js`：新增 `renderExternalDataLibrary()`、`renderExternalDatasetCard()`、`formatBytes()`；首屏只显示 6 个真实候选文件，并显示总数。
+- `Product/web/assets/styles.css`：新增真实数据候选池、候选数据卡、只读说明和响应式布局样式。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`
+
+说明：点击“数据与设计”，可见 `真实数据候选池`，计数 `223`，根目录 `/Users/mahaoxuan/Desktop/实证数据库`，前 6 个 CFPS 候选文件显示 `本地文件`、文件大小、`尚未画像` 和 `只读`；下方项目内数据仍显示 `analysis_sample.csv`，两者没有混同。

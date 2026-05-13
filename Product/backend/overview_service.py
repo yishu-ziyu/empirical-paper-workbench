@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import os
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,8 @@ from Product.backend.registry import get_project_by_id
 
 STATUS_VALUES = {"completed", "in_progress", "blocked", "not_started"}
 DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feather"}
+EXTERNAL_CATALOG_LIMIT = 40
+EXTERNAL_CSV_PREVIEW_ROWS = 200
 
 
 def mock_meta(service: str) -> dict[str, str]:
@@ -310,6 +313,7 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
         "_meta": local_file_meta("dataset_service"),
         "project": project_identity(project),
         "items": items,
+        "external_catalog": build_external_data_catalog(),
         "empty_state": {
             "title": "尚未登记数据集",
             "description": "已检查项目 Data 目录，当前没有发现 csv/dta/xlsx/parquet 等可识别数据文件。",
@@ -318,6 +322,151 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
         if not items
         else None,
     }
+
+
+def build_external_data_catalog() -> dict[str, Any]:
+    roots = external_data_library_roots()
+    root = next((candidate for candidate in roots if candidate.exists() and candidate.is_dir()), None)
+    if root is None:
+        configured_root = roots[0] if roots else None
+        return {
+            "evidence_level": "local_file",
+            "exists": False,
+            "read_only": True,
+            "root": str(configured_root) if configured_root else None,
+            "items": [],
+            "total_count": 0,
+            "empty_state": {
+                "title": "尚未找到真实数据仓库",
+                "description": "可通过 EMPIRICAL_DATA_LIBRARY_ROOT 指向本机实证数据库目录。",
+            },
+        }
+
+    items: list[dict[str, Any]] = []
+    total_count = 0
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in DATASET_SUFFIXES:
+            continue
+        total_count += 1
+        if len(items) >= EXTERNAL_CATALOG_LIMIT:
+            continue
+        relative_path = path.relative_to(root).as_posix()
+        stat = path.stat()
+        shape, quality_profile = build_external_dataset_preview(path)
+        items.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "relative_path": relative_path,
+                "collection": external_collection_label(path.relative_to(root)),
+                "file_type": path.suffix.lower().lstrip("."),
+                "size": stat.st_size,
+                "row_count": shape["row_count"],
+                "column_count": shape["column_count"],
+                "evidence_level": "local_file",
+                "role": "external_candidate_dataset",
+                "scope": "external_data_library",
+                "read_only": True,
+                "quality_profile": quality_profile,
+                "updated_at": utc_now(),
+            }
+        )
+
+    return {
+        "evidence_level": "local_file",
+        "exists": True,
+        "read_only": True,
+        "root": str(root),
+        "items": items,
+        "total_count": total_count,
+        "limit": EXTERNAL_CATALOG_LIMIT,
+        "empty_state": None
+        if items
+        else {
+            "title": "真实数据仓库为空",
+            "description": "已找到目录，但没有发现 csv/dta/xlsx/parquet 等可识别数据文件。",
+        },
+    }
+
+
+def external_data_library_roots() -> list[Path]:
+    configured = os.environ.get("EMPIRICAL_DATA_LIBRARY_ROOT")
+    if configured:
+        return [Path(item).expanduser() for item in configured.split(os.pathsep) if item.strip()]
+    return [Path.home() / "Desktop" / "实证数据库"]
+
+
+def external_collection_label(relative_path: Path) -> str:
+    parts = relative_path.parts
+    if len(parts) >= 2:
+        return " / ".join(parts[:2])
+    return parts[0] if parts else "未分组"
+
+
+def build_external_dataset_preview(path: Path) -> tuple[dict[str, int | None], dict[str, Any]]:
+    if path.suffix.lower() != ".csv":
+        shape = {"row_count": None, "column_count": None}
+        return shape, {
+            "evidence_level": "local_file",
+            "supported": False,
+            "profile_scope": "catalog_preview",
+            "readiness_status": "not_profiled",
+            "row_count": None,
+            "column_count": None,
+            "missing_cells": None,
+            "missing_rate": None,
+            "numeric_column_count": None,
+            "text_column_count": None,
+            "columns": [],
+            "checks": [
+                {
+                    "id": "profile_supported",
+                    "label": "候选池画像支持",
+                    "status": "warning",
+                    "detail": f"{path.suffix.lower().lstrip('.') or 'unknown'} 暂未接入预览解析。",
+                }
+            ],
+        }
+
+    rows, sampled = read_csv_preview_rows(path, EXTERNAL_CSV_PREVIEW_ROWS)
+    if not rows:
+        profile = empty_csv_quality_profile()
+        profile["profile_scope"] = "catalog_preview"
+        profile["row_count_source"] = "empty"
+        return {"row_count": 0, "column_count": 0}, profile
+
+    headers = rows[0]
+    data_rows = rows[1:]
+    shape = {
+        "row_count": len(data_rows),
+        "column_count": len(headers),
+    }
+    profile = build_dataset_quality_profile_from_rows(headers, data_rows)
+    profile["profile_scope"] = "catalog_preview"
+    profile["row_count_source"] = "sampled_preview" if sampled else "complete_preview"
+    if sampled:
+        profile["checks"].append(
+            {
+                "id": "preview_limited",
+                "label": "预览范围",
+                "status": "warning",
+                "detail": f"仅读取前 {EXTERNAL_CSV_PREVIEW_ROWS} 行用于候选池画像。",
+            }
+        )
+    return shape, profile
+
+
+def read_csv_preview_rows(path: Path, row_limit: int) -> tuple[list[list[str]], bool]:
+    rows: list[list[str]] = []
+    sampled = False
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as handle:
+        reader = csv.reader(handle)
+        for index, row in enumerate(reader):
+            if index > row_limit:
+                sampled = True
+                break
+            rows.append(row)
+    return rows, sampled
 
 
 def configured_dataset_path(root: Path) -> str | None:
@@ -371,6 +520,10 @@ def build_dataset_quality_profile(path: Path, shape: dict[str, int | None]) -> d
 
     headers = rows[0]
     data_rows = rows[1:]
+    return build_dataset_quality_profile_from_rows(headers, data_rows)
+
+
+def build_dataset_quality_profile_from_rows(headers: list[str], data_rows: list[list[str]]) -> dict[str, Any]:
     column_count = len(headers)
     row_count = len(data_rows)
     columns = build_column_profiles(headers, data_rows)

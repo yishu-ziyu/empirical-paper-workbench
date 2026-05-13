@@ -1006,3 +1006,51 @@ P2-F：从 `/Users/mahaoxuan/Desktop/实证数据库` 选择一个真实且可�
 - Finding approve 还没有强制检查 evaluator status；当前只是显示 evaluator 证据。
 - 真实数据目录可能包含大文件、Stata `.dta`、编码问题或隐私数据；P2-F 必须先做只读 inventory，不要移动或修改原始数据。
 - Playwright MCP 仍不稳定；继续使用 Safari + Computer Use 做视觉闭环。
+
+## 2026-05-13 P2-F Real Data Candidate Pool 交接增量
+
+### 当前目标
+
+把用户提供的 `/Users/mahaoxuan/Desktop/实证数据库` 接入产品，但只作为只读真实数据候选池，不把它伪装成当前项目已经使用的数据。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-real-data-catalog-bdd.md`。
+- 新增测试：`tests/test_external_data_catalog.py`，覆盖 API 候选池、CSV 轻量画像、DTA 可见性、前端面板和空状态。
+- 扩展 `Product/backend/overview_service.py`：`list_project_datasets()` 返回 `external_catalog`；默认扫描 `/Users/mahaoxuan/Desktop/实证数据库`，可通过 `EMPIRICAL_DATA_LIBRARY_ROOT` 覆盖。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：数据与设计页新增“真实数据候选池”，首屏只展示 6 张候选卡，并显示真实文件总数。
+- 修复视觉验收中发现的提示不一致：页面显示 6 张卡时，底部提示现在是 `已显示前 6 个候选文件，共发现 223 个。`
+
+### 已验证证据
+
+- 目标测试：`python3 -m unittest tests.test_external_data_catalog -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，11 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，170 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py`、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `external_catalog.exists=true`、`root=/Users/mahaoxuan/Desktop/实证数据库`、`total_count=223`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`，点击“数据与设计”，确认真实数据候选池、6 张 CFPS 候选卡、`本地文件`、`尚未画像`、`只读` 和项目内 `analysis_sample.csv` 分开展示。
+
+### 关键文件路径
+
+- `Product/backend/overview_service.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_external_data_catalog.py`
+- `docs/architecture-v2/codex-phase-p2-real-data-catalog-bdd.md`
+
+### 不能重复探索的结论
+
+- `/Users/mahaoxuan/Desktop/实证数据库` 是外部真实数据候选池，不是当前项目已确认使用的数据目录。
+- 外部候选文件必须保持 `read_only=true`，在没有导入/绑定 manifest 前不能进入 VariableRoleSet、DesignSpec 或 RunPlan。
+- 当前只对 CSV 做轻量预览画像；DTA/XLSX/Parquet 等大文件先登记来源和大小，不在页面加载时深度解析。
+
+### 下一步第一件事
+
+P2-G：做“真实候选数据导入/绑定预检”。最小产品动作是选择一个候选文件，生成 import/bind preview，记录来源路径、目标路径、复制或链接策略、文件大小、证据等级和人工动作；预检通过后才允许进入变量角色确认。
+
+### 未解决风险
+
+- DTA/XLSX/Parquet 深度变量字典还未做，后续应引入 pandas/pyreadstat 或 StatsPAI 的安全预览路径。
+- 外部候选池还没有搜索、过滤、选择、导入或绑定动作。
+- 当前执行链仍使用 `Data/Final/analysis_sample.csv`；不要把 P2-F 的候选池误读为已经完成真实论文数据运行。

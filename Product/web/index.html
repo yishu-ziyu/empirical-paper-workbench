@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>实证工作台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231e6f62'/%3E%3Cpath d='M4 11h8v1H4zm1-7h6v1H5zm0 3h6v1H5z' fill='white'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260513-p2e-eval2" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260513-p2f-realdata2" />
   </head>
   <body>
     <div class="app-shell archive-shell clean-workbench-shell">
@@ -176,6 +176,13 @@
             <h2>数据与变量</h2>
             <p class="muted">上传数据集、定义变量角色、查看数据质量</p>
           </div>
+          <section class="panel external-data-library-panel" id="external-data-library-panel">
+            <div class="panel-head">
+              <h3>真实数据候选池</h3>
+              <span class="pill" id="external-datasets-count">0</span>
+            </div>
+            <div id="external-datasets-list" class="external-datasets-list"></div>
+          </section>
           <section class="panel variable-role-workflow-card" id="variable-role-workflow-card">
             <div class="panel-head">
               <h3>检查并确认变量角色</h3>
@@ -819,6 +826,6 @@
       </main>
     </div>
 
-    <script src="/assets/app.js?v=20260513-p2e-eval2" defer></script>
+    <script src="/assets/app.js?v=20260513-p2f-realdata2" defer></script>
   </body>
 </html>

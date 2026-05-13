@@ -392,3 +392,17 @@ Rejected: 在 UI 中用窄网格展示所有方法证据字段。原因是 Resul
 Rejected: 把极小 p 值四舍五入成 `0`。原因是这会降低研究审阅可信度；当前改为保留显著数字，并由前端显示科学计数法。
 
 Evidence: 最新真实 full run `run_a3674e9e78c6` 返回 `standard_errors.trained=0.0754664205`、`p_values.trained=8.83354660202e-133`、`confidence_intervals.trained=[1.7025934962, 1.9984218644]`、`evaluator.status=passed`，四项 checks 全部 passed。
+
+## 2026-05-13：真实数据仓库先作为只读候选池接入
+
+Decision: 在 `GET /api/v1/projects/{project_id}/datasets` 中新增 `external_catalog`，默认扫描 `/Users/mahaoxuan/Desktop/实证数据库`，把外部真实数据以只读候选池展示在“数据与设计”页；项目内数据仍只来自当前 repo 的 `Data/` 目录和 `paper.yaml` 配置。
+
+Reason: 用户提供的真实数据目录非常适合作为测试与后续选题来源，但它不是当前论文项目已经确认使用的数据。先做只读 inventory/profile，可以让用户看见真实资产，又不破坏 provenance 边界。
+
+Rejected: 直接把外部候选文件加入 `items` 当作项目数据。原因是这会让 UI 暗示变量角色、RunPlan 和 OLS 结果已经基于这些真实文件，实际上当前执行仍使用 `Data/Final/analysis_sample.csv`。
+
+Rejected: 页面加载时深度读取全部 DTA/XLSX/Parquet 文件。原因是真实数据仓库有 223 个文件，包含数百 MB Stata 文件；深度读取会拖慢页面并增加编码/隐私风险。P2-F 只做轻量 catalog preview。
+
+Rejected: 把外部候选池做成可编辑上传区。原因是当前阶段没有导入/绑定 manifest，也没有用户确认动作；候选池必须 `read_only=true`。
+
+Evidence: live API 扫描到 `total_count=223`，Safari `数据与设计` 页显示 `/Users/mahaoxuan/Desktop/实证数据库`、CFPS DTA 候选文件、`本地文件`、`尚未画像` 和 `只读`。

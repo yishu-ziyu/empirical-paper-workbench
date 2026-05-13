@@ -330,3 +330,21 @@
 - 当前 PSM/DML 的 ready 判断较粗，只证明有 outcome/treatment/controls，不证明估计策略充分。
 - 下一步 P2-C 应优先把 OLS baseline 跑成 `local_execution` 证据，再逐步扩展 DID/IV/RDD/PSM/DML。
 - Playwright MCP 仍不稳定；可视化验收当前以 Safari + Computer Use 为准。
+
+## 2026-05-13 P2-C OLS Execution Adapter
+
+- 目标：把 P2-B 的 OLS ready 方法从 `local_file` 级准入判断推进到 `local_execution` 级本地方法执行结果。
+- BDD：新增 `docs/architecture-v2/codex-phase-p2-ols-execution-adapter-bdd.md`，覆盖 approved OLS 执行、RunPlan/数据/公式绑定、manifest 记录、unsupported method 拒绝、不可估数据结构化失败。
+- 失败测试：`python3 -m unittest tests.test_ols_execution_adapter -v` 首次有效失败为缺少 `Results/json/method_execution_result.json`、`run.method_execution` 和 manifest `method_execution`；随后发现测试 fixture 共线并改为可估样本。
+- 目标测试：`python3 -m unittest tests.test_ols_execution_adapter -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_ols_execution_adapter tests.test_full_run_from_run_plan tests.test_method_skill_catalog tests.test_results_draft_evidence_binding -v`，20 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，157 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/overview_service.py Product/backend/design_spec_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：重启 8765 后，`POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_4c62f1721afb`，输出 `status=succeeded`、`plan_binding.tasks[0].method_id=ols`、`method_execution.evidence_level=local_execution`、`treatment_coefficient=1.8505076803`。
+- 可视化验收：Playwright MCP 仍 `Transport closed`；使用 Safari + Computer Use 验证本地页面可正常加载，研究设计细节页仍显示方法技能集。P2-C 的结果展示尚未进入页面。
+
+## 风险更新
+
+- P2-C 已完成最小本地 OLS 执行证据，但它不是完整 StatsPAI/Stata 引擎；当前没有稳健标准误、p 值、固定效应、聚类或模型诊断。
+- `Results & Draft` 仍主要读取 `Results/json/analysis_result.json`；P2-D 应把 `method_execution_result.json` 接入 Execution / Findings。
+- DID/IV/RDD/PSM/DML 仍不能执行；后续每个方法都需要独立 BDD/TDD 和真实产物。

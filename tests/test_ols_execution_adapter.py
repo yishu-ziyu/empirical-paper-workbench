@@ -12,13 +12,13 @@ import Product.app as product_app
 from Product.backend.registry import ensure_registry
 
 
-class FullRunFromRunPlanApiTests(unittest.TestCase):
-    """BDD: 完整执行必须从 approved RunPlan 启动，并保留 provenance。"""
+class OlsExecutionAdapterApiTests(unittest.TestCase):
+    """BDD: ready 的 OLS RunPlan 必须产生真实 local_execution 方法结果。"""
 
     def setUp(self) -> None:
         self.original_product_root = product_app.PRODUCT_ROOT
         self.original_repo_root = product_app.REPO_ROOT
-        self.temp_dir = Path(tempfile.mkdtemp(prefix="full-run-plan-"))
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="ols-execution-adapter-"))
         self.repo_root = self.temp_dir / "repo"
         self.project_root = self.temp_dir / "empirical-project"
         self.product_root = self.repo_root / "Product"
@@ -31,8 +31,8 @@ class FullRunFromRunPlanApiTests(unittest.TestCase):
         response = self.client.post(
             "/api/v1/projects",
             json={
-                "slug": "full-run-plan",
-                "title": "Full RunPlan Project",
+                "slug": "ols-execution-adapter",
+                "title": "OLS Execution Adapter Project",
                 "project_root": str(self.project_root),
                 "language": "zh",
             },
@@ -45,17 +45,8 @@ class FullRunFromRunPlanApiTests(unittest.TestCase):
         product_app.REPO_ROOT = self.original_repo_root
         shutil.rmtree(self.temp_dir)
 
-    def test_bdd_1_full_run_requires_approved_run_plan(self) -> None:
-        """行为 1：缺少 approved RunPlan 时禁止 full run。"""
-        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
-
-        self.assertEqual(response.status_code, 409, msg=response.text)
-        self.assertEqual(response.json()["error"]["code"], "run_plan_required")
-        runs = self.client.get(f"/api/v1/projects/{self.project_id}/runs")
-        self.assertEqual(runs.json()["items"], [])
-
-    def test_bdd_2_full_run_reads_run_plan_and_creates_observable_execution(self) -> None:
-        """行为 2：full run 必须读取 approved RunPlan 并创建可观察执行。"""
+    def test_bdd_1_full_run_writes_local_execution_ols_result(self) -> None:
+        """行为 1：approved OLS RunPlan 生成本地执行结果。"""
         self._approve_variable_roles()
         self._approve_design_spec()
         self._approve_run_plan()
@@ -64,35 +55,80 @@ class FullRunFromRunPlanApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202, msg=response.text)
         run = response.json()
-        self.assertEqual(run["mode"], "full-run")
-        self.assertEqual(run["status"], "succeeded")
-        self.assertEqual(run["execution_evidence_level"], "local_execution")
-        self.assertEqual(run["dataset_source"]["path"], "Data/Final/analysis_sample.csv")
-        self.assertEqual(run["plan_binding"]["evidence_level"], "local_file")
-        self.assertEqual(run["plan_binding"]["run_plan_version"], 1)
-        self.assertEqual(run["plan_binding"]["design_spec_version"], 1)
-        self.assertEqual(run["plan_binding"]["variable_role_set_version"], 1)
-        self.assertEqual(run["plan_binding"]["tasks"][0]["method_id"], "ols")
+        result_path = self.project_root / "Results" / "json" / "method_execution_result.json"
+        self.assertTrue(result_path.exists())
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        self.assertEqual(result["evidence_level"], "local_execution")
+        self.assertEqual(result["engine"], "python_ols_adapter")
+        self.assertEqual(result["methods"][0]["method_id"], "ols")
+        self.assertEqual(result["methods"][0]["task_id"], "baseline_regression")
+        self.assertEqual(run["method_execution"]["artifact_path"], "Results/json/method_execution_result.json")
+        self.assertEqual(run["method_execution"]["evidence_level"], "local_execution")
 
-        manifest_path = self.project_root / "state" / "runs" / run["id"] / "run_manifest.json"
-        self.assertTrue(manifest_path.exists())
+    def test_bdd_2_ols_result_binds_run_plan_dataset_formula_and_coefficient(self) -> None:
+        """行为 2：OLS 结果必须绑定 RunPlan、数据集、公式和 treatment 系数。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        method = response.json()["method_execution"]["methods"][0]
+        self.assertEqual(method["run_plan_version"], 1)
+        self.assertEqual(method["dataset_path"], "Data/Final/analysis_sample.csv")
+        self.assertEqual(method["formula"], "wage ~ trained + edu + experience")
+        self.assertEqual(method["method_id"], "ols")
+        self.assertEqual(method["nobs"], 8)
+        self.assertIn("trained", method["coefficients"])
+        self.assertIsInstance(method["coefficients"]["trained"], float)
+
+    def test_bdd_3_manifest_records_method_execution_artifact(self) -> None:
+        """行为 3：run manifest 必须记录方法执行产物。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        run_id = response.json()["id"]
+        manifest_path = self.project_root / "state" / "runs" / run_id / "run_manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["run_plan_binding"]["run_plan_version"], 1)
-        self.assertEqual(manifest["run_plan_binding"]["dataset_path"], "Data/Final/analysis_sample.csv")
-        self.assertEqual(manifest["run_plan_binding"]["evidence_level"], "local_file")
-        self.assertEqual(manifest["research_engine"]["name"], "Feynman-compatible research engine")
-        self.assertFalse(manifest["research_engine"]["embedded"])
-        self.assertEqual(manifest["research_engine"]["integration_mode"], "callable_external")
+        self.assertEqual(manifest["method_execution"]["artifact_path"], "Results/json/method_execution_result.json")
+        self.assertEqual(manifest["method_execution"]["evidence_level"], "local_execution")
+        self.assertEqual(manifest["method_execution"]["methods"][0]["method_id"], "ols")
 
-        observability = self.client.get(
-            f"/api/v1/projects/{self.project_id}/runs/{run['id']}/observability"
+    def test_bdd_4_unsupported_method_is_rejected_before_execution(self) -> None:
+        """行为 4：unsupported 方法不能被静默执行。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan(method_id="iv")
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "unsupported_run_plan_method")
+        self.assertFalse((self.project_root / "Results" / "json" / "method_execution_result.json").exists())
+
+    def test_bdd_5_insufficient_ols_data_returns_structured_failure(self) -> None:
+        """行为 5：OLS 数据不足时返回结构化失败，不能暴露 500。"""
+        (self.project_root / "Data" / "Final" / "analysis_sample.csv").write_text(
+            "wage,trained,edu,experience\n"
+            "10,1,16,3\n"
+            "12,0,14,5\n",
+            encoding="utf-8",
         )
-        self.assertEqual(observability.status_code, 200, msg=observability.text)
-        self.assertEqual(observability.json()["_meta"]["evidence_level"], "local_execution")
-        self.assertEqual(
-            observability.json()["manifest"]["run_plan_binding"]["evidence_level"],
-            "local_file",
-        )
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "method_execution_failed")
+        self.assertIn("not_enough_numeric_observations", response.json()["error"]["message"])
+        self.assertFalse((self.project_root / "Results" / "json" / "method_execution_result.json").exists())
 
     def _approve_variable_roles(self) -> None:
         response = self.client.put(
@@ -135,12 +171,13 @@ class FullRunFromRunPlanApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200, msg=response.text)
 
-    def _approve_run_plan(self) -> None:
+    def _approve_run_plan(self, method_id: str = "ols") -> None:
         draft = self.client.get(f"/api/v1/projects/{self.project_id}/run-plan").json()["run_plan"]
+        tasks = [dict(task, method_id=method_id) for task in draft["tasks"]]
         response = self.client.put(
             f"/api/v1/projects/{self.project_id}/run-plan",
             json={
-                "tasks": draft["tasks"],
+                "tasks": tasks,
                 "outputs": draft["outputs"],
                 "note": "RunPlan 已确认。",
             },
@@ -151,10 +188,10 @@ class FullRunFromRunPlanApiTests(unittest.TestCase):
     def _create_minimal_project(project_root: Path) -> None:
         (project_root / "Data" / "Final").mkdir(parents=True)
         (project_root / "Program").mkdir(parents=True)
-        (project_root / "Results").mkdir(parents=True)
+        (project_root / "Results" / "json").mkdir(parents=True)
         (project_root / "Manuscripts" / "generated").mkdir(parents=True)
         (project_root / "paper.yaml").write_text(
-            "project:\n  slug: full-run-plan\n  title: Full RunPlan Project\n"
+            "project:\n  slug: ols-execution-adapter\n  title: OLS Execution Adapter Project\n"
             "research:\n  question: 培训是否影响工资？\n"
             "data:\n  final_dataset: Data/Final/analysis_sample.csv\n",
             encoding="utf-8",
@@ -198,24 +235,6 @@ print('ok')
 """,
             encoding="utf-8",
         )
-
-
-class FullRunFromRunPlanFrontendTests(unittest.TestCase):
-    """BDD: 前端 ready 后必须把 full run 作为 Execution 主行动。"""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        root = Path(__file__).resolve().parents[1]
-        cls.index_html = (root / "Product" / "web" / "index.html").read_text(encoding="utf-8")
-        cls.app_js = (root / "Product" / "web" / "assets" / "app.js").read_text(encoding="utf-8")
-
-    def test_bdd_4_execution_page_contains_start_full_run_action(self) -> None:
-        """行为 4：Execution 页面必须有 full run 主行动按钮。"""
-        self.assertIn("observable-run-full-button", self.index_html)
-        self.assertIn("v2api.runs.startFull", self.app_js)
-        self.assertIn("createFullRunFromPlan", self.app_js)
-        self.assertIn("start_full_run", self.app_js)
-        self.assertIn("/runs/full", self.app_js)
 
 
 if __name__ == "__main__":

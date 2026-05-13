@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-13 19:05 CST
+更新时间：2026-05-13 22:37 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与档案界面均已完成。最新 P2-A 已完成 CoPaper/StatsPAI 式“数据质量画像”：`/datasets` 返回 `quality_profile`，数据与设计页能展示样本量、缺失率、字段类型、检查项和 `local_file` 证据，并修正残留英文技术标签。当前 full run `run_c424d6a11af7` 已生成 approved FindingCard `finding_trained_effect` 和 approved Manuscript candidate `manuscript_candidate_finding_trained_effect_results`；该 candidate 已进入 `export_status=preview_ready`。下一步建议进入 P2-B：设计 StatsPAI/CoPaper 式方法技能集目录，把 OLS/DID/IV/RDD/PSM/DML 等方法的前置变量要求和可执行状态接入 RunPlan。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与 clean workbench、P2-A 数据质量画像、P2-B 方法技能集目录均已完成。最新 P2-C 已完成 OLS 本地执行适配器：approved OLS RunPlan 会生成 `Results/json/method_execution_result.json`，run response 和 `run_manifest.json` 均写入 `method_execution.evidence_level=local_execution`。真实验收 run 为 `run_4c62f1721afb`，`treatment_coefficient=1.8505076803`。下一步建议进入 P2-D：把 `method_execution_result.json` 接到 Execution / Findings UI，让用户在页面上看见方法执行证据，而不是只在 API 中看到。
 
 ## 已完成事项
 
@@ -184,7 +184,7 @@
 
 ## 下一步第一件事
 
-写 P1-P BDD 和失败测试：在 Review & Export workbench 基础上，定义显式写回审批或 docx 导出预检。继续保持 `Manuscripts/generated/paper_draft.md` 不被自动覆盖，除非出现独立、明确、可审计的用户审批动作。
+写 P2-D BDD 和失败测试：把 `Results/json/method_execution_result.json` 接入 Execution / Findings。Execution 应显示本次方法执行的 engine、method_id、formula、nobs、treatment coefficient、evidence_level；Findings 应优先从方法执行产物读取 OLS evidence，再决定是否替换旧 `analysis_result.json` 的展示逻辑。
 
 ## 未解决风险
 
@@ -866,3 +866,43 @@ P2-C：选择一个最小真实执行适配器路径，建议先做 OLS baseline
 - 还没有真正调用 StatsPAI、Stata 或 pyfixest；当前只是方法准入目录。
 - PSM/DML 现在只按有无 controls/covariates 判断 ready，还没有样本量、平衡性、交叉拟合等更严格 evaluator。
 - Playwright MCP 仍返回 `Transport closed`；本轮视觉验收继续使用 Safari + Computer Use。
+
+## 2026-05-13 P2-C OLS Execution Adapter 交接增量
+
+### 当前目标
+
+把 P2-B 的方法准入目录推进到第一个真实方法执行产物。OLS baseline 现在不是 `local_file` 级“可执行判断”，而是会在 full run 后写出 `local_execution` 级结果文件。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-ols-execution-adapter-bdd.md`。
+- 新增测试：`tests/test_ols_execution_adapter.py`，覆盖 approved OLS、manifest、unsupported method、insufficient data。
+- 修改 `Product/backend/project_service.py`：full run 成功后执行本地 `python_ols_adapter`，读取 RunPlan 公式和 CSV，计算 OLS 系数并写入 `Results/json/method_execution_result.json`。
+- 修改 `Product/backend/project_service.py`：新增 `MethodExecutionError`，把数据不足、公式不可估、共线设计变成结构化产品错误。
+- 修改 `Product/app.py`：unsupported method 返回 409 `unsupported_run_plan_method`；方法执行失败返回 409 `method_execution_failed`。
+- 修复 `plan_binding.tasks[].method_id` 在真实项目中可能为 `null` 的问题，回退使用 estimator。
+
+### 已验证证据
+
+- 目标测试：`python3 -m unittest tests.test_ols_execution_adapter -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_ols_execution_adapter tests.test_full_run_from_run_plan tests.test_method_skill_catalog tests.test_results_draft_evidence_binding -v`，20 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，157 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/overview_service.py Product/backend/design_spec_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：`POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_4c62f1721afb`，status=`succeeded`，`plan_binding.tasks[0].method_id=ols`，`method_execution.evidence_level=local_execution`，`treatment_coefficient=1.8505076803`。
+- 可视化验收：Safari + Computer Use 打开本地页面，研究设计细节页正常加载；P2-C 的方法执行结果目前主要通过 API 和本地文件验收，尚未完全接入页面展示。
+
+### 不能重复探索的结论
+
+- `method_catalog` 是方法准入目录，`method_execution_result.json` 才是方法执行证据。
+- 当前 OLS adapter 是最小本地 Python 执行器，不是完整 StatsPAI/Stata 引擎。
+- DID/IV/RDD/PSM/DML 仍不能执行，除非后续各自写 BDD/TDD 和真实产物。
+
+### 下一步第一件事
+
+P2-D：写 BDD 和失败测试，把 `Results/json/method_execution_result.json` 接入 Execution / Findings 页面。目标是让用户点击一次 full run 后，在页面上直接看到“OLS 已本地执行、用了哪个公式、多少样本、处理变量系数是多少、证据等级是什么”。
+
+### 未解决风险
+
+- OLS adapter 没有标准误、p 值、稳健标准误、固定效应或聚类。
+- `Results & Draft` 目前仍主要读取 `Results/json/analysis_result.json`；P2-D 应决定是否以 `method_execution_result.json` 作为 Findings 的方法证据源。
+- Playwright MCP 仍返回 `Transport closed`；视觉验收继续使用 Safari + Computer Use fallback。

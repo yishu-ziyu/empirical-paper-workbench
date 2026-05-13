@@ -26,6 +26,7 @@
 - `clean_workbench`：已完成第一轮清洁视觉修正；`archive-shell` 去掉纸格背景和厚重阴影，右侧变为 `inspector-rail` 属性检查器，变量角色确认入口改为 `research-record-card` + `research-step-list`，解决 Data & Design 截图中的重叠问题。
 - `dataset_quality_profile`：已完成第一轮数据质量画像；`analysis_sample.csv` 返回 `row_count=12`、`column_count=4`、`missing_rate=0`、字段类型与 readiness，证据等级为 `local_file`。
 - `method_catalog`：已完成第一轮方法技能集目录；RunPlan 返回 OLS/DID/IV/RDD/PSM/DML 前置条件，OLS/PSM/DML 当前 ready，DID/IV/RDD 当前 blocked，证据等级为 `local_file`，不代表真实 StatsPAI 执行。
+- `method_execution`：已完成第一轮 OLS 本地执行适配器；approved OLS RunPlan 可生成 `Results/json/method_execution_result.json`，证据等级为 `local_execution`，并写入 run response 与 `run_manifest.json`。当前只支持 OLS，unsupported 方法和不可估数据会结构化失败。
 
 ## 当前要求
 
@@ -34,7 +35,7 @@
 - 每次运行都保留可验证的中间产物。
 - 产品主行动必须优先围绕研究生命周期，不把 run/step/gate/artifact 作为首页主对象。
 - P1-P 已完成；Review & Export 已具备显式写回审批和 docx 预检状态，但仍不覆盖源草稿、不直接生成最终 docx。
-- P2-B 已完成；P2-C 开始前必须继续按 BDD/TDD：先定义 OLS/StatsPAI/Stata 最小真实执行适配器如何产生 `local_execution` 证据，再写失败测试。
+- P2-C 已完成；P2-D 开始前必须继续按 BDD/TDD：先定义 Execution / Findings 如何消费 `method_execution_result.json`，再写失败测试和 UI/API 最小实现。
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。

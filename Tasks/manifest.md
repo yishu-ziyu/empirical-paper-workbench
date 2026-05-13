@@ -218,6 +218,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `Product/web/assets/app.js`
 - `Product/web/assets/styles.css`
 
+## 2026-05-13 P2-C OLS Execution Adapter
+
+### 新增/扩展文件
+
+- `docs/architecture-v2/codex-phase-p2-ols-execution-adapter-bdd.md`
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_full_run_from_run_plan.py`
+- `Product/backend/project_service.py`
+- `Product/app.py`
+
+### 新增/扩展 API 与产物
+
+- `POST /api/v1/projects/{project_id}/runs/full`：approved OLS RunPlan 成功执行后返回 `method_execution`。
+- `Results/json/method_execution_result.json`：本地 OLS 方法执行结果，`engine=python_ols_adapter`，`evidence_level=local_execution`。
+- `state/runs/{run_id}/run_manifest.json`：新增 `method_execution` 段，指向方法执行产物。
+- 结构化错误：unsupported method 返回 409 `unsupported_run_plan_method`；数据不足、公式不可估或共线设计返回 409 `method_execution_failed`。
+
+### 手动验收产物
+
+- `state/runs/run_4c62f1721afb.json`
+- `state/runs/run_4c62f1721afb/run_manifest.json`
+- `Results/json/method_execution_result.json`
+
+说明：P2-C API 验收创建 full run `run_4c62f1721afb`，其中 `method_execution.artifact_path=Results/json/method_execution_result.json`、`engine=python_ols_adapter`、`evidence_level=local_execution`、`methods[0].method_id=ols`、`nobs=12`、`treatment_coefficient=1.8505076803`；`plan_binding.tasks[0].method_id=ols`。
+
 ### 新增/扩展 API
 
 - `GET /api/v1/projects/{project_id}/export-package`

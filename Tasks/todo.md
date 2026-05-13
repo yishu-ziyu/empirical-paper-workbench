@@ -321,4 +321,16 @@
 - [x] 前端：研究设计页新增“方法技能集”，显示 StatsPAI/CoPaper 前置条件、方法可执行状态、执行者、证据等级、前置要求和阻塞原因。
 - [x] 视觉修正：方法目录改为纵向 clean workbench 证据清单，避免双列卡片在 Safari 中继续拥挤。
 - [x] 验证：`python3 -m unittest discover -s tests -v`，152 tests OK，skipped=1；Python 编译和 JS 语法检查通过；API / Safari 可视化验收通过。
-- [ ] P2-C：把方法目录推进到真实方法执行适配器设计，优先选择一个最小 OLS/StatsPAI/Stata 执行路径，并把结果写成 `local_execution` 证据。
+- [x] P2-C：把方法目录推进到真实方法执行适配器设计，优先选择一个最小 OLS/StatsPAI/Stata 执行路径，并把结果写成 `local_execution` 证据。
+
+## 2026-05-13 P2-C OLS Execution Adapter
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-ols-execution-adapter-bdd.md`，定义 approved OLS RunPlan 必须生成本地方法执行结果、绑定 RunPlan/数据集/公式、写入 manifest，并拒绝 unsupported 方法。
+- [x] TDD：新增 `tests/test_ols_execution_adapter.py`；首次运行 4 条中 3 条失败，原因是 `Results/json/method_execution_result.json`、`run.method_execution` 和 manifest `method_execution` 尚不存在；unsupported method 已在实现初版后通过。
+- [x] 实现：扩展 `Product/backend/project_service.py`，新增本地 `python_ols_adapter`，从 approved RunPlan 读取 OLS task、公式和本地 CSV，计算 OLS 系数并写入 `Results/json/method_execution_result.json`。
+- [x] 实现：扩展 `Product/app.py`，对 unsupported method 返回 409 `unsupported_run_plan_method`，对数据不足、公式不可估、共线设计返回 409 `method_execution_failed`，避免后端 500。
+- [x] 契约修复：`run.plan_binding.tasks[].method_id` 现在回退到 estimator，真实样例不会再出现 `method_id=null`。
+- [x] 验证：目标测试 5 OK；相邻回归 20 OK；全量回归 157 OK，skipped=1；Python 编译和 JS 语法检查通过。
+- [x] API 验收：真实项目 `POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_4c62f1721afb`，status=`succeeded`，`plan_binding.tasks[0].method_id=ols`，`method_execution.evidence_level=local_execution`，`treatment_coefficient=1.8505076803`。
+- [x] 可视化验收：Safari + Computer Use 打开本地页面，研究设计细节页可正常加载；P2-C 为后端执行证据能力，下一步需要把 `method_execution` 更清晰地接入 Execution / Findings UI。
+- [ ] P2-D：把 `Results/json/method_execution_result.json` 接入 Execution / Findings，把 OLS 结果作为方法执行证据展示，而不是只停留在 API response。

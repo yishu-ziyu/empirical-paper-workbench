@@ -218,6 +218,18 @@ Decision: 新增 `GET /api/v1/projects/{project_id}/manuscript-candidates`，只
 
 Reason: P1-J 只证明某个统计论断可以进入写作，但它还不是最终正文。Manuscript 阶段需要一个中间候选层，让用户先看见由结果证据生成的段落，再决定是否确认、修改、写回或导出。
 
+## 2026-05-13：先用本地 OLS adapter 把方法目录升级为执行证据
+
+Decision: P2-C 新增最小 `python_ols_adapter`，在 approved OLS RunPlan 的 full run 成功后读取本地 CSV 和公式，计算 OLS 系数，写入 `Results/json/method_execution_result.json`，并在 run response 与 `run_manifest.json` 中暴露 `method_execution.evidence_level=local_execution`。
+
+Reason: P2-B 的 `method_catalog` 只能说明方法前置条件是否具备，不能代表真实执行。CoPaper/StatsPAI 式产品必须让至少一个 ready 方法从数据产生可追溯本地执行产物，才算从“方法准入”进入“实证执行”。
+
+Rejected: 把 `method_catalog` 直接标记为 `local_execution`。原因是它只是本地文件级前置条件判断，没有运行统计方法。
+
+Rejected: 立即接入完整 StatsPAI/Stata/DID/IV/RDD/PSM/DML。原因是依赖、统计边界和失败模式更大，应先用 OLS baseline 建立可测试执行证据链，再逐步扩展。
+
+Rejected: OLS 不可估时让 API 暴露 500。原因是真实产品应返回结构化 `method_execution_failed`，让用户知道是数据不足、公式不可估或共线设计，而不是后端崩溃。
+
 ## 2026-05-13：清洁工作台优先于继续增加视觉元素
 
 Decision: 将 archive shell 的纸格背景、厚重阴影和大卡片嵌套降级为干净的工作台表面、右侧属性检查器和 record/list 结构；变量角色确认入口改为单列记录，不再使用易重叠的 auto 双列布局。

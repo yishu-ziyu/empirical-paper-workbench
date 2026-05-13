@@ -366,3 +366,15 @@ Rejected: 直接把 DID/IV/RDD/PSM/DML 全部加入 RunPlan tasks。原因是当
 Rejected: 把 `method_catalog` 标记为 `local_execution`。原因是本阶段没有真实执行外部方法引擎，只读取本地 DesignSpec/VariableRoleSet 做前置条件判断。
 
 Rejected: 把方法目录放到 Execution 页面继续堆卡片。原因是 Execution 页面已经承载 RunPlan、运行轨迹和人工确认；方法准入更适合研究设计细节页。
+
+## 2026-05-13：方法执行证据必须进入执行页和论断卡
+
+Decision: 把 `method_execution_result.json` 作为独立方法证据接入 observability 和 FindingCard，而不是覆盖现有 `analysis_result.json`。
+
+Reason: `analysis_result.json` 适合服务论文摘要和草稿绑定，`method_execution_result.json` 负责证明“哪个方法、公式、数据和 adapter 真正执行过”。两者分层后，用户能区分“结果摘要”和“方法执行证据”。
+
+Rejected: 只在 artifacts 列表里显示 `method_execution_result.json`。原因是用户需要在执行页和结果论断卡直接看到公式、样本量和处理变量系数，而不是去文件浏览器里推断。
+
+Rejected: 直接把 OLS 系数标为可写入正文。原因是还缺标准误、p 值、稳健标准误和 evaluator verdict。
+
+Evidence: `observability.method_execution` 与 `findings[].method_evidence` 均返回 `engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`。

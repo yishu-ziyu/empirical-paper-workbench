@@ -293,6 +293,81 @@ class ObservableExecutionTests(unittest.TestCase):
             product_app.PRODUCT_ROOT = original_product_root
             product_app.REPO_ROOT = original_repo_root
 
+    def test_bdd_6_observability_exposes_method_execution_as_run_evidence(self) -> None:
+        """行为 6：observability API 必须把方法执行结果作为一等执行证据暴露。"""
+        original_product_root = product_app.PRODUCT_ROOT
+        original_repo_root = product_app.REPO_ROOT
+        product_root = self.temp_dir / "repo" / "Product"
+        repo_root = self.temp_dir / "repo"
+        product_root.mkdir(parents=True)
+        ensure_registry(product_root, repo_root)
+        product_app.PRODUCT_ROOT = product_root
+        product_app.REPO_ROOT = repo_root
+        client = TestClient(product_app.app)
+
+        try:
+            response = client.post(
+                "/api/v1/projects",
+                json={
+                    "slug": "observable-method-execution-project",
+                    "title": "Observable Method Execution Project",
+                    "project_root": str(self.project_dir),
+                    "language": "zh",
+                },
+            )
+            self.assertEqual(response.status_code, 201, msg=response.text)
+            project_id = response.json()["id"]
+
+            response = client.post(
+                f"/api/v1/projects/{project_id}/runs",
+                json={"mode": "dry-run", "dataset_path": "Data/Final/analysis_sample.csv"},
+            )
+            self.assertEqual(response.status_code, 202, msg=response.text)
+            run_id = response.json()["id"]
+
+            method_execution = {
+                "artifact_path": "Results/json/method_execution_result.json",
+                "engine": "python_ols_adapter",
+                "evidence_level": "local_execution",
+                "methods": [
+                    {
+                        "run_id": run_id,
+                        "task_id": "baseline_regression",
+                        "method_id": "ols",
+                        "formula": "wage ~ trained + edu + experience",
+                        "dataset_path": "Data/Final/analysis_sample.csv",
+                        "run_plan_version": 1,
+                        "nobs": 12,
+                        "treatment": "trained",
+                        "treatment_coefficient": 1.8505076803,
+                        "evidence_level": "local_execution",
+                    }
+                ],
+            }
+            run_root = self.project_dir / "state" / "runs" / run_id
+            manifest_path = run_root / "run_manifest.json"
+            manifest = self._read_json(manifest_path)
+            manifest["method_execution"] = method_execution
+            manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            result_path = self.project_dir / "Results" / "json" / "method_execution_result.json"
+            result_path.parent.mkdir(parents=True, exist_ok=True)
+            result_path.write_text(json.dumps({"run_id": run_id, **method_execution}), encoding="utf-8")
+
+            response = client.get(f"/api/v1/projects/{project_id}/runs/{run_id}/observability")
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            method = response.json()["method_execution"]
+
+            self.assertEqual(method["evidence_level"], "local_execution")
+            self.assertEqual(method["engine"], "python_ols_adapter")
+            self.assertEqual(method["artifact_path"], "Results/json/method_execution_result.json")
+            self.assertEqual(method["methods"][0]["method_id"], "ols")
+            self.assertEqual(method["methods"][0]["formula"], "wage ~ trained + edu + experience")
+            self.assertEqual(method["methods"][0]["nobs"], 12)
+            self.assertAlmostEqual(method["methods"][0]["treatment_coefficient"], 1.8505076803, places=8)
+        finally:
+            product_app.PRODUCT_ROOT = original_product_root
+            product_app.REPO_ROOT = original_repo_root
+
     @staticmethod
     def _copy_minimal_project(target: Path) -> None:
         target.mkdir(parents=True)

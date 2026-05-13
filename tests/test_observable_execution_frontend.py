@@ -132,6 +132,22 @@ class ObservableExecutionFrontendTests(unittest.TestCase):
         self.assertIn(".observable-artifact-evidence .project-card", self.styles_css)
         self.assertIn("white-space: pre-wrap", self.styles_css)
 
+    def test_bdd_14_execution_page_shows_method_execution_evidence(self) -> None:
+        """行为 14：实证执行页必须展示 OLS 方法执行证据，而不是只把它留在 JSON 文件里。"""
+        self.assertIn("observable-method-execution", self.index_html)
+        self.assertIn("renderObservableMethodExecution", self.app_js)
+        self.assertIn("observability.method_execution", self.app_js)
+        for field in (
+            "method.method_id",
+            "method.formula",
+            "method.nobs",
+            "method.treatment_coefficient",
+            "methodExecution.artifact_path",
+        ):
+            self.assertIn(field, self.app_js)
+        self.assertIn("尚未生成方法执行证据", self.app_js)
+        self.assertIn(".observable-method-execution", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

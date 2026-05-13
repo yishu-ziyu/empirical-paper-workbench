@@ -46,6 +46,7 @@ def load_run_observability(project_root: Path, run_id: str) -> dict[str, Any]:
         "run_id": run_id,
         "dataset_source": manifest.get("dataset_source"),
         "variable_roles": build_variable_roles(steps, gates),
+        "method_execution": build_method_execution(project_root, manifest),
         "manifest": manifest,
         "steps": steps,
         "events": load_observable_events(project_root, run_id),
@@ -71,6 +72,30 @@ def build_variable_roles(steps: dict[str, Any], gates: dict[str, Any]) -> dict[s
         },
         "confirmation_gate_id": gate.get("id") if gate else None,
         "confirmation_status": gate.get("status") if gate else "missing",
+    }
+
+
+def build_method_execution(project_root: Path, manifest: dict[str, Any]) -> dict[str, Any] | None:
+    method_execution = manifest.get("method_execution")
+    if not method_execution:
+        return None
+
+    artifact_path = method_execution.get("artifact_path")
+    if artifact_path:
+        artifact = project_root / artifact_path
+        if artifact.exists():
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            payload.setdefault("artifact_path", artifact_path)
+            payload.setdefault("engine", method_execution.get("engine"))
+            payload.setdefault("evidence_level", method_execution.get("evidence_level", "local_execution"))
+            payload.setdefault("methods", method_execution.get("methods", []))
+            return payload
+
+    return {
+        "artifact_path": artifact_path,
+        "engine": method_execution.get("engine"),
+        "evidence_level": method_execution.get("evidence_level", "local_execution"),
+        "methods": method_execution.get("methods", []),
     }
 
 

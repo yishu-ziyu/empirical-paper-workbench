@@ -31,12 +31,34 @@ const state = {
   overviewData: null,
   journeyData: null,
   datasetsData: null,
+  variableRolesData: null,
+  designSpecData: null,
+  runPlanData: null,
   designData: null,
   draftsData: null,
+  resultsDraftData: null,
+  manuscriptCandidatesData: null,
+  exportPackageData: null,
   agentsData: null,
   selectedAgentId: null,
   agentDetailData: null,
   provenanceData: null,
+  projectRuns: [],
+  selectedRunId: null,
+  runObservability: null,
+  runObservabilityLoading: false,
+  resolvingGateId: null,
+  resolvingGateAction: null,
+  selectedDatasetPath: null,
+  savingVariableRoles: false,
+  savingDesignSpec: false,
+  savingRunPlan: false,
+  reviewingFindingId: null,
+  reviewingFindingAction: null,
+  reviewingCandidateId: null,
+  reviewingCandidateAction: null,
+  promotingCandidateId: null,
+  exportingCandidateId: null,
 };
 
 const fallbackWorkflowSteps = [
@@ -49,6 +71,37 @@ const fallbackWorkflowSteps = [
   "manuscript-drafting",
   "submission-prep",
 ];
+
+const archivePageNotes = {
+  overview: {
+    title: "工作台首页",
+    summary: "研究问题、主链路、关键风险和下一步动作的总索引。",
+  },
+  "data-variables": {
+    title: "数据与设计",
+    summary: "数据集、变量角色和识别设定的前置证据页。",
+  },
+  "research-design": {
+    title: "研究设计细节",
+    summary: "模型公式、识别策略、固定效应和威胁清单。",
+  },
+  "empirical-execution": {
+    title: "实证执行",
+    summary: "执行计划预检、真实运行轨迹、人工确认点和产物证据。",
+  },
+  "paper-draft": {
+    title: "结果与草稿",
+    summary: "结果论断、正文候选和草稿证据绑定。",
+  },
+  "artifacts-replication": {
+    title: "审阅与导出",
+    summary: "导出包、评估器检查、复现清单和下一轮反馈。",
+  },
+  "agent-console": {
+    title: "智能体控制台",
+    summary: "智能体身份、权限、能力、成本和审计日志。",
+  },
+};
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
@@ -117,8 +170,8 @@ function renderProjectCards(targetId, clickable = false) {
           <strong>${project.title}</strong>
           <div class="muted">${project.slug}</div>
           <div class="muted">${project.question ?? ""}</div>
-          <div class="muted">stage=${project.current_stage} · mode=${project.last_run_mode}</div>
-          <div class="muted">dataset=${project.dataset_exists}</div>
+          <div class="muted">阶段：${project.current_stage} · 模式：${project.last_run_mode}</div>
+          <div class="muted">数据集是否存在：${yesNo(project.dataset_exists)}</div>
           ${clickable ? `<button class="ghost-button" data-select-project-id="${project.id}">查看项目</button>` : ""}
         </article>
       `;
@@ -195,7 +248,7 @@ function renderArtifacts() {
               <strong>${artifact.kind}</strong>
               <div>${artifact.description}</div>
               <div class="muted">${artifact.path}</div>
-              <div class="muted">exists=${artifact.exists}</div>
+              <div class="muted">是否存在：${yesNo(artifact.exists)}</div>
             </article>
           `,
         )
@@ -314,6 +367,7 @@ function mountNav() {
       const viewName = button.dataset.view;
       document.getElementById(`view-${viewName}`).classList.add("is-active");
       document.getElementById("topbar-title").textContent = button.textContent;
+      updateArchiveInspector(viewName);
 
       // V2 view handling
       if (isV2View(viewName)) {
@@ -338,6 +392,33 @@ function mountNav() {
     if (navButton) {
       navButton.click();
     }
+  });
+}
+
+function mountArchiveInspector() {
+  document.querySelectorAll("[data-inspector-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const viewName = button.dataset.inspectorView;
+      const navButton = document.querySelector(`.nav-link[data-view="${viewName}"]`);
+      if (navButton) {
+        navButton.click();
+      }
+    });
+  });
+  updateArchiveInspector("overview");
+}
+
+function updateArchiveInspector(viewName) {
+  const note = archivePageNotes[viewName] || {
+    title: "研究档案",
+    summary: "当前页面属于本地实证论文档案的一部分。",
+  };
+  const titleNode = document.getElementById("archive-current-title");
+  const summaryNode = document.getElementById("archive-current-summary");
+  if (titleNode) titleNode.textContent = note.title;
+  if (summaryNode) summaryNode.textContent = note.summary;
+  document.querySelectorAll("[data-inspector-view]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.inspectorView === viewName);
   });
 }
 
@@ -476,14 +557,93 @@ const v2api = {
       return fetchJson(`/api/v1/projects/${projectId}/datasets`);
     },
   },
+  variableRoles: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/variable-roles`);
+    },
+    async save(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/variable-roles`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
   design: {
     async get(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/design`);
     },
   },
+  designSpec: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/design-spec`);
+    },
+    async save(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/design-spec`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  runPlan: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/run-plan`);
+    },
+    async save(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/run-plan`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
   drafts: {
     async list(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/drafts`);
+    },
+  },
+  resultsDraft: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/results-draft`);
+    },
+    async reviewFinding(projectId, findingId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/results-draft/findings/${encodeURIComponent(findingId)}/review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  manuscriptCandidates: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/manuscript-candidates`);
+    },
+    async reviewCandidate(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/manuscript-candidates/${encodeURIComponent(candidateId)}/review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async promoteCandidate(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/manuscript-candidates/${encodeURIComponent(candidateId)}/promote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async exportPreflightCandidate(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/manuscript-candidates/${encodeURIComponent(candidateId)}/export-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  exportPackage: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/export-package`);
     },
   },
   agents: {
@@ -497,6 +657,39 @@ const v2api = {
   provenance: {
     async get(artifactId) {
       return fetchJson(`/api/v1/artifacts/${artifactId}/provenance`);
+    },
+  },
+  runs: {
+    async list(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/runs`);
+    },
+    async create(projectId, mode, datasetPath = null) {
+      const payload = { mode, dataset_path: datasetPath };
+      if (!datasetPath) {
+        delete payload.dataset_path;
+      }
+      return fetchJson(`/api/v1/projects/${projectId}/runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async startFull(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/runs/full`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
+    async observability(projectId, runId) {
+      return fetchJson(`/api/v1/projects/${projectId}/runs/${runId}/observability`);
+    },
+    async resolveGate(projectId, runId, gateId, action, note) {
+      return fetchJson(`/api/v1/projects/${projectId}/runs/${runId}/gates/${gateId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, note }),
+      });
     },
   },
 };
@@ -513,14 +706,14 @@ function getAvatarInitial(name) {
 
 function getStatusLabel(status) {
   const map = {
-    queued: "Queued",
-    planning: "Planning",
-    researching: "Researching",
-    synthesizing: "Synthesizing",
-    reviewing: "Reviewing",
-    completed: "Completed",
-    failed: "Failed",
-    cancelled: "Cancelled",
+    queued: "排队中",
+    planning: "规划中",
+    researching: "研究中",
+    synthesizing: "综合中",
+    reviewing: "审阅中",
+    completed: "已完成",
+    failed: "失败",
+    cancelled: "已取消",
   };
   return map[status] || status;
 }
@@ -685,7 +878,7 @@ function renderErrorBanner() {
     banner.style.display = "block";
     banner.innerHTML = `
       <span>${escapeHtml(message)}</span>
-      <button class="ghost-button" id="dismiss-error" style="padding: 4px 10px; font-size: 12px;">Dismiss</button>
+      <button class="ghost-button" id="dismiss-error" style="padding: 4px 10px; font-size: 12px;">关闭</button>
     `;
     banner.querySelector("#dismiss-error")?.addEventListener("click", () => {
       state.apiError = null;
@@ -849,7 +1042,7 @@ function renderCompletionCard() {
   const statsHtml = `
     <div class="completion-stat">
       <span class="completion-stat-value">${completedCount}</span>
-      <span class="completion-stat-label">完成 Agents</span>
+      <span class="completion-stat-label">已完成智能体</span>
     </div>
     <div class="completion-stat">
       <span class="completion-stat-value">${totalArtifacts}</span>
@@ -876,9 +1069,9 @@ function renderCompletionCard() {
       "beforebegin",
       `
         <select id="promote-target-select" class="promote-target-select">
-          <option value="manuscripts">Manuscripts</option>
-          <option value="results">Results</option>
-          <option value="submissions">Submissions</option>
+          <option value="manuscripts">论文稿件</option>
+          <option value="results">结果目录</option>
+          <option value="submissions">投稿材料</option>
         </select>
       `,
     );
@@ -1128,7 +1321,7 @@ function renderAgentArtifactPreview() {
   }
 
   return `
-    <p class="muted">${escapeHtml(state.agentDetailPreview.path || "local preview")}</p>
+    <p class="muted">${escapeHtml(state.agentDetailPreview.path || "本地预览")}</p>
     <pre class="agent-detail-preview-body">${escapeHtml(state.agentDetailPreview.content || "暂无正文")}</pre>
   `;
 }
@@ -1662,8 +1855,178 @@ function isV2View(viewName) {
 function renderEvidenceBadge(meta) {
   if (!meta || !meta.evidence_level) return "";
   const level = meta.evidence_level;
-  const label = level === "mock" ? "演示数据" : level === "local_file" ? "本地文件" : level;
+  const label = level === "mock" ? "演示数据" : level === "local_file" ? "本地文件" : level === "local_execution" ? "真实执行" : level;
   return `<span class="evidence-badge ${level}">${label}</span>`;
+}
+
+function yesNo(value) {
+  return value ? "是" : "否";
+}
+
+function reviewStatusLabel(status) {
+  const map = {
+    approved: "已确认",
+    needs_review: "待审阅",
+    needs_revision: "需修改",
+    rejected: "已拒绝",
+  };
+  return map[status] || status || "-";
+}
+
+function candidateStatusLabel(status) {
+  const map = {
+    draft: "草稿",
+    reviewed: "已审阅",
+    approved: "已确认",
+    needs_review: "待审阅",
+    needs_revision: "需修改",
+    rejected: "已拒绝",
+  };
+  return map[status] || status || "-";
+}
+
+function promotionStatusLabel(status) {
+  const map = {
+    not_promoted: "尚未进入导出检查",
+    ready_for_export: "已进入导出前检查",
+  };
+  return map[status] || status || "-";
+}
+
+function exportStatusLabel(status) {
+  const map = {
+    not_started: "尚未生成预览",
+    preview_ready: "预览已就绪",
+  };
+  return map[status] || status || "-";
+}
+
+function evaluatorStatusLabel(status) {
+  const map = {
+    passed: "本轮评估通过",
+    failed: "本轮评估失败",
+    unknown: "等待评估",
+  };
+  return map[status] || status || "-";
+}
+
+function frontierPhaseLabel(phase) {
+  const map = {
+    objective: "目标",
+    baseline: "基线",
+    evaluator: "评估器",
+    feedback: "反馈",
+    next_iteration: "下一轮动作",
+  };
+  return map[phase] || phase || "-";
+}
+
+function provenanceLabel(label) {
+  const map = {
+    source_draft: "源草稿",
+    result_artifact: "结果产物",
+    review_decision: "审阅决定",
+    candidate_review: "正文候选审阅",
+    promotion_state: "导出前检查",
+    export_package: "导出包",
+  };
+  return map[label] || label;
+}
+
+function productTermLabel(value) {
+  const text = String(value || "");
+  const exact = {
+    dataset: "数据集",
+    Dataset: "数据集",
+    variable_roles: "变量角色集",
+    VariableRoleSet: "变量角色集",
+    research_question: "研究问题",
+    ResearchQuestion: "研究问题",
+    design_spec: "研究设计方案",
+    DesignSpec: "研究设计方案",
+    run_plan: "执行计划",
+    RunPlan: "执行计划",
+    run: "运行",
+    Run: "运行",
+    results: "结果",
+    Results: "结果",
+    draft: "草稿",
+    Draft: "草稿",
+    review_export: "审阅与导出",
+    "Review and Export": "审阅与导出",
+    agents: "智能体控制台",
+    "Agent 控制台": "智能体控制台",
+    start_full_run: "启动完整执行",
+    START_FULL_RUN: "启动完整执行",
+  };
+  if (exact[text]) return exact[text];
+  return text
+    .replaceAll("VariableRoleSet", "变量角色集")
+    .replaceAll("ResearchQuestion", "研究问题")
+    .replaceAll("DesignSpec", "研究设计方案")
+    .replaceAll("RunPlan", "执行计划")
+    .replaceAll("Review and Export", "审阅与导出")
+    .replaceAll("Agent 控制台", "智能体控制台")
+    .replaceAll("Agent", "智能体")
+    .replaceAll("Phase A", "A 阶段")
+    .replaceAll("full-run", "完整执行");
+}
+
+const WORKFLOW_BLOCKER_LABELS = {
+  variable_roles_unconfirmed: "变量角色尚未确认",
+  design_unconfirmed: "研究设计尚未确认",
+  run_plan_missing: "执行计划尚未生成",
+};
+
+const WORKFLOW_STAGE_LABELS = {
+  completed: "已完成",
+  in_progress: "进行中",
+  requires_confirmation: "待确认",
+  blocked: "阻塞",
+  not_started: "未开始",
+};
+
+function getWorkflowContract() {
+  return state.overviewData?.workflow_contract || null;
+}
+
+function workflowStageLabel(status) {
+  return WORKFLOW_STAGE_LABELS[status] || status || "-";
+}
+
+function renderWorkflowContract(contract) {
+  const actionContainer = document.getElementById("product-next-action-body");
+  const spineContainer = document.getElementById("workflow-spine");
+  if (!actionContainer || !spineContainer) return;
+
+  if (!contract) {
+    actionContainer.innerHTML = "<p class='muted'>正在读取工作流契约...</p>";
+    spineContainer.innerHTML = "";
+    return;
+  }
+
+  const action = contract.next_action || {};
+  actionContainer.innerHTML = `
+    <div class="next-decision-card">
+      <div>
+        <span class="eyebrow">${escapeHtml(productTermLabel(action.id || "next_action"))}</span>
+        <h4>${escapeHtml(productTermLabel(action.label || "等待下一步"))}</h4>
+        <p class="muted">${escapeHtml(productTermLabel(action.reason || "系统正在判断下一步研究决策。"))}</p>
+      </div>
+      <button class="primary-button" data-open-design-action data-next-action="${escapeHtml(action.id || "confirm_variable_roles")}">
+        打开数据与设计
+      </button>
+    </div>
+  `;
+
+  const stages = contract.canonical_stages || [];
+  spineContainer.innerHTML = stages.map((stage, index) => `
+    <article class="workflow-spine-step is-${escapeHtml(stage.status || "not_started")}">
+      <span class="workflow-spine-index">${index + 1}</span>
+      <strong>${escapeHtml(productTermLabel(stage.name || stage.id))}</strong>
+      <span>${escapeHtml(workflowStageLabel(stage.status))}</span>
+    </article>
+  `).join("");
 }
 
 function renderEvidenceBanner(meta) {
@@ -1702,6 +2065,576 @@ function renderEmptyState(emptyState) {
   `;
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN");
+}
+
+function formatMetadata(metadata) {
+  if (!metadata || Object.keys(metadata).length === 0) {
+    return "<p class='muted'>无元数据</p>";
+  }
+  return `<pre class="metadata-box">${escapeHtml(JSON.stringify(metadata, null, 2))}</pre>`;
+}
+
+function observableStatusLabel(status) {
+  const map = {
+    queued: "排队",
+    running: "运行中",
+    succeeded: "成功",
+    failed: "失败",
+    completed: "已完成",
+    skipped: "已跳过",
+    open: "待确认",
+    resolved: "已处理",
+  };
+  return map[status] || status || "-";
+}
+
+function getLatestRun(runs) {
+  return [...runs].sort((a, b) => {
+    const aTime = new Date(a.started_at || a.finished_at || 0).getTime();
+    const bTime = new Date(b.started_at || b.finished_at || 0).getTime();
+    return bTime - aTime;
+  })[0] || null;
+}
+
+function renderObservableExecutionEmpty(message = "当前项目还没有运行记录。") {
+  renderExecutionPreflight();
+  document.getElementById("run-selector").innerHTML = "";
+  document.getElementById("observable-run-id").textContent = "尚未选择 run";
+  document.getElementById("observable-run-status").textContent = "-";
+  document.getElementById("observable-run-mode").textContent = "-";
+  document.getElementById("observable-run-evidence").textContent = "-";
+  document.getElementById("observable-run-time").textContent = message;
+  const datasetContainer = document.getElementById("observable-dataset-source-body");
+  if (datasetContainer) {
+    datasetContainer.innerHTML = "<p class='muted'>未记录数据来源。请从数据页选择本地数据后重新启动运行。</p>";
+  }
+  const variableRolesContainer = document.getElementById("observable-variable-roles-body");
+  if (variableRolesContainer) {
+    variableRolesContainer.innerHTML = "<p class='muted'>未记录变量角色。请从数据页选择本地数据后重新启动运行。</p>";
+  }
+  document.getElementById("observable-step-board").innerHTML = renderEmptyState({
+    title: "暂无可观察阶段",
+    description: message,
+    next_action: "完成执行计划后启动正式执行；开发阶段可使用“开发试运行”生成可观察轨迹。",
+  });
+  document.getElementById("observable-event-stream").innerHTML = "<p class='muted'>暂无事件流</p>";
+  document.getElementById("observable-hitl-gates").innerHTML = "<p class='muted'>暂无人工确认点</p>";
+  document.getElementById("observable-artifact-evidence").innerHTML = "<p class='muted'>暂无产物证据</p>";
+}
+
+function renderExecutionPreflight() {
+  const contract = getWorkflowContract();
+  const preflight = document.getElementById("run-plan-preflight-body");
+  const blockersContainer = document.getElementById("run-blockers-body");
+  if (!preflight || !blockersContainer) return;
+
+  if (!contract) {
+    preflight.innerHTML = "<p class='muted'>正在读取工作流契约...</p>";
+    blockersContainer.innerHTML = "<p class='muted'>等待执行预检。</p>";
+    return;
+  }
+
+  const readiness = contract.run_readiness || {};
+  const canStart = Boolean(readiness.can_start_full_run);
+  const blockers = readiness.blockers || [];
+  preflight.innerHTML = `
+    <div class="run-preflight-summary ${canStart ? "is-ready" : "is-blocked"}">
+      <div>
+        <span class="eyebrow">can_start_full_run=${String(canStart)}</span>
+        <h4>${canStart ? "可以启动完整实证运行" : "完整实证运行暂不可启动"}</h4>
+        <p class="muted">执行入口必须先有已确认的变量角色、研究设计和执行计划。现有运行日志只作为执行证据。</p>
+      </div>
+      <span class="status-pill ${canStart ? "status-completed" : "status-open"}">${canStart ? "已就绪" : "已阻塞"}</span>
+    </div>
+  `;
+  blockersContainer.innerHTML = blockers.length
+    ? blockers.map((blocker) => `
+        <div class="run-blocker-item">
+          <strong>${escapeHtml(WORKFLOW_BLOCKER_LABELS[blocker] || blocker)}</strong>
+          <span class="muted">${escapeHtml(blocker)}</span>
+        </div>
+      `).join("")
+    : "<p class='muted'>当前没有阻塞项。</p>";
+
+  const dryRunButton = document.getElementById("observable-run-dry-button");
+  if (dryRunButton) {
+    dryRunButton.classList.toggle("is-development-shortcut", !canStart);
+    dryRunButton.title = canStart ? "启动当前执行计划" : "开发捷径：用于验证可观察轨迹，不代表完整产品执行路径";
+  }
+  const fullRunButton = document.getElementById("observable-run-full-button");
+  if (fullRunButton) {
+    fullRunButton.disabled = !canStart;
+    fullRunButton.dataset.workflowAction = "start_full_run";
+    fullRunButton.title = canStart ? "从已确认执行计划启动完整实证执行" : "需要先确认变量角色集、研究设计方案和执行计划";
+  }
+}
+
+function renderObservableDatasetSource() {
+  const container = document.getElementById("observable-dataset-source-body");
+  if (!container) return;
+
+  const observability = state.runObservability;
+  const dataset = observability ? observability.dataset_source || observability.manifest?.dataset_source : null;
+  if (!dataset) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>未记录数据来源</h4>
+        <p class="muted">这个运行没有记录数据来源。请从数据页选择本地数据后重新启动运行。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const shapeText =
+    dataset.row_count !== null && dataset.row_count !== undefined && dataset.column_count !== null && dataset.column_count !== undefined
+      ? `${dataset.row_count} 行 · ${dataset.column_count} 列`
+      : "未读取行列数";
+  container.innerHTML = `
+    <article class="dataset-source-card">
+      <div class="observable-card-head">
+        <div>
+          <strong>${escapeHtml(dataset.name || dataset.path || "数据集")}</strong>
+          <div class="muted">${escapeHtml(dataset.path || "-")}</div>
+        </div>
+        ${renderEvidenceBadge(dataset)}
+      </div>
+      <div class="dataset-source-meta">
+        <span>${escapeHtml(shapeText)}</span>
+        <span>${escapeHtml(dataset.file_type || "-")}</span>
+        <span>${escapeHtml(dataset.role || "已选择数据集")}</span>
+        <span>是否存在：${yesNo(dataset.exists)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderVariableRoleGroup(label, values) {
+  const items = values && values.length ? values : ["未识别"];
+  return `
+    <div class="variable-role-group">
+      <span class="meta-label">${escapeHtml(label)}</span>
+      <div class="observable-option-list">
+        ${items.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderObservableVariableRoles() {
+  const container = document.getElementById("observable-variable-roles-body");
+  if (!container) return;
+
+  const observability = state.runObservability;
+  const variableRoles = observability ? observability.variable_roles : null;
+  if (!variableRoles) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>未记录变量角色</h4>
+        <p class="muted">这个运行没有记录变量角色。请从数据页选择本地数据后重新启动运行。</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <article class="variable-roles-card">
+      <div class="observable-card-head">
+        <div>
+          <strong>字段角色</strong>
+          <div class="muted">确认点：${escapeHtml(variableRoles.confirmation_gate_id || "-")} · 状态：${observableStatusLabel(variableRoles.confirmation_status || "-")}</div>
+        </div>
+        ${renderEvidenceBadge({ evidence_level: variableRoles.evidence_level })}
+      </div>
+      <div class="variable-roles-grid">
+        ${renderVariableRoleGroup("结果变量", variableRoles.roles.outcome)}
+        ${renderVariableRoleGroup("处理变量", variableRoles.roles.treatment)}
+        ${renderVariableRoleGroup("控制变量", variableRoles.roles.controls)}
+        ${renderVariableRoleGroup("工具变量", variableRoles.roles.instruments)}
+      </div>
+    </article>
+  `;
+}
+
+function renderRunSelector() {
+  const selector = document.getElementById("run-selector");
+  if (!selector) return;
+
+  selector.innerHTML = state.projectRuns.length
+    ? state.projectRuns.map((run) => `
+        <option value="${escapeHtml(run.id)}" ${run.id === state.selectedRunId ? "selected" : ""}>
+          ${escapeHtml(run.id)} · ${escapeHtml(run.status)} · ${escapeHtml(run.mode)}
+        </option>
+      `).join("")
+    : `<option value="">暂无运行</option>`;
+}
+
+function renderObservableRunHeader() {
+  const run = state.projectRuns.find((item) => item.id === state.selectedRunId);
+  const observability = state.runObservability;
+  const meta = observability?._meta || observability?.manifest?._meta || { evidence_level: "local_execution" };
+
+  if (!run && !observability) {
+    renderObservableExecutionEmpty();
+    return;
+  }
+
+  document.getElementById("observable-run-id").textContent = state.selectedRunId || "-";
+  document.getElementById("observable-run-status").textContent = observableStatusLabel(run?.status || observability?.manifest?.status);
+  document.getElementById("observable-run-mode").textContent = run?.mode || observability?.manifest?.mode || "-";
+  document.getElementById("observable-run-evidence").innerHTML = renderEvidenceBadge(meta) || "-";
+  document.getElementById("observable-run-time").textContent =
+    `开始：${formatDateTime(run?.started_at || observability?.manifest?.started_at)} · 结束：${formatDateTime(run?.finished_at || observability?.manifest?.finished_at)} · 产物：${run?.artifact_count ?? observability?.manifest?.artifact_count ?? 0}`;
+}
+
+function renderObservableSteps() {
+  const steps = state.runObservability?.steps?.items || [];
+  const container = document.getElementById("observable-step-board");
+  if (!container) return;
+
+  if (!steps.length) {
+    container.innerHTML = "<p class='muted'>该运行尚无阶段记录。</p>";
+    return;
+  }
+
+  container.innerHTML = steps.map((step) => {
+    const actor = step.actor || "系统";
+    const statusClass = `status-${step.status || "unknown"}`;
+    return `
+      <article class="observable-step-card">
+        <div class="observable-card-head">
+          <div>
+            <strong>${escapeHtml(step.title || step.id)}</strong>
+            <div class="muted">${escapeHtml(step.id)} · 执行者：${escapeHtml(actor)}</div>
+          </div>
+          <span class="status-pill ${statusClass}">${observableStatusLabel(step.status)}</span>
+        </div>
+        <p>${escapeHtml(step.summary || step.description || "等待执行摘要。")}</p>
+        <div class="muted">开始：${formatDateTime(step.started_at)} · 结束：${formatDateTime(step.finished_at)}</div>
+        ${formatMetadata(step.metadata)}
+      </article>
+    `;
+  }).join("");
+}
+
+function renderObservableEvents() {
+  const events = [...(state.runObservability?.events?.items || [])]
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  const container = document.getElementById("observable-event-stream");
+  if (!container) return;
+
+  if (!events.length) {
+    container.innerHTML = "<p class='muted'>该运行尚无事件。</p>";
+    return;
+  }
+
+  container.innerHTML = events.map((event) => `
+    <div class="observable-event-item">
+      <div class="observable-event-seq">#${event.sequence ?? "-"}</div>
+      <div class="observable-event-body">
+        <div class="observable-card-head">
+          <strong>${escapeHtml(event.type || "event")}</strong>
+          ${renderEvidenceBadge({ evidence_level: event.evidence_level || state.runObservability?._meta?.evidence_level })}
+        </div>
+        <div>${escapeHtml(event.message || "")}</div>
+        <div class="muted">执行者：${escapeHtml(event.actor || "系统")} · 步骤：${escapeHtml(event.step_id || "-")} · ${formatDateTime(event.timestamp)}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderResolvedGateResolution(gate) {
+  const resolution = gate.resolution || {};
+  return `
+    <div class="gate-resolution">
+      <strong>处理结果</strong>
+      <div class="muted">动作：${escapeHtml(resolution.action || "-")} · 处理时间：${formatDateTime(resolution.resolved_at)}</div>
+      <div>${escapeHtml(resolution.note || "未填写处理说明。")}</div>
+    </div>
+  `;
+}
+
+function renderGateResolveControls(gate) {
+  if (gate.status === "resolved") {
+    return renderResolvedGateResolution(gate);
+  }
+
+  const isResolving = state.resolvingGateId === gate.id;
+  const disabled = isResolving ? "disabled" : "";
+  const busyLabel = isResolving ? "处理中..." : "";
+  return `
+    <label class="gate-note-label" for="gate-note-${escapeHtml(gate.id)}">处理说明</label>
+    <textarea
+      class="gate-resolution-note"
+      id="gate-note-${escapeHtml(gate.id)}"
+      data-gate-note="${escapeHtml(gate.id)}"
+      placeholder="记录确认、驳回或调整的原因"
+      ${disabled}
+    ></textarea>
+    <div class="action-group">
+      <button class="ghost-button" data-gate-id="${escapeHtml(gate.id)}" data-gate-resolve-action="confirm" ${disabled}>确认</button>
+      <button class="ghost-button" data-gate-id="${escapeHtml(gate.id)}" data-gate-resolve-action="reject" ${disabled}>驳回</button>
+      <button class="ghost-button" data-gate-id="${escapeHtml(gate.id)}" data-gate-resolve-action="adjust" ${disabled}>调整</button>
+      ${busyLabel ? `<span class="muted">${busyLabel}</span>` : ""}
+    </div>
+  `;
+}
+
+function renderObservableGates() {
+  const gates = state.runObservability?.gates?.items || [];
+  const container = document.getElementById("observable-hitl-gates");
+  if (!container) return;
+
+  if (!gates.length) {
+    container.innerHTML = "<p class='muted'>该运行暂无人工介入点。</p>";
+    return;
+  }
+
+  container.innerHTML = gates.map((gate) => `
+    <article class="observable-gate-card ${gate.blocking ? "is-blocking" : ""}">
+      <div class="observable-card-head">
+        <div>
+          <strong>${escapeHtml(gate.title || gate.id)}</strong>
+          <div class="muted">${escapeHtml(gate.id)} · 步骤：${escapeHtml(gate.step_id || "-")}</div>
+        </div>
+        <span class="status-pill status-${escapeHtml(gate.status || "open")}">${observableStatusLabel(gate.status)}</span>
+      </div>
+      <p>${escapeHtml(gate.reason || "等待用户确认。")}</p>
+      <div class="muted">要求方：${escapeHtml(gate.required_by || "-")} · 是否阻塞：${yesNo(Boolean(gate.blocking))}</div>
+      <div class="observable-option-list">
+        ${(gate.options || []).map((option) => `<span class="pill">${escapeHtml(option)}</span>`).join("")}
+      </div>
+      ${formatMetadata(gate.metadata)}
+      ${renderGateResolveControls(gate)}
+    </article>
+  `).join("");
+}
+
+function collectObservableArtifacts() {
+  const evidenceLevel = state.runObservability?._meta?.evidence_level || "local_execution";
+  const fromEvents = (state.runObservability?.events?.items || [])
+    .filter((event) => event.type === "artifact_written")
+    .map((event) => ({
+      path: event.metadata?.path || event.metadata?.artifact_path || event.message,
+      source: event.step_id || "event",
+      actor: event.actor || "系统",
+      evidence_level: event.evidence_level || evidenceLevel,
+    }));
+  const fromSteps = (state.runObservability?.steps?.items || []).flatMap((step) =>
+    (step.artifacts || []).map((artifact) => ({
+      path: typeof artifact === "string" ? artifact : artifact.path || artifact.id,
+      source: step.id,
+      actor: step.actor || "系统",
+      evidence_level: artifact.evidence_level || evidenceLevel,
+    })),
+  );
+
+  const seen = new Set();
+  return [...fromEvents, ...fromSteps].filter((artifact) => {
+    const key = `${artifact.path}|${artifact.source}`;
+    if (!artifact.path || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderObservableArtifactEvidence() {
+  const container = document.getElementById("observable-artifact-evidence");
+  if (!container) return;
+
+  const artifacts = collectObservableArtifacts();
+  const meta = state.runObservability?._meta || { evidence_level: "local_execution" };
+  if (!artifacts.length) {
+    container.innerHTML = `
+      ${renderEvidenceBadge(meta)}
+      <p class="muted">该运行暂无产物写入事件或阶段产物。</p>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom:12px;">${renderEvidenceBadge(meta)}</div>
+    ${artifacts.map((artifact) => `
+      <article class="project-card">
+        <strong>${escapeHtml(artifact.path)}</strong>
+        <div class="muted">来源：${escapeHtml(artifact.source)} · 执行者：${escapeHtml(artifact.actor)}</div>
+        ${renderEvidenceBadge({ evidence_level: artifact.evidence_level })}
+      </article>
+    `).join("")}
+  `;
+}
+
+function renderObservableExecution() {
+  renderExecutionPreflight();
+  if (state.runObservabilityLoading) {
+    document.getElementById("observable-step-board").innerHTML = "<p class='muted'>正在读取运行可观察轨迹...</p>";
+    return;
+  }
+  renderRunSelector();
+  renderObservableRunHeader();
+  renderObservableDatasetSource();
+  renderObservableVariableRoles();
+  renderObservableSteps();
+  renderObservableEvents();
+  renderObservableGates();
+  renderObservableArtifactEvidence();
+}
+
+function handleMissingRunObservability(runId) {
+  state.runObservability = null;
+  renderRunSelector();
+
+  const run = state.projectRuns.find((item) => item.id === runId);
+  document.getElementById("observable-run-id").textContent = runId || "尚未选择 run";
+  document.getElementById("observable-run-time").textContent = run
+    ? `开始：${formatDateTime(run.started_at)} · 结束：${formatDateTime(run.finished_at)} · 产物：${run.artifact_count || 0}`
+    : "该运行记录缺少可观察执行轨迹";
+  document.getElementById("observable-run-status").textContent = observableStatusLabel(run?.status || "missing_observability");
+  document.getElementById("observable-run-mode").textContent = run?.mode || "-";
+  document.getElementById("observable-run-evidence").innerHTML = renderEvidenceBadge({ evidence_level: "local_file" });
+  renderObservableDatasetSource();
+  renderObservableVariableRoles();
+
+  document.getElementById("observable-step-board").innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-icon">📭</div>
+      <h4>缺少可观察执行轨迹</h4>
+      <p class="muted">这个历史运行没有 state/runs 下的清单、阶段、事件或确认点文件。</p>
+      <p class="muted"><strong>下一步：</strong>完成执行计划后启动正式执行；开发调试可生成新的可观察运行。</p>
+    </div>
+  `;
+  document.getElementById("observable-event-stream").innerHTML = "<p class='muted'>缺少 run_events.jsonl</p>";
+  document.getElementById("observable-hitl-gates").innerHTML = "<p class='muted'>缺少 gates.json</p>";
+  document.getElementById("observable-artifact-evidence").innerHTML = "<p class='muted'>完成执行计划后会产生新的可观察运行。</p>";
+}
+
+async function loadRunObservability(projectId, runId) {
+  if (!projectId || !runId) {
+    state.runObservability = null;
+    renderObservableExecutionEmpty();
+    return;
+  }
+
+  state.runObservabilityLoading = true;
+  renderObservableExecution();
+  try {
+    state.runObservability = await v2api.runs.observability(projectId, runId);
+  } catch (error) {
+    if (error.status === 404) {
+      state.runObservabilityLoading = false;
+      handleMissingRunObservability(runId);
+      return;
+    }
+    throw error;
+  } finally {
+    state.runObservabilityLoading = false;
+  }
+  renderObservableExecution();
+}
+
+async function loadObservableExecution() {
+  if (!state.selectedProjectId) return;
+
+  clearV2Error("empirical-execution");
+  const payload = await v2api.runs.list(state.selectedProjectId);
+  state.projectRuns = payload.items || [];
+
+  if (!state.projectRuns.length) {
+    state.selectedRunId = null;
+    state.runObservability = null;
+    renderObservableExecutionEmpty();
+    return;
+  }
+
+  if (!state.projectRuns.find((run) => run.id === state.selectedRunId)) {
+    state.selectedRunId = getLatestRun(state.projectRuns)?.id || null;
+  }
+  renderRunSelector();
+  await loadRunObservability(state.selectedProjectId, state.selectedRunId);
+}
+
+async function createObservableRun(mode, datasetPath = state.selectedDatasetPath) {
+  if (!state.selectedProjectId) return;
+
+  clearV2Error("empirical-execution");
+  document.getElementById("observable-step-board").innerHTML = "<p class='muted'>正在启动真实试运行...</p>";
+  const run = await v2api.runs.create(state.selectedProjectId, mode, datasetPath);
+  state.selectedRunId = run.id;
+  await loadObservableExecution();
+  await refreshProjects();
+}
+
+async function createFullRunFromPlan() {
+  if (!state.selectedProjectId) return;
+
+  clearV2Error("empirical-execution");
+  document.getElementById("observable-step-board").innerHTML = "<p class='muted'>正在按执行计划启动完整实证执行...</p>";
+  try {
+    const run = await v2api.runs.startFull(state.selectedProjectId);
+    state.selectedRunId = run.id;
+    await refreshProjects();
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderExecutionPreflight();
+    await loadObservableExecution();
+  } catch (error) {
+    showV2Error("empirical-execution", `启动完整实证执行失败：${error.message}`);
+  }
+}
+
+function openDesignAction(datasetPath) {
+  if (datasetPath) {
+    state.selectedDatasetPath = datasetPath;
+  }
+  const dataNav = document.querySelector('.nav-link[data-view="data-variables"]');
+  if (dataNav instanceof HTMLElement && !document.getElementById("view-data-variables")?.classList.contains("is-active")) {
+    dataNav.click();
+    return;
+  }
+  renderVariableRoleWorkflow(state.datasetsData?.items || []);
+  document.getElementById("variable-role-workflow-card")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
+async function startObservableRunForDataset(datasetPath) {
+  if (!datasetPath) return;
+  state.selectedDatasetPath = datasetPath;
+  const executionNav = document.querySelector('.nav-link[data-view="empirical-execution"]');
+  if (executionNav instanceof HTMLElement) {
+    executionNav.click();
+  }
+  await createObservableRun("dry-run", datasetPath);
+}
+
+async function resolveObservableGate(gateId, action) {
+  if (!state.selectedProjectId || !state.selectedRunId || !gateId) return;
+  if (!["confirm", "reject", "adjust"].includes(action)) return;
+
+  const noteNode = Array.from(document.querySelectorAll("[data-gate-note]"))
+    .find((node) => node.dataset.gateNote === gateId);
+  const note = noteNode?.value?.trim() || "";
+
+  clearV2Error("empirical-execution");
+  state.resolvingGateId = gateId;
+  state.resolvingGateAction = action;
+  renderObservableGates();
+  try {
+    await v2api.runs.resolveGate(state.selectedProjectId, state.selectedRunId, gateId, action, note);
+    await loadRunObservability(state.selectedProjectId, state.selectedRunId);
+  } catch (error) {
+    showV2Error("empirical-execution", `处理 gate 失败：${error.message}`);
+  } finally {
+    state.resolvingGateId = null;
+    state.resolvingGateAction = null;
+    renderObservableGates();
+  }
+}
+
 // --- Journey Bar ---
 
 function renderJourneyBar() {
@@ -1728,7 +2661,7 @@ function renderJourneyBar() {
     return `
       <a class="journey-stage ${statusClass}" href="${escapeHtml(stage.href || "#")}" data-jump-view="${escapeHtml(stage.href?.replace("#view-", "") || "")}">
         <span class="journey-dot"></span>
-        <span class="journey-label">${escapeHtml(stage.name)}</span>
+        <span class="journey-label">${escapeHtml(productTermLabel(stage.name))}</span>
       </a>
       ${arrow}
     `;
@@ -1757,7 +2690,9 @@ function renderOverview() {
   // Research question
   document.getElementById("overview-question").textContent = data.research_question || data.project?.title || "未设置研究问题";
   document.getElementById("overview-project-meta").textContent =
-    `项目：${data.project?.slug || ""} · 当前阶段：${data.current_stage || ""} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
+    `项目：${data.project?.slug || ""} · 当前阶段：${productTermLabel(data.current_stage || "")} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
+
+  renderWorkflowContract(data.workflow_contract);
 
   // Stage summary cards
   const summaries = data.stage_summaries || [];
@@ -1769,17 +2704,17 @@ function renderOverview() {
     const metrics = summary.metrics || [];
     const metricsHtml = metrics.length
       ? `<div class="stage-summary-metrics">
-          ${metrics.map((m) => `<div class="stage-summary-metric"><span class="stage-summary-metric-value">${escapeHtml(m.value)}</span><span class="stage-summary-metric-label">${escapeHtml(m.label)}</span></div>`).join("")}
+          ${metrics.map((m) => `<div class="stage-summary-metric"><span class="stage-summary-metric-value">${escapeHtml(productTermLabel(m.value))}</span><span class="stage-summary-metric-label">${escapeHtml(productTermLabel(m.label))}</span></div>`).join("")}
         </div>`
       : `<div class="stage-summary-metrics"><span class="muted">暂无指标</span></div>`;
     return `
       <div class="stage-summary-card ${statusClass}">
         <div class="stage-summary-header">
-          <h4 class="stage-summary-title">${escapeHtml(summary.title)}</h4>
+          <h4 class="stage-summary-title">${escapeHtml(productTermLabel(summary.title))}</h4>
           ${summary.has_pending_action ? `<span class="pill" style="background:rgba(230,126,34,0.12);color:#e67e22;">需确认</span>` : ""}
         </div>
         ${metricsHtml}
-        <p class="stage-summary-hint">${escapeHtml(summary.summary || summary.next_step_hint || "")}</p>
+        <p class="stage-summary-hint">${escapeHtml(productTermLabel(summary.summary || summary.next_step_hint || ""))}</p>
       </div>
     `;
   }).join("");
@@ -1790,7 +2725,7 @@ function renderOverview() {
     ? risks.map((risk) => `
         <div class="event-item">
           <span style="color:${risk.level === "warning" ? "#e67e22" : "#c0392b"};font-size:16px;">${risk.level === "warning" ? "⚠" : "🚫"}</span>
-          <div class="event-item-content">${escapeHtml(risk.description)}</div>
+          <div class="event-item-content">${escapeHtml(productTermLabel(risk.description))}</div>
         </div>
       `).join("")
     : `<div class="event-item"><span>✓</span><div class="event-item-content">当前没有识别到关键风险。</div></div>`;
@@ -1801,7 +2736,7 @@ function renderOverview() {
     ? steps.map((step, i) => `
         <div class="event-item">
           <span style="color:var(--accent);font-weight:600;">${i + 1}.</span>
-          <div class="event-item-content">${escapeHtml(step.description)} ${step.action ? `· <strong>${escapeHtml(step.action)}</strong>` : ""}</div>
+          <div class="event-item-content">${escapeHtml(productTermLabel(step.description))} ${step.action ? `· <strong>${escapeHtml(productTermLabel(step.action))}</strong>` : ""}</div>
         </div>
       `).join("")
     : `<div class="event-item"><span>→</span><div class="event-item-content">暂无明确下一步建议。</div></div>`;
@@ -1814,7 +2749,7 @@ function renderOverview() {
           <span class="event-item-time">${new Date(evt.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
           <div class="event-item-content">
             <span class="event-item-agent">${escapeHtml(evt.agent_name || evt.agent || "系统")}</span>
-            ${escapeHtml(evt.action || "")}
+            ${escapeHtml(productTermLabel(evt.action || ""))}
             ${evt.result === "success" ? "✓" : evt.result === "failed" ? "✗" : ""}
           </div>
         </div>
@@ -1843,16 +2778,307 @@ function renderDataVariables() {
 
   const items = data.items || [];
   document.getElementById("datasets-count").textContent = items.length;
+  renderVariableRoleWorkflow(items);
 
   if (items.length === 0) {
     document.getElementById("datasets-list").innerHTML = renderEmptyState(data.empty_state);
   } else {
+    if (!state.selectedDatasetPath) {
+      state.selectedDatasetPath = items.find((ds) => ds.role === "configured_final_dataset")?.path || items[0]?.path || null;
+    }
     document.getElementById("datasets-list").innerHTML = items.map((ds) => `
       <div class="project-card">
-        <strong>${escapeHtml(ds.name || ds.id)}</strong>
-        <div class="muted">${ds.row_count || 0} 行 · ${ds.column_count || 0} 列 · ${ds.file_type || "未知格式"}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <strong>${escapeHtml(ds.name || ds.id)}</strong>
+          ${renderEvidenceBadge(ds)}
+        </div>
+        <div class="muted">${ds.row_count ?? 0} 行 · ${ds.column_count ?? 0} 列 · ${ds.file_type || "未知格式"} · ${escapeHtml(ds.role || "candidate_dataset")}</div>
+        <div class="muted">${escapeHtml(ds.path || "")}</div>
+        <button class="ghost-button" data-open-design-action data-dataset-path="${escapeHtml(ds.path || "")}">检查并确认变量角色</button>
       </div>
     `).join("");
+  }
+}
+
+function renderVariableRoleWorkflow(items) {
+  const container = document.getElementById("variable-role-workflow-body");
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>等待数据集</h4>
+        <p class="muted">先把 csv/dta/xlsx/parquet 等文件放入 Data 目录，再进入变量角色确认。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const selected = items.find((item) => item.path === state.selectedDatasetPath)
+    || items.find((item) => item.role === "configured_final_dataset")
+    || items[0];
+  state.selectedDatasetPath = selected?.path || state.selectedDatasetPath;
+
+  container.innerHTML = `
+    <div class="variable-role-workflow-layout research-record-card">
+      <div class="record-header">
+        <div>
+          <span class="eyebrow">confirm_variable_roles</span>
+          <h4>${escapeHtml(selected?.name || "已选择数据集")}</h4>
+        </div>
+        ${renderEvidenceBadge(selected)}
+      </div>
+      <div class="record-meta-grid">
+        <div>
+          <span class="record-label">样本路径</span>
+          <p class="record-path">${escapeHtml(selected?.path || "")}</p>
+        </div>
+        <div>
+          <span class="record-label">数据规模</span>
+          <p>${selected?.row_count ?? 0} 行 · ${selected?.column_count ?? 0} 列 · ${escapeHtml(selected?.file_type || "未知格式")}</p>
+        </div>
+      </div>
+      <ol class="research-step-list">
+        <li>
+          <strong>读取字段与样本口径</strong>
+          <span>本地文件证据，路径和行列数必须可追溯。</span>
+        </li>
+        <li>
+          <strong>确认结果变量 / 处理变量 / 控制变量 / 工具变量</strong>
+          <span>确认后进入研究设计方案，不在执行页临时猜测变量角色。</span>
+        </li>
+      </ol>
+      <div class="compact-action-row">
+        <button class="primary-button" data-open-design-action data-dataset-path="${escapeHtml(selected?.path || "")}">
+          检查并确认变量角色
+        </button>
+      </div>
+    </div>
+  `;
+  renderVariableRoleEditor();
+}
+
+function joinRoleValues(values) {
+  return Array.isArray(values) ? values.join(", ") : "";
+}
+
+function parseVariableRoleField(fieldId) {
+  const value = document.getElementById(fieldId)?.value || "";
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function setVariableRoleField(fieldId, values) {
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.value = joinRoleValues(values);
+  }
+}
+
+function renderVariableRoleEditor() {
+  const roleSet = state.variableRolesData?.variable_role_set || null;
+  const form = document.getElementById("variable-role-confirmation-form");
+  const meta = document.getElementById("variable-role-editor-meta");
+  const statusPill = document.getElementById("variable-role-status-pill");
+  const saveButton = document.querySelector("[data-variable-role-save]");
+  if (!form || !meta || !statusPill) return;
+
+  if (!roleSet) {
+    meta.textContent = "正在读取变量角色集...";
+    return;
+  }
+
+  const roles = roleSet.roles || {};
+  state.selectedDatasetPath = roleSet.dataset_path || state.selectedDatasetPath;
+  document.getElementById("variable-role-dataset-path").value = roleSet.dataset_path || "";
+  setVariableRoleField("variable-role-outcome", roles.outcome);
+  setVariableRoleField("variable-role-treatment", roles.treatment);
+  setVariableRoleField("variable-role-controls", roles.controls);
+  setVariableRoleField("variable-role-instruments", roles.instruments);
+  setVariableRoleField("variable-role-fixed-effects", roles.fixed_effects);
+  setVariableRoleField("variable-role-cluster-by", roles.cluster_by);
+  statusPill.textContent = `${roleSet.status || "draft"} · ${roleSet.evidence_level || "local_file"}`;
+  meta.textContent = `${roleSet.dataset_path || "未选择数据集"} · version=${roleSet.version ?? 0} · evidence_level=${roleSet.evidence_level || "local_file"}`;
+  if (saveButton) {
+    saveButton.disabled = state.savingVariableRoles;
+  }
+  document.getElementById("variable-role-save-status").textContent = state.savingVariableRoles ? "保存中..." : "";
+}
+
+async function handleSaveVariableRoles(event) {
+  event.preventDefault();
+  if (!state.selectedProjectId) return;
+
+  const datasetPath = document.getElementById("variable-role-dataset-path")?.value || state.selectedDatasetPath;
+  const payload = {
+    dataset_path: datasetPath,
+    roles: {
+      outcome: parseVariableRoleField("variable-role-outcome"),
+      treatment: parseVariableRoleField("variable-role-treatment"),
+      controls: parseVariableRoleField("variable-role-controls"),
+      instruments: parseVariableRoleField("variable-role-instruments"),
+      fixed_effects: parseVariableRoleField("variable-role-fixed-effects"),
+      cluster_by: parseVariableRoleField("variable-role-cluster-by"),
+    },
+    note: document.getElementById("variable-role-note")?.value?.trim() || "",
+  };
+
+  clearV2Error("data");
+  state.savingVariableRoles = true;
+  renderVariableRoleEditor();
+  try {
+    await v2api.variableRoles.save(state.selectedProjectId, payload);
+    state.variableRolesData = await v2api.variableRoles.get(state.selectedProjectId);
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderDataVariables();
+    renderWorkflowContract(state.overviewData.workflow_contract);
+    document.getElementById("variable-role-save-status").textContent = "已保存";
+  } catch (error) {
+    showV2Error("data", `保存变量角色集失败：${error.message}`);
+  } finally {
+    state.savingVariableRoles = false;
+    renderVariableRoleEditor();
+  }
+}
+
+function parseCommaField(fieldId) {
+  return parseVariableRoleField(fieldId);
+}
+
+function setTextField(fieldId, value) {
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.value = value || "";
+  }
+}
+
+function renderDesignSpecEditor() {
+  const designSpec = state.designSpecData?.design_spec || null;
+  const form = document.getElementById("design-spec-confirmation-form");
+  const meta = document.getElementById("design-spec-editor-meta");
+  const statusPill = document.getElementById("design-spec-status-pill");
+  const saveButton = document.querySelector("[data-design-spec-save]");
+  if (!form || !meta || !statusPill) return;
+
+  if (!designSpec) {
+    meta.textContent = "正在读取研究设计方案...";
+    return;
+  }
+
+  const strategy = designSpec.identification_strategy || {};
+  const model = designSpec.model || {};
+  setTextField("design-spec-question", designSpec.research_question);
+  setTextField("design-spec-strategy", strategy.name || "baseline_ols");
+  setTextField("design-spec-estimator", model.estimator || "ols");
+  setTextField("design-spec-formula", model.formula || "");
+  setTextField("design-spec-fixed-effects", joinRoleValues(model.fixed_effects));
+  setTextField("design-spec-cluster-by", joinRoleValues(model.cluster_by));
+  setTextField("design-spec-summary", strategy.summary || "");
+  setTextField("design-spec-threats", joinRoleValues(strategy.threats));
+  statusPill.textContent = `${designSpec.status || "draft"} · ${designSpec.evidence_level || "local_file"}`;
+  meta.textContent = `${designSpec.dataset_path || "未绑定数据集"} · version=${designSpec.version ?? 0} · variable_role_set_version=${designSpec.variable_role_set_version ?? 0}`;
+  if (saveButton) {
+    saveButton.disabled = state.savingDesignSpec;
+  }
+  document.getElementById("design-spec-save-status").textContent = state.savingDesignSpec ? "保存中..." : "";
+}
+
+async function handleSaveDesignSpec(event) {
+  event.preventDefault();
+  if (!state.selectedProjectId) return;
+
+  const payload = {
+    research_question: document.getElementById("design-spec-question")?.value?.trim() || "",
+    identification_strategy: {
+      name: document.getElementById("design-spec-strategy")?.value?.trim() || "baseline_ols",
+      summary: document.getElementById("design-spec-summary")?.value?.trim() || "",
+      assumptions: [],
+      threats: parseCommaField("design-spec-threats"),
+    },
+    model: {
+      estimator: document.getElementById("design-spec-estimator")?.value?.trim() || "ols",
+      formula: document.getElementById("design-spec-formula")?.value?.trim() || "",
+      fixed_effects: parseCommaField("design-spec-fixed-effects"),
+      cluster_by: parseCommaField("design-spec-cluster-by"),
+      sample_filter: "all",
+    },
+    note: document.getElementById("design-spec-note")?.value?.trim() || "",
+  };
+
+  clearV2Error("design");
+  state.savingDesignSpec = true;
+  renderDesignSpecEditor();
+  try {
+    await v2api.designSpec.save(state.selectedProjectId, payload);
+    state.designSpecData = await v2api.designSpec.get(state.selectedProjectId);
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderDesignSpecEditor();
+    renderWorkflowContract(state.overviewData.workflow_contract);
+    document.getElementById("design-spec-save-status").textContent = "已保存";
+  } catch (error) {
+    showV2Error("design", `保存研究设计方案失败：${error.message}`);
+  } finally {
+    state.savingDesignSpec = false;
+    renderDesignSpecEditor();
+  }
+}
+
+function renderRunPlanEditor() {
+  const runPlan = state.runPlanData?.run_plan || null;
+  const form = document.getElementById("run-plan-confirmation-form");
+  const meta = document.getElementById("run-plan-editor-meta");
+  const statusPill = document.getElementById("run-plan-status-pill");
+  const saveButton = document.querySelector("[data-run-plan-save]");
+  if (!form || !meta || !statusPill) return;
+
+  if (!runPlan) {
+    meta.textContent = "正在读取执行计划，需先确认研究设计方案。";
+    if (saveButton) saveButton.disabled = true;
+    return;
+  }
+
+  setTextField("run-plan-tasks", JSON.stringify(runPlan.tasks || [], null, 2));
+  setTextField("run-plan-outputs", joinRoleValues(runPlan.outputs || []));
+  statusPill.textContent = `${runPlan.status || "draft"} · ${runPlan.evidence_level || "local_file"}`;
+  meta.textContent = `${runPlan.dataset_path || "未绑定数据集"} · version=${runPlan.version ?? 0} · design_spec_version=${runPlan.design_spec_version ?? 0}`;
+  if (saveButton) {
+    saveButton.disabled = state.savingRunPlan;
+  }
+  document.getElementById("run-plan-save-status").textContent = state.savingRunPlan ? "保存中..." : "";
+}
+
+async function handleSaveRunPlan(event) {
+  event.preventDefault();
+  if (!state.selectedProjectId) return;
+
+  let tasks = [];
+  try {
+    tasks = JSON.parse(document.getElementById("run-plan-tasks")?.value || "[]");
+  } catch (error) {
+    showV2Error("empirical-execution", "执行计划任务必须是 JSON 数组。");
+    return;
+  }
+
+  const payload = {
+    tasks,
+    outputs: parseCommaField("run-plan-outputs"),
+    note: document.getElementById("run-plan-note")?.value?.trim() || "",
+  };
+
+  clearV2Error("empirical-execution");
+  state.savingRunPlan = true;
+  renderRunPlanEditor();
+  try {
+    await v2api.runPlan.save(state.selectedProjectId, payload);
+    state.runPlanData = await v2api.runPlan.get(state.selectedProjectId);
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderRunPlanEditor();
+    renderExecutionPreflight();
+    document.getElementById("run-plan-save-status").textContent = "已保存";
+  } catch (error) {
+    showV2Error("empirical-execution", `保存执行计划失败：${error.message}`);
+  } finally {
+    state.savingRunPlan = false;
+    renderRunPlanEditor();
   }
 }
 
@@ -1874,6 +3100,8 @@ function renderResearchDesign() {
   if (bannerHtml) {
     document.getElementById("view-research-design").insertAdjacentHTML("afterbegin", bannerHtml);
   }
+
+  renderDesignSpecEditor();
 
   // Question
   document.getElementById("design-question").innerHTML = `
@@ -1913,10 +3141,14 @@ function renderPaperDraft() {
   const data = state.draftsData;
   if (!data) {
     document.getElementById("drafts-list").innerHTML = "<p class='muted'>加载中...</p>";
+    renderResultsDraftEvidence();
+    renderManuscriptCandidates();
     return;
   }
 
   clearV2Error("draft");
+  renderResultsDraftEvidence();
+  renderManuscriptCandidates();
 
   // Evidence banner (local_file is good, but show it)
   const bannerHtml = renderEvidenceBanner(data._meta);
@@ -1944,9 +3176,411 @@ function renderPaperDraft() {
   }
 }
 
+function renderResultsDraftEvidence() {
+  const findingsContainer = document.getElementById("results-findings-list");
+  const sectionsContainer = document.getElementById("draft-evidence-sections");
+  if (!findingsContainer || !sectionsContainer) return;
+
+  const data = state.resultsDraftData;
+  if (!data) {
+    findingsContainer.innerHTML = "<p class='muted'>正在读取完整执行结果...</p>";
+    sectionsContainer.innerHTML = "<p class='muted'>正在读取草稿证据绑定...</p>";
+    return;
+  }
+
+  if (data.empty_state) {
+    const empty = renderEmptyState(data.empty_state);
+    findingsContainer.innerHTML = empty;
+    sectionsContainer.innerHTML = empty;
+    return;
+  }
+
+  const findings = data.findings || [];
+  findingsContainer.innerHTML = findings.length
+    ? findings.map((finding) => `
+      <article class="project-card finding-card">
+        <div class="card-row">
+          <strong>${escapeHtml(finding.title || finding.id)}</strong>
+          ${renderEvidenceBadge({ evidence_level: finding.evidence_level })}
+        </div>
+        <div class="card-row finding-review-row">
+          <span class="review-status ${finding.can_write_to_draft ? "is-approved" : ""}">
+            审阅状态：${escapeHtml(reviewStatusLabel(finding.review_status || "needs_review"))}
+          </span>
+          <span class="review-status ${finding.can_write_to_draft ? "is-approved" : "is-blocked"}">
+            可写入正文：${yesNo(finding.can_write_to_draft)}
+          </span>
+        </div>
+        <div class="finding-estimate">
+          ${escapeHtml(finding.treatment)} → ${escapeHtml(finding.dependent_var)}:
+          <strong>${formatNumber(finding.estimate)}</strong>
+          <span class="muted">标准误=${formatNumber(finding.std_error)} · p=${formatNumber(finding.p_value)} · 样本量=${escapeHtml(String(finding.sample_size || "-"))}</span>
+        </div>
+        <div class="muted evidence-line">
+          运行：${escapeHtml(finding.run_id)} · 执行计划版本：${escapeHtml(String(finding.run_plan_version || "-"))}
+        </div>
+        <div class="muted evidence-line">${escapeHtml(finding.artifact_path || "")}</div>
+        ${renderFindingReviewPanel(finding)}
+      </article>
+    `).join("")
+    : "<p class='muted'>最新完整执行暂未生成可展示的结果论断。</p>";
+
+  const sections = data.draft_sections || [];
+  sectionsContainer.innerHTML = sections.length
+    ? sections.map((section) => {
+      const binding = section.evidence_binding || {};
+      return `
+        <article class="project-card draft-section-binding">
+          <div class="card-row">
+            <strong>${escapeHtml(section.title || section.id)}</strong>
+            ${renderEvidenceBadge({ evidence_level: section.source_evidence_level })}
+          </div>
+          <div class="muted evidence-line">${escapeHtml(section.source_path || "")}</div>
+          <div class="muted evidence-line">
+            论断证据：
+            ${renderEvidenceBadge({ evidence_level: binding.claim_evidence_level })}
+            运行：${escapeHtml(binding.run_id || "")} · 执行计划版本：${escapeHtml(String(binding.run_plan_version || "-"))}
+          </div>
+          <div class="muted evidence-line">${escapeHtml(binding.artifact_path || "")}</div>
+        </article>
+      `;
+    }).join("")
+    : "<p class='muted'>尚未发现可绑定的草稿章节。</p>";
+}
+
+function renderManuscriptCandidates() {
+  const container = document.getElementById("manuscript-candidates-list");
+  if (!container) return;
+
+  const data = state.manuscriptCandidatesData;
+  if (!data) {
+    container.innerHTML = "<p class='muted'>正在根据已审阅论断生成正文候选...</p>";
+    return;
+  }
+
+  const candidates = data.items || [];
+  if (!candidates.length) {
+    container.innerHTML = data.empty_state
+      ? renderEmptyState({
+          title: data.empty_state.title || "尚无正文候选",
+          description: data.empty_state.description || "需要先确认至少一个结果论断",
+        })
+      : "<p class='muted'>需要先确认至少一个结果论断</p>";
+    return;
+  }
+
+  container.innerHTML = candidates.map((candidate) => {
+    const provenance = candidate.provenance || {};
+    return `
+      <article class="project-card manuscript-candidate-card">
+        <div class="card-row">
+          <strong>${escapeHtml(candidate.section || "正文")} · ${escapeHtml(candidate.title || candidate.id)}</strong>
+          <span class="review-status">状态：${escapeHtml(candidateStatusLabel(candidate.status || "draft"))}</span>
+        </div>
+        <div class="card-row finding-review-row">
+          <span class="review-status ${candidate.review_status === "approved" ? "is-approved" : ""}">
+            审阅状态：${escapeHtml(reviewStatusLabel(candidate.review_status || "needs_review"))}
+          </span>
+          <span class="review-status ${candidate.can_promote ? "is-approved" : "is-blocked"}">
+            可进入导出：${yesNo(candidate.can_promote)}
+          </span>
+          <span class="review-status ${candidate.promotion_status === "ready_for_export" ? "is-approved" : ""}">
+            提升状态：${escapeHtml(promotionStatusLabel(candidate.promotion_status || "not_promoted"))}
+          </span>
+          <span class="review-status ${candidate.can_write_back ? "is-approved" : "is-blocked"}">
+            可写回正文：${yesNo(candidate.can_write_back)}
+          </span>
+          <span class="review-status ${candidate.export_status === "preview_ready" ? "is-approved" : ""}">
+            导出状态：${escapeHtml(exportStatusLabel(candidate.export_status || "not_started"))}
+          </span>
+        </div>
+        <p class="manuscript-candidate-body">${escapeHtml(candidate.body || "")}</p>
+        <div class="muted evidence-line">
+          论断：${escapeHtml(candidate.finding_id || "")} · 运行：${escapeHtml(candidate.run_id || "")} · 执行计划版本：${escapeHtml(String(candidate.run_plan_version || "-"))}
+        </div>
+        <div class="candidate-provenance">
+          ${renderCandidateProvenance("source_draft", provenance.source_draft)}
+          ${renderCandidateProvenance("result_artifact", provenance.result_artifact)}
+          ${renderCandidateProvenance("review_decision", provenance.review_decision)}
+          ${renderCandidateProvenance("candidate_review", provenance.candidate_review)}
+          ${renderCandidateProvenance("promotion_state", provenance.promotion_state)}
+          ${renderCandidateProvenance("export_package", provenance.export_package)}
+        </div>
+        ${renderCandidateReviewPanel(candidate)}
+        ${renderCandidatePromotePanel(candidate)}
+        ${renderCandidateExportPreflightPanel(candidate)}
+      </article>
+    `;
+  }).join("");
+}
+
+function renderCandidateProvenance(label, item = {}) {
+  if (!item || (!item.path && !item.evidence_level)) return "";
+  return `
+    <div class="candidate-provenance-row">
+      <span>${escapeHtml(provenanceLabel(label))}</span>
+      <span>${escapeHtml(item.path || "")}</span>
+      ${renderEvidenceBadge({ evidence_level: item.evidence_level })}
+    </div>
+  `;
+}
+
+function renderCandidatePromotePanel(candidate) {
+  const promotion = candidate.promotion || {};
+  const canPromote = candidate.can_promote === true;
+  const isPromoting = state.promotingCandidateId === candidate.id;
+  const disabled = !canPromote || isPromoting;
+  return `
+    <div class="candidate-promote-panel">
+      <div class="card-row">
+        <div>
+          <strong>导出前检查</strong>
+          <div class="muted evidence-line">
+            ${candidate.promotion_status === "ready_for_export"
+              ? "已进入导出前检查：该段落可以生成写回预览。"
+              : "需要先确认正文候选，才能进入导出前检查。"}
+          </div>
+        </div>
+        <button
+          class="primary-button"
+          data-candidate-id="${escapeHtml(candidate.id)}"
+          data-candidate-promote-action="preflight"
+          ${disabled ? "disabled" : ""}
+        >
+          ${isPromoting ? "生成中..." : "进入导出前检查"}
+        </button>
+      </div>
+      <div class="muted evidence-line">
+        导出前提升检查不会直接覆盖 paper_draft.md；可写回正文：${yesNo(candidate.can_write_back)}
+      </div>
+      ${promotion.evidence_level ? `
+        <div class="muted evidence-line">
+          提升证据：
+          ${renderEvidenceBadge({ evidence_level: promotion.evidence_level })}
+          ${escapeHtml(promotion.promotion_path || "")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderCandidateExportPreflightPanel(candidate) {
+  const exportEntry = candidate.export || {};
+  const isExporting = state.exportingCandidateId === candidate.id;
+  const canExportPreflight = candidate.promotion_status === "ready_for_export" && candidate.can_export === true;
+  const disabled = !canExportPreflight || isExporting;
+  return `
+    <div class="candidate-export-panel">
+      <div class="card-row">
+        <div>
+          <strong>写回预览</strong>
+          <div class="muted evidence-line">
+            ${candidate.export_status === "preview_ready"
+              ? "预览已就绪：已生成独立写回预览。"
+              : "进入导出前检查后可生成独立预览和导出清单。"}
+          </div>
+        </div>
+        <button
+          class="ghost-button"
+          data-candidate-id="${escapeHtml(candidate.id)}"
+          data-candidate-export-preflight-action="preview"
+          ${disabled ? "disabled" : ""}
+        >
+          ${isExporting ? "生成中..." : "生成写回预览"}
+        </button>
+      </div>
+      ${candidate.writeback_preview_path ? `
+        <div class="muted evidence-line">写回预览路径：${escapeHtml(candidate.writeback_preview_path)}</div>
+      ` : ""}
+      ${candidate.export_manifest_path ? `
+        <div class="muted evidence-line">清单路径：${escapeHtml(candidate.export_manifest_path)}</div>
+      ` : ""}
+      ${exportEntry.evidence_level ? `
+        <div class="muted evidence-line">
+          导出预检：
+          ${renderEvidenceBadge({ evidence_level: exportEntry.evidence_level })}
+          ${escapeHtml(exportEntry.writeback_preview_path || "")}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderCandidateReviewPanel(candidate) {
+  const review = candidate.review || {};
+  const note = review.note || "";
+  const isSaving = state.reviewingCandidateId === candidate.id;
+  return `
+    <div class="finding-review-panel candidate-review-panel">
+      <label class="claim-review-note">
+        <span>正文候选审阅备注</span>
+        <textarea data-candidate-review-note="${escapeHtml(candidate.id)}" rows="2" placeholder="说明该段落是否可以进入正文，或需要怎样修改。">${escapeHtml(note)}</textarea>
+      </label>
+      <div class="claim-review-actions">
+        ${["approve", "needs_revision", "reject"].map((action) => `
+          <button
+            class="${action === "approve" ? "primary-button" : "ghost-button"}"
+            data-candidate-id="${escapeHtml(candidate.id)}"
+            data-candidate-review-action="${action}"
+            ${isSaving ? "disabled" : ""}
+          >
+            ${isSaving && state.reviewingCandidateAction === action ? "保存中..." : candidateReviewActionLabel(action)}
+          </button>
+        `).join("")}
+      </div>
+      ${review.evidence_level ? `
+        <div class="muted evidence-line">
+          正文候选审阅：
+          ${renderEvidenceBadge({ evidence_level: review.evidence_level })}
+          执行者：${escapeHtml(review.actor || "用户")} · ${escapeHtml(review.timestamp || "")}
+        </div>
+      ` : `<div class="muted evidence-line">该正文候选尚未完成人工审阅。</div>`}
+    </div>
+  `;
+}
+
+function candidateReviewActionLabel(action) {
+  return {
+    approve: "确认段落",
+    needs_revision: "需要修改",
+    reject: "拒绝段落",
+  }[action] || action;
+}
+
+function renderFindingReviewPanel(finding) {
+  const review = finding.review || {};
+  const note = review.note || "";
+  const isSaving = state.reviewingFindingId === finding.id;
+  return `
+    <div class="finding-review-panel">
+      <label class="claim-review-note">
+        <span>审阅备注</span>
+        <textarea data-finding-review-note="${escapeHtml(finding.id)}" rows="2" placeholder="说明为什么允许写入、拒绝或需要修改。">${escapeHtml(note)}</textarea>
+      </label>
+      <div class="claim-review-actions">
+        ${["approve", "needs_revision", "reject"].map((action) => `
+          <button
+            class="${action === "approve" ? "primary-button" : "ghost-button"}"
+            data-finding-id="${escapeHtml(finding.id)}"
+            data-finding-review-action="${action}"
+            ${isSaving ? "disabled" : ""}
+          >
+            ${isSaving && state.reviewingFindingAction === action ? "保存中..." : findingReviewActionLabel(action)}
+          </button>
+        `).join("")}
+      </div>
+      ${review.evidence_level ? `
+        <div class="muted evidence-line">
+          审阅证据：
+          ${renderEvidenceBadge({ evidence_level: review.evidence_level })}
+          执行者：${escapeHtml(review.actor || "用户")} · ${escapeHtml(review.timestamp || "")}
+        </div>
+      ` : `<div class="muted evidence-line">该结果论断尚未完成人工审阅。</div>`}
+    </div>
+  `;
+}
+
+function findingReviewActionLabel(action) {
+  return {
+    approve: "允许写入正文",
+    needs_revision: "需要修改",
+    reject: "拒绝使用",
+  }[action] || action;
+}
+
+async function reviewFinding(findingId, action) {
+  if (!state.selectedProjectId || !findingId || !action) return;
+  const note = document.querySelector(`[data-finding-review-note="${CSS.escape(findingId)}"]`)?.value?.trim() || "";
+  clearV2Error("draft");
+  state.reviewingFindingId = findingId;
+  state.reviewingFindingAction = action;
+  renderResultsDraftEvidence();
+  try {
+    await v2api.resultsDraft.reviewFinding(state.selectedProjectId, findingId, { action, note });
+    state.resultsDraftData = await v2api.resultsDraft.get(state.selectedProjectId);
+    state.manuscriptCandidatesData = await v2api.manuscriptCandidates.get(state.selectedProjectId);
+    renderResultsDraftEvidence();
+    renderManuscriptCandidates();
+  } catch (error) {
+    showV2Error("draft", `保存结果论断卡审阅失败：${error.message}`);
+  } finally {
+    state.reviewingFindingId = null;
+    state.reviewingFindingAction = null;
+    renderResultsDraftEvidence();
+  }
+}
+
+async function reviewManuscriptCandidate(candidateId, action) {
+  if (!state.selectedProjectId || !candidateId || !action) return;
+  const note = document.querySelector(`[data-candidate-review-note="${CSS.escape(candidateId)}"]`)?.value?.trim() || "";
+  clearV2Error("draft");
+  state.reviewingCandidateId = candidateId;
+  state.reviewingCandidateAction = action;
+  renderManuscriptCandidates();
+  try {
+    await v2api.manuscriptCandidates.reviewCandidate(state.selectedProjectId, candidateId, { action, note });
+    state.manuscriptCandidatesData = await v2api.manuscriptCandidates.get(state.selectedProjectId);
+    renderManuscriptCandidates();
+  } catch (error) {
+    showV2Error("draft", `保存正文候选审阅失败：${error.message}`);
+  } finally {
+    state.reviewingCandidateId = null;
+    state.reviewingCandidateAction = null;
+    renderManuscriptCandidates();
+  }
+}
+
+async function promoteManuscriptCandidate(candidateId) {
+  if (!state.selectedProjectId || !candidateId) return;
+  clearV2Error("draft");
+  state.promotingCandidateId = candidateId;
+  renderManuscriptCandidates();
+  try {
+    await v2api.manuscriptCandidates.promoteCandidate(state.selectedProjectId, candidateId, {
+      note: "进入导出前检查，不直接覆盖草稿。",
+    });
+    state.manuscriptCandidatesData = await v2api.manuscriptCandidates.get(state.selectedProjectId);
+    renderManuscriptCandidates();
+  } catch (error) {
+    showV2Error("draft", `生成正文候选导出前检查失败：${error.message}`);
+  } finally {
+    state.promotingCandidateId = null;
+    renderManuscriptCandidates();
+  }
+}
+
+async function exportPreflightManuscriptCandidate(candidateId) {
+  if (!state.selectedProjectId || !candidateId) return;
+  clearV2Error("draft");
+  state.exportingCandidateId = candidateId;
+  renderManuscriptCandidates();
+  try {
+    await v2api.manuscriptCandidates.exportPreflightCandidate(state.selectedProjectId, candidateId, {
+      note: "生成写回预览和导出清单，不直接覆盖草稿。",
+    });
+    state.manuscriptCandidatesData = await v2api.manuscriptCandidates.get(state.selectedProjectId);
+    renderManuscriptCandidates();
+  } catch (error) {
+    showV2Error("draft", `生成写回预览失败：${error.message}`);
+  } finally {
+    state.exportingCandidateId = null;
+    renderManuscriptCandidates();
+  }
+}
+
+function formatNumber(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const number = Number(value);
+  if (!Number.isFinite(number)) return escapeHtml(String(value));
+  if (Math.abs(number) < 0.001 && number !== 0) return number.toExponential(2);
+  return number.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 // --- Artifacts & Replication Page ---
 
 function renderArtifactsReplication() {
+  renderExportPackageWorkbench();
+
   const artifacts = mergedArtifacts(state.selectedProject);
   const container = document.getElementById("artifacts-replication-list");
 
@@ -1970,6 +3604,100 @@ function renderArtifactsReplication() {
       <div class="muted">${escapeHtml(artifact.path)}</div>
       <div class="muted">${escapeHtml(artifact.description || "")}</div>
     </div>
+  `).join("");
+}
+
+function renderExportPackageWorkbench() {
+  const container = document.getElementById("export-package-workbench");
+  if (!container) return;
+
+  const data = state.exportPackageData;
+  if (!data) {
+    container.innerHTML = "<p class='muted'>正在读取导出包...</p>";
+    return;
+  }
+
+  const packages = data.packages || [];
+  if (!packages.length) {
+    container.innerHTML = data.empty_state
+      ? renderEmptyState(data.empty_state)
+      : "<p class='muted'>需要先生成导出预检</p>";
+    return;
+  }
+
+  container.innerHTML = packages.map((pkg) => `
+    <article class="export-package-card">
+      <div class="export-package-header">
+        <div>
+          <span class="eyebrow">${escapeHtml(pkg.candidate_id || "export_package")}</span>
+          <h4>${escapeHtml(pkg.title || "结果导出包")}</h4>
+          <p class="muted">
+            运行：${escapeHtml(pkg.run_id || "")} · 章节：${escapeHtml(pkg.section || "")} · 导出状态：${escapeHtml(exportStatusLabel(pkg.export_status || ""))}
+          </p>
+        </div>
+        <div class="export-package-status">
+          ${renderEvidenceBadge({ evidence_level: pkg.evidence_level })}
+          <span class="review-status ${pkg.evaluator_status === "passed" ? "is-approved" : "is-blocked"}">
+            评估器：${escapeHtml(evaluatorStatusLabel(pkg.evaluator_status || "unknown"))}
+          </span>
+        </div>
+      </div>
+
+      <div class="export-package-paths">
+        <div><strong>写回预览路径</strong><span>${escapeHtml(pkg.writeback_preview_path || "-")}</span></div>
+        <div><strong>导出清单路径</strong><span>${escapeHtml(pkg.manifest_path || "-")}</span></div>
+        <div><strong>结果产物路径</strong><span>${escapeHtml(pkg.result_artifact_path || "-")}</span></div>
+        <div><strong>可写回正文</strong><span>${yesNo(pkg.can_write_back)}</span></div>
+      </div>
+
+      <div class="export-workbench-grid">
+        <section>
+          <div class="card-row">
+            <strong>评估检查</strong>
+            <span class="pill">导出前必须通过</span>
+          </div>
+          <div class="export-evaluator-checks">
+            ${(pkg.evaluator_checks || []).map((check) => `
+              <div class="export-check is-${escapeHtml(check.status || "unknown")}">
+                <span class="export-check-status">${check.status === "passed" ? "✓" : "!"}</span>
+                <div>
+                  <strong>${escapeHtml(check.label || check.id)}</strong>
+                  <div class="muted evidence-line">
+                    ${escapeHtml(check.path || "")}
+                    ${check.detail ? ` · ${escapeHtml(check.detail)}` : ""}
+                  </div>
+                </div>
+                ${renderEvidenceBadge({ evidence_level: check.evidence_level })}
+              </div>
+            `).join("")}
+          </div>
+        </section>
+
+        <section>
+          <div class="card-row">
+            <strong>前沿工程迭代日志</strong>
+            <span class="pill">${escapeHtml(pkg.frontier_loop?.reference || "前沿工程闭环")}</span>
+          </div>
+          <div class="frontier-iteration-log">
+            ${(pkg.frontier_iteration_log || []).map((entry) => `
+              <div class="frontier-log-row">
+                <span>${escapeHtml(frontierPhaseLabel(entry.phase || ""))}</span>
+                <div>
+                  <strong>${escapeHtml(entry.title || "")}</strong>
+                  <p class="muted">${escapeHtml(entry.description || "")}</p>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+      </div>
+
+      <div class="export-package-footer">
+        <p class="muted">${escapeHtml(pkg.next_manual_action || "")}</p>
+        <button class="ghost-button" data-open-results-draft>回到结果与草稿查看候选来源</button>
+        <button class="primary-button" disabled>等待显式写回审批</button>
+      </div>
+    </article>
   `).join("");
 }
 
@@ -2054,11 +3782,11 @@ function renderAgentConsole() {
 
   document.getElementById("agent-pipeline-list").innerHTML = pipeline.length
     ? pipeline.map(renderAgentCard).join("")
-    : "<p class='muted'>暂无 Pipeline Roles</p>";
+    : "<p class='muted'>暂无流水线角色</p>";
 
   document.getElementById("agent-dimension-list").innerHTML = dimension.length
     ? dimension.map(renderAgentCard).join("")
-    : "<p class='muted'>暂无 Research Dimension Agents</p>";
+    : "<p class='muted'>暂无研究维度智能体</p>";
 }
 
 async function selectAgent(agentId) {
@@ -2091,7 +3819,7 @@ async function selectAgent(agentId) {
         <div class="project-card">
           <strong>${escapeHtml(agent.name || identity.name || agentId)}</strong>
           <div class="muted">角色：${escapeHtml(agent.role || identity.role || "")} · 类型：${escapeHtml(agent.role_type || identity.role_type || "")}</div>
-          <div class="muted">Provider：${escapeHtml(identity.provider || "local_codex")}</div>
+          <div class="muted">模型提供方：${escapeHtml(identity.provider || "local_codex")}</div>
         </div>
       </div>
 
@@ -2118,8 +3846,8 @@ async function selectAgent(agentId) {
       <div class="agent-detail-section">
         <h4>成本追踪</h4>
         <div class="project-card">
-          <div class="muted">Provider：${escapeHtml(cost.provider || "local_codex")}</div>
-          <div class="muted">预估 Token：${cost.estimated_tokens || 0}</div>
+          <div class="muted">模型提供方：${escapeHtml(cost.provider || "local_codex")}</div>
+          <div class="muted">预估令牌数：${cost.estimated_tokens || 0}</div>
           <div class="muted">预估成本：$${cost.estimated_cost_usd || 0}</div>
           ${renderEvidenceBadge(cost)}
         </div>
@@ -2141,7 +3869,7 @@ async function selectAgent(agentId) {
       </div>
     `;
   } catch (error) {
-    panel.innerHTML = `<div class="error-banner"><span>加载 Agent 详情失败：${escapeHtml(error.message)}</span></div>`;
+    panel.innerHTML = `<div class="error-banner"><span>加载智能体详情失败：${escapeHtml(error.message)}</span></div>`;
   }
 }
 
@@ -2161,18 +3889,42 @@ async function loadV2Data(viewName) {
         renderJourneyBar();
         break;
       case "data-variables":
+        state.overviewData = await v2api.overview.get(projectId);
         state.datasetsData = await v2api.datasets.list(projectId);
+        state.variableRolesData = await v2api.variableRoles.get(projectId);
         renderDataVariables();
         break;
       case "research-design":
+        state.overviewData = await v2api.overview.get(projectId);
         state.designData = await v2api.design.get(projectId);
+        state.designSpecData = await v2api.designSpec.get(projectId);
         renderResearchDesign();
         break;
       case "paper-draft":
         state.draftsData = await v2api.drafts.list(projectId);
+        try {
+          state.resultsDraftData = await v2api.resultsDraft.get(projectId);
+          state.manuscriptCandidatesData = await v2api.manuscriptCandidates.get(projectId);
+        } catch (error) {
+          state.resultsDraftData = {
+            empty_state: {
+              title: "尚未形成完整执行结果",
+              description: "结果与草稿需要先完成一次成功的完整实证执行。",
+            },
+          };
+          state.manuscriptCandidatesData = {
+            items: [],
+            empty_state: {
+              code: "approved_finding_required",
+              title: "尚无正文候选",
+              description: "需要先完成完整执行，并审阅通过至少一个结果论断卡。",
+            },
+          };
+        }
         renderPaperDraft();
         break;
       case "artifacts-replication":
+        state.exportPackageData = await v2api.exportPackage.get(projectId);
         renderArtifactsReplication();
         break;
       case "agent-console":
@@ -2180,12 +3932,28 @@ async function loadV2Data(viewName) {
         renderAgentConsole();
         break;
       case "empirical-execution":
-        // Phase A skeleton only, no data to load
+        state.overviewData = await v2api.overview.get(projectId);
+        try {
+          state.runPlanData = await v2api.runPlan.get(projectId);
+        } catch (error) {
+          state.runPlanData = null;
+        }
+        renderExecutionPreflight();
+        renderRunPlanEditor();
+        await loadObservableExecution();
         break;
     }
   } catch (error) {
     console.error(`Failed to load ${viewName}:`, error);
-    const viewId = viewName.replace(/-/g, "");
+    const viewIdMap = {
+      "data-variables": "data",
+      "research-design": "design",
+      "paper-draft": "draft",
+      "artifacts-replication": "artifacts-replication",
+      "agent-console": "agent-console",
+      "empirical-execution": "empirical-execution",
+    };
+    const viewId = viewIdMap[viewName] || viewName;
     showV2Error(viewId, `加载失败：${error.message}`);
   }
 }
@@ -2195,10 +3963,80 @@ async function loadV2Data(viewName) {
 // ============================================================
 async function boot() {
   mountNav();
+  mountArchiveInspector();
   mountProjectSelection();
   mountActions();
   mountForm();
   mountAgentClusterEvents();
+  document.getElementById("run-selector")?.addEventListener("change", (event) => {
+    state.selectedRunId = event.target.value || null;
+    void loadRunObservability(state.selectedProjectId, state.selectedRunId);
+  });
+  document.getElementById("run-refresh-button")?.addEventListener("click", () => void loadObservableExecution());
+  document.getElementById("observable-run-full-button")?.addEventListener("click", () => void createFullRunFromPlan());
+  document.getElementById("observable-run-dry-button")?.addEventListener("click", () => void createObservableRun("dry-run"));
+  document.getElementById("observable-hitl-gates")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-gate-resolve-action]");
+    if (!button) return;
+    void resolveObservableGate(button.dataset.gateId, button.dataset.gateResolveAction);
+  });
+  document.getElementById("results-findings-list")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-finding-review-action]");
+    if (!button) return;
+    void reviewFinding(button.dataset.findingId, button.dataset.findingReviewAction);
+  });
+  document.getElementById("manuscript-candidates-list")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const reviewButton = target.closest("[data-candidate-review-action]");
+    if (reviewButton) {
+      void reviewManuscriptCandidate(reviewButton.dataset.candidateId, reviewButton.dataset.candidateReviewAction);
+      return;
+    }
+    const promoteButton = target.closest("[data-candidate-promote-action]");
+    if (promoteButton) {
+      void promoteManuscriptCandidate(promoteButton.dataset.candidateId);
+      return;
+    }
+    const exportButton = target.closest("[data-candidate-export-preflight-action]");
+    if (exportButton) {
+      void exportPreflightManuscriptCandidate(exportButton.dataset.candidateId);
+    }
+  });
+  document.getElementById("export-package-workbench")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-open-results-draft]");
+    if (!button) return;
+    document.querySelector('.nav-link[data-view="paper-draft"]')?.click();
+  });
+  document.getElementById("datasets-list")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-open-design-action]");
+    if (!button) return;
+    openDesignAction(button.dataset.datasetPath);
+  });
+  document.getElementById("view-overview")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-open-design-action]");
+    if (!button) return;
+    openDesignAction(state.selectedDatasetPath || button.dataset.datasetPath || "");
+  });
+  document.getElementById("variable-role-confirmation-form")?.addEventListener("submit", (event) => {
+    void handleSaveVariableRoles(event);
+  });
+  document.getElementById("design-spec-confirmation-form")?.addEventListener("submit", (event) => {
+    void handleSaveDesignSpec(event);
+  });
+  document.getElementById("run-plan-confirmation-form")?.addEventListener("submit", (event) => {
+    void handleSaveRunPlan(event);
+  });
   await refreshProjects();
   // Load default V2 view data
   if (state.selectedProjectId) {

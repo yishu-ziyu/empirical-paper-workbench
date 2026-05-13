@@ -11,7 +11,24 @@ from pydantic import BaseModel, Field
 from Product.backend.agent_registry_service import get_agent_details, list_agents
 from Product.backend.artifact_service import get_artifact, promote_artifact
 from Product.backend.codex_provider import local_codex_status
+from Product.backend.design_spec_service import (
+    get_project_design_spec,
+    get_project_run_plan,
+    save_project_design_spec,
+    save_project_run_plan,
+)
 from Product.backend.draft_service import list_project_drafts
+from Product.backend.manuscript_candidate_service import (
+    CandidatePromotionRequiredError,
+    CandidateReviewRequiredError,
+    InvalidCandidateReviewActionError,
+    ManuscriptCandidateNotFoundError,
+    get_project_export_package,
+    get_project_manuscript_candidates,
+    save_project_manuscript_candidate_export_preflight,
+    save_project_manuscript_candidate_promotion,
+    save_project_manuscript_candidate_review,
+)
 from Product.backend.overview_service import (
     get_project_design,
     get_project_journey,
@@ -21,6 +38,7 @@ from Product.backend.overview_service import (
 from Product.backend.project_service import (
     create_workspace,
     execute_workbench_run,
+    execute_full_run_from_run_plan,
     execute_run,
     export_docx,
     get_project_api_view,
@@ -36,11 +54,19 @@ from Product.backend.project_service import (
     list_project_api_views,
     list_project_runs,
     register_project_root,
+    resolve_project_run_gate,
     run_orchestration,
     run_pipeline,
 )
 from Product.backend.provenance_service import get_artifact_provenance
 from Product.backend.registry import ensure_registry, get_project_by_id
+from Product.backend.results_draft_service import (
+    FindingNotFoundError,
+    InvalidReviewActionError,
+    get_project_results_draft,
+    save_project_finding_review,
+)
+from Product.backend.variable_role_service import get_project_variable_roles, save_project_variable_roles
 from Product.backend.workflow_service import (
     cancel_workflow,
     create_workflow,
@@ -92,11 +118,54 @@ class CreateManagedProjectPayload(BaseModel):
 
 class RunPayload(BaseModel):
     mode: str = "dry-run"
+    dataset_path: str | None = None
 
 
 class WorkbenchRunPayload(BaseModel):
     mode: str = "dry-run"
     user_goal: str = ""
+
+
+class ResolveGatePayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class VariableRolePayload(BaseModel):
+    dataset_path: str
+    roles: dict[str, list[str]]
+    note: str = ""
+
+
+class DesignSpecPayload(BaseModel):
+    research_question: str
+    identification_strategy: dict
+    model: dict
+    note: str = ""
+
+
+class RunPlanPayload(BaseModel):
+    tasks: list[dict]
+    outputs: list[str]
+    note: str = ""
+
+
+class FindingReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class ManuscriptCandidateReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class ManuscriptCandidatePromotePayload(BaseModel):
+    note: str = ""
+
+
+class ManuscriptCandidateExportPreflightPayload(BaseModel):
+    note: str = ""
 
 
 class CreateWorkflowPayload(BaseModel):
@@ -297,6 +366,94 @@ def api_v1_project_datasets(project_id: str) -> dict:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
+@app.get("/api/v1/projects/{project_id}/variable-roles")
+def api_v1_project_variable_roles(project_id: str) -> dict:
+    try:
+        return get_project_variable_roles(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(400, "dataset_not_found", f"Dataset file does not exist: {exc}")
+    except ValueError as exc:
+        return error_response(400, "invalid_dataset_path", f"Unsupported dataset path: {exc}")
+
+
+@app.put("/api/v1/projects/{project_id}/variable-roles")
+def api_v1_save_project_variable_roles(project_id: str, payload: VariableRolePayload) -> dict:
+    try:
+        return save_project_variable_roles(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.dataset_path,
+            payload.roles,
+            payload.note,
+        )
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except PermissionError as exc:
+        return error_response(400, "invalid_dataset_path", f"Dataset path must stay inside the project: {exc}")
+    except FileNotFoundError as exc:
+        return error_response(400, "dataset_not_found", f"Dataset file does not exist: {exc}")
+    except ValueError as exc:
+        return error_response(400, "invalid_dataset_path", f"Unsupported dataset path: {exc}")
+
+
+@app.get("/api/v1/projects/{project_id}/design-spec")
+def api_v1_project_design_spec(project_id: str) -> dict:
+    try:
+        return get_project_design_spec(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "variable_roles_required", str(exc))
+
+
+@app.put("/api/v1/projects/{project_id}/design-spec")
+def api_v1_save_project_design_spec(project_id: str, payload: DesignSpecPayload) -> dict:
+    try:
+        return save_project_design_spec(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.research_question,
+            payload.identification_strategy,
+            payload.model,
+            payload.note,
+        )
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "variable_roles_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/run-plan")
+def api_v1_project_run_plan(project_id: str) -> dict:
+    try:
+        return get_project_run_plan(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "design_spec_required", str(exc))
+
+
+@app.put("/api/v1/projects/{project_id}/run-plan")
+def api_v1_save_project_run_plan(project_id: str, payload: RunPlanPayload) -> dict:
+    try:
+        return save_project_run_plan(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.tasks,
+            payload.outputs,
+            payload.note,
+        )
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "design_spec_required", str(exc))
+
+
 @app.get("/api/v1/projects/{project_id}/design")
 def api_v1_project_design(project_id: str) -> dict:
     try:
@@ -313,13 +470,173 @@ def api_v1_project_drafts(project_id: str) -> dict:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
+@app.get("/api/v1/projects/{project_id}/results-draft")
+def api_v1_project_results_draft(project_id: str) -> dict:
+    try:
+        return get_project_results_draft(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.put("/api/v1/projects/{project_id}/results-draft/findings/{finding_id}/review")
+def api_v1_review_project_finding(project_id: str, finding_id: str, payload: FindingReviewPayload) -> dict:
+    try:
+        return save_project_finding_review(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            finding_id,
+            payload.action,
+            payload.note,
+        )
+    except InvalidReviewActionError as exc:
+        return error_response(400, "invalid_review_action", f"Invalid finding review action: {exc}")
+    except FindingNotFoundError as exc:
+        return error_response(404, "finding_not_found", f"Finding {exc} does not exist in latest results.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/manuscript-candidates")
+def api_v1_project_manuscript_candidates(project_id: str) -> dict:
+    try:
+        return get_project_manuscript_candidates(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.put("/api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review")
+def api_v1_review_manuscript_candidate(
+    project_id: str,
+    candidate_id: str,
+    payload: ManuscriptCandidateReviewPayload,
+) -> dict:
+    try:
+        return save_project_manuscript_candidate_review(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.action,
+            payload.note,
+        )
+    except InvalidCandidateReviewActionError as exc:
+        return error_response(400, "invalid_candidate_review_action", f"Invalid candidate review action: {exc}")
+    except ManuscriptCandidateNotFoundError as exc:
+        return error_response(404, "manuscript_candidate_not_found", f"Candidate {exc} does not exist.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote")
+def api_v1_promote_manuscript_candidate(
+    project_id: str,
+    candidate_id: str,
+    payload: ManuscriptCandidatePromotePayload,
+) -> dict:
+    try:
+        return save_project_manuscript_candidate_promotion(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.note,
+        )
+    except CandidateReviewRequiredError as exc:
+        return error_response(409, "candidate_review_required", f"Candidate {exc} must be approved before promote.")
+    except ManuscriptCandidateNotFoundError as exc:
+        return error_response(404, "manuscript_candidate_not_found", f"Candidate {exc} does not exist.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight")
+def api_v1_export_preflight_manuscript_candidate(
+    project_id: str,
+    candidate_id: str,
+    payload: ManuscriptCandidateExportPreflightPayload,
+) -> dict:
+    try:
+        return save_project_manuscript_candidate_export_preflight(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.note,
+        )
+    except CandidatePromotionRequiredError as exc:
+        return error_response(409, "candidate_promotion_required", f"Candidate {exc} must be ready_for_export before export preflight.")
+    except ManuscriptCandidateNotFoundError as exc:
+        return error_response(404, "manuscript_candidate_not_found", f"Candidate {exc} does not exist.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/export-package")
+def api_v1_project_export_package(project_id: str) -> dict:
+    try:
+        return get_project_export_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
 @app.post("/api/v1/projects/{project_id}/runs", status_code=202)
 def api_v1_create_run(project_id: str, payload: RunPayload) -> dict:
     try:
         project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
-    return execute_run(project, payload.mode)
+    try:
+        return execute_run(project, payload.mode, payload.dataset_path)
+    except PermissionError as exc:
+        return error_response(400, "invalid_dataset_path", f"Dataset path must stay inside the project: {exc}")
+    except FileNotFoundError as exc:
+        return error_response(400, "dataset_not_found", f"Dataset file does not exist: {exc}")
+
+
+@app.post("/api/v1/projects/{project_id}/runs/full", status_code=202)
+def api_v1_create_full_run(project_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return execute_full_run_from_run_plan(project)
+    except PermissionError as exc:
+        return error_response(400, "invalid_dataset_path", f"Dataset path must stay inside the project: {exc}")
+    except FileNotFoundError as exc:
+        message = str(exc)
+        if "RunPlan" in message or "DesignSpec" in message:
+            return error_response(409, "run_plan_required", message)
+        return error_response(400, "dataset_not_found", f"Dataset file does not exist: {exc}")
 
 
 @app.get("/api/v1/projects/{project_id}/runs")
@@ -410,6 +727,20 @@ def api_v1_run_gates(project_id: str, run_id: str) -> dict:
         return get_project_run_gates(project, run_id)
     except KeyError as exc:
         return error_response(404, "run_not_found", f"Run {run_id} gates do not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve")
+def api_v1_resolve_run_gate(project_id: str, run_id: str, gate_id: str, payload: ResolveGatePayload) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    try:
+        return resolve_project_run_gate(project, run_id, gate_id, payload.action, payload.note)
+    except ValueError as exc:
+        return error_response(400, "invalid_gate_action", f"Gate action {payload.action} is not supported.")
+    except KeyError as exc:
+        return error_response(404, "gate_not_found", f"Gate {gate_id} does not exist for run {run_id}.")
 
 
 @app.post("/api/v1/projects/{project_id}/export")

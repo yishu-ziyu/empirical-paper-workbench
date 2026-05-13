@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ from .observability_service import (
     load_observable_gates,
     load_observable_steps,
     load_run_observability,
+    resolve_observable_gate,
 )
 from .run_store import create_run, get_run, list_runs, save_run
 
@@ -273,10 +275,13 @@ def get_project_detail_api_view(product_root: Path, repo_root: Path, project_id:
     return project_detail_view(get_project_by_id(product_root, repo_root, project_id))
 
 
-def execute_run(project: dict[str, Any], mode: str) -> dict[str, Any]:
+def execute_run(project: dict[str, Any], mode: str, dataset_path: str | None = None) -> dict[str, Any]:
     root = Path(project["project_root"])
+    dataset_source = resolve_dataset_source(root, dataset_path)
     run = create_run(root, project["id"], mode)
     run["status"] = "running"
+    if dataset_source:
+        run["dataset_source"] = dataset_source
     save_run(root, run)
 
     command = ["python3", "Program/run_paper.py", "--project-root", ".", "--run-id", run["id"]]
@@ -324,13 +329,204 @@ def execute_run(project: dict[str, Any], mode: str) -> dict[str, Any]:
             if state
             else None,
             "results": results,
+            "dataset_source": dataset_source,
             "error": None
             if process.returncode == 0
             else {"stdout": process.stdout, "stderr": process.stderr},
         }
     )
+    persist_run_dataset_source(root, run["id"], dataset_source)
     save_run(root, run)
     return run
+
+
+def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
+    from Product.backend.design_spec_service import load_saved_design_spec, load_saved_run_plan
+
+    root = Path(project["project_root"])
+    design_spec = load_saved_design_spec(root)
+    run_plan = load_saved_run_plan(root)
+    if not run_plan or run_plan.get("status") != "approved":
+        raise FileNotFoundError("approved RunPlan is required")
+    if not design_spec or design_spec.get("status") != "approved":
+        raise FileNotFoundError("approved DesignSpec is required")
+
+    dataset_source = resolve_dataset_source(root, run_plan.get("dataset_path"))
+    plan_binding = build_run_plan_binding(design_spec, run_plan)
+    research_engine = build_research_engine_reference()
+    run = create_run(root, project["id"], "full-run")
+    run["status"] = "running"
+    run["dataset_source"] = dataset_source
+    run["plan_binding"] = plan_binding
+    run["research_engine"] = research_engine
+    save_run(root, run)
+
+    command = ["python3", "Program/run_paper.py", "--project-root", ".", "--run-id", run["id"]]
+    process = subprocess.run(command, cwd=root, text=True, capture_output=True)
+    state_path = root / "state" / "project_state.json"
+    results_index_path = root / "Results" / "index.json"
+    state = load_json_if_exists(state_path)
+    results = load_json_if_exists(results_index_path)
+    artifact_paths = []
+    if state_path.exists():
+        artifact_paths.append("state/project_state.json")
+    if results_index_path.exists():
+        artifact_paths.append("Results/index.json")
+    if results and results.get("artifacts"):
+        artifact_paths.extend(
+            [
+                artifact["path"]
+                for artifact in results["artifacts"]
+                if artifact.get("exists")
+            ]
+        )
+
+    run.update(
+        {
+            "status": "succeeded" if process.returncode == 0 else "failed",
+            "finished_at": utc_now(),
+            "state_path": "state/project_state.json" if state_path.exists() else None,
+            "results_index_path": "Results/index.json" if results_index_path.exists() else None,
+            "artifact_count": len(artifact_paths),
+            "artifact_paths": artifact_paths,
+            "observability": {
+                "manifest_path": f"state/runs/{run['id']}/run_manifest.json",
+                "steps_path": f"state/runs/{run['id']}/run_steps.json",
+                "events_path": f"state/runs/{run['id']}/run_events.jsonl",
+                "gates_path": f"state/runs/{run['id']}/gates.json",
+            },
+            "state": {
+                "current_stage": state.get("current_stage") if state else None,
+                "last_run_mode": state.get("last_run_mode") if state else None,
+                "dataset_exists": state.get("dataset_exists") if state else None,
+            }
+            if state
+            else None,
+            "results": results,
+            "dataset_source": dataset_source,
+            "plan_binding": plan_binding,
+            "research_engine": research_engine,
+            "execution_evidence_level": "local_execution",
+            "error": None
+            if process.returncode == 0
+            else {"stdout": process.stdout, "stderr": process.stderr},
+        }
+    )
+    persist_run_dataset_source(root, run["id"], dataset_source)
+    persist_full_run_provenance(root, run["id"], plan_binding, research_engine)
+    save_run(root, run)
+    return run
+
+
+def build_run_plan_binding(design_spec: dict[str, Any], run_plan: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "evidence_level": "local_file",
+        "variable_role_set_version": design_spec.get("variable_role_set_version"),
+        "design_spec_version": run_plan.get("design_spec_version"),
+        "run_plan_version": run_plan.get("version"),
+        "dataset_path": run_plan.get("dataset_path"),
+        "tasks": [
+            {
+                "id": task.get("id"),
+                "formula": task.get("formula"),
+                "estimator": task.get("estimator"),
+                "status": task.get("status"),
+            }
+            for task in run_plan.get("tasks", [])
+        ],
+        "outputs": run_plan.get("outputs", []),
+    }
+
+
+def build_research_engine_reference() -> dict[str, Any]:
+    return {
+        "name": "Feynman-compatible research engine",
+        "integration_mode": "callable_external",
+        "embedded": False,
+        "license": "MIT",
+        "repository": "companion-inc/feynman",
+        "evidence_level": "local_file",
+        "note": "Feynman is treated as an external research-engine reference; its source is not embedded.",
+    }
+
+
+def resolve_dataset_source(project_root: Path, dataset_path: str | None) -> dict[str, Any] | None:
+    configured_path = None
+    if not dataset_path:
+        configured = load_json_if_exists(project_root / "state" / "project_state.json")
+        dataset_path = configured.get("dataset_path") if configured else None
+    if not dataset_path:
+        paper_path = project_root / "paper.yaml"
+        if paper_path.exists():
+            payload = yaml.safe_load(paper_path.read_text(encoding="utf-8")) or {}
+            configured_path = payload.get("data", {}).get("final_dataset")
+            dataset_path = configured_path
+    elif (project_root / "paper.yaml").exists():
+        payload = yaml.safe_load((project_root / "paper.yaml").read_text(encoding="utf-8")) or {}
+        configured_path = payload.get("data", {}).get("final_dataset")
+    if not dataset_path:
+        return None
+
+    raw_path = Path(dataset_path)
+    if raw_path.is_absolute() or ".." in raw_path.parts:
+        raise PermissionError(str(dataset_path))
+    root = project_root.resolve()
+    path = (root / raw_path).resolve()
+    if path != root and root not in path.parents:
+        raise PermissionError(str(dataset_path))
+    if not path.is_file():
+        raise FileNotFoundError(str(dataset_path))
+
+    stat = path.stat()
+    relative_path = path.relative_to(root).as_posix()
+    source = {
+        "path": path.relative_to(root).as_posix(),
+        "name": path.name,
+        "file_type": path.suffix.lower().lstrip("."),
+        "size": stat.st_size,
+        "exists": True,
+        "evidence_level": "local_file",
+        "role": "configured_final_dataset" if configured_path and Path(configured_path).as_posix() == relative_path else "selected_dataset",
+    }
+    source.update(inspect_dataset_source_shape(path))
+    return source
+
+
+def inspect_dataset_source_shape(path: Path) -> dict[str, int | None]:
+    if path.suffix.lower() != ".csv":
+        return {"row_count": None, "column_count": None}
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.reader(handle))
+    if not rows:
+        return {"row_count": 0, "column_count": 0}
+    return {"row_count": max(len(rows) - 1, 0), "column_count": len(rows[0])}
+
+
+def persist_run_dataset_source(project_root: Path, run_id: str, dataset_source: dict[str, Any] | None) -> None:
+    if not dataset_source:
+        return
+    manifest_path = project_root / "state" / "runs" / run_id / "run_manifest.json"
+    if not manifest_path.exists():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["dataset_source"] = dataset_source
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def persist_full_run_provenance(
+    project_root: Path,
+    run_id: str,
+    plan_binding: dict[str, Any],
+    research_engine: dict[str, Any],
+) -> None:
+    manifest_path = project_root / "state" / "runs" / run_id / "run_manifest.json"
+    if not manifest_path.exists():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["run_plan_binding"] = plan_binding
+    manifest["research_engine"] = research_engine
+    manifest["execution_evidence_level"] = "local_execution"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def get_project_run(project: dict[str, Any], run_id: str) -> dict[str, Any]:
@@ -351,6 +547,10 @@ def get_project_run_steps(project: dict[str, Any], run_id: str) -> dict[str, Any
 
 def get_project_run_gates(project: dict[str, Any], run_id: str) -> dict[str, Any]:
     return load_observable_gates(Path(project["project_root"]), run_id)
+
+
+def resolve_project_run_gate(project: dict[str, Any], run_id: str, gate_id: str, action: str, note: str) -> dict[str, Any]:
+    return resolve_observable_gate(Path(project["project_root"]), run_id, gate_id, action, note)
 
 
 def list_project_runs(project: dict[str, Any]) -> list[dict[str, Any]]:

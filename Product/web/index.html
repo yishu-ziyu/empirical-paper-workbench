@@ -5,30 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>实证工作台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231e6f62'/%3E%3Cpath d='M4 11h8v1H4zm1-7h6v1H5zm0 3h6v1H5z' fill='white'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/assets/styles.css" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260513-clean1" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell archive-shell clean-workbench-shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-kicker">本地实证操作系统</span>
+          <span class="brand-kicker">个人研究档案</span>
           <h1>实证工作台</h1>
-          <p>从研究问题到论文草稿的本地优先工作台。</p>
+          <p>把研究问题、数据、执行轨迹和论文草稿放进同一份本地证据档案。</p>
         </div>
 
-        <nav class="nav nav-primary">
-          <button class="nav-link is-active" data-view="overview">研究总览</button>
-          <button class="nav-link" data-view="data-variables">数据与变量</button>
-          <button class="nav-link" data-view="research-design">研究设计</button>
+        <nav class="nav nav-primary product-workspace-nav">
+          <button class="nav-link is-active" data-view="overview">工作台首页</button>
+          <button class="nav-link" data-view="data-variables">数据与设计</button>
           <button class="nav-link" data-view="empirical-execution">实证执行</button>
-          <button class="nav-link" data-view="paper-draft">论文草稿</button>
-          <button class="nav-link" data-view="artifacts-replication">产物与复现</button>
-          <button class="nav-link" data-view="agent-console">Agent 控制台</button>
+          <button class="nav-link" data-view="paper-draft">结果与草稿</button>
+          <button class="nav-link" data-view="artifacts-replication">审阅与导出</button>
         </nav>
 
         <div class="nav-divider"></div>
 
         <nav class="nav nav-secondary">
+          <button class="nav-link" data-view="research-design">工具：研究设计细节</button>
+          <button class="nav-link" data-view="agent-console">工具：智能体控制台</button>
           <button class="nav-link" data-view="dashboard">旧版：总览</button>
           <button class="nav-link" data-view="projects">旧版：项目</button>
           <button class="nav-link" data-view="workflow">旧版：工作流</button>
@@ -38,8 +38,8 @@
         </nav>
 
         <div class="sidebar-card">
-          <h2>当前策略</h2>
-          <p>研究引擎已接入。导航已按研究旅程重塑：数据 → 变量 → 识别 → 模型 → 稳健性 → 图表 → 正文 → 审阅 → 导出。</p>
+          <h2>本地证据</h2>
+          <p>每个页面优先展示研究对象、证据等级、相邻笔记和下一步动作；执行日志只作为可追溯材料。</p>
         </div>
       </aside>
 
@@ -52,12 +52,60 @@
         <header class="topbar">
           <div>
             <span class="eyebrow">工作台状态</span>
-            <h2 id="topbar-title">研究总览</h2>
+            <h2 id="topbar-title">工作台首页</h2>
           </div>
           <div class="topbar-actions">
             <button id="refresh-button" class="ghost-button">刷新</button>
           </div>
         </header>
+
+        <aside class="archive-inspector inspector-rail" aria-label="档案索引 / 属性检查器">
+          <section class="archive-note archive-current-note inspector-section">
+            <span class="archive-note-label">属性检查器</span>
+            <h3 id="archive-current-title">工作台首页</h3>
+            <p id="archive-current-summary">从研究问题进入数据、设计、执行、草稿和导出。</p>
+          </section>
+
+          <section class="archive-note inspector-section">
+            <span class="archive-note-label">相邻笔记</span>
+            <div class="archive-backlinks inspector-link-list">
+              <button class="archive-link is-active" data-inspector-view="overview">
+                <span>工作台首页</span>
+                <small>研究问题与下一步</small>
+              </button>
+              <button class="archive-link" data-inspector-view="data-variables">
+                <span>数据与设计</span>
+                <small>数据集、变量角色、识别设定</small>
+              </button>
+              <button class="archive-link" data-inspector-view="empirical-execution">
+                <span>实证执行</span>
+                <small>执行计划、运行轨迹、人工确认</small>
+              </button>
+              <button class="archive-link" data-inspector-view="paper-draft">
+                <span>结果与草稿</span>
+                <small>论断、段落候选、证据绑定</small>
+              </button>
+              <button class="archive-link" data-inspector-view="artifacts-replication">
+                <span>审阅与导出</span>
+                <small>评估器、清单、复现包</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="archive-note archive-evidence-key inspector-section">
+            <span class="archive-note-label">证据图例</span>
+            <div class="archive-ledger">
+              <div><strong>mock</strong><span>样例或占位，不能进论文。</span></div>
+              <div><strong>local_file</strong><span>来自本地文件，可追溯路径。</span></div>
+              <div><strong>local_execution</strong><span>来自真实运行轨迹。</span></div>
+            </div>
+          </section>
+
+          <section class="archive-note archive-shelf inspector-section" aria-live="polite">
+            <span class="archive-note-label">收藏架</span>
+            <p>数据、模型、结果和草稿按研究生命周期陈列；点击左侧页面继续补证据。</p>
+          </section>
+        </aside>
 
         <!-- ===== 研究总览 ===== -->
         <section class="view is-active" id="view-overview">
@@ -71,6 +119,23 @@
               <p class="muted" id="overview-project-meta"></p>
             </div>
           </div>
+
+          <!-- 产品主链路：下一步研究决策 -->
+          <section class="panel product-next-action" id="product-next-action">
+            <div class="panel-head">
+              <h3>下一步研究决策</h3>
+              <span class="pill">工作流契约</span>
+            </div>
+            <div id="product-next-action-body" class="product-next-action-body"></div>
+          </section>
+
+          <section class="panel workflow-spine-panel">
+            <div class="panel-head">
+              <h3>实证论文主链路</h3>
+              <span class="pill">标准阶段</span>
+            </div>
+            <div class="workflow-spine" id="workflow-spine"></div>
+          </section>
 
           <!-- 阶段摘要网格 -->
           <div class="stage-summary-grid" id="stage-summary-grid"></div>
@@ -94,10 +159,10 @@
             </section>
           </div>
 
-          <!-- Agent 活动时间线 -->
+          <!-- 智能体活动时间线 -->
           <section class="panel" style="margin-top: 18px;">
             <div class="panel-head">
-              <h3>Agent 活动时间线</h3>
+              <h3>智能体活动时间线</h3>
               <span class="pill">最近事件</span>
             </div>
             <div id="overview-events" class="event-timeline"></div>
@@ -111,6 +176,57 @@
             <h2>数据与变量</h2>
             <p class="muted">上传数据集、定义变量角色、查看数据质量</p>
           </div>
+          <section class="panel variable-role-workflow-card" id="variable-role-workflow-card">
+            <div class="panel-head">
+              <h3>检查并确认变量角色</h3>
+              <span class="pill">变量角色集</span>
+            </div>
+            <div id="variable-role-workflow-body" class="variable-role-workflow-body"></div>
+          </section>
+          <section class="panel variable-role-editor-card">
+            <div class="panel-head">
+              <h3>变量角色集编辑器</h3>
+              <span class="pill" id="variable-role-status-pill">草稿</span>
+            </div>
+            <form id="variable-role-confirmation-form" class="variable-role-confirmation-form">
+              <input type="hidden" id="variable-role-dataset-path" />
+              <div id="variable-role-editor-meta" class="muted">正在读取变量角色状态...</div>
+              <div class="variable-role-form-grid">
+                <label>
+                  <span>结果变量</span>
+                  <input id="variable-role-outcome" type="text" placeholder="wage" />
+                </label>
+                <label>
+                  <span>处理变量</span>
+                  <input id="variable-role-treatment" type="text" placeholder="trained" />
+                </label>
+                <label>
+                  <span>控制变量</span>
+                  <input id="variable-role-controls" type="text" placeholder="edu, experience" />
+                </label>
+                <label>
+                  <span>工具变量</span>
+                  <input id="variable-role-instruments" type="text" placeholder="为空表示未使用 IV" />
+                </label>
+                <label>
+                  <span>固定效应</span>
+                  <input id="variable-role-fixed-effects" type="text" placeholder="year, city" />
+                </label>
+                <label>
+                  <span>聚类方式</span>
+                  <input id="variable-role-cluster-by" type="text" placeholder="person_id" />
+                </label>
+              </div>
+              <label class="variable-role-note">
+                <span>确认说明</span>
+                <textarea id="variable-role-note" rows="3" placeholder="记录为什么这样定义变量角色"></textarea>
+              </label>
+              <div class="action-group">
+                <button class="primary-button" type="submit" data-variable-role-save>保存变量角色集</button>
+                <span id="variable-role-save-status" class="muted"></span>
+              </div>
+            </form>
+          </section>
           <div class="panel" id="datasets-panel">
             <div class="panel-head">
               <h3>数据集</h3>
@@ -125,8 +241,61 @@
           <div id="design-error" class="error-banner" style="display: none;"></div>
           <div class="page-header">
             <h2>研究设计</h2>
-            <p class="muted">识别策略、模型设定、Paper Outline</p>
+            <p class="muted">识别策略、模型设定、论文提纲</p>
           </div>
+          <section class="panel design-spec-editor-card">
+            <div class="panel-head">
+              <h3>研究设计方案编辑器</h3>
+              <span class="pill" id="design-spec-status-pill">草稿</span>
+            </div>
+            <form id="design-spec-confirmation-form" class="design-spec-confirmation-form">
+              <div id="design-spec-editor-meta" class="muted">正在读取研究设计状态...</div>
+              <label>
+                <span>研究问题</span>
+                <input id="design-spec-question" type="text" placeholder="培训是否影响工资？" />
+              </label>
+              <div class="variable-role-form-grid">
+                <label>
+                  <span>识别策略</span>
+                  <input id="design-spec-strategy" type="text" placeholder="baseline_ols" />
+                </label>
+                <label>
+                  <span>估计方法</span>
+                  <input id="design-spec-estimator" type="text" placeholder="ols" />
+                </label>
+              </div>
+              <label>
+                <span>模型公式</span>
+                <input id="design-spec-formula" type="text" placeholder="wage ~ trained + edu + experience" />
+              </label>
+              <div class="variable-role-form-grid">
+                <label>
+                  <span>固定效应</span>
+                  <input id="design-spec-fixed-effects" type="text" placeholder="year, city" />
+                </label>
+                <label>
+                  <span>聚类方式</span>
+                  <input id="design-spec-cluster-by" type="text" placeholder="person_id" />
+                </label>
+              </div>
+              <label>
+                <span>策略说明</span>
+                <textarea id="design-spec-summary" rows="3" placeholder="说明为什么这个识别策略成立"></textarea>
+              </label>
+              <label>
+                <span>威胁与风险</span>
+                <input id="design-spec-threats" type="text" placeholder="遗漏变量偏误, 样本选择偏误" />
+              </label>
+              <label>
+                <span>确认说明</span>
+                <textarea id="design-spec-note" rows="3" placeholder="记录研究设计确认理由"></textarea>
+              </label>
+              <div class="action-group">
+                <button class="primary-button" type="submit" data-design-spec-save>保存研究设计方案</button>
+                <span id="design-spec-save-status" class="muted"></span>
+              </div>
+            </form>
+          </section>
           <div class="panel-grid two-up">
             <section class="panel">
               <div class="panel-head">
@@ -146,7 +315,7 @@
           <div class="panel" style="margin-top: 18px;">
             <div class="panel-head">
               <h3>待确认项</h3>
-              <span class="pill">HITL</span>
+              <span class="pill">人工确认</span>
             </div>
             <div id="design-pending" class="stack"></div>
           </div>
@@ -154,20 +323,142 @@
 
         <!-- ===== 实证执行 ===== -->
         <section class="view" id="view-empirical-execution">
+          <div id="empirical-execution-error" class="error-banner" style="display: none;"></div>
           <div class="page-header">
             <h2>实证执行</h2>
-            <p class="muted">任务队列、代码执行、结果查看</p>
+            <p class="muted">先检查执行计划预检与阻塞项，再查看真实运行轨迹、人工确认点与产物证据</p>
           </div>
-          <div class="panel">
+
+          <section class="panel run-plan-preflight" id="run-plan-preflight">
             <div class="panel-head">
-              <h3>执行状态</h3>
-              <span class="pill">Phase A 骨架</span>
+              <h3>执行计划预检</h3>
+              <span class="pill">can_start_full_run</span>
             </div>
-            <div class="empty-state">
-              <div class="empty-state-icon">▶</div>
-              <h4>实证执行将在 Phase C 接入</h4>
-              <p class="muted">当前阶段仅展示骨架，真实执行器（Codex / StatsPAI）尚未接入。</p>
+            <div id="run-plan-preflight-body" class="run-plan-preflight-body"></div>
+          </section>
+
+          <section class="panel run-blockers" id="run-blockers">
+            <div class="panel-head">
+              <h3>执行阻塞项</h3>
+              <span class="pill">run_readiness</span>
             </div>
+            <div id="run-blockers-body" class="run-blockers-body"></div>
+          </section>
+
+          <section class="panel run-plan-editor-card">
+            <div class="panel-head">
+              <h3>执行计划编辑器</h3>
+              <span class="pill" id="run-plan-status-pill">草稿</span>
+            </div>
+            <form id="run-plan-confirmation-form" class="run-plan-confirmation-form">
+              <div id="run-plan-editor-meta" class="muted">正在读取执行计划状态...</div>
+              <label>
+                <span>计划任务</span>
+                <textarea id="run-plan-tasks" rows="6" placeholder="baseline_regression"></textarea>
+              </label>
+              <label>
+                <span>产出清单</span>
+                <input id="run-plan-outputs" type="text" placeholder="regression_table, run_manifest" />
+              </label>
+              <label>
+                <span>确认说明</span>
+                <textarea id="run-plan-note" rows="3" placeholder="记录为什么确认这一版执行计划"></textarea>
+              </label>
+              <div class="action-group">
+                <button class="primary-button" type="submit" data-run-plan-save>保存执行计划</button>
+                <span id="run-plan-save-status" class="muted"></span>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel execution-control-panel">
+            <div class="panel-head">
+              <h3>运行证据</h3>
+              <span class="pill">真实执行</span>
+            </div>
+            <div class="observable-toolbar">
+              <label class="observable-run-select">
+                <span>run_id</span>
+                <select id="run-selector"></select>
+              </label>
+              <button id="run-refresh-button" class="ghost-button">刷新运行</button>
+              <button id="observable-run-full-button" class="primary-button">启动完整实证执行</button>
+              <button id="observable-run-dry-button" class="primary-button">开发试运行</button>
+            </div>
+          </section>
+
+          <div class="execution-context-grid">
+            <section class="panel observable-run-header" id="observable-run-header">
+              <div class="observable-run-title">
+                <span class="eyebrow">当前运行</span>
+                <h3 id="observable-run-id">尚未选择 run</h3>
+                <p class="muted" id="observable-run-time">等待运行数据</p>
+              </div>
+              <div class="observable-run-meta">
+                <div class="meta-item">
+                  <span class="meta-label">状态</span>
+                  <span class="meta-value" id="observable-run-status">-</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">模式</span>
+                  <span class="meta-value" id="observable-run-mode">-</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">证据</span>
+                  <span class="meta-value" id="observable-run-evidence">-</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel observable-dataset-source" id="observable-dataset-source">
+              <div class="panel-head">
+                <h3>运行数据源</h3>
+                <span class="pill">数据来源</span>
+              </div>
+              <div id="observable-dataset-source-body" class="observable-dataset-source-body"></div>
+            </section>
+
+            <section class="panel observable-variable-roles" id="observable-variable-roles">
+              <div class="panel-head">
+                <h3>变量角色确认</h3>
+                <span class="pill">变量角色</span>
+              </div>
+              <div id="observable-variable-roles-body" class="observable-variable-roles-body"></div>
+            </section>
+          </div>
+
+          <div class="observable-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>阶段看板</h3>
+                <span class="pill">run_steps.json</span>
+              </div>
+              <div id="observable-step-board" class="observable-step-board"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>事件流</h3>
+                <span class="pill">run_events.jsonl</span>
+              </div>
+              <div id="observable-event-stream" class="observable-event-stream"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>人工确认点</h3>
+                <span class="pill">确认记录</span>
+              </div>
+              <div id="observable-hitl-gates" class="observable-hitl-gates"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>产物与证据</h3>
+                <span class="pill">可追溯</span>
+              </div>
+              <div id="observable-artifact-evidence" class="observable-artifact-evidence"></div>
+            </section>
           </div>
         </section>
 
@@ -175,9 +466,32 @@
         <section class="view" id="view-paper-draft">
           <div id="draft-error" class="error-banner" style="display: none;"></div>
           <div class="page-header">
-            <h2>论文草稿</h2>
-            <p class="muted">章节管理、Markdown 编辑、修改建议</p>
+            <h2>结果与草稿</h2>
+            <p class="muted">把完整执行结果论断和生成草稿绑定到可审计证据。</p>
           </div>
+          <div class="panel-grid two-up">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>结果论断卡</h3>
+                <span class="pill">真实执行</span>
+              </div>
+              <div id="results-findings-list" class="stack"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>草稿证据绑定</h3>
+                <span class="pill">本地文件 + 真实执行</span>
+              </div>
+              <div id="draft-evidence-sections" class="stack"></div>
+            </section>
+          </div>
+          <section class="panel manuscript-candidates-panel">
+            <div class="panel-head">
+              <h3>正文候选</h3>
+              <span class="pill">仅限已审阅论断</span>
+            </div>
+            <div id="manuscript-candidates-list" class="stack"></div>
+          </section>
           <div class="panel">
             <div class="panel-head">
               <h3>草稿文件</h3>
@@ -191,21 +505,28 @@
         <section class="view" id="view-artifacts-replication">
           <div id="artifacts-replication-error" class="error-banner" style="display: none;"></div>
           <div class="page-header">
-            <h2>产物与复现</h2>
-            <p class="muted">产物浏览、Provenance 溯源、复现包生成</p>
+            <h2>审阅与导出</h2>
+            <p class="muted">按前沿工程闭环检查导出包：基线版本、评估器、反馈、下一轮动作。</p>
           </div>
+          <section class="panel export-package-panel">
+            <div class="panel-head">
+              <h3>导出包验收台</h3>
+              <span class="pill">前沿工程评估器</span>
+            </div>
+            <div id="export-package-workbench" class="export-package-workbench"></div>
+          </section>
           <div class="panel-grid two-up">
             <section class="panel">
               <div class="panel-head">
                 <h3>产物列表</h3>
-                <span class="pill">Traceable</span>
+                <span class="pill">可追溯</span>
               </div>
               <div id="artifacts-replication-list" class="stack"></div>
             </section>
             <section class="panel">
               <div class="panel-head">
-                <h3>Provenance 溯源</h3>
-                <span class="pill">Lineage</span>
+                <h3>来源溯源</h3>
+                <span class="pill">链路</span>
               </div>
               <div id="provenance-panel" class="stack">
                 <p class="muted">点击产物查看溯源链</p>
@@ -214,24 +535,24 @@
           </div>
         </section>
 
-        <!-- ===== Agent 控制台 ===== -->
+        <!-- ===== 智能体控制台 ===== -->
         <section class="view" id="view-agent-console">
           <div id="agent-console-error" class="error-banner" style="display: none;"></div>
           <div class="page-header">
-            <h2>Agent 控制台</h2>
-            <p class="muted">Agent 身份、权限、能力、成本、审计日志</p>
+            <h2>智能体控制台</h2>
+            <p class="muted">智能体身份、权限、能力、成本、审计日志</p>
           </div>
           <div class="panel-grid two-up">
             <section class="panel">
               <div class="panel-head">
-                <h3>Pipeline Roles</h3>
+                <h3>流水线角色</h3>
                 <span class="pill">流水线角色</span>
               </div>
               <div id="agent-pipeline-list" class="stack"></div>
             </section>
             <section class="panel">
               <div class="panel-head">
-                <h3>Research Dimension Agents</h3>
+                <h3>研究维度智能体</h3>
                 <span class="pill">研究维度</span>
               </div>
               <div id="agent-dimension-list" class="stack"></div>
@@ -239,13 +560,13 @@
           </div>
           <div class="panel" style="margin-top: 18px;">
             <div class="panel-head">
-              <h3>Agent 详情</h3>
+              <h3>智能体详情</h3>
               <span class="pill" id="agent-detail-id">未选择</span>
             </div>
             <div id="agent-detail-panel" class="stack">
               <div class="empty-state">
                 <div class="empty-state-icon">🤖</div>
-                <h4>选择左侧 Agent 查看详情</h4>
+                <h4>选择左侧智能体查看详情</h4>
                 <p class="muted">身份、权限、能力注册、成本和审计日志。</p>
               </div>
             </div>
@@ -340,7 +661,7 @@
           <!-- Error Banner -->
           <div id="agent-cluster-error" class="error-banner" style="display: none;"></div>
 
-          <!-- Workflow Header -->
+          <!-- 工作流头部 -->
           <div id="workflow-header" class="workflow-header">
             <div class="workflow-header-main">
               <span class="eyebrow">研究工作流</span>
@@ -365,10 +686,10 @@
             </div>
           </div>
 
-          <!-- Stage Timeline -->
+          <!-- 阶段时间线 -->
           <div id="stage-timeline" class="stage-timeline"></div>
 
-          <!-- Agent Cluster Panel -->
+          <!-- 智能体集群面板 -->
           <div id="agent-cluster-panel" class="agent-cluster-panel"></div>
 
           <!-- Completion Card (hidden by default) -->
@@ -377,7 +698,7 @@
               <div class="completion-icon">✓</div>
               <div class="completion-content">
                 <h3>研究完成</h3>
-                <p id="completion-summary">所有 Agent 已完成并行研究</p>
+                <p id="completion-summary">所有智能体已完成并行研究</p>
                 <div class="completion-stats" id="completion-stats"></div>
                 <div class="completion-actions">
                   <button id="view-report-button" class="primary-button">查看最终报告</button>
@@ -409,12 +730,12 @@
             <div id="artifact-drawer-content" class="artifact-drawer-content"></div>
           </div>
 
-          <!-- Agent Detail Drawer (fixed, off-screen by default) -->
+          <!-- 智能体详情抽屉 -->
           <div id="agent-detail-drawer" class="agent-detail-drawer" aria-hidden="true">
             <div class="agent-detail-drawer-header">
               <div class="drawer-header-left">
                 <button id="prev-agent-button" class="ghost-button" disabled>←</button>
-                <h3>Agent 工作详情</h3>
+                <h3>智能体工作详情</h3>
                 <button id="next-agent-button" class="ghost-button" disabled>→</button>
               </div>
               <button id="close-agent-detail-drawer" class="ghost-button">关闭</button>
@@ -446,7 +767,7 @@
           <div class="panel">
             <div class="panel-head">
               <h3>产物面板</h3>
-              <span class="pill">Traceable</span>
+              <span class="pill">可追溯</span>
             </div>
             <div id="artifact-list" class="artifact-grid"></div>
           </div>
@@ -456,16 +777,16 @@
           <div class="panel-grid two-up">
             <section class="panel">
               <div class="panel-head">
-                <h3>Markdown Draft</h3>
-                <span class="pill">Internal</span>
+                <h3>Markdown 草稿</h3>
+                <span class="pill">内部稿</span>
               </div>
               <pre id="markdown-preview" class="draft-box">暂无内容</pre>
             </section>
 
             <section class="panel">
               <div class="panel-head">
-                <h3>Key Results / Orchestration</h3>
-                <span class="pill">Structured</span>
+                <h3>关键结果与编排记录</h3>
+                <span class="pill">结构化</span>
               </div>
               <pre id="results-preview" class="draft-box">暂无内容</pre>
             </section>
@@ -474,6 +795,6 @@
       </main>
     </div>
 
-    <script src="/assets/app.js" defer></script>
+    <script src="/assets/app.js?v=20260513-clean1" defer></script>
   </body>
 </html>

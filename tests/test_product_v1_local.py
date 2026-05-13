@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 import unittest
@@ -51,6 +52,58 @@ class ProductV1LocalTests(unittest.TestCase):
         response = self.client.get(f"/api/v1/projects/{project_id}")
         self.assertEqual(response.status_code, 200)
         self.assertIn("paper", response.json())
+
+    def test_run_endpoint_records_selected_dataset_source(self) -> None:
+        payload = {
+            "slug": "v1-dataset-run-project",
+            "title": "V1 Dataset Run Project",
+            "project_root": str(self.project_dir),
+            "language": "zh",
+        }
+        response = self.client.post("/api/v1/projects", json=payload)
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        project_id = response.json()["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{project_id}/runs",
+            json={"mode": "dry-run", "dataset_path": "Data/Final/analysis_sample.csv"},
+        )
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        run = response.json()
+        self.assertEqual(run["dataset_source"]["path"], "Data/Final/analysis_sample.csv")
+        self.assertEqual(run["dataset_source"]["evidence_level"], "local_file")
+        self.assertTrue(run["dataset_source"]["exists"])
+
+        manifest_path = self.project_dir / "state" / "runs" / run["id"] / "run_manifest.json"
+        self.assertTrue(manifest_path.exists())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["dataset_source"]["path"], "Data/Final/analysis_sample.csv")
+        self.assertEqual(manifest["dataset_source"]["evidence_level"], "local_file")
+
+    def test_run_endpoint_rejects_invalid_dataset_source(self) -> None:
+        payload = {
+            "slug": "v1-invalid-dataset-project",
+            "title": "V1 Invalid Dataset Project",
+            "project_root": str(self.project_dir),
+            "language": "zh",
+        }
+        response = self.client.post("/api/v1/projects", json=payload)
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        project_id = response.json()["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{project_id}/runs",
+            json={"mode": "dry-run", "dataset_path": "../outside.csv"},
+        )
+        self.assertEqual(response.status_code, 400, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "invalid_dataset_path")
+
+        response = self.client.post(
+            f"/api/v1/projects/{project_id}/runs",
+            json={"mode": "dry-run", "dataset_path": "Data/Final/missing.csv"},
+        )
+        self.assertEqual(response.status_code, 400, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "dataset_not_found")
 
     def test_orchestrate_and_export_v1_endpoints(self) -> None:
         payload = {

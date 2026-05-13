@@ -132,6 +132,167 @@ class ObservableExecutionTests(unittest.TestCase):
             product_app.PRODUCT_ROOT = original_product_root
             product_app.REPO_ROOT = original_repo_root
 
+    def test_bdd_3_observability_exposes_dataset_source_as_run_evidence(self) -> None:
+        """行为 3：observability API 必须把本次 run 的数据来源作为一等证据暴露给前端。"""
+        original_product_root = product_app.PRODUCT_ROOT
+        original_repo_root = product_app.REPO_ROOT
+        product_root = self.temp_dir / "repo" / "Product"
+        repo_root = self.temp_dir / "repo"
+        product_root.mkdir(parents=True)
+        ensure_registry(product_root, repo_root)
+        product_app.PRODUCT_ROOT = product_root
+        product_app.REPO_ROOT = repo_root
+        client = TestClient(product_app.app)
+
+        try:
+            response = client.post(
+                "/api/v1/projects",
+                json={
+                    "slug": "observable-dataset-source-project",
+                    "title": "Observable Dataset Source Project",
+                    "project_root": str(self.project_dir),
+                    "language": "zh",
+                },
+            )
+            self.assertEqual(response.status_code, 201, msg=response.text)
+            project_id = response.json()["id"]
+
+            response = client.post(
+                f"/api/v1/projects/{project_id}/runs",
+                json={"mode": "dry-run", "dataset_path": "Data/Final/analysis_sample.csv"},
+            )
+            self.assertEqual(response.status_code, 202, msg=response.text)
+            run_id = response.json()["id"]
+
+            response = client.get(f"/api/v1/projects/{project_id}/runs/{run_id}/observability")
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            observability = response.json()
+
+            self.assertIn("dataset_source", observability)
+            self.assertEqual(observability["dataset_source"], observability["manifest"]["dataset_source"])
+            self.assertEqual(observability["dataset_source"]["path"], "Data/Final/analysis_sample.csv")
+            self.assertEqual(observability["dataset_source"]["evidence_level"], "local_file")
+            self.assertEqual(observability["dataset_source"]["row_count"], 12)
+            self.assertEqual(observability["dataset_source"]["column_count"], 4)
+        finally:
+            product_app.PRODUCT_ROOT = original_product_root
+            product_app.REPO_ROOT = original_repo_root
+
+    def test_bdd_4_gate_resolve_api_updates_gate_event_and_manifest(self) -> None:
+        """行为 4：HITL gate resolve 必须写回 gates、追加事件并更新 manifest。"""
+        original_product_root = product_app.PRODUCT_ROOT
+        original_repo_root = product_app.REPO_ROOT
+        product_root = self.temp_dir / "repo" / "Product"
+        repo_root = self.temp_dir / "repo"
+        product_root.mkdir(parents=True)
+        ensure_registry(product_root, repo_root)
+        product_app.PRODUCT_ROOT = product_root
+        product_app.REPO_ROOT = repo_root
+        client = TestClient(product_app.app)
+
+        try:
+            response = client.post(
+                "/api/v1/projects",
+                json={
+                    "slug": "gate-resolve-project",
+                    "title": "Gate Resolve Project",
+                    "project_root": str(self.project_dir),
+                    "language": "zh",
+                },
+            )
+            self.assertEqual(response.status_code, 201, msg=response.text)
+            project_id = response.json()["id"]
+
+            response = client.post(f"/api/v1/projects/{project_id}/runs", json={"mode": "dry-run"})
+            self.assertEqual(response.status_code, 202, msg=response.text)
+            run_id = response.json()["id"]
+
+            response = client.get(f"/api/v1/projects/{project_id}/runs/{run_id}/observability")
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            gate = response.json()["gates"]["items"][0]
+            gate_id = gate["id"]
+            original_event_count = len(response.json()["events"]["items"])
+
+            response = client.post(
+                f"/api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve",
+                json={"action": "confirm", "note": "变量识别已人工确认"},
+            )
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            body = response.json()
+            self.assertEqual(body["_meta"]["evidence_level"], "local_execution")
+            self.assertEqual(body["gate"]["status"], "resolved")
+            self.assertEqual(body["gate"]["resolution"]["action"], "confirm")
+            self.assertEqual(body["gate"]["resolution"]["note"], "变量识别已人工确认")
+            self.assertIsNotNone(body["gate"]["resolved_at"])
+
+            response = client.get(f"/api/v1/projects/{project_id}/runs/{run_id}/observability")
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            observability = response.json()
+            resolved_gate = next(item for item in observability["gates"]["items"] if item["id"] == gate_id)
+            self.assertEqual(resolved_gate["status"], "resolved")
+            self.assertEqual(observability["manifest"]["human_in_loop"]["open_gate_count"], len(observability["gates"]["items"]) - 1)
+            self.assertGreater(len(observability["events"]["items"]), original_event_count)
+            self.assertEqual(observability["events"]["items"][-1]["type"], "hitl_gate_resolved")
+            self.assertEqual(observability["events"]["items"][-1]["evidence_level"], "local_execution")
+
+            response = client.post(
+                f"/api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve",
+                json={"action": "delete", "note": "非法动作"},
+            )
+            self.assertEqual(response.status_code, 400, msg=response.text)
+            self.assertEqual(response.json()["error"]["code"], "invalid_gate_action")
+        finally:
+            product_app.PRODUCT_ROOT = original_product_root
+            product_app.REPO_ROOT = original_repo_root
+
+    def test_bdd_5_observability_exposes_variable_roles_and_confirmation_gate(self) -> None:
+        """行为 5：observability API 必须把变量角色和字段确认 gate 作为一等执行证据暴露。"""
+        original_product_root = product_app.PRODUCT_ROOT
+        original_repo_root = product_app.REPO_ROOT
+        product_root = self.temp_dir / "repo" / "Product"
+        repo_root = self.temp_dir / "repo"
+        product_root.mkdir(parents=True)
+        ensure_registry(product_root, repo_root)
+        product_app.PRODUCT_ROOT = product_root
+        product_app.REPO_ROOT = repo_root
+        client = TestClient(product_app.app)
+
+        try:
+            response = client.post(
+                "/api/v1/projects",
+                json={
+                    "slug": "observable-variable-roles-project",
+                    "title": "Observable Variable Roles Project",
+                    "project_root": str(self.project_dir),
+                    "language": "zh",
+                },
+            )
+            self.assertEqual(response.status_code, 201, msg=response.text)
+            project_id = response.json()["id"]
+
+            response = client.post(
+                f"/api/v1/projects/{project_id}/runs",
+                json={"mode": "dry-run", "dataset_path": "Data/Final/analysis_sample.csv"},
+            )
+            self.assertEqual(response.status_code, 202, msg=response.text)
+            run_id = response.json()["id"]
+
+            response = client.get(f"/api/v1/projects/{project_id}/runs/{run_id}/observability")
+            self.assertEqual(response.status_code, 200, msg=response.text)
+            variable_roles = response.json()["variable_roles"]
+
+            self.assertEqual(variable_roles["evidence_level"], "local_execution")
+            self.assertEqual(variable_roles["source_step_id"], "dataset_intake")
+            self.assertEqual(variable_roles["confirmation_gate_id"], "gate_dataset_fields")
+            self.assertEqual(variable_roles["confirmation_status"], "open")
+            self.assertEqual(variable_roles["roles"]["outcome"], ["wage"])
+            self.assertEqual(variable_roles["roles"]["treatment"], ["trained"])
+            self.assertEqual(variable_roles["roles"]["controls"], ["edu", "experience"])
+            self.assertEqual(variable_roles["roles"]["instruments"], [])
+        finally:
+            product_app.PRODUCT_ROOT = original_product_root
+            product_app.REPO_ROOT = original_repo_root
+
     @staticmethod
     def _copy_minimal_project(target: Path) -> None:
         target.mkdir(parents=True)

@@ -1,15 +1,38 @@
 # 当前阶段
 
 - 研究题目：待定
-- 当前主线：Agent 集群式深度研究工作流 API 与前端完成动作已接通，第一执行 provider 选定为本地 Codex
+- 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
+- 当前进展：
+  - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
+  - P1-L Manuscript candidate review 已完成：正文候选有独立 `review_status`、`can_promote` 和 `candidate_review` provenance。
+  - P1-M Manuscript promote preflight 已完成：approved candidate 可进入 `promotion_status=ready_for_export`，状态保存到 `state/product/manuscript_candidate_promotions.json`，但 `can_write_back=false`。
+  - P1-N Export preflight preview 已完成：`ready_for_export` candidate 可生成 write-back preview 和 export package manifest，状态保存到 `state/product/export_package_manifest.json`，但仍 `can_write_back=false`。
+  - P1-O Review & Export package workbench 已完成：`GET /api/v1/projects/{project_id}/export-package` 读取 `preview_ready` package，Review & Export 页面显示导出包验收台、evaluator checks、Frontier-Eng iteration log，并可回到 Results & Draft 查看候选来源。
+  - P1-Q Chinese Copy + Archive Interface 已完成：页面可见文案已中文化，全局界面升级为 `archive-shell`，右侧 `archive-inspector` 显示研究档案、相邻笔记、证据图例和收藏架。
+  - P1-R Clean Workbench Visual Pass 已完成：全局 archive shell 去掉纸格噪声和厚重阴影，右侧变为 `inspector-rail` 属性检查器，Data & Design 的变量角色入口改成单列 record/list，修复截图中的文本重叠。
+  - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
+  - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - 为工作流增加 `events.jsonl` 事件流
-  - 把 deterministic mock 子任务替换为显式 local Codex 执行步骤
-  - 第一批 local Codex adapter 优先接入本地 source inventory、Zotero/PDF 文献池和 StatsPAI 方法设计
-  - 启动本地产品服务并浏览器验证 Agent 集群 UI
+  - P1-P：在 Review & Export 基础上继续设计显式写回审批或 docx 导出预检。该步骤必须单独 BDD/TDD，且继续保持默认不覆盖源草稿。
+  - 只有 `export_status=preview_ready` 的 manuscript candidate 才能进入后续“最终导出 / 显式写回审批”流程。
+  - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
+  - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
 - 当前约束：
   - 原始数据不手改
   - 正文不直接从临时结果取数
   - 临时试验优先放 `Program/temp/`
   - mock 输出不得冒充真实研究证据
   - 第一版优先复用现有 FastAPI + 静态前端产品壳
+  - 已确认 VariableRoleSet 保存在 `state/product/variable_roles.json`
+  - 已确认 DesignSpec 保存在 `state/product/design_spec.json`
+  - 已确认 RunPlan 保存在 `state/product/run_plan.json`
+  - 完整 run 只能在 RunPlan approved 后启动；当前已通过 `POST /api/v1/projects/{project_id}/runs/full` 生成 `run_c424d6a11af7`
+  - Results & Draft 当前已通过 `GET /api/v1/projects/{project_id}/results-draft` 读取 `run_c424d6a11af7` 并生成 FindingCard / DraftSection evidence binding
+  - FindingCard 当前已支持 claim review；`finding_trained_effect` 已 approved，`can_write_to_draft=true`，审阅状态保存在 `state/product/finding_reviews.json`
+  - Manuscript candidates 当前是派生候选，不写回源草稿；候选审阅状态已保存到 `state/product/manuscript_candidate_reviews.json`
+  - Manuscript promotion 当前是导出前检查状态，不写回源草稿；promotion 状态已保存到 `state/product/manuscript_candidate_promotions.json`
+  - Export preflight 当前只生成 `Manuscripts/generated/previews/...md` 和 `state/product/export_package_manifest.json`，不覆盖 `Manuscripts/generated/paper_draft.md`
+  - Review & Export 当前只展示导出包和 evaluator 结果，不执行写回或 docx 生成；可视化验收截图为 `/tmp/empirical-workbench-review-export-p1o.png`
+  - Archive Interface 当前只改前端信息架构和视觉层，不改变后端状态机；验收入口为 `http://127.0.0.1:8765/?v=20260513-archive1`
+  - Clean Workbench 当前是第一轮视觉清洁层；验收入口为 `http://127.0.0.1:8765/?v=20260513-clean1`
+  - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

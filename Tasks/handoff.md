@@ -1,0 +1,765 @@
+# Handoff
+
+更新时间：2026-05-13 19:05 CST
+
+## 当前目标
+
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与档案界面均已完成。最新 P1-R 已完成清洁工作台视觉修正：`archive-shell` 去掉纸格噪声，右侧改为属性检查器，变量角色确认入口改为单列 record/list，修复用户截图中的重叠问题。当前 full run `run_c424d6a11af7` 已生成 approved FindingCard `finding_trained_effect` 和 approved Manuscript candidate `manuscript_candidate_finding_trained_effect_results`；该 candidate 已进入 `export_status=preview_ready`。下一步是继续 P1-P：设计显式写回审批或 docx 导出预检，或者继续把 Artifacts / Agents 做成同样干净的证据与审计工作台。
+
+## 已完成事项
+
+- 确认 git 根目录是 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
+- 读取项目级 `AGENTS.md`，确认本项目默认 BDD + TDD。
+- 读取 `docs/architecture-v2/README.md`、`api-contract-v2.md`、`technical-architecture.md`、`kimi-observable-execution-ui-handoff-2026-05-10.md`、`codex-phase-a-bdd.md`。
+- 运行基线测试：`python3 -m unittest discover -s tests -v`，结果 48 tests OK，skipped=1 是预期外部 API 集成测试跳过。
+- 用浏览器读取 StatsPAI 文章 `https://www.statspai.com/zh/blog/statspai-agent-era-statistics-ecosystem`，并继续读取其关键子链接：StatsPAI 首页、博客列表、加入、更新日志、隐私、条款、CoPaper、GitHub、Issues。
+- 新增方法论沉淀：`docs/architecture-v2/statspai-methodology-synthesis-2026-05-12.md`。
+- 新增 P0 前端 BDD：`docs/architecture-v2/codex-phase-p0-observable-ui-bdd.md`，共 7 条行为。
+- 新增前端行为测试：`tests/test_observable_execution_frontend.py`。
+- 修改 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，把 `实证执行` 页面接到真实 `/api/v1/projects/{project_id}/runs/{run_id}/observability`。
+- 浏览器验收发现旧服务 8765 进程未加载当前代码，改用 8877 启动当前工作树验证。
+- 针对历史 run 缺少 `state/runs/{run_id}` 观测文件的 404 边界补了第 7 条 BDD 和最小前端恢复态。
+- 新增 P1 gate resolve BDD：`docs/architecture-v2/codex-phase-p1-gate-resolve-bdd.md`。
+- 在 `Product/backend/observability_service.py`、`Product/backend/project_service.py`、`Product/app.py` 中实现 `POST /api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve`。
+- 扩展 `tests/test_observable_execution.py`，验证 resolve 后写回 gate、追加 `hitl_gate_resolved` 事件、更新 manifest open gate 数、拒绝非法 action。
+- 新增 P1-A 前端 BDD：`docs/architecture-v2/codex-phase-p1-gate-resolve-frontend-bdd.md`。
+- 扩展 `tests/test_observable_execution_frontend.py` 到 10 条行为，覆盖开放 gate 三类动作、note 提交、成功刷新、错误展示、已处理 gate resolution 展示。
+- 修改 `Product/web/assets/app.js`，增加 `v2api.runs.resolveGate`、`resolveObservableGate`、gate note textarea、confirm/reject/adjust 按钮和 resolved gate 展示。
+- 修改 `Product/web/assets/styles.css`，增加 gate note 和 resolution 样式。
+- 修改 `Product/web/index.html`，给 CSS/JS 加 `?v=20260512-p1a` 版本 query，避免本地浏览器继续执行旧缓存。
+- 浏览器在 `http://127.0.0.1:8765/?v=20260512-p1a` 完成真实 gate resolve 验收：`gate_dataset_fields` 从待确认变为已处理，显示 action/note/resolved_at，事件流出现 resolved 事件。
+- 新增 P1-B 数据入口 BDD：`docs/architecture-v2/codex-phase-p1-dataset-run-bdd.md`。
+- 扩展 `Product/backend/overview_service.py`：`GET /api/v1/projects/{project_id}/datasets` 从项目 `Data/` 目录扫描本地数据文件，返回 `evidence_level=local_file`、相对路径、文件类型、大小、行列数和 configured/candidate role。
+- 扩展 `Product/app.py` 和 `Product/backend/project_service.py`：`POST /api/v1/projects/{project_id}/runs` 接收 `dataset_path`，拒绝绝对路径、`..` 和不存在文件，并在 run response 与 `state/runs/{run_id}/run_manifest.json` 中持久化 `dataset_source`。
+- 新增 `tests/test_dataset_frontend.py`，并扩展 `tests/test_api_contract_v2.py`、`tests/test_product_v1_local.py`，覆盖 P1-B 数据集列表、dataset_source 持久化、非法路径拒绝和前端按钮行为。
+- 修改 `Product/web/assets/app.js`：数据与变量页显示本地数据文件的 evidence/path/shape/role，并提供“用此数据启动试运行”按钮；创建 run 时把 `dataset_path` 传给后端。
+- 修改 `Product/web/index.html`，静态资源版本更新到 `?v=20260512-p1b3`。
+- 浏览器在 `http://127.0.0.1:8765/?v=20260512-p1b3` 验收 P1-B：点击数据页按钮后生成 `run_fc725d15b3c0`，manifest 写入 `dataset_source.path=Data/Final/analysis_sample.csv` 和 `evidence_level=local_file`。
+- 新增 P1-C BDD：`docs/architecture-v2/codex-phase-p1-run-dataset-source-ui-bdd.md`。
+- 扩展 `Product/backend/observability_service.py`：`GET /observability` 顶层返回 `dataset_source`，并保持与 `manifest.dataset_source` 一致。
+- 扩展 `Product/backend/project_service.py`：解析 dataset source 时写入 `role`、`row_count`、`column_count`，CSV shape 来自本地文件检查。
+- 扩展 `tests/test_observable_execution.py`：新增 observability 顶层 dataset_source 行为测试，确认 `row_count=12`、`column_count=4`、`evidence_level=local_file`。
+- 扩展 `tests/test_observable_execution_frontend.py`：新增执行页 Run 数据源面板静态行为测试。
+- 修改 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：新增 `observable-dataset-source` 面板，显示数据文件名、项目相对路径、shape、file_type、role 和 evidence badge。
+- 浏览器在 `http://127.0.0.1:8765/?v=20260512-p1c` 验收 P1-C：从数据页启动 `run_641c9770a1a8`，执行页显示完整 Run 数据源证据。
+- 新增 P1-D BDD：`docs/architecture-v2/codex-phase-p1-variable-roles-bdd.md`。
+- 扩展 `Product/backend/observability_service.py`：从 `dataset_intake` step metadata 提取 `key_variables`，顶层返回 `variable_roles`，并绑定 `gate_dataset_fields` 的 open/resolved 状态。
+- 扩展 `tests/test_observable_execution.py`：新增 variable_roles API 行为测试，覆盖 outcome、treatment、controls、instruments 和 confirmation gate/status。
+- 扩展 `tests/test_observable_execution_frontend.py`：新增变量角色确认面板静态行为测试。
+- 修改 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：新增 `observable-variable-roles` 面板，显示 outcome/treatment/controls/instruments、gate id、确认状态和 evidence badge。
+- 浏览器在 `http://127.0.0.1:8765/?v=20260512-p1d` 验收 P1-D：执行页显示 `gate=gate_dataset_fields · status=open`、`outcome=wage`、`treatment=trained`、`controls=edu, experience`。
+- 新增 P1-UI BDD：`docs/architecture-v2/codex-phase-p1-observable-console-density-bdd.md`，把“实证执行页必须像执行控制台而不是论文卡片堆叠”固化为行为约束。
+- 扩展 `tests/test_observable_execution_frontend.py`：新增行为 13，覆盖 `execution-control-panel`、`execution-context-grid`、system font、8px 圆角、两列上下文网格、artifact 证据条目不溢出、metadata 可换行。
+- 修改 `Product/web/index.html`：运行选择面板增加 `execution-control-panel`，run 摘要、Run 数据源、变量角色确认合并到 `execution-context-grid`。
+- 修改 `Product/web/assets/styles.css`：对 `#view-empirical-execution` 使用 scoped system font、小圆角、小内边距、紧凑面板、可扫读 step/event/gate/artifact 列表；移动端折叠为单列并消除 metadata 横向溢出。
+- 浏览器在 `http://127.0.0.1:8765/?v=20260512-p1ui3` 验收 P1-UI：桌面 1512x982 下无横向溢出，移动端 390x844 下 `overflowCount=0`。
+- 新增产品重置文档：`docs/architecture-v2/product-flow-reset-2026-05-12.md`。
+- 产品重置核心判断：当前产品混乱不是单个面板问题，而是 Run/Step/Gate/Artifact 过早成为主对象，Dataset、VariableRoleSet、DesignSpec、RunPlan 没有形成用户主路径。
+- 新增产品级 workflow contract BDD：`docs/architecture-v2/product-workflow-contract-bdd.md`，固化 Dataset -> VariableRoleSet -> ResearchQuestion -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export 的主链路。
+- 新增 `tests/test_product_workflow_contract.py`，覆盖首页下一步、run blocking、5 个主工作区、workflow spine、变量角色优先、Run Plan 预检。
+- 扩展 `Product/backend/overview_service.py`：`GET /api/v1/projects/{project_id}/overview` 返回 `workflow_contract`，其中 `next_action.id=confirm_variable_roles`，`run_readiness.can_start_full_run=false`，blockers 为 `variable_roles_unconfirmed/design_unconfirmed/run_plan_missing`。
+- 修改 `Product/web/index.html`：一阶导航改为 `Workspace Home / Data & Design / Execution / Results & Draft / Review & Export`；研究设计和 Agent 控制台降为工具入口；首页新增 `product-next-action` 与 `workflow-spine`；Data & Design 新增 `variable-role-workflow-card`；Execution 新增 `run-plan-preflight` 和 `run-blockers`。
+- 修改 `Product/web/assets/app.js`：新增 `renderWorkflowContract`、`renderVariableRoleWorkflow`、`renderExecutionPreflight`、`openDesignAction`；数据卡片不再直接触发 run，而是进入“检查并确认变量角色”。
+- 修改 `Product/web/assets/styles.css`：全局视觉从厚重 serif/米色卡片转为 system font、低噪声白/灰绿工作台；新增 workflow spine、next action、variable role、run preflight/blocker 样式。
+- 新增 P1-E BDD：`docs/architecture-v2/codex-phase-p1-variable-role-confirmation-bdd.md`，把变量角色确认定义为真实产品状态对象，而不是 run log 中的临时 gate note。
+- 新增 `tests/test_variable_role_confirmation.py`，覆盖变量角色 draft、PUT 保存、workflow contract 解锁、前端编辑器和 Execution preflight 后继阻塞。
+- 新增 `Product/backend/variable_role_service.py`，从项目数据文件推断 draft VariableRoleSet，并把用户确认结果保存到 `state/product/variable_roles.json`。
+- 扩展 `Product/app.py`，新增 `GET /api/v1/projects/{project_id}/variable-roles` 与 `PUT /api/v1/projects/{project_id}/variable-roles`。
+- 扩展 `Product/backend/overview_service.py`，`GET /overview` 会读取已确认 VariableRoleSet；确认后 `variable_roles` stage 变为 completed，`next_action.id=confirm_design_spec`，`variable_roles_unconfirmed` blocker 被移除。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，Data & Variables 页新增 VariableRoleSet 编辑器，可编辑 outcome、treatment、controls、instruments、fixed_effects、cluster_by 和 note，保存后刷新 workflow contract。
+- 浏览器验收已创建真实项目状态：`state/product/variable_roles.json`，其中 `roles.outcome=["wage"]`、`roles.treatment=["trained"]`、`roles.controls=["edu","experience"]`，`status=approved`，`evidence_level=local_file`。
+
+## 已验证证据
+
+- `git status --short --branch` 输出：`## main...origin/main`。
+- 基线测试输出：`Ran 48 tests in 4.487s`，`OK (skipped=1)`。
+- StatsPAI 核心文章 DOM 抽取到的标题和章节包括：为什么是 Python、StatsPAI 包在做什么、方法覆盖、面向 Agent 的设计、时间线、接下来、参与。
+- TDD 失败证据：新增 `tests.test_observable_execution_frontend` 后，最初 6 条测试因 DOM/JS/CSS 缺少 P0 observability 元素和函数而失败；第 7 条历史 run 恢复态测试也先失败。
+- P1-A 前端 TDD 失败证据：新增行为 5-8 后，`python3 -m unittest tests.test_observable_execution_frontend -v` 先有 4 条失败，原因是前端缺少 `data-gate-resolve-action`、`resolveGate`、刷新和 `gate.resolution` 展示。
+- 最终回归：`python3 -m unittest discover -s tests -v`，`Ran 59 tests in 5.570s`，`OK (skipped=1)`。
+- 编译/语法：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 手动验收：`http://127.0.0.1:8877` 打开实证执行页，`run_3ffe1e6c1f53` 渲染完整 steps、events、HITL gates 和 artifact evidence；切换到旧 run `run_c617f095b232` 显示“缺少可观察执行轨迹”和“点击启动试运行”的恢复提示；Step 卡片宽度 368.8px，小于 387.8px 容器宽度，无横向撑破。
+- P1 API 验证：`tests.test_observable_execution.ObservableExecutionTests.test_bdd_3_gate_resolve_api_updates_gate_event_and_manifest` 通过，确认 `gates.json`、`run_events.jsonl`、`run_manifest.json` 都被更新。
+- P1-A 浏览器验收：真实页面显示 confirm/reject/adjust 和 note；填写“浏览器验收：确认数据字段进入后续分析。”并点击确认后，`gate_dataset_fields` 显示 `action=confirm` 和 resolved_at，事件流包含 resolved 事件；浏览器 console error 为 0。
+- P1-B TDD 失败证据：datasets API 最初仍返回 `_meta.evidence_level=mock`；run endpoint 最初未返回 `dataset_source`；前端测试最初找不到 `data-start-dataset-run` 和 run payload `dataset_path`。
+- P1-B 最终回归：`python3 -m unittest discover -s tests -v`，`Ran 65 tests in 11.121s`，`OK (skipped=1)`。
+- P1-B 编译/语法：`python3 -m py_compile Product/backend/overview_service.py Product/backend/project_service.py Product/app.py Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P1-B API 验证：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `analysis_sample.csv`，`row_count=12`、`column_count=4`、`role=configured_final_dataset`、`evidence_level=local_file`。
+- P1-B 手动验收：`run_fc725d15b3c0` 的 `state/runs/run_fc725d15b3c0/run_manifest.json` 包含 `dataset_source`，浏览器 console errors/warnings 为 0。
+- P1-C TDD 失败证据：新增 `test_bdd_3_observability_exposes_dataset_source_as_run_evidence` 后先失败，原因是 observability 顶层没有 `dataset_source`；新增前端测试先失败，原因是页面缺少 `observable-dataset-source`。
+- P1-C 目标测试：`python3 -m unittest tests.test_observable_execution -v`，4 tests OK；`python3 -m unittest tests.test_observable_execution_frontend -v`，11 tests OK；`tests.test_product_v1_local.ProductV1LocalTests.test_run_endpoint_records_selected_dataset_source` 通过。
+- P1-C 最终回归：`python3 -m unittest discover -s tests -v`，`Ran 67 tests in 36.309s`，`OK (skipped=1)`。
+- P1-C 编译/语法：`python3 -m py_compile Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P1-C API 验证：`GET /api/v1/projects/proj_undergraduate_thesis/runs/run_641c9770a1a8/observability` 顶层和 manifest 都包含 `dataset_source.path=Data/Final/analysis_sample.csv`、`evidence_level=local_file`、`role=configured_final_dataset`、`row_count=12`、`column_count=4`。
+- P1-C 浏览器验收：执行页 Run 数据源面板文本为 `analysis_sample.csv / Data/Final/analysis_sample.csv / 本地文件 / 12 行 · 4 列 / csv / configured_final_dataset / exists=true`，console errors/warnings=0。
+- P1-D TDD 失败证据：新增 API 测试后先 `KeyError: variable_roles`；新增前端测试后先失败，原因是缺少 `observable-variable-roles`。
+- P1-D 目标测试：`python3 -m unittest tests.test_observable_execution -v`，5 tests OK；`python3 -m unittest tests.test_observable_execution_frontend -v`，12 tests OK。
+- P1-D 最终回归：`python3 -m unittest discover -s tests -v`，`Ran 69 tests in 8.408s`，`OK (skipped=1)`。
+- P1-D 编译/语法：`python3 -m py_compile Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P1-D API 验证：`GET /api/v1/projects/proj_undergraduate_thesis/runs/run_641c9770a1a8/observability` 返回 `variable_roles.evidence_level=local_execution`、`confirmation_gate_id=gate_dataset_fields`、`confirmation_status=open`。
+- P1-D 浏览器验收：变量角色确认面板显示 `outcome=wage`、`treatment=trained`、`controls=edu, experience`、`instruments=未识别`，console errors/warnings=0。
+- P1-UI TDD 失败证据：新增行为 13 后先失败，原因是 `index.html` 缺少 `execution-control-panel`。
+- P1-UI 目标测试：`python3 -m unittest tests.test_observable_execution_frontend -v`，13 tests OK。
+- P1-UI 最终回归：`python3 -m unittest discover -s tests -v`，`Ran 70 tests in 5.553s`，`OK (skipped=1)`。
+- P1-UI 编译/语法：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P1-UI 浏览器验收：桌面 computed style 显示 `font=-apple-system, "system-ui", "Segoe UI", sans-serif`、`panelRadius=8px`、`panelPadding=12px`、`contextColumns=451.594px 677.406px`、`overflowCount=0`；移动端 390x844 显示 `contextColumns=319px`、`toolbarDirection=column`、`overflowCount=0`、`metadataWhiteSpace=pre-wrap`。
+- 产品重置 TDD 失败证据：`python3 -m unittest tests.test_product_workflow_contract -v` 最初 2 条 API 测试因 `KeyError: workflow_contract` 报错，4 条前端测试因缺少新 IA 和新渲染函数失败。
+- 产品重置目标测试：`python3 -m unittest tests.test_product_workflow_contract tests.test_dataset_frontend tests.test_observable_execution_frontend -v`，23 tests OK。
+- 产品重置最终回归：`python3 -m unittest discover -s tests -v`，`Ran 76 tests in 6.385s`，`OK (skipped=1)`。
+- 产品重置编译/语法：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 产品重置浏览器验收：重启 8765 后打开 `http://127.0.0.1:8765/?v=20260512-flow2`；Workspace Home 显示 5 个工作区、`confirm_variable_roles` 和 9 个 workflow spine 阶段；Data & Design 显示真实数据文件并只引导变量角色确认；Execution 显示 `can_start_full_run=false` 和 3 个 blockers 后再显示 run evidence；桌面和 390x844 移动端无横向溢出；console errors/warnings=0。
+- P1-E TDD 失败证据：`python3 -m unittest tests.test_variable_role_confirmation -v` 首次 5 条失败，原因是变量角色 API 尚未实现、前端缺少编辑器和保存 API。
+- P1-E 目标测试：`python3 -m unittest tests.test_variable_role_confirmation -v`，`Ran 5 tests`，OK。
+- P1-E 目标回归：`python3 -m unittest tests.test_variable_role_confirmation tests.test_product_workflow_contract tests.test_dataset_frontend tests.test_observable_execution_frontend tests.test_api_contract_v2 -v`，`Ran 39 tests`，OK。
+- P1-E 全量回归：`python3 -m unittest discover -s tests -v`，`Ran 81 tests in 8.594s`，`OK (skipped=1)`。
+- P1-E 编译/语法：`python3 -m py_compile Product/app.py Product/backend/overview_service.py Product/backend/variable_role_service.py Product/backend/project_service.py Product/backend/observability_service.py Program/run_paper.py Program/workbench/observability.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P1-E 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1e` 显示 VariableRoleSet 编辑器；保存后状态为 `approved · local_file`，meta 为 `Data/Final/analysis_sample.csv · version=1 · evidence_level=local_file`；Overview API 返回 `next_action.id=confirm_design_spec`，blockers 只剩 `design_unconfirmed/run_plan_missing`；Execution preflight 仍显示 `CAN_START_FULL_RUN=FALSE`；console errors/warnings=0。
+
+## 关键文件路径
+
+- `Product/app.py`
+- `Product/backend/project_service.py`
+- `Product/backend/observability_service.py`
+- `Product/backend/overview_service.py`
+- `Product/backend/variable_role_service.py`
+- `Product/backend/project_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_observable_execution.py`
+- `tests/test_observable_execution_frontend.py`
+- `tests/test_dataset_frontend.py`
+- `tests/test_product_v1_local.py`
+- `tests/test_api_contract_v2.py`
+- `tests/test_agent_cluster_frontend_interactions.py`
+- `docs/architecture-v2/kimi-observable-execution-ui-handoff-2026-05-10.md`
+- `docs/architecture-v2/statspai-methodology-synthesis-2026-05-12.md`
+- `docs/architecture-v2/codex-phase-p0-observable-ui-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-gate-resolve-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-gate-resolve-frontend-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-dataset-run-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-run-dataset-source-ui-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-variable-roles-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-observable-console-density-bdd.md`
+- `docs/architecture-v2/product-flow-reset-2026-05-12.md`
+- `docs/architecture-v2/product-workflow-contract-bdd.md`
+- `tests/test_product_workflow_contract.py`
+- `tests/test_variable_role_confirmation.py`
+- `docs/architecture-v2/codex-phase-p1-variable-role-confirmation-bdd.md`
+- `state/product/variable_roles.json`
+
+## 不能重复探索的结论
+
+- 不要把上层 `/Users/mahaoxuan/Desktop/经济学论文` 当作 git 根目录；真实 repo 是 `实证论文项目模板`。
+- 当前 P0 不需要大面积重构 UI；应在现有 `实证执行` 页面接真实 observability。
+- `GET /api/v1/projects/{project_id}/runs/{run_id}/observability` 后端已经存在；本轮主要补前端真实消费。
+- StatsPAI 方法论要求系统分层：Skill/Agent 编排负责“做什么”，StatsPAI/统计包负责“怎么做”；前端不能伪装执行结果，必须显示 evidence_level。
+- 8765 端口已重启为当前工作树的 `python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8765`；浏览器静态资源可能缓存旧 JS，因此 `index.html` 已更新为 `?v=20260513-p1e` 版本 query。
+- 旧 run 可能只有 run store JSON，没有 `state/runs/{run_id}` 下的 observability 文件；前端必须把它当作可恢复历史状态处理。
+- Gate resolve 已完成后端和前端最小闭环；不要再回退到“P1 接入”禁用按钮。
+- P1-B 当前只实现“选择项目内本地数据文件并启动 run”，不是 multipart 上传；这是为了先打通 CoPaper/StatsPAI 式真实数据入口和可追溯 run source，不把 UI 做成伪上传。
+- `dataset_path` 必须限制在项目目录内的相对路径；绝对路径和 `..` 已按安全边界拒绝。
+- P1-C 只做文件级数据理解证据，不做变量级 schema 编辑；下一步必须进入变量/角色确认，不应把文件级 shape 误当成完整数据理解。
+- P1-D 只把变量角色作为一等可见对象展示，并绑定 HITL gate 状态；还没有结构化变量编辑/写回 API。
+- P1-UI 已确认此前执行页视觉问题不是单个 bug，而是信息架构和密度问题：不要回到大号 serif、24px 圆角、分散大卡片的论文式布局；实证执行页应保持 scoped system font、8px 控制台卡片和上下文网格。
+- 产品主流程已重置为 Project -> Dataset -> VariableRoleSet -> ResearchQuestion -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export；不要再把 run selector 作为首页主行动。
+- VariableRoleSet 已经是产品级本地状态，保存路径为 `state/product/variable_roles.json`；`workflow_contract` 已读取该状态，不要再把变量角色确认只写在 run gate 或 note 里。
+- DesignSpec 和 RunPlan 已经是产品级本地状态，保存路径分别为 `state/product/design_spec.json`、`state/product/run_plan.json`；`workflow_contract` 已读取这两个 approval 并推进到 `start_full_run`。
+- Feynman 当前不是源码依赖；本轮按用户参考采用 `callable_external` 研究引擎设计，只把 `embedded=false`、license、repository 等 provenance 写入 run metadata。
+- P1-H 已新增 `POST /api/v1/projects/{project_id}/runs/full`，不要再把旧 dry-run 按钮当作产品主行动。
+- Results & Draft 已有最小 evidence binding；不要再把 drafts API 当作唯一草稿入口。
+- FindingCard 的系数、标准误、p 值和样本量必须来自 `Results/json/analysis_result.json`，不要从 Markdown 草稿解析。
+- FindingCard review 是用户本地决策证据，`evidence_level=local_file`；真实估计结果仍是 `local_execution`。
+- 旧 review 不应自动套用到新 run；当前实现要求 persisted review 的 `run_id` 和 `artifact_path` 与当前 finding 匹配。
+
+## 下一步第一件事
+
+写 P1-P BDD 和失败测试：在 Review & Export workbench 基础上，定义显式写回审批或 docx 导出预检。继续保持 `Manuscripts/generated/paper_draft.md` 不被自动覆盖，除非出现独立、明确、可审计的用户审批动作。
+
+## 未解决风险
+
+- 当前手动验收已把 `run_3ffe1e6c1f53` 的 `gate_dataset_fields` 处理为 resolved；如需验收开放 gate，可使用同一 run 的 `gate_research_question`，或点击“启动试运行”重新生成。
+- `Product/serve_product.py` 直接运行会因 `ModuleNotFoundError: No module named 'Product'` 失败；模块方式启动或 `uvicorn Product.app:app` 可用，后续可单独补入口测试和修复。
+- P1-B 还没有 multipart 上传；当前入口要求数据文件已经存在于项目 `Data/` 目录下。
+- `state/product/variable_roles.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 是浏览器/API 验收创建的真实本地运行状态；当前未纳入 git 跟踪，后续提交前需要决定是否作为样例状态保留、迁移到 fixtures，或继续作为 gitignored runtime artifacts。
+- full run、Results & Draft evidence binding、FindingCard claim review、Manuscript candidate generation/review/promote/export preflight、Review & Export package workbench 已打通；还没有真正的源草稿写回或 docx export。
+- 当前前端已收敛为 5 个工作区，但还不是用户材料中完整的 8 板块 AppShell；后续应先完成 Review & Export 的可审计导出闭环，再逐步展开 Artifacts / Agents。
+- P1-R 已修复当前最明显的视觉风险：Data & Design 中变量角色确认入口不再重叠；后续视觉迭代应继续沿用 `clean-workbench-shell`、`inspector-rail`、`research-record-card`，不要回到纸格背景和大卡片嵌套。
+
+## 2026-05-13 P1-R Clean Workbench Visual Pass 交接增量
+
+### 当前目标
+
+回应用户指出的“前端页面依然很脏、不够干净”和截图中的变量角色入口重叠问题。保持现有 FastAPI + vanilla 前端，不换框架，先把信息架构和视觉密度清理到可继续开发的状态。
+
+### 已完成事项
+
+- 阅读并参考 JupyterLab 主工作区/侧边栏/属性检查器、Grafana dashboard panel、OpenMetadata 数据资产与质量证据的公开产品文档。
+- 新增 `docs/architecture-v2/codex-phase-p1-clean-workbench-bdd.md`。
+- 新增 `tests/test_clean_workbench_visual_contract.py`，覆盖清洁背景、变量入口无重叠、右侧属性检查器、record/list 替代嵌套大卡片、保留现有技术栈。
+- 修改 `Product/web/index.html`：加入 `clean-workbench-shell`，静态资源版本改为 `20260513-clean1`，右侧文案改为“属性检查器”。
+- 修改 `Product/web/assets/app.js`：重写 `renderVariableRoleWorkflow()` 输出 `research-record-card`、`record-meta-grid`、`research-step-list` 和 `compact-action-row`。
+- 修改 `Product/web/assets/styles.css`：去掉 archive shell 的纸格背景和厚重阴影，新增 clean surface、inspector rail、record/list、长路径换行和单列变量入口布局。
+
+### 已验证证据
+
+- TDD 失败证据：`python3 -m unittest tests.test_clean_workbench_visual_contract -v` 首次 4 失败 1 通过，失败原因符合预期。
+- 目标测试：`python3 -m unittest tests.test_clean_workbench_visual_contract tests.test_archive_interface_visual_contract tests.test_frontend_chinese_copy -v`，15 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，137 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-clean1`，点击右侧“数据与设计”后，变量角色入口显示为单列记录布局，未再出现截图中的文本重叠。
+
+### 不能重复探索的结论
+
+- 当前视觉问题不是要继续加“个人档案感”，而是要把研究工作台做干净、可扫读、可操作。
+- `variable-role-workflow-layout` 不能再使用 `grid-template-columns: minmax(0, 1fr) auto`；长路径和中文说明必须允许换行。
+- 右侧栏应作为属性检查器和相邻记录索引，不应承担大面积装饰。
+
+### 下一步第一件事
+
+继续 P1-P：为 Review & Export 增加显式写回审批或 docx 导出预检的 BDD/TDD。若继续视觉方向，优先清理 Results & Draft / Review & Export 的记录密度和右侧属性检查器联动，而不是添加新装饰。
+
+### 未解决风险
+
+- Browser plugin 和 Playwright MCP 本轮均出现连接/传输问题；已用 Safari + Computer Use 兜底，但还需要后续恢复 Browser 自动化截图链路。
+- P1-R 只做了第一轮清洁视觉 pass；Artifacts / Agents 还没做成完整的证据架和审计时间线。
+- 当前仍有大量 P1 变更处于工作区，提交时需要 scoped stage，避免把 runtime artifacts 或无关状态混入。
+
+## 2026-05-13 P1-F/P1-G DesignSpec 与 RunPlan 交接增量
+
+## 2026-05-13 P1-O Review & Export Package Workbench 交接增量
+
+### 当前目标
+
+把 `export_status=preview_ready` 的 manuscript candidate 接入 Review & Export 工作区，并吸收用户提供的 Frontier-Eng 方法论：baseline/export preview -> evaluator checks -> feedback -> next_iteration。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-review-export-package-bdd.md`，定义 4 条 Review & Export 行为。
+- 新增 `tests/test_review_export_package.py`，覆盖 export package API、evaluator checks、Frontier-Eng iteration log 和前端工作台。
+- 扩展 `Product/backend/manuscript_candidate_service.py`，新增 export package 组装逻辑。
+- 扩展 `Product/app.py`，新增 `GET /api/v1/projects/{project_id}/export-package`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，Review & Export 页面新增导出包验收台。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_review_export_package -v` 首次 4 条失败，原因符合预期。
+- 目标测试：`python3 -m unittest tests.test_review_export_package -v`，4 tests OK。
+- 目标回归：`python3 -m unittest tests.test_manuscript_consumption tests.test_results_draft_evidence_binding tests.test_review_export_package -v`，31 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，122 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；相关 Python `py_compile` 通过。
+- Chrome 可视化验收：`http://127.0.0.1:8765/?v=20260513-p1o` 点击 `Review & Export` 可见导出包验收台；截图为 `/tmp/empirical-workbench-review-export-p1o.png`。
+
+### 不能重复探索的结论
+
+- Review & Export 不是“直接下载/写回”的页面，而是最终产物进入前的 evaluator checkpoint。
+- `can_write_back=false` 是当前安全边界，不是缺陷。
+- Frontier-Eng 当前只借鉴闭环结构，不引入官方 benchmark 或复刻其完整仓库。
+
+### 下一步第一件事
+
+P1-P：围绕“显式写回审批”或“docx 导出预检”写 BDD，再写失败测试。不要直接实现覆盖源草稿。
+
+### 当前目标
+
+把产品主流程从 `confirm_design_spec` 推进到 `start_full_run`。已完成 DesignSpec 和 RunPlan 的 BDD、失败测试、最小后端服务、API、前端表单、workflow contract 状态推进和浏览器验收。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-design-run-plan-bdd.md`，定义 6 条 DesignSpec/RunPlan 行为。
+- 新增 `tests/test_design_run_plan_state_machine.py`，覆盖 5 条 API 状态机行为和 2 条前端表单/保存行为。
+- 新增 `Product/backend/design_spec_service.py`，负责读取/保存 `state/product/design_spec.json`、`state/product/run_plan.json`，并从 approved VariableRoleSet/DesignSpec 生成 draft。
+- 扩展 `Product/app.py`，新增 `GET/PUT /api/v1/projects/{project_id}/design-spec` 和 `GET/PUT /api/v1/projects/{project_id}/run-plan`。
+- 扩展 `Product/backend/overview_service.py`，让 `workflow_contract` 读取 approved VariableRoleSet、DesignSpec、RunPlan，依次解除 `design_unconfirmed` 和 `run_plan_missing`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，Data & Design 页面能保存 DesignSpec，Execution 页面能保存 RunPlan。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_design_run_plan_state_machine -v` 首次 7 条失败，失败原因是 API 404 和前端缺少确认表单/函数。
+- 目标测试：`python3 -m unittest tests.test_design_run_plan_state_machine -v`，7 tests OK。
+- 目标回归：`python3 -m unittest tests.test_design_run_plan_state_machine tests.test_variable_role_confirmation tests.test_product_workflow_contract tests.test_dataset_frontend tests.test_observable_execution_frontend tests.test_api_contract_v2 -v`，46 tests OK。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/overview_service.py Product/backend/variable_role_service.py Product/backend/design_spec_service.py Product/backend/project_service.py Product/backend/observability_service.py Program/run_paper.py Program/workbench/observability.py` 通过。
+- 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1fg` 保存 DesignSpec 后 `next_action=confirm_run_plan`，保存 RunPlan 后 `next_action=start_full_run`、blockers 为空、`can_start_full_run=true`，console errors/warnings=0。
+- 全量回归：`python3 -m unittest discover -s tests -v`，88 tests OK，skipped=1，耗时 83.833s。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-design-run-plan-bdd.md`
+- `tests/test_design_run_plan_state_machine.py`
+- `Product/backend/design_spec_service.py`
+- `Product/backend/overview_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/design_spec.json`
+- `state/product/run_plan.json`
+
+### 不能重复探索的结论
+
+- DesignSpec/RunPlan 是产品级状态，不是某一次 run 的事件日志；它们必须放在 `state/product/`，供跨 Session 的 `workflow_contract` 恢复。
+- full run readiness 必须依赖 approved VariableRoleSet、DesignSpec、RunPlan 三者同时存在；不能只凭数据或变量角色启动完整执行。
+- RunPlan 的下一步不是静态展示结果，而是驱动 P1-H 的 `start_full_run`，并绑定后续 Results / Draft / Artifacts / Agents。
+
+### 下一步第一件事
+
+写 P1-I Results & Draft evidence binding BDD 和失败测试：确认 full-run 产出的 `analysis_result.json`、`Results/index.json`、`paper_draft.md` 能在 Results & Draft 页面形成可审计 FindingCard / DraftSection。
+
+### 未解决风险
+
+- `start_full_run` 已有真实产品 API/UI 闭环；下一步风险转移到 Results & Draft 是否正确绑定 full-run 产物。
+- `state/product/*.json` 是本地浏览器验收产物，提交前要决定是否保留为样例状态或迁移为 fixture。
+- Findings / Manuscript / Artifacts / Agents 仍未展开；应等 full run 与结果绑定稳定后再扩展。
+
+## 2026-05-13 P1-H Full Run From RunPlan 交接增量
+
+### 当前目标
+
+把 `workflow_contract.next_action=start_full_run` 变成真实产品执行路径。已完成 BDD、失败测试、后端 full-run API、RunPlan provenance 绑定、前端主行动按钮和浏览器 full-run 验收。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-full-run-from-run-plan-bdd.md`，定义 full run 必须从 approved RunPlan 启动，并把 Feynman 作为 callable external research engine 参考写入 provenance。
+- 新增 `tests/test_full_run_from_run_plan.py`，覆盖缺少 approved RunPlan 时阻断、approved RunPlan 启动 full run、前端主按钮和 API 契约。
+- 扩展 `Product/backend/project_service.py`，新增 `execute_full_run_from_run_plan()`、`build_run_plan_binding()`、`build_research_engine_reference()`、`persist_full_run_provenance()`。
+- 扩展 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/runs/full`。
+- 扩展 `Product/web/index.html` 与 `Product/web/assets/app.js`，Execution ready 后显示“启动完整实证执行”主按钮，并调用 full-run API。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_full_run_from_run_plan -v` 首次 3 条失败；2 条 API 测试因 `/runs/full` 返回 405，1 条前端测试因缺少 `observable-run-full-button`、`v2api.runs.startFull`、`createFullRunFromPlan` 失败。
+- 目标测试：`python3 -m unittest tests.test_full_run_from_run_plan -v`，3 tests OK。
+- 目标回归：`python3 -m unittest tests.test_full_run_from_run_plan tests.test_design_run_plan_state_machine tests.test_product_v1_local tests.test_observable_execution tests.test_observable_execution_frontend tests.test_product_workflow_contract -v`，39 tests OK。
+
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/project_service.py Product/backend/design_spec_service.py Product/backend/overview_service.py Product/backend/observability_service.py` 通过。
+- 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1h` 中 Execution preflight 显示 `start_full_run` ready；点击“启动完整实证执行”生成 `run_c424d6a11af7`。
+- API 验收：`run_c424d6a11af7` 的 run store 返回 `mode=full-run`、`status=succeeded`、`execution_evidence_level=local_execution`、`plan_binding.run_plan_version=1`、`research_engine.embedded=false`、`research_engine.integration_mode=callable_external`。
+- Observability 验收：`GET /observability` 返回 `_meta.evidence_level=local_execution`，manifest 包含 `run_plan_binding.evidence_level=local_file` 与 Feynman-compatible external engine metadata。
+- 全量回归：`python3 -m unittest discover -s tests -v`，`Ran 91 tests in 6.591s`，`OK (skipped=1)`。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-full-run-from-run-plan-bdd.md`
+- `tests/test_full_run_from_run_plan.py`
+- `Product/backend/project_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `state/runs/run_c424d6a11af7.json`
+- `state/runs/run_c424d6a11af7/run_manifest.json`
+- `state/runs/run_c424d6a11af7/run_steps.json`
+- `state/runs/run_c424d6a11af7/run_events.jsonl`
+- `state/runs/run_c424d6a11af7/gates.json`
+
+### 不能重复探索的结论
+
+- Feynman 不应被复制进项目；短期按 external callable research engine 处理，中期吸收 provider、skill、workflow、provenance 设计。
+- Full run 必须绑定 approved RunPlan provenance；不能只从当前数据集或旧 dry-run 直接启动。
+- `execution_evidence_level=local_execution` 属于执行产物；`plan_binding.evidence_level=local_file` 属于输入契约。
+
+### 下一步第一件事
+
+写 P1-I Results & Draft evidence binding BDD 和失败测试：从 full run `run_c424d6a11af7` 读取 `Results/json/analysis_result.json`、`Results/index.json`、`Manuscripts/generated/paper_draft.md`，在 Results & Draft 页面显示最小 FindingCard / DraftSection，并绑定 run_id、RunPlan version、artifact path、evidence_level。
+
+### 未解决风险
+
+- Full run 目前复用 `Program/run_paper.py` + StatsPAI，本轮没有实际调用 Feynman CLI。
+- Results & Draft 还没消费 `run_c424d6a11af7` 的结果文件。
+- 后续提交前仍要处理 `state/product/*.json` 与 `state/runs/run_c424d6a11af7*` 是否保留为 fixture 或 runtime artifact。
+
+## 2026-05-13 P1-I/P1-J Results, Draft, Claim Review 交接增量
+
+### 当前目标
+
+把 full-run 结果推进到 Results & Draft，并增加最小 claim review / accept-for-writing 状态。当前 `finding_trained_effect` 已经 approved，可以作为下一步 Manuscript 候选段落生成的输入。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-results-draft-evidence-binding-bdd.md`，定义 FindingCard / DraftSection evidence binding。
+- 新增 `docs/architecture-v2/codex-phase-p1-claim-review-bdd.md`，定义 FindingCard 人工审阅与 accept-for-writing 行为。
+- 扩展 `tests/test_results_draft_evidence_binding.py` 到 8 条行为，覆盖 no full-run、FindingCard evidence binding、DraftSection binding、approve/reject/needs_revision、非法 action/finding 和前端 claim review。
+- 新增/扩展 `Product/backend/results_draft_service.py`，读取最新 successful full-run、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`，并把 review 状态持久化到 `state/product/finding_reviews.json`。
+- 扩展 `Product/app.py`，新增 `GET /api/v1/projects/{project_id}/results-draft` 和 `PUT /api/v1/projects/{project_id}/results-draft/findings/{finding_id}/review`。
+- 扩展 `Product/web/assets/app.js`、`Product/web/assets/styles.css`、`Product/web/index.html`，Results & Draft 页面显示 FindingCard、DraftSection evidence binding、review_status、accept-for-writing、审阅备注和 approve/needs_revision/reject 操作。
+
+### 已验证证据
+
+- P1-I 失败测试：`python3 -m unittest tests.test_results_draft_evidence_binding -v` 首次有效失败为 API 404 和前端缺少 `results-findings-list`、`draft-evidence-sections`、`v2api.resultsDraft.get`、`renderResultsDraftEvidence`。
+- P1-J 失败测试：同一测试文件扩展后，首次失败为 `KeyError: review_status`、review API 404、前端缺少 `reviewFinding` / `data-finding-review-action`。
+- 目标测试：`python3 -m unittest tests.test_results_draft_evidence_binding -v`，8 tests OK。
+- 目标回归：`python3 -m unittest tests.test_results_draft_evidence_binding tests.test_full_run_from_run_plan tests.test_design_run_plan_state_machine tests.test_product_workflow_contract tests.test_api_contract_v2 -v`，35 tests OK。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/results_draft_service.py Product/backend/draft_service.py Product/backend/project_service.py` 通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/results-draft` 返回 `latest_run_id=run_c424d6a11af7`、`finding_trained_effect`、`review_status=needs_review`、`can_write_to_draft=false`；随后 `PUT .../review` approve 返回 `review_status=approved`、`evidence_level=local_file`、`can_write_to_draft=true`。
+- 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1j` 的 Results & Draft 页面显示 `review_status=approved`、`accept-for-writing=yes`、approve/needs_revision/reject 三个操作、审阅备注、`review evidence: 本地文件`；overflowCount=0，console errors/warnings=0。
+- 全量回归：`python3 -m unittest discover -s tests -v`，99 tests OK，skipped=1，耗时 13.177s。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-results-draft-evidence-binding-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-claim-review-bdd.md`
+- `tests/test_results_draft_evidence_binding.py`
+- `Product/backend/results_draft_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `Results/json/analysis_result.json`
+- `Manuscripts/generated/paper_draft.md`
+- `state/product/finding_reviews.json`
+
+### 不能重复探索的结论
+
+- Results & Draft 已经消费 `run_c424d6a11af7` 的结果文件；不要再把 P1-I 当作未完成。
+- FindingCard 的数值来自 `Results/json/analysis_result.json`，不要从 Markdown 草稿反向解析。
+- `approve/reject/needs_revision` 是用户审阅状态，证据等级为 `local_file`；估计结果仍是 `local_execution`。
+- review 只在 `run_id` 和 `artifact_path` 匹配当前 finding 时生效，避免新 run 误用旧审阅。
+
+### 下一步第一件事
+
+写 P1-L Manuscript candidate review/promote BDD 和失败测试：候选段落必须支持人工确认、驳回或要求修改；确认后的 candidate 才能进入 promote/write-back/export，并保留 candidate review provenance。
+
+### 未解决风险
+
+- `state/product/finding_reviews.json` 是本地验收状态，后续提交前要决定是否保留、迁移 fixture 或继续作为 runtime artifact。
+- P1-K 已实现；当前 approved finding 已生成 Manuscript 段落候选，但候选本身还没有独立 review/promote 状态。
+- Feynman 目前仍是 callable external research engine provenance，没有实际调用 CLI。
+
+## 2026-05-13 P1-K Manuscript Consumption 交接增量
+
+### 当前目标
+
+让 Manuscript 阶段只消费已审阅、可写入正文的 FindingCard，生成可审阅正文段落候选，并保留草稿、结果文件和人工审阅决定的 provenance。已完成 BDD、失败测试、后端服务/API、前端渲染、API 验收和浏览器验收。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-manuscript-consumption-bdd.md`，定义 approved FindingCard、空状态、provenance 和前端展示行为。
+- 新增 `tests/test_manuscript_consumption.py`，覆盖未 approved 不生成候选、approved 生成候选、provenance 绑定、rejected 不生成候选、前端容器/API/渲染函数。
+- 新增 `Product/backend/manuscript_candidate_service.py`，从 `GET /results-draft` 的 `review_status=approved`、`can_write_to_draft=true` FindingCard 派生 `manuscript_section_candidate`。
+- 扩展 `Product/app.py`，新增 `GET /api/v1/projects/{project_id}/manuscript-candidates`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，Results & Draft 页面显示 Manuscript candidates 和 `source_draft`、`result_artifact`、`review_decision` provenance。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_manuscript_consumption -v` 首次 5 条失败，原因是 `/manuscript-candidates` API 404 和前端缺少 candidate 容器/API/渲染函数。
+- 目标测试：`python3 -m unittest tests.test_manuscript_consumption -v`，5 tests OK。
+- 目标回归：`python3 -m unittest tests.test_manuscript_consumption tests.test_results_draft_evidence_binding tests.test_full_run_from_run_plan tests.test_design_run_plan_state_machine tests.test_product_workflow_contract tests.test_api_contract_v2 -v`，40 tests OK。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/manuscript_candidate_service.py Product/backend/results_draft_service.py Product/backend/draft_service.py Product/backend/project_service.py` 通过。
+- 全量回归：`python3 -m unittest discover -s tests -v`，104 tests OK，skipped=1。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/manuscript-candidates` 返回 `manuscript_candidate_finding_trained_effect_results`，绑定 `finding_trained_effect`、`run_c424d6a11af7`、`run_plan_version=1`。
+- 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1k` 的 Results & Draft 页面显示 1 个 candidate，无 `overwrite-paper-draft` 写回按钮，横向溢出数量为 0，console errors/warnings=0。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-manuscript-consumption-bdd.md`
+- `tests/test_manuscript_consumption.py`
+- `Product/backend/manuscript_candidate_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/finding_reviews.json`
+- `Results/json/analysis_result.json`
+- `Manuscripts/generated/paper_draft.md`
+
+### 不能重复探索的结论
+
+- approved FindingCard 不是最终正文；它只能生成 Manuscript candidate，不能直接覆盖 `paper_draft.md`。
+- Manuscript candidate 必须绑定 `source_draft`、`result_artifact`、`review_decision`，否则用户无法审计文本从何而来。
+- rejected / needs_revision FindingCard 不得生成 candidate。
+- 本阶段不调用 LLM 改写正文；先锁定证据和状态机。
+
+### 下一步第一件事
+
+写 P1-L BDD：候选段落必须支持人工确认、驳回、要求修改；确认后的 candidate 才能进入 promote/write-back/export。新增 candidate review 状态应持久化到 `state/product/`，并在前端展示 candidate review provenance。
+
+### 未解决风险
+
+- Manuscript candidate 当前是派生响应，尚未单独持久化候选审阅状态。
+- 还没有 promote/write-back/export，因此不会自动更新 `Manuscripts/generated/paper_draft.md` 或生成最终 docx。
+- `state/product/finding_reviews.json` 仍是本地 runtime artifact，提交前要决定是否保留为 fixture 或继续 gitignore。
+
+## 2026-05-13 P1-M Manuscript Promote Preflight 交接增量
+
+### 当前目标
+
+把 approved Manuscript candidate 推进到导出前检查状态，但仍不直接改写 `Manuscripts/generated/paper_draft.md`。当前 `manuscript_candidate_finding_trained_effect_results` 已进入 `promotion_status=ready_for_export`。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-manuscript-promote-preflight-bdd.md`，定义 promote 只生成本地可审计 preflight 状态。
+- 扩展 `tests/test_manuscript_consumption.py` 到 15 条行为，覆盖未审阅/被拒绝 candidate 不得 promote、approved candidate 生成 promotion preflight、缺失 candidate 结构化拒绝、前端 promote 操作。
+- 扩展 `Product/backend/manuscript_candidate_service.py`，新增 `save_project_manuscript_candidate_promotion()`、`load_candidate_promotions()`、`promotion_state` provenance。
+- 扩展 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`。
+- 扩展 `Product/web/assets/app.js`、`Product/web/assets/styles.css`、`Product/web/index.html`，Results & Draft 页面显示 `promotion_status`、`can_write_back`、promotion evidence 和“进入导出前检查”操作；静态资源版本更新到 `?v=20260513-p1m`。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_manuscript_consumption -v` 首次 P1-M 失败为 `/promote` API 404 和前端缺少 promote preflight 标识。
+- 目标测试：`python3 -m unittest tests.test_manuscript_consumption -v`，15 tests OK。
+- 目标回归：`python3 -m unittest tests.test_manuscript_consumption tests.test_results_draft_evidence_binding tests.test_full_run_from_run_plan tests.test_design_run_plan_state_machine tests.test_product_workflow_contract tests.test_api_contract_v2 -v`，50 tests OK。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/manuscript_candidate_service.py Product/backend/results_draft_service.py Product/backend/draft_service.py Product/backend/project_service.py` 通过。
+- 全量回归：`python3 -m unittest discover -s tests -v`，114 tests OK，skipped=1。
+- API 验收：`POST /api/v1/projects/proj_undergraduate_thesis/manuscript-candidates/manuscript_candidate_finding_trained_effect_results/promote` 返回 `promotion_status=ready_for_export`、`can_export=true`、`can_write_back=false`，并写入 `state/product/manuscript_candidate_promotions.json`。
+- 浏览器验收：`http://127.0.0.1:8765/?v=20260513-p1m` 的 Results & Draft 页面显示 `ready_for_export`、`can_write_back=no`、`promotion_state`、`promotion evidence` 和“进入导出前检查”按钮；无 `overwrite-paper-draft`，overflowCount=0，console errors/warnings=0。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-manuscript-promote-preflight-bdd.md`
+- `tests/test_manuscript_consumption.py`
+- `Product/backend/manuscript_candidate_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/manuscript_candidate_promotions.json`
+
+### 不能重复探索的结论
+
+- Promote 不等于 write-back；`can_write_back=false` 是刻意边界。
+- 只有 approved candidate 可以 promote；`needs_revision` 和 `rejected` 必须返回 409 `candidate_review_required`。
+- Promotion 必须落到 `state/product/manuscript_candidate_promotions.json`，不能只存在前端状态。
+
+### 下一步第一件事
+
+写 P1-N BDD：`ready_for_export` candidate 如何生成可审计 write-back draft 或 export package manifest。第一版仍不要直接覆盖 `Manuscripts/generated/paper_draft.md`，应先产出独立 manifest / patch / preview。
+
+### 未解决风险
+
+- `state/product/manuscript_candidate_promotions.json` 是本地 runtime artifact，提交前需决定是否保留、迁移 fixture 或继续 gitignore。
+- 还没有真正 write-back、docx export 或 export package manifest。
+- Feynman 目前仍是 callable external research engine provenance，没有实际调用 CLI。
+
+## 2026-05-13 P1-N Export Preflight Preview 交接增量
+
+### 当前目标
+
+把 `promotion_status=ready_for_export` 的正文候选推进到可检查的导出预检状态：生成 write-back preview 和 export package manifest，但仍不覆盖源草稿。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p1-export-preflight-bdd.md`，定义未 promote 不可导出、ready candidate 生成 preview/manifest、缺失 candidate 返回 404、前端显示 export preflight 预览。
+- 扩展 `tests/test_manuscript_consumption.py` 到 19 条行为，先确认 `/export-preflight` API 404 和前端缺少 export preflight 识别符。
+- 扩展 `Product/backend/manuscript_candidate_service.py`，新增 export preflight 状态读写、preview 文件生成、export package manifest 和 `export_package` provenance。
+- 扩展 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`。
+- 扩展 `Product/web/assets/app.js`、`Product/web/assets/styles.css`、`Product/web/index.html`，在 Results & Draft candidate 卡片显示 `preview_ready`、preview path、manifest path、export evidence 和“生成写回预览”操作。
+
+### 已验证证据
+
+- 目标测试：`python3 -m unittest tests.test_manuscript_consumption -v`，19 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_manuscript_consumption tests.test_results_draft_evidence_binding tests.test_full_run_from_run_plan tests.test_design_run_plan_state_machine tests.test_product_workflow_contract tests.test_api_contract_v2 -v`，54 tests OK。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/app.py Product/backend/manuscript_candidate_service.py Product/backend/results_draft_service.py Product/backend/draft_service.py Product/backend/project_service.py` 通过。
+- 全量回归：`python3 -m unittest discover -s tests -v`，118 tests OK，skipped=1；更新 `Tasks/` 后收尾复查同命令仍为 118 tests OK，skipped=1。
+- API 验收：candidate 当前返回 `export_status=preview_ready`、`writeback_preview_path=Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`、`export_manifest_path=state/product/export_package_manifest.json`、`can_write_back=false`、`export_package` provenance。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-export-preflight-bdd.md`
+- `tests/test_manuscript_consumption.py`
+- `Product/backend/manuscript_candidate_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/export_package_manifest.json`
+- `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`
+
+### 不能重复探索的结论
+
+- Export preflight 不等于 source draft write-back；`can_write_back=false` 仍是刻意边界。
+- `export-preflight` 只允许 `promotion_status=ready_for_export` 的 candidate；未 promote candidate 必须返回 409 `candidate_promotion_required`。
+- Preview 和 manifest 都是 `local_file` 证据；不应只在前端显示导出状态。
+
+### 下一步第一件事
+
+写 P1-O BDD：Review & Export 页面应如何消费 `export_status=preview_ready` 的 candidate，显示最终导出包、docx 预检或显式写回审批。第一版仍不要自动覆盖 `Manuscripts/generated/paper_draft.md`。
+
+### 未解决风险
+
+- Playwright 在 P1-N 最终视觉复验时 transport closed；已用 API、HTML asset 和 JS identifier fallback 复核，但缺少最终截图级验收。
+- `state/product/export_package_manifest.json` 和 preview 文件是本地 runtime artifacts，提交前需决定是否保留、迁移 fixture 或继续 gitignore。
+- 还没有真正 docx export、最终导出包浏览或显式写回审批。
+
+## 2026-05-13 P1-Q Chinese Copy + Archive Interface 交接增量
+
+### 当前目标
+
+把现有产品页面从普通控制台卡片堆叠，升级为中文化的个人研究档案界面：用户进入页面后能看到研究生命周期、当前研究对象、相邻笔记、证据等级和可验收产物，而不是被迫理解英文内部对象名或后端目录。
+
+### 已完成事项
+
+- 新增中文化 BDD：`docs/architecture-v2/codex-phase-p1-chinese-copy-bdd.md`。
+- 新增档案界面 BDD：`docs/architecture-v2/codex-phase-p1-archive-interface-bdd.md`。
+- 新增中文文案测试：`tests/test_frontend_chinese_copy.py`。
+- 新增档案视觉契约测试：`tests/test_archive_interface_visual_contract.py`。
+- 更新 `Product/web/index.html`：静态资源版本为 `20260513-archive1`，增加 `archive-shell`、`个人研究档案`、`本地证据`、右侧 `archive-inspector`、`研究档案`、`相邻笔记`、`证据图例`、`收藏架`。
+- 更新 `Product/web/assets/app.js`：增加 `archivePageNotes`、`mountArchiveInspector()`、`updateArchiveInspector()`，让右侧相邻笔记可切换主工作区并随当前页面更新说明。
+- 更新 `Product/web/assets/styles.css`：新增纸张网格、档案 note、证据 ledger、收藏架、hover、focus-visible、loading、empty、error 等状态样式。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_archive_interface_visual_contract -v` 首次 4 条失败，原因是缺少 `研究档案`、`archive-inspector`、`archive-ledger`、hover/focus/loading/empty/error 状态。
+- 目标测试：`python3 -m unittest tests.test_archive_interface_visual_contract -v`，5 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，132 tests OK，skipped=1。
+- JS 语法：`node --check Product/web/assets/app.js` 通过。
+- Python 编译：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过。
+- 静态服务：`curl http://127.0.0.1:8765/?v=20260513-archive1` 返回新版 HTML 和 asset version。
+- 可视化验收：Browser/IAB 与 Playwright 连接异常后，使用 Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-archive1`；页面显示 `个人研究档案`、右侧 `档案索引`、`相邻笔记`、`证据图例` 和 `收藏架`。点击右侧 `数据与设计` 后，主工作区切换到变量角色编辑器，右侧当前笔记同步为 `数据与设计`。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-chinese-copy-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-archive-interface-bdd.md`
+- `tests/test_frontend_chinese_copy.py`
+- `tests/test_archive_interface_visual_contract.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+
+### 不能重复探索的结论
+
+- 本轮是视觉和信息架构层升级，不改变 P1 后端状态机，不引入 React/Vite/Next。
+- 右侧 `相邻笔记` 第一版是静态导航 + 当前页面高亮，不是真正双向链接数据库。
+- 档案气质参考 Maggie Appleton / Andy Matuschak / read.cv / 豆瓣收藏架，但不得复制原始插画、品牌、文字或完整页面结构。
+- 视觉元素必须服务信息：证据图例、相邻页面、收藏架、当前研究对象说明都必须可解释，不做纯装饰渐变球或空 hero。
+
+### 下一步第一件事
+
+继续 P1-P：显式写回审批或 docx 导出预检。若先做界面细化，应只在当前 archive shell 内迭代真实页面，例如把 Export package、Artifacts、Agents 也改成“档案条目/证据架/审计时间线”，不要重新做 landing page。
+
+### 未解决风险
+
+- 真正 backlinks / graph、可折叠旁注和手绘解释层还没实现。
+- Safari 验收可见浏览器侧边栏，但产品主体渲染正确；Browser/IAB 和 Playwright 本轮连接不稳定。
+- 当前 `archive-inspector` 的收藏架条目仍是静态概览，后续应绑定真实 artifacts/export package 数据。
+
+## 2026-05-13 P1-R Clean Workbench Visual Pass 交接增量
+
+### 当前目标
+
+回应用户指出的“前端页面依然很脏、不够干净”和截图中的变量角色入口重叠问题。保持现有 FastAPI + vanilla 前端，不换框架，先把信息架构和视觉密度清理到可继续开发的状态。
+
+### 已完成事项
+
+- 阅读并参考 JupyterLab 主工作区/侧边栏/属性检查器、Grafana dashboard panel、OpenMetadata 数据资产与质量证据的公开产品文档。
+- 新增 `docs/architecture-v2/codex-phase-p1-clean-workbench-bdd.md`。
+- 新增 `tests/test_clean_workbench_visual_contract.py`，覆盖清洁背景、变量入口无重叠、右侧属性检查器、record/list 替代嵌套大卡片、保留现有技术栈。
+- 修改 `Product/web/index.html`：加入 `clean-workbench-shell`，静态资源版本改为 `20260513-clean1`，右侧文案改为“属性检查器”。
+- 修改 `Product/web/assets/app.js`：重写 `renderVariableRoleWorkflow()` 输出 `research-record-card`、`record-meta-grid`、`research-step-list` 和 `compact-action-row`。
+- 修改 `Product/web/assets/styles.css`：去掉 archive shell 的纸格背景和厚重阴影，新增 clean surface、inspector rail、record/list、长路径换行和单列变量入口布局。
+
+### 已验证证据
+
+- TDD 失败证据：`python3 -m unittest tests.test_clean_workbench_visual_contract -v` 首次 4 失败 1 通过，失败原因符合预期。
+- 目标测试：`python3 -m unittest tests.test_clean_workbench_visual_contract tests.test_archive_interface_visual_contract tests.test_frontend_chinese_copy -v`，15 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，137 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-clean1`，点击右侧“数据与设计”后，变量角色入口显示为单列记录布局，未再出现截图中的文本重叠。
+
+### 不能重复探索的结论
+
+- 当前视觉问题不是要继续加“个人档案感”，而是要把研究工作台做干净、可扫读、可操作。
+- `variable-role-workflow-layout` 不能再使用 `grid-template-columns: minmax(0, 1fr) auto`；长路径和中文说明必须允许换行。
+- 右侧栏应作为属性检查器和相邻记录索引，不应承担大面积装饰。
+
+### 下一步第一件事
+
+继续 P1-P：为 Review & Export 增加显式写回审批或 docx 导出预检的 BDD/TDD。若继续视觉方向，优先清理 Results & Draft / Review & Export 的记录密度和右侧属性检查器联动，而不是添加新装饰。
+
+### 未解决风险
+
+- Browser plugin 和 Playwright MCP 本轮均出现连接/传输问题；已用 Safari + Computer Use 兜底，但还需要后续恢复 Browser 自动化截图链路。
+- P1-R 只做了第一轮清洁视觉 pass；Artifacts / Agents 还没做成完整的证据架和审计时间线。
+- 当前仍有大量 P1 变更处于工作区，提交时需要 scoped stage，避免把 runtime artifacts 或无关状态混入。
+
+## 2026-05-13 P1-R Clean Workbench Visual Pass 交接增量
+
+### 当前目标
+
+回应用户指出的“前端页面依然很脏、不够干净”和截图中的变量角色入口重叠问题。保持现有 FastAPI + vanilla 前端，不换框架，先把信息架构和视觉密度清理到可继续开发的状态。
+
+### 已完成事项
+
+- 阅读并参考 JupyterLab 主工作区/侧边栏/属性检查器、Grafana dashboard panel、OpenMetadata 数据资产与质量证据的公开产品文档。
+- 新增 `docs/architecture-v2/codex-phase-p1-clean-workbench-bdd.md`。
+- 新增 `tests/test_clean_workbench_visual_contract.py`，覆盖清洁背景、变量入口无重叠、右侧属性检查器、record/list 替代嵌套大卡片、保留现有技术栈。
+- 修改 `Product/web/index.html`：加入 `clean-workbench-shell`，静态资源版本改为 `20260513-clean1`，右侧文案改为“属性检查器”。
+- 修改 `Product/web/assets/app.js`：重写 `renderVariableRoleWorkflow()` 输出 `research-record-card`、`record-meta-grid`、`research-step-list` 和 `compact-action-row`。
+- 修改 `Product/web/assets/styles.css`：去掉 archive shell 的纸格背景和厚重阴影，新增 clean surface、inspector rail、record/list、长路径换行和单列变量入口布局。
+
+### 已验证证据
+
+- TDD 失败证据：`python3 -m unittest tests.test_clean_workbench_visual_contract -v` 首次 4 失败 1 通过，失败原因符合预期。
+- 目标测试：`python3 -m unittest tests.test_clean_workbench_visual_contract tests.test_archive_interface_visual_contract tests.test_frontend_chinese_copy -v`，15 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，137 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-clean1`，点击右侧“数据与设计”后，变量角色入口显示为单列记录布局，未再出现截图中的文本重叠。
+
+### 不能重复探索的结论
+
+- 当前视觉问题不是要继续加“个人档案感”，而是要把研究工作台做干净、可扫读、可操作。
+- `variable-role-workflow-layout` 不能再使用 `grid-template-columns: minmax(0, 1fr) auto`；长路径和中文说明必须允许换行。
+- 右侧栏应作为属性检查器和相邻记录索引，不应承担大面积装饰。
+
+### 下一步第一件事
+
+继续 P1-P：为 Review & Export 增加显式写回审批或 docx 导出预检的 BDD/TDD。若继续视觉方向，优先清理 Results & Draft / Review & Export 的记录密度和右侧属性检查器联动，而不是添加新装饰。
+
+### 未解决风险
+
+- Browser plugin 和 Playwright MCP 本轮均出现连接/传输问题；已用 Safari + Computer Use 兜底，但还需要后续恢复 Browser 自动化截图链路。
+- P1-R 只做了第一轮清洁视觉 pass；Artifacts / Agents 还没做成完整的证据架和审计时间线。
+- 当前仍有大量 P1 变更处于工作区，提交时需要 scoped stage，避免把 runtime artifacts 或无关状态混入。
+
+## 2026-05-13 P1-Q Chinese Copy + Archive Interface 交接增量
+
+### 当前目标
+
+把现有产品页面从普通控制台卡片堆叠，升级为中文化的个人研究档案界面：用户进入页面后能看到研究生命周期、当前研究对象、相邻笔记、证据等级和可验收产物，而不是被迫理解英文内部对象名或后端目录。
+
+### 已完成事项
+
+- 新增中文化 BDD：`docs/architecture-v2/codex-phase-p1-chinese-copy-bdd.md`。
+- 新增档案界面 BDD：`docs/architecture-v2/codex-phase-p1-archive-interface-bdd.md`。
+- 新增中文文案测试：`tests/test_frontend_chinese_copy.py`。
+- 新增档案视觉契约测试：`tests/test_archive_interface_visual_contract.py`。
+- 更新 `Product/web/index.html`：静态资源版本为 `20260513-archive1`，增加 `archive-shell`、`个人研究档案`、`本地证据`、右侧 `archive-inspector`、`研究档案`、`相邻笔记`、`证据图例`、`收藏架`。
+- 更新 `Product/web/assets/app.js`：增加 `archivePageNotes`、`mountArchiveInspector()`、`updateArchiveInspector()`，让右侧相邻笔记可切换主工作区并随当前页面更新说明。
+- 更新 `Product/web/assets/styles.css`：新增纸张网格、档案 note、证据 ledger、收藏架、hover、focus-visible、loading、empty、error 等状态样式。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_archive_interface_visual_contract -v` 首次 4 条失败，原因是缺少 `研究档案`、`archive-inspector`、`archive-ledger`、hover/focus/loading/empty/error 状态。
+- 目标测试：`python3 -m unittest tests.test_archive_interface_visual_contract -v`，5 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，132 tests OK，skipped=1。
+- JS 语法：`node --check Product/web/assets/app.js` 通过。
+- Python 编译：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过。
+- 静态服务：`curl http://127.0.0.1:8765/?v=20260513-archive1` 返回新版 HTML 和 asset version。
+- 可视化验收：Browser/IAB 与 Playwright 连接异常后，使用 Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-archive1`；页面显示 `个人研究档案`、右侧 `档案索引`、`相邻笔记`、`证据图例` 和 `收藏架`。点击右侧 `数据与设计` 后，主工作区切换到变量角色编辑器，右侧当前笔记同步为 `数据与设计`。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-chinese-copy-bdd.md`
+- `docs/architecture-v2/codex-phase-p1-archive-interface-bdd.md`
+- `tests/test_frontend_chinese_copy.py`
+- `tests/test_archive_interface_visual_contract.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+
+### 不能重复探索的结论
+
+- 本轮是视觉和信息架构层升级，不改变 P1 后端状态机，不引入 React/Vite/Next。
+- 右侧 `相邻笔记` 第一版是静态导航 + 当前页面高亮，不是真正双向链接数据库。
+- 档案气质参考 Maggie Appleton / Andy Matuschak / read.cv / 豆瓣收藏架，但不得复制原始插画、品牌、文字或完整页面结构。
+- 视觉元素必须服务信息：证据图例、相邻页面、收藏架、当前研究对象说明都必须可解释，不做纯装饰渐变球或空 hero。
+
+### 下一步第一件事
+
+继续 P1-P：显式写回审批或 docx 导出预检。若先做界面细化，应只在当前 archive shell 内迭代真实页面，例如把 Export package、Artifacts、Agents 也改成“档案条目/证据架/审计时间线”，不要重新做 landing page。
+
+### 未解决风险
+
+- 真正 backlinks / graph、可折叠旁注和手绘解释层还没实现。
+- Safari 验收可见浏览器侧边栏，但产品主体渲染正确；Browser/IAB 和 Playwright 本轮连接不稳定。
+- 当前 `archive-inspector` 的收藏架条目仍是静态概览，后续应绑定真实 artifacts/export package 数据。

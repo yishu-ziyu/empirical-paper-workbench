@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from Product.backend.design_spec_service import has_approved_design_spec, has_approved_run_plan
+from Product.backend.variable_role_service import has_approved_variable_role_set
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
 
 
 STATUS_VALUES = {"completed", "in_progress", "blocked", "not_started"}
+DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feather"}
 
 
 def mock_meta(service: str) -> dict[str, str]:
@@ -16,6 +22,14 @@ def mock_meta(service: str) -> dict[str, str]:
         "service": service,
         "generated_at": utc_now(),
         "note": "Phase A skeleton response; not a verified research fact.",
+    }
+
+
+def local_file_meta(service: str) -> dict[str, str]:
+    return {
+        "evidence_level": "local_file",
+        "service": service,
+        "generated_at": utc_now(),
     }
 
 
@@ -30,12 +44,23 @@ def project_identity(project: dict[str, Any]) -> dict[str, str]:
 
 def get_project_overview(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:
     project = get_project_by_id(product_root, repo_root, project_id)
+    root = Path(project.get("project_root") or project["root"]).resolve()
+    dataset_count = count_local_datasets(root)
+    variable_roles_confirmed = has_approved_variable_role_set(root)
+    design_spec_confirmed = has_approved_design_spec(root)
+    run_plan_confirmed = has_approved_run_plan(root)
     return {
         "_meta": mock_meta("overview_service"),
         "project": project_identity(project),
         "research_question": project.get("question", ""),
         "current_stage": "overview",
         "overall_progress": 0.1,
+        "workflow_contract": build_workflow_contract(
+            dataset_count,
+            variable_roles_confirmed,
+            design_spec_confirmed,
+            run_plan_confirmed,
+        ),
         "next_action": {
             "label": "补充数据与变量信息",
             "href": "#view-data-variables",
@@ -87,18 +112,158 @@ def get_project_overview(product_root: Path, repo_root: Path, project_id: str) -
     }
 
 
+def count_local_datasets(root: Path) -> int:
+    data_root = root / "Data"
+    if not data_root.exists():
+        return 0
+    return sum(
+        1
+        for path in data_root.rglob("*")
+        if path.is_file() and path.suffix.lower() in DATASET_SUFFIXES
+    )
+
+
+def build_workflow_contract(
+    dataset_count: int,
+    variable_roles_confirmed: bool = False,
+    design_spec_confirmed: bool = False,
+    run_plan_confirmed: bool = False,
+) -> dict[str, Any]:
+    has_dataset = dataset_count > 0
+    blockers = []
+    if not variable_roles_confirmed:
+        blockers.append("variable_roles_unconfirmed")
+    if not design_spec_confirmed:
+        blockers.append("design_unconfirmed")
+    if not run_plan_confirmed:
+        blockers.append("run_plan_missing")
+    next_action = next_workflow_action(has_dataset, variable_roles_confirmed, design_spec_confirmed, run_plan_confirmed)
+    return {
+        "primary_workspace": "data-design",
+        "canonical_stages": [
+            {
+                "id": "dataset",
+                "name": "Dataset",
+                "workspace": "data-design",
+                "status": "completed" if has_dataset else "blocked",
+            },
+            {
+                "id": "variable_roles",
+                "name": "VariableRoleSet",
+                "workspace": "data-design",
+                "status": "completed"
+                if variable_roles_confirmed
+                else ("requires_confirmation" if has_dataset else "blocked"),
+            },
+            {
+                "id": "research_question",
+                "name": "ResearchQuestion",
+                "workspace": "data-design",
+                "status": "in_progress",
+            },
+            {
+                "id": "design_spec",
+                "name": "DesignSpec",
+                "workspace": "data-design",
+                "status": "completed"
+                if design_spec_confirmed
+                else ("requires_confirmation" if variable_roles_confirmed else "blocked"),
+            },
+            {
+                "id": "run_plan",
+                "name": "RunPlan",
+                "workspace": "execution",
+                "status": "completed"
+                if run_plan_confirmed
+                else ("requires_confirmation" if design_spec_confirmed else "blocked"),
+            },
+            {
+                "id": "run",
+                "name": "Run",
+                "workspace": "execution",
+                "status": "not_started" if run_plan_confirmed else "blocked",
+            },
+            {
+                "id": "results",
+                "name": "Results",
+                "workspace": "results-draft",
+                "status": "not_started",
+            },
+            {
+                "id": "draft",
+                "name": "Draft",
+                "workspace": "results-draft",
+                "status": "not_started",
+            },
+            {
+                "id": "review_export",
+                "name": "Review and Export",
+                "workspace": "review-export",
+                "status": "not_started",
+            },
+        ],
+        "next_action": next_action,
+        "run_readiness": {
+            "can_start_full_run": variable_roles_confirmed and design_spec_confirmed and run_plan_confirmed,
+            "blockers": blockers,
+            "development_shortcut_allowed": True,
+        },
+    }
+
+
+def next_workflow_action(
+    has_dataset: bool,
+    variable_roles_confirmed: bool,
+    design_spec_confirmed: bool,
+    run_plan_confirmed: bool,
+) -> dict[str, str]:
+    if not variable_roles_confirmed:
+        return {
+            "id": "confirm_variable_roles",
+            "label": "检查并确认变量角色",
+            "workspace": "data-design",
+            "view": "data-variables",
+            "reason": "已发现本地数据，但尚未形成可审计 VariableRoleSet。"
+            if has_dataset
+            else "尚未发现可用数据集，需要先放入或选择本地数据文件。",
+        }
+    if not design_spec_confirmed:
+        return {
+            "id": "confirm_design_spec",
+            "label": "确认研究设计",
+            "workspace": "data-design",
+            "view": "research-design",
+            "reason": "变量角色已确认，下一步需要形成可审计 DesignSpec。",
+        }
+    if not run_plan_confirmed:
+        return {
+            "id": "confirm_run_plan",
+            "label": "确认 Run Plan",
+            "workspace": "execution",
+            "view": "empirical-execution",
+            "reason": "研究设计已确认，下一步需要形成可执行、可审计的 RunPlan。",
+        }
+    return {
+        "id": "start_full_run",
+        "label": "启动完整实证执行",
+        "workspace": "execution",
+        "view": "empirical-execution",
+        "reason": "变量角色、研究设计和 RunPlan 均已确认，可以进入完整执行。",
+    }
+
+
 def get_project_journey(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:
     project = get_project_by_id(product_root, repo_root, project_id)
     stages = [
         ("question", "研究问题", "completed", 1.0, "#view-overview"),
         ("data", "数据准备", "in_progress", 0.1, "#view-data-variables"),
         ("variables", "变量定义", "not_started", 0.0, "#view-data-variables"),
-        ("design", "研究设计", "not_started", 0.0, "#view-design"),
-        ("execution", "实证执行", "not_started", 0.0, "#view-execution"),
-        ("robustness", "稳健性", "not_started", 0.0, "#view-execution"),
-        ("manuscript", "论文草稿", "not_started", 0.0, "#view-drafts"),
-        ("review", "审查确认", "not_started", 0.0, "#view-agents"),
-        ("export", "产物复现", "not_started", 0.0, "#view-artifacts"),
+        ("design", "研究设计", "not_started", 0.0, "#view-data-variables"),
+        ("execution", "实证执行", "not_started", 0.0, "#view-empirical-execution"),
+        ("robustness", "稳健性", "not_started", 0.0, "#view-empirical-execution"),
+        ("manuscript", "论文草稿", "not_started", 0.0, "#view-paper-draft"),
+        ("review", "审查确认", "not_started", 0.0, "#view-artifacts-replication"),
+        ("export", "产物复现", "not_started", 0.0, "#view-artifacts-replication"),
     ]
     return {
         "_meta": mock_meta("journey_service"),
@@ -112,15 +277,66 @@ def get_project_journey(product_root: Path, repo_root: Path, project_id: str) ->
 
 def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:
     project = get_project_by_id(product_root, repo_root, project_id)
+    root = Path(project.get("project_root") or project["root"]).resolve()
+    configured_final_dataset = configured_dataset_path(root)
+    items: list[dict[str, Any]] = []
+    data_root = root / "Data"
+    if data_root.exists():
+        for path in sorted(data_root.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in DATASET_SUFFIXES:
+                continue
+            relative_path = path.resolve().relative_to(root).as_posix()
+            stat = path.stat()
+            shape = inspect_dataset_shape(path)
+            items.append(
+                {
+                    "name": path.name,
+                    "path": relative_path,
+                    "file_type": path.suffix.lower().lstrip("."),
+                    "size": stat.st_size,
+                    "row_count": shape["row_count"],
+                    "column_count": shape["column_count"],
+                    "evidence_level": "local_file",
+                    "role": "configured_final_dataset"
+                    if configured_final_dataset == relative_path
+                    else "candidate_dataset",
+                    "updated_at": utc_now(),
+                }
+            )
+
     return {
-        "_meta": mock_meta("dataset_service"),
+        "_meta": local_file_meta("dataset_service"),
         "project": project_identity(project),
-        "items": [],
+        "items": items,
         "empty_state": {
             "title": "尚未登记数据集",
-            "description": "Phase A 只返回可解释空状态；真实上传和 schema 解析留到后续阶段。",
-            "next_action": "在数据与变量页登记数据来源、样本口径和变量字典。",
-        },
+            "description": "已检查项目 Data 目录，当前没有发现 csv/dta/xlsx/parquet 等可识别数据文件。",
+            "next_action": "将数据文件放入 Data/Raw、Data/Interim 或 Data/Final 后刷新。",
+        }
+        if not items
+        else None,
+    }
+
+
+def configured_dataset_path(root: Path) -> str | None:
+    paper_path = root / "paper.yaml"
+    if not paper_path.exists():
+        return None
+    payload = yaml.safe_load(paper_path.read_text(encoding="utf-8")) or {}
+    configured = payload.get("data", {}).get("final_dataset")
+    return str(configured).replace("\\", "/") if configured else None
+
+
+def inspect_dataset_shape(path: Path) -> dict[str, int | None]:
+    if path.suffix.lower() != ".csv":
+        return {"row_count": None, "column_count": None}
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as handle:
+        rows = list(csv.reader(handle))
+    if not rows:
+        return {"row_count": 0, "column_count": 0}
+    return {
+        "row_count": max(len(rows) - 1, 0),
+        "column_count": len(rows[0]),
     }
 
 

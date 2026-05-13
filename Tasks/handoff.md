@@ -906,3 +906,46 @@ P2-D：写 BDD 和失败测试，把 `Results/json/method_execution_result.json`
 - OLS adapter 没有标准误、p 值、稳健标准误、固定效应或聚类。
 - `Results & Draft` 目前仍主要读取 `Results/json/analysis_result.json`；P2-D 应决定是否以 `method_execution_result.json` 作为 Findings 的方法证据源。
 - Playwright MCP 仍返回 `Transport closed`；视觉验收继续使用 Safari + Computer Use fallback。
+
+## 2026-05-13 P2-D Method Execution Evidence UI 交接增量
+
+### 当前目标
+
+让 P2-C 生成的 `Results/json/method_execution_result.json` 不再只是后端产物，而是在“实证执行”和“结果与草稿”中作为可审阅的 `local_execution` 方法证据出现。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-method-execution-ui-bdd.md`。
+- 扩展后端 `Product/backend/observability_service.py`：`load_run_observability()` 返回顶层 `method_execution`，并从 manifest 指向的 artifact JSON 读取真实执行内容。
+- 扩展后端 `Product/backend/results_draft_service.py`：`get_project_results_draft()` 返回顶层 `method_execution`，每个 FindingCard 增加 `method_evidence`。
+- 扩展前端 `Product/web/index.html`：新增“方法执行证据”面板，静态资源版本更新为 `20260513-p2d-method`。
+- 扩展前端 `Product/web/assets/app.js`：新增 `renderObservableMethodExecution()` 和 `renderFindingMethodEvidence()`。
+- 扩展前端 `Product/web/assets/styles.css`：新增方法执行证据面板与 FindingCard 证据块样式。
+- 扩展测试：`tests/test_observable_execution.py`、`tests/test_observable_execution_frontend.py`、`tests/test_results_draft_evidence_binding.py`。
+
+### 已验证证据
+
+- 失败测试先通过 TDD 观察到预期缺口：`method_execution`、`observable-method-execution`、`method_evidence` 均不存在。
+- 目标测试：4 tests OK。
+- Results Draft 回归：10 tests OK。
+- 相邻回归：38 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，161 tests OK，skipped=1。
+- 静态检查：Python 编译、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- API 验收：`observability` 和 `results-draft` 都返回 `engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`、`artifact_path=Results/json/method_execution_result.json`。
+- 可视化验收：Safari + Computer Use 确认“实证执行”页和“结果与草稿”页均能看到方法执行证据。
+
+### 不能重复探索的结论
+
+- `method_execution_result.json` 是方法执行证据；`analysis_result.json` 仍是论文结果摘要证据。两者当前互补，不应互相替代。
+- 当前 OLS 执行器是本地 Python 最小 adapter，不是完整 StatsPAI/Stata 引擎。
+- FindingCard 现在可以显示方法证据，但人工 approve 仍然应该依赖后续 evaluator，而不是只看系数。
+
+### 下一步第一件事
+
+P2-E：为 OLS 方法执行补 evaluator。最小范围是标准误、p 值、样本量、可逆矩阵/共线性、稳健或聚类标准误预检，并把不满足门槛的 finding 标为 `needs_review`。
+
+### 未解决风险
+
+- 方法执行结果尚未包含标准误、p 值、置信区间、固定效应、聚类或稳健标准误。
+- Results/FindingCard 还没有把 evaluator verdict 作为 approve 前置条件。
+- Playwright MCP 仍返回 `Transport closed`，本轮视觉闭环使用 Safari + Computer Use。

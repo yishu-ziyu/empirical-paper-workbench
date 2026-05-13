@@ -158,6 +158,23 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
         self.assertEqual(results_section["evidence_binding"]["artifact_path"], "Results/json/analysis_result.json")
         self.assertEqual(results_section["evidence_binding"]["claim_evidence_level"], "local_execution")
 
+    def test_bdd_9_finding_card_binds_method_execution_evidence(self) -> None:
+        """行为 9：FindingCard 必须绑定 OLS 方法执行适配器产物。"""
+        self._write_successful_full_run("run_test_full_001")
+
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/results-draft")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        finding = response.json()["findings"][0]
+        method_evidence = finding["method_evidence"]
+        self.assertEqual(method_evidence["artifact_path"], "Results/json/method_execution_result.json")
+        self.assertEqual(method_evidence["evidence_level"], "local_execution")
+        self.assertEqual(method_evidence["engine"], "python_ols_adapter")
+        self.assertEqual(method_evidence["method_id"], "ols")
+        self.assertEqual(method_evidence["formula"], "wage ~ trained + edu + experience")
+        self.assertEqual(method_evidence["nobs"], 12)
+        self.assertAlmostEqual(method_evidence["treatment_coefficient"], 1.8505, places=4)
+
     def _write_successful_full_run(self, run_id: str) -> None:
         runs_root = self.project_root / "state" / "runs"
         runs_root.mkdir(parents=True)
@@ -172,10 +189,12 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
             "artifact_count": 2,
             "artifact_paths": [
                 "Results/json/analysis_result.json",
+                "Results/json/method_execution_result.json",
                 "Manuscripts/generated/paper_draft.md",
             ],
             "plan_binding": {"run_plan_version": 1},
             "execution_evidence_level": "local_execution",
+            "method_execution": self._method_execution_payload(run_id),
         }
         (runs_root / f"{run_id}.json").write_text(json.dumps(run), encoding="utf-8")
         (runs_root / "index.json").write_text(
@@ -207,8 +226,13 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
                     "run_id": run_id,
                     "run_plan_binding": {"run_plan_version": 1, "evidence_level": "local_file"},
                     "execution_evidence_level": "local_execution",
+                    "method_execution": self._method_execution_payload(run_id),
                 }
             ),
+            encoding="utf-8",
+        )
+        (self.project_root / "Results" / "json" / "method_execution_result.json").write_text(
+            json.dumps(self._method_execution_payload(run_id)),
             encoding="utf-8",
         )
 
@@ -279,10 +303,36 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        (project_root / "Results" / "json" / "method_execution_result.json").write_text(
+            json.dumps(ResultsDraftEvidenceBindingApiTests._method_execution_payload("run_test_full_001")),
+            encoding="utf-8",
+        )
         (project_root / "Manuscripts" / "generated" / "paper_draft.md").write_text(
             "## Results\n\n- **trained**: 1.8505 (SE = 0.0573)\n\n## Robustness\n\n- Estimate: 1.8505\n",
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _method_execution_payload(run_id: str) -> dict:
+        return {
+            "artifact_path": "Results/json/method_execution_result.json",
+            "engine": "python_ols_adapter",
+            "evidence_level": "local_execution",
+            "methods": [
+                {
+                    "run_id": run_id,
+                    "task_id": "baseline_regression",
+                    "method_id": "ols",
+                    "formula": "wage ~ trained + edu + experience",
+                    "dataset_path": "Data/Final/analysis_sample.csv",
+                    "run_plan_version": 1,
+                    "nobs": 12,
+                    "treatment": "trained",
+                    "treatment_coefficient": 1.8505,
+                    "evidence_level": "local_execution",
+                }
+            ],
+        }
 
 
 class ResultsDraftEvidenceBindingFrontendTests(unittest.TestCase):
@@ -312,6 +362,15 @@ class ResultsDraftEvidenceBindingFrontendTests(unittest.TestCase):
         self.assertIn("can_write_to_draft", self.app_js)
         self.assertIn("可写入正文", self.app_js)
         self.assertIn("run_plan_version", self.app_js)
+
+    def test_bdd_10_results_draft_workspace_shows_method_execution_evidence(self) -> None:
+        """行为 10：前端 FindingCard 必须展示方法执行证据来源。"""
+        self.assertIn("method_evidence", self.app_js)
+        self.assertIn("renderFindingMethodEvidence", self.app_js)
+        self.assertIn("方法执行证据", self.app_js)
+        self.assertIn("methodEvidence.method_id", self.app_js)
+        self.assertIn("methodEvidence.formula", self.app_js)
+        self.assertIn("methodEvidence.treatment_coefficient", self.app_js)
 
 
 if __name__ == "__main__":

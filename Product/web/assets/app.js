@@ -2140,6 +2140,10 @@ function renderObservableExecutionEmpty(message = "当前项目还没有运行�
   if (variableRolesContainer) {
     variableRolesContainer.innerHTML = "<p class='muted'>未记录变量角色。请从数据页选择本地数据后重新启动运行。</p>";
   }
+  const methodExecutionContainer = document.getElementById("observable-method-execution-body");
+  if (methodExecutionContainer) {
+    methodExecutionContainer.innerHTML = "<p class='muted'>尚未生成方法执行证据。完成 full run 后会显示 OLS 执行结果。</p>";
+  }
   document.getElementById("observable-step-board").innerHTML = renderEmptyState({
     title: "暂无可观察阶段",
     description: message,
@@ -2280,6 +2284,55 @@ function renderObservableVariableRoles() {
         ${renderVariableRoleGroup("工具变量", variableRoles.roles.instruments)}
       </div>
     </article>
+  `;
+}
+
+function renderObservableMethodExecution() {
+  const container = document.getElementById("observable-method-execution-body");
+  if (!container) return;
+
+  const observability = state.runObservability;
+  const methodExecution = observability ? observability.method_execution || observability.manifest?.method_execution : null;
+  if (!methodExecution) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>尚未生成方法执行证据</h4>
+        <p class="muted">这个运行没有记录 OLS 方法执行结果。请从已确认执行计划启动完整实证执行。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const methods = methodExecution.methods || [];
+  container.innerHTML = `
+    <div class="method-execution-summary">
+      <div>
+        <span class="meta-label">执行引擎</span>
+        <strong>${escapeHtml(methodExecution.engine || "-")}</strong>
+      </div>
+      <div>
+        <span class="meta-label">产物路径</span>
+        <code>${escapeHtml(methodExecution.artifact_path || "-")}</code>
+      </div>
+      ${renderEvidenceBadge({ evidence_level: methodExecution.evidence_level || "local_execution" })}
+    </div>
+    ${methods.length ? methods.map((method) => `
+      <article class="method-execution-card">
+        <div class="observable-card-head">
+          <div>
+            <strong>${escapeHtml(productTermLabel(method.method_id || method.estimator || "method"))}</strong>
+            <div class="muted">${escapeHtml(method.task_id || "baseline_regression")} · ${escapeHtml(method.dataset_path || "-")}</div>
+          </div>
+          ${renderEvidenceBadge({ evidence_level: method.evidence_level || methodExecution.evidence_level || "local_execution" })}
+        </div>
+        <div class="method-execution-grid">
+          <div><span class="meta-label">模型公式</span><strong>${escapeHtml(method.formula || "-")}</strong></div>
+          <div><span class="meta-label">样本量</span><strong>${escapeHtml(String(method.nobs ?? "-"))}</strong></div>
+          <div><span class="meta-label">处理变量</span><strong>${escapeHtml(method.treatment || "-")}</strong></div>
+          <div><span class="meta-label">处理变量系数</span><strong>${formatNumber(method.treatment_coefficient)}</strong></div>
+        </div>
+      </article>
+    `).join("") : "<p class='muted'>方法执行产物中没有 method item。</p>"}
   `;
 }
 
@@ -2501,6 +2554,7 @@ function renderObservableExecution() {
   renderObservableRunHeader();
   renderObservableDatasetSource();
   renderObservableVariableRoles();
+  renderObservableMethodExecution();
   renderObservableSteps();
   renderObservableEvents();
   renderObservableGates();
@@ -2521,6 +2575,7 @@ function handleMissingRunObservability(runId) {
   document.getElementById("observable-run-evidence").innerHTML = renderEvidenceBadge({ evidence_level: "local_file" });
   renderObservableDatasetSource();
   renderObservableVariableRoles();
+  renderObservableMethodExecution();
 
   document.getElementById("observable-step-board").innerHTML = `
     <div class="empty-state">
@@ -3458,6 +3513,7 @@ function renderResultsDraftEvidence() {
           运行：${escapeHtml(finding.run_id)} · 执行计划版本：${escapeHtml(String(finding.run_plan_version || "-"))}
         </div>
         <div class="muted evidence-line">${escapeHtml(finding.artifact_path || "")}</div>
+        ${renderFindingMethodEvidence(finding.method_evidence)}
         ${renderFindingReviewPanel(finding)}
       </article>
     `).join("")
@@ -3484,6 +3540,34 @@ function renderResultsDraftEvidence() {
       `;
     }).join("")
     : "<p class='muted'>尚未发现可绑定的草稿章节。</p>";
+}
+
+function renderFindingMethodEvidence(methodEvidence) {
+  if (!methodEvidence) {
+    return `
+      <div class="finding-method-evidence is-empty">
+        <strong>方法执行证据</strong>
+        <span class="muted">尚未绑定 method_execution_result.json。</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="finding-method-evidence">
+      <div class="card-row">
+        <strong>方法执行证据</strong>
+        ${renderEvidenceBadge({ evidence_level: methodEvidence.evidence_level })}
+      </div>
+      <div class="method-evidence-grid">
+        <div><span class="meta-label">方法</span><strong>${escapeHtml(productTermLabel(methodEvidence.method_id || "-"))}</strong></div>
+        <div><span class="meta-label">样本量</span><strong>${escapeHtml(String(methodEvidence.nobs ?? "-"))}</strong></div>
+        <div><span class="meta-label">处理变量系数</span><strong>${formatNumber(methodEvidence.treatment_coefficient)}</strong></div>
+        <div><span class="meta-label">执行引擎</span><strong>${escapeHtml(methodEvidence.engine || "-")}</strong></div>
+      </div>
+      <div class="muted evidence-line">公式：${escapeHtml(methodEvidence.formula || "-")}</div>
+      <div class="muted evidence-line">${escapeHtml(methodEvidence.artifact_path || "")}</div>
+    </div>
+  `;
 }
 
 function renderManuscriptCandidates() {

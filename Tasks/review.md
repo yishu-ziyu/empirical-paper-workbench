@@ -348,3 +348,33 @@
 - P2-C 已完成最小本地 OLS 执行证据，但它不是完整 StatsPAI/Stata 引擎；当前没有稳健标准误、p 值、固定效应、聚类或模型诊断。
 - `Results & Draft` 仍主要读取 `Results/json/analysis_result.json`；P2-D 应把 `method_execution_result.json` 接入 Execution / Findings。
 - DID/IV/RDD/PSM/DML 仍不能执行；后续每个方法都需要独立 BDD/TDD 和真实产物。
+
+## 2026-05-13 P2-D Method Execution Evidence UI
+
+### 行为覆盖
+
+- [x] Observability API 暴露顶层 `method_execution`，证据等级为 `local_execution`。
+- [x] “实证执行”页面显示方法执行证据，包含 adapter、artifact、公式、样本量、处理变量和系数。
+- [x] 缺少方法执行产物时，页面显示可恢复空状态，不伪造执行证据。
+- [x] Results & Draft API 把方法执行证据绑定到 FindingCard。
+- [x] “结果与草稿”页面的结果论断卡显示方法证据来源。
+
+### 测试覆盖
+
+- 测试文件：`tests/test_observable_execution.py`、`tests/test_observable_execution_frontend.py`、`tests/test_results_draft_evidence_binding.py`。
+- 目标测试：4 OK。
+- Results Draft 回归：10 OK。
+- 相邻回归：38 OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，161 OK，skipped=1。
+- 静态检查：Python 编译、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+
+### 手动验收
+
+- API：`/observability` 和 `/results-draft` 都返回 `engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`。
+- 页面：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2d-method`，点击“实证执行”可见方法执行证据；点击“结果与草稿”可见 FindingCard 方法证据。
+
+### 剩余风险
+
+- 方法执行结果还没有标准误、p 值、置信区间、稳健或聚类标准误。
+- Finding approve 还没有强制依赖 evaluator verdict。
+- Playwright MCP 本轮仍为 `Transport closed`，视觉验收使用 Safari + Computer Use fallback。

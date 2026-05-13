@@ -3298,6 +3298,65 @@ select:focus-visible {
   min-width: min(260px, 100%);
 }
 
+.observable-method-execution {
+  border-left: 3px solid rgba(37, 77, 114, 0.42);
+}
+
+.observable-method-execution-body,
+.method-execution-card,
+.finding-method-evidence {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.method-execution-summary {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.method-execution-summary code,
+.finding-method-evidence code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.method-execution-card,
+.finding-method-evidence {
+  padding: 12px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #fafbf8;
+}
+
+.finding-method-evidence {
+  margin-top: 12px;
+}
+
+.finding-method-evidence.is-empty {
+  border-style: dashed;
+}
+
+.method-execution-grid,
+.method-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.method-execution-grid strong,
+.method-evidence-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
 .archive-ledger,
 .workflow-spine,
 .stage-summary-grid,
@@ -3372,6 +3431,12 @@ select:focus-visible {
   }
 
   .record-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .method-execution-summary,
+  .method-execution-grid,
+  .method-evidence-grid {
     grid-template-columns: 1fr;
   }
 

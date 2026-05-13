@@ -392,3 +392,32 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260513-p2b-clean`
 
 说明：Safari + Computer Use 验收确认“工具：研究设计细节”页显示 `方法技能集`、`StatsPAI/CoPaper methodology index`、OLS/PSM/DML ready、DID/IV/RDD blocked 和对应阻塞原因；当前是 `local_file` 方法准入目录，不是 StatsPAI 真实执行。
+
+## 2026-05-13 P2-D Method Execution Evidence UI
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-method-execution-ui-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_observable_execution.py`
+- `tests/test_observable_execution_frontend.py`
+- `tests/test_results_draft_evidence_binding.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/observability_service.py`：读取 run manifest / `Results/json/method_execution_result.json`，在 run observability response 中暴露顶层 `method_execution`。
+- `Product/backend/results_draft_service.py`：读取同一方法执行产物，在 results-draft response 中暴露顶层 `method_execution`，并为 FindingCard 增加 `method_evidence`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：新增 `observable-method-execution` 面板，静态资源版本更新到 `20260513-p2d-method`。
+- `Product/web/assets/app.js`：新增 `renderObservableMethodExecution()` 和 `renderFindingMethodEvidence()`，把方法、公式、样本量、处理变量系数、执行引擎和 artifact 路径渲染到页面。
+- `Product/web/assets/styles.css`：新增方法执行证据面板、方法证据网格和 FindingCard 方法证据样式。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p2d-method`
+
+说明：Safari + Computer Use 验收确认“实证执行”页显示 `方法执行证据`、`python_ols_adapter`、`wage ~ trained + edu + experience`、样本量 `12`、处理变量系数 `1.8505`、`Results/json/method_execution_result.json`；“结果与草稿”页的结果论断卡也显示同一方法证据。

@@ -49,13 +49,15 @@ def get_project_results_draft(product_root: Path, repo_root: Path, project_id: s
     analysis_result = json.loads(result_path.read_text(encoding="utf-8"))
     manifest = load_manifest(root, run["id"])
     plan_binding = run.get("plan_binding") or manifest.get("run_plan_binding") or {}
-    findings = apply_finding_reviews(root, build_findings(run, analysis_result, plan_binding))
+    method_execution = load_method_execution(root, run, manifest)
+    findings = apply_finding_reviews(root, build_findings(run, analysis_result, plan_binding, method_execution))
     return {
         "_meta": local_execution_meta("results_draft_service"),
         "project_id": project_id,
         "latest_run_id": run["id"],
         "run_plan_version": plan_binding.get("run_plan_version"),
         "result_artifact": artifact_reference(root, RESULT_ARTIFACT_PATH, "local_execution"),
+        "method_execution": method_execution,
         "draft_artifact": artifact_reference(root, DRAFT_ARTIFACT_PATH, "local_file"),
         "findings": findings,
         "draft_sections": build_draft_sections(root, run, plan_binding),
@@ -132,6 +134,30 @@ def load_manifest(project_root: Path, run_id: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_method_execution(project_root: Path, run: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any] | None:
+    method_execution = run.get("method_execution") or manifest.get("method_execution")
+    if not method_execution:
+        return None
+
+    artifact_path = method_execution.get("artifact_path")
+    if artifact_path:
+        path = project_root / artifact_path
+        if path.exists():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload.setdefault("artifact_path", artifact_path)
+            payload.setdefault("engine", method_execution.get("engine"))
+            payload.setdefault("evidence_level", method_execution.get("evidence_level", "local_execution"))
+            payload.setdefault("methods", method_execution.get("methods", []))
+            return payload
+
+    return {
+        "artifact_path": artifact_path,
+        "engine": method_execution.get("engine"),
+        "evidence_level": method_execution.get("evidence_level", "local_execution"),
+        "methods": method_execution.get("methods", []),
+    }
+
+
 def artifact_reference(project_root: Path, relative_path: str, evidence_level: str) -> dict[str, Any]:
     path = project_root / relative_path
     return {
@@ -186,7 +212,12 @@ def matching_review(finding: dict[str, Any], review: dict[str, Any] | None) -> d
     return review
 
 
-def build_findings(run: dict[str, Any], analysis_result: dict[str, Any], plan_binding: dict[str, Any]) -> list[dict[str, Any]]:
+def build_findings(
+    run: dict[str, Any],
+    analysis_result: dict[str, Any],
+    plan_binding: dict[str, Any],
+    method_execution: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     result_payload = analysis_result.get("result_payload") or {}
     coefficients = result_payload.get("coefficients") or {}
     treatment = (
@@ -214,8 +245,39 @@ def build_findings(run: dict[str, Any], analysis_result: dict[str, Any], plan_bi
             "p_value": coefficient.get("p_value"),
             "conf_low": coefficient.get("conf_low"),
             "conf_high": coefficient.get("conf_high"),
+            "method_evidence": build_method_evidence(treatment, method_execution),
         }
     ]
+
+
+def build_method_evidence(treatment: str, method_execution: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not method_execution:
+        return None
+
+    methods = method_execution.get("methods") or []
+    method = next(
+        (
+            item
+            for item in methods
+            if item.get("treatment") == treatment or treatment in (item.get("coefficients") or {})
+        ),
+        methods[0] if methods else None,
+    )
+    if not method:
+        return None
+
+    return {
+        "artifact_path": method_execution.get("artifact_path"),
+        "engine": method_execution.get("engine"),
+        "evidence_level": method.get("evidence_level") or method_execution.get("evidence_level", "local_execution"),
+        "method_id": method.get("method_id") or method.get("estimator"),
+        "formula": method.get("formula"),
+        "dataset_path": method.get("dataset_path"),
+        "run_plan_version": method.get("run_plan_version"),
+        "nobs": method.get("nobs"),
+        "treatment": method.get("treatment") or treatment,
+        "treatment_coefficient": method.get("treatment_coefficient"),
+    }
 
 
 def first_treatment_name(coefficients: dict[str, Any]) -> str | None:

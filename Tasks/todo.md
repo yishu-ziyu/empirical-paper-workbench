@@ -333,4 +333,15 @@
 - [x] 验证：目标测试 5 OK；相邻回归 20 OK；全量回归 157 OK，skipped=1；Python 编译和 JS 语法检查通过。
 - [x] API 验收：真实项目 `POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_4c62f1721afb`，status=`succeeded`，`plan_binding.tasks[0].method_id=ols`，`method_execution.evidence_level=local_execution`，`treatment_coefficient=1.8505076803`。
 - [x] 可视化验收：Safari + Computer Use 打开本地页面，研究设计细节页可正常加载；P2-C 为后端执行证据能力，下一步需要把 `method_execution` 更清晰地接入 Execution / Findings UI。
-- [ ] P2-D：把 `Results/json/method_execution_result.json` 接入 Execution / Findings，把 OLS 结果作为方法执行证据展示，而不是只停留在 API response。
+- [x] P2-D：把 `Results/json/method_execution_result.json` 接入 Execution / Findings，把 OLS 结果作为方法执行证据展示，而不是只停留在 API response。
+
+## 2026-05-13 P2-D Method Execution Evidence UI
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-method-execution-ui-bdd.md`，定义方法执行证据在 observability、Execution 页面和 Results/FindingCard 中必须可见。
+- [x] TDD：扩展 `tests/test_observable_execution.py`、`tests/test_observable_execution_frontend.py`、`tests/test_results_draft_evidence_binding.py`；首次失败原因符合预期：后端缺少 `method_execution`，前端缺少 `observable-method-execution` 和 FindingCard 方法证据渲染。
+- [x] 实现：扩展 `Product/backend/observability_service.py` 和 `Product/backend/results_draft_service.py`，从 run manifest / artifact 读取 `Results/json/method_execution_result.json`，并把方法、公式、样本量、处理变量系数和证据等级返回给页面。
+- [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，在“实证执行”新增“方法执行证据”，在“结果与草稿”的 FindingCard 内新增方法执行证据块。
+- [x] 验证：目标测试 4 OK；Results Draft 回归 10 OK；相邻回归 38 OK；全量回归 161 OK，skipped=1；Python 编译、`node --check` 和 `git diff --check` 通过。
+- [x] API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/runs/run_4c62f1721afb/observability` 和 `/results-draft` 均返回 `method_execution.evidence_level=local_execution`、`engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`。
+- [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2d-method`，在“实证执行”和“结果与草稿”均可看到 OLS 方法执行证据、artifact 路径、公式、样本量和处理变量系数。
+- [ ] P2-E：扩展方法执行 evaluator，至少补齐标准误、p 值、稳健/聚类标准误预检，并把不满足条件的结果放入 `needs_review` 而不是直接进入论断。

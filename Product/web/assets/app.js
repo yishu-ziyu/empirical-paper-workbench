@@ -2856,6 +2856,7 @@ function renderDataVariables() {
 
   const items = data.items || [];
   document.getElementById("datasets-count").textContent = items.length;
+  renderExternalDataLibrary(data.external_catalog);
   renderVariableRoleWorkflow(items);
   renderDatasetQualityProfile(items);
 
@@ -2880,6 +2881,78 @@ function renderDataVariables() {
       </div>
     `).join("");
   }
+}
+
+function renderExternalDataLibrary(catalog) {
+  const container = document.getElementById("external-datasets-list");
+  const count = document.getElementById("external-datasets-count");
+  if (!container) return;
+
+  if (!catalog || !catalog.exists) {
+    if (count) count.textContent = "0";
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>尚未找到真实数据仓库</h4>
+        <p class="muted">可通过 EMPIRICAL_DATA_LIBRARY_ROOT 指向本机实证数据库目录。这里是候选池，不会修改原始数据。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const items = catalog.items || [];
+  const visibleItems = items.slice(0, 6);
+  if (count) count.textContent = String(catalog.total_count ?? items.length);
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>${escapeHtml(catalog.empty_state?.title || "真实数据仓库为空")}</h4>
+        <p class="muted">${escapeHtml(catalog.empty_state?.description || "没有发现可识别的数据文件。")}</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="external-library-note">
+      <div>
+        <span class="eyebrow">真实数据候选池 · 只读</span>
+        <strong>${escapeHtml(catalog.root || "实证数据库")}</strong>
+      </div>
+      <p class="muted">这些是真实数据资产，需要导入或绑定到当前项目后，才会进入变量确认、研究设计和执行。</p>
+    </div>
+    <div class="external-dataset-grid">
+      ${visibleItems.map((item) => renderExternalDatasetCard(item)).join("")}
+    </div>
+    ${(catalog.total_count || 0) > visibleItems.length ? `
+      <p class="muted external-catalog-limit">已显示前 ${visibleItems.length} 个候选文件，共发现 ${catalog.total_count} 个。</p>
+    ` : ""}
+  `;
+}
+
+function renderExternalDatasetCard(item) {
+  const profile = item.quality_profile || {};
+  const profileLine = profile.supported
+    ? `${profile.row_count ?? "-"} 行预览 · ${profile.column_count ?? "-"} 列 · 缺失率 ${formatQualityRate(profile.missing_rate)}`
+    : "暂未解析内容，仅登记文件与来源";
+  return `
+    <article class="external-dataset-card">
+      <div class="external-dataset-card-head">
+        <div>
+          <span class="eyebrow">${escapeHtml(item.collection || "真实数据")}</span>
+          <strong>${escapeHtml(item.name || "候选数据")}</strong>
+        </div>
+        ${renderEvidenceBadge(item)}
+      </div>
+      <p class="muted">${escapeHtml(profileLine)}</p>
+      <div class="external-dataset-meta">
+        <span>${escapeHtml((item.file_type || "unknown").toUpperCase())}</span>
+        <span>${formatBytes(item.size)}</span>
+        <span>${escapeHtml(qualityReadinessLabel(profile.readiness_status))}</span>
+        <span>只读</span>
+      </div>
+      <code>${escapeHtml(item.relative_path || item.path || "")}</code>
+    </article>
+  `;
 }
 
 function renderDatasetQualityProfile(items) {
@@ -3007,6 +3080,15 @@ function formatQualityRate(value) {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) return escapeHtml(String(value));
   return `${Math.round(numeric * 1000) / 10}%`;
+}
+
+function formatBytes(value) {
+  const size = Number(value);
+  if (!Number.isFinite(size)) return "-";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 102.4) / 10} KB`;
+  if (size < 1024 * 1024 * 1024) return `${Math.round(size / 1024 / 102.4) / 10} MB`;
+  return `${Math.round(size / 1024 / 1024 / 102.4) / 10} GB`;
 }
 
 function renderVariableRoleWorkflow(items) {

@@ -408,3 +408,32 @@
 - 当前 OLS 标准误不是 robust/clustered；下一轮若进入真实论文口径，应先增加稳健/聚类标准误选项和 evaluator 阻断条件。
 - 当前真实数据仍主要使用项目内 `Data/Final/analysis_sample.csv` 样例；用户提供的 `/Users/mahaoxuan/Desktop/实证数据库` 已初步确认包含 `CHARLS.csv`、CFPS、CLDS、CGSS 等材料，下一轮应选一个可解析数据源做真实数据接入验收。
 - Playwright MCP 本轮仍不稳定；视觉验收继续使用 Safari + Computer Use fallback。
+
+## 2026-05-13 P2-F Real Data Candidate Pool
+
+### 行为覆盖
+
+- [x] datasets API 返回只读 `external_catalog`，不把外部文件混入项目内 `items`。
+- [x] 外部 CSV 候选数据返回最多 200 行轻量质量画像，证据等级为 `local_file`。
+- [x] DTA 等暂未画像格式仍保留在候选池，并明确 `readiness_status=not_profiled`。
+- [x] “数据与设计”页面把真实数据候选池和当前项目数据分开展示。
+- [x] 未配置真实数据库时，前端提供空状态，不伪造数据。
+
+### 测试覆盖
+
+- 目标测试：`python3 -m unittest tests.test_external_data_catalog -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，11 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，170 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `external_catalog.exists=true`、`root=/Users/mahaoxuan/Desktop/实证数据库`、`total_count=223`、`items[0].evidence_level=local_file`。
+- 页面：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`，点击“数据与设计”，可见 `真实数据候选池`、`223`、真实根目录、6 张 CFPS 候选卡、`本地文件`、`尚未画像`、`只读`。
+- Browser 插件路径：Node REPL 连接 in-app Browser 超时；本轮可视化验收使用 Safari + Computer Use fallback。
+
+### 剩余风险
+
+- 当前仅 CSV 做轻量预览画像；DTA/XLSX/Parquet 只登记文件，不读取变量字典。
+- 外部候选数据还不能导入或绑定到当前项目；变量角色、RunPlan 和 OLS 执行仍使用 `Data/Final/analysis_sample.csv`。
+- 下一步 P2-G 需要显式导入/绑定预检：记录来源路径、目标路径、复制/链接策略、证据等级、用户动作和失败原因。

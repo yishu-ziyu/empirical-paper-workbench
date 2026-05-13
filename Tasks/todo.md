@@ -356,4 +356,16 @@
 - [x] 验证：目标测试 19 OK；全量回归 165 OK，skipped=1；Python 编译、`node --check Product/web/assets/app.js` 和 `git diff --check` 通过。
 - [x] API 验收：真实 full run `run_a3674e9e78c6` succeeded；`p_value_trained=8.83354660202e-133`、`standard_error_trained=0.0754664205`、`evaluator_status=passed`，四项 evaluator checks 全部 passed。
 - [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，点击“结果与草稿”，结果论断卡显示 `ols · n=12 · β=1.8505 · 标准误=0.0755 · p=8.83e-133 · 95% 置信区间 1.7026 ~ 1.9984 · 评估器通过`。
-- [ ] P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 中的真实数据源做数据接入验收，优先挑选一个小型 CSV 或可快速解析样本，把真实数据 profiling 接到 Data & Design。
+- [x] P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 中的真实数据源做数据接入验收，先以只读候选池方式把真实数据 inventory/profile 接到 Data & Design。
+
+## 2026-05-13 P2-F Real Data Candidate Pool
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-real-data-catalog-bdd.md`，定义真实数据仓库必须以只读候选池进入产品，而不是直接伪装成项目内数据。
+- [x] TDD：新增 `tests/test_external_data_catalog.py`；首次失败覆盖 `external_catalog` 缺失、外部 CSV 画像缺失、DTA 可见性缺失和前端候选池面板缺失。
+- [x] 实现：扩展 `Product/backend/overview_service.py`，`GET /datasets` 返回 `external_catalog`；默认读取 `/Users/mahaoxuan/Desktop/实证数据库`，也可用 `EMPIRICAL_DATA_LIBRARY_ROOT` 覆盖。
+- [x] 实现：外部候选数据全部标记 `evidence_level=local_file`、`read_only=true`、`role=external_candidate_dataset`；CSV 做最多 200 行轻量预览画像，DTA/XLSX/Parquet 等暂标 `not_profiled` 但保留可见。
+- [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，在“数据与设计”页新增 `真实数据候选池`，与项目内 `analysis_sample.csv` 分开展示；首屏只渲染 6 张候选卡，避免重新拥挤。
+- [x] 真实数据验收：本机 `/Users/mahaoxuan/Desktop/实证数据库` 扫描到 223 个候选数据文件；Safari 页面显示 CFPS DTA 文件、`本地文件`、`尚未画像`、`只读` 和真实根目录。
+- [x] 验证：目标测试 5 OK；相邻数据画像测试 11 OK；全量回归 170 OK，skipped=1；Python 编译、`node --check`、`git diff --check` 通过。
+- [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow，并同步 `Tasks/` 到 `tasks/`。
+- [ ] P2-G：设计“从真实候选池导入/绑定数据集”的显式预检。导入前必须记录来源、目标路径、文件大小、证据等级和用户动作；不能直接把外部原始数据当成当前项目数据。

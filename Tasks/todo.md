@@ -310,4 +310,15 @@
 - [x] 中文化修正：扩展 `tests/test_frontend_chinese_copy.py`，防止 `dataset_quality_profile` / `confirm_variable_roles` 这类内部标签重新出现在可见 eyebrow 文案。
 - [x] 验证：`python3 -m unittest discover -s tests -v`，148 tests OK，skipped=1；Python 编译检查通过；`node --check Product/web/assets/app.js` 通过。
 - [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2a`，进入“数据与设计”后可见 `analysis_sample.csv`、`数据质量画像`、样本 12、缺失率 0%、字段画像和中文标签；布局不再出现两列挤压。
-- [ ] P2-B：设计 StatsPAI/CoPaper 式方法技能集目录，把 OLS/DID/IV/RDD/PSM/DML 等方法的前置变量要求和可执行状态接入 RunPlan。
+- [x] P2-B：设计 StatsPAI/CoPaper 式方法技能集目录，把 OLS/DID/IV/RDD/PSM/DML 等方法的前置变量要求和可执行状态接入 RunPlan。
+
+## 2026-05-13 P2-B Method Skill Catalog
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-method-skill-catalog-bdd.md`，定义 RunPlan 必须暴露方法技能集、前置变量、阻塞原因和默认可执行方法。
+- [x] TDD：新增 `tests/test_method_skill_catalog.py`；首次运行失败原因是 RunPlan 缺少 `method_catalog`、任务缺少 `method_id`、前端缺少 `method-skill-catalog-panel`。
+- [x] 实现：扩展 `Product/backend/design_spec_service.py`，从已确认 DesignSpec / VariableRoleSet 派生 OLS、DID、IV、RDD、PSM、DML 方法目录；所有条目标记 `evidence_level=local_file`。
+- [x] 实现：默认 RunPlan 只加入当前 ready 的 OLS baseline 任务，DID/IV/RDD 等方法只展示阻塞原因，不伪装为已执行。
+- [x] 前端：研究设计页新增“方法技能集”，显示 StatsPAI/CoPaper 前置条件、方法可执行状态、执行者、证据等级、前置要求和阻塞原因。
+- [x] 视觉修正：方法目录改为纵向 clean workbench 证据清单，避免双列卡片在 Safari 中继续拥挤。
+- [x] 验证：`python3 -m unittest discover -s tests -v`，152 tests OK，skipped=1；Python 编译和 JS 语法检查通过；API / Safari 可视化验收通过。
+- [ ] P2-C：把方法目录推进到真实方法执行适配器设计，优先选择一个最小 OLS/StatsPAI/Stata 执行路径，并把结果写成 `local_execution` 证据。

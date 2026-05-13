@@ -1975,6 +1975,12 @@ function productTermLabel(value) {
     "Agent 控制台": "智能体控制台",
     start_full_run: "启动完整执行",
     START_FULL_RUN: "启动完整执行",
+    missing_outcome: "缺少结果变量",
+    missing_treatment: "缺少处理变量",
+    missing_instrument: "缺少工具变量",
+    missing_panel_time: "缺少面板或时间变量",
+    missing_running_variable: "缺少断点运行变量",
+    missing_covariates: "缺少协变量",
   };
   if (exact[text]) return exact[text];
   return text
@@ -3130,6 +3136,83 @@ function renderDesignSpecEditor() {
   document.getElementById("design-spec-save-status").textContent = state.savingDesignSpec ? "保存中..." : "";
 }
 
+function methodReadinessLabel(status) {
+  return {
+    ready: "可进入执行计划",
+    blocked: "前置条件不足",
+    needs_review: "需要人工复核",
+  }[status] || productTermLabel(status || "unknown");
+}
+
+function requirementStatusLabel(status) {
+  return status === "present" ? "已具备" : "缺失";
+}
+
+function renderMethodRequirement(requirement) {
+  const values = requirement.values || [];
+  return `
+    <li class="method-requirement ${requirement.status === "present" ? "is-present" : "is-missing"}">
+      <span>${escapeHtml(requirement.label || requirement.id || "")}</span>
+      <strong>${escapeHtml(requirementStatusLabel(requirement.status))}</strong>
+      ${values.length ? `<small>${escapeHtml(values.join(", "))}</small>` : ""}
+    </li>
+  `;
+}
+
+function renderMethodSkillCatalog() {
+  const container = document.getElementById("method-skill-catalog-body");
+  if (!container) return;
+
+  const catalog = state.runPlanData?.run_plan?.method_catalog || null;
+  if (!catalog) {
+    container.innerHTML = renderEmptyState({
+      title: "方法技能集尚未生成",
+      description: "需要先确认变量角色和研究设计方案，系统才会生成 OLS、DID、IV、RDD、PSM、DML 的前置条件目录。",
+    });
+    return;
+  }
+
+  const methods = catalog.methods || [];
+  container.innerHTML = `
+    <div class="method-catalog-summary">
+      <div>
+        <span class="eyebrow">方法技能集</span>
+        <h4>${escapeHtml(catalog.source || "StatsPAI/CoPaper methodology index")}</h4>
+        <p class="muted">这里只做方法前置条件判断，不代表已经执行 StatsPAI。</p>
+      </div>
+      ${renderEvidenceBadge({ evidence_level: catalog.evidence_level || "local_file" })}
+    </div>
+    <div class="method-skill-list">
+      ${methods.map((method) => `
+        <article class="method-skill-card ${method.readiness_status === "ready" ? "is-ready" : "is-blocked"}">
+          <div class="method-skill-card-head">
+            <div>
+              <strong>${escapeHtml(method.label || method.id || "")}</strong>
+              <p class="muted">${escapeHtml(method.summary || "")}</p>
+            </div>
+            <span class="status-chip ${method.readiness_status === "ready" ? "is-ready" : "is-blocked"}">
+              ${escapeHtml(methodReadinessLabel(method.readiness_status))}
+            </span>
+          </div>
+          <div class="method-skill-meta">
+            <span>${escapeHtml(method.statspai_method || "")}</span>
+            <span>执行者：${escapeHtml(method.agent_role || "")}</span>
+            <span>证据：${escapeHtml(method.evidence_level || "local_file")}</span>
+          </div>
+          <ul class="method-requirement-list">
+            ${(method.requirements || []).map(renderMethodRequirement).join("")}
+          </ul>
+          ${method.blockers?.length ? `
+            <div class="method-blockers">
+              阻塞原因：${method.blockers.map((blocker) => escapeHtml(productTermLabel(blocker))).join("、")}
+            </div>
+          ` : ""}
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
 async function handleSaveDesignSpec(event) {
   event.preventDefault();
   if (!state.selectedProjectId) return;
@@ -3158,8 +3241,14 @@ async function handleSaveDesignSpec(event) {
   try {
     await v2api.designSpec.save(state.selectedProjectId, payload);
     state.designSpecData = await v2api.designSpec.get(state.selectedProjectId);
+    try {
+      state.runPlanData = await v2api.runPlan.get(state.selectedProjectId);
+    } catch (error) {
+      state.runPlanData = null;
+    }
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
     renderDesignSpecEditor();
+    renderMethodSkillCatalog();
     renderWorkflowContract(state.overviewData.workflow_contract);
     document.getElementById("design-spec-save-status").textContent = "已保存";
   } catch (error) {
@@ -3250,6 +3339,7 @@ function renderResearchDesign() {
   }
 
   renderDesignSpecEditor();
+  renderMethodSkillCatalog();
 
   // Question
   document.getElementById("design-question").innerHTML = `
@@ -4206,6 +4296,11 @@ async function loadV2Data(viewName) {
         state.overviewData = await v2api.overview.get(projectId);
         state.designData = await v2api.design.get(projectId);
         state.designSpecData = await v2api.designSpec.get(projectId);
+        try {
+          state.runPlanData = await v2api.runPlan.get(projectId);
+        } catch (error) {
+          state.runPlanData = null;
+        }
         renderResearchDesign();
         break;
       case "paper-draft":

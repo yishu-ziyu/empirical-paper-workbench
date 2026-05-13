@@ -826,3 +826,43 @@ P1-P：围绕“显式写回审批”或“docx 导出预检”写 BDD，再写�
 - 真正 backlinks / graph、可折叠旁注和手绘解释层还没实现。
 - Safari 验收可见浏览器侧边栏，但产品主体渲染正确；Browser/IAB 和 Playwright 本轮连接不稳定。
 - 当前 `archive-inspector` 的收藏架条目仍是静态概览，后续应绑定真实 artifacts/export package 数据。
+## 2026-05-13 P2-B Method Skill Catalog 交接增量
+
+### 当前目标
+
+把 CoPaper/StatsPAI 的“方法技能集”思想接入本项目的 RunPlan 前置层：用户在执行前能看到 OLS、DID、IV、RDD、PSM、DML 哪些方法具备条件，哪些缺少变量，哪些只能作为候选而不能执行。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-method-skill-catalog-bdd.md`。
+- 新增测试：`tests/test_method_skill_catalog.py`，覆盖 API 方法目录、阻塞原因、默认 RunPlan task 和前端面板。
+- 修改 `Product/backend/design_spec_service.py`：新增 `method_catalog` 构建逻辑；默认 `baseline_regression` task 带 `method_id=ols`；DID/IV/RDD 等缺前置条件时只进入目录，不进入执行任务。
+- 修改 `Product/web/index.html`：研究设计页新增 `method-skill-catalog-panel`，静态资源版本为 `20260513-p2b-clean`。
+- 修改 `Product/web/assets/app.js`：研究设计页读取 RunPlan，渲染方法技能集、要求状态和阻塞原因。
+- 修改 `Product/web/assets/styles.css`：新增方法目录样式，并把方法卡片改成纵向单列，避免拥挤和 `auto` 列重叠。
+
+### 已验证证据
+
+- 失败测试：`python3 -m unittest tests.test_method_skill_catalog -v` 首次失败，原因符合预期：缺少 `method_catalog`、`method_id` 和前端面板。
+- 目标测试：`python3 -m unittest tests.test_method_skill_catalog tests.test_clean_workbench_visual_contract -v`，9 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，152 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/design_spec_service.py Product/app.py Product/backend/project_service.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/run-plan` 返回 `method_catalog`；OLS/PSM/DML 为 `ready`，DID 阻塞 `missing_panel_time`，IV 阻塞 `missing_instrument`，RDD 阻塞 `missing_running_variable`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2b-clean`，点击“工具：研究设计细节”，可见“方法技能集”、StatsPAI/CoPaper methodology index、OLS ready、DID/IV/RDD 阻塞原因；布局为纵向证据清单，无双列挤压。
+
+### 不能重复探索的结论
+
+- `method_catalog` 现在是 `local_file` 前置条件判断，不是 StatsPAI 真实执行结果；不能把它标记为 `local_execution`。
+- DID/IV/RDD 缺少关键变量时不能进入默认 RunPlan task，只能展示阻塞原因。
+- 方法技能集属于“研究设计细节”页面；Execution 页面先保持执行计划、运行轨迹和人工确认，不再堆方法百科。
+- 视觉上不要再用双列方法卡片承载长中文说明；纵向证据清单更适合当前 clean workbench。
+
+### 下一步第一件事
+
+P2-C：选择一个最小真实执行适配器路径，建议先做 OLS baseline 的 `local_execution`：从 approved RunPlan 读取 `method_id=ols` 和公式，调用现有 Python/Stata/StatsPAI 可用路径生成结果 JSON、日志和 provenance，再接入 Execution/Findings。
+
+### 未解决风险
+
+- 还没有真正调用 StatsPAI、Stata 或 pyfixest；当前只是方法准入目录。
+- PSM/DML 现在只按有无 controls/covariates 判断 ready，还没有样本量、平衡性、交叉拟合等更严格 evaluator。
+- Playwright MCP 仍返回 `Transport closed`；本轮视觉验收继续使用 Safari + Computer Use。

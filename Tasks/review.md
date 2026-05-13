@@ -315,3 +315,18 @@
 - 当前右侧 `archive-inspector` 仍是第一版静态档案索引，不是真正 backlinks / graph。
 - 当前收藏架条目未绑定真实 artifacts/export package API，后续应把导出包、run manifest、paper draft 等产物接成可浏览 shelf。
 - Browser/IAB 和 Playwright 本轮连接异常；已通过 Safari + Computer Use 做可视化 fallback。
+## 2026-05-13 P2-B Method Skill Catalog
+
+- 失败测试：`python3 -m unittest tests.test_method_skill_catalog -v` 首次失败，主要失败为 `method_catalog` 缺失、RunPlan task 缺少 `method_id`、前端缺少 `method-skill-catalog-panel`。
+- 目标测试：`python3 -m unittest tests.test_method_skill_catalog tests.test_clean_workbench_visual_contract -v`，9 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，152 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/design_spec_service.py Product/app.py Product/backend/project_service.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/run-plan` 返回 `method_catalog`，包含 OLS/DID/IV/RDD/PSM/DML；DID/IV/RDD 分别暴露缺面板时间、工具变量、断点运行变量。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2b-clean`，研究设计细节页展示纵向方法技能集证据清单，无双列卡片挤压。
+
+## 风险更新
+
+- P2-B 已完成方法准入目录，但还不是 CoPaper/StatsPAI 的真实方法执行器。
+- 当前 PSM/DML 的 ready 判断较粗，只证明有 outcome/treatment/controls，不证明估计策略充分。
+- 下一步 P2-C 应优先把 OLS baseline 跑成 `local_execution` 证据，再逐步扩展 DID/IV/RDD/PSM/DML。
+- Playwright MCP 仍不稳定；可视化验收当前以 Safari + Computer Use 为准。

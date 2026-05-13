@@ -406,3 +406,17 @@ Rejected: 页面加载时深度读取全部 DTA/XLSX/Parquet 文件。原因是�
 Rejected: 把外部候选池做成可编辑上传区。原因是当前阶段没有导入/绑定 manifest，也没有用户确认动作；候选池必须 `read_only=true`。
 
 Evidence: live API 扫描到 `total_count=223`，Safari `数据与设计` 页显示 `/Users/mahaoxuan/Desktop/实证数据库`、CFPS DTA 候选文件、`本地文件`、`尚未画像` 和 `只读`。
+
+## 2026-05-14：真实数据绑定必须先经过只读预检
+
+Decision: 新增真实候选数据导入/绑定预检，预检写入 `state/product/dataset_import_preflights.json`，只记录来源、目标建议、策略、文件大小、证据等级和检查结果；预检阶段不复制、不移动、不绑定外部文件，也不更新 VariableRoleSet、DesignSpec 或 RunPlan。
+
+Reason: 用户提供的 `/Users/mahaoxuan/Desktop/实证数据库` 是真实研究资产。产品需要给用户“我选的是这个文件、准备进入这个项目路径、检查都通过”的确定感，但不能把检查动作伪装成真实导入或执行。
+
+Rejected: 点击候选文件后直接复制到 `Data/Raw/`。原因是复制是有副作用的导入动作，必须等 P2-H 明确人工确认、哈希/大小记录和失败回滚语义。
+
+Rejected: 允许任意本地路径进入预检。原因是这会绕过真实数据候选池的 provenance 边界，并可能把无关或敏感文件带入项目。
+
+Rejected: 预检成功后立即重建变量角色或 RunPlan。原因是预检只证明“导入准备就绪”，不证明数据已经进入项目，也不证明字段角色已确认。
+
+Evidence: live API 对 CFPS DTA 候选文件返回 `status=ready_for_review`、`target.path=Data/Raw/cfps2010adult_202008.dta`、`will_create_project_file=false`、`will_mutate_source=false`；Safari 数据与设计页显示 `待人工确认` 和 4 项 passed checks。

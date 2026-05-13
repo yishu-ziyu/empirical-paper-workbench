@@ -39,6 +39,7 @@ from Product.backend.overview_service import (
     get_project_journey,
     get_project_overview,
     list_project_datasets,
+    save_external_dataset_bind_preflight,
 )
 from Product.backend.project_service import (
     MethodExecutionError,
@@ -154,6 +155,12 @@ class DesignSpecPayload(BaseModel):
 class RunPlanPayload(BaseModel):
     tasks: list[dict]
     outputs: list[str]
+    note: str = ""
+
+
+class ExternalDatasetBindPreflightPayload(BaseModel):
+    source_path: str
+    strategy: str = "copy_to_project_raw"
     note: str = ""
 
 
@@ -380,6 +387,30 @@ def api_v1_project_datasets(project_id: str) -> dict:
         return list_project_datasets(PRODUCT_ROOT, REPO_ROOT, project_id)
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/datasets/external-bind-preflight", status_code=201)
+def api_v1_external_dataset_bind_preflight(
+    project_id: str,
+    payload: ExternalDatasetBindPreflightPayload,
+) -> dict:
+    try:
+        return save_external_dataset_bind_preflight(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.source_path,
+            payload.strategy,
+            payload.note,
+        )
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except PermissionError as exc:
+        return error_response(400, "invalid_external_dataset_path", f"Path is outside the external data catalog: {exc}")
+    except FileNotFoundError as exc:
+        return error_response(400, "external_dataset_not_found", f"External dataset file does not exist: {exc}")
+    except ValueError as exc:
+        return error_response(400, "invalid_external_dataset_path", f"Unsupported external dataset path or strategy: {exc}")
 
 
 @app.get("/api/v1/projects/{project_id}/variable-roles")

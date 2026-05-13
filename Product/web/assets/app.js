@@ -3558,16 +3558,33 @@ function renderFindingMethodEvidence(methodEvidence) {
         <strong>方法执行证据</strong>
         ${renderEvidenceBadge({ evidence_level: methodEvidence.evidence_level })}
       </div>
-      <div class="method-evidence-grid">
-        <div><span class="meta-label">方法</span><strong>${escapeHtml(productTermLabel(methodEvidence.method_id || "-"))}</strong></div>
-        <div><span class="meta-label">样本量</span><strong>${escapeHtml(String(methodEvidence.nobs ?? "-"))}</strong></div>
-        <div><span class="meta-label">处理变量系数</span><strong>${formatNumber(methodEvidence.treatment_coefficient)}</strong></div>
-        <div><span class="meta-label">执行引擎</span><strong>${escapeHtml(methodEvidence.engine || "-")}</strong></div>
-      </div>
+      <p class="method-evidence-summary">
+        ${escapeHtml(productTermLabel(methodEvidence.method_id || "-"))} ·
+        n=${escapeHtml(String(methodEvidence.nobs ?? "-"))} ·
+        β=${formatNumber(methodEvidence.treatment_coefficient)} ·
+        标准误=${formatNumber(methodEvidence.standard_error)} ·
+        p=${formatNumber(methodEvidence.p_value)} ·
+        95% 置信区间 ${renderConfidenceInterval(methodEvidence.confidence_interval)} ·
+        评估器${escapeHtml(evaluatorStatusLabel(methodEvidence.evaluator_status || "needs_review"))}
+      </p>
+      <div class="muted evidence-line">执行引擎：${escapeHtml(methodEvidence.engine || "-")}</div>
       <div class="muted evidence-line">公式：${escapeHtml(methodEvidence.formula || "-")}</div>
       <div class="muted evidence-line">${escapeHtml(methodEvidence.artifact_path || "")}</div>
     </div>
   `;
+}
+
+function evaluatorStatusLabel(status) {
+  return {
+    passed: "通过",
+    needs_review: "需要复核",
+    failed: "未通过",
+  }[status] || status;
+}
+
+function renderConfidenceInterval(interval) {
+  if (!interval) return "-";
+  return `${formatNumber(interval.low)} ~ ${formatNumber(interval.high)}`;
 }
 
 function renderManuscriptCandidates() {

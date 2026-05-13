@@ -130,6 +130,45 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertIn("not_enough_numeric_observations", response.json()["error"]["message"])
         self.assertFalse((self.project_root / "Results" / "json" / "method_execution_result.json").exists())
 
+    def test_bdd_6_ols_result_includes_inference_diagnostics(self) -> None:
+        """行为 6：OLS 结果必须包含标准误、p 值、置信区间和残差诊断。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        method = response.json()["method_execution"]["methods"][0]
+        self.assertIn("trained", method["standard_errors"])
+        self.assertIn("trained", method["t_statistics"])
+        self.assertIn("trained", method["p_values"])
+        self.assertIn("trained", method["confidence_intervals"])
+        self.assertGreater(method["standard_errors"]["trained"], 0)
+        self.assertGreaterEqual(method["p_values"]["trained"], 0)
+        self.assertLessEqual(method["p_values"]["trained"], 1)
+        self.assertEqual(method["p_value_method"], "normal_approximation")
+        self.assertGreater(method["diagnostics"]["residual_degrees_of_freedom"], 0)
+        self.assertGreater(method["diagnostics"]["residual_standard_error"], 0)
+
+    def test_bdd_7_ols_result_includes_evaluator_checks(self) -> None:
+        """行为 7：OLS 方法执行必须给出 evaluator verdict 和命名检查。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        evaluator = response.json()["method_execution"]["methods"][0]["evaluator"]
+        self.assertEqual(evaluator["evidence_level"], "local_execution")
+        self.assertEqual(evaluator["status"], "passed")
+        check_ids = {check["id"] for check in evaluator["checks"]}
+        self.assertIn("sample_size", check_ids)
+        self.assertIn("model_rank", check_ids)
+        self.assertIn("treatment_coefficient", check_ids)
+        self.assertIn("inference_diagnostics", check_ids)
+
     def _approve_variable_roles(self) -> None:
         response = self.client.put(
             f"/api/v1/projects/{self.project_id}/variable-roles",

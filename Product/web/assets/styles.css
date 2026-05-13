@@ -3343,11 +3343,23 @@ select:focus-visible {
   border-style: dashed;
 }
 
+.method-evidence-summary {
+  margin: 10px 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink-clean);
+}
+
 .method-execution-grid,
 .method-evidence-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.finding-method-evidence .meta-label {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .method-execution-grid strong,

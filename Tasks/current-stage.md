@@ -14,10 +14,12 @@
   - P2-B Method Skill Catalog 已完成：RunPlan 暴露 OLS/DID/IV/RDD/PSM/DML 方法技能集；OLS/PSM/DML 当前 ready，DID/IV/RDD 暴露缺面板时间、工具变量和断点运行变量；前端“研究设计细节”显示纵向方法准入证据清单。
   - P2-C OLS Execution Adapter 已完成：approved OLS RunPlan 现在会生成 `Results/json/method_execution_result.json`，run response 和 `run_manifest.json` 都包含 `method_execution.evidence_level=local_execution`；unsupported method 返回 `unsupported_run_plan_method`，数据不足/公式不可估返回 `method_execution_failed`。
   - P2-D Method Execution Evidence UI 已完成：`method_execution_result.json` 现在进入 `observability.method_execution` 和 `findings[].method_evidence`；“实证执行”和“结果与草稿”页面都显示 OLS adapter、公式、样本量、处理变量系数、证据等级和 artifact 路径。
+  - P2-E OLS Evaluator Evidence 已完成：`method_execution_result.json` 现在包含标准误、t 统计量、normal approximation p 值、95% 置信区间、残差诊断和 evaluator checks；Results & Draft 的 FindingCard 显示中文紧凑方法证据摘要，最新验收 run 为 `run_a3674e9e78c6`。
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-E：为 OLS 方法执行补 evaluator。最小范围是标准误、p 值、置信区间、样本量阈值、共线性/不可估诊断、稳健或聚类标准误预检，并让 Finding approve 依赖 evaluator verdict。
+  - P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 的真实数据源做只读 inventory/profile 验收，优先选小型 CSV 或容易解析样本接入 Data & Design。
+  - 后续 P2-G：让 Finding approve 强制依赖 evaluator status，并补 robust/clustered standard errors 的预检状态。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
   - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
   - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
@@ -43,4 +45,5 @@
   - Method Skill Catalog 当前是 `local_file` 前置条件目录，不是 StatsPAI 真实执行；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2b-clean`
   - OLS Execution Adapter 当前是最小本地 Python OLS 执行器，不是完整 StatsPAI/Stata 统计引擎；验收 run 为 `run_4c62f1721afb`，`Results/json/method_execution_result.json` 为 `local_execution` 证据。
   - Method Execution Evidence UI 当前已把 OLS 方法执行证据接入 Execution / Findings；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2d-method`。
+  - OLS Evaluator Evidence 当前已把标准误、p 值、置信区间和 evaluator checks 接入方法执行与 FindingCard；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，最新 run 为 `run_a3674e9e78c6`。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

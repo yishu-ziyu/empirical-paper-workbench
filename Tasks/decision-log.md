@@ -378,3 +378,17 @@ Rejected: 只在 artifacts 列表里显示 `method_execution_result.json`。原�
 Rejected: 直接把 OLS 系数标为可写入正文。原因是还缺标准误、p 值、稳健标准误和 evaluator verdict。
 
 Evidence: `observability.method_execution` 与 `findings[].method_evidence` 均返回 `engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`。
+
+## 2026-05-13：OLS 论断必须携带 evaluator 证据
+
+Decision: 扩展本地 `python_ols_adapter`，让 `method_execution_result.json` 不再只保存系数，而是同时保存标准误、t 统计量、p 值、95% 置信区间、残差诊断和命名 evaluator checks；FindingCard 的 `method_evidence` 直接绑定这些字段，并在页面以中文审阅摘要显示。
+
+Reason: CoPaper/StatsPAI 式产品不能把“跑出一个系数”当作可写入论文的结果。用户需要在结果论断卡上直接看到这个估计是否具备最基本的统计推断证据，以及 evaluator 是否通过。
+
+Rejected: 继续把 `analysis_result.json` 里的 coefficient/std_error/p_value 当作唯一结果来源。原因是它是摘要结果，不足以证明具体方法、公式、adapter 和诊断检查。
+
+Rejected: 在 UI 中用窄网格展示所有方法证据字段。原因是 Results & Draft 卡片宽度有限，网格会重新制造拥挤和换行；审阅摘要更适合当前 clean workbench。
+
+Rejected: 把极小 p 值四舍五入成 `0`。原因是这会降低研究审阅可信度；当前改为保留显著数字，并由前端显示科学计数法。
+
+Evidence: 最新真实 full run `run_a3674e9e78c6` 返回 `standard_errors.trained=0.0754664205`、`p_values.trained=8.83354660202e-133`、`confidence_intervals.trained=[1.7025934962, 1.9984218644]`、`evaluator.status=passed`，四项 checks 全部 passed。

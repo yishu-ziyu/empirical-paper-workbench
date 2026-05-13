@@ -277,6 +277,13 @@ def build_method_evidence(treatment: str, method_execution: dict[str, Any] | Non
         "nobs": method.get("nobs"),
         "treatment": method.get("treatment") or treatment,
         "treatment_coefficient": method.get("treatment_coefficient"),
+        "standard_error": (method.get("standard_errors") or {}).get(treatment),
+        "t_statistic": (method.get("t_statistics") or {}).get(treatment),
+        "p_value": (method.get("p_values") or {}).get(treatment),
+        "p_value_method": method.get("p_value_method"),
+        "confidence_interval": (method.get("confidence_intervals") or {}).get(treatment),
+        "evaluator_status": (method.get("evaluator") or {}).get("status", "needs_review"),
+        "evaluator": method.get("evaluator"),
     }
 
 

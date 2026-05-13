@@ -437,3 +437,34 @@
 - 当前仅 CSV 做轻量预览画像；DTA/XLSX/Parquet 只登记文件，不读取变量字典。
 - 外部候选数据还不能导入或绑定到当前项目；变量角色、RunPlan 和 OLS 执行仍使用 `Data/Final/analysis_sample.csv`。
 - 下一步 P2-G 需要显式导入/绑定预检：记录来源路径、目标路径、复制/链接策略、证据等级、用户动作和失败原因。
+
+## 2026-05-14 P2-G Real Dataset Bind Preflight
+
+### 行为覆盖
+
+- [x] 用户选择真实候选池内文件时，后端生成 `ready_for_review` 导入/绑定预检。
+- [x] 预检记录包含源路径、目标建议路径、策略、文件大小、证据等级、manifest 路径和检查项。
+- [x] 预检拒绝候选池之外的本地路径，避免绕过 provenance 边界。
+- [x] datasets API 返回最新 `external_import_preflight`，前端可回显上一条预检。
+- [x] “数据与设计”页面提供候选文件预检按钮和独立预检面板。
+- [ ] 未覆盖：真正 apply/import、哈希记录、DTA/XLSX/Parquet 深度变量字典、搜索/过滤候选池。
+
+### 测试覆盖
+
+- 目标测试：`python3 -m unittest tests.test_external_dataset_bind_preflight -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，16 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，175 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `external_catalog.exists=true`、`total_count=223`。
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/external-bind-preflight` 对 CFPS DTA 候选文件返回 `status=ready_for_review`、`evidence_level=local_file`、`target.path=Data/Raw/cfps2010adult_202008.dta`、`will_create_project_file=false`、`will_mutate_source=false`。
+- 页面：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，点击“数据与设计”，点击候选文件“生成导入/绑定预检”，预检面板显示 `待人工确认`、源文件、目标路径、策略、4 项 passed checks 和只读说明。
+
+### 剩余风险
+
+- 当前只是预检，没有真实导入/绑定；用户还不能把 CFPS 文件变成项目内可分析数据。
+- 当前没有文件哈希，无法证明预检后文件未变化；P2-H apply/import 应补 SHA256。
+- DTA/XLSX/Parquet 变量字典仍未解析；P2-H 或 P2-I 应先做安全读取和字段预览。
+- Browser 插件路径仍不稳定；本轮可视化验收使用 Safari + Computer Use fallback。

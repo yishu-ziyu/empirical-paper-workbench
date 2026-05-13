@@ -50,6 +50,7 @@ const state = {
   resolvingGateId: null,
   resolvingGateAction: null,
   selectedDatasetPath: null,
+  bindingExternalDatasetPath: null,
   savingVariableRoles: false,
   savingDesignSpec: false,
   savingRunPlan: false,
@@ -558,6 +559,13 @@ const v2api = {
   datasets: {
     async list(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/datasets`);
+    },
+    async bindPreflight(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/datasets/external-bind-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
   },
   variableRoles: {
@@ -2857,6 +2865,7 @@ function renderDataVariables() {
   const items = data.items || [];
   document.getElementById("datasets-count").textContent = items.length;
   renderExternalDataLibrary(data.external_catalog);
+  renderExternalBindPreflight(data.external_import_preflight);
   renderVariableRoleWorkflow(items);
   renderDatasetQualityProfile(items);
 
@@ -2951,6 +2960,75 @@ function renderExternalDatasetCard(item) {
         <span>只读</span>
       </div>
       <code>${escapeHtml(item.relative_path || item.path || "")}</code>
+      <div class="compact-action-row">
+        <button class="ghost-button compact"
+          data-external-bind-preflight-action
+          data-source-path="${escapeHtml(item.path || "")}"
+          ${state.bindingExternalDatasetPath === item.path ? "disabled" : ""}>
+          ${state.bindingExternalDatasetPath === item.path ? "正在生成预检..." : "生成导入/绑定预检"}
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderExternalBindPreflight(preflight) {
+  const container = document.getElementById("external-bind-preflight-body");
+  const statusPill = document.getElementById("external-bind-preflight-status");
+  if (!container) return;
+
+  if (!preflight) {
+    if (statusPill) statusPill.textContent = "尚未生成";
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>等待选择真实数据</h4>
+        <p class="muted">点击候选数据卡片上的“生成导入/绑定预检”，系统只会记录来源、目标路径和检查项，不会复制或修改数据。</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (statusPill) statusPill.textContent = preflight.status === "ready_for_review" ? "待人工确认" : (preflight.status || "预检");
+  const checks = preflight.checks || [];
+  container.innerHTML = `
+    <article class="external-bind-preflight-record">
+      <div class="record-header">
+        <div>
+          <span class="eyebrow">导入/绑定预检</span>
+          <h4>${escapeHtml(preflight.source?.name || "真实数据文件")}</h4>
+        </div>
+        ${renderEvidenceBadge(preflight)}
+      </div>
+      <div class="record-meta-grid">
+        <div>
+          <span class="record-label">来源</span>
+          <p class="record-path">${escapeHtml(preflight.source?.path || "")}</p>
+        </div>
+        <div>
+          <span class="record-label">预检目标</span>
+          <p class="record-path">${escapeHtml(preflight.target?.path || "")}</p>
+        </div>
+        <div>
+          <span class="record-label">策略</span>
+          <p>${escapeHtml(preflight.strategy || "copy_to_project_raw")}</p>
+        </div>
+        <div>
+          <span class="record-label">执行状态</span>
+          <p>${preflight.will_create_project_file ? "会创建项目文件" : "尚未导入/绑定"} · ${preflight.will_mutate_source ? "会修改源文件" : "源文件只读"}</p>
+        </div>
+      </div>
+      <div class="preflight-check-list">
+        ${checks.map((check) => `
+          <div class="quality-check is-${escapeHtml(check.status || "unknown")}">
+            <span>${qualityCheckIcon(check.status)}</span>
+            <div>
+              <strong>${escapeHtml(check.label || check.id || "检查项")}</strong>
+              <p class="muted">${escapeHtml(check.detail || "")}</p>
+            </div>
+          </div>
+        `).join("") || "<p class='muted'>暂无检查项。</p>"}
+      </div>
+      <p class="muted external-bind-preflight-note">状态文件：${escapeHtml(preflight.manifest_path || "state/product/dataset_import_preflights.json")} · 本阶段不会改写 paper.yaml、VariableRoleSet、DesignSpec 或 RunPlan。</p>
     </article>
   `;
 }
@@ -3162,6 +3240,27 @@ function setVariableRoleField(fieldId, values) {
   const field = document.getElementById(fieldId);
   if (field) {
     field.value = joinRoleValues(values);
+  }
+}
+
+async function requestExternalBindPreflight(sourcePath) {
+  if (!state.selectedProjectId || !sourcePath) return;
+  clearV2Error("data");
+  state.bindingExternalDatasetPath = sourcePath;
+  renderDataVariables();
+  try {
+    await v2api.datasets.bindPreflight(state.selectedProjectId, {
+      source_path: sourcePath,
+      strategy: "copy_to_project_raw",
+      note: "用户在数据与设计页请求真实数据导入/绑定预检。",
+    });
+    state.datasetsData = await v2api.datasets.list(state.selectedProjectId);
+    renderDataVariables();
+  } catch (error) {
+    showV2Error("data", `生成导入/绑定预检失败：${error.message}`);
+  } finally {
+    state.bindingExternalDatasetPath = null;
+    renderDataVariables();
   }
 }
 
@@ -4622,6 +4721,13 @@ async function boot() {
     const button = target.closest("[data-open-design-action]");
     if (!button) return;
     openDesignAction(button.dataset.datasetPath);
+  });
+  document.getElementById("external-datasets-list")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-external-bind-preflight-action]");
+    if (!button) return;
+    void requestExternalBindPreflight(button.dataset.sourcePath || "");
   });
   document.getElementById("view-overview")?.addEventListener("click", (event) => {
     const target = event.target;

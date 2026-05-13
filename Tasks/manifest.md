@@ -482,3 +482,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`
 
 说明：点击“数据与设计”，可见 `真实数据候选池`，计数 `223`，根目录 `/Users/mahaoxuan/Desktop/实证数据库`，前 6 个 CFPS 候选文件显示 `本地文件`、文件大小、`尚未画像` 和 `只读`；下方项目内数据仍显示 `analysis_sample.csv`，两者没有混同。
+
+## 2026-05-14 P2-G Real Dataset Bind Preflight
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-dataset-bind-preflight-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_external_dataset_bind_preflight.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：新增 `save_external_dataset_bind_preflight()`、`build_external_dataset_bind_preflight()`、`validate_external_source_path()`、`build_dataset_preflight_id()`、`latest_external_import_preflight()`、`load_dataset_import_preflight_manifest()`、`write_dataset_import_preflight_manifest()`。
+- `Product/app.py`：新增 `ExternalDatasetBindPreflightPayload` 和 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight`。
+- Runtime manifest：`state/product/dataset_import_preflights.json`，记录预检对象；不提交为源码，不代表真实导入完成。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：数据与设计页新增 `external-bind-preflight-panel`，静态资源版本更新到 `20260513-p2g-bind1`。
+- `Product/web/assets/app.js`：新增 `v2api.datasets.bindPreflight()`、`requestExternalBindPreflight()`、`renderExternalBindPreflight()`；候选数据卡新增 `data-external-bind-preflight-action`。
+- `Product/web/assets/styles.css`：新增导入/绑定预检面板、检查清单和说明样式。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p2g-bind1`
+
+说明：点击“数据与设计”，在“真实数据候选池”中点击候选文件的“生成导入/绑定预检”，页面显示 `待人工确认`、真实源路径、目标 `Data/Raw/<filename>`、策略 `copy_to_project_raw`、`尚未导入/绑定 · 源文件只读` 和 4 项通过检查。

@@ -368,4 +368,17 @@
 - [x] 真实数据验收：本机 `/Users/mahaoxuan/Desktop/实证数据库` 扫描到 223 个候选数据文件；Safari 页面显示 CFPS DTA 文件、`本地文件`、`尚未画像`、`只读` 和真实根目录。
 - [x] 验证：目标测试 5 OK；相邻数据画像测试 11 OK；全量回归 170 OK，skipped=1；Python 编译、`node --check`、`git diff --check` 通过。
 - [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow，并同步 `Tasks/` 到 `tasks/`。
-- [ ] P2-G：设计“从真实候选池导入/绑定数据集”的显式预检。导入前必须记录来源、目标路径、文件大小、证据等级和用户动作；不能直接把外部原始数据当成当前项目数据。
+- [x] P2-G：设计“从真实候选池导入/绑定数据集”的显式预检。导入前记录来源、目标路径、文件大小、证据等级和用户动作；预检阶段不移动、不复制、不绑定外部原始数据。
+
+## 2026-05-14 P2-G Real Dataset Bind Preflight
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-dataset-bind-preflight-bdd.md`，定义真实候选数据进入项目之前必须先生成导入/绑定预检，而不是直接复制或喂给变量角色、DesignSpec、RunPlan。
+- [x] TDD：新增 `tests/test_external_dataset_bind_preflight.py`；首次运行失败原因符合预期：API 返回 404，前端缺少 `external-bind-preflight-panel` 和候选数据预检按钮。
+- [x] 实现：扩展 `Product/backend/overview_service.py` 和 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight`，只接受 `/Users/mahaoxuan/Desktop/实证数据库` 候选池内的数据文件，写入 `state/product/dataset_import_preflights.json`。
+- [x] 实现：预检结果包含 `status=ready_for_review`、`evidence_level=local_file`、源文件路径、目标建议路径 `Data/Raw/<filename>`、策略、文件大小、4 项检查和 `will_mutate_source=false` / `will_create_project_file=false`。
+- [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，在“真实数据候选池”候选卡上新增“生成导入/绑定预检”，并在“导入/绑定预检”面板显示待人工确认、来源、目标、策略、检查项和只读说明。
+- [x] 验证：目标测试 5 OK；相邻数据测试 16 OK；全量回归 175 OK，skipped=1；Python 编译、`node --check` 和 `git diff --check` 通过。
+- [x] API 验收：`GET /datasets` 返回外部候选池 223 个文件；`POST /datasets/external-bind-preflight` 对 CFPS DTA 候选文件返回 `ready_for_review`、目标 `Data/Raw/...dta` 和 4 项 passed checks。
+- [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，点击“数据与设计”，点击候选文件“生成导入/绑定预检”，页面显示 `待人工确认`、源路径、目标路径、`尚未导入/绑定 · 源文件只读` 和 4 项通过检查。
+- [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow，并同步 `Tasks/` 到 `tasks/`。
+- [ ] P2-H：实现显式 apply/import workflow。只有用户确认后才允许把预检记录变成项目内 `Data/Raw/...` 文件或绑定记录；同时必须记录人工动作、目标 artifact、哈希/大小和失败回滚语义。

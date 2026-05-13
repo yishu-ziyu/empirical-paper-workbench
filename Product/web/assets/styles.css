@@ -440,6 +440,37 @@ textarea {
   font-weight: 700;
 }
 
+.external-bind-preflight-panel {
+  margin-bottom: 18px;
+  border-left: 3px solid rgba(30, 111, 98, 0.38);
+}
+
+.external-bind-preflight-body,
+.external-bind-preflight-record {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.external-bind-preflight-record {
+  padding: 16px;
+  border: 1px solid rgba(30, 111, 98, 0.14);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(247, 250, 248, 0.92), #fff);
+}
+
+.preflight-check-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.external-bind-preflight-note {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-clean);
+}
+
 .data-quality-profile {
   display: grid;
   gap: 18px;

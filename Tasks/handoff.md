@@ -1054,3 +1054,54 @@ P2-G：做“真实候选数据导入/绑定预检”。最小产品动作是选
 - DTA/XLSX/Parquet 深度变量字典还未做，后续应引入 pandas/pyreadstat 或 StatsPAI 的安全预览路径。
 - 外部候选池还没有搜索、过滤、选择、导入或绑定动作。
 - 当前执行链仍使用 `Data/Final/analysis_sample.csv`；不要把 P2-F 的候选池误读为已经完成真实论文数据运行。
+
+## 2026-05-14 P2-G Real Dataset Bind Preflight 交接增量
+
+### 当前目标
+
+真实数据候选池已经可以生成“导入/绑定预检”。本阶段只证明用户选择了哪个外部真实文件、计划进入哪个项目路径、检查是否通过；不会移动、复制、覆盖或绑定原始数据。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-dataset-bind-preflight-bdd.md`。
+- 新增测试：`tests/test_external_dataset_bind_preflight.py`，覆盖成功预检、外部目录逃逸、缺失文件、datasets API 最新预检回读和前端预检面板。
+- 扩展 `Product/backend/overview_service.py`：新增外部候选路径校验、预检构造、manifest 读写和最新预检回读；预检写入 `state/product/dataset_import_preflights.json`。
+- 扩展 `Product/app.py`：新增 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：候选卡新增“生成导入/绑定预检”，数据与设计页新增“导入/绑定预检”证据面板。
+
+### 已验证证据
+
+- 目标测试：`python3 -m unittest tests.test_external_dataset_bind_preflight -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，16 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，175 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py`、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- API 验收：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/external-bind-preflight` 对 `/Users/mahaoxuan/Desktop/实证数据库/A001CFPS中国家庭追踪调查/2010cfps/cfps2010adult_202008.dta` 返回 `status=ready_for_review`、`target.path=Data/Raw/cfps2010adult_202008.dta`、`will_mutate_source=false`、`will_create_project_file=false`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，点击“数据与设计”，对 CFPS 候选文件点击“生成导入/绑定预检”，页面显示 `待人工确认`、真实源路径、目标路径、策略、4 项 passed checks 和 `尚未导入/绑定 · 源文件只读`。
+
+### 关键文件路径
+
+- `Product/backend/overview_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_external_dataset_bind_preflight.py`
+- `docs/architecture-v2/codex-phase-p2-dataset-bind-preflight-bdd.md`
+- `state/product/dataset_import_preflights.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- 预检不是导入。`will_create_project_file=false` 和 `will_mutate_source=false` 必须保持，直到后续 P2-H 有明确 apply/import 动作。
+- 外部真实数据只能来自 `external_data_library_roots()` 允许的候选池；不能接受任意本地路径，否则 provenance 边界会失效。
+- 预检不能更新 VariableRoleSet、DesignSpec 或 RunPlan；这些状态只能在真实导入/绑定完成并有用户确认后消费新数据。
+
+### 下一步第一件事
+
+P2-H：实现显式 apply/import workflow 的 BDD。最小行为应是读取一条 `ready_for_review` 预检，用户确认后生成项目内目标 artifact 或绑定记录，记录人工动作、文件大小、哈希、目标路径、失败原因和回滚语义；仍然不能直接进入 RunPlan。
+
+### 未解决风险
+
+- 当前预检只做路径、大小和目标建议，不做 DTA/XLSX/Parquet 深度字段画像。
+- 当前没有搜索/过滤真实候选池，223 个文件只能看首屏候选。
+- 当前没有 apply/import API，因此用户还不能真正把真实数据加入项目。
+- Playwright MCP 仍不稳定；视觉闭环继续使用 Safari + Computer Use。

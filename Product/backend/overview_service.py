@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,7 @@ STATUS_VALUES = {"completed", "in_progress", "blocked", "not_started"}
 DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feather"}
 EXTERNAL_CATALOG_LIMIT = 40
 EXTERNAL_CSV_PREVIEW_ROWS = 200
+DATASET_IMPORT_PREFLIGHT_PATH = Path("state/product/dataset_import_preflights.json")
 
 
 def mock_meta(service: str) -> dict[str, str]:
@@ -314,6 +317,7 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
         "project": project_identity(project),
         "items": items,
         "external_catalog": build_external_data_catalog(),
+        "external_import_preflight": latest_external_import_preflight(root),
         "empty_state": {
             "title": "尚未登记数据集",
             "description": "已检查项目 Data 目录，当前没有发现 csv/dta/xlsx/parquet 等可识别数据文件。",
@@ -322,6 +326,166 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
         if not items
         else None,
     }
+
+
+def save_external_dataset_bind_preflight(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    source_path: str,
+    strategy: str = "copy_to_project_raw",
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    source, catalog_root = validate_external_source_path(Path(source_path))
+    if strategy != "copy_to_project_raw":
+        raise ValueError(f"Unsupported external dataset bind strategy: {strategy}")
+
+    preflight = build_external_dataset_bind_preflight(project_root, source, catalog_root, strategy, note)
+    manifest = load_dataset_import_preflight_manifest(project_root)
+    manifest.setdefault("preflights", {})[preflight["id"]] = preflight
+    manifest["latest_preflight_id"] = preflight["id"]
+    manifest["updated_at"] = utc_now()
+    write_dataset_import_preflight_manifest(project_root, manifest)
+    return {
+        "_meta": local_file_meta("dataset_import_preflight_service"),
+        "project": project_identity(project),
+        "preflight": preflight,
+    }
+
+
+def build_external_dataset_bind_preflight(
+    project_root: Path,
+    source: Path,
+    catalog_root: Path,
+    strategy: str,
+    note: str,
+) -> dict[str, Any]:
+    relative_source = source.relative_to(catalog_root)
+    target_relative_path = Path("Data/Raw") / source.name
+    target_absolute_path = (project_root / target_relative_path).resolve()
+    try:
+        target_absolute_path.relative_to(project_root)
+    except ValueError as exc:
+        raise PermissionError(target_absolute_path) from exc
+
+    timestamp = utc_now()
+    stat = source.stat()
+    preflight_id = build_dataset_preflight_id(source, strategy)
+    checks = [
+        {
+            "id": "source_exists",
+            "label": "源文件存在",
+            "status": "passed",
+            "detail": "已确认真实数据文件位于候选池内。",
+        },
+        {
+            "id": "source_in_external_catalog",
+            "label": "候选池边界",
+            "status": "passed",
+            "detail": f"相对路径：{relative_source.as_posix()}",
+        },
+        {
+            "id": "target_inside_project",
+            "label": "目标路径边界",
+            "status": "passed",
+            "detail": f"预检目标：{target_relative_path.as_posix()}",
+        },
+        {
+            "id": "preflight_only",
+            "label": "仅生成预检",
+            "status": "passed",
+            "detail": "本步骤不会复制、移动、链接或修改真实数据文件。",
+        },
+    ]
+    return {
+        "id": preflight_id,
+        "status": "ready_for_review",
+        "evidence_level": "local_file",
+        "strategy": strategy,
+        "note": note,
+        "source": {
+            "name": source.name,
+            "path": str(source),
+            "relative_path": relative_source.as_posix(),
+            "collection": external_collection_label(relative_source),
+            "file_type": source.suffix.lower().lstrip("."),
+            "size": stat.st_size,
+            "evidence_level": "local_file",
+            "read_only": True,
+        },
+        "target": {
+            "path": target_relative_path.as_posix(),
+            "absolute_path": str(target_absolute_path),
+            "exists": target_absolute_path.exists(),
+            "evidence_level": "local_file",
+        },
+        "checks": checks,
+        "will_mutate_source": False,
+        "will_create_project_file": False,
+        "can_apply": False,
+        "manifest_path": DATASET_IMPORT_PREFLIGHT_PATH.as_posix(),
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+
+
+def validate_external_source_path(source_path: Path) -> tuple[Path, Path]:
+    source = source_path.expanduser().absolute()
+    source_resolved = source.resolve()
+    if source.suffix.lower() not in DATASET_SUFFIXES:
+        raise ValueError(source)
+    if not source.exists() or not source.is_file():
+        raise FileNotFoundError(source)
+
+    for root in external_data_library_roots():
+        catalog_root = root.expanduser().absolute()
+        catalog_root_resolved = catalog_root.resolve()
+        if not catalog_root.exists() or not catalog_root.is_dir():
+            continue
+        try:
+            source_resolved.relative_to(catalog_root_resolved)
+        except ValueError:
+            continue
+        return source, catalog_root
+    raise PermissionError(source)
+
+
+def build_dataset_preflight_id(source: Path, strategy: str) -> str:
+    digest = hashlib.sha1(f"{source}|{strategy}".encode("utf-8")).hexdigest()[:12]
+    return f"dataset_bind_preflight_{digest}"
+
+
+def latest_external_import_preflight(project_root: Path) -> dict[str, Any] | None:
+    manifest = load_dataset_import_preflight_manifest(project_root)
+    latest_id = manifest.get("latest_preflight_id")
+    if not latest_id:
+        return None
+    preflight = manifest.get("preflights", {}).get(latest_id)
+    return preflight if isinstance(preflight, dict) else None
+
+
+def load_dataset_import_preflight_manifest(project_root: Path) -> dict[str, Any]:
+    path = project_root / DATASET_IMPORT_PREFLIGHT_PATH
+    if not path.exists():
+        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+    if not isinstance(payload, dict):
+        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+    payload.setdefault("preflights", {})
+    payload.setdefault("latest_preflight_id", None)
+    payload.setdefault("updated_at", None)
+    return payload
+
+
+def write_dataset_import_preflight_manifest(project_root: Path, manifest: dict[str, Any]) -> None:
+    path = project_root / DATASET_IMPORT_PREFLIGHT_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def build_external_data_catalog() -> dict[str, Any]:

@@ -258,6 +258,17 @@
 - [x] 验证：`python3 -m unittest tests.test_archive_interface_visual_contract -v` 5 tests OK；`python3 -m unittest discover -s tests -v` 132 tests OK，skipped=1；`node --check Product/web/assets/app.js` 通过；Python 编译检查通过；Safari 可视化验收 `http://127.0.0.1:8765/?v=20260513-archive1` 通过。
 - [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow。
 
+## 2026-05-13 P1-P Writeback Approval + DOCX Preflight
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p1-writeback-docx-preflight-bdd.md`，定义显式写回审批、docx 导出预检和 Review & Export 证据验收台。
+- [x] TDD：扩展 `tests/test_review_export_package.py` 到 9 条行为；首次运行失败原因是导出包缺少 `writeback_approval`/`docx_preflight` 状态、POST API 404、前端缺少 clean evidence bench 结构。
+- [x] 实现：扩展 `Product/backend/manuscript_candidate_service.py`，新增 `writeback_approvals.json` 与 `docx_export_preflight.json` 两类本地状态；审批只写状态，不覆盖 `Manuscripts/generated/paper_draft.md`。
+- [x] 实现：扩展 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/export-package/{candidate_id}/writeback-approval` 与 `POST /api/v1/projects/{project_id}/export-package/{candidate_id}/docx-preflight`。
+- [x] 前端：把 Review & Export 改成 `review-export-evidence-bench`，用证据表、写回审批面板、docx 预检面板替代拥挤的路径卡片堆。
+- [x] 验证：目标测试 9 OK；相邻回归 36 OK；全量回归 142 OK，skipped=1；Python 编译和 JS 语法检查通过。
+- [x] 可视化验收：重启 8765 旧服务后，Safari + Computer Use 验证“批准写回 -> 运行 docx 预检”闭环，页面显示 `写回：已审批` 和 `预检通过`。
+- [x] 交接：更新 handoff、manifest、decision-log、review。
+
 ## 2026-05-13 P1-R Clean Workbench Visual Pass
 
 - [x] 参考研究：读取 JupyterLab / Grafana / OpenMetadata 的公开产品文档，提炼为“主工作区 + 属性检查器 + 信息面板/记录，而不是装饰卡片堆叠”。

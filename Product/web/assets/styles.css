@@ -432,16 +432,26 @@ textarea {
   margin-bottom: 18px;
 }
 
-.export-package-card {
+.export-package-workbench {
   display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid rgba(107, 81, 44, 0.16);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
+  gap: 14px;
 }
 
-.export-package-header,
+.export-package-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(35, 66, 60, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: none;
+}
+
+.review-export-evidence-bench {
+  border-left: 3px solid rgba(30, 111, 98, 0.48);
+}
+
+.export-bench-header,
 .export-package-footer {
   display: flex;
   justify-content: space-between;
@@ -449,47 +459,91 @@ textarea {
   align-items: flex-start;
 }
 
-.export-package-header h4 {
+.export-bench-header h4 {
   margin: 4px 0 6px;
 }
 
-.export-package-status {
+.export-bench-status {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
 }
 
-.export-package-paths {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.review-status.is-pending {
+  color: #75583a;
+  background: rgba(117, 88, 58, 0.1);
 }
 
-.export-package-paths div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid rgba(107, 81, 44, 0.12);
+.export-evidence-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 1px solid rgba(35, 66, 60, 0.12);
   border-radius: 8px;
-  background: rgba(250, 247, 241, 0.8);
+  overflow: hidden;
+  background: rgba(250, 247, 241, 0.56);
 }
 
-.export-package-paths strong {
+.export-evidence-table th,
+.export-evidence-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(35, 66, 60, 0.1);
+  text-align: left;
+  vertical-align: top;
+}
+
+.export-evidence-table th {
   font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(236, 242, 238, 0.62);
 }
 
-.export-package-paths span {
+.export-evidence-table td:first-child {
+  width: 140px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.export-evidence-table code {
+  white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.export-decision-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.export-decision-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(35, 66, 60, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.48);
+}
+
+.export-decision-panel strong {
+  display: block;
+  margin: 4px 0;
+}
+
+.export-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .export-workbench-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: 12px;
 }
 
 .export-evaluator-checks,
@@ -502,12 +556,12 @@ textarea {
 .export-check,
 .frontier-log-row {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-start;
-  padding: 10px;
-  border: 1px solid rgba(107, 81, 44, 0.12);
+  padding: 9px;
+  border: 1px solid rgba(35, 66, 60, 0.1);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .export-check {
@@ -515,7 +569,7 @@ textarea {
 }
 
 .frontier-log-row {
-  grid-template-columns: 108px minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
 }
 
 .frontier-log-row p {
@@ -536,6 +590,38 @@ textarea {
 .export-check.is-failed .export-check-status {
   background: rgba(177, 83, 50, 0.12);
   color: #b15332;
+}
+
+.docx-preflight-checks {
+  display: grid;
+  gap: 6px;
+}
+
+.docx-check {
+  display: grid;
+  grid-template-columns: 20px minmax(120px, 0.8fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px dashed rgba(35, 66, 60, 0.12);
+}
+
+.docx-check span {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(30, 111, 98, 0.12);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.docx-check code {
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .candidate-provenance {
@@ -2449,7 +2535,7 @@ textarea {
   .metric-grid,
   .panel-grid.two-up,
   .artifact-grid,
-  .export-package-paths,
+  .export-decision-strip,
   .export-workbench-grid,
   .execution-context-grid,
   #view-empirical-execution .observable-grid {

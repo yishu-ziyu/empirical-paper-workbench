@@ -265,6 +265,23 @@
 - 当前收藏架条目未绑定真实 artifacts/export package API，后续应把导出包、run manifest、paper draft 等产物接成可浏览 shelf。
 - Browser/IAB 和 Playwright 本轮连接异常；已通过 Safari + Computer Use 做可视化 fallback。
 
+## 2026-05-13 P1-P Writeback Approval + DOCX Preflight
+
+- 失败测试：`python3 -m unittest tests.test_review_export_package -v` 首次出现 4 failures、1 error；失败原因是导出包缺少 `writeback_approval`，两个新 POST API 返回 404，前端缺少 `review-export-evidence-bench`、`writeback-approval-panel`、`docx-preflight-panel` 和 `export-evidence-table`。
+- 目标测试：`python3 -m unittest tests.test_review_export_package -v`，9 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_review_export_package tests.test_manuscript_consumption tests.test_results_draft_evidence_binding -v`，36 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，142 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/manuscript_candidate_service.py Product/app.py Product/backend/project_service.py Product/backend/results_draft_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：旧 8765 服务一开始返回 404；确认是旧 uvicorn 进程后重启服务，`POST /writeback-approval` 返回 200 并写入 `state/product/writeback_approvals.json`。
+- 可视化验收：Browser plugin 运行超时且 Playwright MCP `Transport closed`；已用 Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p1p`，进入“审阅与导出”，确认 `导出包验收台`、证据表、写回审批面板和 docx 预检面板可见；点击 `运行 docx 预检` 后显示 `预检通过`、`源草稿存在`、`写回预览存在`、`docx 导出命令已声明`、`docx 目标路径已声明`。
+
+## 风险更新
+
+- P1-P 已完成：Review & Export 现在可以承接用户显式审批，并把 docx 导出前条件写成可追溯本地状态。
+- 本阶段没有真正生成 docx，也没有覆盖 `Manuscripts/generated/paper_draft.md`；这是有意保留的安全边界。
+- 旧本地服务进程可能继续缓存旧路由；如果页面按钮返回 404，先重启 `python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8765`。
+- Browser/Playwright 自动化链路仍需后续修复；当前验收证据来自 Safari + Computer Use 和 API/tests。
+
 ## 2026-05-13 P1-Q Chinese Copy + Archive Interface
 
 - 失败测试：`python3 -m unittest tests.test_archive_interface_visual_contract -v` 首次 4 条失败；失败原因是页面缺少 `研究档案`、`archive-inspector`、`archive-ledger`、hover/focus/loading/empty/error 状态标识。

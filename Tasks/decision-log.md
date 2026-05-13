@@ -306,6 +306,18 @@ Rejected: 为了视觉升级改用 React/Vite/Next。原因是当前产品是 Fa
 
 Rejected: 本轮实现真正双向链接数据库。原因是右侧 `相邻笔记` 先承担产品导航和信息架构修正；真实 backlinks / graph 应在后续 Artifacts/Agents 或知识库层单独设计。
 
+## 2026-05-13：写回审批和 docx 预检必须分开
+
+Decision: 新增 `writeback_approval` 与 `docx_preflight` 两个独立状态。写回审批写入 `state/product/writeback_approvals.json`，只表示用户允许候选段落进入下一步；docx 预检写入 `state/product/docx_export_preflight.json`，只表示源草稿、写回预览、导出命令和目标 docx 路径都可追溯。
+
+Reason: P1-O 已经有导出包和 evaluator checks，但用户仍需要明确的产品确定感：哪个动作只是审批，哪个动作只是预检，哪个动作才会真正改文件或生成 docx。拆开状态后，Review & Export 可以变成可审计的证据验收台。
+
+Rejected: 点击 approve 后直接覆盖 `Manuscripts/generated/paper_draft.md`。原因是审批不等于写文件，自动覆盖会破坏源草稿与候选预览的证据边界。
+
+Rejected: docx preflight 直接生成 `Submissions/paper_draft.docx`。原因是预检阶段只证明条件具备，不应该把“检查”伪装成“导出执行”。
+
+Rejected: 在旧的拥挤卡片布局里继续塞按钮。原因是 Review & Export 需要先回答“证据在哪里、状态是什么、下一步动作是什么”，所以本轮改为 evidence table + decision panels。
+
 ## 2026-05-13：界面先转向个人研究档案，而不是继续堆普通控制台卡片
 
 Decision: 在不引入新框架、不改后端数据结构的前提下，把前端外壳升级为 `archive-shell`：左侧仍是研究生命周期导航，中间保留现有工作区，右侧新增 `archive-inspector`，展示当前页面的研究语义、相邻笔记、证据图例和收藏架。视觉层采用温暖纸张、细网格、档案条目和紧凑交互状态，而不是 SaaS hero、渐变球或营销卡片。

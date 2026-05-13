@@ -21,13 +21,18 @@ from Product.backend.draft_service import list_project_drafts
 from Product.backend.manuscript_candidate_service import (
     CandidatePromotionRequiredError,
     CandidateReviewRequiredError,
+    ExportPackageRequiredError,
     InvalidCandidateReviewActionError,
+    InvalidWritebackApprovalActionError,
     ManuscriptCandidateNotFoundError,
+    WritebackApprovalRequiredError,
     get_project_export_package,
     get_project_manuscript_candidates,
+    save_project_docx_export_preflight,
     save_project_manuscript_candidate_export_preflight,
     save_project_manuscript_candidate_promotion,
     save_project_manuscript_candidate_review,
+    save_project_writeback_approval,
 )
 from Product.backend.overview_service import (
     get_project_design,
@@ -165,6 +170,15 @@ class ManuscriptCandidatePromotePayload(BaseModel):
 
 
 class ManuscriptCandidateExportPreflightPayload(BaseModel):
+    note: str = ""
+
+
+class WritebackApprovalPayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class DocxPreflightPayload(BaseModel):
     note: str = ""
 
 
@@ -600,6 +614,63 @@ def api_v1_export_preflight_manuscript_candidate(
 def api_v1_project_export_package(project_id: str) -> dict:
     try:
         return get_project_export_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/export-package/{candidate_id}/writeback-approval")
+def api_v1_writeback_approval(
+    project_id: str,
+    candidate_id: str,
+    payload: WritebackApprovalPayload,
+) -> dict:
+    try:
+        return save_project_writeback_approval(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.action,
+            payload.note,
+        )
+    except InvalidWritebackApprovalActionError as exc:
+        return error_response(400, "invalid_writeback_approval_action", f"Writeback approval action {exc} is not supported.")
+    except ExportPackageRequiredError as exc:
+        return error_response(409, "export_package_required", f"Candidate {exc} must be preview_ready before writeback approval.")
+    except ManuscriptCandidateNotFoundError as exc:
+        return error_response(404, "manuscript_candidate_not_found", f"Candidate {exc} does not exist.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/export-package/{candidate_id}/docx-preflight")
+def api_v1_docx_export_preflight(
+    project_id: str,
+    candidate_id: str,
+    payload: DocxPreflightPayload,
+) -> dict:
+    try:
+        return save_project_docx_export_preflight(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.note,
+        )
+    except WritebackApprovalRequiredError as exc:
+        return error_response(409, "writeback_approval_required", f"Candidate {exc} must have approved writeback before docx preflight.")
+    except ExportPackageRequiredError as exc:
+        return error_response(409, "export_package_required", f"Candidate {exc} must be preview_ready before docx preflight.")
+    except ManuscriptCandidateNotFoundError as exc:
+        return error_response(404, "manuscript_candidate_not_found", f"Candidate {exc} does not exist.")
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except FileNotFoundError as exc:

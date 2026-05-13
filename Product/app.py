@@ -41,6 +41,8 @@ from Product.backend.overview_service import (
     list_project_datasets,
 )
 from Product.backend.project_service import (
+    MethodExecutionError,
+    UnsupportedRunPlanMethodError,
     create_workspace,
     execute_workbench_run,
     execute_full_run_from_run_plan,
@@ -708,6 +710,10 @@ def api_v1_create_full_run(project_id: str) -> dict:
         if "RunPlan" in message or "DesignSpec" in message:
             return error_response(409, "run_plan_required", message)
         return error_response(400, "dataset_not_found", f"Dataset file does not exist: {exc}")
+    except UnsupportedRunPlanMethodError as exc:
+        return error_response(409, "unsupported_run_plan_method", f"Unsupported RunPlan method: {exc}")
+    except MethodExecutionError as exc:
+        return error_response(409, "method_execution_failed", f"{exc.code}: {exc}")
 
 
 @app.get("/api/v1/projects/{project_id}/runs")

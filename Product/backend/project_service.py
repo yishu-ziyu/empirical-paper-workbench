@@ -38,6 +38,16 @@ ESSENTIAL_PATHS = [
 ]
 
 
+class UnsupportedRunPlanMethodError(ValueError):
+    pass
+
+
+class MethodExecutionError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -352,6 +362,7 @@ def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
         raise FileNotFoundError("approved DesignSpec is required")
 
     dataset_source = resolve_dataset_source(root, run_plan.get("dataset_path"))
+    validate_supported_run_plan_methods(run_plan)
     plan_binding = build_run_plan_binding(design_spec, run_plan)
     research_engine = build_research_engine_reference()
     run = create_run(root, project["id"], "full-run")
@@ -367,6 +378,9 @@ def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
     results_index_path = root / "Results" / "index.json"
     state = load_json_if_exists(state_path)
     results = load_json_if_exists(results_index_path)
+    method_execution = None
+    if process.returncode == 0:
+        method_execution = execute_run_plan_method_tasks(root, run["id"], design_spec, run_plan, dataset_source)
     artifact_paths = []
     if state_path.exists():
         artifact_paths.append("state/project_state.json")
@@ -380,6 +394,8 @@ def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
                 if artifact.get("exists")
             ]
         )
+    if method_execution:
+        artifact_paths.append(method_execution["artifact_path"])
 
     run.update(
         {
@@ -406,6 +422,7 @@ def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
             "dataset_source": dataset_source,
             "plan_binding": plan_binding,
             "research_engine": research_engine,
+            "method_execution": method_execution,
             "execution_evidence_level": "local_execution",
             "error": None
             if process.returncode == 0
@@ -413,9 +430,21 @@ def execute_full_run_from_run_plan(project: dict[str, Any]) -> dict[str, Any]:
         }
     )
     persist_run_dataset_source(root, run["id"], dataset_source)
-    persist_full_run_provenance(root, run["id"], plan_binding, research_engine)
+    persist_full_run_provenance(root, run["id"], plan_binding, research_engine, method_execution)
     save_run(root, run)
     return run
+
+
+def validate_supported_run_plan_methods(run_plan: dict[str, Any]) -> None:
+    unsupported = sorted(
+        {
+            str(task.get("method_id") or task.get("estimator") or "").strip()
+            for task in run_plan.get("tasks", [])
+            if str(task.get("method_id") or task.get("estimator") or "").strip() not in {"ols"}
+        }
+    )
+    if unsupported:
+        raise UnsupportedRunPlanMethodError(", ".join(unsupported))
 
 
 def build_run_plan_binding(design_spec: dict[str, Any], run_plan: dict[str, Any]) -> dict[str, Any]:
@@ -428,6 +457,7 @@ def build_run_plan_binding(design_spec: dict[str, Any], run_plan: dict[str, Any]
         "tasks": [
             {
                 "id": task.get("id"),
+                "method_id": task.get("method_id") or task.get("estimator"),
                 "formula": task.get("formula"),
                 "estimator": task.get("estimator"),
                 "status": task.get("status"),
@@ -436,6 +466,140 @@ def build_run_plan_binding(design_spec: dict[str, Any], run_plan: dict[str, Any]
         ],
         "outputs": run_plan.get("outputs", []),
     }
+
+
+def execute_run_plan_method_tasks(
+    project_root: Path,
+    run_id: str,
+    design_spec: dict[str, Any],
+    run_plan: dict[str, Any],
+    dataset_source: dict[str, Any] | None,
+) -> dict[str, Any]:
+    methods = []
+    for task in run_plan.get("tasks", []):
+        method_id = str(task.get("method_id") or task.get("estimator") or "").strip()
+        if method_id == "ols":
+            methods.append(execute_ols_task(project_root, run_id, design_spec, run_plan, task, dataset_source))
+
+    payload = {
+        "id": "method_execution_result",
+        "run_id": run_id,
+        "engine": "python_ols_adapter",
+        "evidence_level": "local_execution",
+        "artifact_path": "Results/json/method_execution_result.json",
+        "created_at": utc_now(),
+        "methods": methods,
+    }
+    result_path = project_root / "Results" / "json" / "method_execution_result.json"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "artifact_path": payload["artifact_path"],
+        "engine": payload["engine"],
+        "evidence_level": payload["evidence_level"],
+        "methods": methods,
+    }
+
+
+def execute_ols_task(
+    project_root: Path,
+    run_id: str,
+    design_spec: dict[str, Any],
+    run_plan: dict[str, Any],
+    task: dict[str, Any],
+    dataset_source: dict[str, Any] | None,
+) -> dict[str, Any]:
+    formula = str(task.get("formula") or design_spec.get("model", {}).get("formula") or "").strip()
+    dependent, predictors = parse_linear_formula(formula)
+    dataset_path = str(run_plan.get("dataset_path") or (dataset_source or {}).get("path") or "")
+    rows = read_numeric_formula_rows(project_root / dataset_path, dependent, predictors)
+    coefficients = fit_ols_coefficients(rows, dependent, predictors)
+    treatment = first_string((design_spec.get("variables") or {}).get("treatment"))
+    return {
+        "run_id": run_id,
+        "task_id": task.get("id"),
+        "method_id": "ols",
+        "estimator": task.get("estimator", "ols"),
+        "formula": formula,
+        "dataset_path": dataset_path,
+        "run_plan_version": run_plan.get("version"),
+        "design_spec_version": run_plan.get("design_spec_version"),
+        "nobs": len(rows),
+        "dependent_var": dependent,
+        "predictors": predictors,
+        "coefficients": coefficients,
+        "treatment": treatment,
+        "treatment_coefficient": coefficients.get(treatment) if treatment else None,
+        "evidence_level": "local_execution",
+    }
+
+
+def parse_linear_formula(formula: str) -> tuple[str, list[str]]:
+    if "~" not in formula:
+        raise MethodExecutionError("unsupported_formula", f"Unsupported OLS formula: {formula}")
+    lhs, rhs = formula.split("~", 1)
+    dependent = lhs.strip()
+    predictors = [term.strip() for term in rhs.split("+") if term.strip() and term.strip() != "1"]
+    if not dependent or not predictors:
+        raise MethodExecutionError("unsupported_formula", f"Unsupported OLS formula: {formula}")
+    return dependent, predictors
+
+
+def read_numeric_formula_rows(path: Path, dependent: str, predictors: list[str]) -> list[dict[str, float]]:
+    fields = [dependent, *predictors]
+    rows: list[dict[str, float]] = []
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        for raw in csv.DictReader(handle):
+            try:
+                rows.append({field: float(raw[field]) for field in fields})
+            except (KeyError, TypeError, ValueError):
+                continue
+    if len(rows) <= len(predictors):
+        raise MethodExecutionError("not_enough_numeric_observations", "Not enough numeric observations for OLS execution")
+    return rows
+
+
+def fit_ols_coefficients(rows: list[dict[str, float]], dependent: str, predictors: list[str]) -> dict[str, float]:
+    columns = ["intercept", *predictors]
+    x_rows = [[1.0, *[row[predictor] for predictor in predictors]] for row in rows]
+    y_values = [row[dependent] for row in rows]
+    xtx = [
+        [sum(x_row[i] * x_row[j] for x_row in x_rows) for j in range(len(columns))]
+        for i in range(len(columns))
+    ]
+    xty = [sum(x_row[i] * y for x_row, y in zip(x_rows, y_values)) for i in range(len(columns))]
+    beta = solve_linear_system(xtx, xty)
+    return {column: round(value, 10) for column, value in zip(columns, beta)}
+
+
+def solve_linear_system(matrix: list[list[float]], vector: list[float]) -> list[float]:
+    size = len(vector)
+    augmented = [row[:] + [value] for row, value in zip(matrix, vector)]
+    for pivot_index in range(size):
+        pivot_row = max(range(pivot_index, size), key=lambda row_index: abs(augmented[row_index][pivot_index]))
+        if abs(augmented[pivot_row][pivot_index]) < 1e-12:
+            raise MethodExecutionError("singular_ols_design", "OLS normal equation is singular")
+        if pivot_row != pivot_index:
+            augmented[pivot_index], augmented[pivot_row] = augmented[pivot_row], augmented[pivot_index]
+        pivot = augmented[pivot_index][pivot_index]
+        augmented[pivot_index] = [value / pivot for value in augmented[pivot_index]]
+        for row_index in range(size):
+            if row_index == pivot_index:
+                continue
+            factor = augmented[row_index][pivot_index]
+            augmented[row_index] = [
+                current - factor * pivot_value
+                for current, pivot_value in zip(augmented[row_index], augmented[pivot_index])
+            ]
+    return [row[-1] for row in augmented]
+
+
+def first_string(values: Any) -> str | None:
+    if isinstance(values, list) and values:
+        return str(values[0])
+    if isinstance(values, str) and values:
+        return values
+    return None
 
 
 def build_research_engine_reference() -> dict[str, Any]:
@@ -518,6 +682,7 @@ def persist_full_run_provenance(
     run_id: str,
     plan_binding: dict[str, Any],
     research_engine: dict[str, Any],
+    method_execution: dict[str, Any] | None = None,
 ) -> None:
     manifest_path = project_root / "state" / "runs" / run_id / "run_manifest.json"
     if not manifest_path.exists():
@@ -526,6 +691,8 @@ def persist_full_run_provenance(
     manifest["run_plan_binding"] = plan_binding
     manifest["research_engine"] = research_engine
     manifest["execution_evidence_level"] = "local_execution"
+    if method_execution:
+        manifest["method_execution"] = method_execution
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 

@@ -2796,6 +2796,7 @@ function renderDataVariables() {
   const items = data.items || [];
   document.getElementById("datasets-count").textContent = items.length;
   renderVariableRoleWorkflow(items);
+  renderDatasetQualityProfile(items);
 
   if (items.length === 0) {
     document.getElementById("datasets-list").innerHTML = renderEmptyState(data.empty_state);
@@ -2804,17 +2805,147 @@ function renderDataVariables() {
       state.selectedDatasetPath = items.find((ds) => ds.role === "configured_final_dataset")?.path || items[0]?.path || null;
     }
     document.getElementById("datasets-list").innerHTML = items.map((ds) => `
-      <div class="project-card">
+      <div class="project-card dataset-card ${ds.path === state.selectedDatasetPath ? "is-selected" : ""}">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
           <strong>${escapeHtml(ds.name || ds.id)}</strong>
           ${renderEvidenceBadge(ds)}
         </div>
         <div class="muted">${ds.row_count ?? 0} 行 · ${ds.column_count ?? 0} 列 · ${ds.file_type || "未知格式"} · ${escapeHtml(ds.role || "candidate_dataset")}</div>
         <div class="muted">${escapeHtml(ds.path || "")}</div>
-        <button class="ghost-button" data-open-design-action data-dataset-path="${escapeHtml(ds.path || "")}">检查并确认变量角色</button>
+        <div class="compact-action-row">
+          <button class="ghost-button" data-select-dataset-quality data-dataset-path="${escapeHtml(ds.path || "")}">查看质量画像</button>
+          <button class="ghost-button" data-open-design-action data-dataset-path="${escapeHtml(ds.path || "")}">检查并确认变量角色</button>
+        </div>
       </div>
     `).join("");
   }
+}
+
+function renderDatasetQualityProfile(items) {
+  const container = document.getElementById("data-quality-profile-body");
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>等待数据文件</h4>
+        <p class="muted">发现本地数据后，这里会显示字段、缺失率和进入研究设计前的检查结果。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const selected = items.find((item) => item.path === state.selectedDatasetPath)
+    || items.find((item) => item.role === "configured_final_dataset")
+    || items[0];
+  const profile = selected?.quality_profile || null;
+  if (!profile) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>尚未生成质量画像</h4>
+        <p class="muted">当前数据集只有文件登记信息，尚未返回字段质量检查。</p>
+      </div>
+    `;
+    return;
+  }
+
+  const columns = profile.columns || [];
+  const checks = profile.checks || [];
+  container.innerHTML = `
+    <div class="data-quality-profile">
+      <div class="quality-profile-header">
+        <div>
+          <span class="eyebrow">数据质量画像</span>
+          <h4>${escapeHtml(selected.name || selected.path || "数据集")}</h4>
+          <p class="muted">${escapeHtml(selected.path || "")}</p>
+        </div>
+        <div class="quality-profile-status">
+          ${renderEvidenceBadge(profile)}
+          <span class="status-pill status-${escapeHtml(profile.readiness_status || "unknown")}">
+            ${escapeHtml(qualityReadinessLabel(profile.readiness_status))}
+          </span>
+        </div>
+      </div>
+      <div class="quality-profile-grid">
+        <div class="quality-metric">
+          <span>样本</span>
+          <strong>${profile.row_count ?? "-"}</strong>
+          <small>${profile.column_count ?? "-"} 个字段</small>
+        </div>
+        <div class="quality-metric">
+          <span>缺失率</span>
+          <strong>${formatQualityRate(profile.missing_rate)}</strong>
+          <small>${profile.missing_cells ?? "-"} 个空单元格</small>
+        </div>
+        <div class="quality-metric">
+          <span>数值字段</span>
+          <strong>${profile.numeric_column_count ?? "-"}</strong>
+          <small>可进入模型候选</small>
+        </div>
+        <div class="quality-metric">
+          <span>文本字段</span>
+          <strong>${profile.text_column_count ?? "-"}</strong>
+          <small>需人工解释</small>
+        </div>
+      </div>
+      <div class="quality-profile-section">
+        <h5>检查项</h5>
+        <div class="quality-check-list">
+          ${checks.map((check) => `
+            <div class="quality-check is-${escapeHtml(check.status || "unknown")}">
+              <span>${qualityCheckIcon(check.status)}</span>
+              <div>
+                <strong>${escapeHtml(check.label || check.id)}</strong>
+                <p class="muted">${escapeHtml(check.detail || "")}</p>
+              </div>
+            </div>
+          `).join("") || "<p class='muted'>暂无检查项。</p>"}
+        </div>
+      </div>
+      <div class="quality-profile-section">
+        <h5>字段画像</h5>
+        <div class="quality-column-list">
+          ${columns.slice(0, 8).map((column) => `
+            <div class="quality-column">
+              <div>
+                <strong>${escapeHtml(column.name || "")}</strong>
+                <span>${escapeHtml(qualityColumnTypeLabel(column.inferred_type))}</span>
+              </div>
+              <small>缺失 ${formatQualityRate(column.missing_rate)} · 样例 ${escapeHtml((column.sample_values || []).join(", ") || "-")}</small>
+            </div>
+          `).join("") || "<p class='muted'>当前格式暂未解析字段画像。</p>"}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function qualityReadinessLabel(status) {
+  return {
+    ready: "可进入变量确认",
+    needs_review: "需要人工检查",
+    blocked: "阻塞",
+    not_profiled: "尚未画像",
+  }[status] || status || "未知";
+}
+
+function qualityColumnTypeLabel(type) {
+  return {
+    numeric: "数值",
+    text: "文本",
+    empty: "空列",
+  }[type] || type || "未知";
+}
+
+function qualityCheckIcon(status) {
+  return status === "passed" ? "✓" : status === "warning" ? "!" : "×";
+}
+
+function formatQualityRate(value) {
+  if (value === null || value === undefined) return "-";
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return escapeHtml(String(value));
+  return `${Math.round(numeric * 1000) / 10}%`;
 }
 
 function renderVariableRoleWorkflow(items) {
@@ -2840,7 +2971,7 @@ function renderVariableRoleWorkflow(items) {
     <div class="variable-role-workflow-layout research-record-card">
       <div class="record-header">
         <div>
-          <span class="eyebrow">confirm_variable_roles</span>
+          <span class="eyebrow">确认变量角色</span>
           <h4>${escapeHtml(selected?.name || "已选择数据集")}</h4>
         </div>
         ${renderEvidenceBadge(selected)}
@@ -4204,6 +4335,12 @@ async function boot() {
   document.getElementById("datasets-list")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const selectButton = target.closest("[data-select-dataset-quality]");
+    if (selectButton) {
+      state.selectedDatasetPath = selectButton.dataset.datasetPath || state.selectedDatasetPath;
+      renderDataVariables();
+      return;
+    }
     const button = target.closest("[data-open-design-action]");
     if (!button) return;
     openDesignAction(button.dataset.datasetPath);

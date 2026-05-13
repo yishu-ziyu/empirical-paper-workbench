@@ -306,6 +306,18 @@ Rejected: 为了视觉升级改用 React/Vite/Next。原因是当前产品是 Fa
 
 Rejected: 本轮实现真正双向链接数据库。原因是右侧 `相邻笔记` 先承担产品导航和信息架构修正；真实 backlinks / graph 应在后续 Artifacts/Agents 或知识库层单独设计。
 
+## 2026-05-13：数据质量画像是进入方法技能集前的准入对象
+
+Decision: 在 `GET /api/v1/projects/{project_id}/datasets` 中新增 `quality_profile`，让 CSV 数据集返回样本量、字段数、缺失率、字段类型、检查项和 `readiness_status`；前端“数据与设计”页新增 `数据质量画像` 面板，并把它放在变量角色确认之前。
+
+Reason: CoPaper/StatsPAI 式路径不是直接选择 DID/IV/RDD 等方法，而是先完成数据引入、字段理解、样本/缺失检查，再进入变量角色和方法选择。没有数据质量画像，RunPlan 的方法选择会变成对不透明数据的猜测。
+
+Rejected: 直接进入 StatsPAI 方法执行。原因是当前还缺少数据质量准入、方法前置变量要求和可执行状态，直接执行会把方法引擎接成黑盒。
+
+Rejected: 只在前端显示静态数据质量说明。原因是质量画像必须来自本地文件读取，并标记 `evidence_level=local_file`；否则会伪装成真实 EDA。
+
+Rejected: 把 `dataset_quality_profile` / `confirm_variable_roles` 作为可见 UI 标签。原因是用户界面必须展示中文研究语义，内部契约名只留在 API 和代码路径中。
+
 ## 2026-05-13：写回审批和 docx 预检必须分开
 
 Decision: 新增 `writeback_approval` 与 `docx_preflight` 两个独立状态。写回审批写入 `state/product/writeback_approvals.json`，只表示用户允许候选段落进入下一步；docx 预检写入 `state/product/docx_export_preflight.json`，只表示源草稿、写回预览、导出命令和目标 docx 路径都可追溯。

@@ -288,6 +288,7 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
             relative_path = path.resolve().relative_to(root).as_posix()
             stat = path.stat()
             shape = inspect_dataset_shape(path)
+            quality_profile = build_dataset_quality_profile(path, shape)
             items.append(
                 {
                     "name": path.name,
@@ -300,6 +301,7 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
                     "role": "configured_final_dataset"
                     if configured_final_dataset == relative_path
                     else "candidate_dataset",
+                    "quality_profile": quality_profile,
                     "updated_at": utc_now(),
                 }
             )
@@ -338,6 +340,145 @@ def inspect_dataset_shape(path: Path) -> dict[str, int | None]:
         "row_count": max(len(rows) - 1, 0),
         "column_count": len(rows[0]),
     }
+
+
+def build_dataset_quality_profile(path: Path, shape: dict[str, int | None]) -> dict[str, Any]:
+    if path.suffix.lower() != ".csv":
+        return {
+            "evidence_level": "local_file",
+            "supported": False,
+            "readiness_status": "not_profiled",
+            "row_count": shape["row_count"],
+            "column_count": shape["column_count"],
+            "missing_cells": None,
+            "missing_rate": None,
+            "numeric_column_count": None,
+            "text_column_count": None,
+            "columns": [],
+            "checks": [
+                {
+                    "id": "profile_supported",
+                    "label": "数据画像支持",
+                    "status": "warning",
+                    "detail": f"{path.suffix.lower().lstrip('.') or 'unknown'} 暂未接入内容解析。",
+                }
+            ],
+        }
+
+    rows = read_csv_rows(path)
+    if not rows:
+        return empty_csv_quality_profile()
+
+    headers = rows[0]
+    data_rows = rows[1:]
+    column_count = len(headers)
+    row_count = len(data_rows)
+    columns = build_column_profiles(headers, data_rows)
+    missing_cells = sum(column["missing_count"] for column in columns)
+    total_cells = row_count * column_count
+    missing_rate = round(missing_cells / total_cells, 4) if total_cells else 0
+    numeric_column_count = sum(1 for column in columns if column["inferred_type"] == "numeric")
+    text_column_count = sum(1 for column in columns if column["inferred_type"] == "text")
+
+    if row_count == 0 or column_count == 0:
+        readiness_status = "blocked"
+    elif missing_cells > 0:
+        readiness_status = "needs_review"
+    else:
+        readiness_status = "ready"
+
+    return {
+        "evidence_level": "local_file",
+        "supported": True,
+        "readiness_status": readiness_status,
+        "row_count": row_count,
+        "column_count": column_count,
+        "missing_cells": missing_cells,
+        "missing_rate": missing_rate,
+        "numeric_column_count": numeric_column_count,
+        "text_column_count": text_column_count,
+        "columns": columns,
+        "checks": [
+            {
+                "id": "schema_detected",
+                "label": "字段结构",
+                "status": "passed" if column_count > 0 else "failed",
+                "detail": f"识别到 {column_count} 个字段。",
+            },
+            {
+                "id": "sample_size_checked",
+                "label": "样本数量",
+                "status": "passed" if row_count > 0 else "failed",
+                "detail": f"识别到 {row_count} 行样本。",
+            },
+            {
+                "id": "missing_values_checked",
+                "label": "缺失值",
+                "status": "warning" if missing_cells > 0 else "passed",
+                "detail": f"发现 {missing_cells} 个空单元格。",
+            },
+        ],
+    }
+
+
+def read_csv_rows(path: Path) -> list[list[str]]:
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as handle:
+        return list(csv.reader(handle))
+
+
+def empty_csv_quality_profile() -> dict[str, Any]:
+    return {
+        "evidence_level": "local_file",
+        "supported": True,
+        "readiness_status": "blocked",
+        "row_count": 0,
+        "column_count": 0,
+        "missing_cells": 0,
+        "missing_rate": 0,
+        "numeric_column_count": 0,
+        "text_column_count": 0,
+        "columns": [],
+        "checks": [
+            {
+                "id": "schema_detected",
+                "label": "字段结构",
+                "status": "failed",
+                "detail": "CSV 文件为空。",
+            }
+        ],
+    }
+
+
+def build_column_profiles(headers: list[str], data_rows: list[list[str]]) -> list[dict[str, Any]]:
+    profiles: list[dict[str, Any]] = []
+    row_count = len(data_rows)
+    for index, header in enumerate(headers):
+        values = [row[index] if index < len(row) else "" for row in data_rows]
+        non_missing = [value.strip() for value in values if value.strip()]
+        missing_count = row_count - len(non_missing)
+        inferred_type = infer_column_type(non_missing)
+        profiles.append(
+            {
+                "name": header or f"column_{index + 1}",
+                "index": index,
+                "inferred_type": inferred_type,
+                "missing_count": missing_count,
+                "missing_rate": round(missing_count / row_count, 4) if row_count else 0,
+                "sample_values": non_missing[:3],
+            }
+        )
+    return profiles
+
+
+def infer_column_type(values: list[str]) -> str:
+    if not values:
+        return "empty"
+    for value in values:
+        try:
+            float(value)
+        except ValueError:
+            return "text"
+    return "numeric"
 
 
 def get_project_design(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:

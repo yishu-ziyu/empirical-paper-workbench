@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>实证工作台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231e6f62'/%3E%3Cpath d='M4 11h8v1H4zm1-7h6v1H5zm0 3h6v1H5z' fill='white'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260513-clean1" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260513-p2a" />
   </head>
   <body>
     <div class="app-shell archive-shell clean-workbench-shell">
@@ -183,6 +183,22 @@
             </div>
             <div id="variable-role-workflow-body" class="variable-role-workflow-body"></div>
           </section>
+          <div class="panel-grid two-up data-intake-grid">
+            <div class="panel" id="datasets-panel">
+              <div class="panel-head">
+                <h3>数据集</h3>
+                <span class="pill" id="datasets-count">0</span>
+              </div>
+              <div id="datasets-list" class="stack"></div>
+            </div>
+            <section class="panel data-quality-profile-panel" id="data-quality-profile-panel">
+              <div class="panel-head">
+                <h3>数据质量画像</h3>
+                <span class="pill">本地文件证据</span>
+              </div>
+              <div id="data-quality-profile-body" class="data-quality-profile-body"></div>
+            </section>
+          </div>
           <section class="panel variable-role-editor-card">
             <div class="panel-head">
               <h3>变量角色集编辑器</h3>
@@ -227,13 +243,6 @@
               </div>
             </form>
           </section>
-          <div class="panel" id="datasets-panel">
-            <div class="panel-head">
-              <h3>数据集</h3>
-              <span class="pill" id="datasets-count">0</span>
-            </div>
-            <div id="datasets-list" class="stack"></div>
-          </div>
         </section>
 
         <!-- ===== 研究设计 ===== -->
@@ -795,6 +804,6 @@
       </main>
     </div>
 
-    <script src="/assets/app.js?v=20260513-clean1" defer></script>
+    <script src="/assets/app.js?v=20260513-p2a" defer></script>
   </body>
 </html>

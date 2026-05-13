@@ -301,3 +301,13 @@
 - [x] 实现：在 `Product/web/index.html` 增加 `archive-shell` 和右侧 `archive-inspector`；在 `Product/web/assets/app.js` 增加 `archivePageNotes`、`mountArchiveInspector()`、`updateArchiveInspector()`；在 `Product/web/assets/styles.css` 增加纸张网格、档案条目、相邻笔记、证据 ledger、hover/focus/loading/empty/error 状态。
 - [x] 验证：`python3 -m unittest tests.test_archive_interface_visual_contract -v` 5 tests OK；`python3 -m unittest discover -s tests -v` 132 tests OK，skipped=1；`node --check Product/web/assets/app.js` 通过；Python 编译检查通过；Safari 可视化验收 `http://127.0.0.1:8765/?v=20260513-archive1` 通过。
 - [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow。
+## 2026-05-13 P2-A Dataset Quality Profile
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-data-quality-profile-bdd.md`，定义数据集必须先生成本地文件证据级质量画像，再进入变量角色/研究设计。
+- [x] TDD：新增 `tests/test_dataset_quality_profile.py`；首次运行失败原因是 `/datasets` 返回的数据集缺少 `quality_profile`，前端缺少数据质量画像面板。
+- [x] 实现：扩展 `Product/backend/overview_service.py`，CSV 数据集返回 `quality_profile`，包含行列数、缺失单元格、缺失率、数值/文本字段数、字段画像和检查项；暂不支持的真实文件保留 `evidence_level=local_file` 并标记 `not_profiled`。
+- [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，数据与设计页新增“数据质量画像”，并把数据集、质量画像、变量角色编辑器改成纵向 clean workbench 顺序，避免与右侧属性检查器挤压。
+- [x] 中文化修正：扩展 `tests/test_frontend_chinese_copy.py`，防止 `dataset_quality_profile` / `confirm_variable_roles` 这类内部标签重新出现在可见 eyebrow 文案。
+- [x] 验证：`python3 -m unittest discover -s tests -v`，148 tests OK，skipped=1；Python 编译检查通过；`node --check Product/web/assets/app.js` 通过。
+- [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2a`，进入“数据与设计”后可见 `analysis_sample.csv`、`数据质量画像`、样本 12、缺失率 0%、字段画像和中文标签；布局不再出现两列挤压。
+- [ ] P2-B：设计 StatsPAI/CoPaper 式方法技能集目录，把 OLS/DID/IV/RDD/PSM/DML 等方法的前置变量要求和可执行状态接入 RunPlan。

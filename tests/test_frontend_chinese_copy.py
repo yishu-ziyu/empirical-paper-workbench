@@ -39,10 +39,17 @@ class FrontendChineseCopyTests(unittest.TestCase):
 
     def test_bdd_4_dynamic_copy_uses_chinese_action_and_status_words(self) -> None:
         """行为 4：动态渲染文案必须避免英文操作标签。"""
-        for text in ["已就绪", "已阻塞", "打开数据与设计", "本轮评估通过", "productTermLabel"]:
+        for text in ["已就绪", "已阻塞", "打开数据与设计", "本轮评估通过", "数据质量画像", "确认变量角色", "productTermLabel"]:
             self.assertIn(text, self.app_js)
 
-        for text in ["Queued", "Planning", "Reviewing", "打开 Data & Design"]:
+        for text in [
+            "Queued",
+            "Planning",
+            "Reviewing",
+            "打开 Data & Design",
+            '<span class="eyebrow">dataset_quality_profile</span>',
+            '<span class="eyebrow">confirm_variable_roles</span>',
+        ]:
             self.assertNotIn(text, self.app_js)
 
     def test_bdd_5_backend_contract_terms_are_translated_before_display(self) -> None:

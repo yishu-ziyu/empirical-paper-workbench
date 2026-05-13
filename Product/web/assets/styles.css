@@ -337,6 +337,161 @@ textarea {
   margin-top: 8px;
 }
 
+.dataset-card .compact-action-row button {
+  margin-top: 0;
+}
+
+.data-quality-profile-panel {
+  margin-top: 18px;
+}
+
+.panel-grid.two-up.data-intake-grid {
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 18px;
+}
+
+.data-intake-grid .data-quality-profile-panel {
+  margin-top: 0;
+}
+
+.data-intake-grid .quality-profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.data-quality-profile {
+  display: grid;
+  gap: 18px;
+}
+
+.quality-profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.quality-profile-header h4 {
+  margin: 4px 0;
+  font-size: 24px;
+}
+
+.quality-profile-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quality-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-metric {
+  border: 1px solid rgba(30, 111, 98, 0.12);
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+  min-width: 0;
+}
+
+.quality-metric span,
+.quality-metric small {
+  display: block;
+  color: var(--muted);
+}
+
+.quality-metric strong {
+  display: block;
+  margin: 6px 0 2px;
+  font-size: 22px;
+}
+
+.quality-profile-section {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-profile-section h5 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.quality-check-list,
+.quality-column-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quality-check {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.quality-check > span {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 111, 98, 0.1);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.quality-check.is-warning > span {
+  background: rgba(171, 99, 35, 0.13);
+  color: #8a4d16;
+}
+
+.quality-check.is-failed > span {
+  background: rgba(168, 45, 45, 0.12);
+  color: #a82d2d;
+}
+
+.quality-column {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.quality-column:last-child {
+  border-bottom: 0;
+}
+
+.quality-column div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.quality-column strong,
+.quality-column small {
+  overflow-wrap: anywhere;
+}
+
+.quality-column span {
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.08);
+  color: var(--accent);
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .card-row,
 .finding-card .card-row,
 .draft-section-binding .card-row {

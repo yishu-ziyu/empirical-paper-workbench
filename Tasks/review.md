@@ -265,6 +265,23 @@
 - 当前收藏架条目未绑定真实 artifacts/export package API，后续应把导出包、run manifest、paper draft 等产物接成可浏览 shelf。
 - Browser/IAB 和 Playwright 本轮连接异常；已通过 Safari + Computer Use 做可视化 fallback。
 
+## 2026-05-13 P2-A Dataset Quality Profile
+
+- 目标：把 CoPaper/StatsPAI 式流程里的“数据引入与质量理解”做成可见、可验证的研究对象，避免在变量角色、DesignSpec 或 RunPlan 阶段对不透明数据直接选方法。
+- BDD：新增 `docs/architecture-v2/codex-phase-p2-data-quality-profile-bdd.md`，覆盖 datasets API 返回质量画像、缺失值进入 `needs_review`、干净 CSV 进入 `ready`、未解析格式进入 `not_profiled`、前端展示质量画像。
+- 失败测试：`python3 -m unittest tests.test_dataset_quality_profile -v` 首次有效失败为 `KeyError: 'quality_profile'` 和前端缺少 `data-quality-profile-panel`，说明目标行为尚未实现。
+- 目标测试：`python3 -m unittest tests.test_frontend_chinese_copy tests.test_dataset_quality_profile -v`，11 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，148 tests OK，skipped=1，耗时 6.502s。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `analysis_sample.csv`，`quality_profile.evidence_level=local_file`、`readiness_status=ready`、`row_count=12`、`column_count=4`、`missing_rate=0`、`numeric_column_count=4`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2a`，进入“数据与设计”后可见 `analysis_sample.csv`、`数据质量画像`、样本 12、缺失率 0%、字段画像和中文操作标签；布局为纵向 clean workbench，不再出现两列挤压。
+
+## 风险更新
+
+- P2-A 已解决“方法选择前看不见数据质量”的问题，但当前质量画像只做轻量 CSV schema、缺失值和类型推断；还不是完整 StatsPAI 描述统计、平衡性检查或因果方法诊断。
+- `.dta`、`.xlsx`、`.parquet` 等格式当前保留 `evidence_level=local_file` 并标记 `readiness_status=not_profiled`，后续需要接入真实解析器或 StatsPAI/Stata 侧 profiling。
+- Playwright MCP 本轮仍出现 `Transport closed`；自动化视觉链路未修复前，继续使用 Safari + Computer Use、API 和静态资源检查组合验收。
+
 ## 2026-05-13 P1-P Writeback Approval + DOCX Preflight
 
 - 失败测试：`python3 -m unittest tests.test_review_export_package -v` 首次出现 4 failures、1 error；失败原因是导出包缺少 `writeback_approval`，两个新 POST API 返回 404，前端缺少 `review-export-evidence-bench`、`writeback-approval-panel`、`docx-preflight-panel` 和 `export-evidence-table`。

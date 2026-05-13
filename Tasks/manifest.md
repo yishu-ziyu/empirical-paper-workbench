@@ -260,6 +260,33 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 
 说明：Safari 可视化验收确认首页显示 `个人研究档案`、`本地证据`、右侧 `档案索引`、`相邻笔记`、`证据图例`、`收藏架`。点击右侧 `数据与设计` 后页面切换到变量角色集编辑器，右侧当前档案说明同步为 `数据与设计`。Browser/IAB 与 Playwright 本轮连接异常，已使用 Safari + Computer Use 作为可视化 fallback。
 
+## 2026-05-13 P2-A Dataset Quality Profile
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-data-quality-profile-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_dataset_quality_profile.py`
+- `tests/test_frontend_chinese_copy.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：`list_project_datasets()` 为每个数据文件附加 `quality_profile`；新增 CSV 读取、字段类型推断、缺失率统计和 `readiness_status` 计算。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `?v=20260513-p2a`；数据与设计页新增 `data-quality-profile-panel`。
+- `Product/web/assets/app.js`：新增 `renderDatasetQualityProfile()`、`qualityReadinessLabel()`、`qualityColumnTypeLabel()`、`qualityCheckIcon()`、`formatQualityRate()`，数据卡片可点击“查看质量画像”。
+- `Product/web/assets/styles.css`：新增 `data-quality-profile`、`quality-profile-grid`、`quality-check-list`、`quality-column-list` 等样式；`data-intake-grid` 强制单列，避免面板挤压。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p2a`
+
+说明：Safari + Computer Use 验收确认“数据与设计”页显示 `数据质量画像`、`analysis_sample.csv`、样本 12、缺失率 0%、字段画像和中文可见标签；Playwright MCP 仍出现 `Transport closed`，本轮用 Safari/接口/静态资源检查作为可视化 fallback。
+
 ## 2026-05-13 P1-P Writeback Approval + DOCX Preflight
 
 ### 新增/扩展文档

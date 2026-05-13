@@ -4,10 +4,13 @@
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与档案界面均已完成。最新 P1-R 已完成清洁工作台视觉修正：`archive-shell` 去掉纸格噪声，右侧改为属性检查器，变量角色确认入口改为单列 record/list，修复用户截图中的重叠问题。当前 full run `run_c424d6a11af7` 已生成 approved FindingCard `finding_trained_effect` 和 approved Manuscript candidate `manuscript_candidate_finding_trained_effect_results`；该 candidate 已进入 `export_status=preview_ready`。下一步是继续 P1-P：设计显式写回审批或 docx 导出预检，或者继续把 Artifacts / Agents 做成同样干净的证据与审计工作台。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与档案界面均已完成。最新 P2-A 已完成 CoPaper/StatsPAI 式“数据质量画像”：`/datasets` 返回 `quality_profile`，数据与设计页能展示样本量、缺失率、字段类型、检查项和 `local_file` 证据，并修正残留英文技术标签。当前 full run `run_c424d6a11af7` 已生成 approved FindingCard `finding_trained_effect` 和 approved Manuscript candidate `manuscript_candidate_finding_trained_effect_results`；该 candidate 已进入 `export_status=preview_ready`。下一步建议进入 P2-B：设计 StatsPAI/CoPaper 式方法技能集目录，把 OLS/DID/IV/RDD/PSM/DML 等方法的前置变量要求和可执行状态接入 RunPlan。
 
 ## 已完成事项
 
+- P2-A 数据质量画像已完成：`Product/backend/overview_service.py` 的 datasets API 现在把数据文件升级为可审计研究对象，CSV 返回 `quality_profile`，包含样本量、字段数、缺失值、字段类型和检查项；未解析格式保留 `local_file` 证据并标记 `not_profiled`。
+- P2-A 前端已完成：`Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css` 在“数据与设计”页新增 `数据质量画像` 面板；数据集、质量画像、变量角色编辑器按纵向 clean workbench 顺序展示，避免与右侧属性检查器挤压。
+- P2-A 中文化补丁已完成：`tests/test_frontend_chinese_copy.py` 防止 `dataset_quality_profile` / `confirm_variable_roles` 这类内部标签重新作为可见 eyebrow 文案出现。
 - 确认 git 根目录是 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
 - 读取项目级 `AGENTS.md`，确认本项目默认 BDD + TDD。
 - 读取 `docs/architecture-v2/README.md`、`api-contract-v2.md`、`technical-architecture.md`、`kimi-observable-execution-ui-handoff-2026-05-10.md`、`codex-phase-a-bdd.md`。
@@ -71,6 +74,12 @@
 
 ## 已验证证据
 
+- P2-A TDD 失败证据：`python3 -m unittest tests.test_dataset_quality_profile -v` 首次有效失败为 `KeyError: 'quality_profile'` 和前端缺少 `data-quality-profile-panel`，说明目标行为尚未实现。
+- P2-A 目标测试：`python3 -m unittest tests.test_frontend_chinese_copy tests.test_dataset_quality_profile -v`，11 tests OK。
+- P2-A 全量回归：`python3 -m unittest discover -s tests -v`，148 tests OK，skipped=1。
+- P2-A 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- P2-A API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `analysis_sample.csv`，`quality_profile.evidence_level=local_file`、`readiness_status=ready`、`row_count=12`、`column_count=4`、`missing_rate=0`、`numeric_column_count=4`。
+- P2-A 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2a`，进入“数据与设计”后可见 `数据质量画像`、样本 12、缺失率 0%、字段画像和中文 `确认变量角色` 标签；布局纵向排列，不再与右侧属性检查器挤压。
 - `git status --short --branch` 输出：`## main...origin/main`。
 - 基线测试输出：`Ran 48 tests in 4.487s`，`OK (skipped=1)`。
 - StatsPAI 核心文章 DOM 抽取到的标题和章节包括：为什么是 Python、StatsPAI 包在做什么、方法覆盖、面向 Agent 的设计、时间线、接下来、参与。

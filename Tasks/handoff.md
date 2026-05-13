@@ -633,6 +633,60 @@ P1-P：围绕“显式写回审批”或“docx 导出预检”写 BDD，再写�
 - Safari 验收可见浏览器侧边栏，但产品主体渲染正确；Browser/IAB 和 Playwright 本轮连接不稳定。
 - 当前 `archive-inspector` 的收藏架条目仍是静态概览，后续应绑定真实 artifacts/export package 数据。
 
+## 2026-05-13 P1-P Writeback Approval + DOCX Preflight 交接增量
+
+### 当前目标
+
+把 Review & Export 从“导出包展示”推进到“证据验收台”：用户必须先显式批准写回，系统才允许生成 docx 导出预检清单；这一步仍然不直接覆盖源草稿，也不直接生成 docx。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p1-writeback-docx-preflight-bdd.md`。
+- 扩展测试：`tests/test_review_export_package.py` 新增写回审批、docx 预检、拒绝阻断和 clean evidence bench 的行为测试。
+- 扩展后端：`Product/backend/manuscript_candidate_service.py` 新增 `save_project_writeback_approval()`、`save_project_docx_export_preflight()` 和导出包状态聚合。
+- 扩展 API：`Product/app.py` 新增两个 POST endpoint：
+  - `/api/v1/projects/{project_id}/export-package/{candidate_id}/writeback-approval`
+  - `/api/v1/projects/{project_id}/export-package/{candidate_id}/docx-preflight`
+- 扩展前端：`Product/web/assets/app.js` 和 `Product/web/assets/styles.css` 将 Review & Export 整理为 `review-export-evidence-bench`、`export-evidence-table`、`writeback-approval-panel`、`docx-preflight-panel`。
+
+### 已验证证据
+
+- 红灯测试：`python3 -m unittest tests.test_review_export_package -v` 首次失败，缺口符合预期：状态字段缺失、POST API 404、前端 clean bench 标识缺失。
+- 目标测试：`python3 -m unittest tests.test_review_export_package -v`，9 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_review_export_package tests.test_manuscript_consumption tests.test_results_draft_evidence_binding -v`，36 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，142 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/manuscript_candidate_service.py Product/app.py Product/backend/project_service.py Product/backend/results_draft_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API 验收：重启 8765 后，写回审批 endpoint 返回 200，并写入 `state/product/writeback_approvals.json`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p1p`，进入“审阅与导出”，审批后页面显示 `写回：已审批`；点击 `运行 docx 预检` 后页面显示 `预检通过` 和四项检查。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p1-writeback-docx-preflight-bdd.md`
+- `tests/test_review_export_package.py`
+- `Product/backend/manuscript_candidate_service.py`
+- `Product/app.py`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/writeback_approvals.json`（runtime state，不提交）
+- `state/product/docx_export_preflight.json`（runtime state，不提交）
+
+### 不能重复探索的结论
+
+- 显式写回审批只是本地状态确认，不能自动覆盖 `Manuscripts/generated/paper_draft.md`。
+- docx 预检只声明导出条件、目标路径和命令，不能在本阶段直接生成 docx。
+- Review & Export 应继续保持证据验收台结构：表格列出证据路径，动作面板处理审批和预检，日志作为 Frontier-Eng 迭代说明。
+- 8765 页面出现 404 时，优先检查是否是旧 uvicorn 进程未重启；本轮就是旧服务导致的，不是路由实现失败。
+
+### 下一步第一件事
+
+继续 P1-Q/P1-R 后续：实现真正的 docx 导出执行按钮或复现包封装前，需要先设计“执行导出”与“预检通过”之间的边界，避免把预检误当成最终导出。
+
+### 未解决风险
+
+- 本轮没有真正执行 `Program/export_docx.py` 生成 docx，只做导出预检。
+- Browser plugin 和 Playwright MCP 仍不稳定；本轮可视化验收使用 Safari + Computer Use fallback。
+- runtime state 已写入 `state/product/`，该目录应保持 ignored，不进入提交。
+
 ## 2026-05-13 P1-R Clean Workbench Visual Pass 交接增量
 
 ### 当前目标

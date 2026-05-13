@@ -260,6 +260,37 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 
 说明：Safari 可视化验收确认首页显示 `个人研究档案`、`本地证据`、右侧 `档案索引`、`相邻笔记`、`证据图例`、`收藏架`。点击右侧 `数据与设计` 后页面切换到变量角色集编辑器，右侧当前档案说明同步为 `数据与设计`。Browser/IAB 与 Playwright 本轮连接异常，已使用 Safari + Computer Use 作为可视化 fallback。
 
+## 2026-05-13 P1-P Writeback Approval + DOCX Preflight
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p1-writeback-docx-preflight-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_review_export_package.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/manuscript_candidate_service.py`：新增写回审批状态、docx 预检状态、导出包状态聚合和拒绝/未审批阻断。
+- `Product/app.py`：新增 writeback approval 与 docx preflight POST API。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：Review & Export 新增证据表、写回审批面板、docx 预检面板、审批/预检 API 调用和交互状态。
+- `Product/web/assets/styles.css`：新增 `review-export-evidence-bench`、`export-evidence-table`、`export-decision-panel`、`docx-preflight-checks` 等 clean workbench 样式。
+
+### Runtime 产物
+
+- `state/product/writeback_approvals.json`：显式写回审批状态，本地运行产物，不提交。
+- `state/product/docx_export_preflight.json`：docx 导出预检状态，本地运行产物，不提交。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p1p`
+
+说明：重启 8765 的 uvicorn 服务后，Safari + Computer Use 可视化验收确认 Review & Export 显示“导出包验收台”，审批后显示 `写回：已审批`，点击 `运行 docx 预检` 后显示 `预检通过` 和四项检查。
+
 ## 2026-05-13 P1-Q Chinese Copy + Archive Interface
 
 ### 新增/扩展文档

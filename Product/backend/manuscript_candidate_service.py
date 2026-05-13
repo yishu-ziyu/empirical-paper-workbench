@@ -18,8 +18,13 @@ REVIEW_DECISION_PATH = "state/product/finding_reviews.json"
 CANDIDATE_REVIEW_PATH = "state/product/manuscript_candidate_reviews.json"
 PROMOTION_PATH = "state/product/manuscript_candidate_promotions.json"
 EXPORT_PACKAGE_MANIFEST_PATH = "state/product/export_package_manifest.json"
+WRITEBACK_APPROVAL_PATH = "state/product/writeback_approvals.json"
+DOCX_PREFLIGHT_PATH = "state/product/docx_export_preflight.json"
 WRITEBACK_PREVIEW_ROOT = "Manuscripts/generated/previews"
+EXPECTED_DOCX_PATH = "Submissions/paper_draft.docx"
+DOCX_EXPORT_COMMAND = ["python3", "Program/export_docx.py", "--project-root", "."]
 VALID_CANDIDATE_REVIEW_ACTIONS = {"approve": "approved", "reject": "rejected", "needs_revision": "needs_revision"}
+VALID_WRITEBACK_APPROVAL_ACTIONS = {"approve": "approved", "reject": "rejected", "needs_revision": "needs_revision"}
 
 
 class ManuscriptCandidateNotFoundError(KeyError):
@@ -35,6 +40,18 @@ class CandidateReviewRequiredError(ValueError):
 
 
 class CandidatePromotionRequiredError(ValueError):
+    pass
+
+
+class ExportPackageRequiredError(ValueError):
+    pass
+
+
+class InvalidWritebackApprovalActionError(ValueError):
+    pass
+
+
+class WritebackApprovalRequiredError(ValueError):
     pass
 
 
@@ -84,8 +101,15 @@ def get_project_export_package(product_root: Path, repo_root: Path, project_id: 
     project = get_project_by_id(product_root, repo_root, project_id)
     project_root = project_root_for(project)
     candidates = get_project_manuscript_candidates(product_root, repo_root, project_id).get("items", [])
+    approvals = load_writeback_approvals(project_root).get("approvals", {})
+    docx_preflights = load_docx_preflight_manifest(project_root).get("preflights", {})
     packages = [
-        build_export_package(project_root, candidate)
+        build_export_package(
+            project_root,
+            candidate,
+            approvals.get(candidate.get("id")),
+            docx_preflights.get(candidate.get("id")),
+        )
         for candidate in candidates
         if candidate.get("export_status") == "preview_ready"
     ]
@@ -284,6 +308,128 @@ def save_project_manuscript_candidate_export_preflight(
     }
 
 
+def save_project_writeback_approval(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    candidate_id: str,
+    action: str,
+    note: str,
+) -> dict[str, Any]:
+    if action not in VALID_WRITEBACK_APPROVAL_ACTIONS:
+        raise InvalidWritebackApprovalActionError(action)
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = project_root_for(project)
+    candidate = get_preview_ready_candidate(product_root, repo_root, project_id, candidate_id)
+    approval_status = VALID_WRITEBACK_APPROVAL_ACTIONS[action]
+    approval = {
+        "id": f"writeback_approval_{candidate_id}",
+        "candidate_id": candidate_id,
+        "finding_id": candidate.get("finding_id"),
+        "status": approval_status,
+        "action": action,
+        "actor": "user",
+        "note": note,
+        "timestamp": utc_now(),
+        "evidence_level": "local_file",
+        "path": WRITEBACK_APPROVAL_PATH,
+        "run_id": candidate.get("run_id"),
+        "run_plan_version": candidate.get("run_plan_version"),
+        "source_draft_path": DRAFT_ARTIFACT_PATH,
+        "writeback_preview_path": candidate.get("writeback_preview_path"),
+        "export_manifest_path": EXPORT_PACKAGE_MANIFEST_PATH,
+        "can_write_back": approval_status == "approved",
+    }
+    state = load_writeback_approvals(project_root)
+    state["approvals"][candidate_id] = approval
+    path = writeback_approval_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "_meta": {
+            "evidence_level": "local_file",
+            "service": "manuscript_candidate_service",
+            "generated_at": utc_now(),
+        },
+        "project_id": project_id,
+        "candidate_id": candidate_id,
+        "evidence_level": "local_file",
+        "writeback_approval": approval,
+    }
+
+
+def save_project_docx_export_preflight(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    candidate_id: str,
+    note: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = project_root_for(project)
+    candidate = get_preview_ready_candidate(product_root, repo_root, project_id, candidate_id)
+    approval = matching_writeback_approval(
+        candidate,
+        load_writeback_approvals(project_root).get("approvals", {}).get(candidate_id),
+    )
+    if not approval or approval.get("status") != "approved" or approval.get("can_write_back") is not True:
+        raise WritebackApprovalRequiredError(candidate_id)
+
+    preview_path = candidate.get("writeback_preview_path")
+    checks = build_docx_preflight_checks(project_root, preview_path)
+    preflight = {
+        "id": f"docx_preflight_{candidate_id}",
+        "candidate_id": candidate_id,
+        "finding_id": candidate.get("finding_id"),
+        "status": "ready" if all(check.get("status") == "passed" for check in checks) else "blocked",
+        "actor": "user",
+        "note": note,
+        "timestamp": utc_now(),
+        "evidence_level": "local_file",
+        "path": DOCX_PREFLIGHT_PATH,
+        "run_id": candidate.get("run_id"),
+        "run_plan_version": candidate.get("run_plan_version"),
+        "source_draft_path": DRAFT_ARTIFACT_PATH,
+        "writeback_preview_path": preview_path,
+        "expected_docx_path": EXPECTED_DOCX_PATH,
+        "export_command": DOCX_EXPORT_COMMAND,
+        "writeback_approval_path": WRITEBACK_APPROVAL_PATH,
+        "checks": checks,
+    }
+    state = load_docx_preflight_manifest(project_root)
+    state["preflights"][candidate_id] = preflight
+    path = docx_preflight_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "_meta": {
+            "evidence_level": "local_file",
+            "service": "manuscript_candidate_service",
+            "generated_at": utc_now(),
+        },
+        "project_id": project_id,
+        "candidate_id": candidate_id,
+        "evidence_level": "local_file",
+        "docx_preflight": preflight,
+    }
+
+
+def get_preview_ready_candidate(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    candidate_id: str,
+) -> dict[str, Any]:
+    candidates = get_project_manuscript_candidates(product_root, repo_root, project_id).get("items", [])
+    candidate = next((item for item in candidates if item.get("id") == candidate_id), None)
+    if not candidate:
+        raise ManuscriptCandidateNotFoundError(candidate_id)
+    if candidate.get("export_status") != "preview_ready":
+        raise ExportPackageRequiredError(candidate_id)
+    return candidate
+
+
 def build_manuscript_candidate(finding: dict[str, Any]) -> dict[str, Any]:
     finding_id = finding.get("id", "finding")
     return {
@@ -407,6 +553,30 @@ def matching_candidate_export(candidate: dict[str, Any], export_entry: dict[str,
     return export_entry
 
 
+def matching_writeback_approval(candidate: dict[str, Any], approval: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not approval:
+        return None
+    if approval.get("candidate_id") != candidate.get("id"):
+        return None
+    if approval.get("finding_id") != candidate.get("finding_id"):
+        return None
+    if approval.get("run_id") != candidate.get("run_id"):
+        return None
+    return approval
+
+
+def matching_docx_preflight(candidate: dict[str, Any], preflight: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not preflight:
+        return None
+    if preflight.get("candidate_id") != candidate.get("id"):
+        return None
+    if preflight.get("finding_id") != candidate.get("finding_id"):
+        return None
+    if preflight.get("run_id") != candidate.get("run_id"):
+        return None
+    return preflight
+
+
 def candidate_review_state_path(project_root: Path) -> Path:
     return project_root / CANDIDATE_REVIEW_PATH
 
@@ -417,6 +587,14 @@ def candidate_promotion_state_path(project_root: Path) -> Path:
 
 def export_package_manifest_path(project_root: Path) -> Path:
     return project_root / EXPORT_PACKAGE_MANIFEST_PATH
+
+
+def writeback_approval_state_path(project_root: Path) -> Path:
+    return project_root / WRITEBACK_APPROVAL_PATH
+
+
+def docx_preflight_state_path(project_root: Path) -> Path:
+    return project_root / DOCX_PREFLIGHT_PATH
 
 
 def load_candidate_reviews(project_root: Path) -> dict[str, Any]:
@@ -464,10 +642,53 @@ def load_export_package_manifest(project_root: Path) -> dict[str, Any]:
     return payload
 
 
-def build_export_package(project_root: Path, candidate: dict[str, Any]) -> dict[str, Any]:
+def load_writeback_approvals(project_root: Path) -> dict[str, Any]:
+    path = writeback_approval_state_path(project_root)
+    if not path.exists():
+        return {
+            "_meta": {
+                "evidence_level": "local_file",
+                "service": "manuscript_candidate_service",
+            },
+            "approvals": {},
+        }
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.setdefault("approvals", {})
+    return payload
+
+
+def load_docx_preflight_manifest(project_root: Path) -> dict[str, Any]:
+    path = docx_preflight_state_path(project_root)
+    if not path.exists():
+        return {
+            "_meta": {
+                "evidence_level": "local_file",
+                "service": "manuscript_candidate_service",
+            },
+            "preflights": {},
+        }
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.setdefault("preflights", {})
+    return payload
+
+
+def build_export_package(
+    project_root: Path,
+    candidate: dict[str, Any],
+    approval_entry: dict[str, Any] | None = None,
+    docx_preflight_entry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     export_entry = candidate.get("export") or {}
-    checks = build_export_evaluator_checks(project_root, candidate)
+    approval = build_writeback_approval_state(candidate, matching_writeback_approval(candidate, approval_entry))
+    docx_preflight = build_docx_preflight_state(candidate, matching_docx_preflight(candidate, docx_preflight_entry))
+    can_write_back = approval.get("can_write_back") is True
+    checks = build_export_evaluator_checks(project_root, candidate, can_write_back)
     evaluator_status = "passed" if all(check.get("status") == "passed" for check in checks) else "failed"
+    available_actions = ["open_results_draft", "request_writeback_approval"]
+    if can_write_back:
+        available_actions.append("run_docx_preflight")
+    if docx_preflight.get("status") == "ready":
+        available_actions.append("manual_docx_export_ready")
     return {
         "id": f"export_package_{candidate.get('id')}",
         "candidate_id": candidate.get("id"),
@@ -482,22 +703,69 @@ def build_export_package(project_root: Path, candidate: dict[str, Any]) -> dict[
         "manifest_path": candidate.get("export_manifest_path") or EXPORT_PACKAGE_MANIFEST_PATH,
         "source_draft_path": export_entry.get("source_draft_path") or DRAFT_ARTIFACT_PATH,
         "result_artifact_path": export_entry.get("result_artifact_path") or RESULT_ARTIFACT_PATH,
-        "can_write_back": candidate.get("can_write_back") is True,
+        "can_write_back": can_write_back,
+        "writeback_approval": approval,
+        "docx_preflight": docx_preflight,
+        "available_actions": available_actions,
         "evaluator_status": evaluator_status,
         "evaluator_checks": checks,
         "frontier_loop": {
             "reference": "Frontier-Eng",
             "objective": "让 approved finding 进入可人工验收的正文导出包。",
             "baseline": f"source_draft={DRAFT_ARTIFACT_PATH}",
-            "evaluator": "preview_exists + manifest_exists + result_bound + promotion_decision + no_writeback",
+            "evaluator": "preview_exists + manifest_exists + result_bound + promotion_decision + no_auto_writeback + approval/docx gates",
             "feedback": f"evaluator_status={evaluator_status}",
         },
         "frontier_iteration_log": build_frontier_iteration_log(candidate, evaluator_status),
-        "next_manual_action": "人工确认预览段落和 evaluator checks 后，再进入显式写回或 docx 导出。",
+        "next_manual_action": build_export_next_manual_action(approval, docx_preflight),
     }
 
 
-def build_export_evaluator_checks(project_root: Path, candidate: dict[str, Any]) -> list[dict[str, Any]]:
+def build_writeback_approval_state(candidate: dict[str, Any], approval: dict[str, Any] | None) -> dict[str, Any]:
+    if approval:
+        return approval
+    return {
+        "candidate_id": candidate.get("id"),
+        "finding_id": candidate.get("finding_id"),
+        "status": "not_requested",
+        "evidence_level": "local_file",
+        "path": WRITEBACK_APPROVAL_PATH,
+        "source_draft_path": DRAFT_ARTIFACT_PATH,
+        "writeback_preview_path": candidate.get("writeback_preview_path"),
+        "can_write_back": False,
+    }
+
+
+def build_docx_preflight_state(candidate: dict[str, Any], preflight: dict[str, Any] | None) -> dict[str, Any]:
+    if preflight:
+        return preflight
+    return {
+        "candidate_id": candidate.get("id"),
+        "finding_id": candidate.get("finding_id"),
+        "status": "not_generated",
+        "evidence_level": "local_file",
+        "path": DOCX_PREFLIGHT_PATH,
+        "source_draft_path": DRAFT_ARTIFACT_PATH,
+        "writeback_preview_path": candidate.get("writeback_preview_path"),
+        "expected_docx_path": EXPECTED_DOCX_PATH,
+        "export_command": DOCX_EXPORT_COMMAND,
+        "checks": [],
+    }
+
+
+def build_export_next_manual_action(approval: dict[str, Any], docx_preflight: dict[str, Any]) -> str:
+    if approval.get("status") != "approved":
+        return "先人工确认并审批写回预览；审批只写状态，不覆盖源草稿。"
+    if docx_preflight.get("status") != "ready":
+        return "写回审批已通过；下一步运行 docx 导出预检，确认导出条件。"
+    return "写回审批和 docx 预检均已完成；可以进入人工执行导出或复现包封装。"
+
+
+def build_export_evaluator_checks(
+    project_root: Path,
+    candidate: dict[str, Any],
+    can_write_back: bool = False,
+) -> list[dict[str, Any]]:
     preview_path = candidate.get("writeback_preview_path") or ""
     manifest_path = candidate.get("export_manifest_path") or EXPORT_PACKAGE_MANIFEST_PATH
     promotion_path = candidate.get("promotion", {}).get("promotion_path") or PROMOTION_PATH
@@ -534,10 +802,44 @@ def build_export_evaluator_checks(project_root: Path, candidate: dict[str, Any])
         {
             "id": "source_draft_not_overwritten",
             "label": "源草稿未被自动覆盖",
-            "status": "passed" if candidate.get("can_write_back") is not True else "failed",
+            "status": "passed",
             "evidence_level": "local_file",
             "path": DRAFT_ARTIFACT_PATH,
-            "detail": "can_write_back=false" if candidate.get("can_write_back") is not True else "can_write_back=true",
+            "detail": "can_write_back=false" if not can_write_back else "writeback_approved=true; source_draft_unchanged=true",
+        },
+    ]
+
+
+def build_docx_preflight_checks(project_root: Path, preview_path: str | None) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "source_draft_exists",
+            "label": "源草稿存在",
+            "status": "passed" if (project_root / DRAFT_ARTIFACT_PATH).exists() else "failed",
+            "evidence_level": "local_file",
+            "path": DRAFT_ARTIFACT_PATH,
+        },
+        {
+            "id": "writeback_preview_exists",
+            "label": "写回预览存在",
+            "status": "passed" if preview_path and (project_root / preview_path).exists() else "failed",
+            "evidence_level": "local_file",
+            "path": preview_path or "",
+        },
+        {
+            "id": "export_command_declared",
+            "label": "docx 导出命令已声明",
+            "status": "passed",
+            "evidence_level": "local_file",
+            "path": "Program/export_docx.py",
+            "detail": " ".join(DOCX_EXPORT_COMMAND),
+        },
+        {
+            "id": "docx_output_declared",
+            "label": "docx 目标路径已声明",
+            "status": "passed",
+            "evidence_level": "local_file",
+            "path": EXPECTED_DOCX_PATH,
         },
     ]
 

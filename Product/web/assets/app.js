@@ -59,6 +59,9 @@ const state = {
   reviewingCandidateAction: null,
   promotingCandidateId: null,
   exportingCandidateId: null,
+  approvingWritebackCandidateId: null,
+  approvingWritebackAction: null,
+  preflightingDocxCandidateId: null,
 };
 
 const fallbackWorkflowSteps = [
@@ -644,6 +647,20 @@ const v2api = {
   exportPackage: {
     async get(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/export-package`);
+    },
+    async approveWriteback(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/export-package/${encodeURIComponent(candidateId)}/writeback-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async docxPreflight(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/export-package/${encodeURIComponent(candidateId)}/docx-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
   },
   agents: {
@@ -3626,8 +3643,8 @@ function renderExportPackageWorkbench() {
   }
 
   container.innerHTML = packages.map((pkg) => `
-    <article class="export-package-card">
-      <div class="export-package-header">
+    <article class="review-export-evidence-bench export-package-card">
+      <div class="export-bench-header">
         <div>
           <span class="eyebrow">${escapeHtml(pkg.candidate_id || "export_package")}</span>
           <h4>${escapeHtml(pkg.title || "结果导出包")}</h4>
@@ -3635,23 +3652,26 @@ function renderExportPackageWorkbench() {
             运行：${escapeHtml(pkg.run_id || "")} · 章节：${escapeHtml(pkg.section || "")} · 导出状态：${escapeHtml(exportStatusLabel(pkg.export_status || ""))}
           </p>
         </div>
-        <div class="export-package-status">
+        <div class="export-bench-status">
           ${renderEvidenceBadge({ evidence_level: pkg.evidence_level })}
           <span class="review-status ${pkg.evaluator_status === "passed" ? "is-approved" : "is-blocked"}">
             评估器：${escapeHtml(evaluatorStatusLabel(pkg.evaluator_status || "unknown"))}
           </span>
+          <span class="review-status ${pkg.can_write_back ? "is-approved" : "is-pending"}">
+            写回：${pkg.can_write_back ? "已审批" : "未审批"}
+          </span>
         </div>
       </div>
 
-      <div class="export-package-paths">
-        <div><strong>写回预览路径</strong><span>${escapeHtml(pkg.writeback_preview_path || "-")}</span></div>
-        <div><strong>导出清单路径</strong><span>${escapeHtml(pkg.manifest_path || "-")}</span></div>
-        <div><strong>结果产物路径</strong><span>${escapeHtml(pkg.result_artifact_path || "-")}</span></div>
-        <div><strong>可写回正文</strong><span>${yesNo(pkg.can_write_back)}</span></div>
+      ${renderExportEvidenceTable(pkg)}
+
+      <div class="export-decision-strip">
+        ${renderWritebackApprovalPanel(pkg)}
+        ${renderDocxPreflightPanel(pkg)}
       </div>
 
       <div class="export-workbench-grid">
-        <section>
+        <section class="export-evaluator-section">
           <div class="card-row">
             <strong>评估检查</strong>
             <span class="pill">导出前必须通过</span>
@@ -3673,9 +3693,9 @@ function renderExportPackageWorkbench() {
           </div>
         </section>
 
-        <section>
+        <section class="export-loop-section">
           <div class="card-row">
-            <strong>前沿工程迭代日志</strong>
+            <strong>迭代日志</strong>
             <span class="pill">${escapeHtml(pkg.frontier_loop?.reference || "前沿工程闭环")}</span>
           </div>
           <div class="frontier-iteration-log">
@@ -3695,10 +3715,167 @@ function renderExportPackageWorkbench() {
       <div class="export-package-footer">
         <p class="muted">${escapeHtml(pkg.next_manual_action || "")}</p>
         <button class="ghost-button" data-open-results-draft>回到结果与草稿查看候选来源</button>
-        <button class="primary-button" disabled>等待显式写回审批</button>
       </div>
     </article>
   `).join("");
+}
+
+function renderExportEvidenceTable(pkg) {
+  const rows = [
+    ["写回预览路径", pkg.writeback_preview_path || "-", "local_file"],
+    ["导出清单路径", pkg.manifest_path || "-", "local_file"],
+    ["结果产物路径", pkg.result_artifact_path || "-", "local_execution"],
+    ["源草稿路径", pkg.source_draft_path || "-", "local_file"],
+    ["目标 docx 路径", pkg.docx_preflight?.expected_docx_path || "Submissions/paper_draft.docx", "local_file"],
+  ];
+  return `
+    <table class="export-evidence-table">
+      <thead>
+        <tr>
+          <th>验收项</th>
+          <th>路径 / 状态</th>
+          <th>证据</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(([label, value, evidence]) => `
+          <tr>
+            <td>${escapeHtml(label)}</td>
+            <td><code>${escapeHtml(value)}</code></td>
+            <td>${renderEvidenceBadge({ evidence_level: evidence })}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderWritebackApprovalPanel(pkg) {
+  const approval = pkg.writeback_approval || {};
+  const isSaving = state.approvingWritebackCandidateId === pkg.candidate_id;
+  return `
+    <section class="writeback-approval-panel export-decision-panel">
+      <div>
+        <span class="eyebrow">写回审批</span>
+        <strong>${escapeHtml(writebackApprovalLabel(approval.status || "not_requested"))}</strong>
+        <p class="muted">审批只写入 ${escapeHtml(approval.path || "state/product/writeback_approvals.json")}，不会覆盖源草稿。</p>
+      </div>
+      <div class="export-action-row">
+        ${["approve", "needs_revision", "reject"].map((action) => `
+          <button
+            class="${action === "approve" ? "primary-button" : "ghost-button"}"
+            data-candidate-id="${escapeHtml(pkg.candidate_id || "")}"
+            data-writeback-approval-action="${action}"
+            ${isSaving ? "disabled" : ""}
+          >
+            ${isSaving && state.approvingWritebackAction === action ? "保存中..." : writebackApprovalActionLabel(action)}
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderDocxPreflightPanel(pkg) {
+  const preflight = pkg.docx_preflight || {};
+  const canRun = pkg.writeback_approval?.status === "approved" && pkg.can_write_back === true;
+  const isSaving = state.preflightingDocxCandidateId === pkg.candidate_id;
+  return `
+    <section class="docx-preflight-panel export-decision-panel">
+      <div>
+        <span class="eyebrow">docx 导出预检</span>
+        <strong>${escapeHtml(docxPreflightLabel(preflight.status || "not_generated"))}</strong>
+        <p class="muted">预检生成 ${escapeHtml(preflight.path || "state/product/docx_export_preflight.json")}，只检查条件，不直接生成 docx。</p>
+      </div>
+      <div class="export-action-row">
+        <button
+          class="primary-button"
+          data-candidate-id="${escapeHtml(pkg.candidate_id || "")}"
+          data-docx-preflight-action
+          ${!canRun || isSaving ? "disabled" : ""}
+        >
+          ${isSaving ? "预检中..." : "运行 docx 预检"}
+        </button>
+      </div>
+      ${(preflight.checks || []).length ? `
+        <div class="docx-preflight-checks">
+          ${(preflight.checks || []).map((check) => `
+            <div class="docx-check is-${escapeHtml(check.status || "unknown")}">
+              <span>${check.status === "passed" ? "✓" : "!"}</span>
+              <strong>${escapeHtml(check.label || check.id)}</strong>
+              <code>${escapeHtml(check.path || check.detail || "")}</code>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function writebackApprovalLabel(status) {
+  return {
+    not_requested: "尚未审批",
+    approved: "已审批，可进入预检",
+    rejected: "已拒绝",
+    needs_revision: "需要修改",
+  }[status] || status;
+}
+
+function writebackApprovalActionLabel(action) {
+  return {
+    approve: "批准写回",
+    needs_revision: "要求修改",
+    reject: "拒绝写回",
+  }[action] || action;
+}
+
+function docxPreflightLabel(status) {
+  return {
+    not_generated: "尚未生成",
+    ready: "预检通过",
+    blocked: "预检阻塞",
+  }[status] || status;
+}
+
+async function requestWritebackApproval(candidateId, action) {
+  if (!state.selectedProjectId || !candidateId || !action) return;
+  clearV2Error("artifacts-replication");
+  state.approvingWritebackCandidateId = candidateId;
+  state.approvingWritebackAction = action;
+  renderArtifactsReplication();
+  try {
+    await v2api.exportPackage.approveWriteback(state.selectedProjectId, candidateId, {
+      action,
+      note: "Review & Export 验收台显式写回审批。",
+    });
+    state.exportPackageData = await v2api.exportPackage.get(state.selectedProjectId);
+    renderArtifactsReplication();
+  } catch (error) {
+    showV2Error("artifacts-replication", `保存写回审批失败：${error.message}`);
+  } finally {
+    state.approvingWritebackCandidateId = null;
+    state.approvingWritebackAction = null;
+    renderArtifactsReplication();
+  }
+}
+
+async function runDocxExportPreflight(candidateId) {
+  if (!state.selectedProjectId || !candidateId) return;
+  clearV2Error("artifacts-replication");
+  state.preflightingDocxCandidateId = candidateId;
+  renderArtifactsReplication();
+  try {
+    await v2api.exportPackage.docxPreflight(state.selectedProjectId, candidateId, {
+      note: "Review & Export 验收台运行 docx 导出预检。",
+    });
+    state.exportPackageData = await v2api.exportPackage.get(state.selectedProjectId);
+    renderArtifactsReplication();
+  } catch (error) {
+    showV2Error("artifacts-replication", `运行 docx 导出预检失败：${error.message}`);
+  } finally {
+    state.preflightingDocxCandidateId = null;
+    renderArtifactsReplication();
+  }
 }
 
 async function loadProvenance(artifactId) {
@@ -4010,8 +4187,18 @@ async function boot() {
   document.getElementById("export-package-workbench")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    const button = target.closest("[data-open-results-draft]");
-    if (!button) return;
+    const writebackButton = target.closest("[data-writeback-approval-action]");
+    if (writebackButton) {
+      void requestWritebackApproval(writebackButton.dataset.candidateId, writebackButton.dataset.writebackApprovalAction);
+      return;
+    }
+    const docxButton = target.closest("[data-docx-preflight-action]");
+    if (docxButton) {
+      void runDocxExportPreflight(docxButton.dataset.candidateId);
+      return;
+    }
+    const sourceButton = target.closest("[data-open-results-draft]");
+    if (!sourceButton) return;
     document.querySelector('.nav-link[data-view="paper-draft"]')?.click();
   });
   document.getElementById("datasets-list")?.addEventListener("click", (event) => {

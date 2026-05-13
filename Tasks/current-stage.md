@@ -10,11 +10,13 @@
   - P1-O Review & Export package workbench 已完成：`GET /api/v1/projects/{project_id}/export-package` 读取 `preview_ready` package，Review & Export 页面显示导出包验收台、evaluator checks、Frontier-Eng iteration log，并可回到 Results & Draft 查看候选来源。
   - P1-Q Chinese Copy + Archive Interface 已完成：页面可见文案已中文化，全局界面升级为 `archive-shell`，右侧 `archive-inspector` 显示研究档案、相邻笔记、证据图例和收藏架。
   - P1-R Clean Workbench Visual Pass 已完成：全局 archive shell 去掉纸格噪声和厚重阴影，右侧变为 `inspector-rail` 属性检查器，Data & Design 的变量角色入口改成单列 record/list，修复截图中的文本重叠。
+  - P2-A Dataset Quality Profile 已完成：`GET /datasets` 返回本地 CSV 质量画像，前端“数据与设计”显示样本量、缺失率、字段类型和 readiness。
+  - P2-B Method Skill Catalog 已完成：RunPlan 暴露 OLS/DID/IV/RDD/PSM/DML 方法技能集；OLS/PSM/DML 当前 ready，DID/IV/RDD 暴露缺面板时间、工具变量和断点运行变量；前端“研究设计细节”显示纵向方法准入证据清单。
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P1-P：在 Review & Export 基础上继续设计显式写回审批或 docx 导出预检。该步骤必须单独 BDD/TDD，且继续保持默认不覆盖源草稿。
-  - 只有 `export_status=preview_ready` 的 manuscript candidate 才能进入后续“最终导出 / 显式写回审批”流程。
+  - P2-C：把方法技能集推进到真实执行适配器，优先做 OLS baseline 的 `local_execution` 结果证据；该步骤必须单独 BDD/TDD，不能把方法目录当真实执行。
+  - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
   - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
   - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
 - 当前约束：
@@ -35,4 +37,6 @@
   - Review & Export 当前只展示导出包和 evaluator 结果，不执行写回或 docx 生成；可视化验收截图为 `/tmp/empirical-workbench-review-export-p1o.png`
   - Archive Interface 当前只改前端信息架构和视觉层，不改变后端状态机；验收入口为 `http://127.0.0.1:8765/?v=20260513-archive1`
   - Clean Workbench 当前是第一轮视觉清洁层；验收入口为 `http://127.0.0.1:8765/?v=20260513-clean1`
+  - Dataset Quality Profile 当前是轻量 CSV 画像，不是完整 StatsPAI 描述统计；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2a`
+  - Method Skill Catalog 当前是 `local_file` 前置条件目录，不是 StatsPAI 真实执行；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2b-clean`
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

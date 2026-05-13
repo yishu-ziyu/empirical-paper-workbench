@@ -343,3 +343,14 @@ Rejected: 复制 Maggie Appleton 的原始插画、品牌元素或完整页面�
 Rejected: 为了视觉升级改用 React/Vite/Next。原因是当前产品是 FastAPI + 静态 HTML/CSS/vanilla JS，P1 需要小范围、可验证修改，不能扩大维护面。
 
 Rejected: 本轮实现真正双向链接数据库。原因是右侧 `相邻笔记` 先承担产品导航和信息架构修正；真实 backlinks / graph 应在后续 Artifacts/Agents 或知识库层单独设计。
+## 2026-05-13：方法技能集先做前置条件目录，不伪装真实执行
+
+Decision: 在 RunPlan 中新增 `method_catalog`，以 `local_file` 证据展示 OLS、DID、IV、RDD、PSM、DML 的方法说明、前置变量、ready/blocked 状态和阻塞原因。默认执行任务只包含当前具备条件的 OLS baseline，并显式写入 `method_id=ols`。
+
+Reason: CoPaper/StatsPAI 式系统的核心不是让用户直接点一个黑盒方法，而是先把数据、变量、识别方法和前置条件变成可审查对象。当前项目尚未调用真实 StatsPAI/Stata 执行器，因此只能声明“方法准入判断”，不能宣称 DID/IV/RDD 已经运行。
+
+Rejected: 直接把 DID/IV/RDD/PSM/DML 全部加入 RunPlan tasks。原因是当前样例数据缺少面板时间、工具变量和断点运行变量，加入执行任务会伪装可执行性。
+
+Rejected: 把 `method_catalog` 标记为 `local_execution`。原因是本阶段没有真实执行外部方法引擎，只读取本地 DesignSpec/VariableRoleSet 做前置条件判断。
+
+Rejected: 把方法目录放到 Execution 页面继续堆卡片。原因是 Execution 页面已经承载 RunPlan、运行轨迹和人工确认；方法准入更适合研究设计细节页。

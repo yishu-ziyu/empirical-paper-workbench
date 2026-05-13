@@ -24,6 +24,8 @@
 - `review_export`：已具备 FindingCard claim review、Manuscript candidate review、promote preflight、export preflight preview 和 Review & Export package workbench；`finding_trained_effect` 当前 `review_status=approved`、`can_write_to_draft=true`，`manuscript_candidate_finding_trained_effect_results` 当前 `review_status=approved`、`can_promote=true`、`promotion_status=ready_for_export`、`can_export=true`、`export_status=preview_ready`、`evaluator_status=passed`、`can_write_back=false`，审阅、promotion、export preflight 和 package evaluator 证据均为 `local_file`。下一步应设计显式写回审批或 docx 导出预检。
 - `archive_interface`：已完成中文化和档案型全局界面；`Product/web/index.html` 提供 `archive-shell`/`archive-inspector`，`Product/web/assets/app.js` 提供相邻笔记切换，`Product/web/assets/styles.css` 提供纸张网格、证据 ledger、收藏架与交互状态。当前为前端信息架构层，不改变后端 API 或状态机。
 - `clean_workbench`：已完成第一轮清洁视觉修正；`archive-shell` 去掉纸格背景和厚重阴影，右侧变为 `inspector-rail` 属性检查器，变量角色确认入口改为 `research-record-card` + `research-step-list`，解决 Data & Design 截图中的重叠问题。
+- `dataset_quality_profile`：已完成第一轮数据质量画像；`analysis_sample.csv` 返回 `row_count=12`、`column_count=4`、`missing_rate=0`、字段类型与 readiness，证据等级为 `local_file`。
+- `method_catalog`：已完成第一轮方法技能集目录；RunPlan 返回 OLS/DID/IV/RDD/PSM/DML 前置条件，OLS/PSM/DML 当前 ready，DID/IV/RDD 当前 blocked，证据等级为 `local_file`，不代表真实 StatsPAI 执行。
 
 ## 当前要求
 
@@ -31,7 +33,8 @@
 - 最终稳定导出 `docx`。
 - 每次运行都保留可验证的中间产物。
 - 产品主行动必须优先围绕研究生命周期，不把 run/step/gate/artifact 作为首页主对象。
-- P1-O 已完成；P1-P 开始前必须继续按 BDD/TDD：先定义 Review & Export 如何执行显式写回审批或 docx 导出预检，再写失败测试。
+- P1-P 已完成；Review & Export 已具备显式写回审批和 docx 预检状态，但仍不覆盖源草稿、不直接生成最终 docx。
+- P2-B 已完成；P2-C 开始前必须继续按 BDD/TDD：先定义 OLS/StatsPAI/Stata 最小真实执行适配器如何产生 `local_execution` 证据，再写失败测试。
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。

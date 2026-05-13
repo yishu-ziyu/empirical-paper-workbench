@@ -492,6 +492,155 @@ textarea {
   font-weight: 700;
 }
 
+.method-skill-catalog-panel {
+  margin: 18px 0;
+}
+
+.method-skill-catalog-body {
+  display: grid;
+  gap: 14px;
+}
+
+.method-catalog-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid rgba(30, 111, 98, 0.14);
+  border-radius: 10px;
+  background: rgba(246, 250, 248, 0.82);
+}
+
+.method-catalog-summary h4 {
+  margin: 4px 0;
+  font-size: 18px;
+}
+
+.method-skill-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.method-skill-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.method-skill-card.is-ready {
+  border-color: rgba(30, 111, 98, 0.2);
+}
+
+.method-skill-card.is-blocked {
+  background: rgba(255, 251, 246, 0.78);
+}
+
+.method-skill-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.method-skill-card-head strong {
+  display: block;
+  font-size: 18px;
+}
+
+.method-skill-card-head p {
+  margin-top: 4px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-chip.is-ready {
+  background: rgba(30, 111, 98, 0.1);
+  color: var(--accent);
+}
+
+.status-chip.is-blocked {
+  background: rgba(160, 87, 39, 0.1);
+  color: #7a431f;
+}
+
+.method-skill-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.method-skill-meta span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.07);
+}
+
+.method-requirement-list {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.method-requirement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.method-requirement strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.method-requirement small {
+  flex-basis: 100%;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.method-requirement.is-present strong {
+  color: var(--accent);
+}
+
+.method-requirement.is-missing strong {
+  color: #7a431f;
+}
+
+.method-blockers {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(160, 87, 39, 0.08);
+  color: #7a431f;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .card-row,
 .finding-card .card-row,
 .draft-section-binding .card-row {
@@ -3210,6 +3359,7 @@ select:focus-visible {
     position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
 }
 
 @media (max-width: 700px) {

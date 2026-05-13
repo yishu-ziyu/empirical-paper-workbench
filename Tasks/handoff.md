@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-13 22:37 CST
+更新时间：2026-05-13 23:47 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与 clean workbench、P2-A 数据质量画像、P2-B 方法技能集目录均已完成。最新 P2-C 已完成 OLS 本地执行适配器：approved OLS RunPlan 会生成 `Results/json/method_execution_result.json`，run response 和 `run_manifest.json` 均写入 `method_execution.evidence_level=local_execution`。真实验收 run 为 `run_4c62f1721afb`，`treatment_coefficient=1.8505076803`。下一步建议进入 P2-D：把 `method_execution_result.json` 接到 Execution / Findings UI，让用户在页面上看见方法执行证据，而不是只在 API 中看到。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与 clean workbench、P2-A 数据质量画像、P2-B 方法技能集目录、P2-C OLS 本地执行适配器、P2-D 方法执行证据 UI 均已完成。最新 P2-E 已完成 OLS evaluator evidence：`method_execution_result.json` 现在包含标准误、t 统计量、p 值、95% 置信区间、残差诊断和 evaluator checks；FindingCard 也显示中文紧凑方法证据摘要。真实验收 run 为 `run_a3674e9e78c6`，`p_value_trained=8.83354660202e-133`、`standard_error_trained=0.0754664205`、`evaluator_status=passed`。下一步建议进入 P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 中的真实数据源做数据接入验收。
 
 ## 已完成事项
 
@@ -949,3 +949,60 @@ P2-E：为 OLS 方法执行补 evaluator。最小范围是标准误、p 值、�
 - 方法执行结果尚未包含标准误、p 值、置信区间、固定效应、聚类或稳健标准误。
 - Results/FindingCard 还没有把 evaluator verdict 作为 approve 前置条件。
 - Playwright MCP 仍返回 `Transport closed`，本轮视觉闭环使用 Safari + Computer Use。
+
+## 2026-05-13 P2-E OLS Evaluator Evidence 交接增量
+
+### 当前目标
+
+把 P2-D 的“方法执行证据可见”推进到“结果论断具备最小统计推断证据”：OLS 方法执行必须给出标准误、p 值、置信区间、诊断和 evaluator verdict，并在 Results & Draft 页面直接可见。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-ols-evaluator-bdd.md`。
+- 扩展 `Product/backend/project_service.py`：`fit_ols_model()` 现在计算系数、标准误、t 统计量、normal approximation p 值、95% 置信区间、残差自由度、残差标准误和残差平方和；新增 `build_ols_evaluator()` 输出命名检查。
+- 扩展 `Product/backend/results_draft_service.py`：`build_method_evidence()` 绑定 `standard_error`、`p_value`、`p_value_method`、`confidence_interval`、`evaluator_status` 和完整 evaluator。
+- 扩展 `Product/web/assets/app.js`：FindingCard 的方法执行证据改为中文审阅摘要，显示 `ols · n=12 · β=... · 标准误=... · p=... · 95% 置信区间 ... · 评估器通过`。
+- 扩展 `Product/web/assets/styles.css`：新增 `method-evidence-summary`，避免窄卡片网格继续制造拥挤。
+- 更新 `Product/web/index.html` 静态资源版本为 `20260513-p2e-eval2`，避免 Safari 继续使用旧 JS/CSS 缓存。
+- 初步查看用户提供的数据目录 `/Users/mahaoxuan/Desktop/实证数据库`，确认至少存在 `外部源数据/CHARLS.csv`、CFPS、CLDS、CGSS 等真实数据材料。
+
+### 已验证证据
+
+- TDD 首次失败符合预期：`standard_errors`、`evaluator`、`evaluator_status` 等字段缺失。
+- 目标测试：`python3 -m unittest tests.test_ols_execution_adapter tests.test_results_draft_evidence_binding -v`，19 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，165 tests OK，skipped=1。
+- 静态检查：Python 编译、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- API 验收：`POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_a3674e9e78c6`，status=`succeeded`。
+- API 验收：`observability.method_execution.methods[0]` 返回 `standard_errors.trained=0.0754664205`、`p_values.trained=8.83354660202e-133`、`confidence_intervals.trained.low=1.7025934962`、`confidence_intervals.trained.high=1.9984218644`、`evaluator.status=passed`。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，点击“结果与草稿”，结果论断卡显示最新 run `run_a3674e9e78c6` 和紧凑方法证据摘要。
+
+### 关键文件路径
+
+- `Product/backend/project_service.py`
+- `Product/backend/results_draft_service.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_results_draft_evidence_binding.py`
+- `docs/architecture-v2/codex-phase-p2-ols-evaluator-bdd.md`
+- `Results/json/method_execution_result.json`
+- `state/runs/run_a3674e9e78c6/run_manifest.json`
+
+### 不能重复探索的结论
+
+- 极小 p 值不能四舍五入为 `0`；当前使用显著数字保留，前端用科学计数法显示。
+- 当前 p 值方法是 `normal_approximation`，必须继续显式暴露，不要伪装成精确 t 分布或稳健推断。
+- FindingCard 方法证据不应回到窄网格布局；当前中文摘要更适合 clean workbench。
+- `method_execution_result.json` 负责方法执行和推断证据，`analysis_result.json` 仍负责结果摘要和草稿绑定，两者保持分层。
+
+### 下一步第一件事
+
+P2-F：从 `/Users/mahaoxuan/Desktop/实证数据库` 选择一个真实且可快速解析的数据源，先做只读 inventory/profile BDD。目标不是立刻跑完整论文，而是让 Data & Design 能选择真实外部数据、生成 `local_file` 质量画像，并把字段/样本口径暴露给 VariableRoleSet。
+
+### 未解决风险
+
+- OLS evaluator 仍缺 robust/clustered standard errors、固定效应和有限样本 t 分布 p 值。
+- Finding approve 还没有强制检查 evaluator status；当前只是显示 evaluator 证据。
+- 真实数据目录可能包含大文件、Stata `.dta`、编码问题或隐私数据；P2-F 必须先做只读 inventory，不要移动或修改原始数据。
+- Playwright MCP 仍不稳定；继续使用 Safari + Computer Use 做视觉闭环。

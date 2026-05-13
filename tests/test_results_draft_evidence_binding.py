@@ -175,6 +175,22 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
         self.assertEqual(method_evidence["nobs"], 12)
         self.assertAlmostEqual(method_evidence["treatment_coefficient"], 1.8505, places=4)
 
+    def test_bdd_11_finding_card_binds_method_evaluator_evidence(self) -> None:
+        """行为 11：FindingCard 必须绑定方法 evaluator 状态和推断指标。"""
+        self._write_successful_full_run("run_test_full_001")
+
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/results-draft")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        method_evidence = response.json()["findings"][0]["method_evidence"]
+        self.assertEqual(method_evidence["evaluator_status"], "passed")
+        self.assertAlmostEqual(method_evidence["standard_error"], 0.0573, places=4)
+        self.assertLess(method_evidence["p_value"], 0.001)
+        self.assertEqual(method_evidence["p_value_method"], "normal_approximation")
+        self.assertEqual(method_evidence["confidence_interval"]["level"], 0.95)
+        self.assertLess(method_evidence["confidence_interval"]["low"], method_evidence["treatment_coefficient"])
+        self.assertGreater(method_evidence["confidence_interval"]["high"], method_evidence["treatment_coefficient"])
+
     def _write_successful_full_run(self, run_id: str) -> None:
         runs_root = self.project_root / "state" / "runs"
         runs_root.mkdir(parents=True)
@@ -329,6 +345,27 @@ class ResultsDraftEvidenceBindingApiTests(unittest.TestCase):
                     "nobs": 12,
                     "treatment": "trained",
                     "treatment_coefficient": 1.8505,
+                    "standard_errors": {"trained": 0.0573},
+                    "t_statistics": {"trained": 32.295},
+                    "p_values": {"trained": 0.000000001},
+                    "p_value_method": "normal_approximation",
+                    "confidence_intervals": {
+                        "trained": {"level": 0.95, "low": 1.7184, "high": 1.9826}
+                    },
+                    "diagnostics": {
+                        "residual_degrees_of_freedom": 8,
+                        "residual_standard_error": 0.12,
+                    },
+                    "evaluator": {
+                        "status": "passed",
+                        "evidence_level": "local_execution",
+                        "checks": [
+                            {"id": "sample_size", "status": "passed"},
+                            {"id": "model_rank", "status": "passed"},
+                            {"id": "treatment_coefficient", "status": "passed"},
+                            {"id": "inference_diagnostics", "status": "passed"},
+                        ],
+                    },
                     "evidence_level": "local_execution",
                 }
             ],
@@ -371,6 +408,15 @@ class ResultsDraftEvidenceBindingFrontendTests(unittest.TestCase):
         self.assertIn("methodEvidence.method_id", self.app_js)
         self.assertIn("methodEvidence.formula", self.app_js)
         self.assertIn("methodEvidence.treatment_coefficient", self.app_js)
+
+    def test_bdd_12_results_draft_workspace_shows_method_evaluator_evidence(self) -> None:
+        """行为 12：前端 FindingCard 必须展示 evaluator 状态、标准误、p 值和置信区间。"""
+        self.assertIn("methodEvidence.evaluator_status", self.app_js)
+        self.assertIn("methodEvidence.standard_error", self.app_js)
+        self.assertIn("methodEvidence.p_value", self.app_js)
+        self.assertIn("methodEvidence.confidence_interval", self.app_js)
+        self.assertIn("评估器", self.app_js)
+        self.assertIn("95% 置信区间", self.app_js)
 
 
 if __name__ == "__main__":

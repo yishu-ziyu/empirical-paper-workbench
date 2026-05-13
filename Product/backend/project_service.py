@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -513,8 +514,10 @@ def execute_ols_task(
     dependent, predictors = parse_linear_formula(formula)
     dataset_path = str(run_plan.get("dataset_path") or (dataset_source or {}).get("path") or "")
     rows = read_numeric_formula_rows(project_root / dataset_path, dependent, predictors)
-    coefficients = fit_ols_coefficients(rows, dependent, predictors)
+    model = fit_ols_model(rows, dependent, predictors)
+    coefficients = model["coefficients"]
     treatment = first_string((design_spec.get("variables") or {}).get("treatment"))
+    evaluator = build_ols_evaluator(model, treatment)
     return {
         "run_id": run_id,
         "task_id": task.get("id"),
@@ -528,6 +531,13 @@ def execute_ols_task(
         "dependent_var": dependent,
         "predictors": predictors,
         "coefficients": coefficients,
+        "standard_errors": model["standard_errors"],
+        "t_statistics": model["t_statistics"],
+        "p_values": model["p_values"],
+        "p_value_method": "normal_approximation",
+        "confidence_intervals": model["confidence_intervals"],
+        "diagnostics": model["diagnostics"],
+        "evaluator": evaluator,
         "treatment": treatment,
         "treatment_coefficient": coefficients.get(treatment) if treatment else None,
         "evidence_level": "local_execution",
@@ -560,6 +570,10 @@ def read_numeric_formula_rows(path: Path, dependent: str, predictors: list[str])
 
 
 def fit_ols_coefficients(rows: list[dict[str, float]], dependent: str, predictors: list[str]) -> dict[str, float]:
+    return fit_ols_model(rows, dependent, predictors)["coefficients"]
+
+
+def fit_ols_model(rows: list[dict[str, float]], dependent: str, predictors: list[str]) -> dict[str, Any]:
     columns = ["intercept", *predictors]
     x_rows = [[1.0, *[row[predictor] for predictor in predictors]] for row in rows]
     y_values = [row[dependent] for row in rows]
@@ -569,7 +583,105 @@ def fit_ols_coefficients(rows: list[dict[str, float]], dependent: str, predictor
     ]
     xty = [sum(x_row[i] * y for x_row, y in zip(x_rows, y_values)) for i in range(len(columns))]
     beta = solve_linear_system(xtx, xty)
-    return {column: round(value, 10) for column, value in zip(columns, beta)}
+    fitted = [sum(value * coefficient for value, coefficient in zip(x_row, beta)) for x_row in x_rows]
+    residuals = [y - fitted_value for y, fitted_value in zip(y_values, fitted)]
+    residual_degrees_of_freedom = len(rows) - len(columns)
+    if residual_degrees_of_freedom <= 0:
+        raise MethodExecutionError("not_enough_degrees_of_freedom", "OLS residual degrees of freedom must be positive")
+    residual_sum_of_squares = sum(residual * residual for residual in residuals)
+    sigma_squared = residual_sum_of_squares / residual_degrees_of_freedom
+    inverse_xtx = invert_matrix(xtx)
+    standard_errors_raw = [
+        math.sqrt(max(sigma_squared * inverse_xtx[index][index], 0.0))
+        for index in range(len(columns))
+    ]
+    t_statistics_raw = [
+        coefficient / standard_error if standard_error > 0 else math.inf
+        for coefficient, standard_error in zip(beta, standard_errors_raw)
+    ]
+    p_values_raw = [normal_two_sided_p_value(t_statistic) for t_statistic in t_statistics_raw]
+
+    return {
+        "coefficients": {column: round(value, 10) for column, value in zip(columns, beta)},
+        "standard_errors": {column: round(value, 10) for column, value in zip(columns, standard_errors_raw)},
+        "t_statistics": {column: round(value, 10) for column, value in zip(columns, t_statistics_raw)},
+        "p_values": {column: round_significant(value) for column, value in zip(columns, p_values_raw)},
+        "confidence_intervals": {
+            column: {
+                "level": 0.95,
+                "low": round(coefficient - 1.96 * standard_error, 10),
+                "high": round(coefficient + 1.96 * standard_error, 10),
+            }
+            for column, coefficient, standard_error in zip(columns, beta, standard_errors_raw)
+        },
+        "diagnostics": {
+            "nobs": len(rows),
+            "parameter_count": len(columns),
+            "model_rank": len(columns),
+            "residual_degrees_of_freedom": residual_degrees_of_freedom,
+            "residual_standard_error": round(math.sqrt(sigma_squared), 10),
+            "residual_sum_of_squares": round(residual_sum_of_squares, 10),
+        },
+    }
+
+
+def invert_matrix(matrix: list[list[float]]) -> list[list[float]]:
+    size = len(matrix)
+    return [solve_linear_system(matrix, [1.0 if index == column else 0.0 for index in range(size)]) for column in range(size)]
+
+
+def normal_two_sided_p_value(t_statistic: float) -> float:
+    if math.isinf(t_statistic):
+        return 0.0
+    return math.erfc(abs(t_statistic) / math.sqrt(2.0))
+
+
+def round_significant(value: float, digits: int = 12) -> float:
+    if value == 0 or not math.isfinite(value):
+        return value
+    return float(f"{value:.{digits}g}")
+
+
+def build_ols_evaluator(model: dict[str, Any], treatment: str | None) -> dict[str, Any]:
+    diagnostics = model["diagnostics"]
+    coefficients = model["coefficients"]
+    standard_errors = model["standard_errors"]
+    p_values = model["p_values"]
+    checks = [
+        {
+            "id": "sample_size",
+            "label": "样本量大于参数数量",
+            "status": "passed" if diagnostics["residual_degrees_of_freedom"] > 0 else "failed",
+            "detail": f"n={diagnostics['nobs']}, parameters={diagnostics['parameter_count']}",
+        },
+        {
+            "id": "model_rank",
+            "label": "模型矩阵可估",
+            "status": "passed" if diagnostics["model_rank"] == diagnostics["parameter_count"] else "failed",
+            "detail": f"rank={diagnostics['model_rank']}",
+        },
+        {
+            "id": "treatment_coefficient",
+            "label": "处理变量系数存在",
+            "status": "passed" if treatment and treatment in coefficients else "failed",
+            "detail": treatment or "missing treatment",
+        },
+        {
+            "id": "inference_diagnostics",
+            "label": "推断诊断可用",
+            "status": "passed"
+            if treatment and treatment in standard_errors and treatment in p_values and standard_errors[treatment] > 0
+            else "failed",
+            "detail": "standard error and p value available",
+        },
+    ]
+    status = "passed" if all(check["status"] == "passed" for check in checks) else "needs_review"
+    return {
+        "status": status,
+        "evidence_level": "local_execution",
+        "p_value_method": "normal_approximation",
+        "checks": checks,
+    }
 
 
 def solve_linear_system(matrix: list[list[float]], vector: list[float]) -> list[float]:

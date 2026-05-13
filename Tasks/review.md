@@ -378,3 +378,33 @@
 - 方法执行结果还没有标准误、p 值、置信区间、稳健或聚类标准误。
 - Finding approve 还没有强制依赖 evaluator verdict。
 - Playwright MCP 本轮仍为 `Transport closed`，视觉验收使用 Safari + Computer Use fallback。
+
+## 2026-05-13 P2-E OLS Evaluator Evidence
+
+### 行为覆盖
+
+- [x] OLS 方法执行结果包含标准误、t 统计量、p 值、95% 置信区间和残差诊断。
+- [x] OLS 方法执行结果包含命名 evaluator checks：样本量、模型矩阵可估、处理变量系数存在、推断诊断可用。
+- [x] Results Draft API 把 evaluator 状态、标准误、p 值和置信区间绑定到 FindingCard。
+- [x] Results & Draft 页面以中文紧凑摘要展示方法 evaluator 证据。
+- [ ] 未覆盖：稳健标准误、聚类标准误、固定效应、DID/IV/RDD/PSM/DML 的方法级 evaluator。
+
+### 测试覆盖
+
+- 目标测试：`python3 -m unittest tests.test_ols_execution_adapter tests.test_results_draft_evidence_binding -v`，19 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，165 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/results_draft_service.py Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_a3674e9e78c6`，status=`succeeded`。
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/runs/run_a3674e9e78c6/observability` 返回 `p_values.trained=8.83354660202e-133`、`standard_errors.trained=0.0754664205`、`evaluator.status=passed`，四项 evaluator checks 全部 passed。
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/results-draft` 返回 `finding.method_evidence.evaluator_status=passed` 和 `confidence_interval.low=1.7025934962/high=1.9984218644`。
+- 页面：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，点击“结果与草稿”，可见 `ols · n=12 · β=1.8505 · 标准误=0.0755 · p=8.83e-133 · 95% 置信区间 1.7026 ~ 1.9984 · 评估器通过`。
+
+### 剩余风险
+
+- 当前 p 值使用 `normal_approximation`，不是有限样本 t 分布；已在产物里显式标记 `p_value_method=normal_approximation`。
+- 当前 OLS 标准误不是 robust/clustered；下一轮若进入真实论文口径，应先增加稳健/聚类标准误选项和 evaluator 阻断条件。
+- 当前真实数据仍主要使用项目内 `Data/Final/analysis_sample.csv` 样例；用户提供的 `/Users/mahaoxuan/Desktop/实证数据库` 已初步确认包含 `CHARLS.csv`、CFPS、CLDS、CGSS 等材料，下一轮应选一个可解析数据源做真实数据接入验收。
+- Playwright MCP 本轮仍不稳定；视觉验收继续使用 Safari + Computer Use fallback。

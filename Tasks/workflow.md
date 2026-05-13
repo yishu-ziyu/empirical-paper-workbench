@@ -28,6 +28,7 @@
 - `method_catalog`：已完成第一轮方法技能集目录；RunPlan 返回 OLS/DID/IV/RDD/PSM/DML 前置条件，OLS/PSM/DML 当前 ready，DID/IV/RDD 当前 blocked，证据等级为 `local_file`，不代表真实 StatsPAI 执行。
 - `method_execution`：已完成第一轮 OLS 本地执行适配器；approved OLS RunPlan 可生成 `Results/json/method_execution_result.json`，证据等级为 `local_execution`，并写入 run response 与 `run_manifest.json`。当前只支持 OLS，unsupported 方法和不可估数据会结构化失败。
 - `method_execution_ui`：已完成第一轮方法执行证据展示；`observability.method_execution` 和 `findings[].method_evidence` 都绑定 `Results/json/method_execution_result.json`，页面可见 adapter、公式、样本量、处理变量系数和证据等级。
+- `ols_evaluator`：已完成第一轮 OLS evaluator evidence；`method_execution_result.json` 包含标准误、t 统计量、p 值、置信区间、残差诊断和命名 checks，FindingCard 页面显示中文方法证据摘要。
 
 ## 当前要求
 
@@ -36,7 +37,7 @@
 - 每次运行都保留可验证的中间产物。
 - 产品主行动必须优先围绕研究生命周期，不把 run/step/gate/artifact 作为首页主对象。
 - P1-P 已完成；Review & Export 已具备显式写回审批和 docx 预检状态，但仍不覆盖源草稿、不直接生成最终 docx。
-- P2-D 已完成；P2-E 开始前必须继续按 BDD/TDD：先定义 evaluator 如何判断 OLS 结果能否进入 claim review，再写失败测试和最小实现。
+- P2-E 已完成；P2-F 开始前必须继续按 BDD/TDD：先定义真实数据源只读 inventory/profile 行为，避免移动、修改或误提交 `/Users/mahaoxuan/Desktop/实证数据库` 中的原始数据。
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。

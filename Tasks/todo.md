@@ -344,4 +344,16 @@
 - [x] 验证：目标测试 4 OK；Results Draft 回归 10 OK；相邻回归 38 OK；全量回归 161 OK，skipped=1；Python 编译、`node --check` 和 `git diff --check` 通过。
 - [x] API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/runs/run_4c62f1721afb/observability` 和 `/results-draft` 均返回 `method_execution.evidence_level=local_execution`、`engine=python_ols_adapter`、`formula=wage ~ trained + edu + experience`、`nobs=12`、`treatment_coefficient=1.8505076803`。
 - [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2d-method`，在“实证执行”和“结果与草稿”均可看到 OLS 方法执行证据、artifact 路径、公式、样本量和处理变量系数。
-- [ ] P2-E：扩展方法执行 evaluator，至少补齐标准误、p 值、稳健/聚类标准误预检，并把不满足条件的结果放入 `needs_review` 而不是直接进入论断。
+- [x] P2-E：扩展方法执行 evaluator，补齐标准误、t 统计量、p 值、95% 置信区间、残差诊断和命名 evaluator checks，并把结果绑定到 FindingCard 方法证据。
+
+## 2026-05-13 P2-E OLS Evaluator Evidence
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-ols-evaluator-bdd.md`，定义 OLS 方法执行必须产出推断指标、诊断项、evaluator verdict，并在 Results & Draft 显示。
+- [x] TDD：扩展 `tests/test_ols_execution_adapter.py` 和 `tests/test_results_draft_evidence_binding.py`；首次失败为 `KeyError: standard_errors/evaluator/evaluator_status`，符合“尚未实现 evaluator 证据”的预期。
+- [x] 实现：扩展 `Product/backend/project_service.py`，本地 OLS adapter 计算标准误、t 统计量、normal approximation p 值、95% 置信区间、残差自由度、残差标准误和 evaluator checks。
+- [x] 实现：扩展 `Product/backend/results_draft_service.py`，FindingCard 的 `method_evidence` 绑定 `standard_error`、`p_value`、`confidence_interval`、`evaluator_status` 和完整 evaluator。
+- [x] 前端：扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`，把 FindingCard 的方法证据改为紧凑中文审阅摘要，避免窄卡片网格拥挤；`Product/web/index.html` asset version 更新到 `20260513-p2e-eval2`。
+- [x] 验证：目标测试 19 OK；全量回归 165 OK，skipped=1；Python 编译、`node --check Product/web/assets/app.js` 和 `git diff --check` 通过。
+- [x] API 验收：真实 full run `run_a3674e9e78c6` succeeded；`p_value_trained=8.83354660202e-133`、`standard_error_trained=0.0754664205`、`evaluator_status=passed`，四项 evaluator checks 全部 passed。
+- [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，点击“结果与草稿”，结果论断卡显示 `ols · n=12 · β=1.8505 · 标准误=0.0755 · p=8.83e-133 · 95% 置信区间 1.7026 ~ 1.9984 · 评估器通过`。
+- [ ] P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 中的真实数据源做数据接入验收，优先挑选一个小型 CSV 或可快速解析样本，把真实数据 profiling 接到 Data & Design。

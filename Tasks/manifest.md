@@ -421,3 +421,36 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260513-p2d-method`
 
 说明：Safari + Computer Use 验收确认“实证执行”页显示 `方法执行证据`、`python_ols_adapter`、`wage ~ trained + edu + experience`、样本量 `12`、处理变量系数 `1.8505`、`Results/json/method_execution_result.json`；“结果与草稿”页的结果论断卡也显示同一方法证据。
+
+## 2026-05-13 P2-E OLS Evaluator Evidence
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-ols-evaluator-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_results_draft_evidence_binding.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/project_service.py`：`python_ols_adapter` 现在生成 `standard_errors`、`t_statistics`、`p_values`、`p_value_method`、`confidence_intervals`、`diagnostics` 和 `evaluator`；新增 `fit_ols_model()`、`normal_two_sided_p_value()`、`round_significant()`、`build_ols_evaluator()`。
+- `Product/backend/results_draft_service.py`：FindingCard 的 `method_evidence` 绑定 OLS evaluator 状态、标准误、p 值和置信区间。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `20260513-p2e-eval2`。
+- `Product/web/assets/app.js`：FindingCard 方法证据展示改为中文紧凑审阅摘要；新增/使用 evaluator 状态和置信区间展示。
+- `Product/web/assets/styles.css`：新增 `method-evidence-summary`，移除 FindingCard 内部窄网格展示带来的拥挤。
+
+### Runtime 产物
+
+- `Results/json/method_execution_result.json`：最新真实运行写入 OLS 推断指标和 evaluator 结果。
+- `state/runs/run_a3674e9e78c6/run_manifest.json`：最新 full run manifest，包含 `method_execution` artifact。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260513-p2e-eval`
+
+说明：Safari + Computer Use 验收确认“结果与草稿”页结果论断卡显示 `ols · n=12 · β=1.8505 · 标准误=0.0755 · p=8.83e-133 · 95% 置信区间 1.7026 ~ 1.9984 · 评估器通过`，并绑定 `run_a3674e9e78c6`。

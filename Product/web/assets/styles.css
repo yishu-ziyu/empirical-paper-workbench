@@ -520,7 +520,7 @@ textarea {
 
 .field-profile-row {
   display: grid;
-  grid-template-columns: minmax(130px, 1.1fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(160px, 1.4fr);
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.45fr) minmax(90px, 0.65fr) minmax(70px, 0.45fr);
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -542,7 +542,6 @@ textarea {
   background: rgba(96, 113, 108, 0.06);
   font-size: 12px;
   font-weight: 800;
-  text-transform: uppercase;
 }
 
 .field-profile-row.empty {

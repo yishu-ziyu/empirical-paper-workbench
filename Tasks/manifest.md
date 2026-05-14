@@ -567,3 +567,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260514-p2i-profile1`
 
 说明：点击“数据与设计”，在“导入/绑定预检”已接入结果中点击“生成字段画像”。当前真实 CFPS `.dta` 绑定会显示 `暂未画像`、`dta 暂未接入安全字段读取器。`、`fields=0` 和 `不会改写 VariableRoleSet、DesignSpec 或 RunPlan`；CSV 在测试夹具中会返回字段表。
+
+## 2026-05-14 P2-J Stata DTA Field Profile
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-dta-field-profile-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_external_dataset_import_profile.py`：新增有效 DTA metadata-only 画像、损坏 DTA 阻塞画像、前端变量标签/Stata 类型展示约束。
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：新增 `build_dta_metadata_profile()`、`blocked_dta_metadata_profile()`、`infer_stata_field_type()`；`build_dataset_import_profile()` 现在支持 `.dta` metadata-only 字段画像。
+- 可选依赖：`pyreadstat`。当前本机已安装；缺失时服务返回 blocked 画像而不是 500。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `20260514-p2j-dta1`。
+- `Product/web/assets/app.js`：字段画像表显示 `字段 / 变量标签 / Stata 类型 / 缺失率`。
+- `Product/web/assets/styles.css`：字段画像表列宽按变量字典优化，并取消自动大写表头。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2j-dta1`
+- 截图证据：`/tmp/empirical-workbench-p2j-dta-profile.png`
+
+说明：点击“数据与设计”，在“字段画像 / 变量字典预览”面板可见 `cfps2011adult_202202(1).dta`、`已画像`、`1279 行 · 723 列 · row_limit=200`、`metadata-only 字段画像，未读取完整数据表`，字段表显示 `pid / 个人id / double`、`fid / 家户号 / double` 等真实 Stata 变量字典。

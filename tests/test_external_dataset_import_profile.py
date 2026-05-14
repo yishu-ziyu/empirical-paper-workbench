@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pandas as pd
 from fastapi.testclient import TestClient
 
 import Product.app as product_app
@@ -96,9 +97,34 @@ class ExternalDatasetImportProfileApiTests(unittest.TestCase):
         self.assertFalse((self.project_root / "Data" / "Raw" / "CHARLS.csv").exists())
         self.assertEqual(profile["source"]["path"], str(self.external_csv))
 
-    def test_bdd_3_dta_import_returns_blocked_profile_without_fake_fields(self) -> None:
-        """行为 3：DTA 暂未接入解析器时，必须返回阻塞状态而不是伪造字段。"""
+    def test_bdd_3_valid_dta_import_generates_metadata_only_field_profile(self) -> None:
+        """行为 3：有效 DTA 以 metadata-only 方式生成变量字典画像。"""
         dataset_import_id = self._apply_dataset_import(self.external_dta, "bind_external_reference")
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/datasets/imports/{dataset_import_id}/profile",
+            json={"row_limit": 200},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        profile = response.json()["dataset_import_profile"]
+        self.assertEqual(profile["status"], "profiled")
+        self.assertEqual(profile["readiness_status"], "ready")
+        self.assertEqual(profile["quality_profile"]["row_count"], 2)
+        self.assertEqual(profile["quality_profile"]["column_count"], 4)
+        self.assertEqual(profile["quality_profile"]["row_count_source"], "metadata_only")
+        self.assertEqual([field["name"] for field in profile["fields"]], ["pid", "wage", "trained", "name"])
+        self.assertEqual(profile["fields"][1]["label"], "hourly wage")
+        self.assertEqual(profile["fields"][1]["stata_type"], "double")
+        self.assertEqual(profile["fields"][3]["inferred_type"], "text")
+        self.assertFalse(profile["can_feed_variable_roles"])
+        self.assertIsNone(profile["blocking_reason"])
+
+    def test_bdd_4_malformed_dta_returns_blocked_profile_without_fake_fields(self) -> None:
+        """行为 4：损坏 DTA 必须返回阻塞画像，不能伪造字段或抛 500。"""
+        malformed_dta = self.external_root / "外部源数据" / "BROKEN.dta"
+        malformed_dta.write_bytes(b"stata-dta-placeholder")
+        dataset_import_id = self._apply_dataset_import(malformed_dta, "bind_external_reference")
 
         response = self.client.post(
             f"/api/v1/projects/{self.project_id}/datasets/imports/{dataset_import_id}/profile",
@@ -111,10 +137,10 @@ class ExternalDatasetImportProfileApiTests(unittest.TestCase):
         self.assertEqual(profile["readiness_status"], "not_profiled")
         self.assertEqual(profile["fields"], [])
         self.assertFalse(profile["can_feed_variable_roles"])
-        self.assertIn("暂未接入", profile["blocking_reason"])
+        self.assertIn("DTA 读取失败", profile["blocking_reason"])
 
-    def test_bdd_4_changed_external_source_is_rejected_before_profile(self) -> None:
-        """行为 4：外部绑定文件变化后，必须阻止画像以保护 provenance。"""
+    def test_bdd_5_changed_external_source_is_rejected_before_profile(self) -> None:
+        """行为 5：外部绑定文件变化后，必须阻止画像以保护 provenance。"""
         dataset_import_id = self._apply_dataset_import(self.external_csv, "bind_external_reference")
         self.external_csv.write_text("pid,wage,trained\n1,99,1\n", encoding="utf-8")
 
@@ -126,8 +152,8 @@ class ExternalDatasetImportProfileApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409, msg=response.text)
         self.assertEqual(response.json()["error"]["code"], "dataset_import_source_changed")
 
-    def test_bdd_5_cancelled_import_cannot_be_profiled(self) -> None:
-        """行为 5：已取消的导入记录不能进入字段画像。"""
+    def test_bdd_6_cancelled_import_cannot_be_profiled(self) -> None:
+        """行为 6：已取消的导入记录不能进入字段画像。"""
         dataset_import_id = self._apply_dataset_import(self.external_csv, "cancel")
 
         response = self.client.post(
@@ -178,7 +204,23 @@ class ExternalDatasetImportProfileApiTests(unittest.TestCase):
     def _create_external_dta(external_root: Path) -> Path:
         source = external_root / "外部源数据" / "CFPS.dta"
         source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_bytes(b"stata-dta-placeholder")
+        pd.DataFrame(
+            {
+                "pid": [1, 2],
+                "wage": [10.5, 12.0],
+                "trained": [1, 0],
+                "name": ["a", "b"],
+            }
+        ).to_stata(
+            source,
+            write_index=False,
+            variable_labels={
+                "pid": "person id",
+                "wage": "hourly wage",
+                "trained": "training status",
+                "name": "respondent name",
+            },
+        )
         return source
 
     @staticmethod
@@ -200,13 +242,15 @@ class ExternalDatasetImportProfileFrontendTests(unittest.TestCase):
         cls.app_js = (root / "Product" / "web" / "assets" / "app.js").read_text(encoding="utf-8")
         cls.styles = (root / "Product" / "web" / "assets" / "styles.css").read_text(encoding="utf-8")
 
-    def test_bdd_6_frontend_exposes_profile_entry_and_non_mutation_copy(self) -> None:
-        """行为 6：前端必须有字段画像入口、画像面板和不改写研究状态说明。"""
+    def test_bdd_7_frontend_exposes_profile_entry_and_non_mutation_copy(self) -> None:
+        """行为 7：前端必须有字段画像入口、画像面板和不改写研究状态说明。"""
         self.assertIn("dataset-import-profile-panel", self.index_html)
         self.assertIn("data-external-import-profile-action", self.app_js)
         self.assertIn("requestExternalImportProfile", self.app_js)
         self.assertIn("生成字段画像", self.app_js)
         self.assertIn("字段画像 / 变量字典预览", self.app_js)
+        self.assertIn("变量标签", self.app_js)
+        self.assertIn("Stata 类型", self.app_js)
         self.assertIn("不会改写 VariableRoleSet、DesignSpec 或 RunPlan", self.app_js)
         self.assertIn("dataset-import-profile-panel", self.styles)
 

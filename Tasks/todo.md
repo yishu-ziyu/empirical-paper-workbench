@@ -403,3 +403,15 @@
 - [x] 实现：DTA/XLSX/Parquet 暂不伪造字段，返回 `blocked/not_profiled` 和阻塞原因。
 - [x] 前端：导入/绑定预检结果区增加“生成字段画像”和画像预览面板，明确不会改写 VariableRoleSet、DesignSpec 或 RunPlan。
 - [x] 验证：目标测试 6 OK；相邻回归 27 OK；全量回归 186 OK，skipped=1；Python/JS 静态检查、`git diff --check`、API 和页面静态资源验收通过。
+
+## 2026-05-14 P2-J Stata DTA Field Profile
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-dta-field-profile-bdd.md`，定义 DTA metadata-only 字段画像、损坏文件阻塞、不改写研究状态。
+- [x] TDD：扩展 `tests/test_external_dataset_import_profile.py`；首次运行 3 条失败，原因是有效 DTA 仍返回 blocked、损坏 DTA 阻塞原因不精确、前端缺少变量标签/Stata 类型。
+- [x] 实现：扩展 `Product/backend/overview_service.py`，用 `pyreadstat.read_dta(..., metadataonly=True)` 读取 Stata 元数据，返回字段名、变量标签、Stata 类型、display format、样本数和字段数。
+- [x] 实现：损坏 DTA 或缺少读取器时返回 `blocked/not_profiled`、空字段和 `DTA 读取失败...`，不抛 500、不伪造字段。
+- [x] 前端：字段画像表从“样本值”改为“变量标签 / Stata 类型”，并修正字段表列宽和表头大小写。
+- [x] 真实验收：`dataset_import_e9d864229be8` 绑定的 `cfps2011adult_202202(1).dta` 返回 `profiled/ready`、`row_count=1279`、`column_count=723`、`row_count_source=metadata_only`，前 6 个字段含 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。
+- [x] 验证：目标测试 7 OK；相邻回归 28 OK；全量回归 187 OK，skipped=1；Python/JS 静态检查和 `git diff --check` 通过；Playwright CLI 截图 `/tmp/empirical-workbench-p2j-dta-profile.png`。
+- [ ] P2-K：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
+- [ ] P2-L：设计严谨实证执行层：Python/StatsPAI/StataMCP 三条路径的执行日志、结果文件、evaluator checks、交叉验证和 evidence_level。

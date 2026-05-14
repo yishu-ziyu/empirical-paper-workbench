@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-14 23:35 CST
+更新时间：2026-05-14 23:58 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。最新 P2-I 已完成：已 apply 的真实数据现在可以生成安全字段画像；CSV 会读取字段结构并持久化画像，DTA/XLSX/Parquet 等暂不伪造变量字典，而是返回 `blocked/not_profiled` 和阻塞原因；画像明确 `can_feed_variable_roles=false`，不会改写 VariableRoleSet、DesignSpec 或 RunPlan。真实验收当前最新 import 为 `dataset_import_e9d864229be8`，绑定 CFPS `.dta`，画像结果为 `blocked/not_profiled`、`fields=[]`、`blocking_reason=dta 暂未接入安全字段读取器。`。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。P2-I 已完成 CSV/阻塞式字段画像入口。最新 P2-J 已完成：已 apply 的 Stata `.dta` 现在可以用 metadata-only 方式读取变量字典；真实验收当前 import `dataset_import_e9d864229be8` 绑定 `cfps2011adult_202202(1).dta`，画像结果为 `profiled/ready`、`row_count=1279`、`column_count=723`、`fields=723`、`row_count_source=metadata_only`，字段样例包括 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。画像仍明确 `can_feed_variable_roles=false`，不会改写 VariableRoleSet、DesignSpec 或 RunPlan。下一步应把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，并继续设计 Python/StatsPAI/StataMCP 的严谨实证执行层。
 
 ## 已完成事项
 
@@ -1209,3 +1209,53 @@ P2-J：优先实现 DTA 字段读取器的安全元数据模式，目标是读�
 - XLSX/Parquet 也还没有安全字段读取器。
 - 本地版绑定引用依赖本机路径；线上版必须改成上传或云对象，不能继续使用 `/Users/...` 路径。
 - Playwright CLI fallback 可用并已完成截图级验收；但 Playwright MCP 仍 `Transport closed`，Computer Use 对当前 in-app browser URL 受限，后续仍应修复主浏览器自动化链路。
+
+## 2026-05-14 P2-J Stata DTA Field Profile 交接增量
+
+### 当前目标
+
+真实 CFPS `.dta` 已经不再停留在文件名/阻塞状态，系统现在能在不读取整张大表的情况下展示 Stata 变量字典。该能力仍属于数据理解层，不等于实证分析，也不会自动写入变量角色或执行计划。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-dta-field-profile-bdd.md`。
+- 扩展测试：`tests/test_external_dataset_import_profile.py`，覆盖有效 DTA metadata-only 画像、损坏 DTA 阻塞画像、前端变量标签/Stata 类型展示。
+- 扩展 `Product/backend/overview_service.py`：新增 `build_dta_metadata_profile()`、`blocked_dta_metadata_profile()`、`infer_stata_field_type()`。
+- 扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`：字段画像表显示变量标签和 Stata 类型，列宽更适合变量字典。
+- 更新 `Product/web/index.html` asset version 到 `20260514-p2j-dta1`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_external_dataset_import_profile -v` 首次 3 条失败。
+- GREEN：`python3 -m unittest tests.test_external_dataset_import_profile -v`，7 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_profile tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，28 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，187 tests OK，skipped=1。
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/imports/dataset_import_e9d864229be8/profile` 返回 `profiled/ready`、`row_count=1279`、`column_count=723`、`fields=723`、`can_feed_variable_roles=false`。
+- 可视化：Playwright CLI 截图 `/tmp/empirical-workbench-p2j-dta-profile.png`，页面显示真实 CFPS 变量标签和 Stata 类型。
+
+### 关键文件路径
+
+- `Product/backend/overview_service.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_external_dataset_import_profile.py`
+- `docs/architecture-v2/codex-phase-p2-dta-field-profile-bdd.md`
+- `state/product/dataset_import_preflights.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- DTA 字段画像只读元数据，不读取全量数据；`row_count_source=metadata_only` 是有意设计。
+- 字段画像不是变量角色确认；`can_feed_variable_roles=false` 需要保持，直到 P2-K 建立人工审阅状态机。
+- Python/pyreadstat 只负责安全读字段，不代表完整实证分析；严谨估计要由 Python/StatsPAI/StataMCP 执行器产出日志、结果、诊断和 evaluator checks。
+
+### 下一步第一件事
+
+P2-K：基于 `dataset_import_profile.fields` 生成可审阅的字段候选清单，允许用户选择 outcome/treatment/controls/instruments 的候选，但保存前不得改写正式 VariableRoleSet。
+
+### 未解决风险
+
+- DTA value labels、缺失统计和抽样预览还没有接入。
+- XLSX/Parquet 仍没有安全字段读取器。
+- 真实实证执行层还需要接 StatsPAI/StatsAPI、StataMCP 或 Python 的严格 pipeline，而不是只看字段画像。
+- Playwright MCP 仍 `Transport closed`；当前可视化验收使用 Playwright CLI fallback。

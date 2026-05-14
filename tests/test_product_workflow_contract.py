@@ -67,6 +67,20 @@ class ProductWorkflowContractTests(unittest.TestCase):
             ["variable_roles_unconfirmed", "design_unconfirmed", "run_plan_missing"],
         )
 
+    def test_bdd_7_workflow_contract_declares_llm_supervisor_layer(self) -> None:
+        """行为 7：工作流契约必须显式声明 LLM Supervisor，而不是只靠工程状态机推进。"""
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/overview")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        intelligence = response.json()["workflow_contract"]["intelligence_layer"]
+        self.assertEqual(intelligence["supervisor_agent_id"], "pipeline_supervisor")
+        self.assertEqual(intelligence["provider"]["provider"], "local_codex")
+        self.assertIn("available", intelligence["provider"])
+        self.assertIn("execution_enabled", intelligence["provider"])
+        self.assertIn(intelligence["status"], {"ready", "blocked"})
+        self.assertEqual(intelligence["evidence_level"], "local_file")
+        self.assertIn("dispatch_plan", intelligence)
+
     @staticmethod
     def _create_minimal_project(project_root: Path) -> None:
         (project_root / "Data" / "Final").mkdir(parents=True)
@@ -123,6 +137,14 @@ class ProductWorkflowFrontendContractTests(unittest.TestCase):
         self.assertIn("renderExecutionPreflight", self.app_js)
         self.assertIn("can_start_full_run", self.app_js)
         self.assertIn("variable_roles_unconfirmed", self.app_js)
+
+    def test_bdd_8_home_shows_llm_supervisor_readiness(self) -> None:
+        """行为 8：首页必须展示本地大模型中控状态，而不是把 Agent 当静态装饰。"""
+        self.assertIn("llm-supervisor-panel", self.index_html)
+        self.assertIn("renderIntelligenceLayer", self.app_js)
+        self.assertIn("intelligence_layer", self.app_js)
+        for label in ("智能中控", "本地 Codex", "Supervisor", "派工计划"):
+            self.assertIn(label, self.app_js + self.index_html)
 
 
 if __name__ == "__main__":

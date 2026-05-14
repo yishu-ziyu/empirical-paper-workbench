@@ -512,3 +512,27 @@ Rejected: 只在前端切换字段，不把 `candidate_id` 写入正式角色集
 Rejected: 继续要求 candidate 的 `dataset_path` 必须位于 `Data/Final`。原因是真实数据候选可能来自 `Data/Raw` 或本地外部绑定；保存边界应由 candidate 审批和 provenance 控制，而不是旧 demo 数据路径假设。
 
 Evidence: Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，点击“载入正式编辑器”后编辑器显示 `draft_from_candidate · local_file`、真实 CFPS DTA 路径、`candidate_id=variable_role_candidate_495092cb7af2` 和“保存后才写入正式变量角色集”。目标测试 8 OK，全量回归 198 OK。
+
+## 2026-05-14：StatsPAI 必须从候选能力变成独立验证证据
+
+Decision: 在 CSV OLS full run 中真实调用 StatsPAI/StatsAPI，写出 `Results/json/statspai_execution_result.json`，并把结果作为 `backend_validations` 展示在实证执行页；Python OLS adapter 仍是主执行路径，StatsPAI 是独立复核路径。
+
+Reason: 用户指出“StatsPAI 为什么还是候选后端，为什么没有进入执行层”。如果系统只在 UI 中列出 StatsPAI，却没有运行和产物，就无法证明严谨实证执行。先从当前可控的 OLS/CSV 场景做独立验证，可以立即提升可信度，同时不伪装 DID/IV/RDD 等尚未完成的方法。
+
+Rejected: 因为 StatsPAI 可安装就把所有方法标记为 `local_execution`。原因是可安装不等于本次 run 调用过，也不等于产生日志、结果和可复核产物。
+
+Rejected: 用 StatsPAI 替换 Python adapter 作为唯一执行路径。原因是当前 Python adapter 已承载 run manifest、evaluator、FindingCard 绑定；StatsPAI 先做独立复核更稳，后续再抽象可替换后端。
+
+Evidence: full run `run_92c32fdf847f` 的实证执行页显示 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`；全量回归 203 tests OK。
+
+## 2026-05-14：本地 Codex Supervisor 必须显式暴露，不能藏在工程状态机后面
+
+Decision: 在 `workflow_contract` 中新增 `intelligence_layer`，并在首页新增“智能中控”面板，显式展示本地 Codex Supervisor、provider readiness、执行开关、阻塞原因和派工计划。当前本机 Codex CLI 可用，但 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用，因此状态为 `blocked`。
+
+Reason: 用户指出如果没有底层大模型/中控系统，产品会退化成纯逻辑条件驱动的工程体系，偏离最初构想。正确做法不是假装 Agent 已经在工作，而是把中控层作为一等产品对象，明确“可检测、未启用、下一步要真实派工”。
+
+Rejected: 继续用静态 Agent 卡片暗示智能编排。原因是这无法证明模型是否可用、是否允许执行、是否生成计划，也无法给用户确定感。
+
+Rejected: 默认打开本地 Codex 执行。原因是模型 subprocess 可能产生外部调用、费用和不确定输出；必须由环境开关显式启用，并把每次计划/派工写入可审计产物。
+
+Evidence: `GET /api/v1/providers/local-codex` 返回 `available=true`、`execution_enabled=false`；overview API 返回 `intelligence_layer.status=blocked` 和 blocker `local_codex_execution_not_enabled`；Chrome 页面显示“本地 Codex Supervisor 未启用”和派工计划。

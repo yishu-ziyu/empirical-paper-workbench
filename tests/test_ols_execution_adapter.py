@@ -218,6 +218,50 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertEqual(reproducibility["result_artifact_path"], "Results/json/method_execution_result.json")
         self.assertEqual(reproducibility["source_entrypoint"], "Product/backend/project_service.py::execute_ols_task")
 
+    def test_bdd_10_statspai_runs_as_local_execution_validation_when_available(self) -> None:
+        """行为 10：StatsPAI 可用时必须真实执行 OLS validation，而不是只停留在候选后端。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        method = response.json()["method_execution"]["methods"][0]
+        validations = {item["backend_id"]: item for item in method["backend_validations"]}
+        self.assertIn("statspai", validations)
+        statspai = validations["statspai"]
+        self.assertEqual(statspai["status"], "passed")
+        self.assertEqual(statspai["evidence_level"], "local_execution")
+        self.assertEqual(statspai["artifact_path"], "Results/json/statspai_execution_result.json")
+        self.assertEqual(statspai["formula"], "wage ~ trained + edu + experience")
+        self.assertEqual(statspai["nobs"], 8)
+        coefficient_check = next(check for check in statspai["checks"] if check["id"] == "treatment_coefficient_cross_check")
+        self.assertEqual(coefficient_check["status"], "passed")
+        self.assertLessEqual(coefficient_check["difference"], coefficient_check["tolerance"])
+
+    def test_bdd_11_statspai_validation_writes_independent_artifact(self) -> None:
+        """行为 11：StatsPAI 执行必须写出独立 JSON 产物，便于审计和复现。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        artifact_path = self.project_root / "Results" / "json" / "statspai_execution_result.json"
+        self.assertTrue(artifact_path.exists())
+        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["backend_id"], "statspai")
+        self.assertEqual(payload["evidence_level"], "local_execution")
+        self.assertEqual(payload["dataset_path"], "Data/Final/analysis_sample.csv")
+        self.assertEqual(payload["formula"], "wage ~ trained + edu + experience")
+        self.assertEqual(payload["nobs"], 8)
+        self.assertIn("trained", payload["coefficients"])
+        self.assertIn("trained", payload["p_values"])
+        self.assertIn("R-squared", payload["diagnostics"])
+        self.assertIn("Model: OLS", payload["summary_text"])
+
     def _approve_variable_roles(self) -> None:
         response = self.client.put(
             f"/api/v1/projects/{self.project_id}/variable-roles",

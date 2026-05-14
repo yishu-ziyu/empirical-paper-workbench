@@ -163,6 +163,16 @@ class ObservableExecutionFrontendTests(unittest.TestCase):
         ):
             self.assertIn(label, self.app_js)
 
+    def test_bdd_16_execution_page_shows_independent_backend_validation(self) -> None:
+        """行为 16：实证执行页必须展示 StatsPAI 独立验证结果，而不是只展示 Python 适配器。"""
+        self.assertIn("backend_validations", self.app_js)
+        self.assertIn("renderMethodBackendValidations", self.app_js)
+        self.assertIn("独立后端验证", self.app_js)
+        self.assertIn("StatsPAI / StatsAPI", self.app_js)
+        self.assertIn("statspai_execution_result.json", self.app_js)
+        self.assertIn("treatment_coefficient_cross_check", self.app_js)
+        self.assertIn(".method-validation-item", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

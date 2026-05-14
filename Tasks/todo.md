@@ -454,4 +454,24 @@
 - [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，进入“数据与设计”，点击“载入正式编辑器”后确认编辑器显示 `candidate_id=variable_role_candidate_495092cb7af2`、`draft_from_candidate · local_file`、真实 CFPS DTA 路径和候选字段。
 - [x] 保护性验收：本轮没有点击“保存变量角色集”，避免把当前演示项目已批准的 `analysis_sample.csv` 变量角色覆盖成 CFPS 启发式候选。
 - [x] 验证：目标测试 8 OK；全量回归 198 OK，skipped=1；Python 编译和 JS 语法检查通过。
-- [ ] P2-N：让 DesignSpec/RunPlan 只读取正式 VariableRoleSet，并为真实 CFPS/StatsPAI/StataMCP 执行增加数据源解析、后端日志和 evaluator checks。
+- [x] P2-N：接入 StatsPAI/StatsAPI 作为 OLS 独立验证后端，生成独立结果文件、交叉验证检查和 `local_execution` evidence。
+- [x] P2-O：把本地 Codex Supervisor 作为智能中控层显式接入 workflow contract 和首页，展示 provider readiness、执行开关、阻塞原因和派工计划。
+- [ ] P2-P：实现真实 Supervisor plan artifact。启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 后，由本地 Codex 生成/审阅阶段计划并写入可审计产物；未启用时必须继续显示 blocked，不允许伪装智能派工。
+
+## 2026-05-14 P2-N StatsPAI Independent OLS Validation
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-statspai-execution-validation-bdd.md`，定义 StatsPAI 必须真实执行并写出独立验证产物。
+- [x] TDD：扩展 `tests/test_ols_execution_adapter.py`；首次失败原因是 full run 只有 Python OLS adapter，没有 `backend_validations` 和 `Results/json/statspai_execution_result.json`。
+- [x] 实现：扩展 `Product/backend/project_service.py`，新增 `execute_statspai_ols_validation()`；当 StatsPAI 可用且数据为 CSV 时调用 `statspai.regress()`，输出系数、标准误、p 值、t 统计、诊断和 cross-check。
+- [x] 前端：扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`，在实证执行页“方法执行证据”中新增“独立后端验证”，显示 StatsPAI adapter、状态、产物路径、证据等级和交叉检查。
+- [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`，启动完整实证执行生成 `run_92c32fdf847f`，页面显示 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`。
+- [x] 验证：目标测试和全量回归均通过；最新全量为 `python3 -m unittest discover -s tests -v`，203 tests OK，skipped=1。
+
+## 2026-05-14 P2-O LLM Supervisor Readiness Contract
+
+- [x] BDD：扩展 `tests/test_product_workflow_contract.py`，定义 workflow contract 必须显式声明 LLM Supervisor 层，首页必须展示本地大模型中控状态。
+- [x] TDD：首次失败原因是 `workflow_contract` 缺少 `intelligence_layer`，前端缺少 `llm-supervisor-panel` 和 `renderIntelligenceLayer()`。
+- [x] 实现：扩展 `Product/backend/overview_service.py`，新增 `build_intelligence_layer_contract()`，读取 `local_codex_status()`，返回 `supervisor_agent_id=pipeline_supervisor`、provider、ready/blocked 状态、blockers 和派工计划。
+- [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，首页新增“智能中控”面板，显示本地 Codex Supervisor、Provider、可用性、执行开关、阻塞原因和阶段派工计划。
+- [x] 可视化验收：页面显示 `本地 Codex Supervisor 未启用`、`provider=local_codex`、`可用=是`、`允许执行=否`、`local_codex_execution_not_enabled` 和四个派工方向。
+- [ ] 未完成：当前只是 Supervisor readiness contract，不是实际 LLM 派工执行。真实派工必须等 P2-P 持久化 `supervisor_plan` 并在执行开关启用时调用本地 Codex。

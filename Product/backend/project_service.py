@@ -570,6 +570,9 @@ def execute_ols_task(
     treatment = first_string((design_spec.get("variables") or {}).get("treatment"))
     evaluator = build_ols_evaluator(model, treatment)
     reproducibility = build_ols_reproducibility(run_id, run_plan, formula, dataset_path)
+    backend_validations = [
+        execute_statspai_ols_validation(project_root, run_id, formula, dataset_path, model, treatment)
+    ]
     return {
         "run_id": run_id,
         "task_id": task.get("id"),
@@ -592,10 +595,188 @@ def execute_ols_task(
         "evaluator": evaluator,
         "data_preflight": data_preflight,
         "reproducibility": reproducibility,
+        "backend_validations": backend_validations,
         "treatment": treatment,
         "treatment_coefficient": coefficients.get(treatment) if treatment else None,
         "evidence_level": "local_execution",
     }
+
+
+def execute_statspai_ols_validation(
+    project_root: Path,
+    run_id: str,
+    formula: str,
+    dataset_path: str,
+    python_model: dict[str, Any],
+    treatment: str | None,
+) -> dict[str, Any]:
+    artifact_path = "Results/json/statspai_execution_result.json"
+    result_path = project_root / artifact_path
+    validation_base = {
+        "backend_id": "statspai",
+        "backend_label": "StatsPAI / StatsAPI",
+        "formula": formula,
+        "dataset_path": dataset_path,
+        "artifact_path": artifact_path,
+    }
+    if importlib.util.find_spec("statspai") is None:
+        payload = {
+            **validation_base,
+            "run_id": run_id,
+            "status": "blocked",
+            "evidence_level": "local_file",
+            "blocker_code": "statspai_not_installed",
+            "checks": [
+                {
+                    "id": "statspai_import",
+                    "label": "StatsPAI 可导入",
+                    "status": "blocked",
+                    "detail": "Python environment cannot import statspai.",
+                }
+            ],
+        }
+        write_json_artifact(result_path, payload)
+        return payload
+
+    source_path = resolve_execution_dataset_path(project_root, dataset_path)
+    if source_path.suffix.lower() != ".csv":
+        payload = {
+            **validation_base,
+            "run_id": run_id,
+            "status": "blocked",
+            "evidence_level": "local_file",
+            "blocker_code": "statspai_validation_requires_csv",
+            "checks": [
+                {
+                    "id": "analysis_ready_csv",
+                    "label": "StatsPAI validation 输入格式",
+                    "status": "blocked",
+                    "detail": f"Current MVP validation supports CSV only, got {source_path.suffix or 'unknown'}.",
+                }
+            ],
+        }
+        write_json_artifact(result_path, payload)
+        return payload
+
+    try:
+        import pandas as pd
+        import statspai as sp
+
+        dataframe = pd.read_csv(source_path)
+        result = sp.regress(formula, dataframe)
+        coefficients = statspai_series_to_float_dict(result.params)
+        p_values = statspai_series_to_float_dict(result.pvalues, keys=list(coefficients))
+        std_errors = statspai_series_to_float_dict(result.std_errors, keys=list(coefficients))
+        t_values = statspai_series_to_float_dict(result.tvalues, keys=list(coefficients))
+        diagnostics = json_safe_value(getattr(result, "diagnostics", {}) or {})
+        summary_text = str(result.summary())
+        python_treatment_coefficient = python_model.get("coefficients", {}).get(treatment) if treatment else None
+        statspai_treatment_coefficient = coefficients.get(treatment) if treatment else None
+        difference = (
+            abs(float(python_treatment_coefficient) - float(statspai_treatment_coefficient))
+            if python_treatment_coefficient is not None and statspai_treatment_coefficient is not None
+            else None
+        )
+        tolerance = 1e-6
+        coefficient_status = "passed" if difference is not None and difference <= tolerance else "failed"
+        payload = {
+            **validation_base,
+            "run_id": run_id,
+            "status": "passed" if coefficient_status == "passed" else "needs_review",
+            "evidence_level": "local_execution",
+            "adapter": "statspai.regress",
+            "statspai_version": getattr(sp, "__version__", "unknown"),
+            "nobs": int(len(dataframe)),
+            "coefficients": coefficients,
+            "standard_errors": std_errors,
+            "t_statistics": t_values,
+            "p_values": p_values,
+            "diagnostics": diagnostics,
+            "summary_text": summary_text,
+            "checks": [
+                {
+                    "id": "statspai_import",
+                    "label": "StatsPAI 可导入",
+                    "status": "passed",
+                    "detail": f"statspai {getattr(sp, '__version__', 'unknown')}",
+                },
+                {
+                    "id": "statspai_regress_execution",
+                    "label": "StatsPAI regress 已执行",
+                    "status": "passed",
+                    "detail": formula,
+                },
+                {
+                    "id": "treatment_coefficient_cross_check",
+                    "label": "处理变量系数与 Python adapter 一致",
+                    "status": coefficient_status,
+                    "python_adapter_value": python_treatment_coefficient,
+                    "statspai_value": statspai_treatment_coefficient,
+                    "difference": difference,
+                    "tolerance": tolerance,
+                },
+            ],
+        }
+    except Exception as exc:  # pragma: no cover - defensive runtime boundary
+        payload = {
+            **validation_base,
+            "run_id": run_id,
+            "status": "blocked",
+            "evidence_level": "local_file",
+            "blocker_code": "statspai_execution_failed",
+            "checks": [
+                {
+                    "id": "statspai_regress_execution",
+                    "label": "StatsPAI regress 已执行",
+                    "status": "blocked",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                }
+            ],
+        }
+    write_json_artifact(result_path, payload)
+    return payload
+
+
+def resolve_execution_dataset_path(project_root: Path, dataset_path: str) -> Path:
+    raw_path = Path(dataset_path)
+    if raw_path.is_absolute():
+        return raw_path
+    return (project_root / raw_path).resolve()
+
+
+def write_json_artifact(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def statspai_series_to_float_dict(values: Any, keys: list[str] | None = None) -> dict[str, float]:
+    if hasattr(values, "to_dict"):
+        return {str(key): round_significant(float(value)) for key, value in values.to_dict().items()}
+    raw_values = list(values) if isinstance(values, (list, tuple)) or hasattr(values, "__iter__") else []
+    if not keys:
+        keys = [str(index) for index in range(len(raw_values))]
+    return {
+        key: round_significant(float(raw_values[index]))
+        for index, key in enumerate(keys)
+        if index < len(raw_values)
+    }
+
+
+def json_safe_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_safe_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [json_safe_value(item) for item in value]
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except (TypeError, ValueError):
+            pass
+    if isinstance(value, (int, float, str, bool)) or value is None:
+        return value
+    return str(value)
 
 
 def parse_linear_formula(formula: str) -> tuple[str, list[str]]:

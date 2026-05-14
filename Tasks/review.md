@@ -671,3 +671,35 @@
 - DesignSpec/RunPlan 还没有基于 candidate 写回后的正式 VariableRoleSet 自动刷新。
 - StatsPAI/StataMCP 仍是候选后端，尚未实际执行并生成独立日志、结果文件和 evaluator checks。
 - 线上版仍需要上传/云对象路径抽象；本地版可以绑定 `/Users/...`，云端不能执行本地路径。
+
+## 2026-05-14 P2-N/P2-O StatsPAI Validation 与 LLM Supervisor
+
+### 行为覆盖
+
+- [x] CSV OLS full run 在 StatsPAI 可用时必须真实执行独立 validation，而不是只展示候选后端。
+- [x] StatsPAI validation 必须写出独立 JSON 产物，供审计和复现。
+- [x] 实证执行页必须展示独立后端验证状态、adapter、artifact、证据等级和交叉验证。
+- [x] workflow contract 必须显式声明 LLM Supervisor 层，不能只靠工程状态机推进。
+- [x] 首页必须展示本地 Codex Supervisor readiness、执行开关、阻塞原因和派工计划。
+- [ ] 未覆盖：启用本地 Codex 后真实生成 supervisor plan artifact；Stata do-file/log 执行；StatsPAI 对 DTA/面板/IV/DID/RDD 等方法的执行。
+
+### 测试覆盖
+
+- RED：StatsPAI 行为首次失败为缺少 `backend_validations` 和 `Results/json/statspai_execution_result.json`；LLM Supervisor 行为首次失败为缺少 `workflow_contract.intelligence_layer` 和 `llm-supervisor-panel`。
+- 目标测试：`python3 -m unittest tests.test_clean_workbench_visual_contract tests.test_ols_execution_adapter tests.test_observable_execution_frontend tests.test_product_workflow_contract -v`，40 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，203 tests OK，skipped=1，耗时 12.235s。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/backend/overview_service.py Product/backend/project_service.py Product/app.py` 通过。
+
+### API / 可视化验收
+
+- API：`GET /api/v1/providers/local-codex` 返回 `available=true`、`path=/Users/mahaoxuan/.local/bin/codex`、`version=codex-cli 0.130.0`、`execution_enabled=false`。
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/overview` 返回 `workflow_contract.intelligence_layer.status=blocked`，blocker 为 `local_codex_execution_not_enabled`。
+- 页面：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`，首页显示“智能中控”“本地 Codex Supervisor 未启用”“允许执行=否”和派工计划。
+- 页面：点击“启动完整实证执行”生成 `run_92c32fdf847f`，刷新后实证执行页显示 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
+
+### 剩余风险
+
+- 本地 Codex 还没有真正进入执行层；当前只是 provider readiness + workflow contract + UI。下一步必须实现 plan artifact 和 gated execution。
+- StatsPAI 只完成当前 CSV OLS 独立验证；真实 CFPS `.dta`、StataMCP、DID/IV/RDD/PSM/DML 和稳健标准误还没完成。
+- LLM 输出需要持久化、审计和人工确认；不能让 Supervisor 输出直接覆盖 VariableRoleSet、DesignSpec、RunPlan 或论文正文。
+- 本地版和线上版要继续分离：本地版可接 Codex、本地数据和本地统计后端；线上版必须走云模型、上传数据和云执行队列。

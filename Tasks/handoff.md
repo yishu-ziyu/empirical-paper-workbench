@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-15 00:32 CST
+更新时间：2026-05-14 17:20 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。P2-I/P2-J 已完成真实 Stata `.dta` metadata-only 字段画像，当前 import `dataset_import_e9d864229be8` 可读 `cfps2011adult_202202(1).dta` 的 1279 行、723 列、变量标签和 Stata 类型，但仍 `can_feed_variable_roles=false`。最新 P2-K 已按用户要求优先建立“严谨实证执行契约”：full run 会声明真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口。下一步应做 P2-L 字段审阅 / VariableRoleSet 候选生成状态机，然后接真实 StatsPAI 或 StataMCP 后端。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-N 已把 StatsPAI/StatsAPI 从“候选后端”推进为 CSV OLS 的独立验证后端：full run 会额外写出 `Results/json/statspai_execution_result.json`，并在实证执行页展示 `statspai.regress`、验证状态、证据等级和 treatment coefficient cross-check。P2-O 已回应用户关于“底层大模型/中控系统是否缺失”的关键质疑：`workflow_contract.intelligence_layer` 和首页“智能中控”面板现在显式展示本地 Codex Supervisor、provider readiness、执行开关、阻塞原因和派工计划。当前真实状态是：本机 Codex CLI 可检测到，但 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用，所以 Supervisor 处于 `blocked`，还没有真正生成计划或派出 sub agent。
 
 ## 已完成事项
 
@@ -181,20 +181,66 @@
 - FindingCard 的系数、标准误、p 值和样本量必须来自 `Results/json/analysis_result.json`，不要从 Markdown 草稿解析。
 - FindingCard review 是用户本地决策证据，`evidence_level=local_file`；真实估计结果仍是 `local_execution`。
 - 旧 review 不应自动套用到新 run；当前实现要求 persisted review 的 `run_id` 和 `artifact_path` 与当前 finding 匹配。
+- StatsPAI/StatsAPI 现在已经不是单纯候选后端：对 CSV OLS full run，系统会真实调用 `statspai.regress()` 并写出独立 `Results/json/statspai_execution_result.json`。但这只覆盖当前 OLS validation，不代表 DID/IV/RDD/PSM/DML 已接入。
+- 本地 Codex 已作为 provider readiness 暴露到 `workflow_contract.intelligence_layer`，但实际执行开关默认关闭。不要把“可检测到 Codex CLI”误写成“Supervisor 已经真实派工”。
+- 当前大模型中控边界：工程状态机负责可复现和审计；本地 Codex Supervisor 应负责计划、派工、审阅和失败恢复。下一步必须让 Supervisor 产出可持久化 plan artifact，而不是继续只在 UI 上展示 agent 名称。
 
 ## 下一步第一件事
 
-写 P2-D BDD 和失败测试：把 `Results/json/method_execution_result.json` 接入 Execution / Findings。Execution 应显示本次方法执行的 engine、method_id、formula、nobs、treatment coefficient、evidence_level；Findings 应优先从方法执行产物读取 OLS evidence，再决定是否替换旧 `analysis_result.json` 的展示逻辑。
+写 P2-P BDD 和失败测试：实现真实 Supervisor plan artifact。`POST /api/v1/projects/{project_id}/supervisor/plan` 或 full-run 前置编排应在 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 时调用本地 Codex，写入 `state/product/supervisor_plan.json` 或 run-scoped `state/runs/{run_id}/supervisor_plan.json`；未启用时继续返回 blocked，并在首页显示不能派工的原因。
 
 ## 未解决风险
 
-- 当前手动验收已把 `run_3ffe1e6c1f53` 的 `gate_dataset_fields` 处理为 resolved；如需验收开放 gate，可使用同一 run 的 `gate_research_question`，或点击“启动试运行”重新生成。
 - `Product/serve_product.py` 直接运行会因 `ModuleNotFoundError: No module named 'Product'` 失败；模块方式启动或 `uvicorn Product.app:app` 可用，后续可单独补入口测试和修复。
 - P1-B 还没有 multipart 上传；当前入口要求数据文件已经存在于项目 `Data/` 目录下。
 - `state/product/variable_roles.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 是浏览器/API 验收创建的真实本地运行状态；当前未纳入 git 跟踪，后续提交前需要决定是否作为样例状态保留、迁移到 fixtures，或继续作为 gitignored runtime artifacts。
-- full run、Results & Draft evidence binding、FindingCard claim review、Manuscript candidate generation/review/promote/export preflight、Review & Export package workbench 已打通；还没有真正的源草稿写回或 docx export。
-- 当前前端已收敛为 5 个工作区，但还不是用户材料中完整的 8 板块 AppShell；后续应先完成 Review & Export 的可审计导出闭环，再逐步展开 Artifacts / Agents。
-- P1-R 已修复当前最明显的视觉风险：Data & Design 中变量角色确认入口不再重叠；后续视觉迭代应继续沿用 `clean-workbench-shell`、`inspector-rail`、`research-record-card`，不要回到纸格背景和大卡片嵌套。
+- StatsPAI 独立验证目前只覆盖 CSV OLS；真实 CFPS `.dta` 还没有进入 StatsPAI/StataMCP 执行层，DTA 仍停在字段画像和变量角色候选流程。
+- StataMCP/Stata 仍未产生日志、do-file、结果 JSON 或 evaluator checks，不能标记为 `local_execution`。
+- 本地 Codex Supervisor 已可见但未执行派工；`EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用时必须继续 blocked，避免把工程状态机伪装成大模型中控。
+- 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；必须经正式 VariableRoleSet 保存、DesignSpec/RunPlan 重建和真实执行后才可作为研究证据。
+
+## 2026-05-14 P2-N/P2-O StatsPAI Validation 与 LLM Supervisor 交接增量
+
+### 当前目标
+
+把系统从“工程状态机 + 候选统计后端”推进到“统计执行有独立验证、智能中控状态可见”。用户指出没有底层大模型中控会偏离产品构想，本轮已把本地 Codex Supervisor 显式接入 workflow contract，但实际 Codex 派工尚未启用。
+
+### 已完成事项
+
+- 新增 `docs/architecture-v2/codex-phase-p2-statspai-execution-validation-bdd.md`。
+- 扩展 `tests/test_ols_execution_adapter.py`，要求 StatsPAI 可用时生成独立 validation artifact。
+- 扩展 `Product/backend/project_service.py`，新增 `execute_statspai_ols_validation()`，调用 `statspai.regress()` 并写出 `Results/json/statspai_execution_result.json`。
+- 扩展 `tests/test_observable_execution_frontend.py`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，在实证执行页展示“独立后端验证”。
+- 扩展 `tests/test_product_workflow_contract.py`，要求 `workflow_contract.intelligence_layer` 声明 LLM Supervisor。
+- 扩展 `Product/backend/overview_service.py`，新增 `build_intelligence_layer_contract()`，读取本地 Codex provider readiness。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，首页新增“智能中控”面板。
+
+### 已验证证据
+
+- 全量回归：`python3 -m unittest discover -s tests -v`，203 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/backend/overview_service.py Product/backend/project_service.py Product/app.py` 通过。
+- API：`GET /api/v1/providers/local-codex` 返回 `available=true`、`path=/Users/mahaoxuan/.local/bin/codex`、`version=codex-cli 0.130.0`、`execution_enabled=false`。
+- API：首页 overview 返回 `workflow_contract.intelligence_layer.status=blocked`，blocker 为 `local_codex_execution_not_enabled`，并包含 `pipeline_data/pipeline_design/pipeline_execution/pipeline_manuscript` 派工计划。
+- 可视化：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`，首页显示“智能中控”“本地 Codex Supervisor 未启用”“允许执行=否”和派工计划。
+- 可视化：点击“启动完整实证执行”生成 `run_92c32fdf847f` 后，实证执行页显示“独立后端验证”“passed”“statspai.regress”“Results/json/statspai_execution_result.json”。
+
+### 不能重复探索的结论
+
+- 当前不是“完全没有模型接入”，而是“模型 provider 可检测，但还没有作为执行中控运行”。这两者必须区分。
+- StatsPAI 现在已实际参与 CSV OLS validation；不要再把它全部归类为未接入候选能力。
+- StataMCP/Stata 仍是候选后端，尚未执行 do-file 或产生日志，不能与 StatsPAI 本轮进展混同。
+- LLM Supervisor 的下一步不是继续加静态 Agent 卡片，而是生成可审计 plan artifact，并在开关启用时真实调用 Codex。
+
+### 下一步第一件事
+
+写 P2-P BDD/TDD：Supervisor plan artifact。未启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 时 API 返回 blocked；启用后调用本地 Codex，生成阶段计划、风险、派工建议、审阅要求和下一步动作，并写入本地状态文件供首页/Agents/Execution 使用。
+
+### 未解决风险
+
+- 真实 LLM 派工未完成；当前只是 readiness contract 和 UI 呈现。
+- StatsPAI validation 只覆盖当前 CSV OLS；真实 CFPS DTA 执行、DID/IV/RDD/PSM/DML、robust/cluster 标准误仍未完成。
+- 当前启发式变量候选不能进入论文分析；必须由用户正式保存 VariableRoleSet，并重建 DesignSpec/RunPlan。
+- 线上版大模型与数据执行边界尚未设计：本地版可用 Codex/local data，线上版必须用云模型和上传/云对象数据。
 
 ## 2026-05-13 P1-R Clean Workbench Visual Pass 交接增量
 

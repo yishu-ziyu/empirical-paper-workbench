@@ -2099,6 +2099,45 @@ function renderWorkflowContract(contract) {
       <span>${escapeHtml(workflowStageLabel(stage.status))}</span>
     </article>
   `).join("");
+  renderIntelligenceLayer(contract.intelligence_layer);
+}
+
+function renderIntelligenceLayer(intelligence_layer) {
+  const container = document.getElementById("llm-supervisor-body");
+  if (!container) return;
+  if (!intelligence_layer) {
+    container.innerHTML = "<p class='muted'>尚未读取智能中控状态。</p>";
+    return;
+  }
+  const provider = intelligence_layer.provider || {};
+  const dispatchPlan = intelligence_layer.dispatch_plan || [];
+  const blockers = intelligence_layer.blockers || [];
+  container.innerHTML = `
+    <div class="llm-supervisor-card is-${escapeHtml(intelligence_layer.status || "blocked")}">
+      <div>
+        <span class="meta-label">本地 Codex Supervisor</span>
+        <strong>${escapeHtml(intelligence_layer.status === "ready" ? "已启用" : "未启用")}</strong>
+        <p class="muted">${escapeHtml(intelligence_layer.boundary || "Supervisor 负责计划、派工、审阅和失败恢复。")}</p>
+      </div>
+      ${renderEvidenceBadge({ evidence_level: intelligence_layer.evidence_level || "local_file" })}
+      <div class="llm-provider-grid">
+        <div><span class="meta-label">Provider</span><strong>${escapeHtml(provider.provider || "local_codex")}</strong></div>
+        <div><span class="meta-label">可用</span><strong>${provider.available ? "是" : "否"}</strong></div>
+        <div><span class="meta-label">允许执行</span><strong>${provider.execution_enabled ? "是" : "否"}</strong></div>
+        <div><span class="meta-label">版本</span><strong>${escapeHtml(provider.version || "-")}</strong></div>
+      </div>
+      ${blockers.length ? `<p class="muted">阻塞：${escapeHtml(blockers.map(productTermLabel).join("、"))}</p>` : "<p class='muted'>本地大模型中控可进入真实派工。</p>"}
+    </div>
+    <div class="llm-dispatch-plan">
+      <span class="meta-label">派工计划</span>
+      ${dispatchPlan.map((item) => `
+        <article class="llm-dispatch-item">
+          <strong>${escapeHtml(item.role || item.agent_id)}</strong>
+          <p class="muted">${escapeHtml(item.responsibility || "-")}</p>
+        </article>
+      `).join("") || "<p class='muted'>尚未生成派工计划。</p>"}
+    </div>
+  `;
 }
 
 function renderEvidenceBanner(meta) {
@@ -2384,6 +2423,7 @@ function renderObservableMethodExecution() {
         </div>
         ${renderMethodDataPreflight(method.data_preflight)}
         ${renderMethodReproducibility(method.reproducibility)}
+        ${renderMethodBackendValidations(method.backend_validations)}
       </article>
     `).join("") : "<p class='muted'>方法执行产物中没有 method item。</p>"}
   `;
@@ -2457,6 +2497,38 @@ function renderMethodReproducibility(reproducibility) {
         <div><span class="meta-label">RunPlan 版本</span><strong>${escapeHtml(String(reproducibility.run_plan_version ?? "-"))}</strong></div>
         <div><span class="meta-label">结果产物</span><code>${escapeHtml(reproducibility.result_artifact_path || "-")}</code></div>
         <div><span class="meta-label">源码入口</span><code>${escapeHtml(reproducibility.source_entrypoint || "-")}</code></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMethodBackendValidations(backend_validations) {
+  const validations = Array.isArray(backend_validations) ? backend_validations : [];
+  if (!validations.length) {
+    return "<div class='method-subpanel'><strong>独立后端验证</strong><p class='muted'>尚未记录 StatsPAI / StatsAPI 或 Stata 的独立验证结果。</p></div>";
+  }
+  return `
+    <div class="method-subpanel">
+      <strong>独立后端验证</strong>
+      <div class="method-validation-list">
+        ${validations.map((validation) => `
+          <div class="method-validation-item is-${escapeHtml(validation.status || "unknown")}">
+            <div>
+              <span class="meta-label">${escapeHtml(validation.backend_label || validation.backend_id || "StatsPAI / StatsAPI")}</span>
+              <strong>${escapeHtml(validation.status || "-")}</strong>
+              <p class="muted">${escapeHtml(validation.adapter || "statspai.regress")} · <code>${escapeHtml(validation.artifact_path || "Results/json/statspai_execution_result.json")}</code></p>
+            </div>
+            ${renderEvidenceBadge({ evidence_level: validation.evidence_level || "local_file" })}
+            <div class="method-check-list">
+              ${(validation.checks || []).map((check) => `
+                <span class="method-check is-${escapeHtml(check.status || "unknown")}">
+                  ${escapeHtml(check.id === "treatment_coefficient_cross_check" ? "treatment_coefficient_cross_check" : (check.label || check.id))}
+                  · ${escapeHtml(check.status || "-")}
+                </span>
+              `).join("")}
+            </div>
+          </div>
+        `).join("")}
       </div>
     </div>
   `;

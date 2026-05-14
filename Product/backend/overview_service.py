@@ -15,6 +15,7 @@ try:
 except Exception:  # pragma: no cover - exercised only when optional reader is unavailable
     pyreadstat = None
 
+from Product.backend.codex_provider import local_codex_status
 from Product.backend.design_spec_service import has_approved_design_spec, has_approved_run_plan
 from Product.backend.variable_role_service import has_approved_variable_role_set
 from Product.backend.project_service import utc_now
@@ -236,6 +237,48 @@ def build_workflow_contract(
             "blockers": blockers,
             "development_shortcut_allowed": True,
         },
+        "intelligence_layer": build_intelligence_layer_contract(),
+    }
+
+
+def build_intelligence_layer_contract() -> dict[str, Any]:
+    provider = local_codex_status()
+    ready = bool(provider.get("available")) and bool(provider.get("execution_enabled"))
+    blockers = []
+    if not provider.get("available"):
+        blockers.append("local_codex_not_found")
+    if not provider.get("execution_enabled"):
+        blockers.append("local_codex_execution_not_enabled")
+    return {
+        "supervisor_agent_id": "pipeline_supervisor",
+        "supervisor_label": "Supervisor",
+        "provider": provider,
+        "status": "ready" if ready else "blocked",
+        "evidence_level": "local_file",
+        "blockers": blockers,
+        "dispatch_plan": [
+            {
+                "agent_id": "pipeline_data",
+                "role": "数据与变量治理",
+                "responsibility": "读取数据画像，生成变量角色候选并等待人工确认。",
+            },
+            {
+                "agent_id": "pipeline_design",
+                "role": "研究设计编排",
+                "responsibility": "把 VariableRoleSet 转成 DesignSpec 与识别风险清单。",
+            },
+            {
+                "agent_id": "pipeline_execution",
+                "role": "实证执行调度",
+                "responsibility": "选择 Python、StatsPAI 或 Stata 后端并记录可复现执行证据。",
+            },
+            {
+                "agent_id": "pipeline_manuscript",
+                "role": "论文草稿生产",
+                "responsibility": "只消费已批准 finding 和执行产物，生成可审阅正文候选。",
+            },
+        ],
+        "boundary": "工程状态机负责可复现和审计；本地 Codex Supervisor 负责计划、派工、审阅和失败恢复。",
     }
 
 

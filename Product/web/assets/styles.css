@@ -145,6 +145,7 @@ textarea {
 
 .product-next-action,
 .workflow-spine-panel,
+.llm-supervisor-panel,
 .variable-role-workflow-card,
 .variable-role-candidate-panel,
 .variable-role-editor-card,
@@ -156,6 +157,7 @@ textarea {
 }
 
 .product-next-action-body,
+.llm-supervisor-body,
 .variable-role-workflow-body,
 .variable-role-candidate-body,
 .run-plan-preflight-body,
@@ -220,6 +222,57 @@ textarea {
 .workflow-spine-step.is-blocked {
   border-color: rgba(161, 74, 24, 0.24);
   background: rgba(255, 248, 237, 0.82);
+}
+
+.llm-supervisor-body,
+.llm-dispatch-plan {
+  display: grid;
+  gap: 10px;
+}
+
+.llm-supervisor-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, max-content);
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid rgba(30, 111, 98, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  min-width: 0;
+}
+
+.llm-supervisor-card.is-ready {
+  border-color: rgba(30, 111, 98, 0.3);
+  background: rgba(236, 249, 246, 0.76);
+}
+
+.llm-supervisor-card.is-blocked {
+  border-color: rgba(161, 74, 24, 0.24);
+  background: rgba(255, 248, 237, 0.82);
+}
+
+.llm-provider-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.llm-provider-grid strong,
+.llm-dispatch-item strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.llm-dispatch-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  min-width: 0;
 }
 
 .variable-role-next-steps,
@@ -3577,6 +3630,7 @@ select:focus-visible {
 
 .method-contract-head,
 .method-backend-list,
+.method-validation-list,
 .method-check-list {
   display: grid;
   gap: 8px;
@@ -3604,6 +3658,38 @@ select:focus-visible {
 .method-backend-item span,
 .method-subpanel code {
   overflow-wrap: anywhere;
+}
+
+.method-validation-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, max-content);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.method-validation-item > div {
+  min-width: 0;
+}
+
+.method-validation-item .method-check-list {
+  grid-column: 1 / -1;
+}
+
+.method-validation-item.is-passed {
+  border-color: rgba(54, 117, 103, 0.32);
+  background: rgba(54, 117, 103, 0.06);
+}
+
+.method-validation-item.is-blocked,
+.method-validation-item.is-failed,
+.method-validation-item.is-needs_review {
+  border-color: rgba(157, 87, 47, 0.28);
+  background: rgba(157, 87, 47, 0.06);
 }
 
 .finding-method-evidence {

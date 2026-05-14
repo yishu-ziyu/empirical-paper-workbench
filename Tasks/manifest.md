@@ -691,3 +691,54 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260514-p2m`
 
 说明：点击“数据与设计”，在“字段审阅”面板找到已确认候选，点击“载入正式编辑器”。编辑器应显示 `draft_from_candidate · local_file`、真实 CFPS DTA 路径、`candidate_id=...`、结果变量/控制变量候选和说明“保存后才写入正式变量角色集”。本轮未点击最终保存，避免覆盖演示项目的已批准变量角色。
+
+## 2026-05-14 P2-N StatsPAI Independent OLS Validation
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-statspai-execution-validation-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_observable_execution_frontend.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/project_service.py`：新增 `execute_statspai_ols_validation()`、`write_json_artifact()`、`statspai_series_to_float_dict()`、`json_safe_value()`。
+- full run 的 `method_execution` 现在包含 `backend_validations`。
+- StatsPAI 可用且数据为 CSV 时写出 `Results/json/statspai_execution_result.json`。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：新增 `renderMethodBackendValidations()`。
+- `Product/web/assets/styles.css`：新增 `.method-validation-list`、`.method-validation-item`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`
+
+说明：进入“实证执行”，点击“启动完整实证执行”，刷新后选择 `run_92c32fdf847f · succeeded · full-run`，方法执行证据下应显示 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
+
+## 2026-05-14 P2-O LLM Supervisor Readiness Contract
+
+### 新增/扩展测试
+
+- `tests/test_product_workflow_contract.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：新增 `build_intelligence_layer_contract()`，并把 `intelligence_layer` 写入 `workflow_contract`。
+- 依赖已有 `Product/app.py` / provider endpoint 的 `local_codex_status()`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：首页新增 `llm-supervisor-panel`，静态资源版本更新到 `20260514-p2n-supervisor1`。
+- `Product/web/assets/app.js`：新增 `renderIntelligenceLayer()`，在 `renderWorkflowContract()` 中渲染智能中控状态。
+- `Product/web/assets/styles.css`：新增 `.llm-supervisor-panel`、`.llm-supervisor-card`、`.llm-provider-grid`、`.llm-dispatch-plan`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`
+
+说明：进入“工作台首页”，应显示“智能中控”“本地 Codex Supervisor 未启用”、`provider=local_codex`、`可用=是`、`允许执行=否`、`local_codex_execution_not_enabled` 和阶段派工计划。

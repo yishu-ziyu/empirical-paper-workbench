@@ -464,7 +464,7 @@
 - [x] TDD：扩展 `tests/test_ols_execution_adapter.py`；首次失败原因是 full run 只有 Python OLS adapter，没有 `backend_validations` 和 `Results/json/statspai_execution_result.json`。
 - [x] 实现：扩展 `Product/backend/project_service.py`，新增 `execute_statspai_ols_validation()`；当 StatsPAI 可用且数据为 CSV 时调用 `statspai.regress()`，输出系数、标准误、p 值、t 统计、诊断和 cross-check。
 - [x] 前端：扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`，在实证执行页“方法执行证据”中新增“独立后端验证”，显示 StatsPAI adapter、状态、产物路径、证据等级和交叉检查。
-- [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`，启动完整实证执行生成 `run_92c32fdf847f`，页面显示 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`。
+- [x] 可视化/API 验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`；最终 API 复核启动完整实证执行生成 `run_bb423547439c`，observability 返回 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`。
 - [x] 验证：目标测试和全量回归均通过；最新全量为 `python3 -m unittest discover -s tests -v`，203 tests OK，skipped=1。
 
 ## 2026-05-14 P2-O LLM Supervisor Readiness Contract

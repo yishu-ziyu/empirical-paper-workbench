@@ -718,7 +718,7 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 
 - `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`
 
-说明：进入“实证执行”，点击“启动完整实证执行”，刷新后选择 `run_92c32fdf847f · succeeded · full-run`，方法执行证据下应显示 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
+说明：进入“实证执行”，点击“启动完整实证执行”。最终 API 复核 run `run_bb423547439c` 的 observability 中，方法执行证据包含 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
 
 ## 2026-05-14 P2-O LLM Supervisor Readiness Contract
 

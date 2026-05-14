@@ -695,7 +695,7 @@
 - API：`GET /api/v1/providers/local-codex` 返回 `available=true`、`path=/Users/mahaoxuan/.local/bin/codex`、`version=codex-cli 0.130.0`、`execution_enabled=false`。
 - API：`GET /api/v1/projects/proj_undergraduate_thesis/overview` 返回 `workflow_contract.intelligence_layer.status=blocked`，blocker 为 `local_codex_execution_not_enabled`。
 - 页面：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`，首页显示“智能中控”“本地 Codex Supervisor 未启用”“允许执行=否”和派工计划。
-- 页面：点击“启动完整实证执行”生成 `run_92c32fdf847f`，刷新后实证执行页显示 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
+- API / 页面：点击“启动完整实证执行”后，最终复核 run `run_bb423547439c` 的 observability 返回 `独立后端验证`、`passed`、`statspai.regress`、`Results/json/statspai_execution_result.json`。
 
 ### 剩余风险
 

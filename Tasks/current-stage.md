@@ -52,4 +52,6 @@
   - Real Data Candidate Pool 当前是只读真实数据 inventory；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`，发现 223 个候选文件，但尚未导入/绑定到当前项目。
   - Real Dataset Bind Preflight 当前是只读导入准备状态；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，可对 CFPS 候选文件生成 `ready_for_review` 预检，但尚未创建项目内数据文件。
   - Real Dataset Import Apply 当前已支持本地复制、外部引用绑定和取消预检；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，但尚未解析 DTA/XLSX/Parquet 变量字典。
+  - P2-I/P2-J 已完成真实数据字段画像：已绑定 CFPS `.dta` 可通过 metadata-only 读取变量名、变量标签、Stata 类型、样本数和字段数；该画像仍不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
+  - P2-K Rigorous Empirical Execution Contract 已完成：full run 会声明当前真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

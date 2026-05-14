@@ -472,3 +472,15 @@ Rejected: 读取整张 DTA 大表来做画像。原因是真实数据可能很�
 Rejected: 把 Python metadata reader 当作完整实证分析。原因是严谨实证需要后续 StatsPAI/StatsAPI、StataMCP 或 Python 执行器产出可复现日志、诊断、稳健性和 evaluator checks。
 
 Evidence: 真实 `cfps2011adult_202202(1).dta` 画像返回 `profiled/ready`、`row_count=1279`、`column_count=723`、`row_count_source=metadata_only`，字段含 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。
+
+## 2026-05-14：严谨实证执行必须声明真实后端和候选后端
+
+Decision: 为 full run 增加 `rigorous_empirical_execution_contract`，把当前真实执行后端、候选后端、禁止事项、数据预检和可复现入口一起写入方法执行产物和页面。当前真实执行后端是 `python_ols_adapter`；StatsPAI/StatsAPI 与 StataMCP/Stata 只标记为候选后端。
+
+Reason: 用户明确要求具体数据分析和实证必须严谨，可以使用 StatsPAI/StatsAPI、StataMCP/Stata 或 Python。严谨的第一步不是把这些名字放到 UI 上，而是证明“哪一个后端真的执行过、读取了哪些字段、丢弃了多少行、结果从哪里复现”。
+
+Rejected: 因为本机安装/可检测到 StatsPAI 或 Stata 就把它们标记为 `local_execution`。原因是安装存在只证明候选能力，不证明本次 run 调用了该后端，也不证明它产生了日志和结果文件。
+
+Rejected: 只保留 Python OLS 结果而不声明统计边界。原因是用户需要知道当前结果是最小 Python OLS adapter，不是完整 StatsPAI/Stata 流水线，也还没有 robust/cluster 标准误或固定效应。
+
+Evidence: 真实 full run `run_5ac7052232c8` 返回 `active_backend=python_ols_adapter`，StatsPAI 和 StataMCP 为 candidate backend；`data_preflight.rows_read=12`、`usable_numeric_rows=12`、`dropped_rows=0`，`reproducibility.source_entrypoint=Product/backend/project_service.py::execute_ols_task`。

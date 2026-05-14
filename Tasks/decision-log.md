@@ -523,7 +523,7 @@ Rejected: 因为 StatsPAI 可安装就把所有方法标记为 `local_execution`
 
 Rejected: 用 StatsPAI 替换 Python adapter 作为唯一执行路径。原因是当前 Python adapter 已承载 run manifest、evaluator、FindingCard 绑定；StatsPAI 先做独立复核更稳，后续再抽象可替换后端。
 
-Evidence: full run `run_92c32fdf847f` 的实证执行页显示 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`；全量回归 203 tests OK。
+Evidence: full run `run_bb423547439c` 的 observability 返回 `独立后端验证`、`passed`、`statspai.regress` 和 `Results/json/statspai_execution_result.json`；全量回归 203 tests OK。
 
 ## 2026-05-14：本地 Codex Supervisor 必须显式暴露，不能藏在工程状态机后面
 

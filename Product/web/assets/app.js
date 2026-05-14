@@ -53,6 +53,7 @@ const state = {
   bindingExternalDatasetPath: null,
   applyingExternalPreflightId: null,
   applyingExternalPreflightAction: null,
+  profilingDatasetImportId: null,
   savingVariableRoles: false,
   savingDesignSpec: false,
   savingRunPlan: false,
@@ -571,6 +572,13 @@ const v2api = {
     },
     async applyPreflight(projectId, preflightId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/datasets/external-bind-preflight/${preflightId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async profileImport(projectId, datasetImportId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/datasets/imports/${datasetImportId}/profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -2875,6 +2883,7 @@ function renderDataVariables() {
   document.getElementById("datasets-count").textContent = items.length;
   renderExternalDataLibrary(data.external_catalog);
   renderExternalBindPreflight(data.external_import_preflight);
+  renderDatasetImportProfile(data.external_import_profile);
   renderVariableRoleWorkflow(items);
   renderDatasetQualityProfile(items);
 
@@ -3054,9 +3063,102 @@ function renderExternalBindPreflight(preflight) {
           <p class="muted">动作：${escapeHtml(externalApplyActionLabel(datasetImport.action))} · 模式：${escapeHtml(datasetImport.runtime_mode || "local")}</p>
           ${datasetImport.target?.path ? `<p class="record-path">目标：${escapeHtml(datasetImport.target.path)}</p>` : ""}
           ${datasetImport.source?.sha256 ? `<p class="record-path">SHA256：${escapeHtml(datasetImport.source.sha256)}</p>` : ""}
+          ${datasetImport.status === "applied" ? `
+            <div class="compact-action-row">
+              <button
+                class="primary-button compact"
+                data-external-import-profile-action
+                data-dataset-import-id="${escapeHtml(datasetImport.id || "")}"
+                ${state.profilingDatasetImportId === datasetImport.id ? "disabled" : ""}
+              >
+                ${state.profilingDatasetImportId === datasetImport.id ? "画像生成中..." : "生成字段画像"}
+              </button>
+            </div>
+          ` : ""}
         </div>
       ` : ""}
       <p class="muted external-bind-preflight-note">状态文件：${escapeHtml(preflight.manifest_path || "state/product/dataset_import_preflights.json")} · 本阶段不会改写 paper.yaml、VariableRoleSet、DesignSpec 或 RunPlan。</p>
+    </article>
+  `;
+}
+
+function renderDatasetImportProfile(profile) {
+  const container = document.getElementById("dataset-import-profile-body");
+  const statusPill = document.getElementById("dataset-import-profile-status");
+  if (!container) return;
+
+  if (!profile) {
+    if (statusPill) statusPill.textContent = "尚未画像";
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <h4>等待真实数据接入</h4>
+        <p class="muted">导入或绑定真实数据后，先生成字段画像 / 变量字典预览。该步骤不会改写 VariableRoleSet、DesignSpec 或 RunPlan。</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (statusPill) statusPill.textContent = datasetImportProfileStatusLabel(profile.status || "blocked");
+  const fields = profile.fields || [];
+  const checks = profile.checks || [];
+  container.innerHTML = `
+    <article class="dataset-import-profile-record">
+      <div class="record-header">
+        <div>
+          <span class="eyebrow">字段画像 / 变量字典预览</span>
+          <h4>${escapeHtml(profile.source?.name || "真实数据")}</h4>
+          <p class="muted">dataset_import_id=${escapeHtml(profile.dataset_import_id || "-")} · ${escapeHtml(profile.readiness_status || "-")}</p>
+        </div>
+        ${renderEvidenceBadge(profile)}
+      </div>
+      <div class="record-meta-grid">
+        <div>
+          <span class="record-label">来源</span>
+          <p class="record-path">${escapeHtml(profile.source?.path || "")}</p>
+        </div>
+        <div>
+          <span class="record-label">绑定方式</span>
+          <p>${escapeHtml(profile.binding?.mode || "project_file")} · ${profile.binding?.read_only ? "只读" : "项目文件"}</p>
+        </div>
+        <div>
+          <span class="record-label">样本范围</span>
+          <p>${profile.quality_profile?.row_count ?? "-"} 行 · ${profile.quality_profile?.column_count ?? "-"} 列 · row_limit=${profile.row_limit ?? "-"}</p>
+        </div>
+        <div>
+          <span class="record-label">状态边界</span>
+          <p>${profile.can_feed_variable_roles ? "可进入变量确认" : "不会改写 VariableRoleSet、DesignSpec 或 RunPlan"}</p>
+        </div>
+      </div>
+      ${profile.blocking_reason ? `<p class="warning-copy">${escapeHtml(profile.blocking_reason)}</p>` : ""}
+      <div class="preflight-check-list">
+        ${checks.map((check) => `
+          <div class="quality-check is-${escapeHtml(check.status || "unknown")}">
+            <span>${qualityCheckIcon(check.status)}</span>
+            <div>
+              <strong>${escapeHtml(check.label || check.id || "检查项")}</strong>
+              <p class="muted">${escapeHtml(check.detail || "")}</p>
+            </div>
+          </div>
+        `).join("") || "<p class='muted'>暂无画像检查项。</p>"}
+      </div>
+      <div class="field-profile-table" role="table" aria-label="字段画像">
+        <div class="field-profile-row field-profile-head" role="row">
+          <span>字段</span><span>类型</span><span>缺失率</span><span>样本值</span>
+        </div>
+        ${fields.length ? fields.map((field) => `
+          <div class="field-profile-row" role="row">
+            <span>${escapeHtml(field.name || "-")}</span>
+            <span>${escapeHtml(field.inferred_type || "-")}</span>
+            <span>${formatQualityRate(field.missing_rate)}</span>
+            <span>${escapeHtml((field.sample_values || []).join(", ") || "-")}</span>
+          </div>
+        `).join("") : `
+          <div class="field-profile-row empty" role="row">
+            <span>暂无字段</span><span>未画像</span><span>-</span><span>解析器未接入或文件为空</span>
+          </div>
+        `}
+      </div>
+      <p class="muted external-bind-preflight-note">状态文件：${escapeHtml(profile.manifest_path || "state/product/dataset_import_preflights.json")} · ${escapeHtml(profile.next_action || "先人工审阅字段画像。")}</p>
     </article>
   `;
 }
@@ -3098,6 +3200,13 @@ function externalApplyResultLabel(datasetImport) {
   if (datasetImport.action === "copy_to_project_raw") return "已导入到项目";
   if (datasetImport.action === "bind_external_reference") return "已绑定外部引用";
   return datasetImport.status || "已处理";
+}
+
+function datasetImportProfileStatusLabel(status) {
+  return {
+    profiled: "已画像",
+    blocked: "暂未画像",
+  }[status] || status || "未知状态";
 }
 
 function renderDatasetQualityProfile(items) {
@@ -3350,6 +3459,25 @@ async function requestExternalPreflightApply(preflightId, action) {
   } finally {
     state.applyingExternalPreflightId = null;
     state.applyingExternalPreflightAction = null;
+    renderDataVariables();
+  }
+}
+
+async function requestExternalImportProfile(datasetImportId) {
+  if (!state.selectedProjectId || !datasetImportId) return;
+  clearV2Error("data");
+  state.profilingDatasetImportId = datasetImportId;
+  renderDataVariables();
+  try {
+    await v2api.datasets.profileImport(state.selectedProjectId, datasetImportId, {
+      row_limit: 200,
+    });
+    state.datasetsData = await v2api.datasets.list(state.selectedProjectId);
+    renderDataVariables();
+  } catch (error) {
+    showV2Error("data", `生成字段画像失败：${error.message}`);
+  } finally {
+    state.profilingDatasetImportId = null;
     renderDataVariables();
   }
 }
@@ -4822,6 +4950,11 @@ async function boot() {
   document.getElementById("external-bind-preflight-panel")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const profileButton = target.closest("[data-external-import-profile-action]");
+    if (profileButton) {
+      void requestExternalImportProfile(profileButton.dataset.datasetImportId || "");
+      return;
+    }
     const button = target.closest("[data-external-preflight-apply-action]");
     if (!button) return;
     void requestExternalPreflightApply(button.dataset.preflightId || "", button.dataset.externalPreflightApplyAction || "");

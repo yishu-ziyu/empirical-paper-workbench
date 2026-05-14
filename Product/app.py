@@ -36,12 +36,15 @@ from Product.backend.manuscript_candidate_service import (
 )
 from Product.backend.overview_service import (
     CloudUploadRequiredError,
+    DatasetImportProfileStateError,
+    DatasetImportSourceChangedError,
     DatasetPreflightStateError,
     apply_external_dataset_bind_preflight,
     get_project_design,
     get_project_journey,
     get_project_overview,
     list_project_datasets,
+    profile_external_dataset_import,
     save_external_dataset_bind_preflight,
 )
 from Product.backend.project_service import (
@@ -171,6 +174,10 @@ class ExternalDatasetPreflightApplyPayload(BaseModel):
     action: str
     runtime_mode: str = "local"
     note: str = ""
+
+
+class DatasetImportProfilePayload(BaseModel):
+    row_limit: int = Field(default=200, ge=1, le=1000)
 
 
 class FindingReviewPayload(BaseModel):
@@ -452,6 +459,34 @@ def api_v1_external_dataset_preflight_apply(
         return error_response(400, "external_dataset_not_found", f"External dataset file does not exist: {exc}")
     except ValueError as exc:
         return error_response(400, "invalid_dataset_import_action", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/datasets/imports/{dataset_import_id}/profile")
+def api_v1_external_dataset_import_profile(
+    project_id: str,
+    dataset_import_id: str,
+    payload: DatasetImportProfilePayload,
+) -> dict:
+    try:
+        return profile_external_dataset_import(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            dataset_import_id,
+            payload.row_limit,
+        )
+    except DatasetImportSourceChangedError as exc:
+        return error_response(409, "dataset_import_source_changed", str(exc))
+    except DatasetImportProfileStateError as exc:
+        return error_response(409, "dataset_import_not_profileable", str(exc))
+    except KeyError as exc:
+        return error_response(404, "dataset_import_not_found", f"Dataset import does not exist: {dataset_import_id}.")
+    except PermissionError as exc:
+        return error_response(400, "invalid_external_dataset_path", f"Path is outside the allowed boundary: {exc}")
+    except FileNotFoundError as exc:
+        return error_response(400, "dataset_import_source_missing", f"Dataset import source file does not exist: {exc}")
+    except ValueError as exc:
+        return error_response(400, "invalid_dataset_import_profile", str(exc))
 
 
 @app.get("/api/v1/projects/{project_id}/variable-roles")

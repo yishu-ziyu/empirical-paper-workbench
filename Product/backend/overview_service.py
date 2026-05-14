@@ -31,6 +31,14 @@ class DatasetPreflightStateError(RuntimeError):
     pass
 
 
+class DatasetImportProfileStateError(RuntimeError):
+    pass
+
+
+class DatasetImportSourceChangedError(RuntimeError):
+    pass
+
+
 def mock_meta(service: str) -> dict[str, str]:
     return {
         "evidence_level": "mock",
@@ -327,6 +335,7 @@ def list_project_datasets(product_root: Path, repo_root: Path, project_id: str) 
         "items": items,
         "external_catalog": build_external_data_catalog(),
         "external_import_preflight": latest_external_import_preflight(root),
+        "external_import_profile": latest_external_import_profile(root),
         "empty_state": {
             "title": "尚未登记数据集",
             "description": "已检查项目 Data 目录，当前没有发现 csv/dta/xlsx/parquet 等可识别数据文件。",
@@ -484,6 +493,206 @@ def apply_external_dataset_bind_preflight(
     }
 
 
+def profile_external_dataset_import(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    dataset_import_id: str,
+    row_limit: int = EXTERNAL_CSV_PREVIEW_ROWS,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    manifest = load_dataset_import_preflight_manifest(project_root)
+    dataset_import = manifest.get("dataset_imports", {}).get(dataset_import_id)
+    if not isinstance(dataset_import, dict):
+        raise KeyError(dataset_import_id)
+    if dataset_import.get("status") != "applied":
+        raise DatasetImportProfileStateError(f"Dataset import {dataset_import_id} is {dataset_import.get('status')}")
+
+    dataset_path = resolve_dataset_import_profile_path(project_root, dataset_import)
+    expected_hash = expected_dataset_import_hash(dataset_import)
+    actual_hash = file_sha256(dataset_path)
+    if expected_hash and actual_hash != expected_hash:
+        raise DatasetImportSourceChangedError(
+            f"Dataset import {dataset_import_id} source hash changed from {expected_hash} to {actual_hash}."
+        )
+
+    profile = build_dataset_import_profile(project_root, dataset_import, dataset_path, actual_hash, row_limit)
+    manifest.setdefault("dataset_import_profiles", {})[profile["id"]] = profile
+    manifest["latest_import_profile_id"] = profile["id"]
+    manifest["latest_import_id"] = dataset_import_id
+    manifest["updated_at"] = utc_now()
+    dataset_import["field_profile"] = {
+        "id": profile["id"],
+        "status": profile["status"],
+        "readiness_status": profile["readiness_status"],
+        "evidence_level": "local_file",
+        "can_feed_variable_roles": False,
+    }
+    dataset_import["updated_at"] = profile["updated_at"]
+    write_dataset_import_preflight_manifest(project_root, manifest)
+    return {
+        "_meta": local_file_meta("dataset_import_profile_service"),
+        "project": project_identity(project),
+        "dataset_import": dataset_import,
+        "dataset_import_profile": profile,
+    }
+
+
+def resolve_dataset_import_profile_path(project_root: Path, dataset_import: dict[str, Any]) -> Path:
+    action = dataset_import.get("action")
+    if action == "copy_to_project_raw":
+        target_path = dataset_import.get("target", {}).get("path")
+        if not target_path:
+            raise FileNotFoundError("Missing copied dataset target path.")
+        dataset_path = (project_root / target_path).resolve()
+        try:
+            dataset_path.relative_to(project_root)
+        except ValueError as exc:
+            raise PermissionError(dataset_path) from exc
+        if not dataset_path.exists() or not dataset_path.is_file():
+            raise FileNotFoundError(dataset_path)
+        return dataset_path
+    if action == "bind_external_reference":
+        source_path = dataset_import.get("binding", {}).get("path") or dataset_import.get("source", {}).get("path")
+        if not source_path:
+            raise FileNotFoundError("Missing external dataset source path.")
+        source, _catalog_root = validate_external_source_path(Path(source_path))
+        return source
+    raise DatasetImportProfileStateError(f"Dataset import action {action} cannot be profiled.")
+
+
+def expected_dataset_import_hash(dataset_import: dict[str, Any]) -> str | None:
+    if dataset_import.get("action") == "copy_to_project_raw":
+        return dataset_import.get("target", {}).get("sha256") or dataset_import.get("source", {}).get("sha256")
+    return dataset_import.get("source", {}).get("sha256")
+
+
+def build_dataset_import_profile(
+    project_root: Path,
+    dataset_import: dict[str, Any],
+    dataset_path: Path,
+    actual_hash: str,
+    row_limit: int,
+) -> dict[str, Any]:
+    timestamp = utc_now()
+    profile_id = f"dataset_import_profile_{dataset_import['id'].removeprefix('dataset_import_')}"
+    source = {
+        "name": dataset_import.get("source", {}).get("name") or dataset_path.name,
+        "path": str(dataset_path),
+        "file_type": dataset_path.suffix.lower().lstrip("."),
+        "size": dataset_path.stat().st_size,
+        "sha256": actual_hash,
+        "evidence_level": "local_file",
+    }
+    binding = dataset_import.get("binding")
+
+    if dataset_path.suffix.lower() == ".csv":
+        rows, sampled = read_csv_preview_rows(dataset_path, row_limit)
+        if rows:
+            headers = rows[0]
+            data_rows = rows[1:]
+            quality_profile = build_dataset_quality_profile_from_rows(headers, data_rows)
+            quality_profile["profile_scope"] = "dataset_import_profile"
+            quality_profile["row_count_source"] = "sampled_preview" if sampled else "complete_preview"
+            if sampled:
+                quality_profile["checks"].append(
+                    {
+                        "id": "preview_limited",
+                        "label": "画像范围",
+                        "status": "warning",
+                        "detail": f"仅读取前 {row_limit} 行用于字段画像。",
+                    }
+                )
+        else:
+            quality_profile = empty_csv_quality_profile()
+            quality_profile["profile_scope"] = "dataset_import_profile"
+            quality_profile["row_count_source"] = "empty"
+
+        fields = quality_profile.get("columns", [])
+        status = "profiled" if quality_profile.get("supported") and fields else "blocked"
+        readiness_status = quality_profile.get("readiness_status", "blocked")
+        checks = [
+            {
+                "id": "source_hash_verified",
+                "label": "来源哈希一致",
+                "status": "passed",
+                "detail": actual_hash,
+            },
+            {
+                "id": "profile_supported",
+                "label": "字段画像解析器",
+                "status": "passed",
+                "detail": "CSV 字段结构已读取。",
+            },
+            {
+                "id": "no_research_state_write",
+                "label": "研究状态未改写",
+                "status": "passed",
+                "detail": "未改写 VariableRoleSet、DesignSpec 或 RunPlan。",
+            },
+        ]
+        blocking_reason = None if status == "profiled" else "CSV 文件为空或缺少字段。"
+    else:
+        file_type = dataset_path.suffix.lower().lstrip(".") or "unknown"
+        quality_profile = build_dataset_quality_profile(
+            dataset_path,
+            {"row_count": None, "column_count": None},
+        )
+        quality_profile["profile_scope"] = "dataset_import_profile"
+        fields = []
+        status = "blocked"
+        readiness_status = "not_profiled"
+        blocking_reason = f"{file_type} 暂未接入安全字段读取器。"
+        checks = [
+            {
+                "id": "source_hash_verified",
+                "label": "来源哈希一致",
+                "status": "passed",
+                "detail": actual_hash,
+            },
+            {
+                "id": "profile_supported",
+                "label": "字段画像解析器",
+                "status": "warning",
+                "detail": blocking_reason,
+            },
+            {
+                "id": "no_fake_fields",
+                "label": "未伪造字段",
+                "status": "passed",
+                "detail": "解析器未接入前字段列表保持为空。",
+            },
+        ]
+
+    return {
+        "id": profile_id,
+        "dataset_import_id": dataset_import["id"],
+        "status": status,
+        "readiness_status": readiness_status,
+        "evidence_level": "local_file",
+        "profile_scope": "dataset_import_profile",
+        "row_limit": row_limit,
+        "source": source,
+        "target": dataset_import.get("target", {}),
+        "binding": binding
+        or {
+            "mode": "project_file",
+            "path": dataset_import.get("target", {}).get("path"),
+            "read_only": False,
+        },
+        "quality_profile": quality_profile,
+        "fields": fields,
+        "checks": checks,
+        "blocking_reason": blocking_reason,
+        "can_feed_variable_roles": False,
+        "next_action": "先人工审阅字段画像，再手动确认 VariableRoleSet。",
+        "manifest_path": DATASET_IMPORT_PREFLIGHT_PATH.as_posix(),
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+
+
 def build_external_dataset_bind_preflight(
     project_root: Path,
     source: Path,
@@ -595,18 +804,55 @@ def latest_external_import_preflight(project_root: Path) -> dict[str, Any] | Non
     return preflight if isinstance(preflight, dict) else None
 
 
+def latest_external_import_profile(project_root: Path) -> dict[str, Any] | None:
+    manifest = load_dataset_import_preflight_manifest(project_root)
+    latest_id = manifest.get("latest_import_profile_id")
+    if not latest_id:
+        return None
+    profile = manifest.get("dataset_import_profiles", {}).get(latest_id)
+    return profile if isinstance(profile, dict) else None
+
+
 def load_dataset_import_preflight_manifest(project_root: Path) -> dict[str, Any]:
     path = project_root / DATASET_IMPORT_PREFLIGHT_PATH
     if not path.exists():
-        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+        return {
+            "preflights": {},
+            "dataset_imports": {},
+            "dataset_import_profiles": {},
+            "latest_preflight_id": None,
+            "latest_import_id": None,
+            "latest_import_profile_id": None,
+            "updated_at": None,
+        }
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+        return {
+            "preflights": {},
+            "dataset_imports": {},
+            "dataset_import_profiles": {},
+            "latest_preflight_id": None,
+            "latest_import_id": None,
+            "latest_import_profile_id": None,
+            "updated_at": None,
+        }
     if not isinstance(payload, dict):
-        return {"preflights": {}, "latest_preflight_id": None, "updated_at": None}
+        return {
+            "preflights": {},
+            "dataset_imports": {},
+            "dataset_import_profiles": {},
+            "latest_preflight_id": None,
+            "latest_import_id": None,
+            "latest_import_profile_id": None,
+            "updated_at": None,
+        }
     payload.setdefault("preflights", {})
+    payload.setdefault("dataset_imports", {})
+    payload.setdefault("dataset_import_profiles", {})
     payload.setdefault("latest_preflight_id", None)
+    payload.setdefault("latest_import_id", None)
+    payload.setdefault("latest_import_profile_id", None)
     payload.setdefault("updated_at", None)
     return payload
 

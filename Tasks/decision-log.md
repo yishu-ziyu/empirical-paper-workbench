@@ -218,6 +218,30 @@ Decision: 新增 `GET /api/v1/projects/{project_id}/manuscript-candidates`，只
 
 Reason: P1-J 只证明某个统计论断可以进入写作，但它还不是最终正文。Manuscript 阶段需要一个中间候选层，让用户先看见由结果证据生成的段落，再决定是否确认、修改、写回或导出。
 
+## 2026-05-14：真实数据字段画像不能自动进入研究状态
+
+Decision: P2-I 新增 `dataset_import_profile`，但画像结果默认 `can_feed_variable_roles=false`；它只提供字段/质量预览，不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
+
+Reason: 真实数据接入后仍需要人工确认变量含义、处理变量、结果变量和模型设定。字段画像只能证明“系统读到了什么”，不能代表“研究者确认了什么”。
+
+Rejected: 画像成功后自动替换当前 VariableRoleSet。原因是这会把文件结构读取误当成研究语义确认，尤其是外部 CFPS/CHARLS 数据变量名需要人工解释。
+
+## 2026-05-14：不为 DTA/XLSX/Parquet 伪造变量字典
+
+Decision: P2-I 对 CSV 读取字段画像；对 DTA/XLSX/Parquet 等暂未接入安全读取器的格式返回 `blocked/not_profiled`、空 `fields` 和明确 `blocking_reason`。
+
+Reason: 当前真实候选池大量是大体积 `.dta` 文件。没有安全读取器、行数上限和错误处理时，伪造字段列表会误导用户，也可能造成内存/性能风险。
+
+Rejected: 用文件名或历史样例猜测变量字段。原因是这会破坏 evidence discipline，尤其不能把 mock 或推断内容展示成 `local_file` 证据。
+
+## 2026-05-14：绑定引用画像必须重新校验哈希
+
+Decision: `profile_external_dataset_import()` 在读取已绑定外部引用前重新计算 SHA256；如果源文件与 apply 时记录的哈希不一致，返回 409 `dataset_import_source_changed`。
+
+Reason: 本地绑定引用不复制大文件，依赖原始路径稳定。画像阶段必须证明现在读取的文件仍是当时用户确认绑定的文件。
+
+Rejected: 只检查路径存在。原因是同一路径可能被替换或覆盖，路径存在不能证明 provenance 仍然成立。
+
 ## 2026-05-13：先用本地 OLS adapter 把方法目录升级为执行证据
 
 Decision: P2-C 新增最小 `python_ols_adapter`，在 approved OLS RunPlan 的 full run 成功后读取本地 CSV 和公式，计算 OLS 系数，写入 `Results/json/method_execution_result.json`，并在 run response 与 `run_manifest.json` 中暴露 `method_execution.evidence_level=local_execution`。

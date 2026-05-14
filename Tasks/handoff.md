@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-13 23:47 CST
+更新时间：2026-05-14 23:35 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P0 可观察执行 UI、P1 gate resolve、本地数据入口、VariableRoleSet、DesignSpec、RunPlan、full run、Results & Draft evidence binding、claim review、Manuscript candidate review/promote/export preflight、Review & Export package workbench、中文化与 clean workbench、P2-A 数据质量画像、P2-B 方法技能集目录、P2-C OLS 本地执行适配器、P2-D 方法执行证据 UI 均已完成。最新 P2-E 已完成 OLS evaluator evidence：`method_execution_result.json` 现在包含标准误、t 统计量、p 值、95% 置信区间、残差诊断和 evaluator checks；FindingCard 也显示中文紧凑方法证据摘要。真实验收 run 为 `run_a3674e9e78c6`，`p_value_trained=8.83354660202e-133`、`standard_error_trained=0.0754664205`、`evaluator_status=passed`。下一步建议进入 P2-F：使用 `/Users/mahaoxuan/Desktop/实证数据库` 中的真实数据源做数据接入验收。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。最新 P2-I 已完成：已 apply 的真实数据现在可以生成安全字段画像；CSV 会读取字段结构并持久化画像，DTA/XLSX/Parquet 等暂不伪造变量字典，而是返回 `blocked/not_profiled` 和阻塞原因；画像明确 `can_feed_variable_roles=false`，不会改写 VariableRoleSet、DesignSpec 或 RunPlan。真实验收当前最新 import 为 `dataset_import_e9d864229be8`，绑定 CFPS `.dta`，画像结果为 `blocked/not_profiled`、`fields=[]`、`blocking_reason=dta 暂未接入安全字段读取器。`。
 
 ## 已完成事项
 
@@ -1156,3 +1156,56 @@ P2-I：读取 `dataset_import` 的结果，给已复制或已绑定的真实数�
 - 绑定引用依赖本地路径稳定性；如果原始文件移动，后续画像应显示 `source_missing` 而不是继续运行。
 - 线上版本还没有上传、云对象存储、脱敏或远端执行队列。
 - Browser 插件连接本轮超时；视觉验收使用 Safari + Computer Use fallback。
+
+## 2026-05-14 P2-I Dataset Import Field Profile 交接增量
+
+### 当前目标
+
+真实数据已经可以被复制或绑定到项目，但在它进入变量角色、研究设计或执行计划之前，必须先经过可审计字段画像。P2-I 的目标是给已 apply 的 `dataset_import` 增加安全字段画像入口，并明确“不画像、不进入研究状态”。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-dataset-import-profile-bdd.md`。
+- 新增测试：`tests/test_external_dataset_import_profile.py`，覆盖 CSV 画像、绑定引用画像、DTA 阻塞画像、源文件哈希变化拒绝、取消导入拒绝画像和前端非改写提示。
+- 扩展 `Product/backend/overview_service.py`：新增 `profile_external_dataset_import()`、`build_dataset_import_profile()`、`resolve_dataset_import_profile_path()`、`latest_external_import_profile()` 和相关错误类型。
+- 扩展 `Product/app.py`：新增 `POST /api/v1/projects/{project_id}/datasets/imports/{dataset_import_id}/profile`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：预检/导入结果区新增“生成字段画像”，Data & Design 新增“字段画像 / 变量字典预览”面板。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_external_dataset_import_profile -v` 首次 6 条失败，失败原因是 profile API 404、前端缺少画像入口和画像面板。
+- GREEN：`python3 -m unittest tests.test_external_dataset_import_profile -v`，6 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_profile tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，27 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，186 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/overview_service.py`、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- API 验收：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/imports/dataset_import_e9d864229be8/profile` 返回 `status=blocked`、`readiness_status=not_profiled`、`fields=[]`、`blocking_reason=dta 暂未接入安全字段读取器。`、`can_feed_variable_roles=false`。
+- 页面验收：`curl http://127.0.0.1:8765/?v=20260514-p2i-profile1` 确认页面加载新版静态资源和 `dataset-import-profile-panel`；`npx playwright screenshot --wait-for-timeout=3000` 生成 `/tmp/empirical-workbench-p2i-home-loaded.png`；临时 Playwright 脚本点击“数据与设计”和“生成字段画像”后生成 `/tmp/empirical-workbench-p2i-data-profile.png`，页面显示 `.dta` 阻塞画像和不改写研究状态说明。
+
+### 关键文件路径
+
+- `Product/backend/overview_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_external_dataset_import_profile.py`
+- `docs/architecture-v2/codex-phase-p2-dataset-import-profile-bdd.md`
+- `state/product/dataset_import_preflights.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- 字段画像不等于变量角色确认。`dataset_import_profile.can_feed_variable_roles=false` 必须保持，直到用户显式确认 VariableRoleSet。
+- 对 DTA/XLSX/Parquet 不能伪造字段列表；没有安全读取器时必须显示 `blocked/not_profiled`。
+- 已绑定外部引用在画像前必须重新计算 SHA256；哈希不一致返回 `dataset_import_source_changed`，不能继续使用旧预检状态。
+- 已取消或未 apply 的 import 不能画像。
+
+### 下一步第一件事
+
+P2-J：优先实现 DTA 字段读取器的安全元数据模式，目标是读取变量名、变量标签、类型、样本量上限和读取错误，不加载整份大文件进入内存；如果先推进线上版，则先设计上传/云对象抽象，替代本地路径绑定。
+
+### 未解决风险
+
+- 当前真实 CFPS `.dta` 文件仍只能显示 `blocked/not_profiled`，用户还看不到变量字典。
+- XLSX/Parquet 也还没有安全字段读取器。
+- 本地版绑定引用依赖本机路径；线上版必须改成上传或云对象，不能继续使用 `/Users/...` 路径。
+- Playwright CLI fallback 可用并已完成截图级验收；但 Playwright MCP 仍 `Transport closed`，Computer Use 对当前 in-app browser URL 受限，后续仍应修复主浏览器自动化链路。

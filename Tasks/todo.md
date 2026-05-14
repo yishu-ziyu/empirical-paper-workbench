@@ -393,4 +393,13 @@
 - [x] 前端：扩展“导入/绑定预检”面板，显示“确认导入到项目 / 只绑定引用 / 取消预检”及按钮解释；apply 后回显“已接入”、动作、local 模式和 SHA256。
 - [x] 验证：目标测试 5 OK；相邻数据测试 21 OK；全量回归 180 OK，skipped=1；Python 编译、`node --check`、`git diff --check` 通过。
 - [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，点击“数据与设计”，对 CFPS 预检点击“只绑定引用”，页面显示 `已接入`、`已绑定外部引用`、`模式：local` 和 SHA256。
-- [ ] P2-I：对已复制或已绑定的真实数据做安全字段画像/变量字典预览，尤其是 DTA/XLSX/Parquet；完成前不得让新数据进入 VariableRoleSet、DesignSpec 或 RunPlan。
+- [x] P2-I：对已复制或已绑定的真实数据做安全字段画像/变量字典预览，尤其是 DTA/XLSX/Parquet；完成前不得让新数据进入 VariableRoleSet、DesignSpec 或 RunPlan。
+
+## 2026-05-14 P2-I Dataset Import Field Profile
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-dataset-import-profile-bdd.md`，定义真实数据接入后的字段画像/变量字典预览边界。
+- [x] TDD：新增 `tests/test_external_dataset_import_profile.py`；首次运行 6 条失败，原因是缺少 profile API、前端画像入口和画像面板。
+- [x] 实现：新增 dataset import profile 服务，读取已 apply 的 CSV 字段结构并持久化画像结果。
+- [x] 实现：DTA/XLSX/Parquet 暂不伪造字段，返回 `blocked/not_profiled` 和阻塞原因。
+- [x] 前端：导入/绑定预检结果区增加“生成字段画像”和画像预览面板，明确不会改写 VariableRoleSet、DesignSpec 或 RunPlan。
+- [x] 验证：目标测试 6 OK；相邻回归 27 OK；全量回归 186 OK，skipped=1；Python/JS 静态检查、`git diff --check`、API 和页面静态资源验收通过。

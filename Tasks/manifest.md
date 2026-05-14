@@ -539,3 +539,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260514-p2h-import1`
 
 说明：点击“数据与设计”，在“导入/绑定预检”面板中可见 `确认导入到项目`、`只绑定引用`、`取消预检`。点击 `只绑定引用` 后，页面显示 `已接入`、`已绑定外部引用`、`动作：只绑定引用 · 模式：local`、目标 `Data/Raw/...` 和 SHA256。
+
+## 2026-05-14 P2-I Dataset Import Field Profile
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-dataset-import-profile-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_external_dataset_import_profile.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：新增 `DatasetImportProfileStateError`、`DatasetImportSourceChangedError`、`profile_external_dataset_import()`、`resolve_dataset_import_profile_path()`、`expected_dataset_import_hash()`、`build_dataset_import_profile()`、`latest_external_import_profile()`。
+- `Product/app.py`：新增 `DatasetImportProfilePayload` 和 `POST /api/v1/projects/{project_id}/datasets/imports/{dataset_import_id}/profile`。
+- Runtime manifest：`state/product/dataset_import_preflights.json` 中新增 `dataset_import_profiles`、`latest_import_profile_id`，并在 `dataset_import.field_profile` 中记录画像摘要。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：数据与设计页新增 `dataset-import-profile-panel`，静态资源版本更新到 `20260514-p2i-profile1`。
+- `Product/web/assets/app.js`：新增 `v2api.datasets.profileImport()`、`requestExternalImportProfile()`、`renderDatasetImportProfile()`，并在已接入结果中显示“生成字段画像”。
+- `Product/web/assets/styles.css`：新增字段画像面板、字段表、阻塞提示和检查项样式。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2i-profile1`
+
+说明：点击“数据与设计”，在“导入/绑定预检”已接入结果中点击“生成字段画像”。当前真实 CFPS `.dta` 绑定会显示 `暂未画像`、`dta 暂未接入安全字段读取器。`、`fields=0` 和 `不会改写 VariableRoleSet、DesignSpec 或 RunPlan`；CSV 在测试夹具中会返回字段表。

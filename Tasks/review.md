@@ -499,3 +499,38 @@
 - 当前只是“接入数据源”，不是“解析变量字典”；下一步 P2-I 必须先做安全字段画像，再允许变量角色确认消费真实数据。
 - 只绑定引用依赖本地文件路径不变；后续画像/执行前必须重新检查文件存在性和 SHA256。
 - 云端版本还缺上传、对象存储、隐私/脱敏、远端执行队列和云模型配置。
+
+## 2026-05-14 P2-I Dataset Import Field Profile
+
+### 行为覆盖
+
+- [x] 已复制到项目的 CSV import 可以生成字段画像，字段来自真实文件，证据等级为 `local_file`。
+- [x] 只绑定外部引用的 CSV import 可以生成字段画像，但仍保留外部路径依赖和哈希校验。
+- [x] DTA/XLSX/Parquet 等暂未接入安全读取器的格式不会伪造字段，而是返回 `blocked/not_profiled`。
+- [x] 外部绑定文件哈希变化时拒绝画像，返回 `dataset_import_source_changed`。
+- [x] 已取消或未 apply 的 import 不能画像，返回 `dataset_import_not_profileable`。
+- [x] 前端显示“生成字段画像”和字段画像面板，并明确不会改写 VariableRoleSet、DesignSpec 或 RunPlan。
+- [ ] 未覆盖：DTA 安全变量字典读取、XLSX sheet/字段预览、Parquet schema 读取、云端上传对象画像。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_external_dataset_import_profile -v` 首次 6 条失败，失败原因为 profile API 404、前端缺少画像入口和画像面板。
+- 目标测试：`python3 -m unittest tests.test_external_dataset_import_profile -v`，6 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_profile tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，27 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，186 tests OK，skipped=1，最终复查耗时 27.137s。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/imports/dataset_import_e9d864229be8/profile` 返回 `status=blocked`、`readiness_status=not_profiled`、`fields=[]`、`blocking_reason=dta 暂未接入安全字段读取器。`、`can_feed_variable_roles=false`。
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/datasets` 返回 `external_import_profile.status=blocked`、`external_import_profile.readiness_status=not_profiled`、`fields=0`。
+- 页面静态资源：`curl http://127.0.0.1:8765/?v=20260514-p2i-profile1` 确认 `dataset-import-profile-panel` 和新版 asset version 已加载。
+- 可视化验收：`npx playwright screenshot --wait-for-timeout=3000 'http://127.0.0.1:8765/?v=20260514-p2i-profile1' /tmp/empirical-workbench-p2i-home-loaded.png` 成功生成首页截图。
+- 点击级可视化验收：临时使用 `/tmp/empirical-pw/node_modules` 中的 Playwright，打开页面、点击“数据与设计”、点击“生成字段画像”，生成 `/tmp/empirical-workbench-p2i-data-profile.png`；截图中显示 `字段画像 / 变量字典预览`、`dataset_import_id=dataset_import_e9d864229be8 · not_profiled`、`dta 暂未接入安全字段读取器。` 和 `不会改写 VariableRoleSet、DesignSpec 或 RunPlan`。
+- Browser 工具限制：Playwright MCP 仍返回 `Transport closed`；Computer Use 对当前 in-app browser URL 返回不允许操作。本轮通过 Playwright CLI fallback 完成截图级验收。
+
+### 剩余风险
+
+- 当前真实 CFPS `.dta` 仍只能进入 `blocked/not_profiled`，还不能查看变量标签和 Stata 类型。
+- 线上版还没有上传/云对象入口；本地绑定路径不能直接迁移到线上。
+- 字段画像结果还未进入 VariableRoleSet 确认器，下一步必须先做人工确认边界，而不是自动填充研究状态。

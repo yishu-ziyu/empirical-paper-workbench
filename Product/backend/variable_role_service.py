@@ -30,6 +30,10 @@ class VariableRoleCandidateNotFoundError(KeyError):
     pass
 
 
+class VariableRoleCandidateApprovalRequiredError(RuntimeError):
+    pass
+
+
 def variable_role_state_path(project_root: Path) -> Path:
     return project_root / "state" / "product" / "variable_roles.json"
 
@@ -76,33 +80,56 @@ def save_project_variable_roles(
     dataset_path: str,
     roles: dict[str, Any],
     note: str,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     project = get_project_by_id(product_root, repo_root, project_id)
     project_root = Path(project.get("project_root") or project["root"]).resolve()
-    dataset = resolve_dataset_path(project_root, dataset_path)
+    candidate = load_approved_variable_role_candidate(project_root, candidate_id) if candidate_id else None
+    dataset = None if candidate else resolve_dataset_path(project_root, dataset_path)
     existing = load_saved_variable_role_set(project_root)
     version = int(existing.get("version", 0)) + 1 if existing else 1
     previous_events = existing.get("decision_events", []) if existing else []
     event = {
         "actor": "user",
-        "action": "confirm_variable_roles",
+        "action": "confirm_variable_roles_from_candidate" if candidate else "confirm_variable_roles",
         "timestamp": utc_now(),
         "note": note,
     }
+    source = candidate.get("source", {}) if candidate else {}
+    binding = candidate.get("binding", {}) if candidate else {}
+    saved_dataset_path = dataset.relative_to(project_root).as_posix() if dataset else dataset_path
+    dataset_name = dataset.name if dataset else source.get("name") or Path(dataset_path).name
     role_set = {
         "id": "variable_role_set",
         "version": version,
         "status": "approved",
         "evidence_level": "local_file",
-        "dataset_path": dataset.relative_to(project_root).as_posix(),
-        "dataset_name": dataset.name,
+        "dataset_path": saved_dataset_path,
+        "dataset_name": dataset_name,
         "updated_at": event["timestamp"],
         "roles": normalize_roles(roles),
         "decision_events": [*previous_events, event],
     }
+    if candidate:
+        role_set.update(
+            {
+                "candidate_id": candidate["id"],
+                "dataset_import_id": candidate.get("dataset_import_id"),
+                "dataset_import_profile_id": candidate.get("dataset_import_profile_id"),
+                "source": source,
+                "binding": binding,
+                "provenance": {
+                    "candidate_state_path": VARIABLE_ROLE_CANDIDATE_PATH.as_posix(),
+                    "dataset_import_manifest_path": DATASET_IMPORT_PREFLIGHT_PATH.as_posix(),
+                    "field_profile_source": "dataset_import_profile.fields",
+                },
+            }
+        )
     path = variable_role_state_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(role_set, ensure_ascii=False, indent=2), encoding="utf-8")
+    if candidate:
+        mark_variable_role_candidate_applied(project_root, candidate["id"], version, event)
     return {
         "_meta": {
             "evidence_level": "local_file",
@@ -116,6 +143,44 @@ def save_project_variable_roles(
         },
         "variable_role_set": role_set,
     }
+
+
+def load_approved_variable_role_candidate(project_root: Path, candidate_id: str | None) -> dict[str, Any]:
+    if not candidate_id:
+        raise VariableRoleCandidateNotFoundError("")
+    state = load_variable_role_candidate_state(project_root)
+    candidate = state.get("candidates", {}).get(candidate_id)
+    if not isinstance(candidate, dict):
+        raise VariableRoleCandidateNotFoundError(candidate_id)
+    if candidate.get("status") != "approved_candidate" or not candidate.get("can_apply_to_variable_roles"):
+        raise VariableRoleCandidateApprovalRequiredError(candidate_id)
+    return candidate
+
+
+def mark_variable_role_candidate_applied(
+    project_root: Path,
+    candidate_id: str,
+    variable_role_set_version: int,
+    event: dict[str, Any],
+) -> None:
+    state = load_variable_role_candidate_state(project_root)
+    candidate = state.get("candidates", {}).get(candidate_id)
+    if not isinstance(candidate, dict):
+        return
+    candidate["status"] = "applied_to_variable_roles"
+    candidate["can_apply_to_variable_roles"] = False
+    candidate["applied_variable_role_set_version"] = variable_role_set_version
+    candidate["updated_at"] = event["timestamp"]
+    candidate.setdefault("review_events", []).append(
+        {
+            **event,
+            "action": "apply_to_variable_role_set",
+        }
+    )
+    state.setdefault("candidates", {})[candidate_id] = candidate
+    state["latest_candidate_id"] = candidate_id
+    state["updated_at"] = candidate["updated_at"]
+    write_variable_role_candidate_state(project_root, state)
 
 
 def get_project_variable_role_candidates(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:

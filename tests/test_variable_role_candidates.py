@@ -113,8 +113,92 @@ class VariableRoleCandidateApiTests(unittest.TestCase):
         self.assertEqual(candidate["review_events"][-1]["action"], "approve_candidate")
         self.assertFalse((self.project_root / "state" / "product" / "variable_roles.json").exists())
 
+    def test_bdd_3_unapproved_candidate_cannot_be_saved_as_formal_variable_roles(self) -> None:
+        """行为 3：未审批候选不能绕过审阅直接写入正式 VariableRoleSet。"""
+        dataset_import_id = self._profile_dta_import()
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/datasets/imports/{dataset_import_id}/variable-role-candidates",
+            json={"note": "生成待审候选。"},
+        )
+        self.assertEqual(generated.status_code, 201, msg=generated.text)
+        candidate = generated.json()["variable_role_candidate"]
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/variable-roles",
+            json={
+                "dataset_path": candidate["source"]["path"],
+                "candidate_id": candidate["id"],
+                "roles": candidate["candidate_roles"],
+                "note": "不应绕过候选审批。",
+            },
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "variable_role_candidate_approval_required")
+        self.assertFalse((self.project_root / "state" / "product" / "variable_roles.json").exists())
+
+    def test_bdd_4_approved_candidate_saves_edited_roles_with_source_provenance(self) -> None:
+        """行为 4：已审批候选显式保存后，正式 VariableRoleSet 绑定真实字段画像证据。"""
+        dataset_import_id = self._profile_dta_import()
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/datasets/imports/{dataset_import_id}/variable-role-candidates",
+            json={"note": "生成待审候选。"},
+        )
+        self.assertEqual(generated.status_code, 201, msg=generated.text)
+        candidate = generated.json()["variable_role_candidate"]
+        approved = self.client.put(
+            f"/api/v1/projects/{self.project_id}/variable-role-candidates/{candidate['id']}/review",
+            json={
+                "action": "approve_candidate",
+                "note": "候选可以进入正式编辑器。",
+                "candidate_roles": candidate["candidate_roles"],
+            },
+        )
+        self.assertEqual(approved.status_code, 200, msg=approved.text)
+
+        edited_roles = {
+            "outcome": ["wage"],
+            "treatment": ["trained"],
+            "controls": ["edu"],
+            "instruments": [],
+            "fixed_effects": ["pid"],
+            "cluster_by": ["pid"],
+        }
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/variable-roles",
+            json={
+                "dataset_path": candidate["source"]["path"],
+                "candidate_id": candidate["id"],
+                "roles": edited_roles,
+                "note": "从真实字段候选正式确认，人工删去 experience 并设置 pid 聚类。",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        role_set = response.json()["variable_role_set"]
+        self.assertEqual(role_set["status"], "approved")
+        self.assertEqual(role_set["evidence_level"], "local_file")
+        self.assertEqual(role_set["candidate_id"], candidate["id"])
+        self.assertEqual(role_set["dataset_import_id"], dataset_import_id)
+        self.assertEqual(role_set["dataset_import_profile_id"], candidate["dataset_import_profile_id"])
+        self.assertEqual(role_set["source"]["sha256"], self._sha256(self.external_dta))
+        self.assertEqual(role_set["binding"]["mode"], "external_reference")
+        self.assertTrue(role_set["binding"]["read_only"])
+        self.assertEqual(role_set["roles"]["controls"], ["edu"])
+        self.assertEqual(role_set["roles"]["fixed_effects"], ["pid"])
+        self.assertEqual(role_set["roles"]["cluster_by"], ["pid"])
+        self.assertEqual(role_set["decision_events"][-1]["action"], "confirm_variable_roles_from_candidate")
+        saved = json.loads((self.project_root / "state" / "product" / "variable_roles.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["candidate_id"], candidate["id"])
+
+        candidates = self.client.get(f"/api/v1/projects/{self.project_id}/variable-role-candidates")
+        self.assertEqual(candidates.status_code, 200, msg=candidates.text)
+        saved_candidate = candidates.json()["latest_variable_role_candidate"]
+        self.assertEqual(saved_candidate["status"], "applied_to_variable_roles")
+        self.assertEqual(saved_candidate["applied_variable_role_set_version"], role_set["version"])
+
     def test_bdd_3_unprofiled_import_cannot_generate_candidate(self) -> None:
-        """行为 3：未生成字段画像前，不能基于猜测创建变量角色候选。"""
+        """行为 5：未生成字段画像前，不能基于猜测创建变量角色候选。"""
         dataset_import_id = self._apply_dataset_import(self.external_dta, "bind_external_reference")
 
         response = self.client.post(
@@ -126,7 +210,7 @@ class VariableRoleCandidateApiTests(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "field_profile_required")
 
     def test_bdd_4_invalid_candidate_review_action_is_rejected(self) -> None:
-        """行为 4：候选状态机必须拒绝非法审阅动作。"""
+        """行为 6：候选状态机必须拒绝非法审阅动作。"""
         dataset_import_id = self._profile_dta_import()
         generated = self.client.post(
             f"/api/v1/projects/{self.project_id}/datasets/imports/{dataset_import_id}/variable-role-candidates",
@@ -238,6 +322,14 @@ class VariableRoleCandidateFrontendTests(unittest.TestCase):
         self.assertIn("data-variable-role-candidate-generate", self.app_js)
         self.assertIn("data-variable-role-candidate-review-action", self.app_js)
         self.assertIn("variable-role-candidate-panel", self.styles)
+
+    def test_bdd_6_frontend_loads_approved_candidate_into_formal_editor_before_save(self) -> None:
+        """行为 6：前端必须把已审批候选载入正式编辑器，并在保存请求中携带 candidate_id。"""
+        self.assertIn("pendingVariableRoleCandidateId", self.app_js)
+        self.assertIn("loadVariableRoleCandidateIntoEditor", self.app_js)
+        self.assertIn("data-variable-role-candidate-load-editor", self.app_js)
+        self.assertIn("保存后才写入正式变量角色集", self.app_js)
+        self.assertIn("candidate_id", self.app_js)
 
 
 if __name__ == "__main__":

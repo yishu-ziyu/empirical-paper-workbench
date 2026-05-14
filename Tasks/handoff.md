@@ -1390,3 +1390,65 @@ P2-M 应先把 approved candidate 连接到“正式变量角色编辑确认”�
 - DTA value labels、缺失统计和抽样预览还没有进入候选评分。
 - 正式变量角色编辑器仍绑定旧的 `analysis_sample.csv`，还没有消费真实 CFPS candidate。
 - StatsPAI/StataMCP 仍未实际执行；严谨实证执行仍停留在 Python OLS adapter。
+
+## 2026-05-14 P2-M Candidate Promotion to Formal VariableRoleSet 交接增量
+
+### 当前目标
+
+把 P2-L 已确认的真实字段候选推进到“正式变量角色编辑确认”流程：候选可以被载入编辑器、人工调整，并且只有用户点击保存后才写入正式 `VariableRoleSet`。这一步解决“真实数据还没有进入变量角色候选生成/确认”的关键缺口，但仍保护正式研究状态不被启发式自动覆盖。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-variable-role-candidate-promote-bdd.md`。
+- 扩展 `tests/test_variable_role_candidates.py`，新增 3 条 P2-M 行为测试。
+- 扩展 `Product/backend/variable_role_service.py`：
+  - `save_project_variable_roles(..., candidate_id=...)`
+  - `VariableRoleCandidateApprovalRequiredError`
+  - candidate 写回后状态更新为 `applied_to_variable_roles`
+- 扩展 `Product/app.py`：
+  - `VariableRolePayload.candidate_id`
+  - 保存变量角色 API 对未确认 candidate 返回 409 `variable_role_candidate_approval_required`
+- 扩展 `Product/web/assets/app.js`：
+  - `pendingVariableRoleCandidateId`
+  - `载入正式编辑器` 按钮
+  - `loadVariableRoleCandidateIntoEditor()`
+  - 保存变量角色集时携带 `candidate_id`
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_variable_role_candidates -v` 首次新增行为失败，失败点是旧后端按 `dataset_path` 拒绝真实 candidate，前端缺少 candidate-to-editor 状态。
+- GREEN：`python3 -m unittest tests.test_variable_role_candidates -v`，8 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，198 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/variable_role_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- 可视化：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，点击“数据与设计” -> “载入正式编辑器”，编辑器显示 `draft_from_candidate · local_file`、真实 CFPS DTA 路径、`candidate_id=variable_role_candidate_495092cb7af2` 和“保存后才写入正式变量角色集”。
+
+### 关键文件路径
+
+- `Product/backend/variable_role_service.py`
+- `Product/app.py`
+- `Product/web/assets/app.js`
+- `tests/test_variable_role_candidates.py`
+- `docs/architecture-v2/codex-phase-p2-variable-role-candidate-promote-bdd.md`
+- `tasks/todo.md`
+- `tasks/handoff.md`
+- `tasks/decision-log.md`
+- `tasks/manifest.md`
+- `tasks/review.md`
+
+### 不能重复探索的结论
+
+- `approved_candidate` 不等于正式变量角色集；它只允许被载入正式编辑器。
+- 从 candidate 写回正式 VariableRoleSet 时，必须保留 `candidate_id` 和数据来源 provenance，否则后续 DesignSpec/RunPlan 无法审计。
+- 当前 CFPS role candidate 仍是启发式，不可自动点击保存；必须由用户人工检查后再确认。
+- Browser/Playwright MCP 仍不稳定，本轮使用 Chrome + Computer Use 做点击级验收。
+
+### 下一步第一件事
+
+P2-N：让 DesignSpec/RunPlan 消费正式 VariableRoleSet 的真实数据来源，并增加执行前 preflight：如果正式角色来自真实 DTA candidate，则必须能解析 `source` / `binding`，明确本地版可读、云端需上传，并准备 StatsPAI/StataMCP/Python 后端执行日志与 evaluator checks。
+
+### 未解决风险
+
+- 字段搜索、多候选对比、value labels、缺失统计和样本预览还没进入变量角色人工选择体验。
+- DesignSpec/RunPlan 尚未自动基于新正式 VariableRoleSet 刷新。
+- StatsPAI/StataMCP 尚未实际执行；目前只有 Python OLS adapter 是 `local_execution`。
+- 线上版不能消费 `/Users/...` 本地路径，必须在后续引入上传/云对象 source abstraction。

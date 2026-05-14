@@ -58,6 +58,7 @@ const state = {
   generatingVariableRoleCandidateId: null,
   reviewingVariableRoleCandidateId: null,
   reviewingVariableRoleCandidateAction: null,
+  pendingVariableRoleCandidateId: null,
   savingVariableRoles: false,
   savingDesignSpec: false,
   savingRunPlan: false,
@@ -3366,7 +3367,20 @@ function renderVariableRoleCandidateReview(profile) {
         ${renderVariableRoleCandidateReviewButton(candidate, "approve_candidate", "候选已确认")}
         ${renderVariableRoleCandidateReviewButton(candidate, "needs_revision", "需要调整")}
         ${renderVariableRoleCandidateReviewButton(candidate, "reject", "驳回候选")}
+        ${candidate.can_apply_to_variable_roles ? `
+          <button
+            class="primary-button compact"
+            data-variable-role-candidate-load-editor
+            data-candidate-id="${escapeHtml(candidate.id || "")}"
+            title="把候选字段载入下方正式变量角色编辑器；保存后才写入正式变量角色集。"
+          >
+            载入正式编辑器
+          </button>
+        ` : ""}
       </div>
+      ${candidate.can_apply_to_variable_roles ? `
+        <p class="muted external-bind-preflight-note">保存后才写入正式变量角色集；载入编辑器后仍可调整每一类变量。</p>
+      ` : ""}
     </article>
   `;
 }
@@ -3406,6 +3420,7 @@ function variableRoleCandidateStatusLabel(status) {
   return {
     needs_review: "待人工审阅",
     approved_candidate: "候选已确认",
+    applied_to_variable_roles: "已写入正式变量角色集",
     rejected: "已驳回",
   }[status] || status || "未知状态";
 }
@@ -3786,6 +3801,47 @@ async function reviewVariableRoleCandidate(candidateId, action) {
   }
 }
 
+function loadVariableRoleCandidateIntoEditor(candidateId) {
+  const candidate = (state.variableRoleCandidatesData?.variable_role_candidates || [])
+    .find((item) => item.id === candidateId)
+    || state.variableRoleCandidatesData?.latest_variable_role_candidate;
+  if (!candidate || candidate.id !== candidateId) return;
+
+  state.pendingVariableRoleCandidateId = candidateId;
+  const roles = candidate.candidate_roles || {};
+  const sourcePath = candidate.source?.path || candidate.binding?.path || "";
+  state.selectedDatasetPath = sourcePath || state.selectedDatasetPath;
+  state.variableRolesData = {
+    ...(state.variableRolesData || {}),
+    variable_role_set: {
+      ...(state.variableRolesData?.variable_role_set || {}),
+      status: "draft_from_candidate",
+      evidence_level: candidate.evidence_level || "local_file",
+      dataset_path: sourcePath,
+      dataset_name: candidate.source?.name || "",
+      candidate_id: candidate.id,
+      dataset_import_id: candidate.dataset_import_id,
+      dataset_import_profile_id: candidate.dataset_import_profile_id,
+      source: candidate.source || {},
+      binding: candidate.binding || {},
+      roles: {
+        outcome: roles.outcome || [],
+        treatment: roles.treatment || [],
+        controls: roles.controls || [],
+        instruments: roles.instruments || [],
+        fixed_effects: roles.fixed_effects || [],
+        cluster_by: roles.cluster_by || [],
+      },
+    },
+  };
+  renderVariableRoleEditor();
+  const note = document.getElementById("variable-role-note");
+  if (note) {
+    note.value = `从真实字段候选 ${candidate.id} 正式确认变量角色；保存后才写入正式变量角色集。`;
+  }
+  document.getElementById("variable-role-confirmation-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function variableRoleCandidateReviewActionLabel(action) {
   return {
     approve_candidate: "候选已确认",
@@ -3817,7 +3873,10 @@ function renderVariableRoleEditor() {
   setVariableRoleField("variable-role-fixed-effects", roles.fixed_effects);
   setVariableRoleField("variable-role-cluster-by", roles.cluster_by);
   statusPill.textContent = `${roleSet.status || "draft"} · ${roleSet.evidence_level || "local_file"}`;
-  meta.textContent = `${roleSet.dataset_path || "未选择数据集"} · version=${roleSet.version ?? 0} · evidence_level=${roleSet.evidence_level || "local_file"}`;
+  const pendingCandidateText = state.pendingVariableRoleCandidateId
+    ? ` · candidate_id=${state.pendingVariableRoleCandidateId} · 保存后才写入正式变量角色集`
+    : "";
+  meta.textContent = `${roleSet.dataset_path || "未选择数据集"} · version=${roleSet.version ?? 0} · evidence_level=${roleSet.evidence_level || "local_file"}${pendingCandidateText}`;
   if (saveButton) {
     saveButton.disabled = state.savingVariableRoles;
   }
@@ -3841,6 +3900,9 @@ async function handleSaveVariableRoles(event) {
     },
     note: document.getElementById("variable-role-note")?.value?.trim() || "",
   };
+  if (state.pendingVariableRoleCandidateId) {
+    payload.candidate_id = state.pendingVariableRoleCandidateId;
+  }
 
   clearV2Error("data");
   state.savingVariableRoles = true;
@@ -3848,7 +3910,9 @@ async function handleSaveVariableRoles(event) {
   try {
     await v2api.variableRoles.save(state.selectedProjectId, payload);
     state.variableRolesData = await v2api.variableRoles.get(state.selectedProjectId);
+    state.variableRoleCandidatesData = await v2api.variableRoleCandidates.list(state.selectedProjectId);
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    state.pendingVariableRoleCandidateId = null;
     renderDataVariables();
     renderWorkflowContract(state.overviewData.workflow_contract);
     document.getElementById("variable-role-save-status").textContent = "已保存";
@@ -5278,6 +5342,11 @@ async function boot() {
     const generateButton = target.closest("[data-variable-role-candidate-generate]");
     if (generateButton) {
       void generateVariableRoleCandidate(generateButton.dataset.datasetImportId || "");
+      return;
+    }
+    const loadEditorButton = target.closest("[data-variable-role-candidate-load-editor]");
+    if (loadEditorButton) {
+      loadVariableRoleCandidateIntoEditor(loadEditorButton.dataset.candidateId || "");
       return;
     }
     const reviewButton = target.closest("[data-variable-role-candidate-review-action]");

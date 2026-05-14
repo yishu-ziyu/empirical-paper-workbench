@@ -99,6 +99,7 @@
 - [x] P1-L 前端：Manuscript candidate 卡片显示 review_status/can-promote、审阅备注和 approve/needs_revision/reject 操作
 - [x] P1-L 验证：目标测试、相邻回归、全量 unittest、py_compile、node --check、API 和浏览器验收
 - [ ] P1-M 规划：approved candidate 的 promote/write-back/export preflight
+- [ ] P2-L：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
 
 ## Review
 
@@ -415,7 +416,7 @@
 - [x] 验证：目标测试 7 OK；相邻回归 28 OK；全量回归 187 OK，skipped=1；Python/JS 静态检查和 `git diff --check` 通过；Playwright CLI 截图 `/tmp/empirical-workbench-p2j-dta-profile.png`。
 - [x] P2-K：按用户最新要求，优先建立严谨实证执行契约；full run 必须声明当前真实执行后端、候选 StatsPAI/StataMCP 后端、数据预检和可复现入口。
 - [x] P2-K：Execution 页面显示“严谨执行契约 / 数据预检 / 可复现入口”，明确 StatsPAI/StataMCP 目前是候选后端，不能冒充 `local_execution`。
-- [ ] P2-L：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
+- [x] P2-L：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
 - [ ] P2-M：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求生成独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
 
 ## 2026-05-14 P2-K Rigorous Empirical Execution Contract
@@ -428,3 +429,15 @@
 - [x] 实现：OLS 任务写入 `reproducibility`，包含 run_id、RunPlan/DesignSpec 版本、公式、结果文件路径和源码入口。
 - [x] 前端：Execution 页面新增“严谨执行契约”“数据预检”“可复现入口”三块，用户能直接看到 Python/StatsPAI/StataMCP 的真实状态边界。
 - [x] 验证：目标测试 24 OK；相邻回归 42 OK；全量回归 190 OK，skipped=1；Python/JS 静态检查和 `git diff --check` 通过；Playwright CLI 可视化检查无横向溢出。
+
+## 2026-05-14 P2-L Variable Role Candidate Review
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-variable-role-candidate-review-bdd.md`，定义真实 DTA 字段画像只能生成可审阅候选，不能自动写入正式 VariableRoleSet。
+- [x] TDD：新增 `tests/test_variable_role_candidates.py`；首次运行 5 条失败，原因是候选 API 404、前端缺少 `variable-role-candidate-panel` 和候选 review 操作。
+- [x] 实现：扩展 `Product/backend/variable_role_service.py`，新增 `state/product/variable_role_candidates.json` 候选状态机，支持生成、确认候选、标记需调整和驳回。
+- [x] 实现：扩展 `Product/app.py`，新增候选列表、生成和 review API，并对未画像 import 返回 409 `field_profile_required`，对非法动作返回 400 `invalid_variable_role_candidate_action`。
+- [x] 前端：扩展“数据与设计”页，新增“字段审阅”面板；用户可以从真实字段画像生成变量角色候选，并看到 `不会写入正式变量角色集` 的边界说明。
+- [x] 验证：目标测试 5 OK；相邻回归 17 OK；全量回归 195 OK，skipped=1；Python 编译和 JS 语法检查通过。
+- [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`，进入“数据与设计”，真实 CFPS `.dta` 显示 723 个字段；点击“生成变量角色候选”后显示 `待人工审阅`、候选角色、候选字段表和 `state/product/variable_role_candidates.json`；点击“候选已确认”后候选状态为 `approved_candidate`。
+- [x] 安全边界验收：确认前后 `state/product/variable_roles.json` SHA256 均为 `bc8bedca4d1638d2556ad77957de146eda170cef521db24eeb7ffde5c2e94649`，mtime 未变化，证明候选 review 没有写回正式变量角色集。
+- [ ] P2-M：把 approved candidate 之后的真实变量选择流程做成可编辑确认，不再依赖启发式猜测；随后接 StatsPAI/StataMCP/Python 严格执行器。

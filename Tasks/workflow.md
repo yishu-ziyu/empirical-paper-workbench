@@ -34,6 +34,7 @@
 - `ols_evaluator`：已完成第一轮 OLS evaluator evidence；`method_execution_result.json` 包含标准误、t 统计量、p 值、置信区间、残差诊断和命名 checks，FindingCard 页面显示中文方法证据摘要。
 - `dataset_import_profile`：已完成第一轮真实数据字段画像；已 apply 的 CFPS `.dta` 可用 metadata-only 读取变量名、变量标签、Stata 类型、行数和列数，证据等级为 `local_file`，并且 `can_feed_variable_roles=false`。
 - `rigorous_empirical_execution_contract`：已完成第一轮严谨实证执行契约；full run 当前真实后端为 `python_ols_adapter`，StatsPAI/StatsAPI 和 StataMCP/Stata 作为候选后端展示，方法结果包含数据预检和可复现入口。
+- `variable_role_candidate_review`：已完成第一轮字段审阅状态机；真实 CFPS `.dta` 字段画像可生成 `VariableRoleCandidate`，review 操作只更新 `state/product/variable_role_candidates.json`，不自动改写正式 VariableRoleSet。
 
 ## 当前要求
 
@@ -44,7 +45,7 @@
 - P1-P 已完成；Review & Export 已具备显式写回审批和 docx 预检状态，但仍不覆盖源草稿、不直接生成最终 docx。
 - P2-J 已完成；真实 Stata `.dta` 字段画像当前只读 metadata，不等于实证分析，也不得自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
 - P2-K 已完成；严谨实证执行契约当前只把 `python_ols_adapter` 标记为 active execution，StatsPAI/StatsAPI 和 StataMCP/Stata 只有实际执行并产生日志/结果文件后才能升级为 `local_execution`。
-- 下一步 P2-L 必须继续按 BDD/TDD：从字段画像生成可审阅 VariableRoleSet 候选状态机，要求用户显式确认后才写入正式变量角色。
+- P2-L 已完成；下一步 P2-M 必须继续按 BDD/TDD：把 approved candidate 连接到正式变量角色编辑确认流程，要求用户显式保存后才写入正式 `state/product/variable_roles.json`，然后才能重新生成 DesignSpec/RunPlan。
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。

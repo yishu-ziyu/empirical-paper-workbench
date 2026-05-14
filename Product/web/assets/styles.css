@@ -146,6 +146,7 @@ textarea {
 .product-next-action,
 .workflow-spine-panel,
 .variable-role-workflow-card,
+.variable-role-candidate-panel,
 .variable-role-editor-card,
 .design-spec-editor-card,
 .run-plan-editor-card,
@@ -156,6 +157,7 @@ textarea {
 
 .product-next-action-body,
 .variable-role-workflow-body,
+.variable-role-candidate-body,
 .run-plan-preflight-body,
 .run-blockers-body {
   min-width: 0;
@@ -450,21 +452,35 @@ textarea {
   border-left: 3px solid rgba(85, 111, 150, 0.35);
 }
 
+.variable-role-candidate-panel {
+  margin-bottom: 18px;
+  border-left: 3px solid rgba(30, 111, 98, 0.38);
+}
+
 .external-bind-preflight-body,
 .external-bind-preflight-record,
 .dataset-import-profile-body,
-.dataset-import-profile-record {
+.dataset-import-profile-record,
+.variable-role-candidate-body,
+.variable-role-candidate-record {
   display: grid;
   gap: 14px;
   min-width: 0;
 }
 
 .external-bind-preflight-record,
-.dataset-import-profile-record {
+.dataset-import-profile-record,
+.variable-role-candidate-record {
   padding: 16px;
   border: 1px solid rgba(30, 111, 98, 0.14);
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(247, 250, 248, 0.92), #fff);
+}
+
+.variable-role-candidate-roles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .preflight-check-list {

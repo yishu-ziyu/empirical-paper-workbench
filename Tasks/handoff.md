@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-14 23:58 CST
+更新时间：2026-05-15 00:32 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。P2-I 已完成 CSV/阻塞式字段画像入口。最新 P2-J 已完成：已 apply 的 Stata `.dta` 现在可以用 metadata-only 方式读取变量字典；真实验收当前 import `dataset_import_e9d864229be8` 绑定 `cfps2011adult_202202(1).dta`，画像结果为 `profiled/ready`、`row_count=1279`、`column_count=723`、`fields=723`、`row_count_source=metadata_only`，字段样例包括 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。画像仍明确 `can_feed_variable_roles=false`，不会改写 VariableRoleSet、DesignSpec 或 RunPlan。下一步应把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，并继续设计 Python/StatsPAI/StataMCP 的严谨实证执行层。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-F/P2-G/P2-H 已把 `/Users/mahaoxuan/Desktop/实证数据库` 接成只读真实数据候选池，并打通“生成导入/绑定预检 -> 显式复制/绑定/取消”的本地版数据接入流程。P2-I/P2-J 已完成真实 Stata `.dta` metadata-only 字段画像，当前 import `dataset_import_e9d864229be8` 可读 `cfps2011adult_202202(1).dta` 的 1279 行、723 列、变量标签和 Stata 类型，但仍 `can_feed_variable_roles=false`。最新 P2-K 已按用户要求优先建立“严谨实证执行契约”：full run 会声明真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口。下一步应做 P2-L 字段审阅 / VariableRoleSet 候选生成状态机，然后接真实 StatsPAI 或 StataMCP 后端。
 
 ## 已完成事项
 
@@ -1259,3 +1259,69 @@ P2-K：基于 `dataset_import_profile.fields` 生成可审阅的字段候选清�
 - XLSX/Parquet 仍没有安全字段读取器。
 - 真实实证执行层还需要接 StatsPAI/StatsAPI、StataMCP 或 Python 的严格 pipeline，而不是只看字段画像。
 - Playwright MCP 仍 `Transport closed`；当前可视化验收使用 Playwright CLI fallback。
+
+## 2026-05-14 P2-K Rigorous Empirical Execution Contract 交接增量
+
+### 当前目标
+
+把“具体数据分析和实证一定严谨”落成可审计产品契约：用户必须能看到本次 run 到底由哪个后端执行、哪些后端只是候选、数据是否通过预检，以及结果如何复现。当前真实执行后端是 Python OLS adapter；StatsPAI/StatsAPI 与 StataMCP/Stata 还没有实际调用，因此不能标为 `local_execution`。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-rigorous-empirical-execution-bdd.md`。
+- 扩展测试：`tests/test_ols_execution_adapter.py` 和 `tests/test_observable_execution_frontend.py`。
+- 扩展 `Product/backend/project_service.py`：
+  - `build_empirical_execution_contract("python_ols_adapter")`
+  - `read_numeric_formula_rows_with_preflight()`
+  - `build_ols_reproducibility()`
+- full run 的 `method_execution_result.json` 和 run response 现在包含：
+  - `execution_contract.active_backend=python_ols_adapter`
+  - candidate backends：StatsPAI/StatsAPI、StataMCP/Stata
+  - `data_preflight.rows_read/usable_numeric_rows/dropped_rows/required_fields`
+  - `reproducibility.result_artifact_path/source_entrypoint/run_plan_version/design_spec_version`
+- 扩展 `Product/web/assets/app.js`：
+  - `renderMethodExecutionContract()`
+  - `renderMethodDataPreflight()`
+  - `renderMethodReproducibility()`
+- 扩展 `Product/web/assets/styles.css`，增加严谨执行契约和预检展示样式，并修复 Execution 页面局部溢出。
+- 更新 `Product/web/index.html` 静态资源版本到 `20260514-p2k-rigorous1`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend -v` 首次失败，原因是缺少 `execution_contract`、`data_preflight` 和前端契约展示。
+- GREEN：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend -v`，24 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend tests.test_observable_execution tests.test_results_draft_evidence_binding tests.test_product_api_integration -v`，42 tests OK，skipped=1。
+- 全量回归：`python3 -m unittest discover -s tests -v`，190 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js`、`python3 -m py_compile Product/app.py Product/backend/project_service.py Product/backend/design_spec_service.py Product/backend/overview_service.py Product/backend/observability_service.py`、`git diff --check` 通过。
+- API：真实 full run `run_5ac7052232c8` 成功，`active_backend=python_ols_adapter`，StatsPAI 与 StataMCP 为 candidate backend；`data_preflight.rows_read=12`、`usable_numeric_rows=12`、`dropped_rows=0`。
+- 可视化：Playwright CLI 打开 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`，进入“实证执行”，页面可见“严谨执行契约 / 数据预检 / 可复现入口”，`visibleOverflowCount=0`，截图为 `/tmp/empirical-workbench-p2k-rigorous-execution.png`。
+
+### 关键文件路径
+
+- `Product/backend/project_service.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_observable_execution_frontend.py`
+- `docs/architecture-v2/codex-phase-p2-rigorous-empirical-execution-bdd.md`
+- `state/runs/run_5ac7052232c8/run_manifest.json`（runtime 产物，不作为源码提交）
+- `state/runs/run_5ac7052232c8/project/Results/json/method_execution_result.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- 安装或可检测到 StatsPAI/Stata 只代表候选能力，不代表本次 run 已执行；只有实际调用并产生日志/结果文件后才能标记为 `local_execution`。
+- 当前 OLS 是最小 Python 执行器，适合 baseline/evaluator 契约，不等于完整 StatsPAI/Stata 论文级流水线。
+- 数据预检必须在方法执行结果里保留，不能只在 UI 上写文案；否则无法解释样本数、丢弃行和必需字段。
+- UI 必须明确显示候选后端状态，不能让用户误以为 StatsPAI/StataMCP 已经参与当前估计。
+
+### 下一步第一件事
+
+P2-L：基于 `dataset_import_profile.fields` 做“字段审阅 / VariableRoleSet 候选生成”状态机。它应该允许用户从真实 Stata 变量字典中挑选 outcome/treatment/controls/instruments 的候选，但保存前不得改写正式 `state/product/variable_roles.json`。
+
+### 未解决风险
+
+- 真实 StatsPAI `sp.*` 与 Stata do-file/log 还没有接入执行。
+- 当前 p 值为 normal approximation；论文级估计还需要 robust/cluster 标准误、固定效应、样本筛选日志和跨后端一致性检查。
+- DTA value labels、缺失统计和抽样预览仍未接入。
+- Playwright MCP 仍不稳定；当前可视化验收使用 Playwright CLI fallback。

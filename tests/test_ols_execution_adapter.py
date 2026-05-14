@@ -169,6 +169,55 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertIn("treatment_coefficient", check_ids)
         self.assertIn("inference_diagnostics", check_ids)
 
+    def test_bdd_8_method_execution_declares_rigorous_backend_contract(self) -> None:
+        """行为 8：方法执行必须声明 Python/StatsPAI/StataMCP 后端契约。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        method_execution = response.json()["method_execution"]
+        contract = method_execution["execution_contract"]
+        self.assertEqual(contract["active_backend"], "python_ols_adapter")
+        self.assertEqual(contract["analysis_boundary"], "analysis_ready_numeric_formula_rows")
+        self.assertIn("frontend_inference", contract["prohibits"])
+        backend_ids = {backend["id"] for backend in contract["available_backends"]}
+        self.assertEqual(backend_ids, {"python_ols_adapter", "statspai", "stata_mcp"})
+        backends = {backend["id"]: backend for backend in contract["available_backends"]}
+        self.assertEqual(backends["python_ols_adapter"]["role"], "active_execution")
+        self.assertEqual(backends["python_ols_adapter"]["evidence_level"], "local_execution")
+        self.assertEqual(backends["statspai"]["role"], "candidate_causal_engine")
+        self.assertEqual(backends["stata_mcp"]["role"], "candidate_reproducibility_engine")
+        self.assertNotEqual(backends["statspai"]["evidence_level"], "local_execution")
+        self.assertNotEqual(backends["stata_mcp"]["evidence_level"], "local_execution")
+
+    def test_bdd_9_ols_method_records_data_preflight_and_reproducibility(self) -> None:
+        """行为 9：OLS 方法结果必须记录数据预检和可复现执行说明。"""
+        self._approve_variable_roles()
+        self._approve_design_spec()
+        self._approve_run_plan()
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+
+        self.assertEqual(response.status_code, 202, msg=response.text)
+        method = response.json()["method_execution"]["methods"][0]
+        preflight = method["data_preflight"]
+        self.assertEqual(preflight["evidence_level"], "local_execution")
+        self.assertEqual(preflight["dataset_path"], "Data/Final/analysis_sample.csv")
+        self.assertEqual(preflight["required_fields"], ["wage", "trained", "edu", "experience"])
+        self.assertEqual(preflight["rows_read"], 8)
+        self.assertEqual(preflight["usable_numeric_rows"], 8)
+        self.assertEqual(preflight["dropped_rows"], 0)
+        self.assertTrue(all(check["status"] == "passed" for check in preflight["checks"]))
+        reproducibility = method["reproducibility"]
+        self.assertEqual(reproducibility["evidence_level"], "local_execution")
+        self.assertEqual(reproducibility["adapter"], "python_ols_adapter")
+        self.assertEqual(reproducibility["formula"], "wage ~ trained + edu + experience")
+        self.assertEqual(reproducibility["result_artifact_path"], "Results/json/method_execution_result.json")
+        self.assertEqual(reproducibility["source_entrypoint"], "Product/backend/project_service.py::execute_ols_task")
+
     def _approve_variable_roles(self) -> None:
         response = self.client.put(
             f"/api/v1/projects/{self.project_id}/variable-roles",

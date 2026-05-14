@@ -567,3 +567,38 @@
 - DTA value labels、缺失统计和抽样预览还没读取；当前只证明字段结构和样本规模。
 - 字段画像尚未进入人工 VariableRoleSet 候选生成状态机；下一步 P2-K 必须先做人工审阅边界。
 - 线上版仍缺上传/云对象抽象，本地 `/Users/...` 绑定不能直接用于云端。
+
+## 2026-05-14 P2-K Rigorous Empirical Execution Contract
+
+### 行为覆盖
+
+- [x] full run 必须声明当前真实执行后端，不能把未调用的 StatsPAI/StataMCP 冒充为执行证据。
+- [x] full run 必须列出候选实证后端，并标明可用性、角色和证据等级。
+- [x] OLS 方法执行必须记录数据预检：读取行数、可用数值行、丢弃行数、必需字段和自由度检查。
+- [x] OLS 方法执行必须记录可复现入口：run_id、公式、RunPlan/DesignSpec 版本、结果文件和源码入口。
+- [x] Execution 页面必须把严谨执行契约、数据预检和可复现入口显示给用户。
+- [ ] 未覆盖：真实 StatsPAI `sp.*` 调用、Stata do-file/log 执行、robust/cluster 标准误、固定效应、跨后端数值交叉验证。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend -v` 首次 3 条新增行为失败，失败原因为缺少 `execution_contract`、`data_preflight` 和前端契约展示。
+- 目标测试：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend -v`，24 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_ols_execution_adapter tests.test_observable_execution_frontend tests.test_observable_execution tests.test_results_draft_evidence_binding tests.test_product_api_integration -v`，42 tests OK，skipped=1。
+- 全量回归：`python3 -m unittest discover -s tests -v`，190 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js`、`python3 -m py_compile Product/app.py Product/backend/project_service.py Product/backend/design_spec_service.py Product/backend/overview_service.py Product/backend/observability_service.py`、`git diff --check` 均通过。
+
+### API / 可视化验收
+
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/runs/full` 生成 `run_5ac7052232c8`，状态 `succeeded`，engine `python_ols_adapter`。
+- API：`execution_contract.active_backend=python_ols_adapter`；StatsPAI/StatsAPI 与 StataMCP/Stata 为 candidate backend，其中 StataMCP 检测到本地 Stata 路径。
+- API：`data_preflight.rows_read=12`、`usable_numeric_rows=12`、`dropped_rows=0`、`required_fields=["wage","trained","edu","experience"]`。
+- API：`reproducibility.result_artifact_path=Results/json/method_execution_result.json`、`source_entrypoint=Product/backend/project_service.py::execute_ols_task`。
+- 页面：Playwright CLI 打开 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`，进入“实证执行”，确认 `严谨执行契约`、`当前执行后端`、StatsPAI、StataMCP、`数据预检`、`可复现入口` 均可见，`visibleOverflowCount=0`。
+- 截图：`/tmp/empirical-workbench-p2k-rigorous-execution.png`。
+
+### 剩余风险
+
+- 当前仍是最小 Python OLS adapter，不是完整 StatsPAI/Stata 统计引擎。
+- StatsPAI 和 StataMCP 已作为候选能力展示，但尚未实际运行、产生日志或写出独立结果文件。
+- 当前 p 值仍是 normal approximation；严谨论文场景需要 robust/cluster 标准误、固定效应、样本筛选日志和跨后端复核。
+- 下一步应先补字段审阅 / VariableRoleSet 候选生成状态机，再把真实 StatsPAI 或 Stata do-file 执行接入为可替换后端。

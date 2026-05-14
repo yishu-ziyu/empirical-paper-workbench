@@ -1561,13 +1561,18 @@ textarea {
   line-height: 1.45;
 }
 
+#view-empirical-execution strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 #view-empirical-execution .dataset-source-meta {
   gap: 8px;
   font-size: 12px;
 }
 
 #view-empirical-execution .variable-roles-grid {
-  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2813,11 +2818,22 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.evidence-badge strong,
+.evidence-badge span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .evidence-badge.mock {
@@ -3331,7 +3347,7 @@ body {
 
 .archive-ledger div {
   display: grid;
-  grid-template-columns: minmax(92px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 1fr);
   gap: 8px;
   padding: 8px 0;
   border-top: 1px dashed var(--archive-note-line);
@@ -3346,6 +3362,8 @@ body {
   color: var(--archive-blue);
   font-family: "SFMono-Regular", Menlo, monospace;
   font-size: 11px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .archive-ledger span {
@@ -3502,7 +3520,7 @@ select:focus-visible {
 
 .method-execution-summary {
   display: grid;
-  grid-template-columns: minmax(120px, 0.4fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -3525,6 +3543,53 @@ select:focus-visible {
   background: #fafbf8;
 }
 
+.method-contract-panel,
+.method-subpanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.method-contract-panel {
+  border-color: rgba(37, 77, 114, 0.24);
+  background: #f8fafb;
+}
+
+.method-contract-head,
+.method-backend-list,
+.method-check-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.method-contract-head > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.method-backend-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.method-backend-item strong,
+.method-backend-item span,
+.method-subpanel code {
+  overflow-wrap: anywhere;
+}
+
 .finding-method-evidence {
   margin-top: 12px;
 }
@@ -3545,6 +3610,36 @@ select:focus-visible {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.method-preflight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.method-preflight-grid strong,
+.method-preflight-grid code {
+  display: block;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.method-check-list {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.method-check {
+  padding: 6px 8px;
+  border: 1px solid var(--line-clean);
+  border-radius: 8px;
+  background: #f3f5f2;
+  font-size: 0.82rem;
+}
+
+.method-check.is-passed {
+  color: var(--green-clean);
+  background: rgba(54, 117, 103, 0.08);
 }
 
 .finding-method-evidence .meta-label {
@@ -3638,6 +3733,8 @@ select:focus-visible {
 
   .method-execution-summary,
   .method-execution-grid,
+  .method-backend-item,
+  .method-preflight-grid,
   .method-evidence-grid,
   .external-library-note,
   .external-dataset-grid {

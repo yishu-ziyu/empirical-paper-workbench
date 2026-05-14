@@ -2318,6 +2318,7 @@ function renderObservableMethodExecution() {
 
   const observability = state.runObservability;
   const methodExecution = observability ? observability.method_execution || observability.manifest?.method_execution : null;
+  const contract = methodExecution?.execution_contract || null;
   if (!methodExecution) {
     container.innerHTML = `
       <div class="empty-state compact">
@@ -2341,6 +2342,7 @@ function renderObservableMethodExecution() {
       </div>
       ${renderEvidenceBadge({ evidence_level: methodExecution.evidence_level || "local_execution" })}
     </div>
+    ${renderMethodExecutionContract(contract)}
     ${methods.length ? methods.map((method) => `
       <article class="method-execution-card">
         <div class="observable-card-head">
@@ -2356,8 +2358,83 @@ function renderObservableMethodExecution() {
           <div><span class="meta-label">处理变量</span><strong>${escapeHtml(method.treatment || "-")}</strong></div>
           <div><span class="meta-label">处理变量系数</span><strong>${formatNumber(method.treatment_coefficient)}</strong></div>
         </div>
+        ${renderMethodDataPreflight(method.data_preflight)}
+        ${renderMethodReproducibility(method.reproducibility)}
       </article>
     `).join("") : "<p class='muted'>方法执行产物中没有 method item。</p>"}
+  `;
+}
+
+function renderMethodExecutionContract(contract) {
+  if (!contract) {
+    return `
+      <section class="method-contract-panel">
+        <strong>严谨执行契约</strong>
+        <p class="muted">尚未记录执行后端契约。</p>
+      </section>
+    `;
+  }
+  const backends = contract.available_backends || [];
+  return `
+    <section class="method-contract-panel">
+      <div class="method-contract-head">
+        <div>
+          <span class="meta-label">严谨执行契约</span>
+          <strong>当前执行后端：${escapeHtml(contract.active_backend || "-")}</strong>
+          <p class="muted">分析边界：${escapeHtml(contract.analysis_boundary || "-")}</p>
+        </div>
+      </div>
+      <div class="method-backend-list">
+        ${backends.map((backend) => `
+          <div class="method-backend-item">
+            <strong>${escapeHtml(backend.label || backend.id)}</strong>
+            <span>${escapeHtml(backend.role || "-")} · ${escapeHtml(backend.availability_status || "-")}</span>
+            ${renderEvidenceBadge({ evidence_level: backend.evidence_level || "local_file" })}
+          </div>
+        `).join("") || "<p class='muted'>暂无候选后端。</p>"}
+      </div>
+      <div class="muted">候选后端：StatsPAI/StatsAPI 与 StataMCP/Stata 只有在真实调用并写出产物后，才能升级为 local_execution。</div>
+    </section>
+  `;
+}
+
+function renderMethodDataPreflight(data_preflight) {
+  if (!data_preflight) {
+    return "<div class='method-subpanel'><strong>数据预检</strong><p class='muted'>尚未记录数据预检。</p></div>";
+  }
+  const checks = data_preflight.checks || [];
+  return `
+    <div class="method-subpanel">
+      <strong>数据预检</strong>
+      <div class="method-preflight-grid">
+        <div><span class="meta-label">读取行数</span><strong>${escapeHtml(String(data_preflight.rows_read ?? "-"))}</strong></div>
+        <div><span class="meta-label">可用数值行</span><strong>${escapeHtml(String(data_preflight.usable_numeric_rows ?? "-"))}</strong></div>
+        <div><span class="meta-label">丢弃行数</span><strong>${escapeHtml(String(data_preflight.dropped_rows ?? "-"))}</strong></div>
+        <div><span class="meta-label">必需字段</span><strong>${escapeHtml((data_preflight.required_fields || []).join(", ") || "-")}</strong></div>
+      </div>
+      <div class="method-check-list">
+        ${checks.map((check) => `
+          <span class="method-check is-${escapeHtml(check.status || "unknown")}">${escapeHtml(check.label || check.id)} · ${escapeHtml(check.status || "-")}</span>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderMethodReproducibility(reproducibility) {
+  if (!reproducibility) {
+    return "<div class='method-subpanel'><strong>可复现入口</strong><p class='muted'>尚未记录可复现执行说明。</p></div>";
+  }
+  return `
+    <div class="method-subpanel">
+      <strong>可复现入口</strong>
+      <div class="method-preflight-grid">
+        <div><span class="meta-label">适配器</span><strong>${escapeHtml(reproducibility.adapter || "-")}</strong></div>
+        <div><span class="meta-label">RunPlan 版本</span><strong>${escapeHtml(String(reproducibility.run_plan_version ?? "-"))}</strong></div>
+        <div><span class="meta-label">结果产物</span><code>${escapeHtml(reproducibility.result_artifact_path || "-")}</code></div>
+        <div><span class="meta-label">源码入口</span><code>${escapeHtml(reproducibility.source_entrypoint || "-")}</code></div>
+      </div>
+    </div>
   `;
 }
 

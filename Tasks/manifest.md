@@ -595,3 +595,36 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - 截图证据：`/tmp/empirical-workbench-p2j-dta-profile.png`
 
 说明：点击“数据与设计”，在“字段画像 / 变量字典预览”面板可见 `cfps2011adult_202202(1).dta`、`已画像`、`1279 行 · 723 列 · row_limit=200`、`metadata-only 字段画像，未读取完整数据表`，字段表显示 `pid / 个人id / double`、`fid / 家户号 / double` 等真实 Stata 变量字典。
+
+## 2026-05-14 P2-K Rigorous Empirical Execution Contract
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-rigorous-empirical-execution-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_ols_execution_adapter.py`
+- `tests/test_observable_execution_frontend.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/project_service.py`：新增 `build_empirical_execution_contract()`、`read_numeric_formula_rows_with_preflight()`、`build_ols_reproducibility()`。
+- `method_execution_result.json` 现在包含：
+  - `execution_contract.active_backend=python_ols_adapter`
+  - `execution_contract.available_backends[]`，列出 Python、StatsPAI/StatsAPI、StataMCP/Stata 的角色、可用性和证据等级。
+  - `data_preflight`，记录读取行数、可用数值行、丢弃行数、必需字段和预检结果。
+  - `reproducibility`，记录 run_id、公式、RunPlan/DesignSpec 版本、结果文件路径和源码入口。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：新增 `renderMethodExecutionContract()`、`renderMethodDataPreflight()`、`renderMethodReproducibility()`。
+- `Product/web/assets/styles.css`：新增严谨执行契约、候选后端、数据预检和可复现入口样式，并修复 Execution 页面可见溢出。
+- `Product/web/index.html`：静态资源版本更新到 `20260514-p2k-rigorous1`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`
+- 截图证据：`/tmp/empirical-workbench-p2k-rigorous-execution.png`
+
+说明：点击“实证执行”，查看“方法执行证据”下的“严谨执行契约”“数据预检”“可复现入口”。页面应显示当前执行后端 `python_ols_adapter`，候选后端 StatsPAI/StatsAPI 与 StataMCP/Stata，数据预检 `12 / 12 / 0`，以及源码入口 `Product/backend/project_service.py::execute_ols_task`。

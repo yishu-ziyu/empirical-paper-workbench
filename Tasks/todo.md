@@ -413,5 +413,18 @@
 - [x] 前端：字段画像表从“样本值”改为“变量标签 / Stata 类型”，并修正字段表列宽和表头大小写。
 - [x] 真实验收：`dataset_import_e9d864229be8` 绑定的 `cfps2011adult_202202(1).dta` 返回 `profiled/ready`、`row_count=1279`、`column_count=723`、`row_count_source=metadata_only`，前 6 个字段含 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。
 - [x] 验证：目标测试 7 OK；相邻回归 28 OK；全量回归 187 OK，skipped=1；Python/JS 静态检查和 `git diff --check` 通过；Playwright CLI 截图 `/tmp/empirical-workbench-p2j-dta-profile.png`。
-- [ ] P2-K：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
-- [ ] P2-L：设计严谨实证执行层：Python/StatsPAI/StataMCP 三条路径的执行日志、结果文件、evaluator checks、交叉验证和 evidence_level。
+- [x] P2-K：按用户最新要求，优先建立严谨实证执行契约；full run 必须声明当前真实执行后端、候选 StatsPAI/StataMCP 后端、数据预检和可复现入口。
+- [x] P2-K：Execution 页面显示“严谨执行契约 / 数据预检 / 可复现入口”，明确 StatsPAI/StataMCP 目前是候选后端，不能冒充 `local_execution`。
+- [ ] P2-L：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
+- [ ] P2-M：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求生成独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
+
+## 2026-05-14 P2-K Rigorous Empirical Execution Contract
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-rigorous-empirical-execution-bdd.md`，定义“严谨实证执行契约”。
+- [x] TDD：扩展 `tests/test_ols_execution_adapter.py` 和 `tests/test_observable_execution_frontend.py`；首次运行失败原因为缺少 `execution_contract`、`data_preflight` 和前端展示。
+- [x] 实现：`Product/backend/project_service.py` 的 full run 现在写入 `execution_contract`，并把 active backend 固定为真实执行过的 `python_ols_adapter`。
+- [x] 实现：StatsPAI/StatsAPI 与 StataMCP/Stata 只作为候选后端展示，除非未来实际调用并产生日志/产物，否则不标记为 `local_execution`。
+- [x] 实现：OLS 任务写入 `data_preflight`，包含读取行数、可用数值行、丢弃行数、必需字段和自由度预检。
+- [x] 实现：OLS 任务写入 `reproducibility`，包含 run_id、RunPlan/DesignSpec 版本、公式、结果文件路径和源码入口。
+- [x] 前端：Execution 页面新增“严谨执行契约”“数据预检”“可复现入口”三块，用户能直接看到 Python/StatsPAI/StataMCP 的真实状态边界。
+- [x] 验证：目标测试 24 OK；相邻回归 42 OK；全量回归 190 OK，skipped=1；Python/JS 静态检查和 `git diff --check` 通过；Playwright CLI 可视化检查无横向溢出。

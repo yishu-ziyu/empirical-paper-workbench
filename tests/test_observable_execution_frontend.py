@@ -148,6 +148,21 @@ class ObservableExecutionFrontendTests(unittest.TestCase):
         self.assertIn("尚未生成方法执行证据", self.app_js)
         self.assertIn(".observable-method-execution", self.styles_css)
 
+    def test_bdd_15_execution_page_shows_rigorous_backend_contract(self) -> None:
+        """行为 15：实证执行页必须展示严谨执行后端、数据预检和可复现入口。"""
+        self.assertIn("execution_contract", self.app_js)
+        self.assertIn("available_backends", self.app_js)
+        self.assertIn("data_preflight", self.app_js)
+        self.assertIn("reproducibility", self.app_js)
+        for label in (
+            "严谨执行契约",
+            "当前执行后端",
+            "候选后端",
+            "数据预检",
+            "可复现入口",
+        ):
+            self.assertIn(label, self.app_js)
+
 
 if __name__ == "__main__":
     unittest.main()

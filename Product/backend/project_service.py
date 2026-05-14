@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import math
 import shutil
@@ -477,6 +478,7 @@ def execute_run_plan_method_tasks(
     dataset_source: dict[str, Any] | None,
 ) -> dict[str, Any]:
     methods = []
+    execution_contract = build_empirical_execution_contract("python_ols_adapter")
     for task in run_plan.get("tasks", []):
         method_id = str(task.get("method_id") or task.get("estimator") or "").strip()
         if method_id == "ols":
@@ -489,6 +491,7 @@ def execute_run_plan_method_tasks(
         "evidence_level": "local_execution",
         "artifact_path": "Results/json/method_execution_result.json",
         "created_at": utc_now(),
+        "execution_contract": execution_contract,
         "methods": methods,
     }
     result_path = project_root / "Results" / "json" / "method_execution_result.json"
@@ -498,7 +501,55 @@ def execute_run_plan_method_tasks(
         "artifact_path": payload["artifact_path"],
         "engine": payload["engine"],
         "evidence_level": payload["evidence_level"],
+        "execution_contract": execution_contract,
         "methods": methods,
+    }
+
+
+def build_empirical_execution_contract(active_backend: str) -> dict[str, Any]:
+    statspai_available = importlib.util.find_spec("statspai") is not None
+    stata_path = shutil.which("stata-mp") or "/Applications/Stata/StataMP.app/Contents/MacOS/stata-mp"
+    stata_available = Path(stata_path).exists()
+    return {
+        "id": "rigorous_empirical_execution_contract",
+        "version": 1,
+        "active_backend": active_backend,
+        "analysis_boundary": "analysis_ready_numeric_formula_rows",
+        "prohibits": [
+            "frontend_inference",
+            "mock_result_promotion",
+            "silent_backend_switch",
+        ],
+        "available_backends": [
+            {
+                "id": "python_ols_adapter",
+                "label": "Python OLS adapter",
+                "role": "active_execution" if active_backend == "python_ols_adapter" else "candidate_execution_engine",
+                "availability_status": "ready",
+                "evidence_level": "local_execution" if active_backend == "python_ols_adapter" else "local_file",
+                "purpose": "当前 baseline OLS、统计推断和 evaluator checks 的本地执行后端。",
+                "activation_policy": "只有 RunPlan task=ols 且本适配器真实写出结果时才可标记 local_execution。",
+            },
+            {
+                "id": "statspai",
+                "label": "StatsPAI / StatsAPI",
+                "role": "candidate_causal_engine",
+                "availability_status": "available" if statspai_available else "not_installed",
+                "evidence_level": "local_file",
+                "purpose": "后续用于描述统计、pre-flight diagnostics、estimand-first causal DSL 和 DID/IV/RDD/PSM/DML 等方法族。",
+                "activation_policy": "必须先经过 explicit RunPlan backend selection；未调用 sp.* 并写出结果前不得标记为 local_execution。",
+            },
+            {
+                "id": "stata_mcp",
+                "label": "StataMCP / Stata",
+                "role": "candidate_reproducibility_engine",
+                "availability_status": "available" if stata_available else "not_available",
+                "evidence_level": "local_file",
+                "purpose": "后续用于 do-file/log 级可复现实证执行、Stata 表格和审计日志。",
+                "activation_policy": "必须生成并执行 do-file/log；未产生 Stata log 前不得标记为 local_execution。",
+                "detected_path": stata_path if stata_available else None,
+            },
+        ],
     }
 
 
@@ -513,11 +564,12 @@ def execute_ols_task(
     formula = str(task.get("formula") or design_spec.get("model", {}).get("formula") or "").strip()
     dependent, predictors = parse_linear_formula(formula)
     dataset_path = str(run_plan.get("dataset_path") or (dataset_source or {}).get("path") or "")
-    rows = read_numeric_formula_rows(project_root / dataset_path, dependent, predictors)
+    rows, data_preflight = read_numeric_formula_rows_with_preflight(project_root / dataset_path, dataset_path, dependent, predictors)
     model = fit_ols_model(rows, dependent, predictors)
     coefficients = model["coefficients"]
     treatment = first_string((design_spec.get("variables") or {}).get("treatment"))
     evaluator = build_ols_evaluator(model, treatment)
+    reproducibility = build_ols_reproducibility(run_id, run_plan, formula, dataset_path)
     return {
         "run_id": run_id,
         "task_id": task.get("id"),
@@ -538,6 +590,8 @@ def execute_ols_task(
         "confidence_intervals": model["confidence_intervals"],
         "diagnostics": model["diagnostics"],
         "evaluator": evaluator,
+        "data_preflight": data_preflight,
+        "reproducibility": reproducibility,
         "treatment": treatment,
         "treatment_coefficient": coefficients.get(treatment) if treatment else None,
         "evidence_level": "local_execution",
@@ -556,17 +610,93 @@ def parse_linear_formula(formula: str) -> tuple[str, list[str]]:
 
 
 def read_numeric_formula_rows(path: Path, dependent: str, predictors: list[str]) -> list[dict[str, float]]:
+    rows, _preflight = read_numeric_formula_rows_with_preflight(path, str(path), dependent, predictors)
+    return rows
+
+
+def read_numeric_formula_rows_with_preflight(
+    path: Path,
+    dataset_path: str,
+    dependent: str,
+    predictors: list[str],
+) -> tuple[list[dict[str, float]], dict[str, Any]]:
     fields = [dependent, *predictors]
     rows: list[dict[str, float]] = []
+    rows_read = 0
+    if not path.exists():
+        raise MethodExecutionError("dataset_not_found", f"Dataset not found: {dataset_path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        for raw in csv.DictReader(handle):
+        reader = csv.DictReader(handle)
+        fieldnames = reader.fieldnames or []
+        missing_fields = [field for field in fields if field not in fieldnames]
+        if missing_fields:
+            raise MethodExecutionError("missing_formula_fields", f"Missing formula fields: {', '.join(missing_fields)}")
+        for raw in reader:
+            rows_read += 1
             try:
                 rows.append({field: float(raw[field]) for field in fields})
             except (KeyError, TypeError, ValueError):
                 continue
+    dropped_rows = rows_read - len(rows)
     if len(rows) <= len(predictors):
         raise MethodExecutionError("not_enough_numeric_observations", "Not enough numeric observations for OLS execution")
-    return rows
+    preflight = {
+        "evidence_level": "local_execution",
+        "analysis_boundary": "analysis_ready_numeric_formula_rows",
+        "dataset_path": dataset_path,
+        "required_fields": fields,
+        "rows_read": rows_read,
+        "usable_numeric_rows": len(rows),
+        "dropped_rows": dropped_rows,
+        "checks": [
+            {
+                "id": "dataset_file_exists",
+                "label": "数据文件存在",
+                "status": "passed",
+                "detail": dataset_path,
+            },
+            {
+                "id": "required_fields_present",
+                "label": "公式字段存在",
+                "status": "passed",
+                "detail": ", ".join(fields),
+            },
+            {
+                "id": "numeric_formula_rows_available",
+                "label": "公式字段可转为数值",
+                "status": "passed",
+                "detail": f"usable={len(rows)}, dropped={dropped_rows}",
+            },
+            {
+                "id": "degrees_of_freedom_precheck",
+                "label": "样本量大于解释变量数量",
+                "status": "passed",
+                "detail": f"usable={len(rows)}, predictors={len(predictors)}",
+            },
+        ],
+    }
+    return rows, preflight
+
+
+def build_ols_reproducibility(
+    run_id: str,
+    run_plan: dict[str, Any],
+    formula: str,
+    dataset_path: str,
+) -> dict[str, Any]:
+    return {
+        "evidence_level": "local_execution",
+        "adapter": "python_ols_adapter",
+        "run_id": run_id,
+        "formula": formula,
+        "dataset_path": dataset_path,
+        "run_plan_version": run_plan.get("version"),
+        "design_spec_version": run_plan.get("design_spec_version"),
+        "result_artifact_path": "Results/json/method_execution_result.json",
+        "manifest_artifact_path": f"state/runs/{run_id}/run_manifest.json",
+        "source_entrypoint": "Product/backend/project_service.py::execute_ols_task",
+        "p_value_method": "normal_approximation",
+    }
 
 
 def fit_ols_coefficients(rows: list[dict[str, float]], dependent: str, predictors: list[str]) -> dict[str, float]:

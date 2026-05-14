@@ -18,11 +18,12 @@
   - P2-F Real Data Candidate Pool 已完成：`GET /datasets` 返回只读 `external_catalog`，默认扫描 `/Users/mahaoxuan/Desktop/实证数据库`；本机实证数据库发现 223 个真实候选文件，前端“数据与设计”显示 6 张只读候选卡，与当前项目内 `analysis_sample.csv` 分开。
   - P2-G Real Dataset Bind Preflight 已完成：真实候选文件现在可生成导入/绑定预检，预检写入 `state/product/dataset_import_preflights.json`，页面显示 `待人工确认`、源路径、目标 `Data/Raw/<filename>`、策略、只读说明和检查项；预检不复制、不移动、不绑定数据。
   - P2-H Real Dataset Import Apply 已完成：`ready_for_review` 预检现在可通过显式人工动作复制到项目、只绑定外部引用或取消；apply 记录 SHA256、大小、目标路径和 `dataset_import`，云端 runtime 对本地路径返回 `cloud_upload_required`。
+  - P2-L Variable Role Candidate Review 已完成：已画像真实 CFPS `.dta` 可以生成 `VariableRoleCandidate`，并支持“候选已确认 / 需要调整 / 驳回候选”；候选 review 只写入 `state/product/variable_role_candidates.json`，不会改写正式 `state/product/variable_roles.json`。
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-I：对已复制或已绑定的真实数据做安全字段画像/变量字典预览，尤其是 DTA/XLSX/Parquet；完成前不得让新数据进入 VariableRoleSet、DesignSpec 或 RunPlan。
-  - 后续 P2-J：让 Finding approve 强制依赖 evaluator status，并补 robust/clustered standard errors 的预检状态。
+  - P2-M：把 approved candidate 连接到正式变量角色编辑确认流程，允许用户基于真实字段候选搜索/修改 outcome、treatment、controls、instruments；保存时才写入正式 `state/product/variable_roles.json`。
+  - 后续 P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
   - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
   - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
@@ -54,4 +55,5 @@
   - Real Dataset Import Apply 当前已支持本地复制、外部引用绑定和取消预检；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，但尚未解析 DTA/XLSX/Parquet 变量字典。
   - P2-I/P2-J 已完成真实数据字段画像：已绑定 CFPS `.dta` 可通过 metadata-only 读取变量名、变量标签、Stata 类型、样本数和字段数；该画像仍不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-K Rigorous Empirical Execution Contract 已完成：full run 会声明当前真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`。
+  - P2-L Variable Role Candidate Review 已完成：验收入口为 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`；最新真实 CFPS 候选状态为 `approved_candidate`，但正式 `state/product/variable_roles.json` 哈希与 mtime 未变化。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

@@ -484,3 +484,17 @@ Rejected: 因为本机安装/可检测到 StatsPAI 或 Stata 就把它们标记�
 Rejected: 只保留 Python OLS 结果而不声明统计边界。原因是用户需要知道当前结果是最小 Python OLS adapter，不是完整 StatsPAI/Stata 流水线，也还没有 robust/cluster 标准误或固定效应。
 
 Evidence: 真实 full run `run_5ac7052232c8` 返回 `active_backend=python_ols_adapter`，StatsPAI 和 StataMCP 为 candidate backend；`data_preflight.rows_read=12`、`usable_numeric_rows=12`、`dropped_rows=0`，`reproducibility.source_entrypoint=Product/backend/project_service.py::execute_ols_task`。
+
+## 2026-05-14：变量角色候选必须和正式 VariableRoleSet 分离
+
+Decision: 新增 `VariableRoleCandidate` 状态机，把真实 DTA 字段画像生成的 outcome/treatment/controls/instruments 先保存为候选状态，review 操作只更新 `state/product/variable_role_candidates.json`，不写回正式 `state/product/variable_roles.json`。
+
+Reason: 真实 CFPS 变量字典可以帮助缩小选择范围，但变量角色是研究判断，不是字段读取器或启发式推断的副作用。用户需要看到候选、审阅候选、确认候选，但正式研究状态必须等到显式变量角色编辑保存后才改变。
+
+Rejected: 生成候选后自动覆盖正式 VariableRoleSet。原因是这会让系统把 `countyid`、`kt3_a_1` 这类启发式结果误当成论文可执行变量，风险很高。
+
+Rejected: 只在前端内存里展示候选。原因是长时间任务和跨 session 需要可恢复状态，候选必须写入本地状态文件。
+
+Rejected: 候选确认后立即重新生成 DesignSpec/RunPlan。原因是 `approved_candidate` 只是候选被审阅过，不是正式变量角色已经保存。
+
+Evidence: Chrome + Computer Use 点击真实 CFPS `.dta` 的“生成变量角色候选”和“候选已确认”后，candidate 状态为 `approved_candidate`，但 `state/product/variable_roles.json` SHA256 与 mtime 均保持不变。

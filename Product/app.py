@@ -80,7 +80,16 @@ from Product.backend.results_draft_service import (
     get_project_results_draft,
     save_project_finding_review,
 )
-from Product.backend.variable_role_service import get_project_variable_roles, save_project_variable_roles
+from Product.backend.variable_role_service import (
+    FieldProfileRequiredError,
+    InvalidVariableRoleCandidateActionError,
+    VariableRoleCandidateNotFoundError,
+    generate_project_variable_role_candidate,
+    get_project_variable_role_candidates,
+    get_project_variable_roles,
+    review_project_variable_role_candidate,
+    save_project_variable_roles,
+)
 from Product.backend.workflow_service import (
     cancel_workflow,
     create_workflow,
@@ -178,6 +187,16 @@ class ExternalDatasetPreflightApplyPayload(BaseModel):
 
 class DatasetImportProfilePayload(BaseModel):
     row_limit: int = Field(default=200, ge=1, le=1000)
+
+
+class VariableRoleCandidatePayload(BaseModel):
+    note: str = ""
+
+
+class VariableRoleCandidateReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+    candidate_roles: dict[str, list[str]] | None = None
 
 
 class FindingReviewPayload(BaseModel):
@@ -487,6 +506,61 @@ def api_v1_external_dataset_import_profile(
         return error_response(400, "dataset_import_source_missing", f"Dataset import source file does not exist: {exc}")
     except ValueError as exc:
         return error_response(400, "invalid_dataset_import_profile", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/variable-role-candidates")
+def api_v1_project_variable_role_candidates(project_id: str) -> dict:
+    try:
+        return get_project_variable_role_candidates(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/datasets/imports/{dataset_import_id}/variable-role-candidates")
+def api_v1_generate_project_variable_role_candidate(
+    project_id: str,
+    dataset_import_id: str,
+    payload: VariableRoleCandidatePayload,
+) -> dict:
+    try:
+        return JSONResponse(
+            status_code=201,
+            content=generate_project_variable_role_candidate(
+                PRODUCT_ROOT,
+                REPO_ROOT,
+                project_id,
+                dataset_import_id,
+                payload.note,
+            ),
+        )
+    except FieldProfileRequiredError as exc:
+        return error_response(409, "field_profile_required", str(exc))
+    except KeyError as exc:
+        return error_response(404, "dataset_import_not_found", f"Dataset import does not exist: {dataset_import_id}.")
+
+
+@app.put("/api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/review")
+def api_v1_review_project_variable_role_candidate(
+    project_id: str,
+    candidate_id: str,
+    payload: VariableRoleCandidateReviewPayload,
+) -> dict:
+    try:
+        return review_project_variable_role_candidate(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            candidate_id,
+            payload.action,
+            payload.note,
+            payload.candidate_roles,
+        )
+    except InvalidVariableRoleCandidateActionError as exc:
+        return error_response(400, "invalid_variable_role_candidate_action", str(exc))
+    except VariableRoleCandidateNotFoundError as exc:
+        return error_response(404, "variable_role_candidate_not_found", f"Variable role candidate does not exist: {candidate_id}.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
 @app.get("/api/v1/projects/{project_id}/variable-roles")

@@ -1325,3 +1325,68 @@ P2-L：基于 `dataset_import_profile.fields` 做“字段审阅 / VariableRoleS
 - 当前 p 值为 normal approximation；论文级估计还需要 robust/cluster 标准误、固定效应、样本筛选日志和跨后端一致性检查。
 - DTA value labels、缺失统计和抽样预览仍未接入。
 - Playwright MCP 仍不稳定；当前可视化验收使用 Playwright CLI fallback。
+
+## 2026-05-14 P2-L Variable Role Candidate Review 交接增量
+
+### 当前目标
+
+把真实 DTA 字段画像推进到“可审阅变量角色候选”，但继续保护正式研究状态：候选可以生成、确认、标记需调整或驳回；正式 `state/product/variable_roles.json` 只能由后续显式变量角色编辑/保存流程写入。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-variable-role-candidate-review-bdd.md`。
+- 新增测试：`tests/test_variable_role_candidates.py`。
+- 扩展 `Product/backend/variable_role_service.py`：
+  - `generate_project_variable_role_candidate()`
+  - `review_project_variable_role_candidate()`
+  - `get_project_variable_role_candidates()`
+  - `FieldProfileRequiredError`
+  - `InvalidVariableRoleCandidateActionError`
+  - `VariableRoleCandidateNotFoundError`
+- 扩展 `Product/app.py`：
+  - `GET /api/v1/projects/{project_id}/variable-role-candidates`
+  - `POST /api/v1/projects/{project_id}/datasets/imports/{dataset_import_id}/variable-role-candidates`
+  - `PUT /api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/review`
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，新增“字段审阅”面板、候选角色摘要、候选字段表和 review 按钮。
+- Chrome + Computer Use 已在真实 CFPS `.dta` 页面完成生成候选和确认候选的点击级验收。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_variable_role_candidates -v` 首次 5 条失败，原因是候选 API 404、前端缺少候选面板和 review 操作。
+- GREEN：`python3 -m unittest tests.test_variable_role_candidates -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_variable_role_candidates tests.test_external_dataset_import_profile tests.test_variable_role_confirmation -v`，17 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，195 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/variable_role_service.py Product/backend/overview_service.py Product/backend/project_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/variable-role-candidates` 返回 200。
+- 可视化：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`，进入“数据与设计”，点击“生成变量角色候选”后可见 `待人工审阅`、`不会写入正式变量角色集`、候选字段表和 review 按钮。
+- 文件边界：点击“候选已确认”后，`state/product/variable_roles.json` SHA256 仍为 `bc8bedca4d1638d2556ad77957de146eda170cef521db24eeb7ffde5c2e94649`，mtime 仍为 `1778605951`。
+- 候选状态：`state/product/variable_role_candidates.json` 最新候选为 `variable_role_candidate_1fbe9c0ee659`，`status=approved_candidate`、`evidence_level=local_file`、`does_not_mutate_variable_role_set=true`。
+
+### 关键文件路径
+
+- `Product/backend/variable_role_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_variable_role_candidates.py`
+- `docs/architecture-v2/codex-phase-p2-variable-role-candidate-review-bdd.md`
+- `state/product/variable_role_candidates.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- 字段画像生成候选不等于正式 VariableRoleSet；候选 review 只改变 candidate 状态。
+- `approved_candidate` 是“这个候选被用户看过并接受为候选”，不是“论文变量角色已经确认可执行”。
+- 当前角色推断只是保守启发式，用字段名/标签猜 outcome/treatment/controls；真实 CFPS 变量仍需要下一步人工编辑和变量字典检索，不能直接进入实证执行。
+- Browser/Playwright MCP 当前仍 `Transport closed`，本轮可视化验收使用 Chrome + Computer Use fallback。
+
+### 下一步第一件事
+
+P2-M 应先把 approved candidate 连接到“正式变量角色编辑确认”流程：用户能基于真实字段候选搜索/修改 outcome、treatment、controls、instruments，保存时才写入 `state/product/variable_roles.json`，再触发 DesignSpec/RunPlan 重新生成。之后再接 StatsPAI/StataMCP/Python 严格执行器。
+
+### 未解决风险
+
+- 当前启发式把 `countyid` 猜为结果变量、`kt3_a_1` 猜为处理变量，这对真实研究不可信；它只适合证明状态机链路，不适合直接进入论文。
+- DTA value labels、缺失统计和抽样预览还没有进入候选评分。
+- 正式变量角色编辑器仍绑定旧的 `analysis_sample.csv`，还没有消费真实 CFPS candidate。
+- StatsPAI/StataMCP 仍未实际执行；严谨实证执行仍停留在 Python OLS adapter。

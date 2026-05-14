@@ -602,3 +602,40 @@
 - StatsPAI 和 StataMCP 已作为候选能力展示，但尚未实际运行、产生日志或写出独立结果文件。
 - 当前 p 值仍是 normal approximation；严谨论文场景需要 robust/cluster 标准误、固定效应、样本筛选日志和跨后端复核。
 - 下一步应先补字段审阅 / VariableRoleSet 候选生成状态机，再把真实 StatsPAI 或 Stata do-file 执行接入为可替换后端。
+
+## 2026-05-14 P2-L Variable Role Candidate Review
+
+### 行为覆盖
+
+- [x] 已完成字段画像的真实 DTA import 可以生成 `VariableRoleCandidate`，证据等级为 `local_file`。
+- [x] 候选生成必须写入 `state/product/variable_role_candidates.json`，保留数据源、字段画像 id、候选角色、候选字段表和 review event。
+- [x] 候选生成和 review 不能写回正式 `state/product/variable_roles.json`。
+- [x] 未画像或未 ready 的 import 不能生成候选，返回 409 `field_profile_required`。
+- [x] 非法 review 动作返回 400 `invalid_variable_role_candidate_action`。
+- [x] 前端“字段审阅”面板明确显示 `不会写入正式变量角色集`，并提供“候选已确认 / 需要调整 / 驳回候选”按钮。
+- [ ] 未覆盖：候选字段的人工搜索/编辑、多候选比较、value labels/缺失率参与评分、把确认后的候选显式提升为正式 VariableRoleSet。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_variable_role_candidates -v` 首次 5 条失败，失败原因是候选 API 404 和前端缺少候选审阅面板。
+- 目标测试：`python3 -m unittest tests.test_variable_role_candidates -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_variable_role_candidates tests.test_external_dataset_import_profile tests.test_variable_role_confirmation -v`，17 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，195 tests OK，skipped=1，耗时 8.095s。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/variable_role_service.py Product/backend/overview_service.py Product/backend/project_service.py` 通过；`node --check Product/web/assets/app.js` 通过。
+
+### API / 可视化验收
+
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/variable-role-candidates` 返回 200。
+- 页面：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`，点击“数据与设计”，页面显示真实 CFPS `.dta` 字段画像、723 个字段和“字段审阅”面板。
+- 页面：点击“生成变量角色候选”后，面板显示 `待人工审阅`、`evidence_level=local_file`、`候选边界 不会写入正式变量角色集`、候选 outcome/treatment/controls/instruments 和候选字段表。
+- 页面：点击“候选已确认”后，按钮状态显示 `候选已确认`，review event 记录 `approve_candidate`。
+- 文件边界：确认前后 `state/product/variable_roles.json` SHA256 均为 `bc8bedca4d1638d2556ad77957de146eda170cef521db24eeb7ffde5c2e94649`，mtime 均为 `1778605951`。
+- Candidate 状态：最新 `variable_role_candidate_1fbe9c0ee659` 为 `approved_candidate`，`does_not_mutate_variable_role_set=true`。
+- Browser 插件限制：Playwright MCP 仍返回 `Transport closed`；Node Browser client 超时。本轮使用 Chrome + Computer Use 完成点击级验收。
+
+### 剩余风险
+
+- 当前变量角色推断是启发式，真实 CFPS 上把 `countyid` 猜为结果变量、`kt3_a_1` 猜为处理变量；这只能证明产品状态机，不可直接用于论文。
+- 正式变量角色编辑器仍使用 `analysis_sample.csv` 作为已批准数据源；下一步必须让真实 candidate 进入可编辑正式确认流程。
+- DTA value labels、缺失统计和抽样预览还没参与候选建议。
+- StatsPAI/StataMCP 尚未实际执行，下一阶段仍需独立日志、结果文件、evaluator checks 和跨后端验证。

@@ -628,3 +628,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - 截图证据：`/tmp/empirical-workbench-p2k-rigorous-execution.png`
 
 说明：点击“实证执行”，查看“方法执行证据”下的“严谨执行契约”“数据预检”“可复现入口”。页面应显示当前执行后端 `python_ols_adapter`，候选后端 StatsPAI/StatsAPI 与 StataMCP/Stata，数据预检 `12 / 12 / 0`，以及源码入口 `Product/backend/project_service.py::execute_ols_task`。
+
+## 2026-05-14 P2-L Variable Role Candidate Review
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-variable-role-candidate-review-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_variable_role_candidates.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/variable_role_service.py`：新增变量角色候选状态机，支持从已画像 dataset import 生成 `VariableRoleCandidate`，并支持 `approve_candidate`、`request_changes`、`reject_candidate` 三类 review 动作。
+- `Product/app.py`：新增候选列表、候选生成和候选 review API。
+- Runtime 状态：`state/product/variable_role_candidates.json`，记录 candidate、latest candidate、review events 和 `does_not_mutate_variable_role_set=true`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：数据与设计页新增 `variable-role-candidate-panel`，静态资源版本更新到 `20260515-p2l-candidates1`。
+- `Product/web/assets/app.js`：新增 `v2api.variableRoleCandidates`、`renderVariableRoleCandidateReview()`、`generateVariableRoleCandidate()`、`reviewVariableRoleCandidate()`。
+- `Product/web/assets/styles.css`：新增候选审阅面板、候选字段表、角色摘要和 review 按钮布局。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`
+
+说明：点击“数据与设计”，在“字段审阅”面板点击“生成变量角色候选”，页面应显示 `待人工审阅`、`不会写入正式变量角色集`、候选 outcome/treatment/controls/instruments 和候选字段表。点击“候选已确认”后，按钮状态变为 `候选已确认`，但正式 `state/product/variable_roles.json` 的哈希与 mtime 不变。

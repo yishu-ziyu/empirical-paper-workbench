@@ -656,3 +656,38 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`
 
 说明：点击“数据与设计”，在“字段审阅”面板点击“生成变量角色候选”，页面应显示 `待人工审阅`、`不会写入正式变量角色集`、候选 outcome/treatment/controls/instruments 和候选字段表。点击“候选已确认”后，按钮状态变为 `候选已确认`，但正式 `state/product/variable_roles.json` 的哈希与 mtime 不变。
+
+## 2026-05-14 P2-M Candidate Promotion to Formal VariableRoleSet
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-variable-role-candidate-promote-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_variable_role_candidates.py`：新增未确认候选禁止写回、已确认候选可带编辑结果写回、前端必须把 candidate 载入正式编辑器的行为约束。
+
+### 新增/扩展后端能力
+
+- `Product/backend/variable_role_service.py`：
+  - 新增 `VariableRoleCandidateApprovalRequiredError`。
+  - `save_project_variable_roles()` 支持 `candidate_id`。
+  - 从 candidate 保存时保留 `candidate_id`、`dataset_import_id`、`dataset_import_profile_id`、`source`、`binding`、`provenance`。
+  - 保存成功后把 candidate 标记为 `applied_to_variable_roles`，并记录写入的 VariableRoleSet version。
+- `Product/app.py`：
+  - `VariableRolePayload` 新增 `candidate_id`。
+  - `POST /api/v1/projects/{project_id}/variable-roles` 现在能处理 candidate 写回，并对未确认候选返回 409。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：
+  - 新增 `state.pendingVariableRoleCandidateId`。
+  - 字段审阅卡片新增 `载入正式编辑器`。
+  - `loadVariableRoleCandidateIntoEditor()` 把 approved candidate 的真实数据路径、角色候选、candidate id 和说明载入正式变量角色编辑器。
+  - 保存变量角色集时携带 `candidate_id`，保存后刷新候选、变量角色和 overview。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2m`
+
+说明：点击“数据与设计”，在“字段审阅”面板找到已确认候选，点击“载入正式编辑器”。编辑器应显示 `draft_from_candidate · local_file`、真实 CFPS DTA 路径、`candidate_id=...`、结果变量/控制变量候选和说明“保存后才写入正式变量角色集”。本轮未点击最终保存，避免覆盖演示项目的已批准变量角色。

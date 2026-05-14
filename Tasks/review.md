@@ -639,3 +639,35 @@
 - 正式变量角色编辑器仍使用 `analysis_sample.csv` 作为已批准数据源；下一步必须让真实 candidate 进入可编辑正式确认流程。
 - DTA value labels、缺失统计和抽样预览还没参与候选建议。
 - StatsPAI/StataMCP 尚未实际执行，下一阶段仍需独立日志、结果文件、evaluator checks 和跨后端验证。
+
+## 2026-05-14 P2-M Candidate Promotion to Formal VariableRoleSet
+
+### 行为覆盖
+
+- [x] 未确认、需调整或被驳回的 VariableRoleCandidate 不能写入正式 VariableRoleSet。
+- [x] 已确认 candidate 可以进入正式变量角色编辑器，用户编辑后的 outcome/treatment/controls/instruments 以编辑器内容为准。
+- [x] 后端写回正式 VariableRoleSet 时必须保存 `candidate_id`、`dataset_import_id`、`dataset_import_profile_id`、数据来源、绑定方式和 provenance。
+- [x] 成功写回后 candidate 状态必须变为 `applied_to_variable_roles`，并记录正式角色集 version。
+- [x] 前端必须明确显示候选边界：载入编辑器后仍可调整，保存后才写入正式变量角色集。
+- [ ] 未覆盖：多候选对比、字段搜索、value labels/缺失统计参与建议、保存后自动重建 DesignSpec/RunPlan。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_variable_role_candidates -v` 首次新增行为失败，原因是旧保存逻辑仍把真实候选数据路径当作非法本地数据路径，前端也没有 `pendingVariableRoleCandidateId`。
+- 目标测试：`python3 -m unittest tests.test_variable_role_candidates -v`，8 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，198 tests OK，skipped=1，耗时 8.854s。
+- 静态检查：`python3 -m py_compile Product/backend/variable_role_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过。
+
+### API / 可视化验收
+
+- 页面：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，进入“数据与设计”。
+- 页面：已确认 CFPS `.dta` candidate 显示 `候选已确认`、`候选边界 不会写入正式变量角色集`、`后续动作 可进入正式变量角色集编辑器`。
+- 页面：点击“载入正式编辑器”后，变量角色编辑器显示 `draft_from_candidate · local_file`、真实 DTA 路径、`candidate_id=variable_role_candidate_495092cb7af2`、`结果变量 countyid`、控制变量候选和确认说明。
+- 保护性验收：没有点击“保存变量角色集”，因为当前 CFPS 候选仍是启发式，直接保存会覆盖演示项目的 `analysis_sample.csv` 已批准变量角色。
+
+### 剩余风险
+
+- 当前真实 CFPS candidate 仍由启发式生成，不能直接用于论文；下一步需要字段搜索、变量标签、缺失统计和样本预览辅助人工选择。
+- DesignSpec/RunPlan 还没有基于 candidate 写回后的正式 VariableRoleSet 自动刷新。
+- StatsPAI/StataMCP 仍是候选后端，尚未实际执行并生成独立日志、结果文件和 evaluator checks。
+- 线上版仍需要上传/云对象路径抽象；本地版可以绑定 `/Users/...`，云端不能执行本地路径。

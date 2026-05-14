@@ -83,6 +83,7 @@ from Product.backend.results_draft_service import (
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
     InvalidVariableRoleCandidateActionError,
+    VariableRoleCandidateApprovalRequiredError,
     VariableRoleCandidateNotFoundError,
     generate_project_variable_role_candidate,
     get_project_variable_role_candidates,
@@ -158,6 +159,7 @@ class VariableRolePayload(BaseModel):
     dataset_path: str
     roles: dict[str, list[str]]
     note: str = ""
+    candidate_id: str | None = None
 
 
 class DesignSpecPayload(BaseModel):
@@ -585,7 +587,16 @@ def api_v1_save_project_variable_roles(project_id: str, payload: VariableRolePay
             payload.dataset_path,
             payload.roles,
             payload.note,
+            payload.candidate_id,
         )
+    except VariableRoleCandidateApprovalRequiredError as exc:
+        return error_response(
+            409,
+            "variable_role_candidate_approval_required",
+            f"Variable role candidate must be approved before formal save: {payload.candidate_id}.",
+        )
+    except VariableRoleCandidateNotFoundError as exc:
+        return error_response(404, "variable_role_candidate_not_found", f"Variable role candidate does not exist: {payload.candidate_id}.")
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except PermissionError as exc:

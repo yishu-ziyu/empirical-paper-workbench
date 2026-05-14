@@ -417,7 +417,8 @@
 - [x] P2-K：按用户最新要求，优先建立严谨实证执行契约；full run 必须声明当前真实执行后端、候选 StatsPAI/StataMCP 后端、数据预检和可复现入口。
 - [x] P2-K：Execution 页面显示“严谨执行契约 / 数据预检 / 可复现入口”，明确 StatsPAI/StataMCP 目前是候选后端，不能冒充 `local_execution`。
 - [x] P2-L：把字段画像推进为“字段审阅 / VariableRoleSet 候选生成”状态机，但仍必须人工确认，不允许自动改写研究状态。
-- [ ] P2-M：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求生成独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
+- [x] P2-M：先完成 approved candidate 到正式 VariableRoleSet 的显式写回链路；候选必须载入正式编辑器并允许人工调整，保存后才写入正式研究状态。
+- [ ] P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求生成独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
 
 ## 2026-05-14 P2-K Rigorous Empirical Execution Contract
 
@@ -441,3 +442,16 @@
 - [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`，进入“数据与设计”，真实 CFPS `.dta` 显示 723 个字段；点击“生成变量角色候选”后显示 `待人工审阅`、候选角色、候选字段表和 `state/product/variable_role_candidates.json`；点击“候选已确认”后候选状态为 `approved_candidate`。
 - [x] 安全边界验收：确认前后 `state/product/variable_roles.json` SHA256 均为 `bc8bedca4d1638d2556ad77957de146eda170cef521db24eeb7ffde5c2e94649`，mtime 未变化，证明候选 review 没有写回正式变量角色集。
 - [ ] P2-M：把 approved candidate 之后的真实变量选择流程做成可编辑确认，不再依赖启发式猜测；随后接 StatsPAI/StataMCP/Python 严格执行器。
+
+## 2026-05-14 P2-M Candidate Promotion to Formal VariableRoleSet
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-variable-role-candidate-promote-bdd.md`，定义候选进入正式变量角色集的边界：未确认候选不能写入，已确认候选也必须先载入正式编辑器，保存后才写入。
+- [x] TDD：扩展 `tests/test_variable_role_candidates.py`；首次运行失败符合预期：后端仍按旧本地数据路径校验拒绝真实候选，前端缺少 `pendingVariableRoleCandidateId`。
+- [x] 实现：扩展 `Product/backend/variable_role_service.py`，`save_project_variable_roles(..., candidate_id=...)` 支持从 approved candidate 写入正式 VariableRoleSet，并保留 `candidate_id`、`dataset_import_id`、`dataset_import_profile_id`、`source`、`binding` 和 provenance。
+- [x] 实现：未确认、需调整或被驳回的候选返回 409 `variable_role_candidate_approval_required`，不能写入正式研究状态。
+- [x] 实现：保存成功后候选状态更新为 `applied_to_variable_roles`，并记录 `applied_variable_role_set_version`，避免同一个候选被误认为仍待写回。
+- [x] 前端：字段审阅卡片新增“载入正式编辑器”；点击后编辑器切换为 `draft_from_candidate · local_file`，带入 `candidate_id`、真实数据路径和候选角色，提示“保存后才写入正式变量角色集”。
+- [x] 可视化验收：Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，进入“数据与设计”，点击“载入正式编辑器”后确认编辑器显示 `candidate_id=variable_role_candidate_495092cb7af2`、`draft_from_candidate · local_file`、真实 CFPS DTA 路径和候选字段。
+- [x] 保护性验收：本轮没有点击“保存变量角色集”，避免把当前演示项目已批准的 `analysis_sample.csv` 变量角色覆盖成 CFPS 启发式候选。
+- [x] 验证：目标测试 8 OK；全量回归 198 OK，skipped=1；Python 编译和 JS 语法检查通过。
+- [ ] P2-N：让 DesignSpec/RunPlan 只读取正式 VariableRoleSet，并为真实 CFPS/StatsPAI/StataMCP 执行增加数据源解析、后端日志和 evaluator checks。

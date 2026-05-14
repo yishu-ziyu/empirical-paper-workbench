@@ -498,3 +498,17 @@ Rejected: 只在前端内存里展示候选。原因是长时间任务和跨 ses
 Rejected: 候选确认后立即重新生成 DesignSpec/RunPlan。原因是 `approved_candidate` 只是候选被审阅过，不是正式变量角色已经保存。
 
 Evidence: Chrome + Computer Use 点击真实 CFPS `.dta` 的“生成变量角色候选”和“候选已确认”后，candidate 状态为 `approved_candidate`，但 `state/product/variable_roles.json` SHA256 与 mtime 均保持不变。
+
+## 2026-05-14：候选写回正式变量角色集必须经过显式编辑器
+
+Decision: P2-M 允许 `approved_candidate` 进入正式 VariableRoleSet，但入口必须是“载入正式编辑器 -> 人工调整 -> 保存变量角色集”。后端保存接口接收 `candidate_id`，校验候选已确认且可写回后，才把真实数据来源、candidate provenance、dataset import/profile id 和人工确认说明写入 `state/product/variable_roles.json`。
+
+Reason: P2-L 已证明真实 DTA 字段可以形成候选，但候选仍是启发式。用户需要从候选开始编辑，而不是让系统自动把猜测变成论文变量角色。这个显式写回边界是 DesignSpec/RunPlan 消费真实数据前的必要防线。
+
+Rejected: `approve_candidate` 后自动覆盖正式 VariableRoleSet。原因是这会把 `countyid` 这类机器猜测误提升为论文可执行变量。
+
+Rejected: 只在前端切换字段，不把 `candidate_id` 写入正式角色集。原因是后续 DesignSpec、RunPlan、provenance 和审计无法追踪正式变量角色来自哪次真实字段候选。
+
+Rejected: 继续要求 candidate 的 `dataset_path` 必须位于 `Data/Final`。原因是真实数据候选可能来自 `Data/Raw` 或本地外部绑定；保存边界应由 candidate 审批和 provenance 控制，而不是旧 demo 数据路径假设。
+
+Evidence: Chrome + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2m`，点击“载入正式编辑器”后编辑器显示 `draft_from_candidate · local_file`、真实 CFPS DTA 路径、`candidate_id=variable_role_candidate_495092cb7af2` 和“保存后才写入正式变量角色集”。目标测试 8 OK，全量回归 198 OK。

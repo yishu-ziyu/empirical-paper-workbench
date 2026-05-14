@@ -510,3 +510,32 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260513-p2g-bind1`
 
 说明：点击“数据与设计”，在“真实数据候选池”中点击候选文件的“生成导入/绑定预检”，页面显示 `待人工确认`、真实源路径、目标 `Data/Raw/<filename>`、策略 `copy_to_project_raw`、`尚未导入/绑定 · 源文件只读` 和 4 项通过检查。
+
+## 2026-05-14 P2-H Real Dataset Import Apply
+
+### 新增/扩展文档
+
+- `docs/architecture-v2/codex-phase-p2-dataset-import-apply-bdd.md`
+
+### 新增/扩展测试
+
+- `tests/test_external_dataset_import_apply.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/overview_service.py`：新增 `apply_external_dataset_bind_preflight()`、`file_sha256()`、`CloudUploadRequiredError`、`DatasetPreflightStateError`；apply 会更新 `state/product/dataset_import_preflights.json` 中的预检状态和 `dataset_import` 记录。
+- `Product/app.py`：新增 `ExternalDatasetPreflightApplyPayload` 和 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight/{preflight_id}/apply`。
+- 支持动作：`copy_to_project_raw`、`bind_external_reference`、`cancel`。
+- 云端边界：`runtime_mode=cloud` 返回 `cloud_upload_required`，提示必须上传或使用云对象。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `20260514-p2h-import1`。
+- `Product/web/assets/app.js`：新增 `v2api.datasets.applyPreflight()`、`requestExternalPreflightApply()`、三类 apply 按钮和导入结果回显。
+- `Product/web/assets/styles.css`：新增 `.preflight-action-row`、`.external-import-result`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8765/?v=20260514-p2h-import1`
+
+说明：点击“数据与设计”，在“导入/绑定预检”面板中可见 `确认导入到项目`、`只绑定引用`、`取消预检`。点击 `只绑定引用` 后，页面显示 `已接入`、`已绑定外部引用`、`动作：只绑定引用 · 模式：local`、目标 `Data/Raw/...` 和 SHA256。

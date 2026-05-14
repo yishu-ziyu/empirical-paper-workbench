@@ -17,11 +17,12 @@
   - P2-E OLS Evaluator Evidence 已完成：`method_execution_result.json` 现在包含标准误、t 统计量、normal approximation p 值、95% 置信区间、残差诊断和 evaluator checks；Results & Draft 的 FindingCard 显示中文紧凑方法证据摘要，最新验收 run 为 `run_a3674e9e78c6`。
   - P2-F Real Data Candidate Pool 已完成：`GET /datasets` 返回只读 `external_catalog`，默认扫描 `/Users/mahaoxuan/Desktop/实证数据库`；本机实证数据库发现 223 个真实候选文件，前端“数据与设计”显示 6 张只读候选卡，与当前项目内 `analysis_sample.csv` 分开。
   - P2-G Real Dataset Bind Preflight 已完成：真实候选文件现在可生成导入/绑定预检，预检写入 `state/product/dataset_import_preflights.json`，页面显示 `待人工确认`、源路径、目标 `Data/Raw/<filename>`、策略、只读说明和检查项；预检不复制、不移动、不绑定数据。
+  - P2-H Real Dataset Import Apply 已完成：`ready_for_review` 预检现在可通过显式人工动作复制到项目、只绑定外部引用或取消；apply 记录 SHA256、大小、目标路径和 `dataset_import`，云端 runtime 对本地路径返回 `cloud_upload_required`。
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-H：实现显式 apply/import workflow。只有用户确认后才允许把预检记录变成项目内 `Data/Raw/...` artifact 或绑定记录，并补哈希、大小、人工动作和失败回滚语义。
-  - 后续 P2-I：让 Finding approve 强制依赖 evaluator status，并补 robust/clustered standard errors 的预检状态。
+  - P2-I：对已复制或已绑定的真实数据做安全字段画像/变量字典预览，尤其是 DTA/XLSX/Parquet；完成前不得让新数据进入 VariableRoleSet、DesignSpec 或 RunPlan。
+  - 后续 P2-J：让 Finding approve 强制依赖 evaluator status，并补 robust/clustered standard errors 的预检状态。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
   - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
   - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
@@ -50,4 +51,5 @@
   - OLS Evaluator Evidence 当前已把标准误、p 值、置信区间和 evaluator checks 接入方法执行与 FindingCard；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，最新 run 为 `run_a3674e9e78c6`。
   - Real Data Candidate Pool 当前是只读真实数据 inventory；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`，发现 223 个候选文件，但尚未导入/绑定到当前项目。
   - Real Dataset Bind Preflight 当前是只读导入准备状态；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，可对 CFPS 候选文件生成 `ready_for_review` 预检，但尚未创建项目内数据文件。
+  - Real Dataset Import Apply 当前已支持本地复制、外部引用绑定和取消预检；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，但尚未解析 DTA/XLSX/Parquet 变量字典。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

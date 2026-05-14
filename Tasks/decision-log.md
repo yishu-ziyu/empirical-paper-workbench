@@ -458,3 +458,17 @@ Rejected: 预检后自动复制大文件到 `Data/Raw/`。原因是复制真实�
 Rejected: apply 后立刻让 VariableRoleSet、DesignSpec 或 RunPlan 消费新数据。原因是导入/绑定只证明数据源被接入，还不证明字段、样本口径和变量角色已确认。
 
 Evidence: `tests/test_external_dataset_import_apply.py` 覆盖本地复制、只绑定引用、取消和云端拒绝；Safari 数据与设计页显示 `已接入`、`已绑定外部引用`、`模式：local` 和 SHA256。
+
+## 2026-05-14：DTA 字段画像只读元数据，不等于实证执行
+
+Decision: P2-J 只接入 Stata `.dta` 的 metadata-only 字段画像：用 `pyreadstat.read_dta(..., metadataonly=True)` 读取字段名、变量标签、Stata storage type、display format、样本数和字段数；画像仍标记 `evidence_level=local_file`，且 `can_feed_variable_roles=false`。
+
+Reason: 用户提供的 CFPS 等真实数据大多是 `.dta`。如果系统只能显示文件名，就无法进入严谨变量确认；但如果直接读取全量数据或直接进入回归，又会把数据理解、变量角色和模型执行混在一起。metadata-only 是当前最小安全边界。
+
+Rejected: 把 DTA 字段画像直接写入 VariableRoleSet。原因是变量角色是研究判断，不是读取器副作用，必须经过人工确认。
+
+Rejected: 读取整张 DTA 大表来做画像。原因是真实数据可能很大，字段画像阶段只需要变量字典和样本规模，不应让页面加载或服务被大文件拖住。
+
+Rejected: 把 Python metadata reader 当作完整实证分析。原因是严谨实证需要后续 StatsPAI/StatsAPI、StataMCP 或 Python 执行器产出可复现日志、诊断、稳健性和 evaluator checks。
+
+Evidence: 真实 `cfps2011adult_202202(1).dta` 画像返回 `profiled/ready`、`row_count=1279`、`column_count=723`、`row_count_source=metadata_only`，字段含 `pid=个人id`、`fid=家户号`、`provcd=省国标码`。

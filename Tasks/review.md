@@ -534,3 +534,36 @@
 - 当前真实 CFPS `.dta` 仍只能进入 `blocked/not_profiled`，还不能查看变量标签和 Stata 类型。
 - 线上版还没有上传/云对象入口；本地绑定路径不能直接迁移到线上。
 - 字段画像结果还未进入 VariableRoleSet 确认器，下一步必须先做人工确认边界，而不是自动填充研究状态。
+
+## 2026-05-14 P2-J Stata DTA Field Profile
+
+### 行为覆盖
+
+- [x] 有效 DTA import 可以生成 metadata-only 字段画像，返回 `profiled/ready`。
+- [x] 字段画像保留 Stata 语义：字段名、变量标签、Stata 类型、display format。
+- [x] DTA 画像不读取整张大表，`row_count_source=metadata_only`。
+- [x] 损坏或无法解析的 DTA 返回 `blocked/not_profiled`，不伪造字段、不抛 500。
+- [x] DTA 字段画像仍不改写 VariableRoleSet、DesignSpec 或 RunPlan。
+- [ ] 未覆盖：DTA 值标签 value labels、缺失值统计、抽样预览、真实 Stata do-file 执行、StatsPAI 方法执行。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_external_dataset_import_profile -v` 首次 3 条失败，失败原因是有效 DTA 仍 blocked、损坏 DTA 阻塞原因不精确、前端缺少变量标签/Stata 类型。
+- 目标测试：`python3 -m unittest tests.test_external_dataset_import_profile -v`，7 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_profile tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，28 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，187 tests OK，skipped=1，耗时 44.366s。
+- 静态检查：`node --check Product/web/assets/app.js`、`python3 -m py_compile Product/app.py Product/backend/overview_service.py`、`git diff --check` 均通过。
+
+### API / 可视化验收
+
+- API：`POST /api/v1/projects/proj_undergraduate_thesis/datasets/imports/dataset_import_e9d864229be8/profile` 返回 `status=profiled`、`readiness_status=ready`、`row_count=1279`、`column_count=723`、`row_count_source=metadata_only`、`fields=723`、`can_feed_variable_roles=false`、`blocking_reason=None`。
+- API 字段样例：`pid=个人id`、`fid=家户号`、`provcd=省国标码`、`countyid=区县顺序码`、`cid=村居五位码`、`indnum=户内顺序号`。
+- 页面：Playwright CLI 打开 `http://127.0.0.1:8765/?v=20260514-p2j-dta1`，点击“数据与设计”，截图 `/tmp/empirical-workbench-p2j-dta-profile.png` 显示 `已画像`、`1279 行 · 723 列`、`变量标签`、`Stata 类型`、`个人id` 和“不改写研究状态”说明。
+- Browser 插件限制：Playwright MCP 仍返回 `Transport closed`；本轮继续用 Playwright CLI fallback 完成点击级验收。
+
+### 剩余风险
+
+- 现在只是变量字典级画像，不是实证分析；后续要接 StatsPAI/StatsAPI、StataMCP 或 Python 执行器做严格估计、诊断和稳健性。
+- DTA value labels、缺失统计和抽样预览还没读取；当前只证明字段结构和样本规模。
+- 字段画像尚未进入人工 VariableRoleSet 候选生成状态机；下一步 P2-K 必须先做人工审阅边界。
+- 线上版仍缺上传/云对象抽象，本地 `/Users/...` 绑定不能直接用于云端。

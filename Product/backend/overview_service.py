@@ -10,6 +10,11 @@ from typing import Any
 
 import yaml
 
+try:
+    import pyreadstat
+except Exception:  # pragma: no cover - exercised only when optional reader is unavailable
+    pyreadstat = None
+
 from Product.backend.design_spec_service import has_approved_design_spec, has_approved_run_plan
 from Product.backend.variable_role_service import has_approved_variable_role_set
 from Product.backend.project_service import utc_now
@@ -633,6 +638,45 @@ def build_dataset_import_profile(
             },
         ]
         blocking_reason = None if status == "profiled" else "CSV 文件为空或缺少字段。"
+    elif dataset_path.suffix.lower() == ".dta":
+        quality_profile, fields, blocking_reason = build_dta_metadata_profile(dataset_path)
+        if fields:
+            status = "profiled"
+            readiness_status = "ready"
+            profile_detail = "DTA 元数据已读取，未加载完整数据。"
+            profile_status = "passed"
+        else:
+            status = "blocked"
+            readiness_status = "not_profiled"
+            profile_detail = blocking_reason or "DTA 元数据读取失败。"
+            profile_status = "warning"
+        quality_profile["profile_scope"] = "dataset_import_profile"
+        checks = [
+            {
+                "id": "source_hash_verified",
+                "label": "来源哈希一致",
+                "status": "passed",
+                "detail": actual_hash,
+            },
+            {
+                "id": "profile_supported",
+                "label": "字段画像解析器",
+                "status": profile_status,
+                "detail": profile_detail,
+            },
+            {
+                "id": "metadata_only",
+                "label": "读取范围",
+                "status": "passed" if fields else "warning",
+                "detail": "metadata-only 字段画像，未读取完整数据表。",
+            },
+            {
+                "id": "no_research_state_write",
+                "label": "研究状态未改写",
+                "status": "passed",
+                "detail": "未改写 VariableRoleSet、DesignSpec 或 RunPlan。",
+            },
+        ]
     else:
         file_type = dataset_path.suffix.lower().lstrip(".") or "unknown"
         quality_profile = build_dataset_quality_profile(
@@ -691,6 +735,119 @@ def build_dataset_import_profile(
         "created_at": timestamp,
         "updated_at": timestamp,
     }
+
+
+def build_dta_metadata_profile(dataset_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
+    if pyreadstat is None:
+        return blocked_dta_metadata_profile("DTA 读取器不可用：pyreadstat 未安装。")
+
+    try:
+        _dataframe, metadata = pyreadstat.read_dta(str(dataset_path), metadataonly=True)
+    except Exception as exc:
+        return blocked_dta_metadata_profile(f"DTA 读取失败：{exc}")
+
+    column_names = list(getattr(metadata, "column_names", []) or [])
+    labels_by_name = getattr(metadata, "column_names_to_labels", {}) or {}
+    readstat_types = getattr(metadata, "readstat_variable_types", {}) or {}
+    original_types = getattr(metadata, "original_variable_types", {}) or {}
+    storage_widths = getattr(metadata, "variable_storage_width", {}) or {}
+    display_widths = getattr(metadata, "variable_display_width", {}) or {}
+    row_count = getattr(metadata, "number_rows", None)
+    fields: list[dict[str, Any]] = []
+    for index, name in enumerate(column_names):
+        stata_type = str(readstat_types.get(name) or "")
+        display_format = original_types.get(name)
+        label = labels_by_name.get(name) or ""
+        fields.append(
+            {
+                "name": name,
+                "label": label,
+                "index": index,
+                "inferred_type": infer_stata_field_type(stata_type),
+                "stata_type": stata_type or None,
+                "display_format": display_format,
+                "storage_width": storage_widths.get(name),
+                "display_width": display_widths.get(name),
+                "missing_count": None,
+                "missing_rate": None,
+                "sample_values": [],
+            }
+        )
+
+    if not fields:
+        return blocked_dta_metadata_profile("DTA 读取失败：未识别到字段。")
+
+    quality_profile = {
+        "evidence_level": "local_file",
+        "supported": True,
+        "readiness_status": "ready",
+        "row_count": row_count,
+        "column_count": len(fields),
+        "row_count_source": "metadata_only",
+        "missing_cells": None,
+        "missing_rate": None,
+        "numeric_column_count": sum(1 for field in fields if field["inferred_type"] == "numeric"),
+        "text_column_count": sum(1 for field in fields if field["inferred_type"] == "text"),
+        "columns": fields,
+        "checks": [
+            {
+                "id": "schema_detected",
+                "label": "字段结构",
+                "status": "passed",
+                "detail": f"metadata-only 识别到 {len(fields)} 个 Stata 字段。",
+            },
+            {
+                "id": "sample_size_metadata",
+                "label": "样本数量",
+                "status": "passed" if row_count is not None else "warning",
+                "detail": f"Stata 元数据记录 {row_count if row_count is not None else '未知'} 行样本。",
+            },
+            {
+                "id": "missing_values_not_loaded",
+                "label": "缺失值",
+                "status": "warning",
+                "detail": "本阶段未加载完整数据，缺失值需后续抽样或执行阶段检查。",
+            },
+        ],
+    }
+    return quality_profile, fields, None
+
+
+def blocked_dta_metadata_profile(reason: str) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+    return (
+        {
+            "evidence_level": "local_file",
+            "supported": False,
+            "readiness_status": "not_profiled",
+            "row_count": None,
+            "column_count": None,
+            "row_count_source": "metadata_only_failed",
+            "missing_cells": None,
+            "missing_rate": None,
+            "numeric_column_count": None,
+            "text_column_count": None,
+            "columns": [],
+            "checks": [
+                {
+                    "id": "schema_detected",
+                    "label": "字段结构",
+                    "status": "failed",
+                    "detail": reason,
+                }
+            ],
+        },
+        [],
+        reason,
+    )
+
+
+def infer_stata_field_type(stata_type: str) -> str:
+    normalized = (stata_type or "").lower()
+    if not normalized:
+        return "unknown"
+    if "string" in normalized or normalized in {"str", "strl"}:
+        return "text"
+    return "numeric"
 
 
 def build_external_dataset_bind_preflight(

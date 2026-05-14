@@ -3143,14 +3143,14 @@ function renderDatasetImportProfile(profile) {
       </div>
       <div class="field-profile-table" role="table" aria-label="字段画像">
         <div class="field-profile-row field-profile-head" role="row">
-          <span>字段</span><span>类型</span><span>缺失率</span><span>样本值</span>
+          <span>字段</span><span>变量标签</span><span>Stata 类型</span><span>缺失率</span>
         </div>
         ${fields.length ? fields.map((field) => `
           <div class="field-profile-row" role="row">
             <span>${escapeHtml(field.name || "-")}</span>
-            <span>${escapeHtml(field.inferred_type || "-")}</span>
+            <span>${escapeHtml(field.label || field.inferred_type || "-")}</span>
+            <span>${escapeHtml(field.stata_type || field.display_format || field.inferred_type || "-")}</span>
             <span>${formatQualityRate(field.missing_rate)}</span>
-            <span>${escapeHtml((field.sample_values || []).join(", ") || "-")}</span>
           </div>
         `).join("") : `
           <div class="field-profile-row empty" role="row">

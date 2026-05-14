@@ -1105,3 +1105,54 @@ P2-H：实现显式 apply/import workflow 的 BDD。最小行为应是读取一�
 - 当前没有搜索/过滤真实候选池，223 个文件只能看首屏候选。
 - 当前没有 apply/import API，因此用户还不能真正把真实数据加入项目。
 - Playwright MCP 仍不稳定；视觉闭环继续使用 Safari + Computer Use。
+
+## 2026-05-14 P2-H Real Dataset Import Apply 交接增量
+
+### 当前目标
+
+真实数据候选池现在已经走到“用户明确确认”的第一步：一条 `ready_for_review` 预检可以被复制到当前项目、只绑定为外部引用，或被取消。线上版和本地版的数据边界已明确分开。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-dataset-import-apply-bdd.md`。
+- 新增测试：`tests/test_external_dataset_import_apply.py`，覆盖复制到项目、只绑定外部引用、取消预检、云端拒绝本地路径和前端按钮契约。
+- 扩展 `Product/backend/overview_service.py`：新增 `apply_external_dataset_bind_preflight()`、`file_sha256()`、`CloudUploadRequiredError`、`DatasetPreflightStateError`。
+- 扩展 `Product/app.py`：新增 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight/{preflight_id}/apply`。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：预检面板新增三类人工动作和导入/绑定结果回显。
+
+### 已验证证据
+
+- 目标测试：`python3 -m unittest tests.test_external_dataset_import_apply -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，21 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，180 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py`、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，在“数据与设计”页点击“只绑定引用”，页面显示 `已接入`、`已绑定外部引用`、`动作：只绑定引用 · 模式：local` 和 SHA256。
+
+### 关键文件路径
+
+- `Product/backend/overview_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_external_dataset_import_apply.py`
+- `docs/architecture-v2/codex-phase-p2-dataset-import-apply-bdd.md`
+- `state/product/dataset_import_preflights.json`（runtime 产物，不作为源码提交）
+
+### 不能重复探索的结论
+
+- 本地版可以复制项目内副本，也可以只绑定本机外部引用；线上版不能读取用户桌面路径，必须要求上传或云对象存储。
+- “只绑定引用”不会复制大文件，只记录本机路径、大小、SHA256 和 provenance；这适合本地研究工作台。
+- apply/import 完成仍不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan；下一阶段必须先做字段画像和变量字典预览。
+- 不允许预检或 apply 默默复制大文件；复制必须是用户点击“确认导入到项目”的显式动作。
+
+### 下一步第一件事
+
+P2-I：读取 `dataset_import` 的结果，给已复制或已绑定的真实数据生成安全字段画像/变量字典预览。优先支持小 CSV 和可控 DTA 读取；大文件必须有大小、行数、字段读取上限和错误状态。
+
+### 未解决风险
+
+- DTA/XLSX/Parquet 深度字段字典仍未完成。
+- 绑定引用依赖本地路径稳定性；如果原始文件移动，后续画像应显示 `source_missing` 而不是继续运行。
+- 线上版本还没有上传、云对象存储、脱敏或远端执行队列。
+- Browser 插件连接本轮超时；视觉验收使用 Safari + Computer Use fallback。

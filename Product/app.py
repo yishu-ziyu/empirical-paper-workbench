@@ -35,6 +35,9 @@ from Product.backend.manuscript_candidate_service import (
     save_project_writeback_approval,
 )
 from Product.backend.overview_service import (
+    CloudUploadRequiredError,
+    DatasetPreflightStateError,
+    apply_external_dataset_bind_preflight,
     get_project_design,
     get_project_journey,
     get_project_overview,
@@ -161,6 +164,12 @@ class RunPlanPayload(BaseModel):
 class ExternalDatasetBindPreflightPayload(BaseModel):
     source_path: str
     strategy: str = "copy_to_project_raw"
+    note: str = ""
+
+
+class ExternalDatasetPreflightApplyPayload(BaseModel):
+    action: str
+    runtime_mode: str = "local"
     note: str = ""
 
 
@@ -411,6 +420,38 @@ def api_v1_external_dataset_bind_preflight(
         return error_response(400, "external_dataset_not_found", f"External dataset file does not exist: {exc}")
     except ValueError as exc:
         return error_response(400, "invalid_external_dataset_path", f"Unsupported external dataset path or strategy: {exc}")
+
+
+@app.post("/api/v1/projects/{project_id}/datasets/external-bind-preflight/{preflight_id}/apply")
+def api_v1_external_dataset_preflight_apply(
+    project_id: str,
+    preflight_id: str,
+    payload: ExternalDatasetPreflightApplyPayload,
+) -> dict:
+    try:
+        return apply_external_dataset_bind_preflight(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            preflight_id,
+            payload.action,
+            payload.runtime_mode,
+            payload.note,
+        )
+    except CloudUploadRequiredError as exc:
+        return error_response(409, "cloud_upload_required", str(exc))
+    except DatasetPreflightStateError as exc:
+        return error_response(409, "dataset_preflight_not_ready", str(exc))
+    except FileExistsError as exc:
+        return error_response(409, "dataset_target_exists", f"Target dataset already exists: {exc}")
+    except KeyError as exc:
+        return error_response(404, "dataset_preflight_not_found", f"Dataset preflight does not exist: {preflight_id}.")
+    except PermissionError as exc:
+        return error_response(400, "invalid_external_dataset_path", f"Path is outside the allowed boundary: {exc}")
+    except FileNotFoundError as exc:
+        return error_response(400, "external_dataset_not_found", f"External dataset file does not exist: {exc}")
+    except ValueError as exc:
+        return error_response(400, "invalid_dataset_import_action", str(exc))
 
 
 @app.get("/api/v1/projects/{project_id}/variable-roles")

@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,14 @@ DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feath
 EXTERNAL_CATALOG_LIMIT = 40
 EXTERNAL_CSV_PREVIEW_ROWS = 200
 DATASET_IMPORT_PREFLIGHT_PATH = Path("state/product/dataset_import_preflights.json")
+
+
+class CloudUploadRequiredError(RuntimeError):
+    pass
+
+
+class DatasetPreflightStateError(RuntimeError):
+    pass
 
 
 def mock_meta(service: str) -> dict[str, str]:
@@ -355,6 +364,126 @@ def save_external_dataset_bind_preflight(
     }
 
 
+def apply_external_dataset_bind_preflight(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    preflight_id: str,
+    action: str,
+    runtime_mode: str = "local",
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    manifest = load_dataset_import_preflight_manifest(project_root)
+    preflight = manifest.get("preflights", {}).get(preflight_id)
+    if not isinstance(preflight, dict):
+        raise KeyError(preflight_id)
+    if preflight.get("status") != "ready_for_review":
+        raise DatasetPreflightStateError(f"Preflight {preflight_id} is {preflight.get('status')}")
+    if runtime_mode == "cloud":
+        raise CloudUploadRequiredError("Cloud runtime cannot read local filesystem paths; upload data first.")
+    if runtime_mode != "local":
+        raise ValueError(f"Unsupported runtime_mode: {runtime_mode}")
+    if action not in {"copy_to_project_raw", "bind_external_reference", "cancel"}:
+        raise ValueError(f"Unsupported dataset import action: {action}")
+
+    source, _catalog_root = validate_external_source_path(Path(preflight["source"]["path"]))
+    source_hash = file_sha256(source)
+    timestamp = utc_now()
+    dataset_import = {
+        "id": f"dataset_import_{preflight_id.removeprefix('dataset_bind_preflight_')}",
+        "preflight_id": preflight_id,
+        "status": "cancelled" if action == "cancel" else "applied",
+        "action": action,
+        "runtime_mode": runtime_mode,
+        "evidence_level": "local_file",
+        "note": note,
+        "source": {
+            **preflight["source"],
+            "sha256": source_hash,
+        },
+        "target": preflight["target"],
+        "created_project_file": False,
+        "will_mutate_source": False,
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "checks": [],
+    }
+
+    if action == "copy_to_project_raw":
+        target = (project_root / preflight["target"]["path"]).resolve()
+        try:
+            target.relative_to(project_root)
+        except ValueError as exc:
+            raise PermissionError(target) from exc
+        if target.exists():
+            raise FileExistsError(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        dataset_import["target"] = {
+            **preflight["target"],
+            "exists": True,
+            "size": target.stat().st_size,
+            "sha256": file_sha256(target),
+            "evidence_level": "local_file",
+        }
+        dataset_import["created_project_file"] = True
+        dataset_import["checks"] = [
+            {
+                "id": "project_file_created",
+                "label": "项目内文件已创建",
+                "status": "passed",
+                "detail": preflight["target"]["path"],
+            },
+            {
+                "id": "source_hash_preserved",
+                "label": "源文件哈希已记录",
+                "status": "passed",
+                "detail": source_hash,
+            },
+        ]
+    elif action == "bind_external_reference":
+        dataset_import["binding"] = {
+            "mode": "external_reference",
+            "path": preflight["source"]["path"],
+            "read_only": True,
+            "warning": "本项目依赖本机外部路径；线上版本必须改用上传或云对象存储。",
+        }
+        dataset_import["checks"] = [
+            {
+                "id": "external_reference_recorded",
+                "label": "外部引用已登记",
+                "status": "passed",
+                "detail": preflight["source"]["path"],
+            }
+        ]
+    else:
+        dataset_import["checks"] = [
+            {
+                "id": "preflight_cancelled",
+                "label": "预检已取消",
+                "status": "passed",
+                "detail": "未创建项目文件，未绑定外部引用。",
+            }
+        ]
+
+    preflight["status"] = dataset_import["status"]
+    preflight["dataset_import"] = dataset_import
+    preflight["updated_at"] = timestamp
+    manifest.setdefault("dataset_imports", {})[dataset_import["id"]] = dataset_import
+    manifest["latest_import_id"] = dataset_import["id"]
+    manifest["latest_preflight_id"] = preflight_id
+    manifest["updated_at"] = timestamp
+    write_dataset_import_preflight_manifest(project_root, manifest)
+    return {
+        "_meta": local_file_meta("dataset_import_apply_service"),
+        "project": project_identity(project),
+        "preflight": preflight,
+        "dataset_import": dataset_import,
+    }
+
+
 def build_external_dataset_bind_preflight(
     project_root: Path,
     source: Path,
@@ -486,6 +615,14 @@ def write_dataset_import_preflight_manifest(project_root: Path, manifest: dict[s
     path = project_root / DATASET_IMPORT_PREFLIGHT_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def build_external_data_catalog() -> dict[str, Any]:

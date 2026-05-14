@@ -468,3 +468,34 @@
 - 当前没有文件哈希，无法证明预检后文件未变化；P2-H apply/import 应补 SHA256。
 - DTA/XLSX/Parquet 变量字典仍未解析；P2-H 或 P2-I 应先做安全读取和字段预览。
 - Browser 插件路径仍不稳定；本轮可视化验收使用 Safari + Computer Use fallback。
+
+## 2026-05-14 P2-H Real Dataset Import Apply
+
+### 行为覆盖
+
+- [x] 本地版用户确认后可把 `ready_for_review` 预检复制到项目 `Data/Raw/<filename>`，并记录目标大小和 SHA256。
+- [x] 本地版用户可选择“只绑定引用”，不复制大文件，只记录外部路径、大小、SHA256 和 provenance。
+- [x] 用户可取消预检，状态变为 `cancelled`，不会创建项目文件。
+- [x] 线上/云端 runtime 拒绝本地路径 apply，返回 `cloud_upload_required`。
+- [x] “数据与设计”页面显示三类人工动作按钮，并在 apply 后回显结果。
+- [ ] 未覆盖：上传到云对象存储、DTA/XLSX/Parquet 字段读取、移动源文件后的失效提示。
+
+### 测试覆盖
+
+- 目标测试：`python3 -m unittest tests.test_external_dataset_import_apply -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_external_dataset_import_apply tests.test_external_dataset_bind_preflight tests.test_external_data_catalog tests.test_dataset_quality_profile -v`，21 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，180 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`POST /api/v1/projects/{project_id}/datasets/external-bind-preflight/{preflight_id}/apply` 支持 `copy_to_project_raw`、`bind_external_reference`、`cancel`。
+- API：`runtime_mode=cloud` 返回 409 `cloud_upload_required`，不创建本地项目文件。
+- 页面：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，点击“数据与设计”，对 CFPS 预检点击“只绑定引用”，预检面板显示 `已接入`、`已绑定外部引用`、`动作：只绑定引用 · 模式：local` 和 SHA256。
+- Browser 插件路径：Node REPL 连接 in-app Browser 超时；本轮可视化验收使用 Safari + Computer Use fallback。
+
+### 剩余风险
+
+- 当前只是“接入数据源”，不是“解析变量字典”；下一步 P2-I 必须先做安全字段画像，再允许变量角色确认消费真实数据。
+- 只绑定引用依赖本地文件路径不变；后续画像/执行前必须重新检查文件存在性和 SHA256。
+- 云端版本还缺上传、对象存储、隐私/脱敏、远端执行队列和云模型配置。

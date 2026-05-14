@@ -27,6 +27,7 @@
 - `dataset_quality_profile`：已完成第一轮数据质量画像；`analysis_sample.csv` 返回 `row_count=12`、`column_count=4`、`missing_rate=0`、字段类型与 readiness，证据等级为 `local_file`。
 - `external_data_catalog`：已完成第一轮真实数据候选池；`GET /datasets` 返回 `/Users/mahaoxuan/Desktop/实证数据库` 下 223 个候选数据文件，全部 `read_only=true`、`evidence_level=local_file`，前端“数据与设计”页与项目内数据分开展示。
 - `external_dataset_bind_preflight`：已完成第一轮真实候选数据导入/绑定预检；候选卡可触发 `POST /datasets/external-bind-preflight`，预检写入 `state/product/dataset_import_preflights.json`，状态为 `ready_for_review`，但 `will_create_project_file=false`、`will_mutate_source=false`。
+- `external_dataset_import_apply`：已完成第一轮真实数据接入确认；`POST /datasets/external-bind-preflight/{preflight_id}/apply` 支持复制到 `Data/Raw/`、只绑定外部引用和取消预检，记录 `dataset_import`、SHA256、大小和目标路径；云端 runtime 对本地路径返回 `cloud_upload_required`。
 - `method_catalog`：已完成第一轮方法技能集目录；RunPlan 返回 OLS/DID/IV/RDD/PSM/DML 前置条件，OLS/PSM/DML 当前 ready，DID/IV/RDD 当前 blocked，证据等级为 `local_file`，不代表真实 StatsPAI 执行。
 - `method_execution`：已完成第一轮 OLS 本地执行适配器；approved OLS RunPlan 可生成 `Results/json/method_execution_result.json`，证据等级为 `local_execution`，并写入 run response 与 `run_manifest.json`。当前只支持 OLS，unsupported 方法和不可估数据会结构化失败。
 - `method_execution_ui`：已完成第一轮方法执行证据展示；`observability.method_execution` 和 `findings[].method_evidence` 都绑定 `Results/json/method_execution_result.json`，页面可见 adapter、公式、样本量、处理变量系数和证据等级。
@@ -39,8 +40,8 @@
 - 每次运行都保留可验证的中间产物。
 - 产品主行动必须优先围绕研究生命周期，不把 run/step/gate/artifact 作为首页主对象。
 - P1-P 已完成；Review & Export 已具备显式写回审批和 docx 预检状态，但仍不覆盖源草稿、不直接生成最终 docx。
-- P2-G 已完成；P2-H 开始前必须继续按 BDD/TDD：先定义真实数据源 apply/import 行为，避免移动、修改或误提交 `/Users/mahaoxuan/Desktop/实证数据库` 中的原始数据。
-- P2-H 的最小目标是把一条 `ready_for_review` 预检转成明确人工确认后的项目内 artifact 或绑定记录；不能在 apply/import 之前让 VariableRoleSet、DesignSpec 或 RunPlan 消费外部数据。
+- P2-H 已完成；P2-I 开始前必须继续按 BDD/TDD：对已接入真实数据做安全字段画像/变量字典预览，避免直接把 DTA/XLSX/Parquet 大文件喂给 VariableRoleSet、DesignSpec 或 RunPlan。
+- P2-I 的最小目标是从 `dataset_import` 记录出发，读取可控样本和字段元数据，输出可审查的数据字典；若文件过大、格式不支持或源文件缺失，必须返回明确阻塞状态。
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。

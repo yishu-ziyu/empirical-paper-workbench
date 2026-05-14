@@ -381,4 +381,16 @@
 - [x] API 验收：`GET /datasets` 返回外部候选池 223 个文件；`POST /datasets/external-bind-preflight` 对 CFPS DTA 候选文件返回 `ready_for_review`、目标 `Data/Raw/...dta` 和 4 项 passed checks。
 - [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，点击“数据与设计”，点击候选文件“生成导入/绑定预检”，页面显示 `待人工确认`、源路径、目标路径、`尚未导入/绑定 · 源文件只读` 和 4 项通过检查。
 - [x] 交接：更新 handoff、manifest、decision-log、review、current-stage、workflow，并同步 `Tasks/` 到 `tasks/`。
-- [ ] P2-H：实现显式 apply/import workflow。只有用户确认后才允许把预检记录变成项目内 `Data/Raw/...` 文件或绑定记录；同时必须记录人工动作、目标 artifact、哈希/大小和失败回滚语义。
+- [x] P2-H：实现显式 apply/import workflow。只有用户确认后才允许把预检记录变成项目内 `Data/Raw/...` 文件或绑定记录；同时必须记录人工动作、目标 artifact、哈希/大小和失败回滚语义。
+
+## 2026-05-14 P2-H Real Dataset Import Apply
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-dataset-import-apply-bdd.md`，明确本地版可复制/绑定真实数据，线上版不能读取用户桌面路径，必须走上传或云对象。
+- [x] TDD：新增 `tests/test_external_dataset_import_apply.py`；首次运行失败符合预期：apply API 返回 404，前端没有三类人工动作按钮。
+- [x] 实现：扩展 `Product/backend/overview_service.py` 和 `Product/app.py`，新增 `POST /api/v1/projects/{project_id}/datasets/external-bind-preflight/{preflight_id}/apply`。
+- [x] 实现：支持 `copy_to_project_raw`、`bind_external_reference`、`cancel` 三种动作；记录 `dataset_import`、SHA256、大小、目标路径、runtime mode、人工动作和状态。
+- [x] 产品边界：`runtime_mode=cloud` 对本地路径返回 409 `cloud_upload_required`，避免线上应用假装能读取本机文件。
+- [x] 前端：扩展“导入/绑定预检”面板，显示“确认导入到项目 / 只绑定引用 / 取消预检”及按钮解释；apply 后回显“已接入”、动作、local 模式和 SHA256。
+- [x] 验证：目标测试 5 OK；相邻数据测试 21 OK；全量回归 180 OK，skipped=1；Python 编译、`node --check`、`git diff --check` 通过。
+- [x] 可视化验收：Safari + Computer Use 打开 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，点击“数据与设计”，对 CFPS 预检点击“只绑定引用”，页面显示 `已接入`、`已绑定外部引用`、`模式：local` 和 SHA256。
+- [ ] P2-I：对已复制或已绑定的真实数据做安全字段画像/变量字典预览，尤其是 DTA/XLSX/Parquet；完成前不得让新数据进入 VariableRoleSet、DesignSpec 或 RunPlan。

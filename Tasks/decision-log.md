@@ -420,3 +420,17 @@ Rejected: 允许任意本地路径进入预检。原因是这会绕过真实数�
 Rejected: 预检成功后立即重建变量角色或 RunPlan。原因是预检只证明“导入准备就绪”，不证明数据已经进入项目，也不证明字段角色已确认。
 
 Evidence: live API 对 CFPS DTA 候选文件返回 `status=ready_for_review`、`target.path=Data/Raw/cfps2010adult_202008.dta`、`will_create_project_file=false`、`will_mutate_source=false`；Safari 数据与设计页显示 `待人工确认` 和 4 项 passed checks。
+
+## 2026-05-14：本地版可绑定桌面数据，线上版必须上传或云化
+
+Decision: 在 P2-H 中把真实数据预检 apply 拆成 `copy_to_project_raw`、`bind_external_reference`、`cancel` 三种显式人工动作。本地版允许复制到当前项目或只绑定本机外部引用；线上版遇到本地路径 apply 时返回 409 `cloud_upload_required`。
+
+Reason: 用户明确区分两个产品版本：纯本地版本可以连接本地数据和本地大模型；线上版本只能使用云服务，不能直接读取用户电脑上的文件路径。产品必须把这个边界做成 API 和 UI 状态，而不是只写在说明里。
+
+Rejected: 让线上应用绑定 `/Users/...` 这类桌面路径。原因是线上服务器无法读取用户本机路径，继续保存为可执行数据源会制造假的 provenance。
+
+Rejected: 预检后自动复制大文件到 `Data/Raw/`。原因是复制真实研究数据是有副作用的动作，必须由用户显式点击“确认导入到项目”。
+
+Rejected: apply 后立刻让 VariableRoleSet、DesignSpec 或 RunPlan 消费新数据。原因是导入/绑定只证明数据源被接入，还不证明字段、样本口径和变量角色已确认。
+
+Evidence: `tests/test_external_dataset_import_apply.py` 覆盖本地复制、只绑定引用、取消和云端拒绝；Safari 数据与设计页显示 `已接入`、`已绑定外部引用`、`模式：local` 和 SHA256。

@@ -51,6 +51,8 @@ const state = {
   resolvingGateAction: null,
   selectedDatasetPath: null,
   bindingExternalDatasetPath: null,
+  applyingExternalPreflightId: null,
+  applyingExternalPreflightAction: null,
   savingVariableRoles: false,
   savingDesignSpec: false,
   savingRunPlan: false,
@@ -562,6 +564,13 @@ const v2api = {
     },
     async bindPreflight(projectId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/datasets/external-bind-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async applyPreflight(projectId, preflightId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/datasets/external-bind-preflight/${preflightId}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -2988,8 +2997,10 @@ function renderExternalBindPreflight(preflight) {
     return;
   }
 
-  if (statusPill) statusPill.textContent = preflight.status === "ready_for_review" ? "待人工确认" : (preflight.status || "预检");
+  if (statusPill) statusPill.textContent = externalPreflightStatusLabel(preflight.status || "ready_for_review");
   const checks = preflight.checks || [];
+  const datasetImport = preflight.dataset_import || null;
+  const isApplying = state.applyingExternalPreflightId === preflight.id;
   container.innerHTML = `
     <article class="external-bind-preflight-record">
       <div class="record-header">
@@ -3028,9 +3039,65 @@ function renderExternalBindPreflight(preflight) {
           </div>
         `).join("") || "<p class='muted'>暂无检查项。</p>"}
       </div>
+      ${preflight.status === "ready_for_review" ? `
+        <div class="preflight-action-row">
+          ${renderExternalPreflightApplyButton(preflight, "copy_to_project_raw", "确认导入到项目", "复制到当前项目 Data/Raw，后续可做变量画像。")}
+          ${renderExternalPreflightApplyButton(preflight, "bind_external_reference", "只绑定引用", "不复制大文件，只记录本机外部引用。")}
+          ${renderExternalPreflightApplyButton(preflight, "cancel", "取消预检", "废弃这次选择，不影响项目。")}
+        </div>
+        <p class="muted external-bind-preflight-note">按钮说明：确认导入会复制一份数据到当前项目；只绑定引用不会复制大文件，只记录本机路径；取消预检会废弃这次选择。</p>
+        ${isApplying ? `<p class="muted external-bind-preflight-note">正在处理：${escapeHtml(externalApplyActionLabel(state.applyingExternalPreflightAction))}</p>` : ""}
+      ` : ""}
+      ${datasetImport ? `
+        <div class="external-import-result">
+          <strong>${escapeHtml(externalApplyResultLabel(datasetImport))}</strong>
+          <p class="muted">动作：${escapeHtml(externalApplyActionLabel(datasetImport.action))} · 模式：${escapeHtml(datasetImport.runtime_mode || "local")}</p>
+          ${datasetImport.target?.path ? `<p class="record-path">目标：${escapeHtml(datasetImport.target.path)}</p>` : ""}
+          ${datasetImport.source?.sha256 ? `<p class="record-path">SHA256：${escapeHtml(datasetImport.source.sha256)}</p>` : ""}
+        </div>
+      ` : ""}
       <p class="muted external-bind-preflight-note">状态文件：${escapeHtml(preflight.manifest_path || "state/product/dataset_import_preflights.json")} · 本阶段不会改写 paper.yaml、VariableRoleSet、DesignSpec 或 RunPlan。</p>
     </article>
   `;
+}
+
+function renderExternalPreflightApplyButton(preflight, action, label, description) {
+  const isApplying = state.applyingExternalPreflightId === preflight.id;
+  const active = isApplying && state.applyingExternalPreflightAction === action;
+  return `
+    <button
+      class="${action === "copy_to_project_raw" ? "primary-button" : "ghost-button"} compact"
+      data-external-preflight-apply-action="${escapeHtml(action)}"
+      data-preflight-id="${escapeHtml(preflight.id || "")}"
+      title="${escapeHtml(description)}"
+      ${isApplying ? "disabled" : ""}
+    >
+      ${active ? "处理中..." : escapeHtml(label)}
+    </button>
+  `;
+}
+
+function externalPreflightStatusLabel(status) {
+  return {
+    ready_for_review: "待人工确认",
+    applied: "已接入",
+    cancelled: "已取消",
+  }[status] || status;
+}
+
+function externalApplyActionLabel(action) {
+  return {
+    copy_to_project_raw: "确认导入到项目",
+    bind_external_reference: "只绑定引用",
+    cancel: "取消预检",
+  }[action] || action || "未知动作";
+}
+
+function externalApplyResultLabel(datasetImport) {
+  if (datasetImport.status === "cancelled") return "预检已取消";
+  if (datasetImport.action === "copy_to_project_raw") return "已导入到项目";
+  if (datasetImport.action === "bind_external_reference") return "已绑定外部引用";
+  return datasetImport.status || "已处理";
 }
 
 function renderDatasetQualityProfile(items) {
@@ -3260,6 +3327,29 @@ async function requestExternalBindPreflight(sourcePath) {
     showV2Error("data", `生成导入/绑定预检失败：${error.message}`);
   } finally {
     state.bindingExternalDatasetPath = null;
+    renderDataVariables();
+  }
+}
+
+async function requestExternalPreflightApply(preflightId, action) {
+  if (!state.selectedProjectId || !preflightId || !action) return;
+  clearV2Error("data");
+  state.applyingExternalPreflightId = preflightId;
+  state.applyingExternalPreflightAction = action;
+  renderDataVariables();
+  try {
+    await v2api.datasets.applyPreflight(state.selectedProjectId, preflightId, {
+      action,
+      runtime_mode: "local",
+      note: `用户在数据与设计页执行：${externalApplyActionLabel(action)}。`,
+    });
+    state.datasetsData = await v2api.datasets.list(state.selectedProjectId);
+    renderDataVariables();
+  } catch (error) {
+    showV2Error("data", `处理导入/绑定预检失败：${error.message}`);
+  } finally {
+    state.applyingExternalPreflightId = null;
+    state.applyingExternalPreflightAction = null;
     renderDataVariables();
   }
 }
@@ -4728,6 +4818,13 @@ async function boot() {
     const button = target.closest("[data-external-bind-preflight-action]");
     if (!button) return;
     void requestExternalBindPreflight(button.dataset.sourcePath || "");
+  });
+  document.getElementById("external-bind-preflight-panel")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const button = target.closest("[data-external-preflight-apply-action]");
+    if (!button) return;
+    void requestExternalPreflightApply(button.dataset.preflightId || "", button.dataset.externalPreflightApplyAction || "");
   });
   document.getElementById("view-overview")?.addEventListener("click", (event) => {
     const target = event.target;

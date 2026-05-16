@@ -43,6 +43,10 @@ Results/json/*
 !Results/json/README.md
 state/*.json
 
+# Local external learning downloads
+artifacts/reference-learning/*
+!artifacts/reference-learning/README.md
+
 # Agent Cluster workflow outputs
 docs/workflows/
 !docs/workflows/.gitkeep

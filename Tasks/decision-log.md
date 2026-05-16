@@ -612,3 +612,15 @@ Rejected: 审批时顺手改写 ResearchQuestion、VariableRoleSet、DesignSpec 
 Rejected: 在没有 `state/product/supervisor_plan.json` 时显示批准/驳回按钮。原因是用户不能审批一份不存在的计划；当前真实项目没有计划产物时应只显示生成入口。
 
 Evidence: `python3 -m unittest tests.test_supervisor_plan -v` 13 tests OK；全量回归 226 tests OK，skipped=1；浏览器验收 `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1` 在无计划状态下只显示生成入口，符合审批前置条件。
+
+## 2026-05-17：移动 UI 参考学习的可复用结论
+
+Decision: 把 Bilibili/Kole Jain Mobile App UI 参考资料转化为产品信息架构原则，而不是复制视觉风格。核心原则是：一屏一个主任务、默认隐藏高噪声明细、主操作随对象状态变化、空状态必须给出下一步。
+
+Reason: 用户指出当前页面容易把信息一次性铺满，冲爆短时记忆。移动 UI 教程虽然面向手机，但它对小屏和注意力的约束正好能修正我们产品的信息密度问题。
+
+Rejected: 直接复制 Kole Jain 的暗色界面、移动 app 内容或 Figma 结构。原因是我们的产品是实证研究工作台，需要证据、审计、状态机和可复现产物，而不是通用任务笔记 app。
+
+Rejected: 用缩小字号和压缩间距解决拥挤。原因是视频中的核心观点是小屏上内容往往要更大，真正要减少的是同时出现的决策数量。
+
+Evidence: 视频、音频、转写、Kole Jain `.fig` 和 5 张预览图已保存到本地 `artifacts/reference-learning/`；可提交学习笔记为 `docs/reference-learning/mobile-app-ui-kole-jain-bilibili-2026-05-17.md`。

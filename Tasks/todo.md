@@ -500,3 +500,15 @@
 - [x] 验证：目标测试 15 OK；全量回归 210 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
 - [x] 右侧内置浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2p-disclosure1` 中两个详情块初始关闭；点击后 `Provider` 和 `SupervisorPlan` 明细可见；截图保存到 `artifacts/ui-checks/p2p-home-progressive-disclosure.png`。
 - [ ] 下一步 P2-Q：实现 SupervisorPlan approve/reject/needs_revision 审批状态机，并把 approved plan 作为后续任务队列的输入。
+
+## 2026-05-16 P2-Q Topic-first Home
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-topic-first-home-bdd.md`，定义首页必须先让用户输入或选择研究选题，再进入具体判断环节。
+- [x] TDD：扩展 `tests/test_product_workflow_contract.py`；首次运行 3 条新增行为失败，原因是页面缺少 `research-topic-intake`、`research-workbench-after-topic` 和 `data-topic-start-action`。
+- [x] 实现：首页新增“开始一项实证研究”入口，包含选题输入、从已有选题继续、从真实数据候选池开始。
+- [x] 实现：原首页中的下一步研究决策、智能中控、SupervisorPlan、风险和执行概览默认进入 `research-workbench-after-topic`，确认选题后才展开。
+- [x] 实现：选题只保存为前端本地状态，不写回 VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+- [x] 视觉收敛：窄视口下隐藏右侧 inspector、压缩侧栏和间距，保证选题入口能在首屏可见。
+- [x] 验证：目标前端契约测试 9 OK；相邻回归 18 OK；全量回归 213 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
+- [x] 右侧内置浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2q-topic1` 初始只显示选题入口；输入选题并点击 `进入研究判断` 后，才显示 `下一步研究决策`、`智能中控` 和 `SupervisorPlan`。
+- [ ] 下一步 P2-R：把确认后的研究选题升级为后端 `ResearchQuestion` / `TopicSession` 审计对象，再做 SupervisorPlan approve/reject/needs_revision 审批状态机。

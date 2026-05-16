@@ -560,3 +560,17 @@ Rejected: 继续通过缩小字体或压缩卡片解决拥挤。原因是根因�
 Rejected: 删除 Provider、派工、证据要求和风险等细节。原因是这些是审计材料，必须保留，只是不应默认暴露。
 
 Evidence: 新增 BDD 和前端测试锁定 `查看中控详情`、`查看计划详情`；全量回归 210 tests OK；右侧内置浏览器验证两个详情块初始关闭，点击后可展开。
+
+## 2026-05-16：首页必须先进入研究选题，而不是直接摊开全功能工作台
+
+Decision: 首页新增 `research-topic-intake`，默认先让用户输入研究选题、从已有选题继续，或进入真实数据候选池。原有下一步研究决策、智能中控、SupervisorPlan、风险和证据审计移动到 `research-workbench-after-topic`，确认选题后才展示。
+
+Reason: 用户指出当前产品一进来就铺开所有模块，会让用户不知道如何开始。实证研究产品的第一动作应该是“我要研究什么”，而不是先理解系统的 Agent、执行、证据和文件结构。
+
+Rejected: 继续在首页压缩卡片、缩小字体或只做视觉清理。原因是根因是产品入口错误，不是样式密度。
+
+Rejected: 删除智能中控、SupervisorPlan 和证据审计。原因是这些是研究可审计性的核心，只是不应该作为首屏默认信息。
+
+Rejected: 选题确认后自动改写 VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。原因是本轮只有前端选题上下文，还没有后端 ResearchQuestion 审计状态。
+
+Evidence: 新增 BDD 和 3 条前端契约测试；全量回归 213 tests OK；右侧内置浏览器验证初始只显示选题入口，确认选题后才展开研究判断区。

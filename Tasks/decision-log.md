@@ -624,3 +624,17 @@ Rejected: 直接复制 Kole Jain 的暗色界面、移动 app 内容或 Figma �
 Rejected: 用缩小字号和压缩间距解决拥挤。原因是视频中的核心观点是小屏上内容往往要更大，真正要减少的是同时出现的决策数量。
 
 Evidence: 视频、音频、转写、Kole Jain `.fig` 和 5 张预览图已保存到本地 `artifacts/reference-learning/`；可提交学习笔记为 `docs/reference-learning/mobile-app-ui-kole-jain-bilibili-2026-05-17.md`。
+
+## 2026-05-17：Agent Task Queue 是 approved SupervisorPlan 的派工草案，不是自动执行器
+
+Decision: 新增 `state/product/agent_task_queue.json` 作为 approved SupervisorPlan 的可审阅派工草案。只有 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan 能创建队列；队列项记录 owner agent、角色、任务摘要、输入证据、输出要求、风险、阻塞项和审计日志。前端默认只展示摘要、负责人、阻塞和状态，高噪声明细进入按需展开。
+
+Reason: 用户要求把本地 Codex Supervisor 从“计划建议”推进到“可执行任务组织”，但不能让 LLM 直接篡改变量角色、设计方案或执行计划。Agent Task Queue 是计划和执行之间的审计边界：它把任务拆出来给人检查，不代表已经派工或已经执行。
+
+Rejected: 生成 SupervisorPlan 后自动创建任务队列。原因是未经人工 approve 的计划仍可能包含错误变量、错误方法或不完整证据要求。
+
+Rejected: 创建队列后立即启动子 Agent。原因是用户需要先看到任务摘要、输入证据、输出要求和阻塞项；自动执行会绕过任务级人工 gate。
+
+Rejected: 复用旧 workflow mock tasks 作为产品任务队列。原因是旧 tasks 属于 demo 工作流，不绑定 approved SupervisorPlan 和当前研究证据链，容易把 mock 状态伪装成真实派工。
+
+Evidence: `python3 -m unittest tests.test_agent_task_queue -v` 8 tests OK；`python3 -m unittest discover -s tests -v` 234 tests OK，skipped=1；浏览器真实项目显示 `缺少 SupervisorPlan` 且按钮 disabled；受控 approved-plan 场景点击创建后显示 2 个任务、2 个详情默认折叠、无 console error。

@@ -1554,3 +1554,52 @@ P2-Q：给 SupervisorPlan 增加显式 approve/reject/needs_revision 审批 API 
 - SupervisorPlan 还没有 approval 状态机；现在只是 `needs_review` artifact。
 - 尚未真正启动子 Agent、StataMCP、DID/IV/RDD/PSM/DML 或真实 CFPS 执行。
 - 本地版和线上版仍要拆分 provider：本地版可以调用本地 Codex 和本地统计后端，线上版必须走云模型、上传数据和云执行队列。
+
+## 2026-05-16 P2-P1 首页渐进披露交接增量
+
+### 当前目标
+
+本轮解决用户指出的“屏幕信息太满、短时记忆被冲爆”的问题。首页不再默认摊开智能中控和 SupervisorPlan 的全部细节，而是先展示状态、证据等级、主动作和下一步信号；Provider、执行开关、派工、写入边界、证据要求、风险等二级信息放进原生可展开详情。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-home-progressive-disclosure-bdd.md`。
+- 扩展测试：`tests/test_supervisor_plan.py` 新增 SupervisorPlan 细节折叠行为；`tests/test_product_workflow_contract.py` 新增智能中控细节折叠行为。
+- 修改前端：`Product/web/assets/app.js` 的 `renderIntelligenceLayer()` 和 `renderSupervisorPlan()` 使用 `details/summary` 做渐进披露。
+- 修改样式：`Product/web/assets/styles.css` 新增 `.progressive-disclosure`、`.disclosure-panel`、`.decision-signal-row`，并补齐 focus-visible。
+- 更新静态资源版本：`Product/web/index.html` 改为 `20260516-p2p-disclosure1`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_supervisor_plan tests.test_product_workflow_contract -v` 首次新增 2 条失败，缺少 `supervisor-plan-progressive-disclosure` 和 `intelligence-progressive-disclosure`。
+- GREEN：同一目标测试再次运行，15 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，210 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`git diff --check` 通过。
+- 右侧内置浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2p-disclosure1` 初始状态下 `.llm-supervisor-details.open=false`、`.supervisor-plan-details.open=false`；点击后 `llmOpen=true`、`planOpen=true`，Provider 和计划明细可见。
+- 截图：`artifacts/ui-checks/p2p-home-progressive-disclosure.png`。
+
+### 关键文件路径
+
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_supervisor_plan.py`
+- `tests/test_product_workflow_contract.py`
+- `docs/architecture-v2/codex-phase-p2-home-progressive-disclosure-bdd.md`
+- `artifacts/ui-checks/p2p-home-progressive-disclosure.png`
+
+### 不能重复探索的结论
+
+- 首页的高噪声字段不应默认展示；用户第一眼只需要决策信号、主动作和风险数量。
+- 渐进披露要保留审计能力，不是删除内容；细节必须能点击展开。
+- 这次只改 UI 信息架构，不改变 SupervisorPlan API、不启用 Codex 执行、不改写 VariableRoleSet/DesignSpec/RunPlan。
+
+### 下一步第一件事
+
+P2-Q：给 SupervisorPlan 增加 approve/reject/needs_revision 审批 API、状态文件记录和前端操作。只有 approved SupervisorPlan 才能进入任务队列或下一轮执行编排。
+
+### 未解决风险
+
+- 当前渐进披露只覆盖首页智能中控和 SupervisorPlan；执行页、数据页、Review & Export 的局部密度还需要继续按同样规则收敛。
+- 右侧内置浏览器已验证点击展开，但还没有做移动视口截图。
+- SupervisorPlan 仍无审批状态机，不能进入真实任务队列。

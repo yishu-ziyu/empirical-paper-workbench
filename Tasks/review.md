@@ -736,3 +736,43 @@
 - 本轮未在真实 app 中启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 调用真实 Codex，避免在默认验收中产生不可控模型输出。
 - 子 Agent 分工目前是计划字段，还没有真正拉起执行者或写入运行队列。
 - StatsPAI 只恢复并验证 OLS CSV 路径；DTA、StataMCP 和更多实证方法族仍未完成。
+
+## 2026-05-16 P2-P1 Home Progressive Disclosure
+
+### 行为覆盖
+
+- [x] 智能中控首屏只显示本地 Codex Supervisor 状态、证据等级、阻塞数量和派工角色数量。
+- [x] Provider、可用性、允许执行、版本、阻塞项和派工计划默认折叠，点击 `查看中控详情` 后展开。
+- [x] SupervisorPlan 审阅台首屏只显示状态、主按钮、人工确认说明和下一步摘要。
+- [x] 版本、写入边界、阶段计划、子 Agent 分工、证据要求和风险默认折叠，点击 `查看计划详情` 后展开。
+- [x] 使用原生 `details/summary`，默认不 `open`，支持键盘 focus。
+- [ ] 未覆盖：移动视口截图；执行页和 Review & Export 页面同类高密度内容的进一步折叠。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_supervisor_plan tests.test_product_workflow_contract -v` 首次新增 2 条失败，原因是缺少 `supervisor-plan-progressive-disclosure`、`intelligence-progressive-disclosure` 和对应 summary 文案。
+- 目标测试：`python3 -m unittest tests.test_supervisor_plan tests.test_product_workflow_contract -v`，15 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，210 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/app.py` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-home-progressive-disclosure-bdd.md`：新增本轮信息架构行为说明。
+- `tests/test_supervisor_plan.py`：锁定 SupervisorPlan 详情默认折叠。
+- `tests/test_product_workflow_contract.py`：锁定智能中控详情默认折叠。
+- `Product/web/assets/app.js`：重排 `renderIntelligenceLayer()` 和 `renderSupervisorPlan()`，把高噪声明细移入 `details/summary`。
+- `Product/web/assets/styles.css`：新增折叠控件、决策信号行和 focus 样式。
+- `Product/web/index.html`：更新资源版本。
+
+### 手动验收
+
+1. 打开右侧 Codex 内置浏览器：`http://127.0.0.1:8767/?v=20260516-p2p-disclosure1`。
+2. 在“工作台首页”查看“智能中控”：默认只显示状态和摘要；点击 `查看中控详情` 后显示 Provider、执行开关、阻塞项、派工计划。
+3. 查看 `SupervisorPlan 审阅台`：默认只显示状态、生成按钮和下一步摘要；点击 `查看计划详情` 后显示版本、边界、阶段计划、子 Agent 分工、证据要求和风险。
+4. 本轮截图：`artifacts/ui-checks/p2p-home-progressive-disclosure.png`。
+
+### 剩余风险
+
+- 这次解决的是首页局部信息密度，不代表所有页面已经完成 clean workbench 收敛。
+- SupervisorPlan 仍然只是 `needs_review` 产物；下一步必须做审批状态机。
+- 详情内容仍会在 DOM text 中存在，这是原生 `details` 的正常行为；视觉和交互上默认折叠。

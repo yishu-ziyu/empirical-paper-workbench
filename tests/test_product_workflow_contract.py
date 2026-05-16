@@ -146,6 +146,14 @@ class ProductWorkflowFrontendContractTests(unittest.TestCase):
         for label in ("智能中控", "本地 Codex", "Supervisor", "派工计划"):
             self.assertIn(label, self.app_js + self.index_html)
 
+    def test_bdd_9_llm_supervisor_details_are_progressively_disclosed(self) -> None:
+        """行为 9：智能中控只在首屏展示决策摘要，Provider 与派工细节按需展开。"""
+        self.assertIn("intelligence-progressive-disclosure", self.app_js)
+        self.assertIn('class="progressive-disclosure llm-supervisor-details"', self.app_js)
+        self.assertIn("查看中控详情", self.app_js)
+        self.assertIn("disclosure-panel", self.app_js)
+        self.assertIn(".progressive-disclosure", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

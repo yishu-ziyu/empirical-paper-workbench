@@ -548,3 +548,15 @@ Rejected: 让 Supervisor 直接改写 `state/product/variable_roles.json`、`sta
 Rejected: 未启用执行开关时生成 mock plan。原因是这会把工程状态机伪装成真实智能中控，违反 evidence_level 和用户确定性要求。
 
 Evidence: `tests/test_supervisor_plan.py` 覆盖默认阻断、启用后持久化、正式研究状态不变和前端审阅台；全量回归 208 tests OK；`POST /api/v1/projects/proj_undergraduate_thesis/supervisor-plan` 在默认环境返回 409 `local_codex_execution_not_enabled`。
+
+## 2026-05-16：首页必须先给决策信号，再按需展开细节
+
+Decision: 首页的智能中控和 SupervisorPlan 审阅台改为渐进披露。默认只展示状态、证据等级、主操作、阻塞数量和下一步摘要；Provider、派工、写入边界、证据要求、风险等细节放入原生 `details/summary`，由用户点击展开。
+
+Reason: 用户指出当前页面把具体信息全部摊开，会冲击短时记忆，让人不知道下一步怎么用产品。研究工作台应先告诉用户“现在能不能继续、下一步做什么、哪里有风险”，而不是把审计字段当首屏主体。
+
+Rejected: 继续通过缩小字体或压缩卡片解决拥挤。原因是根因不是样式密度，而是信息层级错误。
+
+Rejected: 删除 Provider、派工、证据要求和风险等细节。原因是这些是审计材料，必须保留，只是不应默认暴露。
+
+Evidence: 新增 BDD 和前端测试锁定 `查看中控详情`、`查看计划详情`；全量回归 210 tests OK；右侧内置浏览器验证两个详情块初始关闭，点击后可展开。

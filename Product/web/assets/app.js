@@ -30,6 +30,7 @@ const state = {
   // V2 page state
   overviewData: null,
   journeyData: null,
+  supervisorPlanData: null,
   datasetsData: null,
   variableRolesData: null,
   variableRoleCandidatesData: null,
@@ -71,6 +72,7 @@ const state = {
   approvingWritebackCandidateId: null,
   approvingWritebackAction: null,
   preflightingDocxCandidateId: null,
+  generatingSupervisorPlan: false,
 };
 
 const fallbackWorkflowSteps = [
@@ -645,6 +647,18 @@ const v2api = {
     async save(projectId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/run-plan`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  supervisorPlan: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan`);
+    },
+    async generate(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -2140,6 +2154,87 @@ function renderIntelligenceLayer(intelligence_layer) {
   `;
 }
 
+function renderSupervisorPlan() {
+  const container = document.getElementById("supervisor-plan-body");
+  if (!container) return;
+  const plan = state.supervisorPlanData?.supervisor_plan || null;
+  if (!plan) {
+    container.innerHTML = "<p class='muted'>正在读取 SupervisorPlan...</p>";
+    return;
+  }
+  const hasPlan = plan.status && plan.status !== "empty";
+  const risks = plan.risks || [];
+  const evidence = plan.evidence_requirements || [];
+  const dispatch = plan.subagent_dispatch || [];
+  const stagePlan = plan.stage_plan || [];
+  container.innerHTML = `
+    <article class="supervisor-plan-card is-${escapeHtml(plan.status || "empty")}">
+      <div class="supervisor-plan-summary">
+        <div>
+          <span class="meta-label">本地 Codex SupervisorPlan</span>
+          <h4>${escapeHtml(hasPlan ? reviewStatusLabel(plan.status) : "尚未生成")}</h4>
+          <p class="muted">${escapeHtml(hasPlan ? plan.objective : "生成后会进入人工确认，不会直接改写变量角色、研究设计或执行计划。")}</p>
+        </div>
+        ${renderEvidenceBadge({ evidence_level: plan.evidence_level || "local_file" })}
+      </div>
+      <div class="supervisor-plan-actions">
+        <button class="primary-button" data-supervisor-plan-generate ${state.generatingSupervisorPlan ? "disabled" : ""}>
+          ${state.generatingSupervisorPlan ? "生成中..." : "生成 SupervisorPlan"}
+        </button>
+        <span class="muted">人工确认后，才允许进入真实子 Agent 派工。</span>
+      </div>
+      <div class="supervisor-plan-ledger">
+        <div><span class="meta-label">下一步</span><strong>${escapeHtml(plan.next_action?.label || "审阅 SupervisorPlan")}</strong></div>
+        <div><span class="meta-label">版本</span><strong>${escapeHtml(String(plan.version ?? 0))}</strong></div>
+        <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
+      </div>
+    </article>
+    ${hasPlan ? `
+      <div class="supervisor-plan-grid">
+        ${renderSupervisorPlanColumn("阶段计划", stagePlan, "goal")}
+        ${renderSupervisorPlanColumn("子 Agent 分工", dispatch, "task")}
+        ${renderSupervisorPlanColumn("证据要求", evidence, "requirement")}
+        ${renderSupervisorPlanColumn("风险", risks, "description")}
+      </div>
+    ` : ""}
+  `;
+}
+
+function renderSupervisorPlanColumn(title, items, detailKey) {
+  return `
+    <section class="supervisor-plan-column">
+      <h4>${escapeHtml(title)}</h4>
+      ${items.length ? items.map((item) => `
+        <div class="supervisor-plan-item">
+          <strong>${escapeHtml(item.stage || item.agent_id || item.id || item.role || title)}</strong>
+          <p class="muted">${escapeHtml(item[detailKey] || item.goal || item.task || item.requirement || item.description || "")}</p>
+        </div>
+      `).join("") : "<p class='muted'>尚无内容。</p>"}
+    </section>
+  `;
+}
+
+async function handleGenerateSupervisorPlan() {
+  if (!state.selectedProjectId) return;
+  clearV2Error("overview");
+  state.generatingSupervisorPlan = true;
+  renderSupervisorPlan();
+  try {
+    state.supervisorPlanData = await v2api.supervisorPlan.generate(state.selectedProjectId, {
+      objective: "基于已确认变量角色、研究设计和执行计划，生成下一轮可审阅研究执行计划。",
+      note: "用户请求 P2-P：先由本地 Codex Supervisor 提出计划，再进入人工确认。",
+    });
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderWorkflowContract(state.overviewData.workflow_contract);
+    renderSupervisorPlan();
+  } catch (error) {
+    showV2Error("overview", `生成 SupervisorPlan 失败：${error.message}`);
+  } finally {
+    state.generatingSupervisorPlan = false;
+    renderSupervisorPlan();
+  }
+}
+
 function renderEvidenceBanner(meta) {
   if (!meta || meta.evidence_level !== "mock") return "";
   return `
@@ -2969,6 +3064,7 @@ function renderOverview() {
     `项目：${data.project?.slug || ""} · 当前阶段：${productTermLabel(data.current_stage || "")} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
 
   renderWorkflowContract(data.workflow_contract);
+  renderSupervisorPlan();
 
   // Stage summary cards
   const summaries = data.stage_summaries || [];
@@ -5231,6 +5327,7 @@ async function loadV2Data(viewName) {
       case "overview":
         state.overviewData = await v2api.overview.get(projectId);
         state.journeyData = await v2api.journey.get(projectId);
+        state.supervisorPlanData = await v2api.supervisorPlan.get(projectId);
         renderOverview();
         renderJourneyBar();
         break;
@@ -5428,6 +5525,11 @@ async function boot() {
   document.getElementById("view-overview")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const supervisorButton = target.closest("[data-supervisor-plan-generate]");
+    if (supervisorButton) {
+      void handleGenerateSupervisorPlan();
+      return;
+    }
     const button = target.closest("[data-open-design-action]");
     if (!button) return;
     openDesignAction(state.selectedDatasetPath || button.dataset.datasetPath || "");

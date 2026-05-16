@@ -536,3 +536,15 @@ Rejected: 继续用静态 Agent 卡片暗示智能编排。原因是这无法证
 Rejected: 默认打开本地 Codex 执行。原因是模型 subprocess 可能产生外部调用、费用和不确定输出；必须由环境开关显式启用，并把每次计划/派工写入可审计产物。
 
 Evidence: `GET /api/v1/providers/local-codex` 返回 `available=true`、`execution_enabled=false`；overview API 返回 `intelligence_layer.status=blocked` 和 blocker `local_codex_execution_not_enabled`；Chrome 页面显示“本地 Codex Supervisor 未启用”和派工计划。
+
+## 2026-05-16：SupervisorPlan 是待审计划，不是自动写回
+
+Decision: 新增 `state/product/supervisor_plan.json` 作为本地 Codex Supervisor 的持久化计划产物。生成计划前必须显式启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`；生成后的计划状态为 `needs_review`，只包含阶段计划、风险、证据要求、子 Agent 分工、人工 gate 和下一步建议。
+
+Reason: 用户指出系统必须有底层大模型中控，但不能让大模型绕过工程审计和人工确认。把 Codex 输出落为可审阅 artifact，可以让中控真实进入产品，同时保留 VariableRoleSet、DesignSpec、RunPlan 的确定性边界。
+
+Rejected: 让 Supervisor 直接改写 `state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。原因是这些是用户确认过的正式研究状态，LLM 输出必须先进入人工审阅。
+
+Rejected: 未启用执行开关时生成 mock plan。原因是这会把工程状态机伪装成真实智能中控，违反 evidence_level 和用户确定性要求。
+
+Evidence: `tests/test_supervisor_plan.py` 覆盖默认阻断、启用后持久化、正式研究状态不变和前端审阅台；全量回归 208 tests OK；`POST /api/v1/projects/proj_undergraduate_thesis/supervisor-plan` 在默认环境返回 409 `local_codex_execution_not_enabled`。

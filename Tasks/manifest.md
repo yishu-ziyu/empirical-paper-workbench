@@ -742,3 +742,34 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8765/?v=20260514-p2n-supervisor1`
 
 说明：进入“工作台首页”，应显示“智能中控”“本地 Codex Supervisor 未启用”、`provider=local_codex`、`可用=是`、`允许执行=否`、`local_codex_execution_not_enabled` 和阶段派工计划。
+
+## 2026-05-16 P2-P Local Codex SupervisorPlan
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-bdd.md`
+- `tests/test_supervisor_plan.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/supervisor_plan_service.py`：生成、读取、规范化并持久化 `SupervisorPlan`。
+- `Product/backend/codex_provider.py`：新增 `run_local_codex_prompt()`，用于把任意 prompt 交给本地 Codex 并读取输出文件。
+- `Product/app.py`：新增 `SupervisorPlanPayload`、`GET /api/v1/projects/{project_id}/supervisor-plan`、`POST /api/v1/projects/{project_id}/supervisor-plan`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：首页新增 `supervisor-plan-panel`，静态资源版本更新到 `20260516-p2p-supervisor-plan`。
+- `Product/web/assets/app.js`：新增 `v2api.supervisorPlan.get/generate`、`renderSupervisorPlan()`、`handleGenerateSupervisorPlan()`。
+- `Product/web/assets/styles.css`：新增 `.supervisor-plan-panel`、`.supervisor-plan-card`、`.supervisor-plan-grid` 等审阅台样式。
+
+### 新增运行时产物契约
+
+- `state/product/supervisor_plan.json`：真实生成后保存 normalized SupervisorPlan，`evidence_level=local_execution`、`status=needs_review`。
+- `state/product/supervisor_plan.raw.md`：保存本地 Codex 原始输出，供解析失败或审计时追溯。
+- `artifacts/ui-checks/p2p-supervisor-plan-overview.png`：本轮 headless Chrome 可视化验收截图。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`
+
+说明：首页应显示 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan`。默认环境未设置 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，点击生成或调用 POST 应返回 409 `local_codex_execution_not_enabled`，不会写入 `state/product/supervisor_plan.json`。

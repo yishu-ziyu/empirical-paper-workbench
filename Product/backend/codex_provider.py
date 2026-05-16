@@ -65,6 +65,20 @@ def run_local_codex_task(
     output_path: Path,
     timeout_seconds: int = 300,
 ) -> dict[str, Any]:
+    return run_local_codex_prompt(
+        project_root,
+        build_codex_task_prompt(workflow, task),
+        output_path,
+        timeout_seconds,
+    )
+
+
+def run_local_codex_prompt(
+    project_root: Path,
+    prompt: str,
+    output_path: Path,
+    timeout_seconds: int = 300,
+) -> dict[str, Any]:
     status = local_codex_status()
     if not status["available"]:
         raise FileNotFoundError("codex")
@@ -81,7 +95,7 @@ def run_local_codex_task(
         "read-only",
         "--output-last-message",
         str(output_path),
-        build_codex_task_prompt(workflow, task),
+        prompt,
     ]
     result = subprocess.run(
         command,
@@ -97,4 +111,3 @@ def run_local_codex_task(
         "stderr": result.stderr,
         "output_path": str(output_path),
     }
-

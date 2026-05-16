@@ -2126,31 +2126,42 @@ function renderIntelligenceLayer(intelligence_layer) {
   const provider = intelligence_layer.provider || {};
   const dispatchPlan = intelligence_layer.dispatch_plan || [];
   const blockers = intelligence_layer.blockers || [];
+  const blockerLabel = blockers.length ? `${blockers.length} 项阻塞` : "可进入派工";
   container.innerHTML = `
     <div class="llm-supervisor-card is-${escapeHtml(intelligence_layer.status || "blocked")}">
       <div>
         <span class="meta-label">本地 Codex Supervisor</span>
         <strong>${escapeHtml(intelligence_layer.status === "ready" ? "已启用" : "未启用")}</strong>
-        <p class="muted">${escapeHtml(intelligence_layer.boundary || "Supervisor 负责计划、派工、审阅和失败恢复。")}</p>
+        <p class="muted">负责计划、派工、审阅和失败恢复；不会直接改写已确认研究状态。</p>
       </div>
       ${renderEvidenceBadge({ evidence_level: intelligence_layer.evidence_level || "local_file" })}
-      <div class="llm-provider-grid">
-        <div><span class="meta-label">Provider</span><strong>${escapeHtml(provider.provider || "local_codex")}</strong></div>
-        <div><span class="meta-label">可用</span><strong>${provider.available ? "是" : "否"}</strong></div>
-        <div><span class="meta-label">允许执行</span><strong>${provider.execution_enabled ? "是" : "否"}</strong></div>
-        <div><span class="meta-label">版本</span><strong>${escapeHtml(provider.version || "-")}</strong></div>
+      <div class="decision-signal-row">
+        <span>${escapeHtml(blockerLabel)}</span>
+        <span>派工角色：${dispatchPlan.length}</span>
       </div>
-      ${blockers.length ? `<p class="muted">阻塞：${escapeHtml(blockers.map(productTermLabel).join("、"))}</p>` : "<p class='muted'>本地大模型中控可进入真实派工。</p>"}
     </div>
-    <div class="llm-dispatch-plan">
-      <span class="meta-label">派工计划</span>
-      ${dispatchPlan.map((item) => `
-        <article class="llm-dispatch-item">
-          <strong>${escapeHtml(item.role || item.agent_id)}</strong>
-          <p class="muted">${escapeHtml(item.responsibility || "-")}</p>
-        </article>
-      `).join("") || "<p class='muted'>尚未生成派工计划。</p>"}
-    </div>
+    <details class="progressive-disclosure llm-supervisor-details" data-disclosure="intelligence-progressive-disclosure">
+      <summary>查看中控详情</summary>
+      <div class="disclosure-panel">
+        <p class="muted">${escapeHtml(intelligence_layer.boundary || "Supervisor 负责计划、派工、审阅和失败恢复。")}</p>
+        <div class="llm-provider-grid">
+          <div><span class="meta-label">Provider</span><strong>${escapeHtml(provider.provider || "local_codex")}</strong></div>
+          <div><span class="meta-label">可用</span><strong>${provider.available ? "是" : "否"}</strong></div>
+          <div><span class="meta-label">允许执行</span><strong>${provider.execution_enabled ? "是" : "否"}</strong></div>
+          <div><span class="meta-label">版本</span><strong>${escapeHtml(provider.version || "-")}</strong></div>
+        </div>
+        ${blockers.length ? `<p class="muted">阻塞：${escapeHtml(blockers.map(productTermLabel).join("、"))}</p>` : "<p class='muted'>本地大模型中控可进入真实派工。</p>"}
+        <div class="llm-dispatch-plan">
+          <span class="meta-label">派工计划</span>
+          ${dispatchPlan.map((item) => `
+            <article class="llm-dispatch-item">
+              <strong>${escapeHtml(item.role || item.agent_id)}</strong>
+              <p class="muted">${escapeHtml(item.responsibility || "-")}</p>
+            </article>
+          `).join("") || "<p class='muted'>尚未生成派工计划。</p>"}
+        </div>
+      </div>
+    </details>
   `;
 }
 
@@ -2167,6 +2178,7 @@ function renderSupervisorPlan() {
   const evidence = plan.evidence_requirements || [];
   const dispatch = plan.subagent_dispatch || [];
   const stagePlan = plan.stage_plan || [];
+  const visibleNextAction = plan.next_action?.label || (hasPlan ? "审阅 SupervisorPlan" : "生成 SupervisorPlan");
   container.innerHTML = `
     <article class="supervisor-plan-card is-${escapeHtml(plan.status || "empty")}">
       <div class="supervisor-plan-summary">
@@ -2183,20 +2195,29 @@ function renderSupervisorPlan() {
         </button>
         <span class="muted">人工确认后，才允许进入真实子 Agent 派工。</span>
       </div>
-      <div class="supervisor-plan-ledger">
-        <div><span class="meta-label">下一步</span><strong>${escapeHtml(plan.next_action?.label || "审阅 SupervisorPlan")}</strong></div>
-        <div><span class="meta-label">版本</span><strong>${escapeHtml(String(plan.version ?? 0))}</strong></div>
-        <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
+      <div class="decision-signal-row">
+        <span>下一步：${escapeHtml(visibleNextAction)}</span>
+        <span>${hasPlan ? `风险 ${risks.length} 项` : "等待生成计划"}</span>
       </div>
+      <details class="progressive-disclosure supervisor-plan-details" data-disclosure="supervisor-plan-progressive-disclosure">
+        <summary>查看计划详情</summary>
+        <div class="disclosure-panel">
+          <div class="supervisor-plan-ledger">
+            <div><span class="meta-label">下一步</span><strong>${escapeHtml(visibleNextAction)}</strong></div>
+            <div><span class="meta-label">版本</span><strong>${escapeHtml(String(plan.version ?? 0))}</strong></div>
+            <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
+          </div>
+          ${hasPlan ? `
+            <div class="supervisor-plan-grid">
+              ${renderSupervisorPlanColumn("阶段计划", stagePlan, "goal")}
+              ${renderSupervisorPlanColumn("子 Agent 分工", dispatch, "task")}
+              ${renderSupervisorPlanColumn("证据要求", evidence, "requirement")}
+              ${renderSupervisorPlanColumn("风险", risks, "description")}
+            </div>
+          ` : "<p class='muted'>生成后会在这里显示阶段计划、子 Agent 分工、证据要求和风险。</p>"}
+        </div>
+      </details>
     </article>
-    ${hasPlan ? `
-      <div class="supervisor-plan-grid">
-        ${renderSupervisorPlanColumn("阶段计划", stagePlan, "goal")}
-        ${renderSupervisorPlanColumn("子 Agent 分工", dispatch, "task")}
-        ${renderSupervisorPlanColumn("证据要求", evidence, "requirement")}
-        ${renderSupervisorPlanColumn("风险", risks, "description")}
-      </div>
-    ` : ""}
   `;
 }
 

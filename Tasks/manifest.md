@@ -773,3 +773,27 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`
 
 说明：首页应显示 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan`。默认环境未设置 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，点击生成或调用 POST 应返回 409 `local_codex_execution_not_enabled`，不会写入 `state/product/supervisor_plan.json`。
+
+## 2026-05-16 P2-P1 Home Progressive Disclosure
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-home-progressive-disclosure-bdd.md`
+- `tests/test_supervisor_plan.py`：新增 SupervisorPlan 审阅台默认折叠行为。
+- `tests/test_product_workflow_contract.py`：新增智能中控默认折叠行为。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `20260516-p2p-disclosure1`。
+- `Product/web/assets/app.js`：`renderIntelligenceLayer()` 和 `renderSupervisorPlan()` 改为首屏摘要 + `details/summary` 按需展开。
+- `Product/web/assets/styles.css`：新增 `.progressive-disclosure`、`.disclosure-panel`、`.decision-signal-row`，保留键盘 focus 状态。
+
+### 新增验收产物
+
+- `artifacts/ui-checks/p2p-home-progressive-disclosure.png`：右侧内置浏览器点击展开后的可视化验收截图。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8767/?v=20260516-p2p-disclosure1`
+
+说明：打开“工作台首页”，智能中控与 SupervisorPlan 先只显示摘要。点击 `查看中控详情` 后可看到 Provider、执行开关、阻塞项和派工计划；点击 `查看计划详情` 后可看到版本、写入边界、阶段计划、子 Agent 分工、证据要求和风险。

@@ -263,6 +263,14 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
             self.assertIn(label, self.app_js + self.index_html)
         self.assertIn("supervisor-plan-card", self.styles_css)
 
+    def test_bdd_6_supervisor_plan_details_are_progressively_disclosed(self) -> None:
+        """行为 6：SupervisorPlan 的高噪声审阅细节必须默认折叠，点击后再展开。"""
+        self.assertIn("supervisor-plan-progressive-disclosure", self.app_js)
+        self.assertIn('class="progressive-disclosure supervisor-plan-details"', self.app_js)
+        self.assertIn("查看计划详情", self.app_js)
+        self.assertIn("disclosure-panel", self.app_js)
+        self.assertIn(".progressive-disclosure", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

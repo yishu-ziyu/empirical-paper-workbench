@@ -254,8 +254,76 @@ textarea {
   background: rgba(255, 248, 237, 0.82);
 }
 
-.llm-provider-grid {
+.decision-signal-row {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.decision-signal-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.progressive-disclosure {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  min-width: 0;
+}
+
+.progressive-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.progressive-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.progressive-disclosure > summary::after {
+  content: "展开";
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.progressive-disclosure[open] > summary::after {
+  content: "收起";
+}
+
+.progressive-disclosure > summary:focus-visible {
+  outline: 3px solid rgba(30, 111, 98, 0.28);
+  outline-offset: 2px;
+}
+
+.disclosure-panel {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.llm-provider-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;

@@ -489,3 +489,14 @@
 - [x] 验证：目标测试 5 OK；相邻回归 20 OK；全量回归 208 OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
 - [x] 可视化/API 验收：当前工作树服务运行在 `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`；DOM 显示 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan` 和默认阻断 `local_codex_execution_not_enabled`；截图保存到 `artifacts/ui-checks/p2p-supervisor-plan-overview.png`。
 - [ ] 下一步 P2-Q：把 SupervisorPlan approval 做成显式人工确认状态，然后让 approved SupervisorPlan 驱动下一轮执行任务队列；仍不能自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
+
+## 2026-05-16 P2-P1 Home Progressive Disclosure
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-home-progressive-disclosure-bdd.md`，定义首页智能中控和 SupervisorPlan 的细节默认折叠。
+- [x] TDD：扩展 `tests/test_supervisor_plan.py` 和 `tests/test_product_workflow_contract.py`；首次运行 2 条新增前端行为失败，原因是页面没有 `progressive-disclosure`、`查看中控详情`、`查看计划详情`。
+- [x] 实现：首页“智能中控”首屏只显示启用状态、证据等级、阻塞数量和派工角色数量；Provider、执行开关、阻塞项和派工计划进入可展开详情。
+- [x] 实现：首页 `SupervisorPlan 审阅台` 首屏只显示状态、主按钮、人工确认说明和下一步摘要；版本、写入边界、阶段计划、子 Agent 分工、证据要求和风险进入可展开详情。
+- [x] 可访问性：使用原生 `details/summary`，默认不加 `open`，并补齐 focus-visible 样式。
+- [x] 验证：目标测试 15 OK；全量回归 210 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
+- [x] 右侧内置浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2p-disclosure1` 中两个详情块初始关闭；点击后 `Provider` 和 `SupervisorPlan` 明细可见；截图保存到 `artifacts/ui-checks/p2p-home-progressive-disclosure.png`。
+- [ ] 下一步 P2-Q：实现 SupervisorPlan approve/reject/needs_revision 审批状态机，并把 approved plan 作为后续任务队列的输入。

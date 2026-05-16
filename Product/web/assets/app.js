@@ -32,6 +32,7 @@ const state = {
   journeyData: null,
   researchQuestionData: null,
   supervisorPlanData: null,
+  agentTaskQueueData: null,
   datasetsData: null,
   variableRolesData: null,
   variableRoleCandidatesData: null,
@@ -75,6 +76,7 @@ const state = {
   preflightingDocxCandidateId: null,
   generatingSupervisorPlan: false,
   reviewingSupervisorPlanAction: null,
+  creatingAgentTaskQueue: false,
   researchTopicConfirmed: false,
   researchTopicDraft: "",
 };
@@ -679,6 +681,18 @@ const v2api = {
     async review(projectId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan/review`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  agentTaskQueue: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue`);
+    },
+    async create(projectId, payload = {}) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -2085,6 +2099,11 @@ function productTermLabel(value) {
     missing_panel_time: "缺少面板或时间变量",
     missing_running_variable: "缺少断点运行变量",
     missing_covariates: "缺少协变量",
+    queued: "已排队",
+    ready_for_dispatch: "待派工",
+    ready_to_create: "待创建",
+    "Data Agent": "数据智能体",
+    "Execution Agent": "执行智能体",
   };
   if (exact[text]) return exact[text];
   return text
@@ -2304,6 +2323,130 @@ function renderSupervisorPlanColumn(title, items, detailKey) {
   `;
 }
 
+function renderAgentTaskQueue() {
+  const container = document.getElementById("agent-task-queue-body");
+  if (!container) return;
+  const queue = state.agentTaskQueueData?.agent_task_queue || null;
+  const plan = state.supervisorPlanData?.supervisor_plan || null;
+  if (!queue) {
+    container.innerHTML = "<p class='muted'>正在读取 Agent 任务队列...</p>";
+    return;
+  }
+  const hasQueue = queue.status === "ready_for_dispatch" && Array.isArray(queue.tasks) && queue.tasks.length > 0;
+  const canCreate = Boolean(queue.can_create || (plan?.status === "approved" && plan?.can_dispatch));
+  const summary = queue.summary || {};
+  const blockers = queue.blockers || [];
+  const ownerAgents = summary.owner_agents || [];
+  const uiContract = queue.ui_contract || {};
+  const detailsPolicy = uiContract.details_collapsed_by_default ? "详情默认折叠" : "详情默认展开";
+  container.innerHTML = `
+    <article class="agent-task-queue-card is-${escapeHtml(queue.status || "empty")}">
+      <div class="agent-task-queue-summary">
+        <div>
+          <span class="meta-label">任务队列</span>
+          <h4>${escapeHtml(hasQueue ? "已生成派工草案" : "尚未创建任务队列")}</h4>
+          <p class="muted">${escapeHtml(hasQueue ? "默认只显示任务摘要和阻塞，输入证据、输出要求和审计日志按需展开。" : "批准 SupervisorPlan 后，可以创建派工草案；不会自动执行或改写研究状态。")}</p>
+        </div>
+        ${renderEvidenceBadge({ evidence_level: queue.evidence_level || "local_file" })}
+      </div>
+      <div class="agent-task-queue-ledger">
+        <div><span class="meta-label">任务总数</span><strong>${escapeHtml(String(summary.total_tasks || 0))}</strong></div>
+        <div><span class="meta-label">排队</span><strong>${escapeHtml(String(summary.queued_count || 0))}</strong></div>
+        <div><span class="meta-label">阻塞项</span><strong>${escapeHtml(String(summary.blocked_count || blockers.length || 0))}</strong></div>
+        <div><span class="meta-label">负责人</span><strong>${escapeHtml(ownerAgents.length ? ownerAgents.join("、") : "-")}</strong></div>
+      </div>
+      ${hasQueue ? `
+        <div class="agent-task-list">
+          ${(queue.tasks || []).map(renderAgentTaskQueueItem).join("")}
+        </div>
+      ` : `
+        <div class="agent-task-queue-empty">
+          ${blockers.length ? blockers.map((blocker) => `
+            <div class="agent-task-blocker">
+              <strong>${escapeHtml(blocker.label || blocker.code || "等待前置条件")}</strong>
+              <p class="muted">${escapeHtml(blocker.description || "")}</p>
+            </div>
+          `).join("") : "<p class='muted'>SupervisorPlan 已批准，可以创建队列。</p>"}
+          <button class="primary-button" data-agent-task-create-action ${!canCreate || state.creatingAgentTaskQueue ? "disabled" : ""}>
+            ${state.creatingAgentTaskQueue ? "创建中..." : "创建 Agent 任务队列"}
+          </button>
+          <p class="muted">这一步只创建可审阅派工草案，不会自动执行或改写研究状态。</p>
+        </div>
+      `}
+      <div class="decision-signal-row">
+        <span>来源：${escapeHtml(queue.source_supervisor_plan?.path || "state/product/supervisor_plan.json")}</span>
+        <span>${escapeHtml(detailsPolicy)}</span>
+        <span>下一步：${escapeHtml(queue.next_action?.label || "等待人工检查")}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderAgentTaskQueueItem(task) {
+  const inputEvidence = task.input_evidence || {};
+  const outputRequirements = task.output_requirements || [];
+  const riskFlags = task.risk_flags || [];
+  const auditLog = task.audit_log || [];
+  return `
+    <article class="agent-task-item">
+      <div class="agent-task-item-head">
+        <div>
+          <span class="meta-label">${escapeHtml(productTermLabel(task.role || task.owner_agent || "Agent"))}</span>
+          <h5>${escapeHtml(task.title || task.id || "未命名任务")}</h5>
+          <p class="muted">负责人 Agent：${escapeHtml(task.owner_agent || "-")} · 状态：${escapeHtml(productTermLabel(task.status || "queued"))}</p>
+        </div>
+        <span class="pill">${escapeHtml(productTermLabel(task.status || "queued"))}</span>
+      </div>
+      <p class="muted">${escapeHtml(task.summary || "")}</p>
+      <details class="progressive-disclosure agent-task-details" data-disclosure="agent-task-progressive-disclosure">
+        <summary>查看任务详情</summary>
+        <div class="disclosure-panel agent-task-detail-grid">
+          <div>
+            <span class="meta-label">输入证据</span>
+            <pre>${escapeHtml(JSON.stringify(inputEvidence, null, 2))}</pre>
+          </div>
+          <div>
+            <span class="meta-label">输出要求</span>
+            ${outputRequirements.length ? outputRequirements.map((item) => `
+              <p class="muted">${escapeHtml(item.requirement || item.id || JSON.stringify(item))}</p>
+            `).join("") : "<p class='muted'>尚未声明。</p>"}
+          </div>
+          <div>
+            <span class="meta-label">风险</span>
+            ${riskFlags.length ? riskFlags.map((item) => `
+              <p class="muted">${escapeHtml(item.description || item.id || JSON.stringify(item))}</p>
+            `).join("") : "<p class='muted'>无阻塞风险。</p>"}
+          </div>
+          <div>
+            <span class="meta-label">审计日志</span>
+            ${auditLog.length ? auditLog.map((item) => `
+              <p class="muted">${escapeHtml(item.event || "event")} · ${escapeHtml(item.actor || "")}</p>
+            `).join("") : "<p class='muted'>尚无审计事件。</p>"}
+          </div>
+        </div>
+      </details>
+    </article>
+  `;
+}
+
+async function handleCreateAgentTaskQueue() {
+  if (!state.selectedProjectId) return;
+  clearV2Error("overview");
+  state.creatingAgentTaskQueue = true;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.create(state.selectedProjectId, {
+      note: "Overview 人工创建 Agent Task Queue。",
+    });
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `创建 Agent 任务队列失败：${error.message}`);
+  } finally {
+    state.creatingAgentTaskQueue = false;
+    renderAgentTaskQueue();
+  }
+}
+
 async function handleGenerateSupervisorPlan() {
   if (!state.selectedProjectId) return;
   clearV2Error("overview");
@@ -2315,13 +2458,16 @@ async function handleGenerateSupervisorPlan() {
       note: "用户请求 P2-P：先由本地 Codex Supervisor 提出计划，再进入人工确认。",
     });
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    state.agentTaskQueueData = await v2api.agentTaskQueue.get(state.selectedProjectId);
     renderWorkflowContract(state.overviewData.workflow_contract);
     renderSupervisorPlan();
+    renderAgentTaskQueue();
   } catch (error) {
     showV2Error("overview", `生成 SupervisorPlan 失败：${error.message}`);
   } finally {
     state.generatingSupervisorPlan = false;
     renderSupervisorPlan();
+    renderAgentTaskQueue();
   }
 }
 
@@ -2336,13 +2482,16 @@ async function handleReviewSupervisorPlan(action) {
       note: `首页 SupervisorPlan 审阅台人工审批：${supervisorReviewActionLabel(action)}`,
     });
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    state.agentTaskQueueData = await v2api.agentTaskQueue.get(state.selectedProjectId);
     renderWorkflowContract(state.overviewData.workflow_contract);
     renderSupervisorPlan();
+    renderAgentTaskQueue();
   } catch (error) {
     showV2Error("overview", `审批 SupervisorPlan 失败：${error.message}`);
   } finally {
     state.reviewingSupervisorPlanAction = null;
     renderSupervisorPlan();
+    renderAgentTaskQueue();
   }
 }
 
@@ -3288,6 +3437,7 @@ function renderOverview() {
 
   renderWorkflowContract(data.workflow_contract);
   renderSupervisorPlan();
+  renderAgentTaskQueue();
 
   // Stage summary cards
   const summaries = data.stage_summaries || [];
@@ -5552,6 +5702,7 @@ async function loadV2Data(viewName) {
         state.journeyData = await v2api.journey.get(projectId);
         state.researchQuestionData = await v2api.researchQuestion.get(projectId);
         state.supervisorPlanData = await v2api.supervisorPlan.get(projectId);
+        state.agentTaskQueueData = await v2api.agentTaskQueue.get(projectId);
         renderOverview();
         renderJourneyBar();
         break;
@@ -5769,6 +5920,10 @@ async function boot() {
     const supervisorReviewButton = target.closest("[data-supervisor-plan-review-action]");
     if (supervisorReviewButton) {
       void handleReviewSupervisorPlan(supervisorReviewButton.dataset.supervisorPlanReviewAction);
+      return;
+    }
+    if (target.closest("[data-agent-task-create-action]")) {
+      void handleCreateAgentTaskQueue();
       return;
     }
     const button = target.closest("[data-open-design-action]");

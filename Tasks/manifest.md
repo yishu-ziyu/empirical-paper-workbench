@@ -887,3 +887,47 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `artifacts/ui-checks/p2t-supervisor-review-page.png`
+
+## 2026-05-17 P2-U Agent Task Queue
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-agent-task-queue-bdd.md`
+- `tests/test_agent_task_queue.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/agent_task_queue_service.py`：
+  - 新增 `get_project_agent_task_queue()`。
+  - 新增 `create_project_agent_task_queue()`。
+  - 新增 `AgentTaskQueueBlockedError`。
+  - 新增运行时状态文件契约 `state/product/agent_task_queue.json`。
+- `Product/app.py`：
+  - 新增 `AgentTaskQueuePayload`。
+  - 新增 `GET /api/v1/projects/{project_id}/agent-task-queue`。
+  - 新增 `POST /api/v1/projects/{project_id}/agent-task-queue`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：首页新增 `agent-task-queue-panel` 和 `agent-task-queue-body`。
+- `Product/web/assets/app.js`：
+  - 新增 `state.agentTaskQueueData` 和 `state.creatingAgentTaskQueue`。
+  - 新增 `v2api.agentTaskQueue.get/create`。
+  - 新增 `renderAgentTaskQueue()`、`renderAgentTaskQueueItem()`、`handleCreateAgentTaskQueue()`。
+  - 首页加载 overview 时同步读取 Agent Task Queue。
+- `Product/web/assets/styles.css`：新增 `.agent-task-queue-*`、`.agent-task-item`、`.agent-task-detail-grid`，保持摘要优先和详情折叠布局。
+
+### 新增运行时产物契约
+
+- `state/product/agent_task_queue.json`：仅由 approved SupervisorPlan 生成，`evidence_level=local_file`，记录 source SupervisorPlan、summary、tasks、blockers、ui_contract 和 next_action。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8768/?v=20260517-p2u-final-browser`
+
+说明：当前真实项目没有 approved `state/product/supervisor_plan.json`，所以页面正确显示 `缺少 SupervisorPlan` 且 `创建 Agent 任务队列` 按钮 disabled。受控 approved-plan 浏览器验收截图保存到 `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`，显示 2 个任务、详情默认折叠。
+
+### 新增验收产物
+
+- `/tmp/empirical-workbench-agent-task-queue-p2u-final.png`
+- `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`

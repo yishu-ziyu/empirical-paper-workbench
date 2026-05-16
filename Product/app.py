@@ -8,6 +8,11 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from Product.backend.agent_task_queue_service import (
+    AgentTaskQueueBlockedError,
+    create_project_agent_task_queue,
+    get_project_agent_task_queue,
+)
 from Product.backend.agent_registry_service import get_agent_details, list_agents
 from Product.backend.artifact_service import get_artifact, promote_artifact
 from Product.backend.codex_provider import local_codex_status
@@ -248,6 +253,10 @@ class SupervisorPlanPayload(BaseModel):
 
 class SupervisorPlanReviewPayload(BaseModel):
     action: str
+    note: str = ""
+
+
+class AgentTaskQueuePayload(BaseModel):
     note: str = ""
 
 
@@ -738,6 +747,27 @@ def api_v1_review_project_supervisor_plan(project_id: str, payload: SupervisorPl
     except InvalidSupervisorPlanReviewActionError as exc:
         return error_response(400, "invalid_supervisor_plan_review_action", f"Unsupported review action: {payload.action}.")
     except SupervisorPlanBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/agent-task-queue")
+def api_v1_project_agent_task_queue(project_id: str) -> dict:
+    try:
+        return get_project_agent_task_queue(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue", status_code=201)
+def api_v1_create_project_agent_task_queue(
+    project_id: str,
+    payload: AgentTaskQueuePayload | None = None,
+) -> dict:
+    try:
+        return create_project_agent_task_queue(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except AgentTaskQueueBlockedError as exc:
         return error_response(409, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

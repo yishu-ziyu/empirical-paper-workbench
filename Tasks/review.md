@@ -922,3 +922,49 @@
 - P2-U 还未实现：approved SupervisorPlan 还没有拆成 Agent Task Queue。
 - StatsPAI/StataMCP 仍未成为完整方法族执行后端；当前只完成 CSV OLS 独立验证和 Python OLS 主路径。
 - 线上版数据上传/云执行队列仍未实现；当前 P2-T 只覆盖本地版的 SupervisorPlan 审批边界。
+
+## 2026-05-17 P2-U Agent Task Queue
+
+### 行为覆盖
+
+- [x] 没有 approved SupervisorPlan 时，创建队列返回 409，前端显示阻塞原因并禁用创建按钮。
+- [x] approved SupervisorPlan 可以生成 `ready_for_dispatch` 的摘要优先 Agent Task Queue。
+- [x] GET API 可以跨 Session 读取已持久化队列；未创建时返回可解释空态。
+- [x] 创建队列不能改写 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+- [x] 前端默认只显示队列摘要、任务状态、负责人和阻塞；任务输入证据、输出要求、风险和审计日志默认折叠。
+- [x] 前端创建队列必须是显式人工动作，并显示“不会自动执行或改写研究状态”的安全边界。
+- [x] approved SupervisorPlan 如果没有 `subagent_dispatch`，不能创建空队列。
+- [ ] 未覆盖：真实本地 Codex 生成生产 SupervisorPlan 后的浏览器点击 approve -> create 全链路；子 Agent 实际执行队列。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_agent_task_queue -v` 首次 8 条失败，原因是缺少 `/agent-task-queue` API、持久化服务和前端队列面板。
+- 目标测试：`python3 -m unittest tests.test_agent_task_queue -v`，8 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，234 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/agent_task_queue_service.py Product/backend/supervisor_plan_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：真实项目状态下 `Agent 任务队列` 显示 `缺少 SupervisorPlan`，创建按钮 disabled，console error=0；受控 approved-plan 场景点击创建后显示 2 个任务、2 个 details 默认关闭、创建按钮消失，console error=0。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-agent-task-queue-bdd.md`：新增本轮行为契约。
+- `tests/test_agent_task_queue.py`：新增 API、持久化保护和前端契约测试。
+- `Product/backend/agent_task_queue_service.py`：新增 Agent Task Queue 服务、阻断错误和状态文件写入。
+- `Product/app.py`：新增 GET/POST Agent Task Queue API。
+- `Product/web/index.html`：首页新增队列面板。
+- `Product/web/assets/app.js`：新增队列读取、创建、摘要渲染和折叠详情。
+- `Product/web/assets/styles.css`：新增队列视觉层，保持 clean workbench 摘要优先规则。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2u-final-browser`。
+3. 当前真实项目没有 approved SupervisorPlan，应看到 `Agent 任务队列`、`尚未创建任务队列`、`缺少 SupervisorPlan`，创建按钮为 disabled。
+4. 后续启用本地 Codex 并生成计划后，先在 `SupervisorPlan 审阅台` 点击 `批准计划`；只有 approved plan 才能点击 `创建 Agent 任务队列`。
+5. 创建后应只看到任务摘要和状态；点击 `查看任务详情` 才展开输入证据、输出要求、风险和审计日志。
+
+### 剩余风险
+
+- 当前真实项目没有 approved `state/product/supervisor_plan.json`，所以真实页面只能验收阻塞态；有 approved plan 的成功态由 API 测试和受控浏览器场景覆盖。
+- P2-U 只创建派工草案，不执行子 Agent。下一步需要 P2-V 人工派工 / 执行前审计状态机。
+- 受控浏览器成功态使用 route interception，目的是避免为了截图伪造当前项目状态；真实持久化行为由后端测试覆盖。
+- 浏览器成功态未覆盖移动视口；本轮只验证桌面 clean workbench 信息层级。

@@ -1837,3 +1837,57 @@ P2-U Agent Task Queue 设计时直接应用这份学习结论：队列页默认�
 - Bilibili 转写使用 tiny 模型，能覆盖学习要点，但不是逐字校对稿。
 - Kole Jain `.fig` 已下载但未被程序化解析为 Figma 节点；本轮学习基于页面 metadata、预览图和视频转写。
 - 还没有把这些原则真正落到 P2-U 页面，需要下一轮 BDD/TDD 进入实现。
+
+## 2026-05-17 P2-U Agent Task Queue 交接增量
+
+### 当前目标
+
+把 approved SupervisorPlan 转成可审阅的 Agent Task Queue。队列是派工草案，不是自动执行器；它必须让用户先看到任务摘要、负责人、阻塞项和状态，再按需展开输入证据、输出要求、风险和审计日志。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-agent-task-queue-bdd.md`。
+- 新增测试：`tests/test_agent_task_queue.py`，覆盖阻断、创建、恢复、不可篡改正式研究状态、前端摘要优先和空 `subagent_dispatch`。
+- 新增后端服务：`Product/backend/agent_task_queue_service.py`。
+- 新增 API：`GET /api/v1/projects/{project_id}/agent-task-queue` 和 `POST /api/v1/projects/{project_id}/agent-task-queue`。
+- 新增状态文件契约：`state/product/agent_task_queue.json`。
+- 前端首页新增 `Agent 任务队列` 面板，接入读取、显式创建、摘要 ledger、任务列表和 `details/summary` 折叠详情。
+- 创建队列不会执行子 Agent，也不会改写 `ResearchQuestion`、`VariableRoleSet`、`DesignSpec`、`RunPlan` 或 `SupervisorPlan`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_agent_task_queue -v` 首次 8 条失败，原因是 API 404、服务缺失和前端缺少队列面板。
+- GREEN：`python3 -m unittest tests.test_agent_task_queue -v`，8 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，234 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/agent_task_queue_service.py Product/backend/supervisor_plan_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器真实阻塞态：`http://127.0.0.1:8768/?v=20260517-p2u-final-browser` 显示 `缺少 SupervisorPlan`，创建按钮 disabled，console error=0；截图 `/tmp/empirical-workbench-agent-task-queue-p2u-final.png`。
+- 浏览器受控成功态：approved-plan 场景点击创建后显示 2 个任务、2 个详情默认折叠、创建按钮消失，console error=0；截图 `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`。
+
+### 关键文件路径
+
+- `Product/backend/agent_task_queue_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_agent_task_queue.py`
+- `docs/architecture-v2/codex-phase-p2-agent-task-queue-bdd.md`
+- `state/product/agent_task_queue.json`
+
+### 不能重复探索的结论
+
+- Agent Task Queue 只能从 approved SupervisorPlan 创建；`needs_review`、`needs_revision`、`rejected` 或不存在的计划都必须阻断。
+- 创建队列不是执行任务，不能自动调用子 Agent，也不能把 LLM 建议写入正式研究对象。
+- 队列 UI 默认必须摘要优先，任务证据和审计明细按需展开，避免回到信息噪声过载。
+- 当前真实项目没有 approved `state/product/supervisor_plan.json`，所以页面出现阻塞态是正确产品状态，不是 bug。
+
+### 下一步第一件事
+
+P2-V：给 Agent Task Queue 增加“人工派工 / 执行前审计”状态。用户应能逐项检查任务输入证据、输出要求和阻塞项，然后才允许把某个任务交给具体执行后端或子 Agent。
+
+### 未解决风险
+
+- 真实 Codex Supervisor 生产计划后的 approve -> create 全链路还需要在 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 环境下人工验收。
+- 当前队列没有任务执行 worker，也没有 retry/cancel/assign 状态；P2-U 只完成可审阅派工草案。
+- 成功态浏览器验收使用 route interception，避免污染当前真实项目状态；真实后端持久化行为由测试覆盖。
+- 还没有移动视口视觉验收。

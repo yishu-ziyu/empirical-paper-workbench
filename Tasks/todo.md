@@ -547,3 +547,15 @@
 - [x] 保护性验证：目标测试 13 OK；相邻回归 28 OK；全量回归 226 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
 - [x] 可视化验收：本地服务运行在 `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1`；当前真实项目尚未生成 `supervisor_plan.json`，页面正确显示 `尚未生成` 和 `生成 SupervisorPlan`；截图保存到 `artifacts/ui-checks/p2t-supervisor-review-page.png`。
 - [ ] 下一步 P2-U：把 approved SupervisorPlan 拆成 Agent Task Queue，显示 owner agent、输入证据、输出要求、阻塞项和状态；未 approved 的计划必须继续阻断。
+
+## 2026-05-17 P2-U Agent Task Queue
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-agent-task-queue-bdd.md`，定义 approved SupervisorPlan 才能创建可审阅任务队列。
+- [x] TDD：新增 `tests/test_agent_task_queue.py`；首次目标测试 8 条失败，失败原因是缺少 API、持久化服务和前端队列面板。
+- [x] 实现：新增 `Product/backend/agent_task_queue_service.py`，从 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan 生成 `state/product/agent_task_queue.json`。
+- [x] 实现：扩展 `Product/app.py`，新增 `GET/POST /api/v1/projects/{project_id}/agent-task-queue`；未生成计划、未批准计划和空 `subagent_dispatch` 都返回结构化 409。
+- [x] 实现：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，首页新增 `Agent 任务队列`，默认展示摘要、阻塞、负责人和任务状态，任务详情用 `details/summary` 按需展开。
+- [x] 保护性边界：创建队列只写 `state/product/agent_task_queue.json`，不执行子 Agent，不改写 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+- [x] 自动验证：`python3 -m unittest tests.test_agent_task_queue -v` 8 tests OK；`python3 -m unittest discover -s tests -v` 234 tests OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
+- [x] 浏览器验收：真实项目在无 approved SupervisorPlan 时显示 `缺少 SupervisorPlan` 且创建按钮 disabled；受控 approved-plan 场景点击创建后显示 2 个任务、2 个详情默认折叠、无 console error；截图保存到 `/tmp/empirical-workbench-agent-task-queue-p2u-final.png` 和 `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`。
+- [ ] 下一步 P2-V：把 approved Agent Task Queue 推进到“人工派工 / 执行前审计”状态；仍不能自动启动子 Agent 或绕过任务级人工检查。

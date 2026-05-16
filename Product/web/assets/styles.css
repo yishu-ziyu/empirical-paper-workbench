@@ -346,12 +346,15 @@ textarea {
 }
 
 .supervisor-plan-body,
-.supervisor-plan-grid {
+.supervisor-plan-grid,
+.agent-task-queue-body,
+.agent-task-list {
   display: grid;
   gap: 12px;
 }
 
-.supervisor-plan-card {
+.supervisor-plan-card,
+.agent-task-queue-card {
   display: grid;
   gap: 14px;
   padding: 14px;
@@ -366,7 +369,9 @@ textarea {
 }
 
 .supervisor-plan-summary,
-.supervisor-plan-actions {
+.supervisor-plan-actions,
+.agent-task-queue-summary,
+.agent-task-item-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -408,9 +413,60 @@ textarea {
 }
 
 .supervisor-plan-ledger strong,
-.supervisor-plan-item strong {
+.supervisor-plan-item strong,
+.agent-task-queue-ledger strong,
+.agent-task-item strong {
   display: block;
   overflow-wrap: anywhere;
+}
+
+.agent-task-queue-ledger {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-task-queue-ledger > div,
+.agent-task-item,
+.agent-task-blocker {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.agent-task-queue-empty {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.agent-task-item {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-task-item h5 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.agent-task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-task-detail-grid pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(245, 245, 242, 0.9);
 }
 
 .supervisor-plan-grid {

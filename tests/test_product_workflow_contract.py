@@ -175,6 +175,14 @@ class ProductWorkflowFrontendContractTests(unittest.TestCase):
         self.assertIn('switchView("data-variables")', self.app_js)
         self.assertNotIn("autoBindDatasetFromTopicIntake", self.app_js)
 
+    def test_bdd_13_topic_confirmation_uses_backend_research_question_api(self) -> None:
+        """行为 13：确认选题必须写入后端 ResearchQuestion，而不是只存在 localStorage。"""
+        self.assertIn("researchQuestion:", self.app_js)
+        self.assertIn("/research-question/current", self.app_js)
+        self.assertIn("saveResearchQuestionState", self.app_js)
+        self.assertIn("loadResearchQuestionState", self.app_js)
+        self.assertIn("researchQuestionData", self.app_js)
+
 
 if __name__ == "__main__":
     unittest.main()

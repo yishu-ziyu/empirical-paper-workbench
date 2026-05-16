@@ -239,6 +239,18 @@
 
 ## 2026-05-13 P1-O Review & Export Package Workbench
 
+## 2026-05-16 P2-R ResearchQuestion / TopicSession 持久化
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-research-question-topic-session-bdd.md`，定义首页确认选题后必须生成可跨 Session 恢复的 ResearchQuestion 状态。
+- [x] TDD：新增 `tests/test_research_question_topic_session.py`，并扩展 `tests/test_product_workflow_contract.py`，首次运行失败原因是 `/research-question/current` API 404 和前端只依赖本地状态。
+- [x] 实现：新增 `Product/backend/research_question_service.py`，读写 `state/product/research_question.json`，未确认时只返回 project seed draft，不创建状态文件。
+- [x] 实现：新增 `GET/PUT /api/v1/projects/{project_id}/research-question/current`。
+- [x] 实现：`GET /overview` 暴露 `research_question_state`，并让 `workflow_contract` 中 ResearchQuestion 阶段按 confirmed 状态推进。
+- [x] 前端：首页“进入研究判断”调用后端保存 ResearchQuestion，保存后刷新 overview；静态资源版本更新到 `20260516-p2r-topic-session1`。
+- [x] 验证：目标测试 15 OK，核心回归 36 OK，全量回归 219 OK、skipped=1，Python/JS 静态检查通过，浏览器验收通过。
+- [x] 交接：更新 `Tasks/handoff.md`、`Tasks/decision-log.md`、`Tasks/manifest.md`、`Tasks/review.md`。
+- [ ] P2-S：把 ResearchQuestion 作为 SupervisorPlan 输入，生成人工可审阅的 plan artifact，不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
+
 - [x] BDD：新增 `docs/architecture-v2/codex-phase-p1-review-export-package-bdd.md`，定义 Review & Export 必须读取 `preview_ready` export package，并显示 evaluator、证据路径和下一轮迭代。
 - [x] TDD：新增 `tests/test_review_export_package.py`；首次运行 4 条失败，失败原因是 `/api/v1/projects/{project_id}/export-package` 404，前端缺少 `export-package-workbench`、`export-evaluator-checks`、`frontier-iteration-log` 和返回 Results & Draft 的入口。
 - [x] 实现：扩展 `Product/backend/manuscript_candidate_service.py`，新增 `get_project_export_package()`，把 export preflight manifest 组装为 Review & Export 包。

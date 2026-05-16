@@ -74,6 +74,11 @@ from Product.backend.project_service import (
 )
 from Product.backend.provenance_service import get_artifact_provenance
 from Product.backend.registry import ensure_registry, get_project_by_id
+from Product.backend.research_question_service import (
+    InvalidResearchQuestionError,
+    get_current_research_question,
+    save_current_research_question,
+)
 from Product.backend.results_draft_service import (
     FindingNotFoundError,
     InvalidReviewActionError,
@@ -236,6 +241,12 @@ class DocxPreflightPayload(BaseModel):
 
 class SupervisorPlanPayload(BaseModel):
     objective: str = Field(min_length=1)
+    note: str = ""
+
+
+class ResearchQuestionPayload(BaseModel):
+    question: str
+    source: str = "user_input"
     note: str = ""
 
 
@@ -425,6 +436,31 @@ def api_v1_project_overview(project_id: str) -> dict:
 def api_v1_project_journey(project_id: str) -> dict:
     try:
         return get_project_journey(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/research-question/current")
+def api_v1_project_current_research_question(project_id: str) -> dict:
+    try:
+        return get_current_research_question(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/research-question/current")
+def api_v1_save_project_current_research_question(project_id: str, payload: ResearchQuestionPayload) -> dict:
+    try:
+        return save_current_research_question(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.question,
+            payload.source,
+            payload.note,
+        )
+    except InvalidResearchQuestionError as exc:
+        return error_response(400, "invalid_research_question", str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 

@@ -170,6 +170,23 @@
 - `state/product/finding_reviews.json` 是浏览器/API 验收创建的本地状态，后续提交前需决定保留、迁移 fixture，或作为 runtime artifact。
 - `state/product/manuscript_candidate_reviews.json` 是浏览器/API 验收创建的本地状态，后续提交前需决定保留、迁移 fixture，或作为 runtime artifact。
 
+## 2026-05-16 P2-R ResearchQuestion / TopicSession
+
+- 失败测试：`python3 -m unittest tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v` 首次有效失败为 5 条 `/research-question/current` 404 和 1 条前端缺少 `researchQuestion` API binding。
+- 目标测试：同一命令再次运行，15 tests OK。
+- 核心回归：`python3 -m unittest tests.test_research_question_topic_session tests.test_product_workflow_contract tests.test_supervisor_plan tests.test_design_run_plan_state_machine tests.test_variable_role_confirmation -v`，36 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，219 tests OK，skipped=1，耗时 24.443s。
+- 静态检查：`python3 -m py_compile Program/run_paper.py Program/workbench/observability.py Product/backend/observability_service.py Product/backend/project_service.py Product/backend/research_question_service.py Product/backend/overview_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- API 验收：`PUT /api/v1/projects/proj_undergraduate_thesis/research-question/current` 写入中文选题后，返回 `status=confirmed`、`topic_session_id=topic_session_v2`、`evidence_level=local_file`、`path=state/product/research_question.json`。
+- 浏览器验收：`http://localhost:8767/?v=20260516-p2r-topic-session1&fresh=1` 刷新后显示 `从已有选题继续：机器人应用是否影响劳动力市场匹配效率？`，工作台区域自动展开，`overview-question` 为同一中文选题；console errors=[]。
+
+## 风险更新
+
+- P2-R 已完成：ResearchQuestion 现在是后端可审计状态，跨 Session 不再只靠 localStorage。
+- `state/product/research_question.json` 是本地 runtime artifact，未纳入 git；如果后续要作为演示 fixture，需要单独迁移。
+- 当前只支持单个 current TopicSession；多选题候选池、版本比较、选题废弃/回滚还未做。
+- SupervisorPlan 还未消费 ResearchQuestion state；P2-S 应把它作为 plan artifact 输入，但继续禁止自动覆盖 VariableRoleSet、DesignSpec、RunPlan。
+
 ## 2026-05-13 P1-M Manuscript Promote Preflight
 
 - 失败测试：`python3 -m unittest tests.test_manuscript_consumption -v` 扩展后首次失败；失败原因为 `/api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote` 返回 404，前端缺少 `promotion_status`、`ready_for_export`、`can_write_back`、`promoteManuscriptCandidate` 和 `data-candidate-promote-action`。

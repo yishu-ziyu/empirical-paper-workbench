@@ -86,6 +86,9 @@
 - `POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote` persists promotion preflight state to `state/product/manuscript_candidate_promotions.json`
 - `POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight` persists export preflight state to `state/product/export_package_manifest.json` and creates a write-back preview under `Manuscripts/generated/previews/`
 - `GET /api/v1/projects/{project_id}/manuscript-candidates` returns `promotion_status`, `export_status`, `writeback_preview_path`, `export_manifest_path`, `can_write_back=false`, and `export_package` provenance when those states exist
+- `GET /api/v1/projects/{project_id}/research-question/current` returns the current ResearchQuestion / TopicSession state, falling back to project seed without creating a state file.
+- `PUT /api/v1/projects/{project_id}/research-question/current` persists the confirmed ResearchQuestion to `state/product/research_question.json`.
+- `GET /api/v1/projects/{project_id}/overview` returns `research_question_state` and updates the ResearchQuestion canonical stage from that state.
 
 ## 新增/扩展前端能力
 
@@ -135,6 +138,10 @@
 - `Product/web/assets/app.js`：`v2api.manuscriptCandidates.exportPreflightCandidate(projectId, candidateId, payload)` 调用 `POST /manuscript-candidates/{candidate_id}/export-preflight`。
 - `Product/web/assets/app.js`：`exportPreflightManuscriptCandidate(candidateId)` 生成 write-back preview / export package manifest 并刷新 candidates。
 - `Product/web/assets/app.js`：`renderCandidateExportPreflightPanel(candidate)` 渲染 `preview_ready`、`writeback_preview_path`、`manifest_path` 和 export preflight evidence。
+- `Product/web/assets/app.js`：`v2api.researchQuestion.get/save` 读写 ResearchQuestion / TopicSession 状态。
+- `Product/web/assets/app.js`：`confirmResearchTopic()` 保存首页选题到后端 ResearchQuestion API，再刷新 overview。
+- `Product/web/assets/app.js`：`loadResearchQuestionState()` 让刷新后的页面从后端 confirmed state 恢复选题，而不是只依赖 localStorage。
+- `Product/web/index.html`：CSS/JS 静态资源版本更新到 `?v=20260516-p2r-topic-session1`。
 - `Product/web/index.html`：Results & Draft 新增 `results-findings-list` 和 `draft-evidence-sections`。
 - `Product/web/index.html`：Results & Draft 新增 `manuscript-candidates-list`。
 - `Product/web/assets/styles.css`：新增 finding/draft evidence binding 的行内换行与布局样式。

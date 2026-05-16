@@ -38,6 +38,9 @@
 
 ## 当前要求
 
+- 2026-05-16 修正：产品主入口已经调整为 topic-first。任何后续执行、SupervisorPlan、变量候选、设计方案和 RunPlan 都应绑定一个可审计研究选题，而不是直接从全功能首页开始。
+- 下一步优先级：P2-R `ResearchQuestion / TopicSession` 持久化 -> P2-S SupervisorPlan 审批 -> P2-T Agent Task Queue -> P2-U 真实数据到正式研究状态 -> P2-V 严谨统计执行后端。
+- 长时间迭代计划见 `Tasks/long-run-iteration-plan.md`。
 - 内部生成 `Markdown` 和 `LaTeX` 中间稿。
 - 最终稳定导出 `docx`。
 - 每次运行都保留可验证的中间产物。

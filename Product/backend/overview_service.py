@@ -20,6 +20,7 @@ from Product.backend.design_spec_service import has_approved_design_spec, has_ap
 from Product.backend.variable_role_service import has_approved_variable_role_set
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
+from Product.backend.research_question_service import load_or_build_research_question
 
 
 STATUS_VALUES = {"completed", "in_progress", "blocked", "not_started"}
@@ -75,17 +76,20 @@ def get_project_overview(product_root: Path, repo_root: Path, project_id: str) -
     project = get_project_by_id(product_root, repo_root, project_id)
     root = Path(project.get("project_root") or project["root"]).resolve()
     dataset_count = count_local_datasets(root)
+    research_question_state = load_or_build_research_question(project, root)
     variable_roles_confirmed = has_approved_variable_role_set(root)
     design_spec_confirmed = has_approved_design_spec(root)
     run_plan_confirmed = has_approved_run_plan(root)
     return {
         "_meta": mock_meta("overview_service"),
         "project": project_identity(project),
-        "research_question": project.get("question", ""),
+        "research_question": research_question_state.get("question") or project.get("question", ""),
+        "research_question_state": research_question_state,
         "current_stage": "overview",
         "overall_progress": 0.1,
         "workflow_contract": build_workflow_contract(
             dataset_count,
+            research_question_state.get("status") == "confirmed",
             variable_roles_confirmed,
             design_spec_confirmed,
             run_plan_confirmed,
@@ -154,6 +158,7 @@ def count_local_datasets(root: Path) -> int:
 
 def build_workflow_contract(
     dataset_count: int,
+    research_question_confirmed: bool = False,
     variable_roles_confirmed: bool = False,
     design_spec_confirmed: bool = False,
     run_plan_confirmed: bool = False,
@@ -188,7 +193,7 @@ def build_workflow_contract(
                 "id": "research_question",
                 "name": "ResearchQuestion",
                 "workspace": "data-design",
-                "status": "in_progress",
+                "status": "completed" if research_question_confirmed else "requires_confirmation",
             },
             {
                 "id": "design_spec",

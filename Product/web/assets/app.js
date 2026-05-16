@@ -30,6 +30,7 @@ const state = {
   // V2 page state
   overviewData: null,
   journeyData: null,
+  researchQuestionData: null,
   supervisorPlanData: null,
   datasetsData: null,
   variableRolesData: null,
@@ -670,6 +671,18 @@ const v2api = {
     async generate(projectId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  researchQuestion: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/research-question/current`);
+    },
+    async save(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/research-question/current`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -3078,10 +3091,21 @@ function researchTopicStorageKey() {
 }
 
 function existingResearchTopic(data = state.overviewData) {
-  return data?.research_question || data?.project?.title || "";
+  return data?.research_question_state?.question || data?.research_question || data?.project?.title || "";
+}
+
+function loadResearchQuestionState(data = state.overviewData) {
+  const questionState = state.researchQuestionData?.research_question || data?.research_question_state || null;
+  if (questionState?.status === "confirmed" && questionState.question) {
+    state.researchTopicConfirmed = true;
+    state.researchTopicDraft = questionState.question;
+  }
+  return questionState;
 }
 
 function loadResearchTopicState() {
+  const backendQuestion = loadResearchQuestionState();
+  if (backendQuestion?.status === "confirmed") return;
   try {
     const raw = window.localStorage.getItem(researchTopicStorageKey());
     if (!raw) {
@@ -3100,9 +3124,12 @@ function loadResearchTopicState() {
   }
 }
 
-function saveResearchTopicState(topic) {
+function saveResearchQuestionState(topic, backendQuestion = null) {
   state.researchTopicConfirmed = true;
   state.researchTopicDraft = topic;
+  if (backendQuestion) {
+    state.researchQuestionData = { research_question: backendQuestion };
+  }
   try {
     window.localStorage.setItem(researchTopicStorageKey(), JSON.stringify({
       confirmed: true,
@@ -3113,6 +3140,10 @@ function saveResearchTopicState(topic) {
   } catch (error) {
     console.warn("Unable to persist research topic locally", error);
   }
+}
+
+function saveResearchTopicState(topic) {
+  saveResearchQuestionState(topic);
 }
 
 function renderResearchTopicIntake(data = state.overviewData) {
@@ -3143,14 +3174,24 @@ function renderResearchTopicIntake(data = state.overviewData) {
   }
 }
 
-function confirmResearchTopic(useExisting = false) {
+async function confirmResearchTopic(useExisting = false) {
   const input = document.getElementById("research-topic-input");
   const typedTopic = input instanceof HTMLTextAreaElement ? input.value.trim() : "";
   const topic = useExisting ? existingResearchTopic() : typedTopic || existingResearchTopic();
   if (!topic) return;
-  saveResearchTopicState(topic);
-  renderResearchTopicIntake();
-  document.getElementById("research-workbench-after-topic")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  try {
+    const response = await v2api.researchQuestion.save(state.selectedProjectId, {
+      question: topic,
+      source: useExisting ? "project_seed" : "user_input",
+      note: useExisting ? "从已有选题继续。" : "首页输入后确认。",
+    });
+    saveResearchQuestionState(topic, response.research_question);
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderOverview();
+    document.getElementById("research-workbench-after-topic")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    showV2Error("overview", `保存研究选题失败：${error.message}`);
+  }
 }
 
 function renderOverview() {
@@ -5443,6 +5484,7 @@ async function loadV2Data(viewName) {
       case "overview":
         state.overviewData = await v2api.overview.get(projectId);
         state.journeyData = await v2api.journey.get(projectId);
+        state.researchQuestionData = await v2api.researchQuestion.get(projectId);
         state.supervisorPlanData = await v2api.supervisorPlan.get(projectId);
         renderOverview();
         renderJourneyBar();
@@ -5642,11 +5684,11 @@ async function boot() {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (target.closest("[data-topic-confirm-action]")) {
-      confirmResearchTopic(false);
+      void confirmResearchTopic(false);
       return;
     }
     if (target.closest("[data-topic-use-existing-action]")) {
-      confirmResearchTopic(true);
+      void confirmResearchTopic(true);
       return;
     }
     if (target.closest("[data-topic-start-action]")) {

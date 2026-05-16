@@ -212,6 +212,18 @@ Rejected: 只在前端内存里保存审阅状态。原因是跨 Session 恢复�
 
 Rejected: 对新 run 复用旧 review。原因是相同 finding id 在不同 run 中可能对应不同系数、样本或模型，当前实现要求 `run_id` 和 `artifact_path` 匹配才应用 review。
 
+## 2026-05-16：ResearchQuestion 作为独立入口状态，不自动改写研究配置
+
+Decision: 新增 `GET/PUT /api/v1/projects/{project_id}/research-question/current`，把首页确认的选题保存为 `state/product/research_question.json`，并让 overview 暴露 `research_question_state`。
+
+Reason: P2-Q 已把首页改成“先确定研究选题”，但只存在前端 localStorage 会导致跨 Session 丢失，也无法让 SupervisorPlan、变量候选和执行计划绑定同一个研究上下文。
+
+Rejected: 继续只用 localStorage 保存选题。原因是它不可审计、不可跨窗口继承，也不能成为后续 agent 计划的稳定输入。
+
+Rejected: 保存 ResearchQuestion 后自动重建 VariableRoleSet、DesignSpec 或 RunPlan。原因是这会把“用户输入研究主题”误当成“用户批准研究设定”，风险是模型或工程逻辑偷偷改写研究配置。
+
+Directive: 后续 SupervisorPlan 可以引用 ResearchQuestion，但不得因为 ResearchQuestion 变更而自动覆盖已确认的变量角色、研究设计或运行计划。
+
 ## 2026-05-13：Manuscript 只消费 approved FindingCard，并生成候选而非覆盖正文
 
 Decision: 新增 `GET /api/v1/projects/{project_id}/manuscript-candidates`，只从 `review_status=approved` 且 `can_write_to_draft=true` 的 FindingCard 派生 `manuscript_section_candidate`，并在 Results & Draft 页面显示候选段落与 provenance。

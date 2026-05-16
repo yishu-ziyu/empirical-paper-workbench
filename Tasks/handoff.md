@@ -1653,3 +1653,48 @@ P2-R：新增后端 `ResearchQuestion` / `TopicSession` 状态机，把用户确
 - 右侧内置浏览器截图捕获超时，本轮用 DOM 和可见交互验证替代截图。
 - 选题确认后还没有驱动真实 SupervisorPlan 审批或任务队列。
 - 数据页、执行页、Review & Export 页仍需要继续按“默认摘要、按需展开”收敛信息密度。
+
+## 2026-05-16 P2-R ResearchQuestion / TopicSession 交接增量
+
+### 当前目标
+
+把首页“输入或选择研究选题”从前端本地状态升级为产品级 ResearchQuestion / TopicSession。用户确认选题后，系统必须保存到项目本地状态文件，供后续 SupervisorPlan、VariableRoleSet、DesignSpec、RunPlan 和跨 Session 恢复引用；但本轮明确不让选题确认自动篡改变量角色、设计方案或执行计划。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-research-question-topic-session-bdd.md`。
+- 新增测试：`tests/test_research_question_topic_session.py`。
+- 扩展测试：`tests/test_product_workflow_contract.py` 增加“首页确认选题必须调用后端 ResearchQuestion API”行为。
+- 新增服务：`Product/backend/research_question_service.py`，保存路径为 `state/product/research_question.json`，证据等级为 `local_file`。
+- 扩展 API：`GET/PUT /api/v1/projects/{project_id}/research-question/current`。
+- 扩展 overview：`GET /overview` 返回 `research_question_state`，并把 workflow 中 ResearchQuestion 阶段设为 `completed` 或 `requires_confirmation`。
+- 扩展前端：首页保存选题时调用后端 API，保存后刷新 overview，并继续用渐进披露隐藏后续工作台。
+- 更新静态资源版本：`20260516-p2r-topic-session1`。
+
+### 已验证证据
+
+- RED：新增测试首次运行时 5 条后端测试因 `/research-question/current` 404 失败，1 条前端测试因缺少 `researchQuestion` API binding 失败。
+- GREEN：`python3 -m unittest tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，15 tests OK。
+- 核心回归：`python3 -m unittest tests.test_research_question_topic_session tests.test_product_workflow_contract tests.test_supervisor_plan tests.test_design_run_plan_state_machine tests.test_variable_role_confirmation -v`，36 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，219 tests OK，skipped=1。
+- 静态检查：Python 编译、`node --check Product/web/assets/app.js`、`git diff --check` 均通过。
+- 浏览器验收：内置浏览器打开 `http://localhost:8767/?v=20260516-p2r-topic-session1&fresh=1`，点击“进入研究判断”后写入 ResearchQuestion；随后刷新页面显示 `机器人应用是否影响劳动力市场匹配效率？`，工作台区域自动展开，console error 为 0。
+- 状态文件验收：`state/product/research_question.json` 写入 `status=confirmed`、`topic_session_id=topic_session_v2`、`evidence_level=local_file`、`write_boundary=不会自动改写 VariableRoleSet、DesignSpec 或 RunPlan`。
+
+### 不能重复探索的结论
+
+- 首页确认选题不再只依赖 localStorage；localStorage 只能作为前端体验缓存，正式状态源是 `state/product/research_question.json`。
+- `ResearchQuestion` 只是研究上下文入口，不是自动建模指令；保存它不得创建或改写 `variable_roles.json`、`design_spec.json`、`run_plan.json`。
+- 未确认时 API 返回 project seed draft 且不创建状态文件，避免把默认题目误标成用户确认。
+- 本轮没有启用真实 LLM 派工；下一步应让 SupervisorPlan 引用已确认 ResearchQuestion 并进入人工审阅。
+
+### 下一步第一件事
+
+P2-S：SupervisorPlan 生成时读取 `research_question_state`、VariableRoleSet、DesignSpec 和 RunPlan 的当前状态，输出可审阅 plan artifact。这个 artifact 应包含目标、风险、证据要求、子 Agent 分工、下一步动作；仍不得自动修改正式研究状态。
+
+### 未解决风险
+
+- 浏览器验收产生的 `state/product/research_question.json` 是 gitignored runtime state；当前为本机验收保留，后续若要做示例项目 fixture，应单独迁移。
+- 浏览器插件对 textarea 填充中文时出现 clipboard/timeout 问题；本轮通过点击 seed 选题路径验证 UI 保存，再用 API 写入中文题目并刷新页面验证持久化渲染。
+- 当前 ResearchQuestion API 还没有多选题/版本比较界面，只保留单个 current TopicSession。
+- SupervisorPlan 还没有消费这个状态对象；这就是下一轮 P2-S 的主任务。

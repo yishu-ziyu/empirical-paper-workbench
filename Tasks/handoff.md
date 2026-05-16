@@ -1800,3 +1800,40 @@ P2-U：读取 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan，把
 - P2-U 尚未实现，approved 计划不会自动变成任务队列。
 - 本地 Codex 执行仍需 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，默认关闭是为了避免模型输出在未授权时进入项目状态。
 - StatsPAI/StataMCP 的完整方法族执行仍是后续 P2-W/P2-N 工作，不属于本轮审批状态机。
+
+## 2026-05-17 外部 UI 参考学习交接增量
+
+### 当前目标
+
+下载并学习 `BV16BRQBSEVy` 和 Kole Jain `mobile-app-ui` 资源，把结论沉淀为我们实证研究工作台后续 UI/交互迭代原则。
+
+### 已完成事项
+
+- 已下载 Bilibili 视频、metadata、缩略图、音频和本地 whisper 转写。
+- 已解析 Kole Jain resources 页面，确认 `Mobile App UI` 资源包含 watch link、Figma link、`.fig` 下载和 5 张预览图。
+- 已下载 `Mobile App UI.fig`、缩略图、5 张预览图，并生成 contact sheet。
+- 已新增学习笔记：`docs/reference-learning/mobile-app-ui-kole-jain-bilibili-2026-05-17.md`。
+- 已把大体积参考下载加入 `.gitignore`，避免把视频、模型和 Figma 二进制误提交。
+
+### 已验证证据
+
+- Bilibili metadata 显示标题为 `8分钟带你了解移动应用UI的一切（新手友好）`，时长约 499 秒。
+- 本地转写输出：`artifacts/reference-learning/bilibili-bv16brqbsevy/transcript.txt`、`.srt`、`.json`。
+- Kole Jain resource manifest 中 `mobile-app-ui` 的 Figma link 为 `https://www.figma.com/design/WwEtNcIqpDNxYZx4ZpiE7m/Mobile-App-UI?...`。
+- 本地下载目录：`artifacts/reference-learning/kolejain-resources/`。
+
+### 不能重复探索的结论
+
+- 这些参考资料不是要我们复制移动 app 或暗色风格，而是要吸收信息层级：一屏一个主任务、细节按需展开、空状态给下一步、主操作随对象状态变化。
+- 对我们的产品而言，移动端导航经验对应的是“对象状态驱动的主操作”，不是把桌面工作台改成手机底部栏。
+- 页面拥挤不能靠缩小字体解决，必须减少默认可见决策数量。
+
+### 下一步第一件事
+
+P2-U Agent Task Queue 设计时直接应用这份学习结论：队列页默认只显示任务摘要和当前阻塞，选中任务后才展开输入证据、输出要求、工具日志和 provenance。
+
+### 未解决风险
+
+- Bilibili 转写使用 tiny 模型，能覆盖学习要点，但不是逐字校对稿。
+- Kole Jain `.fig` 已下载但未被程序化解析为 Figma 节点；本轮学习基于页面 metadata、预览图和视频转写。
+- 还没有把这些原则真正落到 P2-U 页面，需要下一轮 BDD/TDD 进入实现。

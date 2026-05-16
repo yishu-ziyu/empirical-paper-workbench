@@ -1698,3 +1698,52 @@ P2-S：SupervisorPlan 生成时读取 `research_question_state`、VariableRoleSe
 - 浏览器插件对 textarea 填充中文时出现 clipboard/timeout 问题；本轮通过点击 seed 选题路径验证 UI 保存，再用 API 写入中文题目并刷新页面验证持久化渲染。
 - 当前 ResearchQuestion API 还没有多选题/版本比较界面，只保留单个 current TopicSession。
 - SupervisorPlan 还没有消费这个状态对象；这就是下一轮 P2-S 的主任务。
+
+## 2026-05-16 P2-S SupervisorPlan 绑定选题交接增量
+
+### 当前目标
+
+让本地 Codex SupervisorPlan 不再围绕项目名或旧设计状态泛泛生成计划，而是显式消费已确认的 `ResearchQuestion / TopicSession`。计划仍然只是待审 artifact，不允许自动改写 `ResearchQuestion`、`VariableRoleSet`、`DesignSpec` 或 `RunPlan`。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-supervisor-plan-topic-binding-bdd.md`。
+- 扩展测试：`tests/test_supervisor_plan.py` 增加缺少 confirmed ResearchQuestion 的阻断、计划输入证据、Codex prompt 绑定和前端展示。
+- 修改 `Product/backend/supervisor_plan_service.py`：生成前调用 `load_saved_research_question()`，要求 `status=confirmed`，否则返回 409 `research_question_required`。
+- 修改 Codex prompt：新增 `confirmed_research_question`，包含 `question`、`topic_session_id`、`version`、`evidence_level` 和 `path`。
+- 修改 normalized plan：新增 `input_research_question`，并在 `input_state_versions` / `input_evidence` 中记录 ResearchQuestion 版本和路径。
+- 修改 `Product/web/assets/app.js`：SupervisorPlan 审阅台摘要显示 `绑定选题`，展开后显示 `TopicSession` 和 `ResearchQuestion 版本`。
+- 更新静态资源版本：`20260516-p2s-supervisor-topic1`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_supervisor_plan -v` 首次 5 条失败；3 条因 prompt 缺少 confirmed research question 返回 502，1 条因缺少 ResearchQuestion 时没有返回 `research_question_required`，1 条前端缺少选题绑定展示。
+- GREEN：`python3 -m unittest tests.test_supervisor_plan -v`，8 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，23 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，221 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/supervisor_plan_service.py Product/backend/research_question_service.py Product/app.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1` 自动识别 confirmed ResearchQuestion，`SupervisorPlan 审阅台` 显示 `绑定选题：机器人应用是否影响劳动力市场匹配效率？`，展开详情可见 TopicSession/ResearchQuestion 版本槽位，console error=0；截图保存到 `artifacts/ui-checks/p2s-supervisor-topic-binding.png`。
+
+### 关键文件路径
+
+- `Product/backend/supervisor_plan_service.py`
+- `Product/web/assets/app.js`
+- `Product/web/index.html`
+- `tests/test_supervisor_plan.py`
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-topic-binding-bdd.md`
+
+### 不能重复探索的结论
+
+- SupervisorPlan 必须基于 confirmed ResearchQuestion；project seed draft 不能当作用户确认选题。
+- Codex prompt 必须携带 `confirmed_research_question` 和 `topic_session_id`，否则计划无法审计。
+- 绑定选题仍不是执行授权；它只让计划有研究上下文，不允许跳过人工审批。
+
+### 下一步第一件事
+
+P2-T：给 SupervisorPlan 增加 approve/reject/needs_revision API、状态文件记录和前端操作。只有 approved SupervisorPlan 才能拆成 Agent Task Queue。
+
+### 未解决风险
+
+- 当前仍没有 SupervisorPlan 审批状态机；`needs_review` 计划不能派工。
+- 本轮使用 fake Codex CLI 测试 prompt contract；真实本地 Codex 执行还需要在启用环境变量后做一次人工验收。
+- 默认环境没有启用本地 Codex 执行，因此浏览器只验证了“空计划 + confirmed ResearchQuestion fallback”的绑定展示；真实 plan 的 `TopicSession` 值由 fake Codex 测试覆盖，后续开启执行开关后需要再做一次人工验收。

@@ -8,6 +8,7 @@ from Product.backend.codex_provider import local_codex_status, run_local_codex_p
 from Product.backend.design_spec_service import load_saved_design_spec, load_saved_run_plan
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
+from Product.backend.research_question_service import load_saved_research_question
 from Product.backend.variable_role_service import load_saved_variable_role_set
 
 
@@ -70,6 +71,7 @@ def generate_project_supervisor_plan(
             f"Set {provider.get('execution_env')}=1 to allow local Codex supervisor execution.",
         )
 
+    research_question = require_confirmed_research_question(load_saved_research_question(project_root))
     variable_roles = require_approved_state(load_saved_variable_role_set(project_root), "VariableRoleSet")
     design_spec = require_approved_state(load_saved_design_spec(project_root), "DesignSpec")
     run_plan = require_approved_state(load_saved_run_plan(project_root), "RunPlan")
@@ -78,7 +80,7 @@ def generate_project_supervisor_plan(
     raw_path = supervisor_plan_raw_path(project_root)
     result = run_local_codex_prompt(
         project_root,
-        build_supervisor_plan_prompt(project, objective, variable_roles, design_spec, run_plan),
+        build_supervisor_plan_prompt(project, objective, research_question, variable_roles, design_spec, run_plan),
         raw_path,
         timeout_seconds=300,
     )
@@ -94,6 +96,7 @@ def generate_project_supervisor_plan(
         objective,
         note,
         provider,
+        research_question,
         variable_roles,
         design_spec,
         run_plan,
@@ -157,9 +160,19 @@ def require_approved_state(state: dict[str, Any] | None, label: str) -> dict[str
     return state
 
 
+def require_confirmed_research_question(state: dict[str, Any] | None) -> dict[str, Any]:
+    if not state or state.get("status") != "confirmed":
+        raise SupervisorPlanBlockedError(
+            "research_question_required",
+            "Confirmed ResearchQuestion is required before generating SupervisorPlan.",
+        )
+    return state
+
+
 def build_supervisor_plan_prompt(
     project: dict[str, Any],
     objective: str,
+    research_question: dict[str, Any],
     variable_roles: dict[str, Any],
     design_spec: dict[str, Any],
     run_plan: dict[str, Any],
@@ -171,6 +184,7 @@ def build_supervisor_plan_prompt(
             "question": project.get("question", ""),
         },
         "objective": objective,
+        "confirmed_research_question": compact_research_question(research_question),
         "approved_variable_roles": compact_state(variable_roles),
         "approved_design_spec": compact_state(design_spec),
         "approved_run_plan": compact_state(run_plan),
@@ -183,6 +197,20 @@ def build_supervisor_plan_prompt(
         "所有建议必须基于输入状态，不得声称已执行分析，不得改写任何已批准状态。\n\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
+
+
+def compact_research_question(state: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "id",
+        "topic_session_id",
+        "version",
+        "status",
+        "question",
+        "evidence_level",
+        "source",
+        "path",
+    )
+    return {key: state.get(key) for key in keys if key in state}
 
 
 def compact_state(state: dict[str, Any]) -> dict[str, Any]:
@@ -222,6 +250,7 @@ def normalize_supervisor_plan(
     objective: str,
     note: str,
     provider: dict[str, Any],
+    research_question: dict[str, Any],
     variable_roles: dict[str, Any],
     design_spec: dict[str, Any],
     run_plan: dict[str, Any],
@@ -236,6 +265,7 @@ def normalize_supervisor_plan(
         "project_id": project["id"],
         "provider": provider,
         "objective": objective,
+        "input_research_question": compact_research_question(research_question),
         "stage_plan": normalize_list(generated.get("stage_plan")),
         "subagent_dispatch": normalize_list(generated.get("subagent_dispatch")),
         "evidence_requirements": normalize_list(generated.get("evidence_requirements")),
@@ -246,11 +276,13 @@ def normalize_supervisor_plan(
             "label": "审阅 SupervisorPlan",
         },
         "input_state_versions": {
+            "research_question_version": int(research_question.get("version", 0)),
             "variable_role_set_version": int(variable_roles.get("version", 0)),
             "design_spec_version": int(design_spec.get("version", 0)),
             "run_plan_version": int(run_plan.get("version", 0)),
         },
         "input_evidence": {
+            "research_question_path": "state/product/research_question.json",
             "variable_roles_path": "state/product/variable_roles.json",
             "design_spec_path": "state/product/design_spec.json",
             "run_plan_path": "state/product/run_plan.json",

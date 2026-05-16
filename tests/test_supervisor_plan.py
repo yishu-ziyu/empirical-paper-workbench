@@ -86,6 +86,10 @@ class SupervisorPlanApiTests(unittest.TestCase):
         self.assertEqual(plan["objective"], "为 approved RunPlan 生成下一轮实证执行计划")
         self.assertEqual(plan["next_action"]["id"], "review_supervisor_plan")
         self.assertEqual(plan["subagent_dispatch"][0]["agent_id"], "pipeline_data")
+        self.assertEqual(plan["input_research_question"]["question"], "培训是否影响工资？")
+        self.assertEqual(plan["input_research_question"]["topic_session_id"], "topic_session_v1")
+        self.assertEqual(plan["input_state_versions"]["research_question_version"], 1)
+        self.assertEqual(plan["input_evidence"]["research_question_path"], "state/product/research_question.json")
         self.assertIn("不可直接改写 VariableRoleSet", plan["write_boundary"])
 
         saved_path = self.project_root / "state" / "product" / "supervisor_plan.json"
@@ -93,6 +97,23 @@ class SupervisorPlanApiTests(unittest.TestCase):
         saved = json.loads(saved_path.read_text(encoding="utf-8"))
         self.assertEqual(saved["status"], "needs_review")
         self.assertEqual(saved["raw_output_path"], "state/product/supervisor_plan.raw.md")
+        self.assertEqual(saved["input_research_question"]["version"], 1)
+
+    def test_bdd_7_generation_requires_confirmed_research_question(self) -> None:
+        """行为 7：没有 confirmed ResearchQuestion 时，SupervisorPlan 不得生成。"""
+        self._install_fake_codex()
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+        research_question_path = self.project_root / "state" / "product" / "research_question.json"
+        research_question_path.unlink()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "尝试在无选题状态下派工", "note": "必须阻断"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "research_question_required")
+        self.assertFalse((self.project_root / "state" / "product" / "supervisor_plan.json").exists())
 
     def test_bdd_3_supervisor_plan_does_not_mutate_approved_research_states(self) -> None:
         """行为 3：SupervisorPlan 只能引用已确认状态，不得直接改写它们。"""
@@ -114,6 +135,7 @@ class SupervisorPlanApiTests(unittest.TestCase):
         after = {path.name: path.read_text(encoding="utf-8") for path in state_paths}
         self.assertEqual(before, after)
         plan = response.json()["supervisor_plan"]
+        self.assertEqual(plan["input_state_versions"]["research_question_version"], 1)
         self.assertEqual(plan["input_state_versions"]["variable_role_set_version"], 1)
         self.assertEqual(plan["input_state_versions"]["design_spec_version"], 1)
         self.assertEqual(plan["input_state_versions"]["run_plan_version"], 1)
@@ -135,6 +157,15 @@ class SupervisorPlanApiTests(unittest.TestCase):
         self.assertEqual(response.json()["supervisor_plan"]["objective"], "生成可审阅执行计划")
 
     def _approve_research_states(self) -> None:
+        question = self.client.put(
+            f"/api/v1/projects/{self.project_id}/research-question/current",
+            json={
+                "question": "培训是否影响工资？",
+                "source": "project_seed",
+                "note": "选题已确认。",
+            },
+        )
+        self.assertEqual(question.status_code, 200, msg=question.text)
         roles = self.client.put(
             f"/api/v1/projects/{self.project_id}/variable-roles",
             json={
@@ -194,6 +225,10 @@ if "--version" in sys.argv:
     raise SystemExit(0)
 
 output_path = Path(sys.argv[sys.argv.index("--output-last-message") + 1])
+prompt = sys.argv[-1]
+if "confirmed_research_question" not in prompt or "topic_session_v1" not in prompt:
+    print("prompt missing confirmed research question context", file=sys.stderr)
+    raise SystemExit(7)
 payload = {
     "stage_plan": [
         {"stage": "数据与变量", "goal": "复核字段角色与样本口径", "status": "planned"},
@@ -270,6 +305,13 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn("查看计划详情", self.app_js)
         self.assertIn("disclosure-panel", self.app_js)
         self.assertIn(".progressive-disclosure", self.styles_css)
+
+    def test_bdd_8_frontend_shows_supervisor_plan_topic_binding(self) -> None:
+        """行为 8：SupervisorPlan 审阅台必须显示绑定的研究选题和 TopicSession。"""
+        self.assertIn("input_research_question", self.app_js)
+        self.assertIn("绑定选题", self.app_js)
+        self.assertIn("TopicSession", self.app_js)
+        self.assertIn("ResearchQuestion 版本", self.app_js)
 
 
 if __name__ == "__main__":

@@ -535,4 +535,15 @@
 - [x] 前端：`SupervisorPlan 审阅台` 摘要显示 `绑定选题`，详情显示 `TopicSession` 和 `ResearchQuestion 版本`。
 - [x] 验证：目标测试 8 OK；相邻回归 23 OK；全量回归 221 OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
 - [x] 可视化验收：`http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1` 显示已确认选题和 SupervisorPlan 审阅台绑定选题；console error=0；截图保存到 `artifacts/ui-checks/p2s-supervisor-topic-binding.png`。
-- [ ] 下一步 P2-T：实现 SupervisorPlan approve/reject/needs_revision 审批 API 和前端操作；只有 approved plan 才能进入 Agent Task Queue。
+- [x] 下一步 P2-T：已实现 SupervisorPlan approve/reject/needs_revision 审批 API 和前端操作；只有 approved plan 才能进入 Agent Task Queue。
+
+## 2026-05-16 P2-T SupervisorPlan Review State Machine
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-supervisor-plan-review-bdd.md`，定义 SupervisorPlan 人工审批、阻断派工和不可篡改研究状态的行为。
+- [x] TDD：扩展 `tests/test_supervisor_plan.py`；首次目标测试失败，原因是缺少 `/supervisor-plan/review` API、review 状态持久化和前端审批按钮。
+- [x] 实现：`PUT /api/v1/projects/{project_id}/supervisor-plan/review` 支持 `approve`、`needs_revision`、`reject`，写入 `human_review`、`can_dispatch` 和下一步动作。
+- [x] 实现：审批只更新 `state/product/supervisor_plan.json`，不会改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+- [x] 前端：首页 `SupervisorPlan 审阅台` 在存在计划时显示 `批准计划`、`要求修改`、`驳回计划`，并用 `可进入任务队列` / `不可派工` 明确结果。
+- [x] 保护性验证：目标测试 13 OK；相邻回归 28 OK；全量回归 226 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
+- [x] 可视化验收：本地服务运行在 `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1`；当前真实项目尚未生成 `supervisor_plan.json`，页面正确显示 `尚未生成` 和 `生成 SupervisorPlan`；截图保存到 `artifacts/ui-checks/p2t-supervisor-review-page.png`。
+- [ ] 下一步 P2-U：把 approved SupervisorPlan 拆成 Agent Task Queue，显示 owner agent、输入证据、输出要求、阻塞项和状态；未 approved 的计划必须继续阻断。

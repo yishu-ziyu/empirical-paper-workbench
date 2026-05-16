@@ -876,3 +876,49 @@
 - 当前仍然没有 approve/reject/needs_revision，所以计划不能进入真实任务队列。
 - 真实 Codex 执行验收依赖 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，本轮暂未开启；浏览器只验证默认阻断和绑定选题展示。
 - 如果项目没有 confirmed ResearchQuestion，需要先走首页选题确认，否则 SupervisorPlan 会正确阻断。
+
+## 2026-05-16 P2-T SupervisorPlan Review State Machine
+
+### 行为覆盖
+
+- [x] 缺少 `state/product/supervisor_plan.json` 时，审批 API 返回 409 `supervisor_plan_required`，不能审批不存在的计划。
+- [x] `approve` 会把计划标记为 `approved`，写入 `human_review`，并设置 `can_dispatch=true`。
+- [x] `needs_revision` 会把计划标记为 `needs_revision`，写入人工意见，并继续阻断任务队列。
+- [x] `reject` 会把计划标记为 `rejected`，写入人工意见，并继续阻断任务队列。
+- [x] 非法 action 返回 400 `invalid_supervisor_plan_review_action`。
+- [x] 审批不能改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。
+- [x] 前端在存在计划时提供 `批准计划`、`要求修改`、`驳回计划` 三个显式按钮。
+- [ ] 未覆盖：approved SupervisorPlan 拆成真实 Agent Task Queue；真实 Codex 执行生成生产计划后的浏览器点击审批。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_supervisor_plan -v` 首次新增审批行为失败，原因是 review API、状态持久化和前端按钮尚未实现。
+- 目标测试：`python3 -m unittest tests.test_supervisor_plan -v`，13 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，28 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，226 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/supervisor_plan_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-review-bdd.md`：新增本轮审批状态机行为契约。
+- `tests/test_supervisor_plan.py`：新增审批 API、状态保护和前端按钮测试。
+- `Product/backend/supervisor_plan_service.py`：新增审批状态机和错误类型。
+- `Product/app.py`：新增审批 API。
+- `Product/web/assets/app.js`：新增审批请求、按钮渲染和 loading 状态。
+- `Product/web/assets/styles.css`：新增审批区样式，并保持单列防重叠布局。
+
+### 手动验收
+
+1. 打开 `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1`。
+2. 首页进入研究判断区，查看 `SupervisorPlan 审阅台`。
+3. 当前真实项目没有计划产物时，应看到 `尚未生成` 和 `生成 SupervisorPlan`，不应看到批准/驳回按钮。
+4. 当后续启用本地 Codex 并生成 `supervisor_plan.json` 后，审阅台应显示 `批准计划`、`要求修改`、`驳回计划`。
+5. 点击 `批准计划` 后，计划才允许进入下一步任务队列；点击另外两个动作必须继续阻断派工。
+6. 本轮截图：`artifacts/ui-checks/p2t-supervisor-review-page.png`。
+
+### 剩余风险
+
+- 当前真实项目默认未启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，所以浏览器只验收了“无计划时不显示审批按钮”的正确状态；有计划后的按钮路径由 API/前端测试覆盖。
+- P2-U 还未实现：approved SupervisorPlan 还没有拆成 Agent Task Queue。
+- StatsPAI/StataMCP 仍未成为完整方法族执行后端；当前只完成 CSV OLS 独立验证和 Python OLS 主路径。
+- 线上版数据上传/云执行队列仍未实现；当前 P2-T 只覆盖本地版的 SupervisorPlan 审批边界。

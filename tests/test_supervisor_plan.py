@@ -156,6 +156,98 @@ class SupervisorPlanApiTests(unittest.TestCase):
         self.assertEqual(response.json()["supervisor_plan"]["status"], "needs_review")
         self.assertEqual(response.json()["supervisor_plan"]["objective"], "生成可审阅执行计划")
 
+    def test_bdd_9_approve_supervisor_plan_persists_human_review_and_allows_dispatch(self) -> None:
+        """行为 9：人工 approve 后，SupervisorPlan 才能作为任务队列输入。"""
+        self._generate_plan()
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "approve", "note": "计划可以进入下一步任务队列。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        plan = response.json()["supervisor_plan"]
+        self.assertEqual(plan["status"], "approved")
+        self.assertTrue(plan["can_dispatch"])
+        self.assertEqual(plan["next_action"]["id"], "create_agent_task_queue")
+        self.assertEqual(plan["human_review"]["action"], "approve")
+        self.assertEqual(plan["human_review"]["note"], "计划可以进入下一步任务队列。")
+
+        saved = json.loads((self.project_root / "state" / "product" / "supervisor_plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["status"], "approved")
+        self.assertTrue(saved["can_dispatch"])
+
+    def test_bdd_10_reject_or_revision_blocks_dispatch(self) -> None:
+        """行为 10：reject / needs_revision 必须阻止派工，并保存审阅意见。"""
+        self._generate_plan()
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "needs_revision", "note": "证据要求还不够清楚。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        plan = response.json()["supervisor_plan"]
+        self.assertEqual(plan["status"], "needs_revision")
+        self.assertFalse(plan["can_dispatch"])
+        self.assertEqual(plan["next_action"]["id"], "revise_supervisor_plan")
+        self.assertEqual(plan["human_review"]["action"], "needs_revision")
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "reject", "note": "暂不采用。"},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        self.assertEqual(response.json()["supervisor_plan"]["status"], "rejected")
+        self.assertFalse(response.json()["supervisor_plan"]["can_dispatch"])
+
+    def test_bdd_11_review_requires_existing_plan_and_valid_action(self) -> None:
+        """行为 11：不存在计划或非法审批动作必须被结构化拒绝。"""
+        missing = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "approve", "note": "不能审批不存在的计划。"},
+        )
+        self.assertEqual(missing.status_code, 409, msg=missing.text)
+        self.assertEqual(missing.json()["error"]["code"], "supervisor_plan_required")
+
+        self._generate_plan()
+        invalid = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "dispatch_now", "note": "非法动作。"},
+        )
+        self.assertEqual(invalid.status_code, 400, msg=invalid.text)
+        self.assertEqual(invalid.json()["error"]["code"], "invalid_supervisor_plan_review_action")
+
+    def test_bdd_12_supervisor_plan_review_does_not_mutate_research_states(self) -> None:
+        """行为 12：审批计划不能改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。"""
+        self._generate_plan()
+        state_paths = [
+            self.project_root / "state" / "product" / "research_question.json",
+            self.project_root / "state" / "product" / "variable_roles.json",
+            self.project_root / "state" / "product" / "design_spec.json",
+            self.project_root / "state" / "product" / "run_plan.json",
+        ]
+        before = {path.name: path.read_text(encoding="utf-8") for path in state_paths}
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan/review",
+            json={"action": "approve", "note": "只审批计划。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        after = {path.name: path.read_text(encoding="utf-8") for path in state_paths}
+        self.assertEqual(before, after)
+
+    def _generate_plan(self) -> dict:
+        self._install_fake_codex()
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "生成可审批的 SupervisorPlan", "note": "准备进入人工审批。"},
+        )
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        return response.json()["supervisor_plan"]
+
     def _approve_research_states(self) -> None:
         question = self.client.put(
             f"/api/v1/projects/{self.project_id}/research-question/current",
@@ -312,6 +404,14 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn("绑定选题", self.app_js)
         self.assertIn("TopicSession", self.app_js)
         self.assertIn("ResearchQuestion 版本", self.app_js)
+
+    def test_bdd_13_frontend_exposes_explicit_supervisor_plan_review_actions(self) -> None:
+        """行为 13：前端必须提供 approve/reject/needs_revision 三个显式审批动作。"""
+        self.assertIn("v2api.supervisorPlan.review", self.app_js)
+        self.assertIn("handleReviewSupervisorPlan", self.app_js)
+        self.assertIn("data-supervisor-plan-review-action", self.app_js)
+        for label in ("批准计划", "要求修改", "驳回计划", "只有批准后的计划才能进入任务队列"):
+            self.assertIn(label, self.app_js)
 
 
 if __name__ == "__main__":

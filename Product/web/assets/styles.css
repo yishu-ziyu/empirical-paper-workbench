@@ -373,6 +373,24 @@ textarea {
   align-items: flex-start;
 }
 
+.supervisor-plan-review-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(250, 250, 248, 0.88);
+}
+
+.supervisor-plan-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
 .supervisor-plan-summary h4 {
   margin: 0 0 6px;
 }

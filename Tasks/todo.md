@@ -524,3 +524,15 @@
 - [x] 验证：目标前端契约测试 9 OK；相邻回归 18 OK；全量回归 213 OK，skipped=1；Python 编译、JS 语法、`git diff --check` 通过。
 - [x] 右侧内置浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2q-topic1` 初始只显示选题入口；输入选题并点击 `进入研究判断` 后，才显示 `下一步研究决策`、`智能中控` 和 `SupervisorPlan`。
 - [ ] 下一步 P2-R：把确认后的研究选题升级为后端 `ResearchQuestion` / `TopicSession` 审计对象，再做 SupervisorPlan approve/reject/needs_revision 审批状态机。
+
+## 2026-05-16 P2-S SupervisorPlan Topic Binding
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-supervisor-plan-topic-binding-bdd.md`，定义 SupervisorPlan 必须基于 confirmed ResearchQuestion / TopicSession。
+- [x] TDD：扩展 `tests/test_supervisor_plan.py`；首次运行 5 条失败，原因是 Codex prompt 缺少 confirmed research question、无选题时没有提前返回 `research_question_required`、前端审阅台不显示绑定选题。
+- [x] 实现：`Product/backend/supervisor_plan_service.py` 在生成 SupervisorPlan 前读取 `state/product/research_question.json`，只接受 `status=confirmed`。
+- [x] 实现：SupervisorPlan 输出新增 `input_research_question`、`input_state_versions.research_question_version`、`input_evidence.research_question_path`。
+- [x] 实现：传给本地 Codex 的 prompt 新增 `confirmed_research_question`，包含 question、version、topic_session_id、evidence_level 和 path。
+- [x] 前端：`SupervisorPlan 审阅台` 摘要显示 `绑定选题`，详情显示 `TopicSession` 和 `ResearchQuestion 版本`。
+- [x] 验证：目标测试 8 OK；相邻回归 23 OK；全量回归 221 OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
+- [x] 可视化验收：`http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1` 显示已确认选题和 SupervisorPlan 审阅台绑定选题；console error=0；截图保存到 `artifacts/ui-checks/p2s-supervisor-topic-binding.png`。
+- [ ] 下一步 P2-T：实现 SupervisorPlan approve/reject/needs_revision 审批 API 和前端操作；只有 approved plan 才能进入 Agent Task Queue。

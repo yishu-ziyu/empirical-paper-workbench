@@ -834,3 +834,45 @@
 - 选题目前是前端本地状态，不是后端审计对象；下一步需要 ResearchQuestion/TopicSession。
 - 右侧内置浏览器截图捕获超时；本轮以 DOM 检查和实际可见交互作为验收证据。
 - 这轮只调整首页入口，没有完成 SupervisorPlan approve/reject/needs_revision 审批。
+
+## 2026-05-16 P2-S SupervisorPlan Topic Binding
+
+### 行为覆盖
+
+- [x] 没有 confirmed ResearchQuestion 时，SupervisorPlan 生成返回 409 `research_question_required`。
+- [x] 本地 Codex prompt 必须包含 `confirmed_research_question` 和 `topic_session_id`。
+- [x] 生成后的 SupervisorPlan 记录 `input_research_question`、ResearchQuestion 版本和状态文件路径。
+- [x] 前端 SupervisorPlan 审阅台显示绑定选题、TopicSession 和 ResearchQuestion 版本。
+- [x] 生成计划仍不得改写 VariableRoleSet、DesignSpec 或 RunPlan。
+- [ ] 未覆盖：真实 Codex CLI 在开启执行开关后的端到端生成验收；SupervisorPlan 审批状态机。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_supervisor_plan -v` 首次 5 条失败，符合预期。
+- GREEN：`python3 -m unittest tests.test_supervisor_plan -v`，8 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，23 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，221 tests OK，skipped=1。
+- 静态检查：Python 编译检查通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `Product/backend/supervisor_plan_service.py`：新增 confirmed ResearchQuestion 前置条件、prompt 上下文和 plan 输入证据。
+- `Product/web/assets/app.js`：审阅台显示绑定选题和版本信息。
+- `Product/web/index.html`：更新资源版本。
+- `tests/test_supervisor_plan.py`：扩展 BDD 测试。
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-topic-binding-bdd.md`：新增行为规格。
+
+### 手动验收
+
+1. 打开 `http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1`。
+2. 首页用已有选题继续，确认工作台展开。
+3. 查看 `SupervisorPlan 审阅台`，摘要中应出现 `绑定选题`。
+4. 点击 `查看计划详情`，应看到 `TopicSession` 和 `ResearchQuestion 版本`。
+5. 默认环境点击 `生成 SupervisorPlan` 仍应被 `local_codex_execution_not_enabled` 阻断，不能伪装派工。
+6. 本轮截图：`artifacts/ui-checks/p2s-supervisor-topic-binding.png`。
+
+### 剩余风险
+
+- 当前仍然没有 approve/reject/needs_revision，所以计划不能进入真实任务队列。
+- 真实 Codex 执行验收依赖 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，本轮暂未开启；浏览器只验证默认阻断和绑定选题展示。
+- 如果项目没有 confirmed ResearchQuestion，需要先走首页选题确认，否则 SupervisorPlan 会正确阻断。

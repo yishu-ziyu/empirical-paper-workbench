@@ -2202,6 +2202,8 @@ function renderSupervisorPlan() {
   const evidence = plan.evidence_requirements || [];
   const dispatch = plan.subagent_dispatch || [];
   const stagePlan = plan.stage_plan || [];
+  const inputQuestion = plan.input_research_question || {};
+  const boundQuestion = inputQuestion.question || state.researchQuestionData?.research_question?.question || "";
   const visibleNextAction = plan.next_action?.label || (hasPlan ? "审阅 SupervisorPlan" : "生成 SupervisorPlan");
   container.innerHTML = `
     <article class="supervisor-plan-card is-${escapeHtml(plan.status || "empty")}">
@@ -2210,6 +2212,7 @@ function renderSupervisorPlan() {
           <span class="meta-label">本地 Codex SupervisorPlan</span>
           <h4>${escapeHtml(hasPlan ? reviewStatusLabel(plan.status) : "尚未生成")}</h4>
           <p class="muted">${escapeHtml(hasPlan ? plan.objective : "生成后会进入人工确认，不会直接改写变量角色、研究设计或执行计划。")}</p>
+          ${boundQuestion ? `<p class="muted">绑定选题：${escapeHtml(boundQuestion)}</p>` : ""}
         </div>
         ${renderEvidenceBadge({ evidence_level: plan.evidence_level || "local_file" })}
       </div>
@@ -2229,6 +2232,8 @@ function renderSupervisorPlan() {
           <div class="supervisor-plan-ledger">
             <div><span class="meta-label">下一步</span><strong>${escapeHtml(visibleNextAction)}</strong></div>
             <div><span class="meta-label">版本</span><strong>${escapeHtml(String(plan.version ?? 0))}</strong></div>
+            <div><span class="meta-label">TopicSession</span><strong>${escapeHtml(inputQuestion.topic_session_id || "-")}</strong></div>
+            <div><span class="meta-label">ResearchQuestion 版本</span><strong>${escapeHtml(String(inputQuestion.version ?? "-"))}</strong></div>
             <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
           </div>
           ${hasPlan ? `

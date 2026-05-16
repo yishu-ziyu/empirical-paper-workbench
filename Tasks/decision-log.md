@@ -586,3 +586,15 @@ Rejected: 删除智能中控、SupervisorPlan 和证据审计。原因是这些�
 Rejected: 选题确认后自动改写 VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。原因是本轮只有前端选题上下文，还没有后端 ResearchQuestion 审计状态。
 
 Evidence: 新增 BDD 和 3 条前端契约测试；全量回归 213 tests OK；右侧内置浏览器验证初始只显示选题入口，确认选题后才展开研究判断区。
+
+## 2026-05-16：SupervisorPlan 必须绑定已确认选题
+
+Decision: SupervisorPlan 生成前必须存在 `status=confirmed` 的 `ResearchQuestion`，并把 `question`、`topic_session_id`、`version`、`evidence_level` 和 `path` 写入计划的输入证据。传给本地 Codex 的 prompt 也必须包含 `confirmed_research_question`。
+
+Reason: 用户指出系统必须有大模型中控，但中控必须围绕用户确认的研究问题工作。没有选题绑定的计划只是泛化工作清单，无法支撑后续人工审批、Agent 派工和论文证据链。
+
+Rejected: 让 SupervisorPlan 使用 project seed draft 作为默认研究问题。原因是 project seed 可能来自 `paper.yaml` 初始配置，不等于用户在当前产品流中确认过的题目。
+
+Rejected: 只在前端显示选题，不写入 SupervisorPlan 输入证据。原因是后续任务队列、审计日志和跨 Session 恢复需要后端可追溯状态。
+
+Evidence: `tests/test_supervisor_plan.py` 验证缺选题返回 409 `research_question_required`，生成计划包含 `input_research_question` 和 `research_question_version`，fake Codex 检查 prompt 必须包含 `confirmed_research_question` 和 `topic_session_v1`。

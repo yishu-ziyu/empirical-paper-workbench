@@ -823,3 +823,33 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8767/?v=20260516-p2q-topic1`
 
 说明：首页默认应先显示 `开始一项实证研究`、选题输入框、`进入研究判断`、`从已有选题继续`、`从真实数据候选池开始`。确认选题前不显示下一步研究决策和 SupervisorPlan 细节；确认后才展开研究判断区。
+
+## 2026-05-16 P2-S SupervisorPlan Topic Binding
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-topic-binding-bdd.md`
+- `tests/test_supervisor_plan.py`：新增 ResearchQuestion 必填、prompt 绑定、输入证据和前端展示测试。
+
+### 新增/扩展后端能力
+
+- `Product/backend/supervisor_plan_service.py`：
+  - 生成前读取 `state/product/research_question.json`。
+  - 缺少 confirmed ResearchQuestion 时返回 `research_question_required`。
+  - Codex prompt 增加 `confirmed_research_question`。
+  - `supervisor_plan.json` 增加 `input_research_question`、`research_question_version` 和 `research_question_path`。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：SupervisorPlan 审阅台显示 `绑定选题`、`TopicSession`、`ResearchQuestion 版本`。
+- `Product/web/index.html`：静态资源版本更新到 `20260516-p2s-supervisor-topic1`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1`
+
+说明：在已有 confirmed ResearchQuestion 的项目中，SupervisorPlan 审阅台应显示绑定选题；展开详情后应显示 TopicSession 和 ResearchQuestion 版本。默认未启用本地 Codex 执行时，点击生成仍应被 `local_codex_execution_not_enabled` 阻断。
+
+### 新增验收产物
+
+- `artifacts/ui-checks/p2s-supervisor-topic-binding.png`

@@ -1,0 +1,268 @@
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+import Product.app as product_app
+from Product.backend.registry import ensure_registry
+
+
+class SupervisorPlanApiTests(unittest.TestCase):
+    """BDD: 本地 Codex Supervisor 只能生成可审阅计划，不能直接改写研究状态。"""
+
+    def setUp(self) -> None:
+        self.original_product_root = product_app.PRODUCT_ROOT
+        self.original_repo_root = product_app.REPO_ROOT
+        self.original_path = os.environ.get("PATH", "")
+        self.original_exec_env = os.environ.get("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC")
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="supervisor-plan-"))
+        self.repo_root = self.temp_dir / "repo"
+        self.project_root = self.temp_dir / "empirical-project"
+        self.product_root = self.repo_root / "Product"
+        self.product_root.mkdir(parents=True)
+        self._create_minimal_project(self.project_root)
+        ensure_registry(self.product_root, self.repo_root)
+        product_app.PRODUCT_ROOT = self.product_root
+        product_app.REPO_ROOT = self.repo_root
+        self.client = TestClient(product_app.app)
+        response = self.client.post(
+            "/api/v1/projects",
+            json={
+                "slug": "supervisor-plan",
+                "title": "Supervisor Plan Project",
+                "project_root": str(self.project_root),
+                "language": "zh",
+            },
+        )
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        self.project_id = response.json()["id"]
+        self._approve_research_states()
+
+    def tearDown(self) -> None:
+        product_app.PRODUCT_ROOT = self.original_product_root
+        product_app.REPO_ROOT = self.original_repo_root
+        os.environ["PATH"] = self.original_path
+        if self.original_exec_env is None:
+            os.environ.pop("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC", None)
+        else:
+            os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = self.original_exec_env
+        shutil.rmtree(self.temp_dir)
+
+    def test_bdd_1_generation_is_blocked_when_local_codex_execution_is_disabled(self) -> None:
+        """行为 1：未启用本地 Codex 执行开关时，不能伪装生成 SupervisorPlan。"""
+        self._install_fake_codex()
+        os.environ.pop("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC", None)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "规划下一轮实证执行", "note": "用户请求 P2-P"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "local_codex_execution_not_enabled")
+        self.assertFalse((self.project_root / "state" / "product" / "supervisor_plan.json").exists())
+
+    def test_bdd_2_enabled_local_codex_persists_needs_review_supervisor_plan(self) -> None:
+        """行为 2：启用本地 Codex 后，系统必须持久化 local_execution 级别的待审计划。"""
+        self._install_fake_codex()
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "为 approved RunPlan 生成下一轮实证执行计划", "note": "进入 P2-P"},
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        plan = response.json()["supervisor_plan"]
+        self.assertEqual(plan["status"], "needs_review")
+        self.assertEqual(plan["evidence_level"], "local_execution")
+        self.assertEqual(plan["provider"]["provider"], "local_codex")
+        self.assertEqual(plan["objective"], "为 approved RunPlan 生成下一轮实证执行计划")
+        self.assertEqual(plan["next_action"]["id"], "review_supervisor_plan")
+        self.assertEqual(plan["subagent_dispatch"][0]["agent_id"], "pipeline_data")
+        self.assertIn("不可直接改写 VariableRoleSet", plan["write_boundary"])
+
+        saved_path = self.project_root / "state" / "product" / "supervisor_plan.json"
+        self.assertTrue(saved_path.exists())
+        saved = json.loads(saved_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["status"], "needs_review")
+        self.assertEqual(saved["raw_output_path"], "state/product/supervisor_plan.raw.md")
+
+    def test_bdd_3_supervisor_plan_does_not_mutate_approved_research_states(self) -> None:
+        """行为 3：SupervisorPlan 只能引用已确认状态，不得直接改写它们。"""
+        self._install_fake_codex()
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+        state_paths = [
+            self.project_root / "state" / "product" / "variable_roles.json",
+            self.project_root / "state" / "product" / "design_spec.json",
+            self.project_root / "state" / "product" / "run_plan.json",
+        ]
+        before = {path.name: path.read_text(encoding="utf-8") for path in state_paths}
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "审阅下一轮任务边界", "note": "不允许改写状态"},
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        after = {path.name: path.read_text(encoding="utf-8") for path in state_paths}
+        self.assertEqual(before, after)
+        plan = response.json()["supervisor_plan"]
+        self.assertEqual(plan["input_state_versions"]["variable_role_set_version"], 1)
+        self.assertEqual(plan["input_state_versions"]["design_spec_version"], 1)
+        self.assertEqual(plan["input_state_versions"]["run_plan_version"], 1)
+
+    def test_bdd_4_get_returns_persisted_supervisor_plan(self) -> None:
+        """行为 4：生成后 GET API 必须返回同一份可审阅计划。"""
+        self._install_fake_codex()
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+        create_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/supervisor-plan",
+            json={"objective": "生成可审阅执行计划", "note": "准备人工确认"},
+        )
+        self.assertEqual(create_response.status_code, 201, msg=create_response.text)
+
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/supervisor-plan")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        self.assertEqual(response.json()["supervisor_plan"]["status"], "needs_review")
+        self.assertEqual(response.json()["supervisor_plan"]["objective"], "生成可审阅执行计划")
+
+    def _approve_research_states(self) -> None:
+        roles = self.client.put(
+            f"/api/v1/projects/{self.project_id}/variable-roles",
+            json={
+                "dataset_path": "Data/Final/analysis_sample.csv",
+                "roles": {
+                    "outcome": ["wage"],
+                    "treatment": ["trained"],
+                    "controls": ["edu", "experience"],
+                    "instruments": [],
+                    "fixed_effects": [],
+                    "cluster_by": [],
+                },
+                "note": "变量角色已确认。",
+            },
+        )
+        self.assertEqual(roles.status_code, 200, msg=roles.text)
+        design = self.client.put(
+            f"/api/v1/projects/{self.project_id}/design-spec",
+            json={
+                "research_question": "培训是否影响工资？",
+                "identification_strategy": {
+                    "name": "baseline_ols",
+                    "summary": "在已确认控制变量下估计培训对工资的相关关系。",
+                    "assumptions": ["控制教育和经验后，处理变量外生。"],
+                    "threats": ["遗漏变量偏误", "样本选择偏误"],
+                },
+                "model": {
+                    "estimator": "ols",
+                    "formula": "wage ~ trained + edu + experience",
+                    "fixed_effects": [],
+                    "cluster_by": [],
+                    "sample_filter": "all",
+                },
+                "note": "研究设计已确认。",
+            },
+        )
+        self.assertEqual(design.status_code, 200, msg=design.text)
+        draft = self.client.get(f"/api/v1/projects/{self.project_id}/run-plan").json()["run_plan"]
+        run_plan = self.client.put(
+            f"/api/v1/projects/{self.project_id}/run-plan",
+            json={"tasks": draft["tasks"], "outputs": draft["outputs"], "note": "执行计划已确认。"},
+        )
+        self.assertEqual(run_plan.status_code, 200, msg=run_plan.text)
+
+    def _install_fake_codex(self) -> None:
+        bin_dir = self.temp_dir / "bin"
+        bin_dir.mkdir()
+        codex = bin_dir / "codex"
+        codex.write_text(
+            """#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+
+if "--version" in sys.argv:
+    print("codex-cli fake-supervisor")
+    raise SystemExit(0)
+
+output_path = Path(sys.argv[sys.argv.index("--output-last-message") + 1])
+payload = {
+    "stage_plan": [
+        {"stage": "数据与变量", "goal": "复核字段角色与样本口径", "status": "planned"},
+        {"stage": "实证执行", "goal": "运行 OLS 并交叉验证 StatsPAI", "status": "planned"}
+    ],
+    "subagent_dispatch": [
+        {"agent_id": "pipeline_data", "role": "Data Agent", "task": "检查数据和变量角色"},
+        {"agent_id": "pipeline_execution", "role": "Execution Agent", "task": "执行并验证模型"}
+    ],
+    "evidence_requirements": [
+        {"id": "dataset_profile", "requirement": "保留字段画像和样本量", "evidence_level": "local_file"},
+        {"id": "model_run", "requirement": "保留运行日志和回归结果", "evidence_level": "local_execution"}
+    ],
+    "risks": [
+        {"id": "heuristic_roles", "level": "medium", "description": "变量角色候选不能直接进入论文"}
+    ],
+    "human_gates": [
+        {"id": "review_supervisor_plan", "label": "人工确认 SupervisorPlan", "required": True}
+    ],
+    "next_action": {"id": "review_supervisor_plan", "label": "审阅 SupervisorPlan"}
+}
+output_path.parent.mkdir(parents=True, exist_ok=True)
+output_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+print("fake codex supervisor complete")
+""",
+            encoding="utf-8",
+        )
+        codex.chmod(0o755)
+        os.environ["PATH"] = f"{bin_dir}{os.pathsep}{self.original_path}"
+
+    @staticmethod
+    def _create_minimal_project(project_root: Path) -> None:
+        (project_root / "Data" / "Final").mkdir(parents=True)
+        (project_root / "Program").mkdir(parents=True)
+        (project_root / "Manuscripts" / "generated").mkdir(parents=True)
+        (project_root / "paper.yaml").write_text(
+            "project:\n  slug: supervisor-plan\n  title: Supervisor Plan Project\n"
+            "research:\n  question: 培训是否影响工资？\n"
+            "data:\n  final_dataset: Data/Final/analysis_sample.csv\n",
+            encoding="utf-8",
+        )
+        (project_root / "Data" / "Final" / "analysis_sample.csv").write_text(
+            "wage,trained,edu,experience\n10,1,16,3\n12,0,14,5\n",
+            encoding="utf-8",
+        )
+        (project_root / "Program" / "run_paper.py").write_text("print('ok')\n", encoding="utf-8")
+
+
+class SupervisorPlanFrontendTests(unittest.TestCase):
+    """BDD: 首页必须把 SupervisorPlan 作为可审阅对象呈现。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        root = Path(__file__).resolve().parents[1]
+        cls.index_html = (root / "Product" / "web" / "index.html").read_text(encoding="utf-8")
+        cls.app_js = (root / "Product" / "web" / "assets" / "app.js").read_text(encoding="utf-8")
+        cls.styles_css = (root / "Product" / "web" / "assets" / "styles.css").read_text(encoding="utf-8")
+
+    def test_bdd_5_frontend_contains_supervisor_plan_review_surface(self) -> None:
+        """行为 5：首页必须有生成和审阅 SupervisorPlan 的界面。"""
+        self.assertIn("supervisor-plan-panel", self.index_html)
+        self.assertIn("supervisor-plan-body", self.index_html)
+        self.assertIn("renderSupervisorPlan", self.app_js)
+        self.assertIn("handleGenerateSupervisorPlan", self.app_js)
+        self.assertIn("v2api.supervisorPlan.generate", self.app_js)
+        for label in ("生成 SupervisorPlan", "人工确认", "证据要求", "子 Agent 分工"):
+            self.assertIn(label, self.app_js + self.index_html)
+        self.assertIn("supervisor-plan-card", self.styles_css)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -475,3 +475,17 @@
 - [x] 前端：扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`，首页新增“智能中控”面板，显示本地 Codex Supervisor、Provider、可用性、执行开关、阻塞原因和阶段派工计划。
 - [x] 可视化验收：页面显示 `本地 Codex Supervisor 未启用`、`provider=local_codex`、`可用=是`、`允许执行=否`、`local_codex_execution_not_enabled` 和四个派工方向。
 - [ ] 未完成：当前只是 Supervisor readiness contract，不是实际 LLM 派工执行。真实派工必须等 P2-P 持久化 `supervisor_plan` 并在执行开关启用时调用本地 Codex。
+
+## 2026-05-16 P2-P Local Codex SupervisorPlan Artifact
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-supervisor-plan-bdd.md`，定义本地 Codex Supervisor 只能生成可审阅计划，不能直接改写正式研究状态。
+- [x] TDD：新增 `tests/test_supervisor_plan.py`；首次运行 5 条失败，原因是 `/supervisor-plan` API 返回 404，前端缺少 `supervisor-plan-panel`。
+- [x] 实现：新增 `Product/backend/supervisor_plan_service.py`，在 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 时调用本地 Codex 生成计划，并持久化到 `state/product/supervisor_plan.json`。
+- [x] 实现：扩展 `Product/backend/codex_provider.py`，新增通用 `run_local_codex_prompt()`，保留 provider readiness 与显式执行开关。
+- [x] 实现：扩展 `Product/app.py`，新增 `GET/POST /api/v1/projects/{project_id}/supervisor-plan`。
+- [x] 前端：首页新增 `SupervisorPlan 审阅台`，显示计划状态、风险、证据要求、子 Agent 分工、人工确认 gate 和生成按钮。
+- [x] 边界：未启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 时返回 409 `local_codex_execution_not_enabled`，不会创建 `supervisor_plan.json`，也不会伪装智能派工。
+- [x] 保护性验证：测试确认生成 SupervisorPlan 前后 `state/product/variable_roles.json`、`state/product/design_spec.json`、`state/product/run_plan.json` 不变。
+- [x] 验证：目标测试 5 OK；相邻回归 20 OK；全量回归 208 OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
+- [x] 可视化/API 验收：当前工作树服务运行在 `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`；DOM 显示 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan` 和默认阻断 `local_codex_execution_not_enabled`；截图保存到 `artifacts/ui-checks/p2p-supervisor-plan-overview.png`。
+- [ ] 下一步 P2-Q：把 SupervisorPlan approval 做成显式人工确认状态，然后让 approved SupervisorPlan 驱动下一轮执行任务队列；仍不能自动改写 VariableRoleSet、DesignSpec 或 RunPlan。

@@ -703,3 +703,36 @@
 - StatsPAI 只完成当前 CSV OLS 独立验证；真实 CFPS `.dta`、StataMCP、DID/IV/RDD/PSM/DML 和稳健标准误还没完成。
 - LLM 输出需要持久化、审计和人工确认；不能让 Supervisor 输出直接覆盖 VariableRoleSet、DesignSpec、RunPlan 或论文正文。
 - 本地版和线上版要继续分离：本地版可接 Codex、本地数据和本地统计后端；线上版必须走云模型、上传数据和云执行队列。
+
+## 2026-05-16 P2-P Local Codex SupervisorPlan
+
+### 行为覆盖
+
+- [x] 未启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 时，SupervisorPlan 生成必须阻断，不能创建伪计划。
+- [x] 启用本地 Codex 后，系统必须把计划持久化为 `state/product/supervisor_plan.json`，并标记 `status=needs_review`、`evidence_level=local_execution`。
+- [x] SupervisorPlan 只能读取并引用 approved VariableRoleSet、DesignSpec、RunPlan，不得直接改写这些正式研究状态。
+- [x] GET API 必须返回已保存的同一份 SupervisorPlan，支持跨 Session 恢复。
+- [x] 首页必须展示 SupervisorPlan 审阅台、生成入口、证据要求、风险和子 Agent 分工。
+- [ ] 未覆盖：真实 Codex subprocess 在持久 app 中生成一份生产计划；SupervisorPlan approve/reject 状态机；approved plan 到任务队列的真实派工。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_supervisor_plan -v` 首次 5 条失败，失败点为 API 404 和前端缺少 `supervisor-plan-panel`。
+- 目标测试：`python3 -m unittest tests.test_supervisor_plan -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_product_workflow_contract tests.test_design_run_plan_state_machine -v`，20 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，208 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/backend/supervisor_plan_service.py Product/backend/codex_provider.py Product/app.py Product/backend/overview_service.py` 通过；`git diff --check` 通过。
+
+### API / 可视化验收
+
+- API：`GET /api/v1/projects/proj_undergraduate_thesis/supervisor-plan` 返回 `status=empty`、`provider.available=true`、`execution_enabled=false`、`next_action.label=生成 SupervisorPlan`。
+- API：默认环境调用 `POST /api/v1/projects/proj_undergraduate_thesis/supervisor-plan` 返回 409 `local_codex_execution_not_enabled`。
+- 页面：当前工作树服务打开 `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`；headless Chrome DOM 检测到 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan`、`local_codex_execution_not_enabled`。
+- 截图：`artifacts/ui-checks/p2p-supervisor-plan-overview.png`，1440x1100。
+
+### 剩余风险
+
+- SupervisorPlan 仍是待审计划，不是自动执行编排；下一步需要 approve/reject/needs_revision。
+- 本轮未在真实 app 中启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 调用真实 Codex，避免在默认验收中产生不可控模型输出。
+- 子 Agent 分工目前是计划字段，还没有真正拉起执行者或写入运行队列。
+- StatsPAI 只恢复并验证 OLS CSV 路径；DTA、StataMCP 和更多实证方法族仍未完成。

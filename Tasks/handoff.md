@@ -1498,3 +1498,59 @@ P2-N：让 DesignSpec/RunPlan 消费正式 VariableRoleSet 的真实数据来源
 - DesignSpec/RunPlan 尚未自动基于新正式 VariableRoleSet 刷新。
 - StatsPAI/StataMCP 尚未实际执行；目前只有 Python OLS adapter 是 `local_execution`。
 - 线上版不能消费 `/Users/...` 本地路径，必须在后续引入上传/云对象 source abstraction。
+
+## 2026-05-16 P2-P Local Codex SupervisorPlan 交接增量
+
+### 当前目标
+
+P2-P 已把“本地 Codex Supervisor”从 readiness 面板推进为可持久化计划层：系统现在可以在显式启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 后调用本地 Codex，生成 `state/product/supervisor_plan.json`。该计划状态固定为 `needs_review`，只提出阶段计划、风险、证据要求、子 Agent 分工和下一步人工 gate；它不能直接篡改 `VariableRoleSet`、`DesignSpec` 或 `RunPlan`。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-supervisor-plan-bdd.md`。
+- 新增测试：`tests/test_supervisor_plan.py`，覆盖执行开关阻断、启用后持久化计划、不改写正式研究状态、GET 返回已保存计划、前端审阅台。
+- 新增后端：`Product/backend/supervisor_plan_service.py`。
+- 扩展 Codex provider：`Product/backend/codex_provider.py` 新增 `run_local_codex_prompt()`。
+- 扩展 API：`Product/app.py` 新增 `GET/POST /api/v1/projects/{project_id}/supervisor-plan`。
+- 扩展前端：`Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css` 新增 `SupervisorPlan 审阅台`。
+- 修复本机验证环境：当前 `statspai` 已重装为 `1.15.1`，`import statspai as sp` 后 `sp.regress` 可用；此前全量测试失败来自本地 broken namespace package，不是本轮代码回归。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_supervisor_plan -v` 首次 5 条失败；4 条 API 是 404，1 条前端缺少审阅台。
+- GREEN：`python3 -m unittest tests.test_supervisor_plan -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_product_workflow_contract tests.test_design_run_plan_state_machine -v`，20 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，208 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；`python3 -m py_compile Product/backend/supervisor_plan_service.py Product/backend/codex_provider.py Product/app.py Product/backend/overview_service.py` 通过；`git diff --check` 通过。
+- API 验收：`GET /api/v1/projects/proj_undergraduate_thesis/supervisor-plan` 返回 empty plan、provider available、execution_enabled=false；`POST` 返回 409 `local_codex_execution_not_enabled`。
+- 可视化验收：当前工作树服务使用 `http://127.0.0.1:8767/?v=20260516-p2p-supervisor-plan`，DOM 显示 `SupervisorPlan 审阅台`、`生成 SupervisorPlan`、`本地 Codex SupervisorPlan`、`local_codex_execution_not_enabled`；截图为 `artifacts/ui-checks/p2p-supervisor-plan-overview.png`。
+
+### 关键文件路径
+
+- `Product/backend/supervisor_plan_service.py`
+- `Product/backend/codex_provider.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_supervisor_plan.py`
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-bdd.md`
+- `artifacts/ui-checks/p2p-supervisor-plan-overview.png`
+
+### 不能重复探索的结论
+
+- `local_codex_status.available=true` 只代表本地 Codex CLI 可检测，不代表允许执行。未设置 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 时必须阻断。
+- SupervisorPlan 是 review artifact，不是 write-back artifact；它不能直接改写 `state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+- 当前成功路径用 fake Codex CLI 测试固定 JSON 输出；真实 Codex subprocess 的不稳定输出由 `supervisor_plan.raw.md` 留痕并经 JSON 解析约束。
+- StatsPAI 本机环境已经修复为 `1.15.1`；不要把旧的 `module 'statspai' has no attribute 'regress'` 当作项目代码问题重复排查。
+
+### 下一步第一件事
+
+P2-Q：给 SupervisorPlan 增加显式 approve/reject/needs_revision 审批 API 和前端操作。只有 approved SupervisorPlan 才能进入任务队列或下一轮执行编排；reject/needs_revision 必须保留审阅意见并阻止派工。
+
+### 未解决风险
+
+- 真实 Codex 生成计划尚未在持久 app 中执行，本轮只验证了默认阻断和 fake Codex 成功路径。
+- SupervisorPlan 还没有 approval 状态机；现在只是 `needs_review` artifact。
+- 尚未真正启动子 Agent、StataMCP、DID/IV/RDD/PSM/DML 或真实 CFPS 执行。
+- 本地版和线上版仍要拆分 provider：本地版可以调用本地 Codex 和本地统计后端，线上版必须走云模型、上传数据和云执行队列。

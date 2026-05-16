@@ -80,6 +80,12 @@ from Product.backend.results_draft_service import (
     get_project_results_draft,
     save_project_finding_review,
 )
+from Product.backend.supervisor_plan_service import (
+    SupervisorPlanBlockedError,
+    SupervisorPlanExecutionError,
+    generate_project_supervisor_plan,
+    get_project_supervisor_plan,
+)
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
     InvalidVariableRoleCandidateActionError,
@@ -225,6 +231,11 @@ class WritebackApprovalPayload(BaseModel):
 
 
 class DocxPreflightPayload(BaseModel):
+    note: str = ""
+
+
+class SupervisorPlanPayload(BaseModel):
+    objective: str = Field(min_length=1)
     note: str = ""
 
 
@@ -643,6 +654,32 @@ def api_v1_project_run_plan(project_id: str) -> dict:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except FileNotFoundError as exc:
         return error_response(409, "design_spec_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/supervisor-plan")
+def api_v1_project_supervisor_plan(project_id: str) -> dict:
+    try:
+        return get_project_supervisor_plan(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/supervisor-plan", status_code=201)
+def api_v1_generate_project_supervisor_plan(project_id: str, payload: SupervisorPlanPayload) -> dict:
+    try:
+        return generate_project_supervisor_plan(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.objective,
+            payload.note,
+        )
+    except SupervisorPlanBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
+    except SupervisorPlanExecutionError as exc:
+        return error_response(502, "local_codex_supervisor_failed", str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
 @app.put("/api/v1/projects/{project_id}/run-plan")

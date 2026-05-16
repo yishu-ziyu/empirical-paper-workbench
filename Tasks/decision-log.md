@@ -598,3 +598,17 @@ Rejected: 让 SupervisorPlan 使用 project seed draft 作为默认研究问题�
 Rejected: 只在前端显示选题，不写入 SupervisorPlan 输入证据。原因是后续任务队列、审计日志和跨 Session 恢复需要后端可追溯状态。
 
 Evidence: `tests/test_supervisor_plan.py` 验证缺选题返回 409 `research_question_required`，生成计划包含 `input_research_question` 和 `research_question_version`，fake Codex 检查 prompt 必须包含 `confirmed_research_question` 和 `topic_session_v1`。
+
+## 2026-05-16：SupervisorPlan 审批只授权派工，不修改研究状态
+
+Decision: 新增 SupervisorPlan review 状态机。`approve` 把计划标记为 `approved` 并设置 `can_dispatch=true`；`needs_revision` 和 `reject` 都保留计划但阻断派工；每次审批写入 `human_review`、决策日志和下一步动作。
+
+Reason: 本地 Codex Supervisor 已经能生成待审计划，但计划仍是 LLM 产物。进入任务队列前必须有人工审阅边界，否则系统会把“模型建议”误当成“已确认研究设计”。
+
+Rejected: 生成 SupervisorPlan 后自动创建 Agent Task Queue。原因是没有人工审批的计划可能包含错误变量、错误方法或不完整证据要求。
+
+Rejected: 审批时顺手改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。原因是审批只回答“这份计划能否派工”，不能替用户修改正式研究对象。
+
+Rejected: 在没有 `state/product/supervisor_plan.json` 时显示批准/驳回按钮。原因是用户不能审批一份不存在的计划；当前真实项目没有计划产物时应只显示生成入口。
+
+Evidence: `python3 -m unittest tests.test_supervisor_plan -v` 13 tests OK；全量回归 226 tests OK，skipped=1；浏览器验收 `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1` 在无计划状态下只显示生成入口，符合审批前置条件。

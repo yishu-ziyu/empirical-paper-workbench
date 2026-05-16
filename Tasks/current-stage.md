@@ -1,15 +1,16 @@
 # 当前阶段
 
 - 更新时间：2026-05-16
-- 当前提交基线：`b1a9210 Persist research topics before downstream planning`
-- 当前本地验收入口：`http://127.0.0.1:8767/?v=20260516-p2s-supervisor-topic1`
-- 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion。
+- 当前提交基线：本文件所在 P2-T 提交 `Require human review before supervisor dispatch`
+- 当前本地验收入口：`http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1`
+- 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion；SupervisorPlan 已进入人工审批状态机，只有 approved plan 才允许进入后续任务队列。
 - 研究题目：机器人应用是否影响劳动力市场匹配效率？
 - 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
 - 当前进展：
   - P2-Q Topic-first Home 已完成：首页显示 `开始一项实证研究`，用户输入或选择选题后才展开下一步研究决策、智能中控和 SupervisorPlan。
   - P2-R ResearchQuestion / TopicSession 已完成：首页确认选题会写入 `state/product/research_question.json`，跨 Session 可恢复，且不会自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-S SupervisorPlan Topic Binding 已完成：生成 SupervisorPlan 前必须存在 confirmed ResearchQuestion；计划输入证据记录 `question`、`topic_session_id`、`version`、`research_question_path`，前端审阅台显示绑定选题。
+  - P2-T SupervisorPlan Review State Machine 已完成：`PUT /api/v1/projects/{project_id}/supervisor-plan/review` 支持 approve / needs_revision / reject；审批只写 `state/product/supervisor_plan.json`，approved 后才 `can_dispatch=true`，不会改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-P Local Codex SupervisorPlan 已完成：本地 Codex Supervisor 可以生成待审计划 artifact，但默认执行开关关闭，不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-N StatsPAI Independent OLS Validation 已完成：StatsPAI 已作为 CSV OLS 独立验证后端产出 `local_execution` evidence；其他方法族仍需后续执行器。
   - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
@@ -31,7 +32,6 @@
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-T：给 SupervisorPlan 增加 approve/reject/needs_revision 审批状态机。只有 approved SupervisorPlan 才能进入任务队列。
   - P2-U：把 approved SupervisorPlan 拆成 Agent Task Queue，显示 owner agent、输入证据、输出要求、阻塞项和状态。
   - P2-V：把真实 CFPS 数据候选推进到正式 VariableRoleSet -> DesignSpec -> RunPlan 的版本化链路。
   - P2-W：继续升级 StatsPAI / StataMCP / Python 执行后端，要求真实日志、结果、诊断和可复现产物。

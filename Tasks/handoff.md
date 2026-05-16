@@ -1747,3 +1747,56 @@ P2-T：给 SupervisorPlan 增加 approve/reject/needs_revision API、状态文�
 - 当前仍没有 SupervisorPlan 审批状态机；`needs_review` 计划不能派工。
 - 本轮使用 fake Codex CLI 测试 prompt contract；真实本地 Codex 执行还需要在启用环境变量后做一次人工验收。
 - 默认环境没有启用本地 Codex 执行，因此浏览器只验证了“空计划 + confirmed ResearchQuestion fallback”的绑定展示；真实 plan 的 `TopicSession` 值由 fake Codex 测试覆盖，后续开启执行开关后需要再做一次人工验收。
+
+## 2026-05-16 P2-T SupervisorPlan Review State Machine 交接增量
+
+### 当前目标
+
+把本地 Codex Supervisor 生成的 `SupervisorPlan` 放进显式人工审批状态机。计划必须先被批准，才可以进入下一步 Agent Task Queue；要求修改或驳回都必须阻断派工。审批动作本身不能改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-supervisor-plan-review-bdd.md`。
+- 扩展测试：`tests/test_supervisor_plan.py` 覆盖审批 API、非法 action、缺少计划、不可篡改正式研究状态和前端审批按钮。
+- 修改 `Product/backend/supervisor_plan_service.py`：新增 `review_project_supervisor_plan()` 和 `InvalidSupervisorPlanReviewActionError`。
+- 修改 `Product/app.py`：新增 `PUT /api/v1/projects/{project_id}/supervisor-plan/review`。
+- 修改 `Product/web/assets/app.js`：存在计划时渲染 `批准计划`、`要求修改`、`驳回计划`，并调用 review API。
+- 修改 `Product/web/assets/styles.css`：新增审批区样式，并保持单列布局，避免把 clean workbench 又做回拥挤双列。
+- 新增验收截图：`artifacts/ui-checks/p2t-supervisor-review-page.png`。
+
+### 已验证证据
+
+- RED：新增审批测试首次失败，原因是 review API、状态持久化和前端按钮尚未实现。
+- GREEN：`python3 -m unittest tests.test_supervisor_plan -v`，13 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_supervisor_plan tests.test_research_question_topic_session tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，28 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，226 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/backend/supervisor_plan_service.py Product/app.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1` 显示 `SupervisorPlan 审阅台`、`尚未生成`、`生成 SupervisorPlan`、绑定选题和人工确认说明；当前真实项目没有 `state/product/supervisor_plan.json`，所以不显示审批按钮是正确状态。
+
+### 关键文件路径
+
+- `Product/backend/supervisor_plan_service.py`
+- `Product/app.py`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_supervisor_plan.py`
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-review-bdd.md`
+- `artifacts/ui-checks/p2t-supervisor-review-page.png`
+
+### 不能重复探索的结论
+
+- SupervisorPlan 审批不是变量角色确认、不是设计方案确认、也不是 RunPlan 确认；它只授权或阻断下一步派工。
+- 没有计划产物时不能显示 approve/reject，因为用户不能审批不存在的东西。
+- `approve` 可以设置 `can_dispatch=true`，但还不能直接启动任务；真正拆任务队列是 P2-U。
+- `needs_revision` 和 `reject` 都必须保留人工意见并阻断派工，区别在于下一步是修订当前计划还是重新生成计划。
+
+### 下一步第一件事
+
+P2-U：读取 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan，把其中的阶段计划和子 Agent 分工拆成 `AgentTaskQueue`。队列项应包含 owner agent、输入证据、输出要求、阻塞项、状态、审计日志和人工 gate；未 approved 的计划必须返回阻断原因。
+
+### 未解决风险
+
+- 当前真实项目还没有生产 `supervisor_plan.json`，所以浏览器只验收了无计划状态；有计划后的按钮路径由测试覆盖，后续开启本地 Codex 执行后要做一次真实点击验收。
+- P2-U 尚未实现，approved 计划不会自动变成任务队列。
+- 本地 Codex 执行仍需 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，默认关闭是为了避免模型输出在未授权时进入项目状态。
+- StatsPAI/StataMCP 的完整方法族执行仍是后续 P2-W/P2-N 工作，不属于本轮审批状态机。

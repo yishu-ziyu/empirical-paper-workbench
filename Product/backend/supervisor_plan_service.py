@@ -26,6 +26,10 @@ class SupervisorPlanExecutionError(RuntimeError):
     pass
 
 
+class InvalidSupervisorPlanReviewActionError(ValueError):
+    pass
+
+
 def supervisor_plan_state_path(project_root: Path) -> Path:
     return project_root / SUPERVISOR_PLAN_PATH
 
@@ -119,6 +123,97 @@ def generate_project_supervisor_plan(
         },
         "supervisor_plan": plan,
     }
+
+
+def review_project_supervisor_plan(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    action: str,
+    note: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    plan = load_saved_supervisor_plan(project_root)
+    if not plan:
+        raise SupervisorPlanBlockedError(
+            "supervisor_plan_required",
+            "SupervisorPlan is required before review.",
+        )
+
+    next_state = supervisor_plan_review_state(action)
+    timestamp = utc_now()
+    reviewed = {
+        **plan,
+        "status": next_state["status"],
+        "can_dispatch": next_state["can_dispatch"],
+        "next_action": next_state["next_action"],
+        "human_review": {
+            "actor": "user",
+            "action": action,
+            "note": note,
+            "timestamp": timestamp,
+        },
+        "updated_at": timestamp,
+    }
+    reviewed["decision_events"] = normalize_list(plan.get("decision_events")) + [
+        {
+            "actor": "user",
+            "action": f"review_supervisor_plan:{action}",
+            "timestamp": timestamp,
+            "note": note,
+        }
+    ]
+
+    path = supervisor_plan_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(reviewed, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "_meta": {
+            "evidence_level": "local_file",
+            "service": "supervisor_plan_service",
+            "generated_at": timestamp,
+        },
+        "project": {
+            "id": project["id"],
+            "slug": project["slug"],
+            "title": project["title"],
+        },
+        "supervisor_plan": reviewed,
+    }
+
+
+def supervisor_plan_review_state(action: str) -> dict[str, Any]:
+    states = {
+        "approve": {
+            "status": "approved",
+            "can_dispatch": True,
+            "next_action": {
+                "id": "create_agent_task_queue",
+                "label": "创建 Agent Task Queue",
+            },
+        },
+        "needs_revision": {
+            "status": "needs_revision",
+            "can_dispatch": False,
+            "next_action": {
+                "id": "revise_supervisor_plan",
+                "label": "修改 SupervisorPlan",
+            },
+        },
+        "reject": {
+            "status": "rejected",
+            "can_dispatch": False,
+            "next_action": {
+                "id": "regenerate_supervisor_plan",
+                "label": "重新生成 SupervisorPlan",
+            },
+        },
+    }
+    try:
+        return states[action]
+    except KeyError as exc:
+        raise InvalidSupervisorPlanReviewActionError(action) from exc
 
 
 def load_saved_supervisor_plan(project_root: Path) -> dict[str, Any] | None:

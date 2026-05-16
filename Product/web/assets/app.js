@@ -74,6 +74,7 @@ const state = {
   approvingWritebackAction: null,
   preflightingDocxCandidateId: null,
   generatingSupervisorPlan: false,
+  reviewingSupervisorPlanAction: null,
   researchTopicConfirmed: false,
   researchTopicDraft: "",
 };
@@ -671,6 +672,13 @@ const v2api = {
     async generate(projectId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async review(projectId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/supervisor-plan/review`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -1977,6 +1985,15 @@ function reviewStatusLabel(status) {
   return map[status] || status || "-";
 }
 
+function supervisorReviewActionLabel(action) {
+  const map = {
+    approve: "批准计划",
+    needs_revision: "要求修改",
+    reject: "驳回计划",
+  };
+  return map[action] || action || "-";
+}
+
 function candidateStatusLabel(status) {
   const map = {
     draft: "草稿",
@@ -2205,6 +2222,8 @@ function renderSupervisorPlan() {
   const inputQuestion = plan.input_research_question || {};
   const boundQuestion = inputQuestion.question || state.researchQuestionData?.research_question?.question || "";
   const visibleNextAction = plan.next_action?.label || (hasPlan ? "审阅 SupervisorPlan" : "生成 SupervisorPlan");
+  const humanReview = plan.human_review || null;
+  const reviewDisabled = Boolean(state.reviewingSupervisorPlanAction);
   container.innerHTML = `
     <article class="supervisor-plan-card is-${escapeHtml(plan.status || "empty")}">
       <div class="supervisor-plan-summary">
@@ -2222,9 +2241,30 @@ function renderSupervisorPlan() {
         </button>
         <span class="muted">人工确认后，才允许进入真实子 Agent 派工。</span>
       </div>
+      ${hasPlan ? `
+        <div class="supervisor-plan-review-bar">
+          <div>
+            <span class="meta-label">人工审批</span>
+            <strong>${humanReview ? escapeHtml(supervisorReviewActionLabel(humanReview.action)) : "尚未审批"}</strong>
+            <p class="muted">只有批准后的计划才能进入任务队列；要求修改或驳回会阻止派工。</p>
+          </div>
+          <div class="supervisor-plan-review-actions">
+            ${["approve", "needs_revision", "reject"].map((action) => `
+              <button
+                class="${action === "approve" ? "primary-button" : "secondary-button"}"
+                data-supervisor-plan-review-action="${escapeHtml(action)}"
+                ${reviewDisabled ? "disabled" : ""}
+              >
+                ${state.reviewingSupervisorPlanAction === action ? "写回中..." : escapeHtml(supervisorReviewActionLabel(action))}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
       <div class="decision-signal-row">
         <span>下一步：${escapeHtml(visibleNextAction)}</span>
         <span>${hasPlan ? `风险 ${risks.length} 项` : "等待生成计划"}</span>
+        <span>${hasPlan ? (plan.can_dispatch ? "可进入任务队列" : "不可派工") : "未生成"}</span>
       </div>
       <details class="progressive-disclosure supervisor-plan-details" data-disclosure="supervisor-plan-progressive-disclosure">
         <summary>查看计划详情</summary>
@@ -2281,6 +2321,27 @@ async function handleGenerateSupervisorPlan() {
     showV2Error("overview", `生成 SupervisorPlan 失败：${error.message}`);
   } finally {
     state.generatingSupervisorPlan = false;
+    renderSupervisorPlan();
+  }
+}
+
+async function handleReviewSupervisorPlan(action) {
+  if (!state.selectedProjectId || !action) return;
+  clearV2Error("overview");
+  state.reviewingSupervisorPlanAction = action;
+  renderSupervisorPlan();
+  try {
+    state.supervisorPlanData = await v2api.supervisorPlan.review(state.selectedProjectId, {
+      action,
+      note: `首页 SupervisorPlan 审阅台人工审批：${supervisorReviewActionLabel(action)}`,
+    });
+    state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    renderWorkflowContract(state.overviewData.workflow_contract);
+    renderSupervisorPlan();
+  } catch (error) {
+    showV2Error("overview", `审批 SupervisorPlan 失败：${error.message}`);
+  } finally {
+    state.reviewingSupervisorPlanAction = null;
     renderSupervisorPlan();
   }
 }
@@ -5703,6 +5764,11 @@ async function boot() {
     const supervisorButton = target.closest("[data-supervisor-plan-generate]");
     if (supervisorButton) {
       void handleGenerateSupervisorPlan();
+      return;
+    }
+    const supervisorReviewButton = target.closest("[data-supervisor-plan-review-action]");
+    if (supervisorReviewButton) {
+      void handleReviewSupervisorPlan(supervisorReviewButton.dataset.supervisorPlanReviewAction);
       return;
     }
     const button = target.closest("[data-open-design-action]");

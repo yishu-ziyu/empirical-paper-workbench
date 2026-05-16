@@ -853,3 +853,37 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `artifacts/ui-checks/p2s-supervisor-topic-binding.png`
+
+## 2026-05-16 P2-T SupervisorPlan Review State Machine
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-supervisor-plan-review-bdd.md`
+- `tests/test_supervisor_plan.py`：新增 approve / needs_revision / reject、缺失计划、非法 action、不可篡改研究状态和前端按钮契约。
+
+### 新增/扩展后端能力
+
+- `Product/backend/supervisor_plan_service.py`：
+  - 新增 `review_project_supervisor_plan()`。
+  - 新增 `InvalidSupervisorPlanReviewActionError`。
+  - 审批动作写入 `status`、`human_review`、`can_dispatch`、`next_action` 和 `decision_events`。
+  - 审批只保存 `state/product/supervisor_plan.json`。
+- `Product/app.py`：
+  - 新增 `SupervisorPlanReviewPayload`。
+  - 新增 `PUT /api/v1/projects/{project_id}/supervisor-plan/review`。
+  - 缺少计划返回 409 `supervisor_plan_required`；非法 action 返回 400 `invalid_supervisor_plan_review_action`。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：新增 `v2api.supervisorPlan.review()`、`handleReviewSupervisorPlan()`、审批按钮和派工状态显示。
+- `Product/web/assets/styles.css`：新增 `.supervisor-plan-review-bar` 和 `.supervisor-plan-review-actions`；保持单列 clean workbench 布局，避免窄视口文字重叠。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8767/?v=20260516-p2t-supervisor-review1`
+
+说明：当前真实项目还没有 `state/product/supervisor_plan.json`，所以页面正确显示 `尚未生成` 和 `生成 SupervisorPlan`。生成计划后，审阅台会出现 `批准计划`、`要求修改`、`驳回计划`；只有批准后的计划显示 `可进入任务队列`。
+
+### 新增验收产物
+
+- `artifacts/ui-checks/p2t-supervisor-review-page.png`

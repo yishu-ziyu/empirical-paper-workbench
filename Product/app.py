@@ -86,10 +86,12 @@ from Product.backend.results_draft_service import (
     save_project_finding_review,
 )
 from Product.backend.supervisor_plan_service import (
+    InvalidSupervisorPlanReviewActionError,
     SupervisorPlanBlockedError,
     SupervisorPlanExecutionError,
     generate_project_supervisor_plan,
     get_project_supervisor_plan,
+    review_project_supervisor_plan,
 )
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
@@ -241,6 +243,11 @@ class DocxPreflightPayload(BaseModel):
 
 class SupervisorPlanPayload(BaseModel):
     objective: str = Field(min_length=1)
+    note: str = ""
+
+
+class SupervisorPlanReviewPayload(BaseModel):
+    action: str
     note: str = ""
 
 
@@ -714,6 +721,24 @@ def api_v1_generate_project_supervisor_plan(project_id: str, payload: Supervisor
         return error_response(409, exc.code, str(exc))
     except SupervisorPlanExecutionError as exc:
         return error_response(502, "local_codex_supervisor_failed", str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/supervisor-plan/review")
+def api_v1_review_project_supervisor_plan(project_id: str, payload: SupervisorPlanReviewPayload) -> dict:
+    try:
+        return review_project_supervisor_plan(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.action,
+            payload.note,
+        )
+    except InvalidSupervisorPlanReviewActionError as exc:
+        return error_response(400, "invalid_supervisor_plan_review_action", f"Unsupported review action: {payload.action}.")
+    except SupervisorPlanBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 

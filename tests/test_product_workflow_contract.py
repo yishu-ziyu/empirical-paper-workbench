@@ -154,6 +154,27 @@ class ProductWorkflowFrontendContractTests(unittest.TestCase):
         self.assertIn("disclosure-panel", self.app_js)
         self.assertIn(".progressive-disclosure", self.styles_css)
 
+    def test_bdd_10_home_starts_from_topic_intake_not_full_workbench(self) -> None:
+        """行为 10：首页首屏必须先让用户输入或选择研究选题。"""
+        self.assertIn("research-topic-intake", self.index_html)
+        for label in ("开始一项实证研究", "输入研究问题", "从已有选题继续", "从真实数据候选池开始"):
+            self.assertIn(label, self.index_html + self.app_js)
+
+    def test_bdd_11_home_workbench_details_are_hidden_until_topic_confirmation(self) -> None:
+        """行为 11：研究判断区默认隐藏，确认选题后再展开。"""
+        self.assertIn("research-workbench-after-topic", self.index_html)
+        self.assertIn("is-topic-pending", self.index_html)
+        self.assertIn("renderResearchTopicIntake", self.app_js)
+        self.assertIn("confirmResearchTopic", self.app_js)
+        self.assertIn("researchTopicConfirmed", self.app_js)
+        self.assertIn(".research-workbench-after-topic.is-topic-pending", self.styles_css)
+
+    def test_bdd_12_topic_intake_links_to_data_first_path_without_binding_data(self) -> None:
+        """行为 12：没有明确选题时，可以从真实数据候选池进入数据与设计页。"""
+        self.assertIn("data-topic-start-action", self.app_js)
+        self.assertIn('switchView("data-variables")', self.app_js)
+        self.assertNotIn("autoBindDatasetFromTopicIntake", self.app_js)
+
 
 if __name__ == "__main__":
     unittest.main()

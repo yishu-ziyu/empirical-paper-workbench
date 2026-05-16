@@ -797,3 +797,22 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `http://127.0.0.1:8767/?v=20260516-p2p-disclosure1`
 
 说明：打开“工作台首页”，智能中控与 SupervisorPlan 先只显示摘要。点击 `查看中控详情` 后可看到 Provider、执行开关、阻塞项和派工计划；点击 `查看计划详情` 后可看到版本、写入边界、阶段计划、子 Agent 分工、证据要求和风险。
+
+## 2026-05-16 P2-Q Topic-first Home
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-topic-first-home-bdd.md`
+- `tests/test_product_workflow_contract.py`：新增首页选题入口、工作台默认隐藏、真实数据候选入口契约。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：静态资源版本更新到 `20260516-p2q-topic1`；首页新增 `research-topic-intake`，原工作台区域包进 `research-workbench-after-topic`。
+- `Product/web/assets/app.js`：新增选题状态、localStorage key、确认选题、使用已有选题、跳转数据候选页和确认后滚动到研究判断区。
+- `Product/web/assets/styles.css`：新增 topic intake、topic form、确认态、工作台隐藏态和窄视口降噪样式。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8767/?v=20260516-p2q-topic1`
+
+说明：首页默认应先显示 `开始一项实证研究`、选题输入框、`进入研究判断`、`从已有选题继续`、`从真实数据候选池开始`。确认选题前不显示下一步研究决策和 SupervisorPlan 细节；确认后才展开研究判断区。

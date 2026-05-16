@@ -1603,3 +1603,53 @@ P2-Q：给 SupervisorPlan 增加 approve/reject/needs_revision 审批 API、状�
 - 当前渐进披露只覆盖首页智能中控和 SupervisorPlan；执行页、数据页、Review & Export 的局部密度还需要继续按同样规则收敛。
 - 右侧内置浏览器已验证点击展开，但还没有做移动视口截图。
 - SupervisorPlan 仍无审批状态机，不能进入真实任务队列。
+
+## 2026-05-16 P2-Q 选题优先首页交接增量
+
+### 当前目标
+
+把首页从“功能全集铺开”改成“先确定研究选题，再进入判断环节”。这轮解决用户指出的核心产品路径问题：用户进来不应先看到全部 Agent、执行、证据和风险，而应先输入或选择一个研究问题。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-topic-first-home-bdd.md`。
+- 扩展测试：`tests/test_product_workflow_contract.py` 增加 3 个首页选题优先行为。
+- 修改 HTML：`Product/web/index.html` 新增 `research-topic-intake`，并把原首页工作台细节包进 `research-workbench-after-topic`。
+- 修改 JS：`Product/web/assets/app.js` 新增选题读取、保存、确认、从已有选题继续、跳转真实数据候选池等交互。
+- 修改 CSS：`Product/web/assets/styles.css` 新增选题入口样式，并在窄视口隐藏右侧 inspector、压缩侧栏，避免首屏被导航/审计信息占满。
+- 后台服务：`http://127.0.0.1:8767/?v=20260516-p2q-topic1` 已用后台 `uvicorn` 进程启动，日志在 `/tmp/empirical-workbench-8767.log`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v` 首次新增 3 条失败，缺少选题入口、隐藏工作台和数据候选入口。
+- GREEN：同一目标测试再次运行，9 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_product_workflow_contract tests.test_supervisor_plan -v`，18 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，213 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；Python 编译检查通过；`git diff --check` 通过。
+- 右侧内置浏览器验收：初始状态 `research-workbench-after-topic` 隐藏，证据 banner 不显示；输入“机器人应用是否影响劳动力市场匹配效率？”并点击 `进入研究判断` 后，工作台区域展开并显示下一步研究决策。
+
+### 关键文件路径
+
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_product_workflow_contract.py`
+- `docs/architecture-v2/codex-phase-p2-topic-first-home-bdd.md`
+
+### 不能重复探索的结论
+
+- 首页第一屏必须服务“用户要研究什么”，不是展示系统已经有哪些模块。
+- 原有智能中控、SupervisorPlan、风险和证据不是删除，而是放到选题确认后的第二层。
+- 当前选题状态只是前端本地状态；这轮不能把它误写成正式 VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+- `从真实数据候选池开始` 只能导航到数据与设计页，不能自动绑定数据或生成变量角色。
+
+### 下一步第一件事
+
+P2-R：新增后端 `ResearchQuestion` / `TopicSession` 状态机，把用户确认的选题持久化为可审计研究对象；然后让 SupervisorPlan 审批、变量候选和执行计划都绑定到这个研究对象。
+
+### 未解决风险
+
+- 选题目前只在前端 localStorage / 当前页面状态中保存，跨设备和后端审计不可用。
+- 右侧内置浏览器截图捕获超时，本轮用 DOM 和可见交互验证替代截图。
+- 选题确认后还没有驱动真实 SupervisorPlan 审批或任务队列。
+- 数据页、执行页、Review & Export 页仍需要继续按“默认摘要、按需展开”收敛信息密度。

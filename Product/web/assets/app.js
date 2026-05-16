@@ -73,6 +73,8 @@ const state = {
   approvingWritebackAction: null,
   preflightingDocxCandidateId: null,
   generatingSupervisorPlan: false,
+  researchTopicConfirmed: false,
+  researchTopicDraft: "",
 };
 
 const fallbackWorkflowSteps = [
@@ -323,6 +325,8 @@ async function refreshProjects() {
 async function selectProject(projectId) {
   state.selectedProjectId = projectId;
   state.activeRun = null;
+  state.researchTopicConfirmed = false;
+  state.researchTopicDraft = "";
   await loadSelectedProject();
   // Reload current V2 view data after project switch
   const activeNav = document.querySelector(".nav-link.is-active");
@@ -407,6 +411,13 @@ function mountNav() {
       navButton.click();
     }
   });
+}
+
+function switchView(viewName) {
+  const navButton = document.querySelector(`.nav-link[data-view="${viewName}"]`);
+  if (navButton instanceof HTMLElement) {
+    navButton.click();
+  }
 }
 
 function mountArchiveInspector() {
@@ -3062,6 +3073,86 @@ function renderJourneyBar() {
 
 // --- Overview Page ---
 
+function researchTopicStorageKey() {
+  return `empirical-workbench.research-topic.${state.selectedProjectId || "default"}`;
+}
+
+function existingResearchTopic(data = state.overviewData) {
+  return data?.research_question || data?.project?.title || "";
+}
+
+function loadResearchTopicState() {
+  try {
+    const raw = window.localStorage.getItem(researchTopicStorageKey());
+    if (!raw) {
+      if (state.researchTopicConfirmed && state.researchTopicDraft) return;
+      state.researchTopicConfirmed = false;
+      state.researchTopicDraft = "";
+      return;
+    }
+    const saved = JSON.parse(raw);
+    state.researchTopicConfirmed = Boolean(saved.confirmed);
+    state.researchTopicDraft = saved.topic || "";
+  } catch (error) {
+    if (state.researchTopicConfirmed && state.researchTopicDraft) return;
+    state.researchTopicConfirmed = false;
+    state.researchTopicDraft = "";
+  }
+}
+
+function saveResearchTopicState(topic) {
+  state.researchTopicConfirmed = true;
+  state.researchTopicDraft = topic;
+  try {
+    window.localStorage.setItem(researchTopicStorageKey(), JSON.stringify({
+      confirmed: true,
+      topic,
+      project_id: state.selectedProjectId,
+      updated_at: new Date().toISOString(),
+    }));
+  } catch (error) {
+    console.warn("Unable to persist research topic locally", error);
+  }
+}
+
+function renderResearchTopicIntake(data = state.overviewData) {
+  const intake = document.getElementById("research-topic-intake");
+  const workbench = document.getElementById("research-workbench-after-topic");
+  const input = document.getElementById("research-topic-input");
+  const existing = document.getElementById("research-topic-existing");
+  if (!intake || !workbench) return;
+
+  loadResearchTopicState();
+  const topic = state.researchTopicDraft || existingResearchTopic(data);
+  if (input instanceof HTMLTextAreaElement && !input.value) {
+    input.value = state.researchTopicDraft || "";
+    input.placeholder = existingResearchTopic(data) || "例如：培训是否影响工资？";
+  }
+  if (existing) {
+    existing.textContent = existingResearchTopic(data)
+      ? `从已有选题继续：${existingResearchTopic(data)}`
+      : "当前项目还没有可复用的选题，可以先输入一个研究问题。";
+  }
+
+  intake.classList.toggle("is-topic-confirmed", state.researchTopicConfirmed);
+  workbench.classList.toggle("is-topic-pending", !state.researchTopicConfirmed);
+  workbench.setAttribute("aria-hidden", state.researchTopicConfirmed ? "false" : "true");
+  if (state.researchTopicConfirmed && topic) {
+    const topicCopy = intake.querySelector(".topic-intake-copy p");
+    if (topicCopy) topicCopy.textContent = `已确认选题：${topic}`;
+  }
+}
+
+function confirmResearchTopic(useExisting = false) {
+  const input = document.getElementById("research-topic-input");
+  const typedTopic = input instanceof HTMLTextAreaElement ? input.value.trim() : "";
+  const topic = useExisting ? existingResearchTopic() : typedTopic || existingResearchTopic();
+  if (!topic) return;
+  saveResearchTopicState(topic);
+  renderResearchTopicIntake();
+  document.getElementById("research-workbench-after-topic")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function renderOverview() {
   const data = state.overviewData;
   if (!data) {
@@ -3075,14 +3166,18 @@ function renderOverview() {
   const bannerHtml = renderEvidenceBanner(data._meta);
   const existingBanner = document.querySelector("#view-overview > .evidence-banner");
   if (existingBanner) existingBanner.remove();
+  const existingWorkbenchBanner = document.querySelector("#research-workbench-after-topic > .evidence-banner");
+  if (existingWorkbenchBanner) existingWorkbenchBanner.remove();
   if (bannerHtml) {
-    document.getElementById("view-overview").insertAdjacentHTML("afterbegin", bannerHtml);
+    const bannerHost = document.getElementById("research-workbench-after-topic") || document.getElementById("view-overview");
+    bannerHost.insertAdjacentHTML("afterbegin", bannerHtml);
   }
 
   // Research question
   document.getElementById("overview-question").textContent = data.research_question || data.project?.title || "未设置研究问题";
   document.getElementById("overview-project-meta").textContent =
     `项目：${data.project?.slug || ""} · 当前阶段：${productTermLabel(data.current_stage || "")} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
+  renderResearchTopicIntake(data);
 
   renderWorkflowContract(data.workflow_contract);
   renderSupervisorPlan();
@@ -5546,6 +5641,18 @@ async function boot() {
   document.getElementById("view-overview")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    if (target.closest("[data-topic-confirm-action]")) {
+      confirmResearchTopic(false);
+      return;
+    }
+    if (target.closest("[data-topic-use-existing-action]")) {
+      confirmResearchTopic(true);
+      return;
+    }
+    if (target.closest("[data-topic-start-action]")) {
+      switchView("data-variables");
+      return;
+    }
     const supervisorButton = target.closest("[data-supervisor-plan-generate]");
     if (supervisorButton) {
       void handleGenerateSupervisorPlan();

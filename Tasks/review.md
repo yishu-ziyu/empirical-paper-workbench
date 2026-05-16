@@ -776,3 +776,44 @@
 - 这次解决的是首页局部信息密度，不代表所有页面已经完成 clean workbench 收敛。
 - SupervisorPlan 仍然只是 `needs_review` 产物；下一步必须做审批状态机。
 - 详情内容仍会在 DOM text 中存在，这是原生 `details` 的正常行为；视觉和交互上默认折叠。
+
+## 2026-05-16 P2-Q Topic-first Home
+
+### 行为覆盖
+
+- [x] 首页第一屏先让用户输入或选择研究选题，不再默认摊开展示所有执行/Agent/风险模块。
+- [x] 用户可以点击 `从已有选题继续`，用 overview 中已有研究问题进入判断环节。
+- [x] 用户可以点击 `从真实数据候选池开始`，直接进入“数据与设计”页，但不会自动绑定数据或写入变量角色。
+- [x] 选题确认前，`下一步研究决策`、智能中控、SupervisorPlan 和证据 banner 默认隐藏。
+- [x] 选题确认后，研究判断区展开并显示后续执行入口。
+- [ ] 未覆盖：后端持久化 ResearchQuestion/TopicSession；选题绑定 SupervisorPlan 审批；线上版上传数据入口。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v` 首次新增 3 条失败，失败原因为缺少 `research-topic-intake`、`research-workbench-after-topic` 和 `data-topic-start-action`。
+- 目标测试：`python3 -m unittest tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，9 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_product_workflow_contract tests.test_supervisor_plan -v`，18 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，213 tests OK，skipped=1。
+- 静态检查：`node --check Product/web/assets/app.js` 通过；Python 编译检查通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-topic-first-home-bdd.md`：新增本轮 BDD 行为契约。
+- `tests/test_product_workflow_contract.py`：锁定首页先选题、确认后展开和数据候选入口。
+- `Product/web/index.html`：新增选题入口并重组首页工作台区域。
+- `Product/web/assets/app.js`：新增选题状态和交互。
+- `Product/web/assets/styles.css`：新增选题入口与窄视口降噪样式。
+
+### 手动验收
+
+1. 打开右侧 Codex 内置浏览器：`http://127.0.0.1:8767/?v=20260516-p2q-topic1`。
+2. 首屏应看到 `开始一项实证研究` 和选题输入框，而不是直接看到所有执行与 Agent 面板。
+3. 输入一个选题，例如“机器人应用是否影响劳动力市场匹配效率？”，点击 `进入研究判断`。
+4. 页面应显示已确认选题，并展开 `下一步研究决策`、智能中控和 SupervisorPlan。
+5. 刷新后可用 `从已有选题继续` 恢复本地确认状态；点击 `从真实数据候选池开始` 应切到“数据与设计”。
+
+### 剩余风险
+
+- 选题目前是前端本地状态，不是后端审计对象；下一步需要 ResearchQuestion/TopicSession。
+- 右侧内置浏览器截图捕获超时；本轮以 DOM 检查和实际可见交互作为验收证据。
+- 这轮只调整首页入口，没有完成 SupervisorPlan approve/reject/needs_revision 审批。

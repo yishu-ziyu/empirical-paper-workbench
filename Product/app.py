@@ -98,6 +98,11 @@ from Product.backend.reviewer_score_service import (
     generate_project_reviewer_scorecard,
     get_project_reviewer_scorecard,
 )
+from Product.backend.verifier_service import (
+    ExportCandidateRequiredError,
+    get_project_verifier_checks,
+    run_project_verifier_checks,
+)
 from Product.backend.supervisor_plan_service import (
     InvalidSupervisorPlanReviewActionError,
     SupervisorPlanBlockedError,
@@ -1049,6 +1054,34 @@ def api_v1_project_reviewer_scorecard(project_id: str) -> dict:
 def api_v1_generate_project_reviewer_scorecard(project_id: str, payload: ReviewerScorecardPayload) -> dict:
     try:
         return generate_project_reviewer_scorecard(PRODUCT_ROOT, REPO_ROOT, project_id, payload.note)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/verifier-checks")
+def api_v1_project_verifier_checks(project_id: str) -> dict:
+    try:
+        return get_project_verifier_checks(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except ExportCandidateRequiredError as exc:
+        return error_response(409, "export_candidate_required", str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/verifier-checks/run", status_code=201)
+def api_v1_run_project_verifier_checks(project_id: str) -> dict:
+    try:
+        return run_project_verifier_checks(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except ExportCandidateRequiredError as exc:
+        return error_response(409, "export_candidate_required", str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except FileNotFoundError as exc:

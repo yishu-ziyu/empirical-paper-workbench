@@ -26,6 +26,16 @@ Reason: 用户明确指出页面信息会冲爆短时记忆。任务队列是控
 
 Rejected: 默认展开所有任务详情。原因是这会重复 P2 前期的信息噪声问题，让用户无法判断下一步该点哪里。
 
+## 2026-05-17：最终导出必须读 verifier gates，而不是读导出包存在性
+
+Decision: P2-Z 新增 verifier checks，`docx 最终导出` 只能由 `verifier_checks.can_export_docx=true` 解锁；export package 或 preview 文件存在只说明有导出候选，不说明可以最终导出。
+
+Reason: 用户要的是可审计论文流水线，不是“看起来已经生成了文稿就能交付”。结果绑定、复现产物、方法执行证据、草稿预览、证据等级和 docx 预检都必须成为显式 gate。
+
+Rejected: 把 `preview_ready` 的 export package 当成最终导出 ready。原因是 preview 和 manifest 是必要证据，但不足以证明 docx 可交付。
+
+Rejected: verifier gate 里直接生成最终 docx。原因是 P2-Z 的责任是核验和阻断，最终写回/导出仍应是独立的显式人工动作，不能绕过 Review & Export。
+
 ## 2026-05-12：采用记忆外化作为长程开发协议
 
 Decision: 本轮开发维护 `tasks/todo.md`、`tasks/handoff.md`、`tasks/decision-log.md`、`tasks/manifest.md`、`tasks/review.md`，把跨 Session 状态落地到仓库文件。

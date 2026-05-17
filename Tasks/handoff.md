@@ -2060,3 +2060,61 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - 当前评分是 deterministic baseline，不是真实 LLM reviewer 或外部审稿 Agent。
 - 任务建议还没有真正写入 proposed queue；本轮只做显式入口和不自动改写边界。
 - 评分维度是最小五维，没有引入 DID/IV/RDD 等方法族的专门审稿 rubrics。
+
+## 2026-05-17 P2-Z Verifier Gates 交接增量
+
+更新时间：2026-05-17 21:02 CST
+
+### 当前目标
+
+把 Review & Export 从“有导出包预览”推进到“最终导出前必须通过显式核验门”。P2-Z 已完成；下一步按计划第 9 节执行 AI Research Pipeline MVP Review，对 P2-V 到 P2-Z 做完整回归、浏览器端到端验收和截图留档。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-verifier-export-gates-bdd.md`。
+- 新增测试：`tests/test_verifier_export_gates.py`。
+- 新增服务：`Product/backend/verifier_service.py`。
+- 扩展 `Product/app.py`：新增 `GET /api/v1/projects/{project_id}/verifier-checks` 和 `POST /api/v1/projects/{project_id}/verifier-checks/run`。
+- 扩展 `Product/web/index.html`：Review & Export 页面新增 `verifier-gate-panel`，放在审稿评分之后、导出包之前。
+- 扩展 `Product/web/assets/app.js`：新增 verifier checks API、渲染、运行核验、状态翻译和 docx 最终导出禁用逻辑。
+- 扩展 `Product/web/assets/styles.css`：新增 verifier gate 的摘要、状态、blocked/failed 视觉样式。
+- 当前真实项目已生成 `state/product/verifier_checks.json` runtime artifact；该文件为本地运行状态，不提交。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_verifier_export_gates -v` 首次失败，原因是 `/verifier-checks` API 404 和前端缺少 `verifier-gate-panel`。
+- GREEN：`python3 -m unittest tests.test_verifier_export_gates -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_verifier_export_gates tests.test_review_export_package tests.test_manuscript_consumption -v`，33 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，257 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/verifier_service.py Product/backend/manuscript_candidate_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8768/?v=20260517-p2z-verifier-gates` 显示 `导出核验门`；`rowCount=8`、`failedRows=1`、`hasResultBinding=true`、`hasDocxPreflight=true`、`finalExportDisabled=true`、`errors=[]`、`badResponses=[]`；截图 `/tmp/p2z-verifier-gates.png`。
+
+### 关键文件路径
+
+- `Product/backend/verifier_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_verifier_export_gates.py`
+- `docs/architecture-v2/codex-phase-p2-verifier-export-gates-bdd.md`
+- `state/product/verifier_checks.json`：浏览器/API 验收时生成的本地运行状态，gitignored，不提交。
+- `/tmp/p2z-verifier-gates.png`：浏览器自动化验收截图。
+
+### 不能重复探索的结论
+
+- `preview_ready` export package 不是最终导出 ready；它只证明有候选包和预览文件。
+- 最终 docx 导出只能读取 `verifier_checks.can_export_docx`，不能从 candidate、preview 或 export manifest 是否存在推断。
+- P2-Z 不直接生成 docx，也不覆盖 `Manuscripts/generated/paper_draft.md`；它只负责核验和阻断。
+- 当前 `docx_export_preflight=blocked` 是正确产品状态，因为还没有真实最终 docx 产物和独立导出动作。
+
+### 下一步第一件事
+
+执行计划第 9 节 `Integration Milestone: AI Research Pipeline MVP Review`：完整回归、启动 8768、浏览器按 10 步端到端验收，并保存 `artifacts/ui-checks/pipeline-mvp-home.png`、`pipeline-mvp-data-variables.png`、`pipeline-mvp-execution.png`、`pipeline-mvp-review-export.png`。
+
+### 未解决风险
+
+- 真实 docx 生成仍未实现；P2-Z 只是把最终导出前的安全门立起来。
+- verifier checks 与当前 export package 绑定；重新生成 finding、candidate 或 export package 后必须重新运行核验。
+- DID/IV/RDD/PSM/DML 未来进入真实执行后，还需要方法族专用 verifier checks。
+- 当前工作区还有非本轮改动：`README.md`、`Manuscripts/templates/README.md` 和 `Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/`，不要在 P2-Z commit 中暂存或回滚。

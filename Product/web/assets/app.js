@@ -77,6 +77,8 @@ const state = {
   generatingSupervisorPlan: false,
   reviewingSupervisorPlanAction: null,
   creatingAgentTaskQueue: false,
+  reviewingAgentTaskId: null,
+  reviewingAgentTaskAction: null,
   researchTopicConfirmed: false,
   researchTopicDraft: "",
 };
@@ -693,6 +695,13 @@ const v2api = {
     async create(projectId, payload = {}) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async reviewDispatch(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/dispatch-review`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -2101,6 +2110,10 @@ function productTermLabel(value) {
     missing_covariates: "缺少协变量",
     queued: "已排队",
     ready_for_dispatch: "待派工",
+    reviewed_for_dispatch: "已通过派工审阅",
+    dispatch_review_required: "等待派工审阅",
+    blocked: "已阻断",
+    needs_revision: "需要修改",
     ready_to_create: "待创建",
     "Data Agent": "数据智能体",
     "Execution Agent": "执行智能体",
@@ -2353,6 +2366,7 @@ function renderAgentTaskQueue() {
         <div><span class="meta-label">任务总数</span><strong>${escapeHtml(String(summary.total_tasks || 0))}</strong></div>
         <div><span class="meta-label">排队</span><strong>${escapeHtml(String(summary.queued_count || 0))}</strong></div>
         <div><span class="meta-label">阻塞项</span><strong>${escapeHtml(String(summary.blocked_count || blockers.length || 0))}</strong></div>
+        <div><span class="meta-label">已审阅</span><strong>${escapeHtml(String(summary.dispatch_reviewed_count || 0))}</strong></div>
         <div><span class="meta-label">负责人</span><strong>${escapeHtml(ownerAgents.length ? ownerAgents.join("、") : "-")}</strong></div>
       </div>
       ${hasQueue ? `
@@ -2387,17 +2401,37 @@ function renderAgentTaskQueueItem(task) {
   const outputRequirements = task.output_requirements || [];
   const riskFlags = task.risk_flags || [];
   const auditLog = task.audit_log || [];
+  const dispatchReadiness = task.dispatch_readiness || {};
+  const dispatchReview = task.dispatch_review || {};
+  const dispatchBlockers = dispatchReadiness.blockers || task.blockers || [];
+  const reviewDisabled = state.reviewingAgentTaskId === task.id;
   return `
     <article class="agent-task-item">
       <div class="agent-task-item-head">
         <div>
           <span class="meta-label">${escapeHtml(productTermLabel(task.role || task.owner_agent || "Agent"))}</span>
           <h5>${escapeHtml(task.title || task.id || "未命名任务")}</h5>
-          <p class="muted">负责人 Agent：${escapeHtml(task.owner_agent || "-")} · 状态：${escapeHtml(productTermLabel(task.status || "queued"))}</p>
+          <p class="muted">负责人 Agent：${escapeHtml(task.owner_agent || "-")} · 状态：${escapeHtml(productTermLabel(task.status || "queued"))} · 下一步：${escapeHtml(productTermLabel(task.next_action || "dispatch_review_required"))}</p>
         </div>
         <span class="pill">${escapeHtml(productTermLabel(task.status || "queued"))}</span>
       </div>
       <p class="muted">${escapeHtml(task.summary || "")}</p>
+      <div class="agent-task-dispatch-review">
+        <div>
+          <span class="meta-label">派工审阅</span>
+          <strong>${escapeHtml(dispatchReviewLabel(dispatchReview, dispatchReadiness))}</strong>
+          ${dispatchBlockers.length ? dispatchBlockers.map((blocker) => `
+            <p class="muted">${escapeHtml(blocker.label || blocker.code || "等待审阅")}：${escapeHtml(blocker.description || "")}</p>
+          `).join("") : "<p class='muted'>已通过派工审阅；仍需后续绑定真实执行后端。</p>"}
+        </div>
+        <div class="agent-task-dispatch-actions">
+          ${["approve", "needs_revision", "reject"].map((action) => `
+            <button class="${action === "approve" ? "primary-button" : "ghost-button"}" data-dispatch-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${reviewDisabled ? "disabled" : ""}>
+              ${reviewDisabled && state.reviewingAgentTaskAction === action ? "写回中..." : escapeHtml(dispatchReviewActionLabel(action))}
+            </button>
+          `).join("")}
+        </div>
+      </div>
       <details class="progressive-disclosure agent-task-details" data-disclosure="agent-task-progressive-disclosure">
         <summary>查看任务详情</summary>
         <div class="disclosure-panel agent-task-detail-grid">
@@ -2429,6 +2463,23 @@ function renderAgentTaskQueueItem(task) {
   `;
 }
 
+function dispatchReviewLabel(review, readiness) {
+  if (review?.action === "approve") return "人工已批准派工";
+  if (review?.action === "reject") return "人工已阻断任务";
+  if (review?.action === "needs_revision") return "人工要求修改";
+  const blocker = (readiness?.blockers || [])[0];
+  return blocker?.code ? productTermLabel(blocker.code) : "等待派工审阅";
+}
+
+function dispatchReviewActionLabel(action) {
+  const labels = {
+    approve: "批准派工",
+    needs_revision: "要求修改",
+    reject: "阻断任务",
+  };
+  return labels[action] || action || "审阅";
+}
+
 async function handleCreateAgentTaskQueue() {
   if (!state.selectedProjectId) return;
   clearV2Error("overview");
@@ -2443,6 +2494,27 @@ async function handleCreateAgentTaskQueue() {
     showV2Error("overview", `创建 Agent 任务队列失败：${error.message}`);
   } finally {
     state.creatingAgentTaskQueue = false;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleReviewAgentTaskDispatch(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingAgentTaskId = taskId;
+  state.reviewingAgentTaskAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewDispatch(state.selectedProjectId, taskId, {
+      action,
+      note: `首页派工审阅：${dispatchReviewActionLabel(action)}`,
+    });
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存派工审阅失败：${error.message}`);
+  } finally {
+    state.reviewingAgentTaskId = null;
+    state.reviewingAgentTaskAction = null;
     renderAgentTaskQueue();
   }
 }
@@ -5924,6 +5996,14 @@ async function boot() {
     }
     if (target.closest("[data-agent-task-create-action]")) {
       void handleCreateAgentTaskQueue();
+      return;
+    }
+    const dispatchReviewButton = target.closest("[data-dispatch-review-action]");
+    if (dispatchReviewButton) {
+      void handleReviewAgentTaskDispatch(
+        dispatchReviewButton.dataset.agentTaskId,
+        dispatchReviewButton.dataset.dispatchReviewAction,
+      );
       return;
     }
     const button = target.closest("[data-open-design-action]");

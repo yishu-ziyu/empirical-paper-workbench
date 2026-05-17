@@ -1,5 +1,50 @@
 # Review
 
+## 2026-05-17 P2-V Human Dispatch Audit
+
+### 行为覆盖
+
+- [x] 队列 item 创建后不能直接执行，`can_execute=false`。
+- [x] 未经审阅的 item 暴露 `dispatch_review_required` 阻塞。
+- [x] 用户批准派工后，item 进入 `reviewed_for_dispatch`，记录 reviewer、note、timestamp、`evidence_level=local_file`。
+- [x] 用户阻断派工后，item 进入 `blocked` 并保留阻断原因。
+- [x] 派工审阅不修改 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+- [x] 前端默认折叠输入证据、输出要求、风险和审计日志，只保留派工动作。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests/test_agent_task_dispatch_audit.py -v` 首轮失败原因符合预期：缺少 `can_execute`、dispatch-review API 404、前端缺少 `reviewDispatch`。
+- 目标测试：`python3 -m unittest tests/test_agent_task_dispatch_audit.py -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests/test_agent_task_queue.py tests/test_product_workflow_contract.py -v`，21 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，239 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/*.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-dispatch-audit-bdd.md`：新增派工审阅行为契约。
+- `tests/test_agent_task_dispatch_audit.py`：新增后端/API/前端契约测试。
+- `Product/backend/task_dispatch_service.py`：新增派工审阅状态机。
+- `Product/backend/agent_task_queue_service.py`：扩展队列 item 默认字段和响应摘要。
+- `Product/app.py`：新增 dispatch-review API。
+- `Product/web/assets/app.js`：新增派工审阅 API、渲染和事件处理。
+- `Product/web/assets/styles.css`：新增派工审阅区和五列摘要样式。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2v-dispatch-audit`。
+3. 首页 `Agent 任务队列` 应显示任务摘要和派工审阅区。
+4. `查看任务详情` 默认折叠；展开后才看到输入证据、输出要求、风险和审计日志。
+5. 点击第一项 `批准派工` 后，摘要中的已审阅数量应增加，任务状态显示已通过派工审阅，下一步为选择执行后端。
+6. 浏览器自动化验收结果：队列可见、3 个批准按钮可见、5 个 details 默认折叠、点击批准后显示已审阅/选择执行后端、console errors=0。
+
+### 剩余风险
+
+- P2-V 仍不执行子 Agent；批准派工后只是进入 `reviewed_for_dispatch`，后续还要做执行后端选择和真实日志产出。
+- 本轮浏览器成功态使用本地 gitignored `state/product/supervisor_plan.json` 和 `state/product/agent_task_queue.json` 做验收状态，不会提交到仓库。
+- StatsPAI/StataMCP/Python 的真实调度仍是 P2-X/P2-W 后续任务；不能把派工审阅误解成统计后端已经执行。
+- 真实 CFPS 字段候选仍需 P2-W 写入正式 VariableRoleSet，再重建 DesignSpec / RunPlan 后才能进入论文分析。
+
 ## 验证记录
 
 - 2026-05-12：`python3 -m unittest discover -s tests -v`，48 tests OK，skipped=1。

@@ -4,6 +4,18 @@
 
 把实证系统从静态阶段页推进到真实执行过程可观察：前端能选择/展示真实 run_id，读取 observability API，并渲染 run steps、events、HITL gates、产物证据、执行者和证据等级。
 
+## 2026-05-17 P2-V Human Dispatch Audit For Agent Task Queue
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-dispatch-audit-bdd.md`，定义 Agent Task Queue item 必须先经过人工派工审阅。
+- [x] TDD：新增 `tests/test_agent_task_dispatch_audit.py`，先确认缺少 `can_execute`、dispatch-review API 404、前端缺少 `reviewDispatch` 的 RED。
+- [x] 后端：新增 `Product/backend/task_dispatch_service.py`，支持 `approve`、`reject`、`needs_revision` 三种派工审阅动作。
+- [x] 后端：扩展 `Product/backend/agent_task_queue_service.py`，让新旧队列都显式包含 `can_execute=false`、`next_action`、`dispatch_readiness`、`dispatch_review`。
+- [x] API：新增 `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review`。
+- [x] 前端：在首页 Agent Task Queue 中显示派工审阅区，默认折叠输入证据、输出要求、风险和审计日志。
+- [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和浏览器自动化点击验收通过。
+- [x] 安全边界：批准派工只进入 `reviewed_for_dispatch`，仍然 `can_execute=false`，不会直接调用 StatsPAI/StataMCP/Python 或改写研究状态。
+- [ ] P2-W：把真实 CFPS 字段候选推进到正式 VariableRoleSet / DesignSpec / RunPlan 版本化链路。
+
 ## 状态机
 
 - [x] 读取项目 AGENTS.md、architecture-v2 契约、Kimi handoff、Phase A BDD

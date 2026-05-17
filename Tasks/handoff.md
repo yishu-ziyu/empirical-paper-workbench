@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-14 17:20 CST
+更新时间：2026-05-17 19:17 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。P2-N 已把 StatsPAI/StatsAPI 从“候选后端”推进为 CSV OLS 的独立验证后端：full run 会额外写出 `Results/json/statspai_execution_result.json`，并在实证执行页展示 `statspai.regress`、验证状态、证据等级和 treatment coefficient cross-check。P2-O 已回应用户关于“底层大模型/中控系统是否缺失”的关键质疑：`workflow_contract.intelligence_layer` 和首页“智能中控”面板现在显式展示本地 Codex Supervisor、provider readiness、执行开关、阻塞原因和派工计划。当前真实状态是：本机 Codex CLI 可检测到，但 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用，所以 Supervisor 处于 `blocked`，还没有真正生成计划或派出 sub agent。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把 approved SupervisorPlan -> Agent Task Queue -> 人工派工审阅 -> 后端执行绑定，逐步做成可审计的 AI 实证研究流水线。P2-V 已完成：Agent Task Queue item 默认不能执行，必须逐项人工派工审阅；批准后只进入 `reviewed_for_dispatch`，仍然不会自动调用执行后端或改写 VariableRoleSet / DesignSpec / RunPlan。
 
 ## 已完成事项
 
@@ -187,7 +187,7 @@
 
 ## 下一步第一件事
 
-写 P2-P BDD 和失败测试：实现真实 Supervisor plan artifact。`POST /api/v1/projects/{project_id}/supervisor/plan` 或 full-run 前置编排应在 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 时调用本地 Codex，写入 `state/product/supervisor_plan.json` 或 run-scoped `state/runs/{run_id}/supervisor_plan.json`；未启用时继续返回 blocked，并在首页显示不能派工的原因。
+写 P2-W BDD 和失败测试：把已审阅的真实 CFPS 字段候选推进到正式 `VariableRoleSet -> DesignSpec -> RunPlan` 版本化链路。重点是“候选不等于正式研究状态”：只有用户显式保存后才写入 `state/product/variable_roles.json`，再触发 DesignSpec / RunPlan 重新确认。
 
 ## 未解决风险
 
@@ -198,6 +198,42 @@
 - StataMCP/Stata 仍未产生日志、do-file、结果 JSON 或 evaluator checks，不能标记为 `local_execution`。
 - 本地 Codex Supervisor 已可见但未执行派工；`EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用时必须继续 blocked，避免把工程状态机伪装成大模型中控。
 - 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；必须经正式 VariableRoleSet 保存、DesignSpec/RunPlan 重建和真实执行后才可作为研究证据。
+
+## 2026-05-17 P2-V Human Dispatch Audit 交接增量
+
+### 当前目标
+
+把 P2-U 生成的 Agent Task Queue 从“可派工草案”推进到“每项任务必须人工派工审阅”的执行前安全层。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-dispatch-audit-bdd.md`。
+- 新增测试：`tests/test_agent_task_dispatch_audit.py`。
+- 新增服务：`Product/backend/task_dispatch_service.py`。
+- 扩展 `Product/backend/agent_task_queue_service.py`：队列 item 统一带 `can_execute=false`、`next_action`、`dispatch_readiness`、`dispatch_review`。
+- 扩展 `Product/app.py`：新增 `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review`。
+- 扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`：前端显示派工审阅区，支持批准、要求修改、阻断。
+
+### 已验证证据
+
+- `python3 -m unittest tests/test_agent_task_dispatch_audit.py -v`：5 tests OK。
+- `python3 -m unittest tests/test_agent_task_queue.py tests/test_product_workflow_contract.py -v`：21 tests OK。
+- `python3 -m unittest discover -s tests -v`：239 tests OK，skipped=1。
+- `python3 -m py_compile Product/app.py Product/backend/*.py`：通过。
+- `node --check Product/web/assets/app.js`：通过。
+- `git diff --check`：通过。
+- 浏览器自动化验收 `http://127.0.0.1:8768/?v=20260517-p2v-dispatch-audit`：队列可见，3 个批准按钮可见，5 个 details 默认折叠，点击首个 `批准派工` 后显示已审阅/选择执行后端，console errors=0。
+
+### 不能重复探索的结论
+
+- 队列创建不是执行授权；`ready_for_dispatch` 只是“草案可审阅”。
+- `approve` 派工审阅不是启动任务；P2-V 仍保持 `can_execute=false`，后续必须单独做执行后端选择和真实任务调度。
+- `dispatch_review_required` 放在 `dispatch_readiness.blockers`，不是旧的 task-level `blockers`，以免破坏 P2-U 的队列摘要语义。
+- 派工审阅只能写 `state/product/agent_task_queue.json`，不能修改 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
+
+### 下一步第一件事
+
+P2-W：真实数据候选进入正式变量角色链路。先写 BDD，锁定“字段候选只能作为待审资料，不能直接进入论文分析”的边界。
 
 ## 2026-05-14 P2-N/P2-O StatsPAI Validation 与 LLM Supervisor 交接增量
 

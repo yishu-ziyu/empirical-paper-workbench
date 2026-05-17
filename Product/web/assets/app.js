@@ -2303,6 +2303,7 @@ function renderSupervisorPlan() {
   const boundQuestion = inputQuestion.question || state.researchQuestionData?.research_question?.question || "";
   const visibleNextAction = plan.next_action?.label || (hasPlan ? "审阅 SupervisorPlan" : "生成 SupervisorPlan");
   const humanReview = plan.human_review || null;
+  const humanReviewLabel = supervisorHumanReviewLabel(plan);
   const reviewDisabled = Boolean(state.reviewingSupervisorPlanAction);
   container.innerHTML = `
     <article class="supervisor-plan-card is-${escapeHtml(plan.status || "empty")}">
@@ -2325,7 +2326,7 @@ function renderSupervisorPlan() {
         <div class="supervisor-plan-review-bar">
           <div>
             <span class="meta-label">人工审批</span>
-            <strong>${humanReview ? escapeHtml(supervisorReviewActionLabel(humanReview.action)) : "尚未审批"}</strong>
+            <strong>${escapeHtml(humanReviewLabel)}</strong>
             <p class="muted">只有批准后的计划才能进入任务队列；要求修改或驳回会阻止派工。</p>
           </div>
           <div class="supervisor-plan-review-actions">
@@ -2368,6 +2369,23 @@ function renderSupervisorPlan() {
       </details>
     </article>
   `;
+}
+
+function supervisorHumanReviewLabel(plan) {
+  const humanReview = plan?.human_review || null;
+  if (humanReview?.action) {
+    return supervisorReviewActionLabel(humanReview.action);
+  }
+  if (plan.status === "approved") {
+    return "已批准";
+  }
+  if (plan.status === "needs_revision") {
+    return "要求修改";
+  }
+  if (plan.status === "rejected") {
+    return "已驳回";
+  }
+  return "尚未审批";
 }
 
 function renderSupervisorPlanColumn(title, items, detailKey) {
@@ -5552,7 +5570,7 @@ function renderVerifierGates() {
       <button class="primary-button" data-run-verifier-checks ${state.runningVerifierChecks ? "disabled" : ""}>
         ${state.runningVerifierChecks ? "核验中..." : "重新运行核验"}
       </button>
-      <button class="ghost-button" data-docx-final-export ${!state.verifierChecksData?.can_export_docx ? "disabled" : ""}>
+      <button id="verifier-final-export-button" class="ghost-button" data-docx-final-export ${!state.verifierChecksData?.can_export_docx ? "disabled" : ""}>
         docx 最终导出
       </button>
     </div>

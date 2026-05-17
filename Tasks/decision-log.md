@@ -1,5 +1,29 @@
 # Decision Log
 
+## 2026-05-17：Pipeline MVP Review 必须用浏览器证明完整路径
+
+Decision: P2-V 到 P2-Z 收尾不只跑单元测试，还用 Playwright 打开 `http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`，检查首页选题、SupervisorPlan、Agent Task Queue、变量/方法、Findings/Manuscript 和 Review/Export verifier gates。
+
+Reason: 用户明确要求“可视化验证”和“点击哪里可以确认”。当前产品风险不是单个 API，而是用户是否能在浏览器里理解下一步。
+
+Rejected: 只汇报测试通过。原因是这不能证明页面信息架构、折叠策略和导出阻断在真实浏览器里可用。
+
+## 2026-05-17：approved SupervisorPlan 要兼容旧本地状态
+
+Decision: 前端新增 `supervisorHumanReviewLabel()`，当 `plan.status=approved` 但旧状态文件没有 `human_review.action` 时，显示 `已批准`。
+
+Reason: 本地长程开发会保留旧版本 `state/product/supervisor_plan.json`。如果 UI 因字段演进误显示 `尚未审批`，用户会以为流程没有走通。
+
+Rejected: 要求用户删除 runtime state 重新生成。原因是跨 Session 状态继承的目标正是兼容本地状态演进，而不是每轮清空。
+
+## 2026-05-17：Agent Task Queue 派工审阅仍然不能等同于执行
+
+Decision: 浏览器验收允许把 3 个任务推进到 `dispatch_reviewed`，但仍保留 `can_execute=false`，下一步必须单独做 execution backend selection。
+
+Reason: `dispatch_reviewed` 只说明人类看过并同意进入后端选择，不代表 StatsPAI、Python、StataMCP 或 Codex 子 Agent 已经被授权执行。
+
+Rejected: 审阅通过后自动执行任务。原因是这会绕过执行后端选择、日志、产物和 evaluator checks 的审计层。
+
 ## 2026-05-17：Agent Task Queue 必须经过人工派工审阅
 
 Decision: P2-V 让每个 Agent Task Queue item 默认 `can_execute=false`，并要求人工执行 `approve`、`needs_revision` 或 `reject` 的派工审阅动作。

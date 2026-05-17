@@ -1079,3 +1079,47 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `/tmp/p2y-reviewer-scorecard.png`
+
+## 2026-05-17 P2-Z Verifier Gates For Results, Manuscript, And Export
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-verifier-export-gates-bdd.md`
+- `tests/test_verifier_export_gates.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/verifier_service.py`：
+  - 新增 `get_project_verifier_checks()`。
+  - 新增 `run_project_verifier_checks()`。
+  - 新增 `state/product/verifier_checks.json` 状态文件契约。
+  - 核验 export candidate、result binding、repro manifest、run plan artifact、analysis result artifact、method execution artifact、draft preview、evidence levels 和 docx export preflight。
+- `Product/app.py`：
+  - 新增 `GET /api/v1/projects/{project_id}/verifier-checks`。
+  - 新增 `POST /api/v1/projects/{project_id}/verifier-checks/run`。
+  - 无 export candidate 时返回 409 `export_candidate_required`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：Review & Export 页面新增 `verifier-gate-panel`，位置在 Reviewer Scorecard 和 Export Package Workbench 之间。
+- `Product/web/assets/app.js`：
+  - 新增 `state.verifierChecksData` 和 `state.runningVerifierChecks`。
+  - 新增 `v2api.verifierChecks.get/run`。
+  - 新增 `renderVerifierGates()`、`verifierCheckStatusText()`、`runVerifierChecks()`。
+  - `docx 最终导出` 按钮只读取 `can_export_docx`，不能从 export package 是否存在推断。
+- `Product/web/assets/styles.css`：新增 `.verifier-gate-*` 样式，保持摘要优先、失败项明确、最终导出动作受控。
+
+### API 契约
+
+- `GET /api/v1/projects/{project_id}/verifier-checks`
+- `POST /api/v1/projects/{project_id}/verifier-checks/run`
+- `status`：`passed`、`blocked`、`failed`。
+- `can_export_docx=false` 时最终 docx 导出按钮必须 disabled。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8768/?v=20260517-p2z-verifier-gates`
+
+### 新增验收产物
+
+- `/tmp/p2z-verifier-gates.png`

@@ -45,6 +45,7 @@ const state = {
   manuscriptCandidatesData: null,
   exportPackageData: null,
   reviewerScorecardData: null,
+  verifierChecksData: null,
   agentsData: null,
   selectedAgentId: null,
   agentDetailData: null,
@@ -78,6 +79,7 @@ const state = {
   approvingWritebackAction: null,
   preflightingDocxCandidateId: null,
   generatingReviewerScorecard: false,
+  runningVerifierChecks: false,
   acceptingReviewerTaskSuggestionId: null,
   generatingSupervisorPlan: false,
   reviewingSupervisorPlanAction: null,
@@ -807,6 +809,16 @@ const v2api = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      });
+    },
+  },
+  verifierChecks: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/verifier-checks`);
+    },
+    async run(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/verifier-checks/run`, {
+        method: "POST",
       });
     },
   },
@@ -5475,6 +5487,7 @@ function formatNumber(value) {
 
 function renderArtifactsReplication() {
   renderReviewerScorecard();
+  renderVerifierGates();
   renderExportPackageWorkbench();
 
   const artifacts = mergedArtifacts(state.selectedProject);
@@ -5501,6 +5514,70 @@ function renderArtifactsReplication() {
       <div class="muted">${escapeHtml(artifact.description || "")}</div>
     </div>
   `).join("");
+}
+
+function renderVerifierGates() {
+  const container = document.getElementById("verifier-gate-body");
+  if (!container) return;
+
+  const data = state.verifierChecksData;
+  if (!data) {
+    container.innerHTML = "<p class='muted'>正在读取导出前验证...</p>";
+    return;
+  }
+
+  const checks = data.checks || [];
+  if (!checks.length) {
+    container.innerHTML = `
+      <div class="verifier-gate-empty">
+        <div>
+          <strong>${escapeHtml(data.empty_state?.title || "尚未运行验证闸门")}</strong>
+          <p class="muted">${escapeHtml(data.empty_state?.description || "运行后会逐项检查结果绑定、复现清单、方法执行产物、草稿预览和 docx 预检。")}</p>
+        </div>
+        <button class="primary-button" data-run-verifier-checks ${state.runningVerifierChecks ? "disabled" : ""}>
+          ${state.runningVerifierChecks ? "核验中..." : "运行验证闸门"}
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="verifier-gate-summary">
+      <div>
+        <span class="eyebrow">docx 导出</span>
+        <strong>${data.can_export_docx ? "可以进入人工导出" : "保持阻断"}</strong>
+        <p class="muted">${escapeHtml(data.next_manual_action || "先处理失败项，再进入最终导出。")}</p>
+      </div>
+      <button class="primary-button" data-run-verifier-checks ${state.runningVerifierChecks ? "disabled" : ""}>
+        ${state.runningVerifierChecks ? "核验中..." : "重新运行核验"}
+      </button>
+      <button class="ghost-button" data-docx-final-export ${!state.verifierChecksData?.can_export_docx ? "disabled" : ""}>
+        docx 最终导出
+      </button>
+    </div>
+    <div class="verifier-gate-list">
+      ${checks.map((check) => `
+        <div class="verifier-gate-row is-${escapeHtml(check.status || "unknown")}">
+          <span class="verifier-gate-status">${verifierCheckStatusText(check.status)}</span>
+          <div>
+            <strong>${escapeHtml(check.label || check.id)}</strong>
+            <p class="muted">${escapeHtml(check.detail || "")}</p>
+            <code>${escapeHtml((check.artifact_paths || []).join(" · ") || "-")}</code>
+          </div>
+          ${renderEvidenceBadge({ evidence_level: check.evidence_level || "local_file" })}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function verifierCheckStatusText(status) {
+  return {
+    passed: "通过",
+    failed: "失败",
+    blocked: "阻断",
+  }[status] || "待核验";
 }
 
 function renderReviewerScorecard() {
@@ -5848,6 +5925,22 @@ async function runDocxExportPreflight(candidateId) {
   }
 }
 
+async function runVerifierChecks() {
+  if (!state.selectedProjectId) return;
+  clearV2Error("artifacts-replication");
+  state.runningVerifierChecks = true;
+  renderArtifactsReplication();
+  try {
+    state.verifierChecksData = await v2api.verifierChecks.run(state.selectedProjectId);
+    renderArtifactsReplication();
+  } catch (error) {
+    showV2Error("artifacts-replication", `运行验证闸门失败：${error.message}`);
+  } finally {
+    state.runningVerifierChecks = false;
+    renderArtifactsReplication();
+  }
+}
+
 async function generateReviewerScorecard() {
   if (!state.selectedProjectId) return;
   clearV2Error("artifacts-replication");
@@ -6123,6 +6216,18 @@ async function loadV2Data(viewName) {
             dimensions: [],
           };
         }
+        try {
+          state.verifierChecksData = await v2api.verifierChecks.get(projectId);
+        } catch (error) {
+          state.verifierChecksData = {
+            empty_state: {
+              title: "尚未运行验证闸门",
+              description: "需要先生成 preview_ready 导出包；验证闸门不会自动覆盖草稿或导出 docx。",
+            },
+            checks: [],
+            can_export_docx: false,
+          };
+        }
         state.exportPackageData = await v2api.exportPackage.get(projectId);
         renderArtifactsReplication();
         break;
@@ -6240,6 +6345,18 @@ async function boot() {
     const suggestionButton = target.closest("[data-accept-reviewer-task-suggestion]");
     if (!suggestionButton) return;
     acceptReviewerTaskSuggestion(suggestionButton.dataset.acceptReviewerTaskSuggestion || "");
+  });
+  document.getElementById("verifier-gate-body")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const runButton = target.closest("[data-run-verifier-checks]");
+    if (runButton) {
+      void runVerifierChecks();
+      return;
+    }
+    const finalExportButton = target.closest("[data-docx-final-export]");
+    if (!finalExportButton) return;
+    showV2Error("artifacts-replication", "docx 最终导出仍需人工触发；当前按钮只在 verifier checks 全部通过后解锁。");
   });
   document.getElementById("datasets-list")?.addEventListener("click", (event) => {
     const target = event.target;

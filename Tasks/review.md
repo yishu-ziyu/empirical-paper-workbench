@@ -1140,3 +1140,50 @@
 - 当前 reviewer backend 是 deterministic baseline，不是外部审稿 Agent；不能把它当作真实学术审稿。
 - 任务建议尚未形成可持久化 proposed task queue；下一步可以在 P2-Z 或后续迭代中接入人工接受后的 proposed queue。
 - 评分卡没有针对 DID/IV/RDD/PSM/DML 建立独立 rubrics；需要等这些方法有真实执行产物后补齐。
+
+## 2026-05-17 P2-Z Verifier Gates For Results, Manuscript, And Export
+
+### 行为覆盖
+
+- [x] 没有 export candidate 时，Verifier Checks API 返回 409 `export_candidate_required`，不能伪造导出核验状态。
+- [x] 有 export package 后，系统核验结果绑定是否存在，并绑定 `Results/json/analysis_result.json`。
+- [x] 系统核验复现产物：export manifest、approved RunPlan、analysis result artifact、method execution artifact 和 draft preview。
+- [x] 系统核验证据等级；最终导出只允许 `local_file` 和 `local_execution`，`mock` 即使显式标记也不能通过最终导出 gate。
+- [x] docx export preflight 是独立 gate；只要 docx 最终产物不存在或未完成预检，`can_export_docx=false`。
+- [x] Review & Export 页面在导出包之前显示 verifier gates，最终导出按钮根据 `can_export_docx` 禁用。
+- [ ] 未覆盖：真实 docx 生成并让 `docx_export_preflight` 变为 passed；这是后续写回/导出任务。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_verifier_export_gates -v` 首次失败，原因是 `/verifier-checks` API 404 和前端缺少 `verifier-gate-panel`。
+- 目标测试：`python3 -m unittest tests.test_verifier_export_gates -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_verifier_export_gates tests.test_review_export_package tests.test_manuscript_consumption -v`，33 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，257 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/verifier_service.py Product/backend/manuscript_candidate_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-verifier-export-gates-bdd.md`：新增最终导出核验行为契约。
+- `tests/test_verifier_export_gates.py`：新增 API、状态保护和前端门禁测试。
+- `Product/backend/verifier_service.py`：新增 verifier gate 读取、生成和持久化服务。
+- `Product/app.py`：新增 verifier checks API。
+- `Product/web/index.html`：Review & Export 页面新增导出核验门面板。
+- `Product/web/assets/app.js`：新增 verifier checks API client、渲染、运行核验和最终导出禁用逻辑。
+- `Product/web/assets/styles.css`：新增 verifier gate 摘要、状态和 blocked/failed 视觉样式。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2z-verifier-gates`。
+3. 进入 `复核与导出`。
+4. 确认 `导出核验门` 出现在 `审稿评分` 之后、导出包之前。
+5. 点击或重新运行核验后，应看到 8 个 gate：结果绑定、复现清单、运行计划、分析结果产物、方法执行产物、草稿预览、证据等级、docx 导出预检。
+6. 当前真实项目中 7 个 gate passed，`docx 导出预检` blocked；`docx 最终导出` 按钮 disabled。
+7. Playwright 浏览器验收记录：`rowCount=8`、`failedRows=1`、`hasResultBinding=true`、`hasDocxPreflight=true`、`finalExportDisabled=true`、`errors=[]`、`badResponses=[]`，截图 `/tmp/p2z-verifier-gates.png`。
+
+### 剩余风险
+
+- P2-Z 只做最终导出前核验，不生成真实 docx；后续需要单独 BDD/TDD 实现 docx export action。
+- 当前 `docx_export_preflight` blocked 是预期状态，不是失败：它说明系统不会把 preview package 误当成最终交付物。
+- verifier checks 依赖当前 export package 和本地 artifact；如果用户切换 run 或重新生成 manuscript candidate，需要重新运行核验。
+- DID/IV/RDD/PSM/DML 仍未有真实执行产物；这些方法未来进入结果后，verifier 需要扩展方法族专用 checks。

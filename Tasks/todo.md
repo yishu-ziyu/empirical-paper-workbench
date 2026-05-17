@@ -48,6 +48,16 @@
 - [x] 安全边界：后续任务只显示 `加入任务队列草案` 入口提示，不自动改写 `state/product/agent_task_queue.json`。
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和 Playwright 浏览器验收通过。
 
+## 2026-05-17 P2-Z Verifier Gates For Results, Manuscript, And Export
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-verifier-export-gates-bdd.md`，定义最终导出前必须显式通过结果绑定、复现产物、正文证据和 docx 预检。
+- [x] TDD：新增 `tests/test_verifier_export_gates.py`，先确认 `/verifier-checks` API 404、缺少状态文件和前端 verifier 面板的 RED。
+- [x] 后端：新增 `Product/backend/verifier_service.py`，从 export package、run plan、method execution、result artifact、draft preview 和 evidence levels 生成 verifier checks。
+- [x] API：新增 `GET /api/v1/projects/{project_id}/verifier-checks` 和 `POST /api/v1/projects/{project_id}/verifier-checks/run`；没有 export package 时返回 409 `export_candidate_required`。
+- [x] 前端：Review & Export 页面新增 `导出核验门` 面板，放在评分卡之后、导出包之前；每个 gate 显示状态、证据和下一步，docx 最终导出按钮受 `can_export_docx` 控制。
+- [x] 安全边界：preview-ready export package 不能等同于最终导出；docx 预检仍 blocked 时，最终 docx 导出按钮保持 disabled。
+- [x] 验证：目标测试、相邻回归、全量 unittest、Python 编译、JS 语法、`git diff --check` 和 Playwright 浏览器验收通过。
+
 ## 状态机
 
 - [x] 读取项目 AGENTS.md、architecture-v2 契约、Kimi handoff、Phase A BDD

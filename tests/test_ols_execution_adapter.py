@@ -100,15 +100,24 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertEqual(manifest["method_execution"]["methods"][0]["method_id"], "ols")
 
     def test_bdd_4_unsupported_method_is_rejected_before_execution(self) -> None:
-        """行为 4：unsupported 方法不能被静默执行。"""
+        """行为 4：blocked 方法必须在 RunPlan 审批阶段被拒绝，不能进入执行。"""
         self._approve_variable_roles()
         self._approve_design_spec()
-        self._approve_run_plan(method_id="iv")
+        draft = self.client.get(f"/api/v1/projects/{self.project_id}/run-plan").json()["run_plan"]
+        tasks = [dict(task, method_id="iv", estimator="iv") for task in draft["tasks"]]
 
-        response = self.client.post(f"/api/v1/projects/{self.project_id}/runs/full", json={})
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/run-plan",
+            json={
+                "tasks": tasks,
+                "outputs": draft["outputs"],
+                "note": "尝试批准缺少工具变量的 IV。",
+            },
+        )
 
         self.assertEqual(response.status_code, 409, msg=response.text)
-        self.assertEqual(response.json()["error"]["code"], "unsupported_run_plan_method")
+        self.assertEqual(response.json()["error"]["code"], "method_workflow_blocked")
+        self.assertIn("instrument_required", response.json()["error"]["details"]["blocked_methods"][0]["blockers"])
         self.assertFalse((self.project_root / "Results" / "json" / "method_execution_result.json").exists())
 
     def test_bdd_5_insufficient_ols_data_returns_structured_failure(self) -> None:

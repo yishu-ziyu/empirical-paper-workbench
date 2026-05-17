@@ -39,6 +39,10 @@ from Product.backend.manuscript_candidate_service import (
     save_project_manuscript_candidate_review,
     save_project_writeback_approval,
 )
+from Product.backend.method_workflow_service import (
+    MethodWorkflowBlockedError,
+    get_project_method_workflows,
+)
 from Product.backend.overview_service import (
     CloudUploadRequiredError,
     DatasetImportProfileStateError,
@@ -137,14 +141,14 @@ app = FastAPI(title="Econ Workbench Product Shell", version="0.1.0")
 app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 
 
-def error_response(status_code: int, code: str, message: str) -> JSONResponse:
+def error_response(status_code: int, code: str, message: str, details: dict | None = None) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={
             "error": {
                 "code": code,
                 "message": message,
-                "details": {},
+                "details": details or {},
             }
         },
     )
@@ -751,6 +755,14 @@ def api_v1_project_run_plan(project_id: str) -> dict:
         return error_response(409, "design_spec_required", str(exc))
 
 
+@app.get("/api/v1/projects/{project_id}/method-workflows")
+def api_v1_project_method_workflows(project_id: str) -> dict:
+    try:
+        return get_project_method_workflows(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
 @app.get("/api/v1/projects/{project_id}/supervisor-plan")
 def api_v1_project_supervisor_plan(project_id: str) -> dict:
     try:
@@ -855,6 +867,8 @@ def api_v1_save_project_run_plan(project_id: str, payload: RunPlanPayload) -> di
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except FileNotFoundError as exc:
         return error_response(409, "design_spec_required", str(exc))
+    except MethodWorkflowBlockedError as exc:
+        return error_response(409, exc.code, str(exc), {"blocked_methods": exc.blocked_methods})
 
 
 @app.get("/api/v1/projects/{project_id}/design")

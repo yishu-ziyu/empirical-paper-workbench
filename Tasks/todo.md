@@ -15,7 +15,7 @@
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和浏览器自动化点击验收通过。
 - [x] 安全边界：批准派工只进入 `reviewed_for_dispatch`，仍然 `can_execute=false`，不会直接调用 StatsPAI/StataMCP/Python 或改写研究状态。
 - [x] P2-W：把真实 CFPS 字段候选推进到正式 VariableRoleSet 草稿链路；正式写入仍需用户在变量角色编辑器中保存。
-- [ ] P2-X：给 DesignSpec/RunPlan 增加方法工作流 checklist，区分 OLS/DID/IV/RDD/PSM/DML 的可执行前置条件。
+- [x] P2-X：给 DesignSpec/RunPlan 增加方法工作流 checklist，区分 OLS/DID/IV/RDD/PSM/DML 的可执行前置条件。
 
 ## 2026-05-17 P2-W Real VariableRoleCandidate Promotion
 
@@ -26,6 +26,16 @@
 - [x] 前端：在候选卡上新增 `基于候选创建变量角色草稿`，保留 `仅载入编辑器` 兼容路径；正式编辑器显示 `正式变量角色`，保存时才写入 `state/product/variable_roles.json`。
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和浏览器自动化点击验收通过。
 - [x] 安全边界：promotion 只写 draft 状态；不覆盖 approved VariableRoleSet，不重建 DesignSpec/RunPlan，不触发执行后端。
+
+## 2026-05-17 P2-X Method Workflow Checklist
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-method-workflow-checklist-bdd.md`，定义 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和阻塞规则。
+- [x] TDD：新增 `tests/test_method_workflow_checklist.py`，先确认 `/method-workflows` API 404、blocked DID RunPlan 仍可保存、前端缺少方法工作流面板的 RED。
+- [x] 后端：新增 `Product/backend/method_workflow_service.py`，把已确认 DesignSpec 转换为方法工作流 readiness、required inputs、diagnostics、blockers。
+- [x] API：新增 `GET /api/v1/projects/{project_id}/method-workflows`，并让 `PUT /api/v1/projects/{project_id}/run-plan` 对 blocked 方法返回 409 `method_workflow_blocked`。
+- [x] 前端：在 Research Design 和 Execution 页面显示方法工作流卡片；摘要显示可执行/缺什么，诊断和要求默认折叠在 `查看方法要求`。
+- [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和 Playwright 浏览器验收通过。
+- [x] 安全边界：P2-X 只做方法准入 checklist；DID/IV/RDD/PSM/DML 没有真实 StatsPAI/StataMCP/Python 执行产物，不标记 `local_execution`。
 
 ## 状态机
 

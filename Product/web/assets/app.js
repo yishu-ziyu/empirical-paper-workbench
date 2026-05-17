@@ -38,6 +38,7 @@ const state = {
   variableRoleCandidatesData: null,
   designSpecData: null,
   runPlanData: null,
+  methodWorkflowsData: null,
   designData: null,
   draftsData: null,
   resultsDraftData: null,
@@ -675,6 +676,11 @@ const v2api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+    },
+  },
+  methodWorkflows: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/method-workflows`);
     },
   },
   supervisorPlan: {
@@ -2116,6 +2122,13 @@ function productTermLabel(value) {
     missing_panel_time: "缺少面板或时间变量",
     missing_running_variable: "缺少断点运行变量",
     missing_covariates: "缺少协变量",
+    outcome_required: "缺少结果变量",
+    treatment_required: "缺少处理变量",
+    time_variable_required: "缺少时间变量",
+    treatment_timing_required: "缺少处理时点",
+    instrument_required: "缺少工具变量",
+    running_variable_required: "缺少断点运行变量",
+    covariates_required: "缺少协变量",
     queued: "已排队",
     ready_for_dispatch: "待派工",
     reviewed_for_dispatch: "已通过派工审阅",
@@ -4714,6 +4727,83 @@ function renderMethodSkillCatalog() {
   `;
 }
 
+function renderMethodWorkflows() {
+  const containers = Array.from(document.querySelectorAll("[data-method-workflow-body]"));
+  if (!containers.length) return;
+
+  const workflows = state.methodWorkflowsData;
+  const html = workflows ? renderMethodWorkflowsBody(workflows) : renderEmptyState({
+    title: "方法工作流尚未生成",
+    description: "需要先确认研究设计方案，系统才会给出 OLS、DID、IV、RDD、PSM、DML 的执行前门禁。",
+  });
+
+  containers.forEach((container) => {
+    container.innerHTML = html;
+  });
+}
+
+const METHOD_WORKFLOW_REFERENCE_LABELS = [
+  "OLS：可执行",
+  "DID：缺少时间变量、处理时点",
+  "IV：缺少工具变量",
+  "RDD：缺少断点运行变量",
+  "PSM：可预检",
+  "DML：可预检",
+];
+
+function renderMethodWorkflowsBody(workflows) {
+  const methods = workflows.methods || [];
+  if (!methods.length) {
+    return renderEmptyState({
+      title: "暂无方法工作流",
+      description: "当前项目还没有可检查的方法清单。",
+    });
+  }
+
+  return `
+    <div class="method-workflow-summary">
+      <div>
+        <span class="eyebrow">方法工作流</span>
+        <h4>先检查方法门禁，再批准执行计划</h4>
+        <p class="muted">默认只展示状态摘要；变量、诊断和阻塞原因放在“查看方法要求”里，避免一屏堆满技术细节。</p>
+      </div>
+      ${renderEvidenceBadge({ evidence_level: workflows.evidence_level || "local_file" })}
+    </div>
+    <div class="method-workflow-list">
+      ${methods.map((method) => `
+        <article class="method-workflow-card ${method.readiness_status === "ready" ? "is-ready" : "is-blocked"}">
+          <div class="method-workflow-card-head">
+            <div>
+              <strong>${escapeHtml(method.label || method.method || method.id || "")}</strong>
+              <p class="muted">${escapeHtml(method.summary || "")}</p>
+            </div>
+            <span class="status-chip ${method.readiness_status === "ready" ? "is-ready" : "is-blocked"}">
+              ${escapeHtml(methodReadinessLabel(method.readiness_status))}
+            </span>
+          </div>
+          <details class="method-workflow-details">
+            <summary>查看方法要求</summary>
+            <div class="method-workflow-detail-grid">
+              <div>
+                <span class="meta-label">输入要求</span>
+                <p>${(method.required_inputs || []).map((item) => `<code>${escapeHtml(item)}</code>`).join(" ")}</p>
+              </div>
+              <div>
+                <span class="meta-label">诊断证据</span>
+                <p>${(method.required_diagnostics || []).map((item) => `<code>${escapeHtml(item)}</code>`).join(" ")}</p>
+              </div>
+              <div>
+                <span class="meta-label">阻塞原因</span>
+                <p>${method.blockers?.length ? method.blockers.map((blocker) => escapeHtml(productTermLabel(blocker))).join("、") : "无阻塞项"}</p>
+              </div>
+            </div>
+          </details>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
 async function handleSaveDesignSpec(event) {
   event.preventDefault();
   if (!state.selectedProjectId) return;
@@ -4748,8 +4838,10 @@ async function handleSaveDesignSpec(event) {
       state.runPlanData = null;
     }
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    state.methodWorkflowsData = await v2api.methodWorkflows.get(state.selectedProjectId);
     renderDesignSpecEditor();
     renderMethodSkillCatalog();
+    renderMethodWorkflows();
     renderWorkflowContract(state.overviewData.workflow_contract);
     document.getElementById("design-spec-save-status").textContent = "已保存";
   } catch (error) {
@@ -4809,7 +4901,9 @@ async function handleSaveRunPlan(event) {
     await v2api.runPlan.save(state.selectedProjectId, payload);
     state.runPlanData = await v2api.runPlan.get(state.selectedProjectId);
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
+    state.methodWorkflowsData = await v2api.methodWorkflows.get(state.selectedProjectId);
     renderRunPlanEditor();
+    renderMethodWorkflows();
     renderExecutionPreflight();
     document.getElementById("run-plan-save-status").textContent = "已保存";
   } catch (error) {
@@ -4841,6 +4935,7 @@ function renderResearchDesign() {
 
   renderDesignSpecEditor();
   renderMethodSkillCatalog();
+  renderMethodWorkflows();
 
   // Question
   document.getElementById("design-question").innerHTML = `
@@ -5852,6 +5947,11 @@ async function loadV2Data(viewName) {
         } catch (error) {
           state.runPlanData = null;
         }
+        try {
+          state.methodWorkflowsData = await v2api.methodWorkflows.get(projectId);
+        } catch (error) {
+          state.methodWorkflowsData = null;
+        }
         renderResearchDesign();
         break;
       case "paper-draft":
@@ -5892,7 +5992,13 @@ async function loadV2Data(viewName) {
         } catch (error) {
           state.runPlanData = null;
         }
+        try {
+          state.methodWorkflowsData = await v2api.methodWorkflows.get(projectId);
+        } catch (error) {
+          state.methodWorkflowsData = null;
+        }
         renderExecutionPreflight();
+        renderMethodWorkflows();
         renderRunPlanEditor();
         await loadObservableExecution();
         break;

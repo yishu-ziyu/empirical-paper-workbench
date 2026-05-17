@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from Product.backend.method_workflow_service import assert_run_plan_methods_ready
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
 from Product.backend.variable_role_service import load_saved_variable_role_set
@@ -135,6 +136,8 @@ def save_project_run_plan(
     existing = load_saved_run_plan(project_root)
     version = int(existing.get("version", 0)) + 1 if existing else 1
     previous_events = existing.get("decision_events", []) if existing else []
+    normalized_tasks = normalize_tasks(tasks)
+    assert_run_plan_methods_ready(design_spec, normalized_tasks)
     event = {
         "actor": "user",
         "action": "confirm_run_plan",
@@ -148,7 +151,7 @@ def save_project_run_plan(
         "evidence_level": "local_file",
         "design_spec_version": design_spec.get("version", 0),
         "dataset_path": design_spec.get("dataset_path"),
-        "tasks": normalize_tasks(tasks),
+        "tasks": normalized_tasks,
         "outputs": normalize_outputs(outputs),
         "updated_at": event["timestamp"],
         "decision_events": [*previous_events, event],

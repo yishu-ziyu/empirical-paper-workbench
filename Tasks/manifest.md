@@ -986,3 +986,53 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `/tmp/p2w-real-variable-promotion-clean.png`
+
+## 2026-05-17 P2-X Method Workflow Checklist
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-method-workflow-checklist-bdd.md`
+- `tests/test_method_workflow_checklist.py`
+- `tests/test_ols_execution_adapter.py`：blocked IV 现在在 RunPlan approval 阶段被拒绝。
+
+### 新增/扩展后端能力
+
+- `Product/backend/method_workflow_service.py`：
+  - 新增 `get_project_method_workflows()`。
+  - 新增 `assert_run_plan_methods_ready()`。
+  - 新增 `MethodWorkflowBlockedError`。
+  - 生成 OLS/DID/IV/RDD/PSM/DML 的 readiness、required inputs、diagnostics、blockers、evidence binding。
+- `Product/backend/design_spec_service.py`：
+  - `save_project_run_plan()` 保存前执行方法工作流准入检查。
+  - blocked 方法返回 `method_workflow_blocked`，不写入 `state/product/run_plan.json`。
+- `Product/app.py`：
+  - 新增 `GET /api/v1/projects/{project_id}/method-workflows`。
+  - `PUT /api/v1/projects/{project_id}/run-plan` 对 `MethodWorkflowBlockedError` 返回 409，并在 `details.blocked_methods` 中说明原因。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：Research Design 与 Execution 页面新增 `method-workflow-panel`。
+- `Product/web/assets/app.js`：
+  - 新增 `state.methodWorkflowsData`。
+  - 新增 `v2api.methodWorkflows.get()`。
+  - 新增 `renderMethodWorkflows()` 和 `renderMethodWorkflowsBody()`。
+  - 保存 DesignSpec/RunPlan 后刷新方法工作流。
+- `Product/web/assets/styles.css`：新增 `.method-workflow-*` 和折叠详情样式。
+
+### API 契约
+
+- `GET /api/v1/projects/{project_id}/method-workflows`
+- `PUT /api/v1/projects/{project_id}/run-plan` blocked response：
+  - status: `409`
+  - code: `method_workflow_blocked`
+  - details: `blocked_methods[]`
+
+### 手动验收入口
+
+- `http://127.0.0.1:8768/?v=20260517-p2x-method-workflow`
+
+说明：Research Design 页面显示 `OLS：可执行`、`DID：缺少时间变量、处理时点`、`IV：缺少工具变量`、`RDD：缺少断点运行变量`、`PSM：可预检`、`DML：可预检`；`查看方法要求` 默认折叠，点击后显示前置条件、诊断和阻塞原因。
+
+### 新增验收产物
+
+- `/tmp/p2x-method-workflow.png`

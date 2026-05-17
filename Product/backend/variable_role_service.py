@@ -16,6 +16,7 @@ DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feath
 ROLE_KEYS = ("outcome", "treatment", "controls", "instruments", "fixed_effects", "cluster_by")
 DATASET_IMPORT_PREFLIGHT_PATH = Path("state/product/dataset_import_preflights.json")
 VARIABLE_ROLE_CANDIDATE_PATH = Path("state/product/variable_role_candidates.json")
+VARIABLE_ROLE_DRAFT_PATH = Path("state/product/variable_roles_drafts.json")
 
 
 class FieldProfileRequiredError(RuntimeError):
@@ -40,6 +41,10 @@ def variable_role_state_path(project_root: Path) -> Path:
 
 def variable_role_candidate_state_path(project_root: Path) -> Path:
     return project_root / VARIABLE_ROLE_CANDIDATE_PATH
+
+
+def variable_role_draft_state_path(project_root: Path) -> Path:
+    return project_root / VARIABLE_ROLE_DRAFT_PATH
 
 
 def load_saved_variable_role_set(project_root: Path) -> dict[str, Any] | None:
@@ -95,6 +100,7 @@ def save_project_variable_roles(
         "timestamp": utc_now(),
         "note": note,
     }
+    draft = load_variable_role_draft_for_candidate(project_root, candidate["id"]) if candidate else None
     source = candidate.get("source", {}) if candidate else {}
     binding = candidate.get("binding", {}) if candidate else {}
     saved_dataset_path = dataset.relative_to(project_root).as_posix() if dataset else dataset_path
@@ -120,6 +126,8 @@ def save_project_variable_roles(
                 "binding": binding,
                 "provenance": {
                     "candidate_state_path": VARIABLE_ROLE_CANDIDATE_PATH.as_posix(),
+                    "variable_roles_draft_path": VARIABLE_ROLE_DRAFT_PATH.as_posix(),
+                    "source_variable_roles_draft_id": draft.get("id") if draft else None,
                     "dataset_import_manifest_path": DATASET_IMPORT_PREFLIGHT_PATH.as_posix(),
                     "field_profile_source": "dataset_import_profile.fields",
                 },
@@ -130,6 +138,7 @@ def save_project_variable_roles(
     path.write_text(json.dumps(role_set, ensure_ascii=False, indent=2), encoding="utf-8")
     if candidate:
         mark_variable_role_candidate_applied(project_root, candidate["id"], version, event)
+        mark_variable_role_draft_applied(project_root, candidate["id"], version, event)
     return {
         "_meta": {
             "evidence_level": "local_file",
@@ -157,6 +166,68 @@ def load_approved_variable_role_candidate(project_root: Path, candidate_id: str 
     return candidate
 
 
+def promote_project_variable_role_candidate(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    candidate_id: str,
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    candidate = load_approved_variable_role_candidate(project_root, candidate_id)
+    timestamp = utc_now()
+    source = candidate.get("source", {})
+    draft = {
+        "id": f"variable_roles_draft_from_{candidate_id}",
+        "status": "draft",
+        "evidence_level": "local_file",
+        "source_candidate_id": candidate_id,
+        "dataset_import_id": candidate.get("dataset_import_id"),
+        "dataset_import_profile_id": candidate.get("dataset_import_profile_id"),
+        "source_dataset": {
+            "name": source.get("name"),
+            "path": source.get("path"),
+            "sha256": source.get("sha256"),
+            "binding": candidate.get("binding", {}),
+        },
+        "dataset_path": source.get("path"),
+        "dataset_name": source.get("name"),
+        "roles": normalize_roles(candidate.get("candidate_roles", {})),
+        "field_options": candidate.get("field_options", []),
+        "write_boundary": "draft_only_until_user_approval",
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "decision_events": [
+            {
+                "actor": "user",
+                "action": "promote_candidate_to_variable_role_draft",
+                "timestamp": timestamp,
+                "note": note,
+            }
+        ],
+    }
+    state = load_variable_role_draft_state(project_root)
+    state.setdefault("drafts", {})[draft["id"]] = draft
+    state["latest_draft_id"] = draft["id"]
+    state["pending_variable_roles_draft"] = draft
+    state["updated_at"] = timestamp
+    write_variable_role_draft_state(project_root, state)
+    return {
+        "_meta": {
+            "evidence_level": "local_file",
+            "service": "variable_role_service",
+            "generated_at": utc_now(),
+        },
+        "project": {
+            "id": project["id"],
+            "slug": project["slug"],
+            "title": project["title"],
+        },
+        "variable_role_set_draft": draft,
+    }
+
+
 def mark_variable_role_candidate_applied(
     project_root: Path,
     candidate_id: str,
@@ -181,6 +252,27 @@ def mark_variable_role_candidate_applied(
     state["latest_candidate_id"] = candidate_id
     state["updated_at"] = candidate["updated_at"]
     write_variable_role_candidate_state(project_root, state)
+
+
+def mark_variable_role_draft_applied(
+    project_root: Path,
+    candidate_id: str,
+    variable_role_set_version: int,
+    event: dict[str, Any],
+) -> None:
+    state = load_variable_role_draft_state(project_root)
+    draft = load_variable_role_draft_for_candidate(project_root, candidate_id, state)
+    if not draft:
+        return
+    draft["status"] = "applied_to_variable_roles"
+    draft["applied_variable_role_set_version"] = variable_role_set_version
+    draft["updated_at"] = event["timestamp"]
+    draft.setdefault("decision_events", []).append({**event, "action": "apply_variable_role_draft_to_formal_state"})
+    state.setdefault("drafts", {})[draft["id"]] = draft
+    state["pending_variable_roles_draft"] = draft
+    state["latest_draft_id"] = draft["id"]
+    state["updated_at"] = draft["updated_at"]
+    write_variable_role_draft_state(project_root, state)
 
 
 def get_project_variable_role_candidates(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:
@@ -538,6 +630,46 @@ def write_variable_role_candidate_state(project_root: Path, state: dict[str, Any
     path = variable_role_candidate_state_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def load_variable_role_draft_state(project_root: Path) -> dict[str, Any]:
+    path = variable_role_draft_state_path(project_root)
+    if not path.exists():
+        return {"drafts": {}, "latest_draft_id": None, "pending_variable_roles_draft": None, "updated_at": None}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"drafts": {}, "latest_draft_id": None, "pending_variable_roles_draft": None, "updated_at": None}
+    if not isinstance(payload, dict):
+        return {"drafts": {}, "latest_draft_id": None, "pending_variable_roles_draft": None, "updated_at": None}
+    payload.setdefault("drafts", {})
+    payload.setdefault("latest_draft_id", None)
+    payload.setdefault("pending_variable_roles_draft", None)
+    payload.setdefault("updated_at", None)
+    return payload
+
+
+def write_variable_role_draft_state(project_root: Path, state: dict[str, Any]) -> None:
+    path = variable_role_draft_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def load_variable_role_draft_for_candidate(
+    project_root: Path,
+    candidate_id: str,
+    state: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    state = state or load_variable_role_draft_state(project_root)
+    drafts = state.get("drafts", {})
+    if isinstance(drafts, dict):
+        for draft in drafts.values():
+            if isinstance(draft, dict) and draft.get("source_candidate_id") == candidate_id:
+                return draft
+    pending = state.get("pending_variable_roles_draft")
+    if isinstance(pending, dict) and pending.get("source_candidate_id") == candidate_id:
+        return pending
+    return None
 
 
 def variable_role_candidate_response(project: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:

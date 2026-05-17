@@ -664,3 +664,17 @@ Rejected: 创建队列后立即启动子 Agent。原因是用户需要先看到�
 Rejected: 复用旧 workflow mock tasks 作为产品任务队列。原因是旧 tasks 属于 demo 工作流，不绑定 approved SupervisorPlan 和当前研究证据链，容易把 mock 状态伪装成真实派工。
 
 Evidence: `python3 -m unittest tests.test_agent_task_queue -v` 8 tests OK；`python3 -m unittest discover -s tests -v` 234 tests OK，skipped=1；浏览器真实项目显示 `缺少 SupervisorPlan` 且按钮 disabled；受控 approved-plan 场景点击创建后显示 2 个任务、2 个详情默认折叠、无 console error。
+
+## 2026-05-17：真实字段候选 promotion 只能生成草稿，不能覆盖正式变量角色
+
+Decision: 新增 `state/product/variable_roles_drafts.json`，让 approved `VariableRoleCandidate` 通过显式 promotion 生成可编辑 `VariableRoleSet` 草稿。正式 `state/product/variable_roles.json` 只能由用户在正式变量角色编辑器中保存写入，并记录 source candidate 与 draft provenance。
+
+Reason: 真实 CFPS 字段候选仍是启发式。它能缩小审阅范围，但不能自动成为论文分析变量。把“候选建议 -> 可编辑草稿 -> 正式保存”拆成三层，可以让用户看见每一步的证据边界，同时保留跨 Session 恢复能力。
+
+Rejected: 点击 `候选已确认` 后自动覆盖正式 VariableRoleSet。原因是这会把字段名/标签规则猜出来的变量角色误提升为正式研究设定。
+
+Rejected: Promotion 后立刻重建 DesignSpec 或 RunPlan。原因是方法设计和执行计划都依赖用户确认后的正式变量角色，不能由候选草稿副作用触发。
+
+Rejected: 只在前端内存里放草稿。原因是长时间任务和跨 Session 需要可恢复的 draft 状态。
+
+Evidence: `tests/test_real_variable_role_promotion.py` 覆盖 approved candidate promotion、正式 state 不被覆盖、保存后 provenance 和前端候选/正式分离；全量回归 243 tests OK；浏览器点击 promotion 后 `badResponses=[]`、`consoleErrors=[]`。

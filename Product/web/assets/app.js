@@ -61,6 +61,7 @@ const state = {
   generatingVariableRoleCandidateId: null,
   reviewingVariableRoleCandidateId: null,
   reviewingVariableRoleCandidateAction: null,
+  promotingVariableRoleCandidateId: null,
   pendingVariableRoleCandidateId: null,
   savingVariableRoles: false,
   savingDesignSpec: false,
@@ -635,6 +636,13 @@ const v2api = {
     async review(projectId, candidateId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/variable-role-candidates/${candidateId}/review`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async promote(projectId, candidateId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/variable-role-candidates/${candidateId}/promote`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -3928,11 +3936,12 @@ function renderVariableRoleCandidateReview(profile) {
   const roles = candidate.candidate_roles || {};
   const fields = candidate.field_options || [];
   const latestEvent = (candidate.review_events || []).slice(-1)[0];
+  const isPromotingCandidate = state.promotingVariableRoleCandidateId === candidate.id;
   container.innerHTML = `
     <article class="variable-role-candidate-record research-record-card">
       <div class="record-header">
         <div>
-          <span class="eyebrow">字段审阅</span>
+          <span class="eyebrow">候选建议</span>
           <h4>${escapeHtml(candidate.source?.name || "变量角色候选")}</h4>
           <p class="muted">${escapeHtml(variableRoleCandidateStatusLabel(candidate.status))} · evidence_level=${escapeHtml(candidate.evidence_level || "local_file")}</p>
         </div>
@@ -3983,11 +3992,20 @@ function renderVariableRoleCandidateReview(profile) {
         ${candidate.can_apply_to_variable_roles ? `
           <button
             class="primary-button compact"
+            data-promote-variable-candidate-action
+            data-candidate-id="${escapeHtml(candidate.id || "")}"
+            title="把候选建议保存成可编辑草稿；不会覆盖正式变量角色。"
+            ${isPromotingCandidate ? "disabled" : ""}
+          >
+            ${isPromotingCandidate ? "创建草稿中..." : "基于候选创建变量角色草稿"}
+          </button>
+          <button
+            class="ghost-button compact"
             data-variable-role-candidate-load-editor
             data-candidate-id="${escapeHtml(candidate.id || "")}"
-            title="把候选字段载入下方正式变量角色编辑器；保存后才写入正式变量角色集。"
+            title="兼容旧路径：只在本页载入，不写入草稿状态。"
           >
-            载入正式编辑器
+            仅载入编辑器
           </button>
         ` : ""}
       </div>
@@ -4414,6 +4432,46 @@ async function reviewVariableRoleCandidate(candidateId, action) {
   }
 }
 
+async function promoteVariableRoleCandidate(candidateId) {
+  if (!state.selectedProjectId || !candidateId) return;
+  const candidate = (state.variableRoleCandidatesData?.variable_role_candidates || [])
+    .find((item) => item.id === candidateId)
+    || state.variableRoleCandidatesData?.latest_variable_role_candidate;
+  if (!candidate || candidate.id !== candidateId) return;
+
+  clearV2Error("data");
+  state.promotingVariableRoleCandidateId = candidateId;
+  renderDataVariables();
+  try {
+    const response = await v2api.variableRoleCandidates.promote(state.selectedProjectId, candidateId, {
+      note: `基于候选建议 ${candidateId} 创建正式变量角色草稿。`,
+    });
+    const draft = response.variable_role_set_draft;
+    state.pendingVariableRoleCandidateId = candidateId;
+    state.variableRolesData = {
+      ...(state.variableRolesData || {}),
+      variable_role_set: {
+        ...(state.variableRolesData?.variable_role_set || {}),
+        ...draft,
+        candidate_id: draft.source_candidate_id,
+        source: candidate.source || {},
+        binding: candidate.binding || {},
+      },
+    };
+    renderDataVariables();
+    const note = document.getElementById("variable-role-note");
+    if (note) {
+      note.value = `已从候选建议 ${candidateId} 创建草稿；编辑后点击“保存正式变量角色”才会写入正式状态。`;
+    }
+    document.getElementById("variable-role-confirmation-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    showV2Error("data", `创建变量角色草稿失败：${error.message}`);
+  } finally {
+    state.promotingVariableRoleCandidateId = null;
+    renderDataVariables();
+  }
+}
+
 function loadVariableRoleCandidateIntoEditor(candidateId) {
   const candidate = (state.variableRoleCandidatesData?.variable_role_candidates || [])
     .find((item) => item.id === candidateId)
@@ -4472,7 +4530,7 @@ function renderVariableRoleEditor() {
   if (!form || !meta || !statusPill) return;
 
   if (!roleSet) {
-    meta.textContent = "正在读取变量角色集...";
+    meta.textContent = "正式变量角色：正在读取...";
     return;
   }
 
@@ -4485,11 +4543,11 @@ function renderVariableRoleEditor() {
   setVariableRoleField("variable-role-instruments", roles.instruments);
   setVariableRoleField("variable-role-fixed-effects", roles.fixed_effects);
   setVariableRoleField("variable-role-cluster-by", roles.cluster_by);
-  statusPill.textContent = `${roleSet.status || "draft"} · ${roleSet.evidence_level || "local_file"}`;
+  statusPill.textContent = `正式变量角色 · ${roleSet.status || "draft"} · ${roleSet.evidence_level || "local_file"}`;
   const pendingCandidateText = state.pendingVariableRoleCandidateId
     ? ` · candidate_id=${state.pendingVariableRoleCandidateId} · 保存后才写入正式变量角色集`
     : "";
-  meta.textContent = `${roleSet.dataset_path || "未选择数据集"} · version=${roleSet.version ?? 0} · evidence_level=${roleSet.evidence_level || "local_file"}${pendingCandidateText}`;
+  meta.textContent = `正式变量角色：${roleSet.dataset_path || "未选择数据集"} · version=${roleSet.version ?? 0} · evidence_level=${roleSet.evidence_level || "local_file"}${pendingCandidateText}`;
   if (saveButton) {
     saveButton.disabled = state.savingVariableRoles;
   }
@@ -5963,6 +6021,11 @@ async function boot() {
     const loadEditorButton = target.closest("[data-variable-role-candidate-load-editor]");
     if (loadEditorButton) {
       loadVariableRoleCandidateIntoEditor(loadEditorButton.dataset.candidateId || "");
+      return;
+    }
+    const promoteButton = target.closest("[data-promote-variable-candidate-action]");
+    if (promoteButton) {
+      void promoteVariableRoleCandidate(promoteButton.dataset.candidateId || "");
       return;
     }
     const reviewButton = target.closest("[data-variable-role-candidate-review-action]");

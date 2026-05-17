@@ -1013,3 +1013,44 @@
 - P2-U 只创建派工草案，不执行子 Agent。下一步需要 P2-V 人工派工 / 执行前审计状态机。
 - 受控浏览器成功态使用 route interception，目的是避免为了截图伪造当前项目状态；真实持久化行为由后端测试覆盖。
 - 浏览器成功态未覆盖移动视口；本轮只验证桌面 clean workbench 信息层级。
+
+## 2026-05-17 P2-W Real VariableRoleCandidate Promotion
+
+### 行为覆盖
+
+- [x] approved `VariableRoleCandidate` 可以创建可编辑 `VariableRoleSet` 草稿。
+- [x] Promotion 不覆盖已经 approved 的正式 `state/product/variable_roles.json`。
+- [x] 用户编辑 promoted draft 并显式保存后，正式 VariableRoleSet 保留 candidate 和 draft provenance。
+- [x] 前端把 `候选建议` 和 `正式变量角色` 分区展示，候选 promotion 与正式保存是两个动作。
+- [ ] 未覆盖：保存正式变量角色后自动要求 DesignSpec/RunPlan 重新确认；这是下一阶段状态失效/方法 checklist 问题。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_real_variable_role_promotion -v` 首次 4 条失败，原因是 promote API 404、前端缺少 `候选建议` / `正式变量角色` / `promoteVariableRoleCandidate`。
+- 目标测试：`python3 -m unittest tests.test_real_variable_role_promotion -v`，4 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_real_variable_role_promotion tests.test_variable_role_candidates tests.test_variable_role_confirmation -v`，17 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，243 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/variable_role_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-real-variable-role-promotion-bdd.md`：新增本轮候选 promotion 行为契约。
+- `tests/test_real_variable_role_promotion.py`：新增 API、状态保护和前端分区测试。
+- `Product/backend/variable_role_service.py`：新增 draft state、promotion、正式保存 provenance 和 draft applied 标记。
+- `Product/app.py`：新增 promotion payload 和 API endpoint。
+- `Product/web/assets/app.js`：新增 promotion API binding、按钮、loading 状态和正式编辑器载入逻辑。
+- `Product/web/assets/styles.css`：新增 draft 视觉边界。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`。
+3. 进入“数据与设计”，确认页面显示 `候选建议` 和 `正式变量角色`。
+4. 点击 `基于候选创建变量角色草稿`。
+5. 页面应显示草稿和保存正式变量角色入口；浏览器自动化验收记录 `badResponses=[]`、`consoleErrors=[]`，截图为 `/tmp/p2w-real-variable-promotion-clean.png`。
+
+### 剩余风险
+
+- 当前 promotion 仍来自启发式字段候选，不能进入论文分析；必须经过正式保存、DesignSpec/RunPlan 重新确认和真实执行。
+- `state/product/variable_roles_drafts.json` 是本地 runtime artifact，gitignored，不随代码提交。
+- P2-W 没有自动重建 DesignSpec/RunPlan；下一步 P2-X 应把方法工作流 checklist 和状态重确认做成产品对象。

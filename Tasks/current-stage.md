@@ -1,8 +1,8 @@
 # 当前阶段
 
 - 更新时间：2026-05-17
-- 当前提交基线：P2-V 工作区改动，待提交 `Require human dispatch audit before agent task execution`
-- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-p2v-dispatch-audit`
+- 当前提交基线：P2-W 工作区改动，待提交 `Separate real-data role candidates from formal variable roles`
+- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`
 - 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion；SupervisorPlan 已进入人工审批状态机，只有 approved plan 才能创建摘要优先的 Agent Task Queue。
 - 研究题目：机器人应用是否影响劳动力市场匹配效率？
 - 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
@@ -13,6 +13,7 @@
   - P2-T SupervisorPlan Review State Machine 已完成：`PUT /api/v1/projects/{project_id}/supervisor-plan/review` 支持 approve / needs_revision / reject；审批只写 `state/product/supervisor_plan.json`，approved 后才 `can_dispatch=true`，不会改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-U Agent Task Queue 已完成：`GET/POST /api/v1/projects/{project_id}/agent-task-queue` 只从 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan 创建 `state/product/agent_task_queue.json`；队列默认只显示任务摘要、阻塞和负责人，输入证据/输出要求/风险/审计日志按需展开；创建队列不执行任务、不改写 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
   - P2-V Human Dispatch Audit 已完成：每个 Agent Task Queue item 创建后默认 `can_execute=false`、`next_action=dispatch_review_required`；用户必须逐项点击 `批准派工`、`要求修改` 或 `阻断任务`。批准后任务进入 `reviewed_for_dispatch`，但仍不自动执行，下一步只是 `select_execution_backend`。
+  - P2-W Real VariableRoleCandidate Promotion 已完成：已审批真实字段候选现在只能 promotion 成 `state/product/variable_roles_drafts.json` 中的可编辑草稿；不会覆盖正式 `state/product/variable_roles.json`。只有用户在正式变量角色编辑器里显式保存后，才进入 approved VariableRoleSet，并携带 candidate/draft provenance。
   - P2-P Local Codex SupervisorPlan 已完成：本地 Codex Supervisor 可以生成待审计划 artifact，但默认执行开关关闭，不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-N StatsPAI Independent OLS Validation 已完成：StatsPAI 已作为 CSV OLS 独立验证后端产出 `local_execution` evidence；其他方法族仍需后续执行器。
   - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
@@ -34,9 +35,8 @@
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-W：把真实 CFPS 数据候选推进到正式 VariableRoleSet -> DesignSpec -> RunPlan 的版本化链路。
-  - P2-W：把真实 CFPS 数据候选推进到正式 VariableRoleSet -> DesignSpec -> RunPlan 的版本化链路。
-  - P2-X：继续升级 StatsPAI / StataMCP / Python 执行后端，要求真实日志、结果、诊断和可复现产物。
+  - P2-X：给 DesignSpec/RunPlan 增加方法工作流 checklist，让 OLS/DID/IV/RDD/PSM/DML 的前置条件和 evaluator checks 成为产品状态。
+  - P2-Y：继续升级 StatsPAI / StataMCP / Python 执行后端，要求真实日志、结果、诊断和可复现产物。
   - P2-M：把 approved candidate 连接到正式变量角色编辑确认流程，允许用户基于真实字段候选搜索/修改 outcome、treatment、controls、instruments；保存时才写入正式 `state/product/variable_roles.json`。
   - 后续 P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
@@ -71,4 +71,5 @@
   - P2-I/P2-J 已完成真实数据字段画像：已绑定 CFPS `.dta` 可通过 metadata-only 读取变量名、变量标签、Stata 类型、样本数和字段数；该画像仍不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-K Rigorous Empirical Execution Contract 已完成：full run 会声明当前真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`。
   - P2-L Variable Role Candidate Review 已完成：验收入口为 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`；最新真实 CFPS 候选状态为 `approved_candidate`，但正式 `state/product/variable_roles.json` 哈希与 mtime 未变化。
+  - P2-W Real VariableRoleCandidate Promotion 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`；浏览器可见 `候选建议` 和 `正式变量角色`，点击 `基于候选创建变量角色草稿` 后只创建草稿并显示保存入口，网络 4xx 和 console errors 均为 0。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

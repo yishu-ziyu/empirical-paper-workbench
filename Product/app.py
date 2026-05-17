@@ -110,6 +110,7 @@ from Product.backend.variable_role_service import (
     generate_project_variable_role_candidate,
     get_project_variable_role_candidates,
     get_project_variable_roles,
+    promote_project_variable_role_candidate,
     review_project_variable_role_candidate,
     save_project_variable_roles,
 )
@@ -221,6 +222,10 @@ class VariableRoleCandidateReviewPayload(BaseModel):
     action: str
     note: str = ""
     candidate_roles: dict[str, list[str]] | None = None
+
+
+class VariableRoleCandidatePromotePayload(BaseModel):
+    note: str = ""
 
 
 class FindingReviewPayload(BaseModel):
@@ -631,6 +636,35 @@ def api_v1_review_project_variable_role_candidate(
         )
     except InvalidVariableRoleCandidateActionError as exc:
         return error_response(400, "invalid_variable_role_candidate_action", str(exc))
+    except VariableRoleCandidateNotFoundError as exc:
+        return error_response(404, "variable_role_candidate_not_found", f"Variable role candidate does not exist: {candidate_id}.")
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/promote")
+def api_v1_promote_project_variable_role_candidate(
+    project_id: str,
+    candidate_id: str,
+    payload: VariableRoleCandidatePromotePayload,
+) -> dict:
+    try:
+        return JSONResponse(
+            status_code=201,
+            content=promote_project_variable_role_candidate(
+                PRODUCT_ROOT,
+                REPO_ROOT,
+                project_id,
+                candidate_id,
+                payload.note,
+            ),
+        )
+    except VariableRoleCandidateApprovalRequiredError as exc:
+        return error_response(
+            409,
+            "variable_role_candidate_approval_required",
+            f"Variable role candidate must be approved before draft promotion: {candidate_id}.",
+        )
     except VariableRoleCandidateNotFoundError as exc:
         return error_response(404, "variable_role_candidate_not_found", f"Variable role candidate does not exist: {candidate_id}.")
     except KeyError as exc:

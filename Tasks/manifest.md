@@ -944,3 +944,45 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 
 - `/tmp/empirical-workbench-agent-task-queue-p2u-final.png`
 - `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`
+
+## 2026-05-17 P2-W Real VariableRoleCandidate Promotion
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-real-variable-role-promotion-bdd.md`
+- `tests/test_real_variable_role_promotion.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/variable_role_service.py`：
+  - 新增 `VARIABLE_ROLE_DRAFT_PATH = state/product/variable_roles_drafts.json`。
+  - 新增 `promote_project_variable_role_candidate()`，把 approved candidate 转成 `variable_role_set_draft`。
+  - 新增 draft state 读写和 `mark_variable_role_draft_applied()`。
+  - 正式 `PUT /variable-roles` 保存时会记录 `source_variable_roles_draft_id` 和 `variable_roles_draft_path` provenance。
+- `Product/app.py`：
+  - 新增 `VariableRoleCandidatePromotePayload`。
+  - 新增 `POST /api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/promote`。
+
+### 新增/扩展前端能力
+
+- `Product/web/assets/app.js`：
+  - 新增 `v2api.variableRoleCandidates.promote()`。
+  - 新增 `promoteVariableRoleCandidate(candidateId)`。
+  - 候选卡新增 `data-promote-variable-candidate-action`。
+  - 正式编辑器显示 `正式变量角色`，并保留旧的 `仅载入编辑器` 路径。
+- `Product/web/assets/styles.css`：
+  - 新增 `.variable-role-draft` 视觉边界。
+
+### 新增运行时产物契约
+
+- `state/product/variable_roles_drafts.json`：promotion 后写入，记录 `pending_variable_roles_draft`、`latest_draft_id`、draft roles、source candidate、source dataset 和 decision events；gitignored，不提交。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`
+
+说明：页面应同时显示 `候选建议` 和 `正式变量角色`。点击 `基于候选创建变量角色草稿` 后，只创建草稿并把内容载入正式编辑器；只有再点击保存正式变量角色，才会改写 `state/product/variable_roles.json`。
+
+### 新增验收产物
+
+- `/tmp/p2w-real-variable-promotion-clean.png`

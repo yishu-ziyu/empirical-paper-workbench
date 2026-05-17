@@ -772,6 +772,11 @@ textarea {
   background: linear-gradient(180deg, rgba(247, 250, 248, 0.92), #fff);
 }
 
+.variable-role-draft,
+.variable-role-candidate-record [data-promote-variable-candidate-action] {
+  border-color: rgba(30, 111, 98, 0.28);
+}
+
 .variable-role-candidate-roles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

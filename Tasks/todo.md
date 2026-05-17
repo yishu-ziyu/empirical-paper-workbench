@@ -14,7 +14,18 @@
 - [x] 前端：在首页 Agent Task Queue 中显示派工审阅区，默认折叠输入证据、输出要求、风险和审计日志。
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和浏览器自动化点击验收通过。
 - [x] 安全边界：批准派工只进入 `reviewed_for_dispatch`，仍然 `can_execute=false`，不会直接调用 StatsPAI/StataMCP/Python 或改写研究状态。
-- [ ] P2-W：把真实 CFPS 字段候选推进到正式 VariableRoleSet / DesignSpec / RunPlan 版本化链路。
+- [x] P2-W：把真实 CFPS 字段候选推进到正式 VariableRoleSet 草稿链路；正式写入仍需用户在变量角色编辑器中保存。
+- [ ] P2-X：给 DesignSpec/RunPlan 增加方法工作流 checklist，区分 OLS/DID/IV/RDD/PSM/DML 的可执行前置条件。
+
+## 2026-05-17 P2-W Real VariableRoleCandidate Promotion
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-real-variable-role-promotion-bdd.md`，定义真实字段候选只能先生成可编辑草稿，不能直接成为正式研究状态。
+- [x] TDD：新增 `tests/test_real_variable_role_promotion.py`，先确认 promote API 404、正式状态未受保护、前端候选/正式区分缺失的 RED。
+- [x] 后端：扩展 `Product/backend/variable_role_service.py`，新增 `state/product/variable_roles_drafts.json` 读写、promotion、draft applied 标记和 provenance。
+- [x] API：新增 `POST /api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/promote`，返回 `201` 和 `variable_role_set_draft`。
+- [x] 前端：在候选卡上新增 `基于候选创建变量角色草稿`，保留 `仅载入编辑器` 兼容路径；正式编辑器显示 `正式变量角色`，保存时才写入 `state/product/variable_roles.json`。
+- [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和浏览器自动化点击验收通过。
+- [x] 安全边界：promotion 只写 draft 状态；不覆盖 approved VariableRoleSet，不重建 DesignSpec/RunPlan，不触发执行后端。
 
 ## 状态机
 

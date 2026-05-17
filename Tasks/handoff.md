@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-17 19:17 CST
+更新时间：2026-05-17 19:36 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把 approved SupervisorPlan -> Agent Task Queue -> 人工派工审阅 -> 后端执行绑定，逐步做成可审计的 AI 实证研究流水线。P2-V 已完成：Agent Task Queue item 默认不能执行，必须逐项人工派工审阅；批准后只进入 `reviewed_for_dispatch`，仍然不会自动调用执行后端或改写 VariableRoleSet / DesignSpec / RunPlan。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-W 已完成：已审批的真实字段候选只能 promotion 成可编辑 VariableRoleSet 草稿，不能直接覆盖正式 `state/product/variable_roles.json`；正式写入仍需要用户在变量角色编辑器中显式保存。
 
 ## 已完成事项
 
@@ -187,7 +187,7 @@
 
 ## 下一步第一件事
 
-写 P2-W BDD 和失败测试：把已审阅的真实 CFPS 字段候选推进到正式 `VariableRoleSet -> DesignSpec -> RunPlan` 版本化链路。重点是“候选不等于正式研究状态”：只有用户显式保存后才写入 `state/product/variable_roles.json`，再触发 DesignSpec / RunPlan 重新确认。
+写 P2-X BDD 和失败测试：给 DesignSpec/RunPlan 增加方法工作流 checklist。重点是 OLS/DID/IV/RDD/PSM/DML 都必须先声明前置条件、数据结构要求、诊断和 evaluator checks；blocked 方法只能展示阻塞原因，不能进入执行。
 
 ## 未解决风险
 
@@ -197,7 +197,7 @@
 - StatsPAI 独立验证目前只覆盖 CSV OLS；真实 CFPS `.dta` 还没有进入 StatsPAI/StataMCP 执行层，DTA 仍停在字段画像和变量角色候选流程。
 - StataMCP/Stata 仍未产生日志、do-file、结果 JSON 或 evaluator checks，不能标记为 `local_execution`。
 - 本地 Codex Supervisor 已可见但未执行派工；`EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用时必须继续 blocked，避免把工程状态机伪装成大模型中控。
-- 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；必须经正式 VariableRoleSet 保存、DesignSpec/RunPlan 重建和真实执行后才可作为研究证据。
+- 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；P2-W 已把它和正式 VariableRoleSet 用 draft 状态隔开，但后续仍需用户编辑保存、DesignSpec/RunPlan 重新确认和真实执行后才可作为研究证据。
 
 ## 2026-05-17 P2-V Human Dispatch Audit 交接增量
 
@@ -233,7 +233,41 @@
 
 ### 下一步第一件事
 
-P2-W：真实数据候选进入正式变量角色链路。先写 BDD，锁定“字段候选只能作为待审资料，不能直接进入论文分析”的边界。
+已完成 P2-W；继续看下方 P2-W 交接增量，下一步改为 P2-X 方法工作流 checklist。
+
+## 2026-05-17 P2-W Real VariableRoleCandidate Promotion 交接增量
+
+### 当前目标
+
+把 P2-L 的 `approved_candidate` 从“候选被审阅过”推进到“可以生成正式 VariableRoleSet 草稿”，但继续阻止它直接改写正式研究状态。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-real-variable-role-promotion-bdd.md`。
+- 新增测试：`tests/test_real_variable_role_promotion.py`。
+- 扩展 `Product/backend/variable_role_service.py`：新增 `state/product/variable_roles_drafts.json`、promotion、draft applied 标记和正式保存 provenance。
+- 扩展 `Product/app.py`：新增 `POST /api/v1/projects/{project_id}/variable-role-candidates/{candidate_id}/promote`。
+- 扩展 `Product/web/assets/app.js` 和 `Product/web/assets/styles.css`：候选卡新增“基于候选创建变量角色草稿”，正式编辑区显示“正式变量角色”，保存动作仍走 `handleSaveVariableRoles()`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_real_variable_role_promotion -v` 首次 4 条失败，原因是 promote API 404 且前端缺少“候选建议 / 正式变量角色 / promoteVariableRoleCandidate”。
+- 目标测试：`python3 -m unittest tests.test_real_variable_role_promotion -v`，4 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_real_variable_role_promotion tests.test_variable_role_candidates tests.test_variable_role_confirmation -v`，17 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，243 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/variable_role_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion` 可见 `候选建议`、`正式变量角色` 和 1 个 promotion 按钮；点击后出现草稿/保存入口，`badResponses=[]`、`consoleErrors=[]`；截图 `/tmp/p2w-real-variable-promotion-clean.png`。
+
+### 不能重复探索的结论
+
+- `approved_candidate` 不是正式变量角色，只代表候选建议已被人工审阅。
+- Promotion 只创建 `variable_role_set_draft`，写入 `state/product/variable_roles_drafts.json`，不能覆盖 `state/product/variable_roles.json`。
+- 只有用户在正式变量角色编辑器中显式保存，`PUT /variable-roles` 才能把草稿 provenance 写入正式状态。
+- Promotion 也不负责重建 DesignSpec/RunPlan；这些是下一阶段方法工作流和状态失效/重确认问题。
+
+### 下一步第一件事
+
+P2-X：为 DesignSpec/RunPlan 增加方法工作流 checklist，让 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和 evaluator checks 成为可审计产品状态。
 
 ## 2026-05-14 P2-N/P2-O StatsPAI Validation 与 LLM Supervisor 交接增量
 

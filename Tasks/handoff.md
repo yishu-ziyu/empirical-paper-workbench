@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-17 20:04 CST
+更新时间：2026-05-17 20:30 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-X 已完成：方法族 OLS/DID/IV/RDD/PSM/DML 已进入可审计 checklist，blocked 方法不能保存进 approved RunPlan；下一步进入 P2-Y Reviewer Scorecard，把审稿意见变成评分、证据绑定和可人工接受的后续任务建议。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-Y 已完成：successful full run 后的审稿反馈已成为 Reviewer Scorecard，包含五维评分、证据绑定和后续任务建议；下一步进入 P2-Z verifier gates，阻止未核验结果、草稿或导出包进入最终产物。
 
 ## 已完成事项
 
@@ -2010,3 +2010,53 @@ P2-V：给 Agent Task Queue 增加“人工派工 / 执行前审计”状态。�
 - 当前队列没有任务执行 worker，也没有 retry/cancel/assign 状态；P2-U 只完成可审阅派工草案。
 - 成功态浏览器验收使用 route interception，避免污染当前真实项目状态；真实后端持久化行为由测试覆盖。
 - 还没有移动视口视觉验收。
+
+## 2026-05-17 P2-Y Reviewer Scorecard 交接增量
+
+### 当前目标
+
+把 successful full run 后的审稿反馈变成可持久化的产品对象：五维评分、证据、理由、风险和后续任务建议。它用于决定下一轮研究迭代，不直接修改 Agent Task Queue、FindingCard、Manuscript candidate 或 Export package。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-reviewer-scorecard-bdd.md`。
+- 新增测试：`tests/test_reviewer_scorecard.py`，覆盖无 full run 阻断、五维评分、低分任务建议不改写队列、前端折叠详情。
+- 新增后端服务：`Product/backend/reviewer_score_service.py`。
+- 新增 API：`GET /api/v1/projects/{project_id}/reviewer-scorecard` 和 `POST /api/v1/projects/{project_id}/reviewer-scorecard`。
+- Review & Export 页面新增 `审稿评分` 面板，默认只显示分数和信号；理由、证据和任务建议在 `查看理由与后续任务` 中展开。
+- 后续任务建议只提供 `加入任务队列草案` 的显式入口提示，不自动写入 `state/product/agent_task_queue.json`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_reviewer_scorecard -v` 首次 4 条失败，原因是 `/reviewer-scorecard` API 404 和前端缺少 `reviewer-scorecard-panel`。
+- GREEN：`python3 -m unittest tests.test_reviewer_scorecard -v`，4 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_reviewer_scorecard tests.test_results_draft_evidence_binding tests.test_review_export_package -v`，25 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，252 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/reviewer_score_service.py Product/backend/results_draft_service.py Product/backend/agent_task_queue_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard` 显示 5 个评分维度；details 初始打开数量为 0，点击后为 1；任务草案按钮可见；`errors=[]`、`badResponses=[]`；截图 `/tmp/p2y-reviewer-scorecard.png`。
+
+### 关键文件路径
+
+- `Product/backend/reviewer_score_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `tests/test_reviewer_scorecard.py`
+- `docs/architecture-v2/codex-phase-p2-reviewer-scorecard-bdd.md`
+
+### 不能重复探索的结论
+
+- Reviewer Scorecard 不是论文审稿人的真实意见；当前后端是 `deterministic_baseline`，证据等级为 `local_file`，只能作为产品闭环的最小评分对象。
+- 评分卡的后续任务建议不能自动进入 Agent Task Queue；必须先经过人工接受和派工审阅，否则会绕过 P2-U/P2-V 的安全边界。
+- 无 successful full run 时不能生成评分卡；否则会把没有结果证据的反馈伪装成审稿意见。
+
+### 下一步第一件事
+
+P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求是结果核验、正文证据绑定核验、导出预检核验都以显式 gate 出现，未通过 gate 的对象不能进入最终导出。
+
+### 未解决风险
+
+- 当前评分是 deterministic baseline，不是真实 LLM reviewer 或外部审稿 Agent。
+- 任务建议还没有真正写入 proposed queue；本轮只做显式入口和不自动改写边界。
+- 评分维度是最小五维，没有引入 DID/IV/RDD 等方法族的专门审稿 rubrics。

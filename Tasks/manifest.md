@@ -1036,3 +1036,46 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `/tmp/p2x-method-workflow.png`
+
+## 2026-05-17 P2-Y Reviewer Scorecard
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-reviewer-scorecard-bdd.md`
+- `tests/test_reviewer_scorecard.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/reviewer_score_service.py`：
+  - 新增 `get_project_reviewer_scorecard()`。
+  - 新增 `generate_project_reviewer_scorecard()`。
+  - 新增 `state/product/reviewer_scorecard.json` 状态文件契约。
+  - 从 `get_project_results_draft()` 读取 latest run、FindingCard 和 draft evidence，生成五维 `deterministic_baseline` scorecard。
+- `Product/app.py`：
+  - 新增 `ReviewerScorecardPayload`。
+  - 新增 `GET /api/v1/projects/{project_id}/reviewer-scorecard`。
+  - 新增 `POST /api/v1/projects/{project_id}/reviewer-scorecard`。
+
+### 新增/扩展前端能力
+
+- `Product/web/index.html`：Review & Export 页面新增 `reviewer-scorecard-panel`。
+- `Product/web/assets/app.js`：
+  - 新增 `state.reviewerScorecardData`。
+  - 新增 `v2api.reviewerScorecard.get/generate`。
+  - 新增 `renderReviewerScorecard()` 和 `renderReviewerScorecardRow()`。
+  - 新增 `generateReviewerScorecard()` 和 `acceptReviewerTaskSuggestion()`。
+- `Product/web/assets/styles.css`：新增 `.reviewer-scorecard-*` 样式，保持摘要优先和 details 折叠详情。
+
+### API 契约
+
+- `GET /api/v1/projects/{project_id}/reviewer-scorecard`
+- `POST /api/v1/projects/{project_id}/reviewer-scorecard`
+- 无 successful full run 时返回 409 `full_run_required`。
+
+### 手动验收入口
+
+- `http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard`
+
+### 新增验收产物
+
+- `/tmp/p2y-reviewer-scorecard.png`

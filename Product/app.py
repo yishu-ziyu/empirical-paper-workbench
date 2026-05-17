@@ -94,6 +94,10 @@ from Product.backend.results_draft_service import (
     get_project_results_draft,
     save_project_finding_review,
 )
+from Product.backend.reviewer_score_service import (
+    generate_project_reviewer_scorecard,
+    get_project_reviewer_scorecard,
+)
 from Product.backend.supervisor_plan_service import (
     InvalidSupervisorPlanReviewActionError,
     SupervisorPlanBlockedError,
@@ -256,6 +260,10 @@ class WritebackApprovalPayload(BaseModel):
 
 
 class DocxPreflightPayload(BaseModel):
+    note: str = ""
+
+
+class ReviewerScorecardPayload(BaseModel):
     note: str = ""
 
 
@@ -1017,6 +1025,30 @@ def api_v1_export_preflight_manuscript_candidate(
 def api_v1_project_export_package(project_id: str) -> dict:
     try:
         return get_project_export_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/reviewer-scorecard")
+def api_v1_project_reviewer_scorecard(project_id: str) -> dict:
+    try:
+        return get_project_reviewer_scorecard(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FileNotFoundError as exc:
+        return error_response(409, "full_run_required", str(exc))
+    except ValueError as exc:
+        return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.post("/api/v1/projects/{project_id}/reviewer-scorecard", status_code=201)
+def api_v1_generate_project_reviewer_scorecard(project_id: str, payload: ReviewerScorecardPayload) -> dict:
+    try:
+        return generate_project_reviewer_scorecard(PRODUCT_ROOT, REPO_ROOT, project_id, payload.note)
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except FileNotFoundError as exc:

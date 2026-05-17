@@ -1096,3 +1096,47 @@
 - P2-X 只是方法准入，不是完整统计执行；DID/IV/RDD/PSM/DML 仍需要真实执行器、日志、诊断和产物。
 - PSM/DML 当前 `可预检` 容易被误读为已执行，后续 UI 可以继续强化“预检”和“真实执行”的区别。
 - 隐藏的 Execution 页面也有一份 method workflow DOM，当前不影响可视化验收，后续可以做 accessibility/DOM 去重。
+
+## 2026-05-17 P2-Y Reviewer Scorecard
+
+### 行为覆盖
+
+- [x] 没有 successful full run 时，Reviewer Scorecard API 返回 409 `full_run_required`，不能伪造审稿反馈。
+- [x] successful full run 后，评分卡包含新颖性、识别可信度、数据质量、表达清晰度、政策相关性五个维度。
+- [x] 每个评分维度包含 score、rationale、evidence、suggested_tasks 和 `local_file` 证据绑定。
+- [x] 识别可信度等低分维度会生成后续任务建议，但不会自动改写 `state/product/agent_task_queue.json`。
+- [x] Review & Export 页面默认只显示评分摘要；理由、证据和后续任务在 `查看理由与后续任务` 中折叠展示。
+- [ ] 未覆盖：真实 LLM reviewer 后端；把用户接受的任务建议写入 proposed queue；方法族专用审稿 rubrics。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_reviewer_scorecard -v` 首次 4 条失败，原因是 `/reviewer-scorecard` API 404 和前端缺少 `reviewer-scorecard-panel`。
+- 目标测试：`python3 -m unittest tests.test_reviewer_scorecard -v`，4 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_reviewer_scorecard tests.test_results_draft_evidence_binding tests.test_review_export_package -v`，25 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，252 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/reviewer_score_service.py Product/backend/results_draft_service.py Product/backend/agent_task_queue_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-reviewer-scorecard-bdd.md`：新增审稿评分卡行为契约。
+- `tests/test_reviewer_scorecard.py`：新增 API、状态保护和前端渐进披露测试。
+- `Product/backend/reviewer_score_service.py`：新增评分卡读取、生成和持久化服务。
+- `Product/app.py`：新增 Reviewer Scorecard API。
+- `Product/web/index.html`：Review & Export 页面新增评分卡面板。
+- `Product/web/assets/app.js`：新增评分卡 API client、渲染、生成和任务建议选择入口。
+- `Product/web/assets/styles.css`：新增评分卡摘要、折叠详情和任务建议样式。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard`。
+3. 进入 `复核与导出`。
+4. 如为空态，点击 `生成审稿评分`。
+5. 确认页面显示 `新颖性`、`识别可信度`、`数据质量`、`表达清晰度`、`政策相关性`。
+6. 初始状态下评分理由不展开；点击 `查看理由与后续任务` 后，看到证据、理由和 `加入任务队列草案`。
+
+### 剩余风险
+
+- 当前 reviewer backend 是 deterministic baseline，不是外部审稿 Agent；不能把它当作真实学术审稿。
+- 任务建议尚未形成可持久化 proposed task queue；下一步可以在 P2-Z 或后续迭代中接入人工接受后的 proposed queue。
+- 评分卡没有针对 DID/IV/RDD/PSM/DML 建立独立 rubrics；需要等这些方法有真实执行产物后补齐。

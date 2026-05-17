@@ -1,8 +1,8 @@
 # 当前阶段
 
 - 更新时间：2026-05-17
-- 当前提交基线：P2-X 工作区改动，待提交 `Make empirical methods executable only through readiness checklists`
-- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-p2x-method-workflow`
+- 当前提交基线：P2-Y 工作区改动，待提交 `Turn reviewer critique into scored evidence and follow-up tasks`
+- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard`
 - 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion；SupervisorPlan 已进入人工审批状态机，只有 approved plan 才能创建摘要优先的 Agent Task Queue。
 - 研究题目：机器人应用是否影响劳动力市场匹配效率？
 - 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
@@ -15,6 +15,7 @@
   - P2-V Human Dispatch Audit 已完成：每个 Agent Task Queue item 创建后默认 `can_execute=false`、`next_action=dispatch_review_required`；用户必须逐项点击 `批准派工`、`要求修改` 或 `阻断任务`。批准后任务进入 `reviewed_for_dispatch`，但仍不自动执行，下一步只是 `select_execution_backend`。
   - P2-W Real VariableRoleCandidate Promotion 已完成：已审批真实字段候选现在只能 promotion 成 `state/product/variable_roles_drafts.json` 中的可编辑草稿；不会覆盖正式 `state/product/variable_roles.json`。只有用户在正式变量角色编辑器里显式保存后，才进入 approved VariableRoleSet，并携带 candidate/draft provenance。
   - P2-X Method Workflow Checklist 已完成：新增 `GET /api/v1/projects/{project_id}/method-workflows`，把 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和 blocker 作为产品状态；RunPlan 保存时会拒绝 blocked DID/IV/RDD 等方法，前端默认折叠方法细节以降低噪声。
+  - P2-Y Reviewer Scorecard 已完成：新增 `GET/POST /api/v1/projects/{project_id}/reviewer-scorecard`，把 successful full run 后的审稿反馈落成五维评分卡；低分维度生成可人工接受的后续任务建议，但不会自动写入 Agent Task Queue。
   - P2-P Local Codex SupervisorPlan 已完成：本地 Codex Supervisor 可以生成待审计划 artifact，但默认执行开关关闭，不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-N StatsPAI Independent OLS Validation 已完成：StatsPAI 已作为 CSV OLS 独立验证后端产出 `local_execution` evidence；其他方法族仍需后续执行器。
   - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
@@ -36,8 +37,7 @@
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - P2-Y：把审稿意见做成 Reviewer Scorecard，包含新颖性、识别可信度、数据质量、表达清晰度、政策相关性评分和可人工接受的后续任务建议。
-  - P2-Z：给 Results、Manuscript、Export 增加 verifier gates，避免未核验的结果或草稿进入导出。
+  - P2-Z：给 Results、Manuscript、Export 增加 verifier gates，避免未核验的结果、草稿或导出包进入最终导出。
   - P2-M：把 approved candidate 连接到正式变量角色编辑确认流程，允许用户基于真实字段候选搜索/修改 outcome、treatment、controls、instruments；保存时才写入正式 `state/product/variable_roles.json`。
   - 后续 P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
@@ -74,4 +74,5 @@
   - P2-L Variable Role Candidate Review 已完成：验收入口为 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`；最新真实 CFPS 候选状态为 `approved_candidate`，但正式 `state/product/variable_roles.json` 哈希与 mtime 未变化。
   - P2-W Real VariableRoleCandidate Promotion 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`；浏览器可见 `候选建议` 和 `正式变量角色`，点击 `基于候选创建变量角色草稿` 后只创建草稿并显示保存入口，网络 4xx 和 console errors 均为 0。
   - P2-X Method Workflow Checklist 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2x-method-workflow`；Research Design 页面可见 `OLS：可执行`、`DID：缺少时间变量、处理时点`、`IV：缺少工具变量`、`RDD：缺少断点运行变量`、`PSM：可预检`、`DML：可预检`；`查看方法要求` 默认折叠，展开后显示诊断和前置条件。
+  - P2-Y Reviewer Scorecard 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard`；Review & Export 页面显示 `新颖性`、`识别可信度`、`数据质量`、`表达清晰度`、`政策相关性` 五个评分维度；`查看理由与后续任务` 初始关闭，点击后显示证据、理由和 `加入任务队列草案`。
   - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI

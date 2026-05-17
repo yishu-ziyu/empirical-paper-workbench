@@ -1290,6 +1290,87 @@ textarea {
   gap: 14px;
 }
 
+.reviewer-scorecard-body {
+  display: grid;
+  gap: 10px;
+}
+
+.reviewer-scorecard-empty,
+.reviewer-scorecard-summary,
+.reviewer-scorecard-row-main,
+.reviewer-suggested-task {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.reviewer-scorecard-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(35, 66, 60, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.reviewer-scorecard-row.is-low {
+  border-left: 3px solid rgba(163, 92, 55, 0.72);
+}
+
+.reviewer-scorecard-row.is-ok {
+  border-left: 3px solid rgba(30, 111, 98, 0.45);
+}
+
+.score-pill {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.1);
+  color: var(--accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.reviewer-scorecard-detail {
+  border-top: 1px dashed rgba(35, 66, 60, 0.16);
+  padding-top: 8px;
+}
+
+.reviewer-scorecard-detail summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.reviewer-evidence-list,
+.reviewer-suggested-task-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reviewer-evidence-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(248, 249, 246, 0.86);
+}
+
+.reviewer-evidence-item code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.reviewer-suggested-task {
+  padding: 9px;
+  border: 1px solid rgba(35, 66, 60, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 247, 241, 0.52);
+}
+
 .export-package-card {
   display: grid;
   gap: 14px;

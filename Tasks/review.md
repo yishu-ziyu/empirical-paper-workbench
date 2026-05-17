@@ -1,5 +1,50 @@
 # Review
 
+## 2026-05-17 Pipeline MVP Review
+
+### 行为覆盖
+
+- [x] 首页先显示研究选题入口，已确认选题为“机器人应用是否影响劳动力市场匹配效率？”。
+- [x] SupervisorPlan 显示 Codex 计划、中控边界和人工审批状态；已批准计划显示 `人工审批 已批准`。
+- [x] Agent Task Queue 默认摘要优先，任务已人工派工审阅，但 `can_execute=false`，不会直接执行。
+- [x] Data & Variables 区分真实字段候选、候选草稿和正式 VariableRoleSet。
+- [x] Design / Execution 显示方法 workflow checklist：OLS ready，DID/IV/RDD 继续展示缺少的前置条件。
+- [x] Results & Draft 显示 FindingCard、Manuscript candidate 和 provenance。
+- [x] Review & Export 显示 Reviewer Scorecard、Verifier Gates；`can_export_docx=false` 时最终 docx 导出按钮 disabled。
+
+### 测试覆盖
+
+- RED：新增两条前端契约后，目标测试先失败，原因分别是 approved SupervisorPlan 仍显示 `尚未审批`，以及 docx 最终导出按钮缺少稳定 id。
+- 目标测试：`python3 -m unittest tests.test_supervisor_plan.SupervisorPlanFrontendTests tests.test_verifier_export_gates.VerifierExportGatesFrontendTests -v`，6 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，258 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/*.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `Product/web/assets/app.js`：新增 SupervisorPlan 人工审阅 label 兼容逻辑；已批准状态不再误报未审批。
+- `Product/web/index.html`：更新静态资源版本，并给 docx 最终导出按钮增加稳定 id。
+- `tests/test_supervisor_plan.py`：锁定 approved SupervisorPlan 的前端文案行为。
+- `tests/test_verifier_export_gates.py`：锁定 docx 最终导出按钮选择器，方便浏览器验收。
+- `Tasks/*`：记录 Pipeline MVP Review 的真实验收、风险和下一步。
+
+### 手动验收
+
+1. 打开 `http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`。
+2. 首页检查：选题已确认；智能中控区域显示 Codex Supervisor 计划，人工审批为 `已批准`。
+3. 首页 Agent Task Queue 检查：摘要在前，任务详情可展开；3 个任务都已审阅但仍不能执行。
+4. 点击 `数据与设计`：确认真实字段候选、草稿和正式变量角色没有混在一起。
+5. 点击 `实证执行 / 工具 -> 研究设计细节`：确认 OLS 可执行，DID/IV/RDD 显示阻塞原因。
+6. 点击 `结果与草稿`：确认 FindingCard 与正文候选都能看到来源和证据等级。
+7. 点击 `审阅与导出`：确认评分卡、核验门、8 个 verifier rows；`docx 最终导出` 按钮 disabled。
+8. 截图留档：`artifacts/ui-checks/pipeline-mvp-home.png`、`pipeline-mvp-data-variables.png`、`pipeline-mvp-execution.png`、`pipeline-mvp-review-export.png`。
+
+### 剩余风险
+
+- 当前浏览器验收修改了 gitignored runtime 状态 `state/product/agent_task_queue.json`，3 个任务为已审阅但不可执行；这是验收状态，不应误当成可提交配置。
+- 当前 MVP 仍未把 reviewed task 接入真实执行后端选择；StatsPAI/Python/StataMCP 的任务调度、日志和 evaluator checks 是 P2-AA。
+- Verifier 当前正确阻断最终 docx 导出；还没有实现最终 docx 生成与写回审批。
+- 真实 `.dta`、DID/IV/RDD/PSM/DML 仍未形成 `local_execution` 证据，页面只展示前置条件和阻塞原因。
+
 ## 2026-05-17 P2-V Human Dispatch Audit
 
 ### 行为覆盖

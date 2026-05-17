@@ -290,6 +290,7 @@ class VerifierExportGatesFrontendTests(unittest.TestCase):
         self.assertIn("verifier-gate-row", self.app_js)
         self.assertIn("data-run-verifier-checks", self.app_js)
         self.assertIn("data-docx-final-export", self.app_js)
+        self.assertIn("verifier-final-export-button", self.app_js)
         self.assertIn("!state.verifierChecksData?.can_export_docx", self.app_js)
         self.assertIn("verifier-gate-panel", self.styles_css)
         self.assertIn("verifier-gate-row", self.styles_css)

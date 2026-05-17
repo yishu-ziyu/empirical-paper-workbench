@@ -58,6 +58,17 @@
 - [x] 安全边界：preview-ready export package 不能等同于最终导出；docx 预检仍 blocked 时，最终 docx 导出按钮保持 disabled。
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python 编译、JS 语法、`git diff --check` 和 Playwright 浏览器验收通过。
 
+## 2026-05-17 Pipeline MVP Review
+
+- [x] 全量回归：`python3 -m unittest discover -s tests -v` 已通过，258 tests OK，skipped=1。
+- [x] 静态检查：`python3 -m py_compile Product/app.py Product/backend/*.py`、`node --check Product/web/assets/app.js`、`git diff --check` 已通过。
+- [x] 浏览器验收：Playwright 打开 `http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`，10 项主流程检查全部通过，`errors=[]`、`badResponses=[]`。
+- [x] 截图留档：`artifacts/ui-checks/pipeline-mvp-home.png`、`pipeline-mvp-data-variables.png`、`pipeline-mvp-execution.png`、`pipeline-mvp-review-export.png`。
+- [x] UI 修复：approved SupervisorPlan 即使缺旧版 `human_review.action`，前端也显示 `人工审批 已批准`，不再误显示 `尚未审批`。
+- [x] UI 修复：`docx 最终导出` 按钮新增稳定 id `verifier-final-export-button`，浏览器验收可直接确认 disabled 状态。
+- [x] 缓存治理：`Product/web/index.html` 静态资源版本更新为 `20260517-pipeline-mvp-review`。
+- [ ] 下一步 P2-AA：把已人工派工审阅的 Agent Task Queue 接到真实执行后端选择；优先做 StatsPAI/Python/StataMCP backend selection BDD/TDD，仍不得自动改写变量角色、研究设计、RunPlan 或论文正文。
+
 ## 状态机
 
 - [x] 读取项目 AGENTS.md、architecture-v2 契约、Kimi handoff、Phase A BDD

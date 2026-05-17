@@ -191,6 +191,17 @@
 - `Product/web/assets/styles.css`
 - `state/product/agent_task_queue.json`：浏览器验收时生成的本地运行状态，gitignored，不提交。
 - `/tmp/p2v-dispatch-audit.png`：浏览器自动化验收截图。
+
+## 2026-05-17 Pipeline MVP Review 新增关键产物
+
+- `Product/web/assets/app.js`：新增 `supervisorHumanReviewLabel()`，修复 approved SupervisorPlan 显示为未审批的问题；Review & Export 可通过稳定按钮 id 检查 docx 最终导出状态。
+- `Product/web/index.html`：静态资源版本更新到 `20260517-pipeline-mvp-review`。
+- `tests/test_supervisor_plan.py`：新增 approved SupervisorPlan 前端状态兼容测试。
+- `tests/test_verifier_export_gates.py`：新增 `verifier-final-export-button` 静态契约测试。
+- `artifacts/ui-checks/pipeline-mvp-home.png`
+- `artifacts/ui-checks/pipeline-mvp-data-variables.png`
+- `artifacts/ui-checks/pipeline-mvp-execution.png`
+- `artifacts/ui-checks/pipeline-mvp-review-export.png`
 - `state/runs/run_c424d6a11af7/gates.json`
 - `state/runs/run_c424d6a11af7.json`
 - `Results/json/analysis_result.json`

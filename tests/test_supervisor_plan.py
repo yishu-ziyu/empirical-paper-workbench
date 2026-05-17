@@ -413,6 +413,12 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         for label in ("批准计划", "要求修改", "驳回计划", "只有批准后的计划才能进入任务队列"):
             self.assertIn(label, self.app_js)
 
+    def test_bdd_14_frontend_does_not_show_unreviewed_when_plan_is_already_approved(self) -> None:
+        """行为 14：历史 approved SupervisorPlan 缺少 human_review 时，前端也不得显示尚未审批。"""
+        self.assertIn("supervisorHumanReviewLabel", self.app_js)
+        self.assertIn('plan.status === "approved"', self.app_js)
+        self.assertIn("已批准", self.app_js)
+
 
 if __name__ == "__main__":
     unittest.main()

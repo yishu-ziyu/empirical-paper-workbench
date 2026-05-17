@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-17 20:30 CST
+更新时间：2026-05-17 22:20 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-Y 已完成：successful full run 后的审稿反馈已成为 Reviewer Scorecard，包含五维评分、证据绑定和后续任务建议；下一步进入 P2-Z verifier gates，阻止未核验结果、草稿或导出包进入最终产物。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-V 到 P2-Z 的 Pipeline MVP Review 已完成：选题入口、SupervisorPlan 审批、Agent Task Queue 派工审阅、候选变量/正式变量隔离、方法 workflow checklist、Reviewer Scorecard、Verifier Export Gates 已通过一次浏览器端到端验收。下一步进入 P2-AA：让已人工派工审阅的任务选择真实执行后端，并产出可审计日志、结果和 evaluator checks。
 
 ## 已完成事项
 
@@ -187,7 +187,7 @@
 
 ## 下一步第一件事
 
-写 P2-Y BDD 和失败测试：新增 Reviewer Scorecard。重点是没有 successful full run 时返回 409；有 FindingCard 后生成新颖性、识别可信度、数据质量、表达清晰度、政策相关性 5 个评分维度；低分维度只生成后续任务建议，不能自动写入 Agent Task Queue；Review & Export 页面默认折叠评分理由和任务建议。
+写 P2-AA BDD 和失败测试：新增 Agent Task Queue execution backend selection。重点是 `reviewed_for_dispatch` 任务只能先选择 StatsPAI/Python/StataMCP 这类执行后端和执行边界；选择后端仍不等于执行；执行必须产生日志、结果文件、evaluator checks 和 `local_execution` 证据。禁止后端选择动作自动改写 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan、FindingCard 或 Manuscript。
 
 ## 未解决风险
 
@@ -200,6 +200,58 @@
 - 前端隐藏页面也渲染了一份方法工作流 DOM，浏览器可见面板正常，但后续可做 accessibility/DOM 去重。
 - 本地 Codex Supervisor 已可见但未执行派工；`EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用时必须继续 blocked，避免把工程状态机伪装成大模型中控。
 - 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；P2-W 已把它和正式 VariableRoleSet 用 draft 状态隔开，但后续仍需用户编辑保存、DesignSpec/RunPlan 重新确认和真实执行后才可作为研究证据。
+
+## 2026-05-17 Pipeline MVP Review 交接增量
+
+### 当前目标
+
+对 P2-V 到 P2-Z 做一次真实产品闭环验收，确认当前系统已经不是单页功能堆叠，而是“选题 -> 智能中控计划 -> 人工派工审阅 -> 变量/方法/结果/导出 gate”的 AI 实证研究流水线 MVP。
+
+### 已完成事项
+
+- 修复 SupervisorPlan 审批状态显示：旧本地状态如果只有 `status=approved`、没有 `human_review.action`，页面现在显示 `人工审批 已批准`。
+- 给 Review & Export 的 `docx 最终导出` 按钮增加稳定 id `verifier-final-export-button`，便于自动化确认 `can_export_docx=false` 时保持 disabled。
+- 更新 `Product/web/index.html` 静态资源版本到 `20260517-pipeline-mvp-review`，避免浏览器缓存旧 JS/CSS。
+- 保存 4 张浏览器验收截图到 `artifacts/ui-checks/`。
+
+### 已验证证据
+
+- 目标补丁测试：`python3 -m unittest tests.test_supervisor_plan.SupervisorPlanFrontendTests tests.test_verifier_export_gates.VerifierExportGatesFrontendTests -v`，6 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，258 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/*.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收入口：`http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`。
+- 浏览器验收 10 项全部通过：topic-first home、confirmed ResearchQuestion、Codex Supervisor 说明、approved SupervisorPlan 当前显示、Agent Queue 摘要优先、dispatch reviewed 但不执行、candidate/formal VariableRoleSet 分离、方法 checklist ready/blocked、Finding/Manuscript provenance、Review Export verifier gates。
+- 浏览器验收 API 状态：ResearchQuestion `confirmed/local_file`；SupervisorPlan `approved/can_dispatch=true/local_execution`；Agent Queue `ready_for_dispatch` 且 3 个任务都 `dispatch_reviewed`、`can_execute=false`；Verifier Checks `status=failed`、`can_export_docx=false`、8 个 checks。
+- 浏览器验收结果：`errors=[]`、`badResponses=[]`。
+
+### 关键文件路径
+
+- `Product/web/assets/app.js`
+- `Product/web/index.html`
+- `tests/test_supervisor_plan.py`
+- `tests/test_verifier_export_gates.py`
+- `artifacts/ui-checks/pipeline-mvp-home.png`
+- `artifacts/ui-checks/pipeline-mvp-data-variables.png`
+- `artifacts/ui-checks/pipeline-mvp-execution.png`
+- `artifacts/ui-checks/pipeline-mvp-review-export.png`
+
+### 不能重复探索的结论
+
+- Agent Task Queue 的 `dispatch_reviewed` 仍不是执行授权；它只说明用户看过派工任务，下一步必须选择真实执行后端。
+- `can_execute=false` 是刻意边界，不能为了“看起来完成”而在 UI 或 API 中放开。
+- Review & Export 的 export package、preview 和 scorecard 都不能替代 verifier gates；`docx_export_preflight` blocked 时最终 docx 导出必须 disabled。
+- SupervisorPlan 的 approved 状态要能兼容旧本地状态文件，不能因为缺少新版 `human_review` 字段而误导用户“尚未审批”。
+
+### 下一步第一件事
+
+P2-AA：给 Agent Task Queue 增加执行后端选择层。按 BDD/TDD 先定义 `reviewed_for_dispatch -> backend_selected -> execution_ready`，再接 StatsPAI/Python/StataMCP 的真实日志、结果文件和 evaluator checks。仍不允许后端选择动作直接改写研究设定或论文正文。
+
+### 未解决风险
+
+- 当前截图文件是验收产物，若仓库规则不跟踪 `artifacts/ui-checks/*.png`，需要在最终报告中给出本地路径而不是强行纳入版本控制。
+- `state/product/agent_task_queue.json` 是本次浏览器验收修改过的 gitignored runtime 状态：3 个任务都已人工审阅，但仍不可执行。
+- StatsPAI 真实执行目前只覆盖当前 CSV OLS 验证；真实 CFPS `.dta` 和 DID/IV/RDD/PSM/DML 仍不能标记为 `local_execution`。
+- 本地 Codex Supervisor 默认仍是“可生成计划 artifact / 可审阅”，不是已启用的自动派工执行器。
 
 ## 2026-05-17 P2-V Human Dispatch Audit 交接增量
 

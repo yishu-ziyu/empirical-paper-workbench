@@ -1,8 +1,8 @@
 # 当前阶段
 
 - 更新时间：2026-05-17
-- 当前提交基线：P2-Z 工作区改动，待提交 `Block manuscript export behind explicit verifier gates`
-- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-p2z-verifier-gates`
+- 当前提交基线：Pipeline MVP Review 工作区改动，待提交 `Make the pipeline MVP review visually verifiable`
+- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`
 - 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion；SupervisorPlan 已进入人工审批状态机，只有 approved plan 才能创建摘要优先的 Agent Task Queue。
 - 研究题目：机器人应用是否影响劳动力市场匹配效率？
 - 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
@@ -17,6 +17,7 @@
   - P2-X Method Workflow Checklist 已完成：新增 `GET /api/v1/projects/{project_id}/method-workflows`，把 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和 blocker 作为产品状态；RunPlan 保存时会拒绝 blocked DID/IV/RDD 等方法，前端默认折叠方法细节以降低噪声。
   - P2-Y Reviewer Scorecard 已完成：新增 `GET/POST /api/v1/projects/{project_id}/reviewer-scorecard`，把 successful full run 后的审稿反馈落成五维评分卡；低分维度生成可人工接受的后续任务建议，但不会自动写入 Agent Task Queue。
   - P2-Z Verifier Gates 已完成：新增 `GET/POST /api/v1/projects/{project_id}/verifier-checks`，Review & Export 页面在最终导出前显式显示结果绑定、复现清单、运行计划、方法执行、草稿预览、证据等级和 docx 导出预检；当前真实项目 8 个 gate 中 7 个 passed，`docx_export_preflight` blocked，因此最终 docx 导出仍禁用。
+  - Pipeline MVP Review 已完成：Playwright 浏览器验收 10 项全部通过，截图保存到 `artifacts/ui-checks/pipeline-mvp-*.png`；SupervisorPlan approved 状态显示修复为 `人工审批 已批准`，`docx 最终导出` 按钮有稳定 id 且在 verifier blocked 时 disabled。
   - P2-P Local Codex SupervisorPlan 已完成：本地 Codex Supervisor 可以生成待审计划 artifact，但默认执行开关关闭，不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan。
   - P2-N StatsPAI Independent OLS Validation 已完成：StatsPAI 已作为 CSV OLS 独立验证后端产出 `local_execution` evidence；其他方法族仍需后续执行器。
   - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
@@ -38,7 +39,7 @@
   - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
   - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
 - 下一步：
-  - Pipeline MVP Review：按计划第 9 节对 P2-V 到 P2-Z 进行完整回归、浏览器端到端验收和截图留档，然后再进入真实 StataMCP 或更广方法族执行。
+  - P2-AA：把已人工派工审阅的 Agent Task Queue 接到执行后端选择层；先做 BDD/TDD，区分 StatsPAI/Python/StataMCP/Codex 子 Agent 的执行边界、日志、结果文件、evaluator checks 和 `local_execution` 证据。
   - P2-M：把 approved candidate 连接到正式变量角色编辑确认流程，允许用户基于真实字段候选搜索/修改 outcome、treatment、controls、instruments；保存时才写入正式 `state/product/variable_roles.json`。
   - 后续 P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
   - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。

@@ -692,3 +692,17 @@ Rejected: 保存 blocked RunPlan 后等 full run 阶段再失败。原因是这�
 Rejected: 因 PSM/DML 显示 `可预检` 就标记为真实执行。原因是当前只是前置变量具备，不代表 StatsPAI/StataMCP/Python 已生成日志、结果和诊断产物。
 
 Evidence: `tests/test_method_workflow_checklist.py` 覆盖 OLS ready、DID/IV blocked、RunPlan blocked 和前端折叠详情；全量回归 248 tests OK；浏览器验收 `detailsInitiallyOpen=0`，点击 `查看方法要求` 后可见诊断和前置条件。
+
+## 2026-05-17：审稿意见先成为评分卡，不直接改写任务队列
+
+Decision: 新增 `state/product/reviewer_scorecard.json` 和 Reviewer Scorecard API，把审稿反馈结构化为新颖性、识别可信度、数据质量、表达清晰度、政策相关性五个维度。低分维度可以生成后续任务建议，但这些建议默认只是草案入口，不自动写入 Agent Task Queue。
+
+Reason: APE/HLER/Frontier-Eng 式研究流水线的核心不是一次性写完论文，而是 evaluator feedback -> next iteration。评分卡把“需要补什么”落成可审计产品状态，同时避免把 baseline 评分误当成正式派工。
+
+Rejected: 没有 successful full run 时生成审稿评分。原因是没有结果和草稿证据，评分会变成空洞意见。
+
+Rejected: 低分后自动创建 Agent Task Queue item。原因是任务队列已经有 SupervisorPlan approve 和 dispatch review 两层人工边界，评分建议不能绕过它们。
+
+Rejected: 把 deterministic baseline 标为 `local_execution` 或真实 LLM reviewer。原因是当前没有实际调用审稿模型，只是从本地结果/草稿证据生成最小产品评分。
+
+Evidence: `tests/test_reviewer_scorecard.py` 4 tests OK；相邻回归 25 tests OK；全量回归 252 tests OK，skipped=1；浏览器验收 5 个维度、默认折叠详情、任务草案按钮可见、无 console error 和无 4xx/5xx。

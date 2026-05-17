@@ -16,6 +16,7 @@
 - [x] 安全边界：批准派工只进入 `reviewed_for_dispatch`，仍然 `can_execute=false`，不会直接调用 StatsPAI/StataMCP/Python 或改写研究状态。
 - [x] P2-W：把真实 CFPS 字段候选推进到正式 VariableRoleSet 草稿链路；正式写入仍需用户在变量角色编辑器中保存。
 - [x] P2-X：给 DesignSpec/RunPlan 增加方法工作流 checklist，区分 OLS/DID/IV/RDD/PSM/DML 的可执行前置条件。
+- [x] P2-Y：把审稿意见产品化为 Reviewer Scorecard；评分理由和后续任务默认折叠，低分建议不会自动写入 Agent Task Queue。
 
 ## 2026-05-17 P2-W Real VariableRoleCandidate Promotion
 
@@ -36,6 +37,16 @@
 - [x] 前端：在 Research Design 和 Execution 页面显示方法工作流卡片；摘要显示可执行/缺什么，诊断和要求默认折叠在 `查看方法要求`。
 - [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和 Playwright 浏览器验收通过。
 - [x] 安全边界：P2-X 只做方法准入 checklist；DID/IV/RDD/PSM/DML 没有真实 StatsPAI/StataMCP/Python 执行产物，不标记 `local_execution`。
+
+## 2026-05-17 P2-Y Reviewer Scorecard And Follow-Up Task Suggestions
+
+- [x] BDD：新增 `docs/architecture-v2/codex-phase-p2-reviewer-scorecard-bdd.md`，定义审稿意见必须结构化为评分、证据、理由和后续任务建议。
+- [x] TDD：新增 `tests/test_reviewer_scorecard.py`，先确认缺少 `/reviewer-scorecard` API、状态文件和前端评分面板的 RED。
+- [x] 后端：新增 `Product/backend/reviewer_score_service.py`，从 successful full run 的 `results-draft` 生成 `deterministic_baseline` Reviewer Scorecard。
+- [x] API：新增 `GET /api/v1/projects/{project_id}/reviewer-scorecard` 和 `POST /api/v1/projects/{project_id}/reviewer-scorecard`。
+- [x] 前端：Review & Export 页面新增 `审稿评分` 面板；五个维度摘要默认可扫读，理由、证据和后续任务通过 `查看理由与后续任务` 按需展开。
+- [x] 安全边界：后续任务只显示 `加入任务队列草案` 入口提示，不自动改写 `state/product/agent_task_queue.json`。
+- [x] 验证：目标测试、相邻回归、全量 unittest、Python/JS 静态检查、`git diff --check` 和 Playwright 浏览器验收通过。
 
 ## 状态机
 

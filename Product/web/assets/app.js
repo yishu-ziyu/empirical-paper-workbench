@@ -44,6 +44,7 @@ const state = {
   resultsDraftData: null,
   manuscriptCandidatesData: null,
   exportPackageData: null,
+  reviewerScorecardData: null,
   agentsData: null,
   selectedAgentId: null,
   agentDetailData: null,
@@ -76,6 +77,8 @@ const state = {
   approvingWritebackCandidateId: null,
   approvingWritebackAction: null,
   preflightingDocxCandidateId: null,
+  generatingReviewerScorecard: false,
+  acceptingReviewerTaskSuggestionId: null,
   generatingSupervisorPlan: false,
   reviewingSupervisorPlanAction: null,
   creatingAgentTaskQueue: false,
@@ -789,6 +792,18 @@ const v2api = {
     },
     async docxPreflight(projectId, candidateId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/export-package/${encodeURIComponent(candidateId)}/docx-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  reviewerScorecard: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/reviewer-scorecard`);
+    },
+    async generate(projectId, payload = {}) {
+      return fetchJson(`/api/v1/projects/${projectId}/reviewer-scorecard`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -5459,6 +5474,7 @@ function formatNumber(value) {
 // --- Artifacts & Replication Page ---
 
 function renderArtifactsReplication() {
+  renderReviewerScorecard();
   renderExportPackageWorkbench();
 
   const artifacts = mergedArtifacts(state.selectedProject);
@@ -5485,6 +5501,97 @@ function renderArtifactsReplication() {
       <div class="muted">${escapeHtml(artifact.description || "")}</div>
     </div>
   `).join("");
+}
+
+function renderReviewerScorecard() {
+  const container = document.getElementById("reviewer-scorecard-body");
+  if (!container) return;
+
+  const data = state.reviewerScorecardData;
+  if (!data) {
+    container.innerHTML = "<p class='muted'>正在读取审稿评分...</p>";
+    return;
+  }
+
+  const dimensions = data.dimensions || [];
+  if (!dimensions.length) {
+    container.innerHTML = `
+      <div class="reviewer-scorecard-empty">
+        <div>
+          <strong>${escapeHtml(data.empty_state?.title || "尚未生成审稿评分卡")}</strong>
+          <p class="muted">${escapeHtml(data.empty_state?.description || "生成后会显示五个审稿维度、理由、证据和后续任务建议。")}</p>
+        </div>
+        <button class="primary-button" data-generate-reviewer-scorecard ${state.generatingReviewerScorecard ? "disabled" : ""}>
+          ${state.generatingReviewerScorecard ? "生成中..." : "生成审稿评分卡"}
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="reviewer-scorecard-summary">
+      <div>
+        <span class="eyebrow">${escapeHtml(data.reviewer_backend || "deterministic_baseline")}</span>
+        <strong>来源运行：${escapeHtml(data.source_run_id || "-")}</strong>
+      </div>
+      ${renderEvidenceBadge({ evidence_level: data.evidence_level || data._meta?.evidence_level || "local_file" })}
+    </div>
+    <div class="reviewer-scorecard-list">
+      ${dimensions.map((dimension) => renderReviewerScorecardRow(dimension)).join("")}
+    </div>
+  `;
+}
+
+function renderReviewerScorecardRow(dimension) {
+  const score = Number(dimension.score);
+  const isLow = Number.isFinite(score) && score < 6;
+  return `
+    <article class="reviewer-scorecard-row ${isLow ? "is-low" : "is-ok"}">
+      <div class="reviewer-scorecard-row-main">
+        <div>
+          <strong>${escapeHtml(dimension.label || dimension.id)}</strong>
+          <p class="muted">${escapeHtml(scorecardSignalText(dimension))}</p>
+        </div>
+        <span class="score-pill">${formatNumber(score)}/10</span>
+      </div>
+      <details class="reviewer-scorecard-detail">
+        <summary>查看理由与后续任务</summary>
+        <p>${escapeHtml(dimension.rationale || "")}</p>
+        <div class="reviewer-evidence-list">
+          ${(dimension.evidence || []).map((evidence) => `
+            <div class="reviewer-evidence-item">
+              <code>${escapeHtml(evidence.path || "")}</code>
+              ${renderEvidenceBadge({ evidence_level: evidence.evidence_level || "local_file" })}
+            </div>
+          `).join("")}
+        </div>
+        <div class="reviewer-suggested-task-list">
+          ${(dimension.suggested_tasks || []).map((task) => `
+            <div class="reviewer-suggested-task">
+              <div>
+                <strong>${escapeHtml(task.label || task.id)}</strong>
+                <p class="muted">
+                  ${escapeHtml(task.target_agent || "Agent")} · ${task.requires_human_acceptance ? "需要人工接受" : "自动任务"}
+                </p>
+              </div>
+              <button class="ghost-button" data-accept-reviewer-task-suggestion="${escapeHtml(task.id)}">
+                加入任务队列草案
+              </button>
+            </div>
+          `).join("") || "<p class='muted'>暂无后续任务建议</p>"}
+        </div>
+      </details>
+    </article>
+  `;
+}
+
+function scorecardSignalText(dimension) {
+  const score = Number(dimension.score);
+  if (!Number.isFinite(score)) return "等待评分";
+  if (score < 6) return "需要补证据或方法升级";
+  if (score < 7) return "可继续打磨";
+  return "当前证据较稳";
 }
 
 function renderExportPackageWorkbench() {
@@ -5741,6 +5848,33 @@ async function runDocxExportPreflight(candidateId) {
   }
 }
 
+async function generateReviewerScorecard() {
+  if (!state.selectedProjectId) return;
+  clearV2Error("artifacts-replication");
+  state.generatingReviewerScorecard = true;
+  renderArtifactsReplication();
+  try {
+    state.reviewerScorecardData = await v2api.reviewerScorecard.generate(state.selectedProjectId, {
+      note: "Review & Export 验收台生成确定性审稿评分卡。",
+    });
+    renderArtifactsReplication();
+  } catch (error) {
+    showV2Error("artifacts-replication", `生成审稿评分失败：${error.message}`);
+  } finally {
+    state.generatingReviewerScorecard = false;
+    renderArtifactsReplication();
+  }
+}
+
+function acceptReviewerTaskSuggestion(taskId) {
+  state.acceptingReviewerTaskSuggestionId = taskId;
+  showV2Error(
+    "artifacts-replication",
+    "任务建议已选中：当前版本只生成任务草案入口，不会自动写入 Agent Task Queue。",
+  );
+  renderArtifactsReplication();
+}
+
 async function loadProvenance(artifactId) {
   const panel = document.getElementById("provenance-panel");
   if (!panel) return;
@@ -5978,6 +6112,17 @@ async function loadV2Data(viewName) {
         renderPaperDraft();
         break;
       case "artifacts-replication":
+        try {
+          state.reviewerScorecardData = await v2api.reviewerScorecard.get(projectId);
+        } catch (error) {
+          state.reviewerScorecardData = {
+            empty_state: {
+              title: "尚未形成审稿评分",
+              description: "需要先完成一次成功的完整实证执行，再生成审稿评分卡。",
+            },
+            dimensions: [],
+          };
+        }
         state.exportPackageData = await v2api.exportPackage.get(projectId);
         renderArtifactsReplication();
         break;
@@ -6083,6 +6228,18 @@ async function boot() {
     const sourceButton = target.closest("[data-open-results-draft]");
     if (!sourceButton) return;
     document.querySelector('.nav-link[data-view="paper-draft"]')?.click();
+  });
+  document.getElementById("reviewer-scorecard-body")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const generateButton = target.closest("[data-generate-reviewer-scorecard]");
+    if (generateButton) {
+      void generateReviewerScorecard();
+      return;
+    }
+    const suggestionButton = target.closest("[data-accept-reviewer-task-suggestion]");
+    if (!suggestionButton) return;
+    acceptReviewerTaskSuggestion(suggestionButton.dataset.acceptReviewerTaskSuggestion || "");
   });
   document.getElementById("datasets-list")?.addEventListener("click", (event) => {
     const target = event.target;

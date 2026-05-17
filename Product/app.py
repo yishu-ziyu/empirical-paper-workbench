@@ -98,6 +98,10 @@ from Product.backend.supervisor_plan_service import (
     get_project_supervisor_plan,
     review_project_supervisor_plan,
 )
+from Product.backend.task_dispatch_service import (
+    AgentTaskDispatchReviewError,
+    review_project_agent_task_dispatch,
+)
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
     InvalidVariableRoleCandidateActionError,
@@ -257,6 +261,11 @@ class SupervisorPlanReviewPayload(BaseModel):
 
 
 class AgentTaskQueuePayload(BaseModel):
+    note: str = ""
+
+
+class AgentTaskDispatchReviewPayload(BaseModel):
+    action: str
     note: str = ""
 
 
@@ -769,6 +778,30 @@ def api_v1_create_project_agent_task_queue(
         return create_project_agent_task_queue(PRODUCT_ROOT, REPO_ROOT, project_id)
     except AgentTaskQueueBlockedError as exc:
         return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review")
+def api_v1_review_project_agent_task_dispatch(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskDispatchReviewPayload,
+) -> dict:
+    try:
+        return review_project_agent_task_dispatch(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.action,
+            payload.note,
+        )
+    except AgentTaskDispatchReviewError as exc:
+        status_code = 400 if exc.code == "invalid_dispatch_review_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
+        return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 

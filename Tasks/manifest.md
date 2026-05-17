@@ -59,6 +59,7 @@
 ## 新增/扩展 API
 
 - `GET /api/v1/projects/{project_id}/runs/{run_id}/observability`
+- `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review` records human dispatch review for a queued Agent task.
 - `POST /api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve`
 - `GET /api/v1/projects/{project_id}/datasets`
 - `POST /api/v1/projects/{project_id}/runs` accepts optional `dataset_path`
@@ -178,6 +179,18 @@
 - `state/runs/run_c424d6a11af7/run_manifest.json`
 - `state/runs/run_c424d6a11af7/run_steps.json`
 - `state/runs/run_c424d6a11af7/run_events.jsonl`
+
+## 2026-05-17 P2-V 新增关键产物
+
+- `docs/architecture-v2/codex-phase-p2-dispatch-audit-bdd.md`
+- `tests/test_agent_task_dispatch_audit.py`
+- `Product/backend/task_dispatch_service.py`
+- `Product/backend/agent_task_queue_service.py`
+- `Product/app.py`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+- `state/product/agent_task_queue.json`：浏览器验收时生成的本地运行状态，gitignored，不提交。
+- `/tmp/p2v-dispatch-audit.png`：浏览器自动化验收截图。
 - `state/runs/run_c424d6a11af7/gates.json`
 - `state/runs/run_c424d6a11af7.json`
 - `Results/json/analysis_result.json`

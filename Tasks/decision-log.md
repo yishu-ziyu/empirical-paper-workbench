@@ -1,5 +1,31 @@
 # Decision Log
 
+## 2026-05-17：Agent Task Queue 必须经过人工派工审阅
+
+Decision: P2-V 让每个 Agent Task Queue item 默认 `can_execute=false`，并要求人工执行 `approve`、`needs_revision` 或 `reject` 的派工审阅动作。
+
+Reason: approved SupervisorPlan 只能说明计划可以拆成任务，不能说明每个子 Agent 已被允许访问输入证据、产生产物或进入真实执行后端。
+
+Rejected: 队列创建后直接允许子 Agent 执行。原因是这会让本地 Codex Supervisor 绕过人类审计，把“生成计划”误变成“授权执行”。
+
+Rejected: `approve` 后立即调用 StatsPAI/StataMCP/Python 执行。原因是 P2-V 只解决执行前授权，执行后端选择、日志、结果文件和 evaluator checks 应在后续阶段独立 BDD/TDD。
+
+## 2026-05-17：派工审阅不能改写正式研究状态
+
+Decision: `PUT /agent-task-queue/tasks/{task_id}/dispatch-review` 只写回 `state/product/agent_task_queue.json` 中该任务的 `status`、`dispatch_review`、`dispatch_readiness`、`audit_log`。
+
+Reason: VariableRoleSet、DesignSpec、RunPlan、SupervisorPlan 都是上游产品状态。派工审阅是执行前控制点，不应偷偷改变研究设定。
+
+Rejected: 审阅通过后同步修改 RunPlan 或变量角色。原因是这会混淆“派工授权”和“研究设计变更”，也会破坏跨 Session 可审计性。
+
+## 2026-05-17：默认折叠高噪声任务细节
+
+Decision: 前端 Agent Task Queue 只默认展示状态、负责人、派工审阅和少量阻塞信息；输入证据、输出要求、风险和审计日志放进 `details`。
+
+Reason: 用户明确指出页面信息会冲爆短时记忆。任务队列是控制台，不应一屏摊开所有 JSON 和审计细节。
+
+Rejected: 默认展开所有任务详情。原因是这会重复 P2 前期的信息噪声问题，让用户无法判断下一步该点哪里。
+
 ## 2026-05-12：采用记忆外化作为长程开发协议
 
 Decision: 本轮开发维护 `tasks/todo.md`、`tasks/handoff.md`、`tasks/decision-log.md`、`tasks/manifest.md`、`tasks/review.md`，把跨 Session 状态落地到仓库文件。

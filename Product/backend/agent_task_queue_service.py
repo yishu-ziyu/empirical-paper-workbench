@@ -133,7 +133,6 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         build_agent_task(index, dispatch, plan, timestamp)
         for index, dispatch in enumerate(dispatch_items, start=1)
     ]
-    owner_agents = unique_preserve_order([task["owner_agent"] for task in tasks])
     return {
         "id": "agent_task_queue",
         "version": 1,
@@ -142,12 +141,7 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         "can_create": False,
         "evidence_level": "local_file",
         "source_supervisor_plan": compact_supervisor_plan_source(plan),
-        "summary": {
-            "total_tasks": len(tasks),
-            "queued_count": len([task for task in tasks if task["status"] == "queued"]),
-            "blocked_count": len([task for task in tasks if task["blockers"]]),
-            "owner_agents": owner_agents,
-        },
+        "summary": build_agent_task_queue_summary(tasks),
         "tasks": tasks,
         "blockers": [],
         "ui_contract": build_queue_ui_contract(),
@@ -173,6 +167,16 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
         "title": title,
         "summary": str(dispatch_item.get("summary") or title),
         "status": "queued",
+        "can_execute": False,
+        "next_action": "dispatch_review_required",
+        "dispatch_readiness": {
+            "status": "blocked",
+            "blockers": [dispatch_review_required_blocker()],
+        },
+        "dispatch_review": {
+            "status": "pending",
+            "evidence_level": "local_file",
+        },
         "input_evidence": build_task_input_evidence(plan),
         "output_requirements": build_output_requirements(plan, dispatch_item),
         "blockers": [],
@@ -245,6 +249,7 @@ def build_queue_ui_contract() -> dict[str, Any]:
 
 
 def build_agent_task_queue_response(project: dict[str, Any], queue: dict[str, Any]) -> dict[str, Any]:
+    queue = normalize_agent_task_queue(queue)
     return {
         "_meta": {
             "evidence_level": queue.get("evidence_level", "local_file"),
@@ -257,6 +262,71 @@ def build_agent_task_queue_response(project: dict[str, Any], queue: dict[str, An
             "title": project["title"],
         },
         "agent_task_queue": queue,
+    }
+
+
+def normalize_agent_task_queue(queue: dict[str, Any]) -> dict[str, Any]:
+    tasks = normalize_list(queue.get("tasks"))
+    if tasks:
+        for task in tasks:
+            if isinstance(task, dict):
+                ensure_task_dispatch_audit_fields(task)
+        queue["summary"] = build_agent_task_queue_summary(tasks)
+    return queue
+
+
+def ensure_task_dispatch_audit_fields(task: dict[str, Any]) -> None:
+    status = str(task.get("status") or "queued")
+    task.setdefault("can_execute", False)
+    if status == "reviewed_for_dispatch":
+        task.setdefault("next_action", "select_execution_backend")
+        task.setdefault("dispatch_readiness", {"status": "reviewed_for_dispatch", "blockers": []})
+    elif status == "blocked":
+        task.setdefault("next_action", "revise_dispatch_task")
+        task.setdefault(
+            "dispatch_readiness",
+            {
+                "status": "blocked",
+                "blockers": task.get("blockers") or [dispatch_review_required_blocker()],
+            },
+        )
+    else:
+        task.setdefault("next_action", "dispatch_review_required")
+        task.setdefault(
+            "dispatch_readiness",
+            {
+                "status": "blocked",
+                "blockers": [dispatch_review_required_blocker()],
+            },
+        )
+    task.setdefault(
+        "dispatch_review",
+        {
+            "status": "pending",
+            "evidence_level": "local_file",
+        },
+    )
+
+
+def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:
+    task_dicts = [task for task in tasks if isinstance(task, dict)]
+    return {
+        "total_tasks": len(task_dicts),
+        "queued_count": len([task for task in task_dicts if task.get("status") == "queued"]),
+        "blocked_count": len([task for task in task_dicts if task.get("blockers")]),
+        "dispatch_reviewed_count": len(
+            [task for task in task_dicts if task.get("status") == "reviewed_for_dispatch"]
+        ),
+        "needs_revision_count": len([task for task in task_dicts if task.get("status") == "needs_revision"]),
+        "owner_agents": unique_preserve_order([str(task.get("owner_agent", "")) for task in task_dicts]),
+    }
+
+
+def dispatch_review_required_blocker() -> dict[str, str]:
+    return {
+        "code": "dispatch_review_required",
+        "label": "等待人工派工审阅",
+        "description": "队列草案不能直接执行，必须先确认这个子 Agent 任务是否应该派发。",
     }
 
 

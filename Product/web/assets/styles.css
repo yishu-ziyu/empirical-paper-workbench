@@ -1002,12 +1002,14 @@ textarea {
   margin: 18px 0;
 }
 
-.method-skill-catalog-body {
+.method-skill-catalog-body,
+.method-workflow-body {
   display: grid;
   gap: 14px;
 }
 
-.method-catalog-summary {
+.method-catalog-summary,
+.method-workflow-summary {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1018,18 +1020,21 @@ textarea {
   background: rgba(246, 250, 248, 0.82);
 }
 
-.method-catalog-summary h4 {
+.method-catalog-summary h4,
+.method-workflow-summary h4 {
   margin: 4px 0;
   font-size: 18px;
 }
 
-.method-skill-list {
+.method-skill-list,
+.method-workflow-list {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
 }
 
-.method-skill-card {
+.method-skill-card,
+.method-workflow-card {
   display: grid;
   gap: 12px;
   min-width: 0;
@@ -1039,27 +1044,32 @@ textarea {
   background: #ffffff;
 }
 
-.method-skill-card.is-ready {
+.method-skill-card.is-ready,
+.method-workflow-card.is-ready {
   border-color: rgba(30, 111, 98, 0.2);
 }
 
-.method-skill-card.is-blocked {
+.method-skill-card.is-blocked,
+.method-workflow-card.is-blocked {
   background: rgba(255, 251, 246, 0.78);
 }
 
-.method-skill-card-head {
+.method-skill-card-head,
+.method-workflow-card-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
 }
 
-.method-skill-card-head strong {
+.method-skill-card-head strong,
+.method-workflow-card-head strong {
   display: block;
   font-size: 18px;
 }
 
-.method-skill-card-head p {
+.method-skill-card-head p,
+.method-workflow-card-head p {
   margin-top: 4px;
 }
 
@@ -1145,6 +1155,39 @@ textarea {
   color: #7a431f;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+.method-workflow-details {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.method-workflow-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+  list-style-position: inside;
+}
+
+.method-workflow-detail-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.method-workflow-detail-grid p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+}
+
+.method-workflow-detail-grid code {
+  border-radius: 999px;
+  background: rgba(30, 111, 98, 0.08);
+  color: var(--accent);
+  padding: 3px 8px;
+  font-size: 12px;
 }
 
 .card-row,

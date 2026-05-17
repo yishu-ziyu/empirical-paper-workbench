@@ -678,3 +678,17 @@ Rejected: Promotion 后立刻重建 DesignSpec 或 RunPlan。原因是方法设�
 Rejected: 只在前端内存里放草稿。原因是长时间任务和跨 Session 需要可恢复的 draft 状态。
 
 Evidence: `tests/test_real_variable_role_promotion.py` 覆盖 approved candidate promotion、正式 state 不被覆盖、保存后 provenance 和前端候选/正式分离；全量回归 243 tests OK；浏览器点击 promotion 后 `badResponses=[]`、`consoleErrors=[]`。
+
+## 2026-05-17：方法族必须先通过 readiness checklist 才能进入 RunPlan
+
+Decision: 新增 `method_workflows` 作为 RunPlan 保存前的执行准入门。OLS/DID/IV/RDD/PSM/DML 都必须暴露前置输入、诊断要求、证据等级和 blockers；blocked 方法在 `PUT /run-plan` 阶段返回 409 `method_workflow_blocked`。
+
+Reason: CoPaper/StatsPAI 式实证产品不能让用户把 DID/IV/RDD 等方法当作自由文本写进执行计划。每个方法都必须先证明数据结构和变量设定满足最低条件，否则后续 full run 会把不可执行方法包装成“研究计划已确认”。
+
+Rejected: 继续复用 `method_catalog` 作为唯一方法对象。原因是 `method_catalog` 是本地方法准入目录和解释面板；RunPlan approval 需要更严格的 workflow gate。
+
+Rejected: 保存 blocked RunPlan 后等 full run 阶段再失败。原因是这会让正式 `state/product/run_plan.json` 包含不可执行研究任务，破坏产品状态机。
+
+Rejected: 因 PSM/DML 显示 `可预检` 就标记为真实执行。原因是当前只是前置变量具备，不代表 StatsPAI/StataMCP/Python 已生成日志、结果和诊断产物。
+
+Evidence: `tests/test_method_workflow_checklist.py` 覆盖 OLS ready、DID/IV blocked、RunPlan blocked 和前端折叠详情；全量回归 248 tests OK；浏览器验收 `detailsInitiallyOpen=0`，点击 `查看方法要求` 后可见诊断和前置条件。

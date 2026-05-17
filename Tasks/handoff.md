@@ -1,10 +1,10 @@
 # Handoff
 
-更新时间：2026-05-17 19:36 CST
+更新时间：2026-05-17 20:04 CST
 
 ## 当前目标
 
-继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-W 已完成：已审批的真实字段候选只能 promotion 成可编辑 VariableRoleSet 草稿，不能直接覆盖正式 `state/product/variable_roles.json`；正式写入仍需要用户在变量角色编辑器中显式保存。
+继续开发 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。当前主线是把真实数据、LLM Supervisor、Agent Task Queue、方法执行和论文产物串成可审计 AI 实证研究流水线。P2-X 已完成：方法族 OLS/DID/IV/RDD/PSM/DML 已进入可审计 checklist，blocked 方法不能保存进 approved RunPlan；下一步进入 P2-Y Reviewer Scorecard，把审稿意见变成评分、证据绑定和可人工接受的后续任务建议。
 
 ## 已完成事项
 
@@ -187,7 +187,7 @@
 
 ## 下一步第一件事
 
-写 P2-X BDD 和失败测试：给 DesignSpec/RunPlan 增加方法工作流 checklist。重点是 OLS/DID/IV/RDD/PSM/DML 都必须先声明前置条件、数据结构要求、诊断和 evaluator checks；blocked 方法只能展示阻塞原因，不能进入执行。
+写 P2-Y BDD 和失败测试：新增 Reviewer Scorecard。重点是没有 successful full run 时返回 409；有 FindingCard 后生成新颖性、识别可信度、数据质量、表达清晰度、政策相关性 5 个评分维度；低分维度只生成后续任务建议，不能自动写入 Agent Task Queue；Review & Export 页面默认折叠评分理由和任务建议。
 
 ## 未解决风险
 
@@ -196,6 +196,8 @@
 - `state/product/variable_roles.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 是浏览器/API 验收创建的真实本地运行状态；当前未纳入 git 跟踪，后续提交前需要决定是否作为样例状态保留、迁移到 fixtures，或继续作为 gitignored runtime artifacts。
 - StatsPAI 独立验证目前只覆盖 CSV OLS；真实 CFPS `.dta` 还没有进入 StatsPAI/StataMCP 执行层，DTA 仍停在字段画像和变量角色候选流程。
 - StataMCP/Stata 仍未产生日志、do-file、结果 JSON 或 evaluator checks，不能标记为 `local_execution`。
+- DID/IV/RDD/PSM/DML 当前只有方法工作流 checklist 和前置条件阻塞，还没有真实 StatsPAI/StataMCP/Python 执行后端。
+- 前端隐藏页面也渲染了一份方法工作流 DOM，浏览器可见面板正常，但后续可做 accessibility/DOM 去重。
 - 本地 Codex Supervisor 已可见但未执行派工；`EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC` 未启用时必须继续 blocked，避免把工程状态机伪装成大模型中控。
 - 真实 CFPS 变量角色候选仍是启发式。启发式意思是“根据字段名、标签和简单规则猜测”，它只能帮用户缩小审阅范围，不能直接进入论文分析；P2-W 已把它和正式 VariableRoleSet 用 draft 状态隔开，但后续仍需用户编辑保存、DesignSpec/RunPlan 重新确认和真实执行后才可作为研究证据。
 
@@ -268,6 +270,53 @@
 ### 下一步第一件事
 
 P2-X：为 DesignSpec/RunPlan 增加方法工作流 checklist，让 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和 evaluator checks 成为可审计产品状态。
+
+## 2026-05-17 P2-X Method Workflow Checklist 交接增量
+
+### 当前目标
+
+把 DesignSpec/RunPlan 中的方法选择从自由文本任务，升级为带前置条件、诊断要求和阻塞原因的可审计方法工作流。P2-X 的边界是“方法准入”，不是“所有方法已经真实执行”。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-method-workflow-checklist-bdd.md`。
+- 新增测试：`tests/test_method_workflow_checklist.py`。
+- 新增服务：`Product/backend/method_workflow_service.py`。
+- 扩展 `Product/backend/design_spec_service.py`：保存 RunPlan 前调用方法工作流检查，blocked 方法返回 `method_workflow_blocked`。
+- 扩展 `Product/app.py`：新增 `GET /api/v1/projects/{project_id}/method-workflows`，并让 RunPlan 保存 API 返回 blocked method details。
+- 扩展 `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：Research Design 和 Execution 页面显示方法工作流卡片，细节默认折叠。
+- 更新 `tests/test_ols_execution_adapter.py`：unsupported/blocked IV 不再允许先保存进 RunPlan 再到 full run 阶段失败，而是在 RunPlan approval 阶段被拒绝。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_method_workflow_checklist -v` 首次 5 条失败，原因是 `/method-workflows` 404、blocked DID RunPlan 仍返回 200、前端缺少 `method-workflow-panel`。
+- 目标测试：`python3 -m unittest tests.test_method_workflow_checklist -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_method_workflow_checklist tests.test_method_skill_catalog tests.test_design_run_plan_state_machine tests.test_ols_execution_adapter -v`，27 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，248 tests OK，skipped=1，耗时 39.867s。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/method_workflow_service.py Product/backend/design_spec_service.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+- 浏览器验收：`http://127.0.0.1:8768/?v=20260517-p2x-method-workflow` 的 Research Design 页面可见 `OLS：可执行`、`DID：缺少时间变量、处理时点`、`IV：缺少工具变量`、`RDD：缺少断点运行变量`、`PSM：可预检`、`DML：可预检`；`detailsInitiallyOpen=0`，点击 `查看方法要求` 后 `firstDetailOpen=true`，`errors=[]`，`badResponses=[]`；截图 `/tmp/p2x-method-workflow.png`。
+
+### 关键文件路径
+
+- `docs/architecture-v2/codex-phase-p2-method-workflow-checklist-bdd.md`
+- `tests/test_method_workflow_checklist.py`
+- `Product/backend/method_workflow_service.py`
+- `Product/backend/design_spec_service.py`
+- `Product/app.py`
+- `Product/web/index.html`
+- `Product/web/assets/app.js`
+- `Product/web/assets/styles.css`
+
+### 不能重复探索的结论
+
+- `method_catalog` 仍是本地方法准入目录；`method_workflows` 是 RunPlan 保存前的执行准入门，二者不要混成一个对象。
+- Blocked DID/IV/RDD 等方法必须在 RunPlan approval 前被拒绝，不要回到“先保存成功，full run 时再失败”的模式。
+- PSM/DML 的 `ready` 只代表具备 outcome/treatment/covariates 可预检，不代表已经真实执行。
+- 除非真实 StatsPAI/StataMCP/Python 后端写出日志和结果产物，否则 DID/IV/RDD/PSM/DML 不能标记 `local_execution`。
+
+### 下一步第一件事
+
+P2-Y：写 Reviewer Scorecard BDD 和失败测试，把 AI/审稿意见转换为 5 个评分维度、证据绑定和后续任务建议；建议任务必须等待人工接受，不能自动写入 Agent Task Queue。
 
 ## 2026-05-14 P2-N/P2-O StatsPAI Validation 与 LLM Supervisor 交接增量
 

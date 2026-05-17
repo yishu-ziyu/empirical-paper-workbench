@@ -1054,3 +1054,45 @@
 - 当前 promotion 仍来自启发式字段候选，不能进入论文分析；必须经过正式保存、DesignSpec/RunPlan 重新确认和真实执行。
 - `state/product/variable_roles_drafts.json` 是本地 runtime artifact，gitignored，不随代码提交。
 - P2-W 没有自动重建 DesignSpec/RunPlan；下一步 P2-X 应把方法工作流 checklist 和状态重确认做成产品对象。
+
+## 2026-05-17 P2-X Method Workflow Checklist
+
+### 行为覆盖
+
+- [x] OLS 在存在 outcome/treatment 时显示 `ready`，并声明样本量、缺失率、系数表和残差诊断。
+- [x] DID 在缺少时间变量和处理时点时显示 blocked，不能被保存为 approved RunPlan。
+- [x] IV 在缺少工具变量时显示 blocked，不能被保存为 approved RunPlan。
+- [x] RDD 暴露断点运行变量 blocker；PSM/DML 在 outcome/treatment/covariates 存在时仅标记为可预检。
+- [x] 前端只显示方法摘要，required inputs、diagnostics、blockers 默认折叠在 `查看方法要求`。
+- [ ] 未覆盖：真实 DID/IV/RDD/PSM/DML 后端执行、Stata do-file/log、StatsPAI 对非 OLS 方法的结果产物。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_method_workflow_checklist -v` 首次 5 条失败，原因是 `/method-workflows` 404、blocked DID RunPlan 仍返回 200、前端缺少 `method-workflow-panel`。
+- 目标测试：`python3 -m unittest tests.test_method_workflow_checklist -v`，5 tests OK。
+- 相邻回归：`python3 -m unittest tests.test_method_workflow_checklist tests.test_method_skill_catalog tests.test_design_run_plan_state_machine tests.test_ols_execution_adapter -v`，27 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，248 tests OK，skipped=1。
+- 静态检查：`python3 -m py_compile Product/app.py Product/backend/method_workflow_service.py Product/backend/design_spec_service.py Product/backend/overview_service.py` 通过；`node --check Product/web/assets/app.js` 通过；`git diff --check` 通过。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-method-workflow-checklist-bdd.md`：新增本轮方法工作流行为契约。
+- `tests/test_method_workflow_checklist.py`：新增 API、RunPlan gate 和前端折叠详情测试。
+- `Product/backend/method_workflow_service.py`：新增方法工作流生成和 RunPlan 准入检查。
+- `Product/backend/design_spec_service.py`：保存 RunPlan 前检查 blocked 方法。
+- `Product/app.py`：新增 method workflows API 和 409 blocked response。
+- `Product/web/index.html`、`Product/web/assets/app.js`、`Product/web/assets/styles.css`：新增方法工作流面板和默认折叠细节。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8768`。
+2. 打开 `http://127.0.0.1:8768/?v=20260517-p2x-method-workflow`。
+3. 进入 `研究设计细节`，确认可见 `OLS：可执行`、`DID：缺少时间变量、处理时点`、`IV：缺少工具变量`、`RDD：缺少断点运行变量`、`PSM：可预检`、`DML：可预检`。
+4. 页面初始不展开方法细节；点击 `查看方法要求` 后显示 required inputs、diagnostics 和 blockers。
+5. 浏览器验收记录：`errors=[]`、`badResponses=[]`，截图 `/tmp/p2x-method-workflow.png`。
+
+### 剩余风险
+
+- P2-X 只是方法准入，不是完整统计执行；DID/IV/RDD/PSM/DML 仍需要真实执行器、日志、诊断和产物。
+- PSM/DML 当前 `可预检` 容易被误读为已执行，后续 UI 可以继续强化“预检”和“真实执行”的区别。
+- 隐藏的 Execution 页面也有一份 method workflow DOM，当前不影响可视化验收，后续可以做 accessibility/DOM 去重。

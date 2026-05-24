@@ -7,6 +7,7 @@
 - `Tasks/decision-log.md`：关键决策与不要重复探索的理由
 - `Tasks/manifest.md`：关键产物路径
 - `Tasks/review.md`：验证、风险、未完成项
+- `Tasks/round-log.md`：长程研发轮次账本，记录平台期、瓶颈、策略跃迁和证据路径
 
 ## 关键开发文件
 
@@ -36,6 +37,7 @@
 
 ## 新增设计/方法论文件
 
+- `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`
 - `docs/architecture-v2/statspai-methodology-synthesis-2026-05-12.md`
 - `docs/architecture-v2/codex-phase-p0-observable-ui-bdd.md`
 - `docs/architecture-v2/codex-phase-p1-gate-resolve-bdd.md`
@@ -55,9 +57,11 @@
 - `docs/architecture-v2/codex-phase-p1-export-preflight-bdd.md`
 - `docs/architecture-v2/codex-phase-p1-clean-workbench-bdd.md`
 - `docs/architecture-v2/codex-phase-p1-clean-workbench-bdd.md`
+- `docs/architecture-v2/long-run-optimization-protocol.md`
 
 ## 新增/扩展 API
 
+- CLI：`python3 Product/cli.py auto-research --topic "<研究题目>" --mode auto --max-depth 2 --max-iterations 5`
 - `GET /api/v1/projects/{project_id}/runs/{run_id}/observability`
 - `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review` records human dispatch review for a queued Agent task.
 - `POST /api/v1/projects/{project_id}/runs/{run_id}/gates/{gate_id}/resolve`
@@ -93,6 +97,11 @@
 
 ## 新增/扩展前端能力
 
+- `Product/web/index.html`：工作台首页恢复 topic-first 入口；`research-topic-intake` 负责输入/确认研究问题，`research-workbench-after-topic` 默认隐藏高噪声工作台细节。
+- `Product/web/index.html`：Agent Console 移除主工作区重复详情面板，新增/保留右侧 `agent-detail-drawer` 作为唯一深层详情展开层。
+- `Product/web/assets/app.js`：Agent 行支持 click / Enter / Space 打开 drawer；`openAgentDetail()`、`closeAgentDetailDrawer()`、`navigateToPrevAgent()`、`navigateToNextAgent()` 管理右侧抽屉。
+- `Product/web/assets/app.js`：`renderAgentArtifactPreview()`、`openAgentArtifactPreview()` 为 drawer 内嵌产物预览提供 loading / empty / error 状态。
+- `Product/web/assets/styles.css`：新增 `agent-detail-drawer`、`agent-row.is-active`、`agent-detail-preview-*` 样式。
 - `Product/web/assets/app.js`：`v2api.runs.resolveGate(projectId, runId, gateId, action, note)`
 - `Product/web/assets/app.js`：`resolveObservableGate(gateId, action)`
 - `Product/web/assets/app.js`：开放 gate 显示 confirm/reject/adjust 和 note；resolved gate 显示 resolution。
@@ -163,6 +172,9 @@
 
 ## 手动验收产物
 
+- `workspace/runs/run_20260524T172441Z_c063b7/`：P2-AB Auto Research CLI 手动验收生成的本地运行目录，包含 `run_manifest.json`、`research_report.md`、`paper_draft_exploratory.md`、候选变量/方法和文献线索。
+- `journey-final-verify.png`：P2-AB 首页/工作台浏览器验收截图。
+- `journey-agent-drawer-clean-verify.png`：P2-AB Agent drawer 浏览器验收截图，确认详情只在右侧抽屉展开。
 - `state/runs/run_3ffe1e6c1f53/run_manifest.json`
 - `state/runs/run_3ffe1e6c1f53/run_steps.json`
 - `state/runs/run_3ffe1e6c1f53/run_events.jsonl`
@@ -1134,3 +1146,39 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 新增验收产物
 
 - `/tmp/p2z-verifier-gates.png`
+
+## 2026-05-25 P2-AB Topic-first Auto Research CLI
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`
+- `tests/test_auto_research_cli.py`
+
+### 新增/扩展后端能力
+
+- `Product/backend/auto_research_service.py`：
+  - 新增 `run_auto_research()`。
+  - 创建 `workspace/runs/{run_id}` 运行目录。
+  - 写入 `00_intake/research_intent.json`、`01_sources/recursive_search_plan.json`、`02_literature/literature_clues.jsonl`、`03_strategy/variable_candidates.json`、`03_strategy/method_candidates.json`、`03_strategy/evidence_gaps.json`、`06_writing/research_report.md`、`06_writing/paper_draft_exploratory.md` 和 `run_manifest.json`。
+  - 写入全局候选池 `state/orchestration/literature_clues.jsonl`。
+  - 记录 `local_data`、`statspai`、`cnki`、`web_search`、`agentmemory`、`llm_supervisor` 的能力状态。
+- `Product/backend/registry.py`：
+  - 新增 `get_project_by_id_or_transient()`，让临时本地项目可以走治理层但不污染全局项目 registry。
+- `Product/backend/identity_service.py`、`Product/backend/permission_service.py`、`Product/backend/capability_registry.py`、`Product/backend/cost_service.py`：
+  - 改用 transient runtime project 解析，支持 CLI 对未注册本地项目执行。
+
+### 新增/扩展 CLI 能力
+
+- `Product/cli.py`：
+  - 新增 `auto-research` 子命令。
+  - 关键参数：`--project-root`、`--topic`、`--mode auto|dry-run`、`--max-depth`、`--max-iterations`。
+
+### 手动验收入口
+
+- `python3 Product/cli.py auto-research --topic "人工智能是否影响劳动收入差距" --mode auto --max-depth 2 --max-iterations 5`
+
+### 预期输出
+
+- CLI stdout 返回 JSON manifest。
+- 本地运行目录：`workspace/runs/{run_id}`。
+- 所有自动生成研究产物均为 `exploratory` / `draft` / `needs_human_review`，`can_promote=false`。

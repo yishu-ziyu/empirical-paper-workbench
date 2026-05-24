@@ -64,19 +64,19 @@ class MethodWorkflowChecklistApiTests(unittest.TestCase):
         self.assertEqual(ols["blockers"], [])
 
     def test_bdd_2_did_blocked_without_panel_time_and_treatment_timing(self) -> None:
-        """行为 2：DID 缺少时间变量和处理时点时必须阻塞。"""
+        """行为 2：DID 缺少面板标识变量（id/time）时必须阻塞。"""
         response = self.client.get(f"/api/v1/projects/{self.project_id}/method-workflows")
 
         self.assertEqual(response.status_code, 200, msg=response.text)
         did = self._methods_by_id(response)["did"]
-        self.assertEqual(did["label"], "DID：缺少时间变量、处理时点")
+        self.assertEqual(did["label"], "DID：缺少面板标识变量（id/time）")
         self.assertEqual(did["readiness_status"], "blocked")
         self.assertEqual(
             did["required_inputs"],
-            ["outcome", "treatment", "unit_id", "time_variable", "treatment_timing"],
+            ["outcome", "treatment", "unit_id", "time_variable"],
         )
+        self.assertIn("panel_id_required", did["blockers"])
         self.assertIn("time_variable_required", did["blockers"])
-        self.assertIn("treatment_timing_required", did["blockers"])
         self.assertIn("parallel_trends", did["required_diagnostics"])
         self.assertIn("heterogeneous_treatment_effects", did["required_diagnostics"])
 

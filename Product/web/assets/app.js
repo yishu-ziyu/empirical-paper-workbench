@@ -4,20 +4,6 @@ const state = {
   selectedProject: null,
   activeRun: null,
 
-  // Agent Cluster state
-  workflows: [],
-  selectedWorkflowId: null,
-  selectedWorkflow: null,
-  workflowTasks: [],
-  workflowArtifacts: [],
-  hoverTaskId: null,
-  activeAgentTaskId: null,
-  agentDetailPreview: null,
-  agentDetailPreviewLoading: false,
-  isArtifactDrawerOpen: false,
-  isCompletionVisible: false,
-  pollIntervalId: null,
-
   // UI state
   isLoading: false,
   apiError: null,
@@ -30,6 +16,7 @@ const state = {
   // V2 page state
   overviewData: null,
   journeyData: null,
+  journeyPrimaryAction: null,
   researchQuestionData: null,
   supervisorPlanData: null,
   agentTaskQueueData: null,
@@ -49,6 +36,10 @@ const state = {
   agentsData: null,
   selectedAgentId: null,
   agentDetailData: null,
+  agentDetailPreviewLoading: false,
+  agentDetailPreviewError: null,
+  agentDetailPreviewContent: null,
+  agentDetailPreviewPath: null,
   provenanceData: null,
   projectRuns: [],
   selectedRunId: null,
@@ -86,8 +77,63 @@ const state = {
   creatingAgentTaskQueue: false,
   reviewingAgentTaskId: null,
   reviewingAgentTaskAction: null,
+  executingAgentTaskId: null,
+  executingAgentTaskBackend: null,
+
+  // SSE state
+  sseConnection: {
+    eventSource: null,
+    connected: false,
+    runId: null,
+    reconnectAttempts: 0,
+  },
+
+  // Agent output panel state
+  agentOutput: {
+    visible: false,
+    currentStage: null,
+    currentAgent: null,
+    lines: [],
+    isTyping: false,
+  },
+
+  // Governance state
+  governanceIdentityData: null,
+  governancePermissionsData: null,
+  governanceCapabilitiesData: null,
+  governanceCostsData: null,
+  initializingGovernanceIdentity: false,
+  initializingGovernancePermissions: false,
+  reindexingCapabilities: false,
+  activatingAgentId: null,
+  deactivatingAgentId: null,
+
+  // Agent Execution Monitor state
+  executionMonitor: {
+    visible: false,
+    taskId: null,
+    jobId: null,
+    status: null,           // "queued" | "running" | "succeeded" | "failed"
+    stage: null,            // "backend_selection" | "data_preflight" | "method_execution" | "result_evaluation" | "complete" | "failed"
+    currentMessage: "",
+    events: [],             // user-facing events
+    technicalEvents: [],    // technical log events
+    startedAt: null,
+    elapsedSeconds: 0,
+    result: null,
+    error: null,
+    pollIntervalId: null,
+  },
+
   researchTopicConfirmed: false,
   researchTopicDraft: "",
+
+  // HITL Checkpoint state
+  checkpoint: {
+    pollIntervalId: null,
+    pending: null,
+    resolving: false,
+  },
 };
 
 const fallbackWorkflowSteps = [
@@ -102,9 +148,9 @@ const fallbackWorkflowSteps = [
 ];
 
 const archivePageNotes = {
-  overview: {
-    title: "工作台首页",
-    summary: "研究问题、主链路、关键风险和下一步动作的总索引。",
+  journey: {
+    title: "研究旅程",
+    summary: "从选题到审阅导出的 8 阶段流水线，每阶段需检查点确认。",
   },
   "data-variables": {
     title: "数据与设计",
@@ -130,6 +176,10 @@ const archivePageNotes = {
     title: "智能体控制台",
     summary: "智能体身份、权限、能力、成本和审计日志。",
   },
+  "governance-panel": {
+    title: "治理面板",
+    summary: "Agent 身份注册、权限矩阵、能力目录与成本追踪的集中管理。",
+  },
 };
 
 async function fetchJson(url, options = {}) {
@@ -149,111 +199,11 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
-function setExecutionLog(message) {
-  document.getElementById("execution-log").textContent = message;
-}
-
-function selectedProjectSummary(project) {
-  if (!project) {
-    return [];
-  }
-  return [
-    `标题：${project.title}`,
-    `问题：${project.question ?? "unknown"}`,
-    `Project ID：${project.id}`,
-    `根目录：${project.project_root ?? project.root}`,
-    `当前阶段：${project.paper?.current_stage ?? project.current_stage ?? "unknown"}`,
-    `最近运行：${project.paper?.last_run_mode ?? project.last_run_mode ?? "never"}`,
-    `数据存在：${project.paper?.dataset_exists ?? project.dataset_exists ?? false}`,
-  ];
-}
-
-function renderMetrics() {
-  const selected = state.selectedProject;
-  const orchestration = selected?.latest_orchestration?.manifest;
-  const metrics = [
-    { label: "项目数", value: state.projects.length },
-    { label: "当前项目", value: selected ? selected.slug : "未选择" },
-    { label: "草稿状态", value: selected?.artifacts?.markdown ? "已生成" : "未生成" },
-    { label: "审阅循环", value: orchestration?.review_loop?.status ?? "未启动" },
-  ];
-
-  document.getElementById("metric-grid").innerHTML = metrics
-    .map(
-      (metric) => `
-        <article class="metric-card">
-          <span class="eyebrow">${metric.label}</span>
-          <strong>${metric.value}</strong>
-        </article>
-      `,
-    )
-    .join("");
-}
-
-function renderProjectCards(targetId, clickable = false) {
-  const html = state.projects
-    .map((project) => {
-      const active = project.id === state.selectedProjectId ? " is-selected" : "";
-      return `
-        <article class="project-card${active}">
-          <strong>${project.title}</strong>
-          <div class="muted">${project.slug}</div>
-          <div class="muted">${project.question ?? ""}</div>
-          <div class="muted">阶段：${project.current_stage} · 模式：${project.last_run_mode}</div>
-          <div class="muted">数据集是否存在：${yesNo(project.dataset_exists)}</div>
-          ${clickable ? `<button class="ghost-button" data-select-project-id="${project.id}">查看项目</button>` : ""}
-        </article>
-      `;
-    })
-    .join("");
-
-  document.getElementById(targetId).innerHTML = html || "<p class='muted'>暂无项目</p>";
-}
-
-function renderSelectedProject() {
-  const project = state.selectedProject;
-  document.getElementById("selected-project-pill").textContent = project ? project.slug : "none";
-  document.getElementById("status-pill").textContent =
-    state.activeRun?.status ?? project?.paper?.last_run_mode ?? "idle";
-
-  if (!project) {
-    document.getElementById("selected-project-summary").innerHTML = "<p>尚未选择项目。</p>";
-    return;
-  }
-
-  document.getElementById("selected-project-summary").innerHTML = selectedProjectSummary(project)
-    .map((line) => `<div>${line}</div>`)
-    .join("");
-}
-
-function buildWorkflowEntries() {
-  const orchestration = state.selectedProject?.latest_orchestration?.manifest;
-  if (orchestration) {
-    return [
-      { label: "supervisor", status: orchestration.supervisor?.status ?? "unknown" },
-      ...orchestration.primary_agents.map((agent) => ({
-        label: agent.name,
-        status: agent.status,
-      })),
-      {
-        label: "review_loop",
-        status: orchestration.review_loop?.status ?? "unknown",
-      },
-    ];
-  }
-
-  const currentStage =
-    state.selectedProject?.paper?.current_stage ?? state.selectedProject?.current_stage ?? "question-definition";
-  return fallbackWorkflowSteps.map((step) => ({
-    label: step,
-    status: step === currentStage ? "current" : "idle",
-  }));
-}
-
-function renderWorkflow() {
-  document.getElementById("workflow-steps").innerHTML = buildWorkflowEntries()
-    .map((entry) => `<li><strong>${entry.label}</strong> <span class="muted">${entry.status}</span></li>`)
-    .join("");
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function mergedArtifacts(project) {
@@ -267,63 +217,12 @@ function mergedArtifacts(project) {
   return [...resultArtifacts, ...orchestrationArtifacts];
 }
 
-function renderArtifacts() {
-  const artifacts = mergedArtifacts(state.selectedProject);
-  document.getElementById("artifact-list").innerHTML = artifacts.length
-    ? artifacts
-        .map(
-          (artifact) => `
-            <article class="artifact-card">
-              <strong>${artifact.kind}</strong>
-              <div>${artifact.description}</div>
-              <div class="muted">${artifact.path}</div>
-              <div class="muted">是否存在：${yesNo(artifact.exists)}</div>
-            </article>
-          `,
-        )
-        .join("")
-    : "<p class='muted'>当前项目还没有结构化产物。</p>";
-}
-
-function renderDrafts() {
-  const orchestrationDraft = state.selectedProject?.latest_orchestration?.revised_draft;
-  if (orchestrationDraft) {
-    document.getElementById("markdown-preview").textContent = orchestrationDraft;
-  } else {
-    const draft = state.selectedProject?.analysis_result?.draft?.sections;
-    document.getElementById("markdown-preview").textContent = draft
-      ? Object.entries(draft)
-          .map(([section, content]) => `## ${section}\n\n${content}`)
-          .join("\n\n")
-      : "暂无内容";
-  }
-
-  const resultsPayload = {
-    result_payload: state.selectedProject?.analysis_result?.result_payload ?? {},
-    latest_orchestration_review: state.selectedProject?.latest_orchestration?.review_packet ?? null,
-    active_run: state.activeRun ?? null,
-  };
-  document.getElementById("results-preview").textContent = JSON.stringify(resultsPayload, null, 2);
-}
-
-function renderAll() {
-  renderMetrics();
-  renderProjectCards("dashboard-projects", false);
-  renderProjectCards("project-list", true);
-  renderSelectedProject();
-  renderWorkflow();
-  renderArtifacts();
-  renderDrafts();
-}
-
 async function loadSelectedProject() {
   if (!state.selectedProjectId) {
     state.selectedProject = null;
-    renderAll();
     return;
   }
   state.selectedProject = await fetchJson(`/api/v1/projects/${state.selectedProjectId}`);
-  renderAll();
 }
 
 async function refreshProjects() {
@@ -347,46 +246,8 @@ async function selectProject(projectId) {
   if (viewName && isV2View(viewName)) {
     await loadV2Data(viewName);
   }
-}
-
-async function pollRun(projectId, runId) {
-  while (true) {
-    const run = await fetchJson(`/api/v1/projects/${projectId}/runs/${runId}`);
-    state.activeRun = run;
-    setExecutionLog(JSON.stringify(run, null, 2));
-    renderAll();
-    if (["succeeded", "failed"].includes(run.status)) {
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-}
-
-async function createRun(mode, label) {
-  if (!state.selectedProjectId) {
-    return;
-  }
-  setExecutionLog(`${label}...`);
-  const run = await fetchJson(`/api/v1/projects/${state.selectedProjectId}/runs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode }),
-  });
-  state.activeRun = run;
-  renderAll();
-  await pollRun(state.selectedProjectId, run.id);
-  await refreshProjects();
-}
-
-async function postAction(path, label) {
-  if (!state.selectedProjectId) {
-    return;
-  }
-  setExecutionLog(`${label}...`);
-  const payload = await fetchJson(path, { method: "POST" });
-  state.activeRun = payload.execution ?? payload.orchestration ?? payload;
-  setExecutionLog(JSON.stringify(payload, null, 2));
-  await refreshProjects();
+  // Start HITL checkpoint polling for the selected project
+  startCheckpointPolling();
 }
 
 function mountNav() {
@@ -443,7 +304,7 @@ function mountArchiveInspector() {
       }
     });
   });
-  updateArchiveInspector("overview");
+  updateArchiveInspector("journey");
 }
 
 function updateArchiveInspector(viewName) {
@@ -468,115 +329,6 @@ function mountProjectSelection() {
     }
   });
 }
-
-function mountActions() {
-  document.getElementById("refresh-button").addEventListener("click", () => void refreshProjects());
-  document.getElementById("run-dry-button").addEventListener("click", () => void createRun("dry-run", "Running dry"));
-  document.getElementById("run-live-button").addEventListener("click", () => void createRun("live", "Running live"));
-  document.getElementById("orchestrate-button").addEventListener("click", () =>
-    void postAction(`/api/v1/projects/${state.selectedProjectId}/orchestrate?mode=dry-run`, "Running orchestration"),
-  );
-  document.getElementById("export-button").addEventListener("click", () =>
-    void postAction(`/api/v1/projects/${state.selectedProjectId}/export`, "Exporting docx"),
-  );
-}
-
-function mountForm() {
-  document.getElementById("project-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(form.entries());
-    const resultNode = document.getElementById("project-form-result");
-    resultNode.textContent = "创建中...";
-    try {
-      const response = await fetchJson("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      resultNode.textContent = `已创建：${response.project.root}`;
-      await refreshProjects();
-      const created = state.projects.find((project) => project.slug === response.project.slug);
-      if (created) {
-        await selectProject(created.id);
-      }
-      event.currentTarget.reset();
-    } catch (error) {
-      resultNode.textContent = `创建失败：${error.message}`;
-    }
-  });
-}
-
-// ============================================================
-// Agent Cluster
-// ============================================================
-
-const AGENT_AVATAR_COLORS = [
-  "#1e6f62", "#a14a18", "#2c5282", "#744210", "#553c9a",
-  "#285e61", "#9c4221", "#276749", "#702459", "#1a365d",
-];
-
-const STAGE_ORDER = ["queued", "planning", "researching", "synthesizing", "reviewing", "completed"];
-
-const DEFAULT_RESEARCH_DIMENSIONS = [
-  { id: "task_01", agent_name: "墨白", title: "研究背景与政策语境" },
-  { id: "task_02", agent_name: "知远", title: "文献综述与研究缺口" },
-  { id: "task_03", agent_name: "数澜", title: "数据源与变量可得性" },
-  { id: "task_04", agent_name: "量衡", title: "核心变量定义与测度" },
-  { id: "task_05", agent_name: "维农", title: "识别策略与内生性处理" },
-  { id: "task_06", agent_name: "建模", title: "基准模型与估计方案" },
-  { id: "task_07", agent_name: "固盾", title: "稳健性检验设计" },
-  { id: "task_08", agent_name: "析微", title: "异质性与机制分析" },
-  { id: "task_09", agent_name: "图灵", title: "表格图形与结果呈现" },
-  { id: "task_10", agent_name: "文心", title: "论文结构与写作路径" },
-];
-
-// === API Client ===
-
-const api = {
-  workflows: {
-    async create(title, projectId = null) {
-      return fetchJson("/api/v1/workflows", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, project_id: projectId }),
-      });
-    },
-    async list() {
-      return fetchJson("/api/v1/workflows");
-    },
-    async get(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}`);
-    },
-    async start(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}/start`, { method: "POST" });
-    },
-    async cancel(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}/cancel`, { method: "POST" });
-    },
-    async getTasks(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}/tasks`);
-    },
-    async getArtifacts(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}/artifacts`);
-    },
-    async getReport(workflowId) {
-      return fetchJson(`/api/v1/workflows/${workflowId}/report`);
-    },
-  },
-  artifacts: {
-    async get(artifactId) {
-      return fetchJson(`/api/v1/artifacts/${artifactId}`);
-    },
-    async promote(artifactId, target) {
-      return fetchJson(`/api/v1/artifacts/${artifactId}/promote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target }),
-      });
-    },
-  },
-};
 
 // --- V2 API (Phase A GET endpoints) ---
 const v2api = {
@@ -725,6 +477,20 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async selectBackend(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async execute(projectId, taskId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
   },
   researchQuestion: {
     async get(projectId) {
@@ -839,6 +605,9 @@ const v2api = {
     async list(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/runs`);
     },
+    async active(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/runs/active`);
+    },
     async create(projectId, mode, datasetPath = null) {
       const payload = { mode, dataset_path: datasetPath };
       if (!datasetPath) {
@@ -860,6 +629,37 @@ const v2api = {
     async observability(projectId, runId) {
       return fetchJson(`/api/v1/projects/${projectId}/runs/${runId}/observability`);
     },
+    async stream(projectId, runId, onEvent) {
+      const url = `/api/v1/projects/${projectId}/runs/${runId}/stream`;
+      const es = new EventSource(url);
+
+      [
+        "connected",
+        "run.started",
+        "stage.start",
+        "stage.output",
+        "stage.complete",
+        "checkpoint.pending",
+        "checkpoint.resolved",
+        "run.completed",
+        "run.failed",
+        "closed",
+      ].forEach((eventType) => {
+        es.addEventListener(eventType, (event) => {
+          onEvent({ type: eventType, data: JSON.parse(event.data) });
+          if (["run.completed", "run.failed", "closed"].includes(eventType)) {
+            es.close();
+          }
+        });
+      });
+
+      es.onerror = (error) => {
+        onEvent({ type: "error", error });
+        es.close();
+      };
+
+      return es;
+    },
     async resolveGate(projectId, runId, gateId, action, note) {
       return fetchJson(`/api/v1/projects/${projectId}/runs/${runId}/gates/${gateId}/resolve`, {
         method: "POST",
@@ -868,1160 +668,98 @@ const v2api = {
       });
     },
   },
-};
-
-// ============================================================
-// Agent Cluster
-// ============================================================
-function getAvatarColor(index) {
-}
-
-function getAvatarInitial(name) {
-  return name ? name.charAt(0) : "?";
-}
-
-function getStatusLabel(status) {
-  const map = {
-    queued: "排队中",
-    planning: "规划中",
-    researching: "研究中",
-    synthesizing: "综合中",
-    reviewing: "审阅中",
-    completed: "已完成",
-    failed: "失败",
-    cancelled: "已取消",
-  };
-  return map[status] || status;
-}
-
-function getStatusClass(status) {
-  return `status-${status}`;
-}
-
-// --- Mock Data ---
-
-function createMockWorkflow(title) {
-  const workflowId = `wf_${Date.now()}`;
-  const tasks = DEFAULT_RESEARCH_DIMENSIONS.map((dim, i) => ({
-    id: dim.id,
-    workflow_id: workflowId,
-    agent_name: dim.agent_name,
-    role: `${dim.title}研究员`,
-    dimension: dim.title,
-    dimension_number: i + 1,
-    status: "queued",
-    progress: 0,
-    summary: "等待启动...",
-    research_scope: [
-      "相关文献梳理",
-      "关键概念界定",
-      "研究假设提出",
-      "方法论初步评估",
-    ],
-    outputs: [],
-    evidence_gaps: [],
-  }));
-
-  return {
-    workflow: {
-      id: workflowId,
-      title: title || "未命名研究",
-      status: "queued",
-      phase: "queued",
-      progress: 0,
-      agent_count: tasks.length,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+  governance: {
+    identity: {
+      async get(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/identity`);
+      },
+      async init(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/identity/init`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      },
+      async activateAgent(projectId, agentId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/identity/agents/${agentId}/activate`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      },
+      async deactivateAgent(projectId, agentId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/identity/agents/${agentId}/deactivate`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      },
     },
-    tasks,
-  };
-}
-
-function createMockArtifacts(workflowId, tasks) {
-  return tasks.map((task) => ({
-    id: `artifact_${task.id}`,
-    workflow_id: workflowId,
-    task_id: task.id,
-    kind: "markdown",
-    path: `docs/workflows/${workflowId}/${task.id.padStart(2, "0")}_${task.dimension.replace(/\s+/g, "_")}.md`,
-    title: task.dimension,
-    created_by: task.id,
-    status: "draft",
-    created_at: new Date().toISOString(),
-  }));
-}
-
-// Simulate task progress (for UI validation before real API)
-function simulateTaskProgress() {
-  if (!state.selectedWorkflow) return;
-
-  let allCompleted = true;
-  let totalProgress = 0;
-
-  state.workflowTasks = state.workflowTasks.map((task) => {
-    if (task.status === "completed" || task.status === "failed") {
-      totalProgress += task.progress;
-      if (task.status !== "completed") allCompleted = false;
-      return task;
-    }
-
-    allCompleted = false;
-    const stageIndex = STAGE_ORDER.indexOf(task.status);
-
-    // Advance progress
-    let newProgress = task.progress + Math.random() * 0.15;
-    if (newProgress >= 1) {
-      newProgress = 1;
-    }
-
-    // Advance stage based on progress thresholds
-    let newStatus = task.status;
-    if (newProgress >= 0.95 && task.status !== "completed") {
-      newStatus = "completed";
-      newProgress = 1;
-    } else if (newProgress >= 0.75 && stageIndex < 4) {
-      newStatus = STAGE_ORDER[Math.min(stageIndex + 1, 4)];
-    } else if (newProgress >= 0.5 && stageIndex < 3) {
-      newStatus = STAGE_ORDER[Math.min(stageIndex + 1, 3)];
-    } else if (newProgress >= 0.25 && stageIndex < 2) {
-      newStatus = STAGE_ORDER[Math.min(stageIndex + 1, 2)];
-    } else if (newProgress >= 0.05 && stageIndex < 1) {
-      newStatus = "planning";
-    }
-
-    // Add mock outputs when completed
-    const outputs = newStatus === "completed" && task.outputs.length === 0
-      ? [`docs/workflows/${state.selectedWorkflow.id}/${String(task.dimension_number).padStart(2, "0")}_${task.dimension.replace(/\s+/g, "_")}.md`]
-      : task.outputs;
-
-    totalProgress += newProgress;
-
-    return {
-      ...task,
-      status: newStatus,
-      progress: newProgress,
-      outputs,
-      summary: newStatus === "completed" ? "研究完成" : `正在${getStatusLabel(newStatus).toLowerCase()}...`,
-    };
-  });
-
-  // Update workflow aggregate state
-  const avgProgress = totalProgress / state.workflowTasks.length;
-  state.selectedWorkflow = {
-    ...state.selectedWorkflow,
-    progress: avgProgress,
-    status: allCompleted ? "completed" : "running",
-    phase: allCompleted ? "completed" : "parallel_research",
-    updated_at: new Date().toISOString(),
-  };
-
-  // Show completion card when all done
-  if (allCompleted && !state.isCompletionVisible) {
-    state.isCompletionVisible = true;
-  }
-
-  renderAgentCluster();
-
-  if (allCompleted) {
-    clearInterval(state.pollIntervalId);
-    state.pollIntervalId = null;
-  }
-}
-
-// --- Rendering ---
-
-function renderAgentCluster() {
-  renderErrorBanner();
-  renderLoadingOverlay();
-  renderWorkflowHeader();
-  renderStageTimeline();
-  renderAgentRows();
-  renderCompletionCard();
-  renderArtifactDrawer();
-  renderAgentDetailDrawer();
-  renderReportModal();
-  updateComposerState();
-}
-
-function renderErrorBanner() {
-  const banner = document.getElementById("agent-cluster-error");
-  if (!banner) return;
-
-  if (state.apiError || state.apiNotice) {
-    const isError = Boolean(state.apiError);
-    const message = state.apiError || state.apiNotice;
-    banner.classList.toggle("is-info", !isError);
-    banner.style.display = "block";
-    banner.innerHTML = `
-      <span>${escapeHtml(message)}</span>
-      <button class="ghost-button" id="dismiss-error" style="padding: 4px 10px; font-size: 12px;">关闭</button>
-    `;
-    banner.querySelector("#dismiss-error")?.addEventListener("click", () => {
-      state.apiError = null;
-      state.apiNotice = null;
-      renderErrorBanner();
-    });
-  } else {
-    banner.classList.remove("is-info");
-    banner.style.display = "none";
-    banner.innerHTML = "";
-  }
-}
-
-function renderLoadingOverlay() {
-  const composer = document.querySelector(".composer-bar");
-  if (!composer) return;
-
-  if (state.isLoading) {
-    composer.classList.add("is-loading");
-  } else {
-    composer.classList.remove("is-loading");
-  }
-}
-
-function updateComposerState() {
-  const input = document.getElementById("research-goal-input");
-  const button = document.getElementById("start-workflow-button");
-  if (input) input.disabled = state.isLoading;
-  if (button) button.disabled = state.isLoading;
-}
-
-function renderWorkflowHeader() {
-  const workflow = state.selectedWorkflow;
-  const titleEl = document.getElementById("workflow-title");
-  const subtitleEl = document.getElementById("workflow-subtitle");
-  const phaseEl = document.getElementById("workflow-phase");
-  const progressEl = document.getElementById("workflow-progress");
-  const countEl = document.getElementById("workflow-agent-count");
-  const cancelButton = document.getElementById("cancel-workflow-button");
-
-  if (!workflow) {
-    titleEl.textContent = "尚未启动研究";
-    subtitleEl.textContent = "输入研究问题并点击启动";
-    phaseEl.textContent = "-";
-    progressEl.textContent = "0%";
-    countEl.textContent = "0/10";
-    if (cancelButton) cancelButton.style.display = "none";
-    return;
-  }
-
-  titleEl.textContent = workflow.title;
-  subtitleEl.textContent = `创建于 ${new Date(workflow.created_at).toLocaleString("zh-CN")}`;
-  phaseEl.textContent = getStatusLabel(workflow.phase);
-  progressEl.textContent = `${Math.round(workflow.progress * 100)}%`;
-
-  const completedCount = state.workflowTasks.filter((t) => t.status === "completed").length;
-  countEl.textContent = `${completedCount}/${state.workflowTasks.length}`;
-  if (cancelButton) {
-    const canCancel = workflow.status === "running" || workflow.status === "queued";
-    cancelButton.style.display = canCancel ? "inline-flex" : "none";
-    cancelButton.disabled = state.isLoading;
-  }
-}
-
-function renderStageTimeline() {
-  const container = document.getElementById("stage-timeline");
-  const workflow = state.selectedWorkflow;
-
-  if (!workflow) {
-    container.innerHTML = "";
-    return;
-  }
-
-  const currentStageIndex = STAGE_ORDER.indexOf(workflow.phase);
-
-  const html = STAGE_ORDER.map((stage, index) => {
-    const isCompleted = index < currentStageIndex;
-    const isCurrent = index === currentStageIndex;
-    const label = getStatusLabel(stage);
-
-    const stageHtml = `
-      <div class="timeline-stage ${isCompleted ? "is-completed" : ""} ${isCurrent ? "is-current" : ""}">
-        <span class="timeline-dot"></span>
-        <span>${label}</span>
-      </div>
-    `;
-
-    if (index < STAGE_ORDER.length - 1) {
-      const lineCompleted = index < currentStageIndex;
-      return `${stageHtml}<div class="timeline-line ${lineCompleted ? "is-completed" : ""}"></div>`;
-    }
-    return stageHtml;
-  }).join("");
-
-  container.innerHTML = html;
-}
-
-function renderAgentRows() {
-  const container = document.getElementById("agent-cluster-panel");
-  const tasks = state.workflowTasks;
-
-  if (tasks.length === 0) {
-    container.innerHTML = `
-      <div class="panel" style="text-align: center; padding: 48px;">
-        <p class="muted">暂无研究任务。在下方输入研究问题并启动。</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = tasks
-    .map((task, index) => {
-      const color = getAvatarColor(index);
-      const initial = getAvatarInitial(task.agent_name);
-      const statusClass = getStatusClass(task.status);
-      const isCompleted = task.status === "completed";
-      const isFailed = task.status === "failed";
-      const isActive = task.id === state.activeAgentTaskId;
-      const progressPercent = Math.round(task.progress * 100);
-
-      return `
-        <div
-          class="agent-row ${isCompleted ? "is-completed" : ""} ${isFailed ? "is-failed" : ""} ${isActive ? "is-active" : ""}"
-          data-task-id="${task.id}"
-          role="button"
-          tabindex="0"
-          aria-label="打开 ${escapeHtml(task.agent_name)} 的工作详情"
-        >
-          <div class="agent-avatar" style="background: ${color}">${initial}</div>
-          <div class="agent-row-info">
-            <div class="agent-row-title">${escapeHtml(task.dimension)}</div>
-            <div class="agent-row-name">${escapeHtml(task.agent_name)} · ${escapeHtml(task.summary)}</div>
-          </div>
-          <div class="agent-row-dimension">#${String(task.dimension_number).padStart(2, "0")}</div>
-          <div class="agent-row-progress">
-            <div class="agent-progress-bar">
-              <div class="agent-progress-fill" style="width: ${progressPercent}%"></div>
-            </div>
-          </div>
-          <div class="agent-row-status">
-            <span class="status-pill ${statusClass}">${getStatusLabel(task.status)}</span>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function renderCompletionCard() {
-  const card = document.getElementById("completion-card");
-  if (!state.isCompletionVisible || !state.selectedWorkflow) {
-    card.style.display = "none";
-    return;
-  }
-
-  card.style.display = "block";
-
-  const completedCount = state.workflowTasks.filter((t) => t.status === "completed").length;
-  const totalArtifacts = state.workflowTasks.reduce((sum, t) => sum + t.outputs.length, 0);
-
-  const statsHtml = `
-    <div class="completion-stat">
-      <span class="completion-stat-value">${completedCount}</span>
-      <span class="completion-stat-label">已完成智能体</span>
-    </div>
-    <div class="completion-stat">
-      <span class="completion-stat-value">${totalArtifacts}</span>
-      <span class="completion-stat-label">产出物</span>
-    </div>
-    <div class="completion-stat">
-      <span class="completion-stat-value">${Math.round(state.selectedWorkflow.progress * 100)}%</span>
-      <span class="completion-stat-label">总体进度</span>
-    </div>
-  `;
-
-  document.getElementById("completion-stats").innerHTML = statsHtml;
-
-  const reportButton = document.getElementById("view-report-button");
-  const promoteButton = document.getElementById("promote-artifacts-button");
-  if (reportButton) reportButton.disabled = state.isLoading;
-  if (promoteButton) {
-    promoteButton.disabled = state.isPromoting;
-    promoteButton.textContent = state.isPromoting ? "导出中..." : "导出到项目";
-  }
-
-  if (promoteButton && !document.getElementById("promote-target-select")) {
-    promoteButton.insertAdjacentHTML(
-      "beforebegin",
-      `
-        <select id="promote-target-select" class="promote-target-select">
-          <option value="manuscripts">论文稿件</option>
-          <option value="results">结果目录</option>
-          <option value="submissions">投稿材料</option>
-        </select>
-      `,
-    );
-  }
-}
-
-function renderAgentHoverCard(task) {
-  const card = document.getElementById("agent-hover-card");
-  const content = document.getElementById("agent-hover-card-content");
-
-  if (!task) {
-    card.classList.remove("is-visible");
-    return;
-  }
-
-  const index = state.workflowTasks.findIndex((t) => t.id === task.id);
-  const color = getAvatarColor(index);
-  const initial = getAvatarInitial(task.agent_name);
-  const progressPercent = Math.round(task.progress * 100);
-
-  const scopeList = (task.research_scope || [])
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-
-  const outputsList = task.outputs.length
-    ? task.outputs
-        .map((path) => `<a class="hover-card-output-link" data-path="${escapeHtml(path)}">${escapeHtml(path.split("/").pop())}</a>`)
-        .join("<br>")
-    : "暂无产出";
-
-  content.innerHTML = `
-    <div class="hover-card-header">
-      <div class="agent-avatar" style="background: ${color}">${initial}</div>
-      <div>
-        <p class="hover-card-title">${escapeHtml(task.agent_name)} · ${escapeHtml(task.role || task.dimension)}</p>
-        <p class="hover-card-subtitle">${escapeHtml(task.dimension)}</p>
-      </div>
-    </div>
-    <div class="hover-card-section">
-      <h4>研究范围</h4>
-      <ul class="hover-card-list">${scopeList}</ul>
-    </div>
-    <div class="hover-card-section">
-      <h4>当前状态</h4>
-      <div class="hover-card-meta">
-        <span>${getStatusLabel(task.status)} (${progressPercent}%)</span>
-      </div>
-    </div>
-    <div class="hover-card-section">
-      <h4>已产出</h4>
-      <div class="hover-card-outputs">${outputsList}</div>
-    </div>
-    ${task.evidence_gaps?.length ? `
-      <div class="hover-card-section">
-        <h4>证据缺口</h4>
-        <ul class="hover-card-list">${task.evidence_gaps.map((g) => `<li>${escapeHtml(g)}</li>`).join("")}</ul>
-      </div>
-    ` : ""}
-  `;
-
-  card.classList.add("is-visible");
-}
-
-function renderArtifactDrawer() {
-  const drawer = document.getElementById("artifact-drawer");
-  const content = document.getElementById("artifact-drawer-content");
-
-  if (state.isArtifactDrawerOpen) {
-    drawer.classList.add("is-open");
-  } else {
-    drawer.classList.remove("is-open");
-    return;
-  }
-
-  // Group artifacts by task
-  const tasks = state.workflowTasks;
-  if (tasks.length === 0) {
-    content.innerHTML = "<p class=\"muted\">暂无产物</p>";
-    return;
-  }
-
-  const html = tasks
-    .filter((task) => task.outputs.length > 0)
-    .map((task) => {
-      const outputsHtml = task.outputs
-        .map((path) => `
-          <div class="artifact-item" data-path="${escapeHtml(path)}">
-            <span class="artifact-icon">📄</span>
-            <span class="artifact-name">${escapeHtml(path.split("/").pop())}</span>
-          </div>
-        `)
-        .join("");
-
-      return `
-        <div class="artifact-group">
-          <div class="artifact-group-title">${escapeHtml(task.agent_name)} · ${escapeHtml(task.dimension)}</div>
-          ${outputsHtml}
-        </div>
-      `;
-    })
-    .join("");
-
-  content.innerHTML = html || "<p class=\"muted\">暂无产物</p>";
-}
-
-function getAgentGovernance(task) {
-  const provider = state.selectedWorkflow?.execution_provider || "local_codex";
-  const outputCount = task.outputs?.length || 0;
-  const progressPercent = Math.round((task.progress || 0) * 100);
-  const permissionStatus = task.status === "completed"
-    ? "仅可提交草稿产物；导出到正式项目仍需人工确认"
-    : "可读取项目上下文；未授予正式产物导出权限";
-
-  return {
-    costs: [
-      `执行提供方：${provider}`,
-      `当前进度：${progressPercent}%`,
-      `产物数量：${outputCount}`,
-    ],
-    permissions: [
-      "读取当前 workflow 与项目上下文",
-      "写入 docs/workflows 下的研究草稿",
-      permissionStatus,
-    ],
-    capabilities: [
-      task.role || "研究执行",
-      "结构化研究范围拆解",
-      "Markdown 研究产物生成",
-    ],
-  };
-}
-
-function renderAgentDetailDrawer() {
-  const drawer = document.getElementById("agent-detail-drawer");
-  const content = document.getElementById("agent-detail-drawer-content");
-  if (!drawer || !content) return;
-
-  const task = state.workflowTasks.find((item) => item.id === state.activeAgentTaskId);
-  if (!task) {
-    drawer.classList.remove("is-open");
-    drawer.setAttribute("aria-hidden", "true");
-    content.innerHTML = "";
-    return;
-  }
-
-  drawer.classList.add("is-open");
-  drawer.setAttribute("aria-hidden", "false");
-
-  // Update prev/next navigation button states
-  const currentIndex = state.workflowTasks.findIndex((item) => item.id === task.id);
-  const prevButton = document.getElementById("prev-agent-button");
-  const nextButton = document.getElementById("next-agent-button");
-  if (prevButton) prevButton.disabled = currentIndex <= 0;
-  if (nextButton) nextButton.disabled = currentIndex < 0 || currentIndex >= state.workflowTasks.length - 1;
-
-  const index = currentIndex;
-  const color = getAvatarColor(index);
-  const initial = getAvatarInitial(task.agent_name);
-  const progressPercent = Math.round((task.progress || 0) * 100);
-  const governance = getAgentGovernance(task);
-  const scopeList = (task.research_scope || [])
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-  const evidenceGaps = (task.evidence_gaps || [])
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-  const outputsHtml = task.outputs?.length
-    ? task.outputs.map((path) => `
-        <button class="agent-detail-output" data-path="${escapeHtml(path)}">
-          <span class="artifact-icon">📄</span>
-          <span>${escapeHtml(path.split("/").pop())}</span>
-        </button>
-      `).join("")
-    : "<p class=\"muted\">暂无最终产物</p>";
-
-  content.innerHTML = `
-    <div class="agent-detail-identity">
-      <div class="agent-avatar" style="background: ${color}">${initial}</div>
-      <div>
-        <p class="agent-detail-name">${escapeHtml(task.agent_name)} · ${escapeHtml(task.role || task.dimension)}</p>
-        <p class="muted">${escapeHtml(task.dimension)} · #${String(task.dimension_number).padStart(2, "0")}</p>
-      </div>
-    </div>
-
-    <section class="agent-detail-section">
-      <h4>当前工作</h4>
-      <div class="agent-detail-status">
-        <span class="status-pill ${getStatusClass(task.status)}">${getStatusLabel(task.status)}</span>
-        <span>${progressPercent}%</span>
-      </div>
-      <div class="agent-progress-bar">
-        <div class="agent-progress-fill" style="width: ${progressPercent}%"></div>
-      </div>
-      <p>${escapeHtml(task.summary || "等待研究状态更新。")}</p>
-    </section>
-
-    <section class="agent-detail-section">
-      <h4>研究范围</h4>
-      <ul class="agent-detail-list">${scopeList || "<li>暂无研究范围</li>"}</ul>
-    </section>
-
-    <section class="agent-detail-grid">
-      <div class="agent-detail-section">
-        <h4>成本追踪</h4>
-        <ul class="agent-detail-list">${governance.costs.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      </div>
-      <div class="agent-detail-section">
-        <h4>权限</h4>
-        <ul class="agent-detail-list">${governance.permissions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      </div>
-      <div class="agent-detail-section">
-        <h4>能力注册</h4>
-        <ul class="agent-detail-list">${governance.capabilities.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      </div>
-    </section>
-
-    ${evidenceGaps ? `
-      <section class="agent-detail-section">
-        <h4>证据缺口</h4>
-        <ul class="agent-detail-list">${evidenceGaps}</ul>
-      </section>
-    ` : ""}
-
-    <section class="agent-detail-section">
-      <h4>产物</h4>
-      <div class="agent-detail-outputs">${outputsHtml}</div>
-    </section>
-
-    <section class="agent-detail-section agent-detail-artifact-preview">
-      <h4>产物预览</h4>
-      ${task.outputs?.length ? renderAgentArtifactPreview() : '<p class="muted">暂无产物。等待研究完成后自动生成。</p>'}
-    </section>
-  `;
-}
-
-function renderAgentArtifactPreview() {
-  if (state.agentDetailPreviewLoading) {
-    return '<p class="muted">正在读取产物正文...</p>';
-  }
-
-  if (state.apiError) {
-    return `<p class="muted">无法读取产物正文：${escapeHtml(state.apiError)}</p>`;
-  }
-
-  if (!state.agentDetailPreview) {
-    return '<p class="muted">点击上方产物后在这里预览正文。</p>';
-  }
-
-  return `
-    <p class="muted">${escapeHtml(state.agentDetailPreview.path || "本地预览")}</p>
-    <pre class="agent-detail-preview-body">${escapeHtml(state.agentDetailPreview.content || "暂无正文")}</pre>
-  `;
-}
-
-function renderReportModal() {
-  const modal = document.getElementById("report-modal");
-  const title = document.getElementById("report-modal-title");
-  const path = document.getElementById("report-modal-path");
-  const body = document.getElementById("report-modal-body");
-  if (!modal || !title || !path || !body) return;
-
-  if (!state.isReportModalOpen || !state.activeReport) {
-    modal.style.display = "none";
-    return;
-  }
-
-  modal.style.display = "flex";
-  title.textContent = "最终研究报告";
-  path.textContent = state.activeReport.path || "local preview";
-  body.textContent = state.activeReport.content || "";
-}
-
-function positionHoverCard(element) {
-  const card = document.getElementById("agent-hover-card");
-  const rect = element.getBoundingClientRect();
-  const cardRect = card.getBoundingClientRect();
-
-  let left = rect.left;
-  let top = rect.bottom + 8;
-
-  // Prevent overflow right
-  if (left + cardRect.width > window.innerWidth - 16) {
-    left = window.innerWidth - cardRect.width - 16;
-  }
-
-  // Prevent overflow bottom - show above instead
-  if (top + cardRect.height > window.innerHeight - 16) {
-    top = rect.top - cardRect.height - 8;
-  }
-
-  card.style.left = `${left}px`;
-  card.style.top = `${top}px`;
-}
-
-function escapeHtml(str) {
-  if (!str) return "";
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function buildMockReport() {
-  const taskLines = state.workflowTasks
-    .map(
-      (task) =>
-        `- ${String(task.dimension_number).padStart(2, "0")}. ${task.agent_name}: ${task.dimension} - ${task.status}`,
-    )
-    .join("\n");
-
-  return {
-    path: `mock://${state.selectedWorkflow?.id || "workflow"}/final_research_report.md`,
-    content: `# ${state.selectedWorkflow?.title || "Mock Workflow"}\n\n当前处于 Mock 模式，报告仅用于前端演示，不代表真实研究证据。\n\n## 任务矩阵\n${taskLines}\n`,
-  };
-}
-
-// --- Event Binding ---
-
-function mountAgentClusterEvents() {
-  // Hover card
-  const panel = document.getElementById("agent-cluster-panel");
-  let hoverTimeout = null;
-  let leaveTimeout = null;
-
-  panel.addEventListener("mouseenter", (event) => {
-    const row = event.target.closest(".agent-row");
-    if (!row) return;
-
-    clearTimeout(leaveTimeout);
-    hoverTimeout = setTimeout(() => {
-      const taskId = row.dataset.taskId;
-      const task = state.workflowTasks.find((t) => t.id === taskId);
-      if (task) {
-        state.hoverTaskId = taskId;
-        renderAgentHoverCard(task);
-        positionHoverCard(row);
-      }
-    }, 200);
-  }, true);
-
-  panel.addEventListener("mouseleave", (event) => {
-    const row = event.target.closest(".agent-row");
-    if (!row) return;
-
-    clearTimeout(hoverTimeout);
-    leaveTimeout = setTimeout(() => {
-      state.hoverTaskId = null;
-      renderAgentHoverCard(null);
-    }, 300);
-  }, true);
-
-  panel.addEventListener("click", (event) => {
-    const row = event.target.closest(".agent-row");
-    if (!row) return;
-    openAgentDetail(row.dataset.taskId);
-  });
-
-  panel.addEventListener("keydown", (event) => {
-    const row = event.target.closest(".agent-row");
-    if (!row || (event.key !== "Enter" && event.key !== " ")) return;
-    event.preventDefault();
-    openAgentDetail(row.dataset.taskId);
-  });
-
-  // Artifact drawer toggle
-  document.getElementById("toggle-artifact-drawer")?.addEventListener("click", () => {
-    state.isArtifactDrawerOpen = !state.isArtifactDrawerOpen;
-    renderArtifactDrawer();
-  });
-
-  document.getElementById("close-artifact-drawer")?.addEventListener("click", () => {
-    state.isArtifactDrawerOpen = false;
-    renderArtifactDrawer();
-  });
-
-  document.getElementById("artifact-drawer-content")?.addEventListener("click", (event) => {
-    const item = event.target.closest(".artifact-item");
-    if (!item) return;
-    void openArtifactPreview(item.dataset.path);
-  });
-
-  document.getElementById("close-agent-detail-drawer")?.addEventListener("click", () => {
-    closeAgentDetail();
-  });
-
-  document.getElementById("prev-agent-button")?.addEventListener("click", () => {
-    navigateToPrevAgent();
-  });
-
-  document.getElementById("next-agent-button")?.addEventListener("click", () => {
-    navigateToNextAgent();
-  });
-
-  document.getElementById("agent-detail-drawer-content")?.addEventListener("click", (event) => {
-    const output = event.target.closest(".agent-detail-output");
-    if (!output) return;
-    void openAgentArtifactPreview(output.dataset.path);
-  });
-
-  // Start workflow
-  document.getElementById("start-workflow-button")?.addEventListener("click", () => {
-    const input = document.getElementById("research-goal-input");
-    const goal = input.value.trim();
-    if (!goal) return;
-
-    void startWorkflow(goal);
-    input.value = "";
-  });
-
-  document.getElementById("cancel-workflow-button")?.addEventListener("click", () => {
-    void cancelActiveWorkflow();
-  });
-
-  // Toggle mock mode (dev helper: Ctrl+M)
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.key === "m") {
-      e.preventDefault();
-      state.useMock = !state.useMock;
-      console.log(`[Dev] Mock mode: ${state.useMock ? "ON" : "OFF"}`);
-    } else if (e.key === "Escape" && state.activeAgentTaskId) {
-      closeAgentDetail();
-    }
-  });
-
-  // Completion card actions
-  document.getElementById("dismiss-completion-button")?.addEventListener("click", () => {
-    state.isCompletionVisible = false;
-    renderCompletionCard();
-  });
-
-  document.getElementById("view-report-button")?.addEventListener("click", () => {
-    void openWorkflowReport();
-  });
-
-  document.getElementById("promote-artifacts-button")?.addEventListener("click", () => {
-    void promoteWorkflowArtifacts();
-  });
-
-  document.getElementById("close-report-modal")?.addEventListener("click", () => {
-    state.isReportModalOpen = false;
-    renderReportModal();
-  });
-
-  document.getElementById("report-modal")?.addEventListener("click", (event) => {
-    if (event.target.id === "report-modal") {
-      state.isReportModalOpen = false;
-      renderReportModal();
-    }
-  });
-
-  // Close drawer on backdrop click
-  document.getElementById("artifact-drawer")?.addEventListener("click", (event) => {
-    if (event.target.id === "artifact-drawer") {
-      state.isArtifactDrawerOpen = false;
-      renderArtifactDrawer();
-    }
-  });
-}
-
-// --- Workflow Operations ---
-
-function openAgentDetail(taskId) {
-  if (!taskId) return;
-  const task = state.workflowTasks.find((item) => item.id === taskId);
-  if (!task) return;
-
-  state.activeAgentTaskId = taskId;
-  state.agentDetailPreview = null;
-  state.agentDetailPreviewLoading = false;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentDetailDrawer();
-  renderAgentRows();
-}
-
-function closeAgentDetail() {
-  state.activeAgentTaskId = null;
-  state.agentDetailPreview = null;
-  state.agentDetailPreviewLoading = false;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentDetailDrawer();
-  renderAgentRows();
-}
-
-function navigateToPrevAgent() {
-  if (!state.activeAgentTaskId) return;
-  const tasks = state.workflowTasks;
-  const currentIndex = tasks.findIndex((t) => t.id === state.activeAgentTaskId);
-  if (currentIndex > 0) {
-    openAgentDetail(tasks[currentIndex - 1].id);
-  }
-}
-
-function navigateToNextAgent() {
-  if (!state.activeAgentTaskId) return;
-  const tasks = state.workflowTasks;
-  const currentIndex = tasks.findIndex((t) => t.id === state.activeAgentTaskId);
-  if (currentIndex >= 0 && currentIndex < tasks.length - 1) {
-    openAgentDetail(tasks[currentIndex + 1].id);
-  }
-}
-
-async function openAgentArtifactPreview(path) {
-  if (!path || !state.activeAgentTaskId) return;
-
-  const artifact = state.workflowArtifacts.find((item) => item.path === path);
-  state.agentDetailPreviewLoading = true;
-  state.agentDetailPreview = null;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentDetailDrawer();
-
-  try {
-    if (state.useMock || !artifact?.id) {
-      state.agentDetailPreview = {
-        path,
-        content: `# ${path.split("/").pop()}\n\n当前为 Mock 模式产物预览。真实内容需要通过 Real API 的 artifact endpoint 读取。`,
-      };
-    } else {
-      const response = await api.artifacts.get(artifact.id);
-      state.agentDetailPreview = {
-        path: response.artifact.path,
-        content: response.content || "后端未返回该产物正文。",
-      };
-    }
-  } catch (error) {
-    state.apiError = error.message;
-  } finally {
-    state.agentDetailPreviewLoading = false;
-    renderAgentCluster();
-  }
-}
-
-async function openWorkflowReport() {
-  if (!state.selectedWorkflow) {
-    state.apiError = "请先启动或选择一个工作流。";
-    renderAgentCluster();
-    return;
-  }
-
-  state.isLoading = true;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentCluster();
-
-  try {
-    const report = state.useMock
-      ? buildMockReport()
-      : await api.workflows.getReport(state.selectedWorkflow.id);
-    state.activeReport = report;
-    state.isReportModalOpen = true;
-  } catch (error) {
-    state.apiError = error.message;
-  } finally {
-    state.isLoading = false;
-    renderAgentCluster();
-  }
-}
-
-async function openArtifactPreview(path) {
-  if (!path) return;
-
-  const artifact = state.workflowArtifacts.find((item) => item.path === path);
-  state.isLoading = true;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentCluster();
-
-  try {
-    if (state.useMock || !artifact?.id) {
-      state.activeReport = {
-        path,
-        content: `# ${path.split("/").pop()}\n\n当前为 Mock 模式产物预览。真实内容需要通过 Real API 的 artifact endpoint 读取。`,
-      };
-    } else {
-      const response = await api.artifacts.get(artifact.id);
-      state.activeReport = {
-        path: response.artifact.path,
-        content: response.content || "后端未返回该产物正文。",
-      };
-    }
-    state.isReportModalOpen = true;
-  } catch (error) {
-    state.apiError = error.message;
-  } finally {
-    state.isLoading = false;
-    renderAgentCluster();
-  }
-}
-
-async function cancelActiveWorkflow() {
-  if (!state.selectedWorkflow) return;
-
-  state.isLoading = true;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentCluster();
-
-  try {
-    if (state.pollIntervalId) {
-      clearInterval(state.pollIntervalId);
-      state.pollIntervalId = null;
-    }
-
-    if (state.useMock) {
-      state.selectedWorkflow = {
-        ...state.selectedWorkflow,
-        status: "cancelled",
-        phase: "cancelled",
-        updated_at: new Date().toISOString(),
-      };
-      state.workflowTasks = state.workflowTasks.map((task) =>
-        task.status === "completed" ? task : { ...task, status: "cancelled" },
-      );
-    } else {
-      const response = await api.workflows.cancel(state.selectedWorkflow.id);
-      state.selectedWorkflow = response.workflow;
-      const bundle = await api.workflows.get(state.selectedWorkflow.id);
-      state.workflowTasks = bundle.tasks || state.workflowTasks;
-      state.workflowArtifacts = bundle.artifacts || state.workflowArtifacts;
-    }
-
-    state.isCompletionVisible = false;
-    state.apiNotice = "工作流已取消。";
-  } catch (error) {
-    state.apiError = error.message;
-  } finally {
-    state.isLoading = false;
-    renderAgentCluster();
-  }
-}
-
-async function promoteWorkflowArtifacts() {
-  if (!state.selectedWorkflow) {
-    state.apiError = "请先完成一个工作流，再导出产物。";
-    renderAgentCluster();
-    return;
-  }
-
-  if (state.useMock) {
-    state.apiError = "Mock 模式下不能导出到项目；请切换到 Real API 后使用后端产物。";
-    renderAgentCluster();
-    return;
-  }
-
-  const artifacts = state.workflowArtifacts.filter((artifact) => artifact.id);
-  if (artifacts.length === 0) {
-    state.apiError = "当前工作流还没有可导出的后端产物。";
-    renderAgentCluster();
-    return;
-  }
-
-  const target = document.getElementById("promote-target-select")?.value || "manuscripts";
-  state.isPromoting = true;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentCluster();
-
-  try {
-    const results = await Promise.allSettled(
-      artifacts.map((artifact) => api.artifacts.promote(artifact.id, target)),
-    );
-    const rejected = results.filter((result) => result.status === "rejected");
-    if (rejected.length > 0) {
-      throw new Error(
-        `${rejected.length}/${artifacts.length} 个产物未导出：${rejected[0].reason.message}`,
-      );
-    }
-
-    state.workflowArtifacts = results.map((result) => result.value.artifact);
-    state.apiNotice = `已导出 ${artifacts.length} 个产物到 ${target}。`;
-  } catch (error) {
-    state.apiError = error.message;
-  } finally {
-    state.isPromoting = false;
-    renderAgentCluster();
-  }
-}
-
-async function startWorkflow(title) {
-  state.isLoading = true;
-  state.apiError = null;
-  state.apiNotice = null;
-  renderAgentCluster();
-
-  try {
-    let workflow, tasks, artifacts;
-
-    if (state.useMock) {
-      const mock = createMockWorkflow(title);
-      workflow = mock.workflow;
-      tasks = mock.tasks;
-      artifacts = createMockArtifacts(workflow.id, tasks);
-    } else {
-      const response = await api.workflows.create(title, state.selectedProjectId);
-      workflow = response.workflow;
-      tasks = response.tasks;
-      artifacts = response.artifacts || [];
-      await api.workflows.start(workflow.id);
-    }
-
-    state.workflows.push(workflow);
-    state.selectedWorkflowId = workflow.id;
-    state.selectedWorkflow = workflow;
-    state.workflowTasks = tasks;
-    state.workflowArtifacts = artifacts;
-    state.isCompletionVisible = false;
-
-    // Start polling
-    if (state.pollIntervalId) {
-      clearInterval(state.pollIntervalId);
-    }
-
-    if (state.useMock) {
-      state.pollIntervalId = setInterval(simulateTaskProgress, 2500);
-    } else {
-      state.pollIntervalId = setInterval(() => pollWorkflowStatus(workflow.id), 3000);
-    }
-
-    renderAgentCluster();
-  } catch (error) {
-    state.apiError = error.message;
-    console.error("Failed to start workflow:", error);
-  } finally {
-    state.isLoading = false;
-    renderAgentCluster();
-  }
-}
-
-async function pollWorkflowStatus(workflowId) {
-  try {
-    const response = await api.workflows.get(workflowId);
-    state.selectedWorkflow = response.workflow;
-    state.workflowTasks = response.tasks || [];
-    state.workflowArtifacts = response.artifacts || [];
-
-    const allTerminal = state.workflowTasks.every(
-      (t) => t.status === "completed" || t.status === "failed"
-    );
-
-    if (
-      allTerminal ||
-      response.workflow.status === "completed" ||
-      response.workflow.status === "failed"
-    ) {
-      clearInterval(state.pollIntervalId);
-      state.pollIntervalId = null;
-      state.isCompletionVisible = true;
-    }
-
-    renderAgentCluster();
-  } catch (error) {
-    if (error.status === 404) {
-      if (state.pollIntervalId) {
-        clearInterval(state.pollIntervalId);
-        state.pollIntervalId = null;
-      }
-      state.apiError = "工作流已不存在，轮询已停止。";
-      renderAgentCluster();
-      return;
-    }
-    console.error("Polling error:", error);
-  }
-}
+    permissions: {
+      async get(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/permissions`);
+      },
+      async init(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/permissions/init`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      },
+      async check(projectId, payload) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/permissions/check`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      },
+      async save(projectId, policies) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/permissions`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ policies }),
+        });
+      },
+    },
+    capabilities: {
+      async get(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/capabilities`);
+      },
+      async reindex(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/capabilities/reindex`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      },
+    },
+    costs: {
+      async get(projectId) {
+        return fetchJson(`/api/v1/projects/${projectId}/governance/costs`);
+      },
+    },
+  },
+  checkpoints: {
+    async poll(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/checkpoints/pending`);
+    },
+    async resolve(projectId, checkpointId, action, feedback) {
+      return fetchJson(`/api/v1/projects/${projectId}/checkpoints/${checkpointId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: action, user_feedback: feedback || "" }),
+      });
+    },
+  },
+};
 
 // ============================================================
 // V2 Page Rendering
 // ============================================================
 
 const V2_VIEWS = [
-  "overview", "data-variables", "research-design",
-  "empirical-execution", "paper-draft", "artifacts-replication", "agent-console",
+  "journey", "data-variables", "research-design",
+  "empirical-execution", "paper-draft", "artifacts-replication", "agent-console", "governance-panel",
 ];
 
 function isV2View(viewName) {
@@ -2433,7 +1171,7 @@ function renderAgentTaskQueue() {
         <div><span class="meta-label">排队</span><strong>${escapeHtml(String(summary.queued_count || 0))}</strong></div>
         <div><span class="meta-label">阻塞项</span><strong>${escapeHtml(String(summary.blocked_count || blockers.length || 0))}</strong></div>
         <div><span class="meta-label">已审阅</span><strong>${escapeHtml(String(summary.dispatch_reviewed_count || 0))}</strong></div>
-        <div><span class="meta-label">负责人</span><strong>${escapeHtml(ownerAgents.length ? ownerAgents.join("、") : "-")}</strong></div>
+        <div><span class="meta-label">负责人 Agent</span><strong>${escapeHtml(ownerAgents.length ? ownerAgents.join("、") : "-")}</strong></div>
       </div>
       ${hasQueue ? `
         <div class="agent-task-list">
@@ -2460,7 +1198,79 @@ function renderAgentTaskQueue() {
       </div>
     </article>
   `;
+
+  // After DOM update, check if any task should show execution monitor
+  if (hasQueue && Array.isArray(queue.tasks)) {
+    queue.tasks.forEach((task) => maybeStartExecutionMonitorForTask(task));
+  }
 }
+
+function renderAgentTaskBackendSelection(task) {
+  const status = task.status || "";
+  const selectedBackend = task.selected_backend || {};
+  const isExecuting = state.executingAgentTaskId === task.id;
+  const backendOptions = [
+    { id: "statspai", label: "StatsPAI" },
+    { id: "python_ols_adapter", label: "Python OLS" },
+    { id: "stata_mcp", label: "StataMCP" },
+    { id: "codex", label: "Codex" },
+  ];
+
+  if (status === "reviewed_for_dispatch") {
+    return `
+      <div class="agent-task-backend-selection">
+        <div>
+          <span class="meta-label">执行后端</span>
+          <p class="muted">选择执行后端并触发运行</p>
+        </div>
+        <div class="agent-task-backend-actions">
+          <select data-backend-select data-agent-task-id="${escapeHtml(task.id || "")}" ${isExecuting ? "disabled" : ""}>
+            ${backendOptions.map((opt) => `
+              <option value="${escapeHtml(opt.id)}" ${selectedBackend.id === opt.id ? "selected" : ""}>${escapeHtml(opt.label)}</option>
+            `).join("")}
+          </select>
+          <button class="primary-button" data-select-backend-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isExecuting ? "disabled" : ""}>
+            ${isExecuting ? "执行中..." : "选择并执行"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (status === "backend_selected") {
+    return `
+      <div class="agent-task-backend-selection">
+        <div>
+          <span class="meta-label">已选后端</span>
+          <p class="muted">${escapeHtml(selectedBackend.label || selectedBackend.id || "-")} · ${escapeHtml(selectedBackend.evidence_level || "")}</p>
+        </div>
+        <div class="agent-task-backend-actions">
+          <button class="primary-button" data-execute-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isExecuting ? "disabled" : ""}>
+            ${isExecuting ? "执行中..." : "执行"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (status === "succeeded" || status === "failed") {
+    const executionResult = task.execution_result || {};
+    const resultLabel = status === "succeeded"
+      ? `执行成功 · ${escapeHtml(executionResult.engine || "")} · ${escapeHtml(executionResult.evidence_level || "")}`
+      : `执行失败 · ${escapeHtml((executionResult.error || {}).code || "")}`;
+    return `
+      <div class="agent-task-backend-selection">
+        <div>
+          <span class="meta-label">执行结果</span>
+          <p class="muted">${resultLabel}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return "";
+}
+
 
 function renderAgentTaskQueueItem(task) {
   const inputEvidence = task.input_evidence || {};
@@ -2498,6 +1308,10 @@ function renderAgentTaskQueueItem(task) {
           `).join("")}
         </div>
       </div>
+      ${renderAgentTaskBackendSelection(task)}
+      ${shouldShowExecutionMonitor(task) ? `
+        <div id="agent-execution-monitor" class="agent-execution-monitor"></div>
+      ` : ""}
       <details class="progressive-disclosure agent-task-details" data-disclosure="agent-task-progressive-disclosure">
         <summary>查看任务详情</summary>
         <div class="disclosure-panel agent-task-detail-grid">
@@ -2527,6 +1341,339 @@ function renderAgentTaskQueueItem(task) {
       </details>
     </article>
   `;
+}
+
+// ============================================================
+// Agent Execution Monitor
+// ============================================================
+// Nothing-style progress panel for long-running empirical tasks.
+// Maps to: backend_selection → data_preflight → method_execution → result_evaluation
+
+const EXECUTION_STAGES = [
+  { id: "backend_selection", label: "选择执行后端" },
+  { id: "data_preflight", label: "数据预检" },
+  { id: "method_execution", label: "方法执行" },
+  { id: "result_evaluation", label: "结果评估" },
+];
+
+function stageIndexForExecution(stage) {
+  if (stage === "queued" || stage === "backend_selection") return 0;
+  if (stage === "data_preflight") return 1;
+  if (stage === "method_execution" || stage === "repair") return 2;
+  if (stage === "result_evaluation" || stage === "alignment" || stage === "complete") return 3;
+  if (stage === "failed") return 2; // Show at execution stage with error state
+  return 0;
+}
+
+function executionStageLabel(stage) {
+  const found = EXECUTION_STAGES.find((s) => s.id === stage);
+  return found ? found.label : stage || "处理中";
+}
+
+function setExecutionStage(stageIndex) {
+  const stages = document.querySelectorAll(".agent-execution-monitor-stage");
+  stages.forEach((el, index) => {
+    el.classList.toggle("is-done", index < stageIndex);
+    el.classList.toggle("is-active", index === stageIndex);
+  });
+}
+
+function startExecutionMonitor(taskId, jobId) {
+  const mon = state.executionMonitor;
+  mon.visible = true;
+  mon.taskId = taskId;
+  mon.jobId = jobId || taskId;
+  mon.status = "queued";
+  mon.stage = "backend_selection";
+  mon.currentMessage = "任务已派发，正在选择执行后端...";
+  mon.events = [];
+  mon.technicalEvents = [];
+  mon.startedAt = Date.now();
+  mon.elapsedSeconds = 0;
+  mon.result = null;
+  mon.error = null;
+
+  if (mon.pollIntervalId) {
+    window.clearInterval(mon.pollIntervalId);
+  }
+  mon.pollIntervalId = window.setInterval(() => {
+    mon.elapsedSeconds = Math.floor((Date.now() - mon.startedAt) / 1000);
+    updateExecutionMonitorTimer();
+  }, 1000);
+
+  // Emit synthetic start event
+  emitExecutionEvent({
+    stage: "backend_selection",
+    studentMessage: "任务已派发，正在选择执行后端...",
+    technicalMessage: `EXECUTE_START taskId=${taskId}`,
+    metadata: { agent: "dispatcher" },
+  });
+
+  renderAgentExecutionMonitor();
+}
+
+function stopExecutionMonitor() {
+  const mon = state.executionMonitor;
+  if (mon.pollIntervalId) {
+    window.clearInterval(mon.pollIntervalId);
+    mon.pollIntervalId = null;
+  }
+}
+
+function resetExecutionMonitor() {
+  stopExecutionMonitor();
+  state.executionMonitor = {
+    visible: false,
+    taskId: null,
+    jobId: null,
+    status: null,
+    stage: null,
+    currentMessage: "",
+    events: [],
+    technicalEvents: [],
+    startedAt: null,
+    elapsedSeconds: 0,
+    result: null,
+    error: null,
+    pollIntervalId: null,
+  };
+}
+
+function emitExecutionEvent(event) {
+  const mon = state.executionMonitor;
+  const now = new Date().toISOString().slice(0, 19);
+  const userEvent = {
+    time: now,
+    stage: event.stage || mon.stage || "event",
+    severity: event.severity || "info",
+    studentMessage: event.studentMessage || event.message || "处理中",
+    metadata: event.metadata || {},
+  };
+  const techEvent = {
+    ...userEvent,
+    technicalMessage: event.technicalMessage || event.studentMessage || event.message || "",
+  };
+  if (event.attempt !== undefined) {
+    userEvent.attempt = event.attempt;
+    techEvent.attempt = event.attempt;
+  }
+
+  mon.events.push(userEvent);
+  mon.technicalEvents.push(techEvent);
+  if (event.studentMessage) {
+    mon.currentMessage = event.studentMessage;
+  }
+  if (event.stage) {
+    mon.stage = event.stage;
+  }
+  if (event.status) {
+    mon.status = event.status;
+  }
+  renderAgentExecutionMonitor();
+}
+
+function finishExecutionMonitor(result) {
+  const mon = state.executionMonitor;
+  mon.status = "succeeded";
+  mon.stage = "complete";
+  mon.currentMessage = "任务完成，结果已就绪。";
+  mon.result = result;
+  emitExecutionEvent({
+    stage: "complete",
+    studentMessage: "任务完成，结果已就绪。",
+    technicalMessage: "EXECUTE_COMPLETE",
+    status: "succeeded",
+  });
+  stopExecutionMonitor();
+  renderAgentExecutionMonitor();
+}
+
+function failExecutionMonitor(errorPayload, studentMessage) {
+  const mon = state.executionMonitor;
+  mon.status = "failed";
+  mon.stage = "failed";
+  mon.currentMessage = studentMessage || "任务执行失败。";
+  mon.error = errorPayload;
+  emitExecutionEvent({
+    stage: "failed",
+    studentMessage: studentMessage || "任务执行失败。",
+    technicalMessage: `EXECUTE_FAILED: ${JSON.stringify(errorPayload)}`,
+    status: "failed",
+    severity: "error",
+  });
+  stopExecutionMonitor();
+  renderAgentExecutionMonitor();
+}
+
+// --- Simulated execution flow (for demo / until real backend wired) ---
+async function simulateExecutionFlow(taskId, methodId) {
+  const methodNames = {
+    ols: "OLS 回归",
+    iv: "工具变量 (2SLS)",
+    did: "双重差分",
+    rdd: "断点回归",
+    psm: "倾向得分匹配",
+    dml: "双重机器学习",
+  };
+  const methodName = methodNames[methodId] || methodId || "统计方法";
+
+  // Stage 1: Backend Selection
+  await new Promise((r) => setTimeout(r, 800));
+  emitExecutionEvent({
+    stage: "backend_selection",
+    studentMessage: `已选择 StatsPAI 作为执行后端，准备运行 ${methodName}。`,
+    technicalMessage: `BACKEND_SELECT backend=statsPAI method=${methodId}`,
+    metadata: { agent: "dispatcher" },
+  });
+
+  // Stage 2: Data Preflight
+  await new Promise((r) => setTimeout(r, 1200));
+  emitExecutionEvent({
+    stage: "data_preflight",
+    studentMessage: "数据预检通过：样本量充足，变量完整性检查无异常。",
+    technicalMessage: `DATA_PREFLIGHT n=1250 vars=8 missing=0`,
+    metadata: { agent: "preflight" },
+  });
+
+  // Stage 3: Method Execution
+  await new Promise((r) => setTimeout(r, 2000));
+  emitExecutionEvent({
+    stage: "method_execution",
+    studentMessage: `正在执行 ${methodName}，估计系数中...`,
+    technicalMessage: `METHOD_EXEC method=${methodId} engine=statsPAI`,
+    metadata: { agent: "executor" },
+  });
+
+  await new Promise((r) => setTimeout(r, 1500));
+  emitExecutionEvent({
+    stage: "method_execution",
+    studentMessage: "第一_stage 完成，计算稳健标准误...",
+    technicalMessage: `METHOD_EXEC vce=robust cluster=none`,
+    metadata: { agent: "executor" },
+  });
+
+  // Stage 4: Result Evaluation
+  await new Promise((r) => setTimeout(r, 1000));
+  emitExecutionEvent({
+    stage: "result_evaluation",
+    studentMessage: "结果评估完成：系数显著性、模型诊断均通过。",
+    technicalMessage: `RESULT_EVAL r2=0.42 f_stat=156.3 p_value=0.000`,
+    metadata: { agent: "evaluator" },
+  });
+
+  finishExecutionMonitor({
+    taskId,
+    method: methodId,
+    status: "completed",
+    message: `${methodName} 执行完成`,
+  });
+}
+
+// --- Wire monitor start into the review flow ---
+function onTaskDispatchedForExecution(task) {
+  // Called when a task is approved and ready to execute
+  const methodId = inferMethodIdFromTask(task);
+  startExecutionMonitor(task.id, task.id);
+  // Kick off simulated flow (replace with real backend call)
+  simulateExecutionFlow(task.id, methodId);
+}
+
+function inferMethodIdFromTask(task) {
+  const title = (task.title || "").toLowerCase();
+  if (title.includes("ols")) return "ols";
+  if (title.includes("iv") || title.includes("2sls")) return "iv";
+  if (title.includes("did")) return "did";
+  if (title.includes("rdd")) return "rdd";
+  if (title.includes("psm") || title.includes("match")) return "psm";
+  if (title.includes("dml")) return "dml";
+  return "ols";
+}
+
+function updateExecutionMonitorTimer() {
+  const timerEl = document.getElementById("agent-execution-monitor-timer");
+  if (timerEl) {
+    timerEl.textContent = String(state.executionMonitor.elapsedSeconds);
+  }
+}
+
+function renderAgentExecutionMonitor() {
+  const container = document.getElementById("agent-execution-monitor");
+  if (!container) return;
+
+  const mon = state.executionMonitor;
+  if (!mon.visible) {
+    container.classList.remove("is-visible");
+    container.innerHTML = "";
+    return;
+  }
+
+  container.classList.add("is-visible");
+  const stageIndex = stageIndexForExecution(mon.stage);
+  const isFailed = mon.status === "failed";
+  const isComplete = mon.status === "succeeded";
+
+  // Last 6 user-facing events
+  const recentEvents = mon.events.slice(-6);
+  const recentTechnical = mon.technicalEvents.slice(-10);
+
+  container.innerHTML = `
+    <div class="agent-execution-monitor-head">
+      <p class="agent-execution-monitor-message">${escapeHtml(mon.currentMessage || "准备执行...")}</p>
+      <span id="agent-execution-monitor-timer" class="agent-execution-monitor-timer">${mon.elapsedSeconds}</span>
+    </div>
+    <div class="agent-execution-monitor-stages">
+      ${EXECUTION_STAGES.map((stage, index) => `
+        <div class="agent-execution-monitor-stage
+          ${index < stageIndex ? "is-done" : ""}
+          ${index === stageIndex && !isComplete ? "is-active" : ""}
+          ${index === stageIndex && isFailed ? "is-active" : ""}
+        ">
+          <span class="agent-execution-monitor-stage-dot"></span>
+          <span class="agent-execution-monitor-stage-label">${escapeHtml(stage.label)}</span>
+        </div>
+      `).join("")}
+    </div>
+    <div class="agent-execution-monitor-feed">
+      ${recentEvents.length
+        ? recentEvents.map((event) => {
+            const agent = event.metadata?.agent ? `${event.metadata.agent} · ` : "";
+            const attempt = event.attempt ? `第 ${event.attempt} 次 · ` : "";
+            const severityClass = event.severity === "warn" ? "is-warn" : event.severity === "error" ? "is-error" : "";
+            return `
+              <div class="agent-execution-monitor-feed-item ${severityClass}">
+                <span class="agent-execution-monitor-feed-item-meta">${escapeHtml(agent + attempt)}</span>
+                <span class="agent-execution-monitor-feed-item-body">${escapeHtml(event.studentMessage || event.stage)}</span>
+              </div>
+            `;
+          }).join("")
+        : `<div class="agent-execution-monitor-empty">等待事件...</div>`
+      }
+    </div>
+    <details class="agent-execution-monitor-tech">
+      <summary>技术日志</summary>
+      <pre class="agent-execution-monitor-tech-log">${escapeHtml(
+        recentTechnical.length
+          ? recentTechnical.map((e) => {
+              const attempt = e.attempt ? ` attempt=${e.attempt}` : "";
+              return `[${e.time || ""}] ${e.stage || "event"}${attempt} ${e.technicalMessage || ""}`;
+            }).join("\n")
+          : "暂无技术日志"
+      )}</pre>
+    </details>
+  `;
+}
+
+// --- Integration: show monitor when task enters execution ---
+function shouldShowExecutionMonitor(task) {
+  return task && task.status === "reviewed_for_dispatch" && task.next_action === "select_execution_backend";
+}
+
+function maybeStartExecutionMonitorForTask(task) {
+  if (!shouldShowExecutionMonitor(task)) return;
+  const mon = state.executionMonitor;
+  // Only start if not already tracking this task
+  if (mon.taskId === task.id && mon.visible) return;
+  startExecutionMonitor(task.id, task.id);
 }
 
 function dispatchReviewLabel(review, readiness) {
@@ -2576,11 +1723,72 @@ async function handleReviewAgentTaskDispatch(taskId, action) {
       note: `首页派工审阅：${dispatchReviewActionLabel(action)}`,
     });
     renderAgentTaskQueue();
+
+    // If approved, trigger execution monitor flow
+    if (action === "approve") {
+      const queue = state.agentTaskQueueData?.agent_task_queue;
+      const task = queue?.tasks?.find((t) => t.id === taskId);
+      if (task) {
+        onTaskDispatchedForExecution(task);
+      }
+    }
   } catch (error) {
     showV2Error("overview", `保存派工审阅失败：${error.message}`);
   } finally {
     state.reviewingAgentTaskId = null;
     state.reviewingAgentTaskAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleSelectBackendAndExecute(taskId, backendId) {
+  if (!state.selectedProjectId || !taskId || !backendId) return;
+  clearV2Error("overview");
+  state.executingAgentTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    // Step 1: select backend
+    state.agentTaskQueueData = await v2api.agentTaskQueue.selectBackend(state.selectedProjectId, taskId, {
+      backend_id: backendId,
+      note: `选择执行后端：${backendId}`,
+    });
+    renderAgentTaskQueue();
+
+    const queue = state.agentTaskQueueData?.agent_task_queue;
+    const task = queue?.tasks?.find((t) => t.id === taskId);
+    if (task) {
+      onTaskDispatchedForExecution(task);
+    }
+
+    // Step 2: execute
+    state.agentTaskQueueData = await v2api.agentTaskQueue.execute(state.selectedProjectId, taskId);
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `选择并执行失败：${error.message}`);
+  } finally {
+    state.executingAgentTaskId = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleExecuteAgentTask(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.executingAgentTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    const queue = state.agentTaskQueueData?.agent_task_queue;
+    const task = queue?.tasks?.find((t) => t.id === taskId);
+    if (task) {
+      onTaskDispatchedForExecution(task);
+    }
+
+    state.agentTaskQueueData = await v2api.agentTaskQueue.execute(state.selectedProjectId, taskId);
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `执行失败：${error.message}`);
+  } finally {
+    state.executingAgentTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -2655,6 +1863,15 @@ function clearV2Error(viewId) {
   if (!el) return;
   el.style.display = "none";
   el.innerHTML = "";
+  el.classList.remove("is-success");
+}
+
+function showV2Success(viewId, message) {
+  const el = document.getElementById(`${viewId}-error`);
+  if (!el) return;
+  el.style.display = "flex";
+  el.classList.add("is-success");
+  el.innerHTML = `<span>${escapeHtml(message)}</span><button class="ghost-button" style="padding:4px 10px;font-size:12px;" onclick="this.parentElement.style.display='none'">关闭</button>`;
 }
 
 function renderEmptyState(emptyState) {
@@ -3333,6 +2550,9 @@ async function createObservableRun(mode, datasetPath = state.selectedDatasetPath
   document.getElementById("observable-step-board").innerHTML = "<p class='muted'>正在启动真实试运行...</p>";
   const run = await v2api.runs.create(state.selectedProjectId, mode, datasetPath);
   state.selectedRunId = run.id;
+  if (run.id) {
+    void connectRunStream(run.id);
+  }
   await loadObservableExecution();
   await refreshProjects();
 }
@@ -3345,6 +2565,9 @@ async function createFullRunFromPlan() {
   try {
     const run = await v2api.runs.startFull(state.selectedProjectId);
     state.selectedRunId = run.id;
+    if (run.id) {
+      void connectRunStream(run.id);
+    }
     await refreshProjects();
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
     renderExecutionPreflight();
@@ -3404,6 +2627,217 @@ async function resolveObservableGate(gateId, action) {
   }
 }
 
+async function connectRunStream(runId, resetOutput = true) {
+  disconnectRunStream();
+  if (!state.selectedProjectId || !runId) return;
+
+  state.sseConnection.runId = runId;
+  state.sseConnection.connected = false;
+  if (resetOutput) {
+    state.sseConnection.reconnectAttempts = 0;
+    state.agentOutput.lines = [];
+    state.agentOutput.currentStage = null;
+    state.agentOutput.currentAgent = null;
+  }
+  state.agentOutput.visible = true;
+  renderAgentOutputPanel();
+
+  const es = await v2api.runs.stream(state.selectedProjectId, runId, (event) => {
+    handleRunEvent(event);
+  });
+
+  state.sseConnection.eventSource = es;
+}
+
+function disconnectRunStream() {
+  if (state.sseConnection.eventSource) {
+    state.sseConnection.eventSource.close();
+    state.sseConnection.eventSource = null;
+  }
+  state.sseConnection.connected = false;
+  state.sseConnection.runId = null;
+}
+
+function scheduleRunStreamReconnect() {
+  const runId = state.sseConnection.runId;
+  if (!runId || state.sseConnection.reconnectAttempts >= 5) return;
+  const attempt = state.sseConnection.reconnectAttempts + 1;
+  state.sseConnection.reconnectAttempts = attempt;
+  const delayMs = Math.min(30000, 1000 * (2 ** (attempt - 1)));
+  window.setTimeout(() => {
+    if (!state.sseConnection.connected && state.selectedProjectId) {
+      void connectRunStream(runId, false);
+    }
+  }, delayMs);
+}
+
+function handleRunEvent(event) {
+  switch (event.type) {
+    case "connected":
+      state.sseConnection.connected = true;
+      state.sseConnection.reconnectAttempts = 0;
+      break;
+    case "run.started":
+      addAgentOutputLine(event.data.timestamp, "system", `运行开始：${event.data.payload?.mode || ""}`);
+      break;
+    case "stage.start":
+      state.agentOutput.currentStage = event.data.stage;
+      state.agentOutput.currentAgent = event.data.agent_name;
+      addAgentOutputLine(
+        event.data.timestamp,
+        "system",
+        `${event.data.agent_name} 开始执行 ${stageNameCN(event.data.stage)}`,
+      );
+      updateJourneyStageStatus(event.data.stage, "running");
+      break;
+    case "stage.output":
+      addAgentOutputLine(
+        event.data.timestamp,
+        event.data.payload?.source || "log",
+        event.data.payload?.chunk || "",
+      );
+      break;
+    case "stage.complete": {
+      const statusLabel = event.data.payload?.status === "succeeded" ? "完成" : "失败";
+      addAgentOutputLine(
+        event.data.timestamp,
+        "system",
+        `${event.data.agent_name} ${statusLabel} (${event.data.payload?.wall_seconds || 0}s)`,
+      );
+      updateJourneyStageStatus(
+        event.data.stage,
+        event.data.payload?.status === "succeeded" ? "completed" : "failed",
+      );
+      break;
+    }
+    case "checkpoint.pending":
+      addAgentOutputLine(event.data.timestamp, "system", `检查点: ${event.data.payload?.title || ""}`);
+      updateJourneyStageStatus(event.data.stage, "pending_confirmation");
+      void pollCheckpoint();
+      break;
+    case "checkpoint.resolved":
+      addAgentOutputLine(
+        event.data.timestamp,
+        "system",
+        `检查点已处理: ${event.data.payload?.status || ""}`,
+      );
+      break;
+    case "run.completed":
+      addAgentOutputLine(event.data.timestamp, "system", "运行完成");
+      disconnectRunStream();
+      break;
+    case "run.failed":
+      addAgentOutputLine(event.data.timestamp, "system", `运行失败: ${event.data.payload?.error || ""}`);
+      disconnectRunStream();
+      break;
+    case "error":
+      state.sseConnection.connected = false;
+      scheduleRunStreamReconnect();
+      break;
+  }
+  renderAgentOutputPanel();
+}
+
+function addAgentOutputLine(timestamp, source, text) {
+  state.agentOutput.lines.push({
+    timestamp: timestamp ? new Date(timestamp).toLocaleTimeString("zh-CN") : "",
+    source,
+    text,
+  });
+  if (state.agentOutput.lines.length > 200) {
+    state.agentOutput.lines = state.agentOutput.lines.slice(-200);
+  }
+}
+
+function stageNameCN(stageId) {
+  const map = {
+    "00_intake": "选题解析",
+    "01_sources": "数据源发现",
+    "02_literature": "文献综述",
+    "03_strategy": "识别策略",
+    "04_modeling": "基线估计",
+    "05_results": "结果整理",
+    "06_writing": "写作",
+    "07_review": "审阅",
+    "08_final": "导出",
+  };
+  return map[stageId] || stageId;
+}
+
+function journeyStageIdForRunStage(stageId) {
+  const map = {
+    "00_intake": "question-definition",
+    "01_sources": "data-readiness",
+    "02_literature": "literature-review",
+    "03_strategy": "identification-design",
+    "04_modeling": "baseline-estimation",
+    "05_results": "robustness",
+    "06_writing": "manuscript-drafting",
+    "07_review": "submission-prep",
+    "08_final": "submission-prep",
+  };
+  return map[stageId] || stageId;
+}
+
+function updateJourneyStageStatus(stageId, status) {
+  const journeyStageId = journeyStageIdForRunStage(stageId);
+  if (state.overviewData) {
+    const summaries = state.overviewData.stage_summaries || [];
+    state.overviewData.stage_summaries = summaries;
+    const existing = summaries.find((item) => item.stage_id === journeyStageId || item.stage_id === stageId);
+    if (existing) {
+      existing.status = status;
+    } else {
+      summaries.push({ stage_id: journeyStageId, title: stageNameCN(stageId), status });
+    }
+    renderJourney();
+  }
+  if (state.journeyData?.stages) {
+    const stage = state.journeyData.stages.find((item) => item.id === journeyStageId || item.stage_id === journeyStageId);
+    if (stage) stage.status = status;
+    renderJourneyBar();
+  }
+}
+
+function renderAgentOutputPanel() {
+  const panel = document.getElementById("agent-output-panel");
+  if (!panel) return;
+
+  if (!state.agentOutput.visible) {
+    panel.style.display = "none";
+    return;
+  }
+
+  panel.style.display = "flex";
+  const linesHtml = state.agentOutput.lines.map((line) => {
+    const sourceClass = line.source === "llm" ? "is-llm"
+      : line.source === "statspai" ? "is-statspai"
+      : line.source === "system" ? "is-system"
+      : "is-log";
+    return `<div class="agent-output-line ${sourceClass}">
+      <span class="agent-output-time">${escapeHtml(line.timestamp)}</span>
+      <span class="agent-output-source">${escapeHtml(line.source)}</span>
+      <span class="agent-output-text">${escapeHtml(line.text)}</span>
+    </div>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div class="agent-output-header">
+      <strong>Agent 实时输出</strong>
+      <span class="agent-output-status ${state.sseConnection.connected ? "is-connected" : "is-disconnected"}">
+        ${state.sseConnection.connected ? "● 实时连接中" : "○ 已断开"}
+      </span>
+      <button class="ghost-button" data-close-agent-output>关闭</button>
+    </div>
+    <div class="agent-output-body">
+      ${linesHtml}
+    </div>
+  `;
+
+  const body = panel.querySelector(".agent-output-body");
+  if (body) body.scrollTop = body.scrollHeight;
+}
+
 // --- Journey Bar ---
 
 function renderJourneyBar() {
@@ -3422,6 +2856,7 @@ function renderJourneyBar() {
 
   content.innerHTML = stages.map((stage, index) => {
     const statusClass = stage.status === "completed" ? "is-completed"
+      : stage.status === "running" ? "is-running"
       : stage.status === "in_progress" ? "is-current"
       : stage.status === "pending_confirmation" ? "is-pending"
       : stage.status === "failed" ? "is-failed"
@@ -3540,104 +2975,139 @@ async function confirmResearchTopic(useExisting = false) {
     });
     saveResearchQuestionState(topic, response.research_question);
     state.overviewData = await v2api.overview.get(state.selectedProjectId);
-    renderOverview();
+    renderJourney();
     document.getElementById("research-workbench-after-topic")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
-    showV2Error("overview", `保存研究选题失败：${error.message}`);
+    showV2Error("journey", `保存研究选题失败：${error.message}`);
   }
 }
 
-function renderOverview() {
+// --- Journey Page ---
+
+const STAGE_PIPELINE = [
+  { id: "question-definition", name: "选题解析", description: "明确研究问题、核心假设与识别策略方向。" },
+  { id: "literature-review", name: "文献综述", description: "梳理相关文献，定位研究缺口与理论支撑。" },
+  { id: "data-readiness", name: "数据准备", description: "上传数据集、定义变量角色、完成数据质量检查。" },
+  { id: "identification-design", name: "识别策略", description: "确定识别策略、模型设定与威胁清单。" },
+  { id: "baseline-estimation", name: "基线估计", description: "运行基线回归、诊断检验与结果解读。" },
+  { id: "robustness", name: "稳健性检验", description: "执行稳健性检验、安慰剂检验与敏感性分析。" },
+  { id: "manuscript-drafting", name: "写作", description: "生成结果表格、撰写正文段落与整合证据。" },
+  { id: "submission-prep", name: "审阅导出", description: "审稿评分、验证闸门与导出复现包。" },
+];
+
+function renderJourney() {
   const data = state.overviewData;
-  if (!data) {
-    document.getElementById("overview-question").textContent = "加载中...";
+  if (!data) return;
+
+  clearV2Error("journey");
+  renderResearchTopicIntake(data);
+
+  const intake = document.getElementById("research-topic-intake");
+  const pipeline = document.getElementById("research-workbench-after-topic");
+  if (!intake || !pipeline) return;
+
+  if (!state.researchTopicConfirmed) {
+    intake.style.display = "flex";
+    pipeline.style.display = "none";
     return;
   }
 
-  clearV2Error("overview");
+  intake.style.display = "none";
+  pipeline.style.display = "block";
 
-  // Evidence banner
-  const bannerHtml = renderEvidenceBanner(data._meta);
-  const existingBanner = document.querySelector("#view-overview > .evidence-banner");
-  if (existingBanner) existingBanner.remove();
-  const existingWorkbenchBanner = document.querySelector("#research-workbench-after-topic > .evidence-banner");
-  if (existingWorkbenchBanner) existingWorkbenchBanner.remove();
-  if (bannerHtml) {
-    const bannerHost = document.getElementById("research-workbench-after-topic") || document.getElementById("view-overview");
-    bannerHost.insertAdjacentHTML("afterbegin", bannerHtml);
+  // Build stage statuses from backend data or fallback
+  const stageSummaries = data.stage_summaries || [];
+  const currentStage = data.current_stage || "";
+  const overallProgress = data.overall_progress || 0;
+
+  const stages = STAGE_PIPELINE.map((stage, index) => {
+    const summary = stageSummaries.find((s) => s.stage_id === stage.id || s.title === stage.name);
+    let status = "locked";
+    if (summary?.status === "completed") status = "completed";
+    else if (summary?.status === "running") status = "running";
+    else if (summary?.status === "in_progress" || currentStage === stage.id) status = "current";
+    else if (summary?.status === "pending_confirmation") status = "pending";
+    else if (summary?.status === "failed") status = "failed";
+    else if (index === 0 || stageSummaries.some((s, i) => i < index && s.status === "completed")) {
+      const prevSummary = stageSummaries.find((s) => s.stage_id === STAGE_PIPELINE[index - 1]?.id);
+      if (index === 0 || prevSummary?.status === "completed") status = "unlocked";
+    }
+    return { ...stage, status, summary };
+  });
+
+  // Render track
+  const track = document.getElementById("journey-track");
+  if (track) {
+    track.innerHTML = stages.map((stage, index) => {
+      const isLast = index === stages.length - 1;
+      const check = stage.status === "completed" ? `<span class="journey-node-check">✓</span>` : "";
+      return `
+        <div class="journey-node is-${stage.status}" data-journey-stage="${escapeHtml(stage.id)}" title="${escapeHtml(stage.description)}">
+          <div class="journey-node-dot"></div>
+          ${check}
+          <span class="journey-node-label">${escapeHtml(stage.name)}</span>
+        </div>
+        ${!isLast ? `<div class="journey-connector ${stage.status === "completed" ? "is-completed" : ""}"></div>` : ""}
+      `;
+    }).join("");
   }
 
-  // Research question
-  document.getElementById("overview-question").textContent = data.research_question || data.project?.title || "未设置研究问题";
-  document.getElementById("overview-project-meta").textContent =
-    `项目：${data.project?.slug || ""} · 当前阶段：${productTermLabel(data.current_stage || "")} · 总体进度：${Math.round((data.overall_progress || 0) * 100)}%`;
-  renderResearchTopicIntake(data);
+  // Find current stage for detail panel
+  const currentStageData = stages.find((s) => s.status === "current") || stages.find((s) => s.status === "pending") || stages.find((s) => s.status === "unlocked") || stages[0];
 
-  renderWorkflowContract(data.workflow_contract);
-  renderSupervisorPlan();
-  renderAgentTaskQueue();
+  // Render stage detail
+  const detail = document.getElementById("journey-stage-detail");
+  if (detail) {
+    if (currentStageData) {
+      const metrics = currentStageData.summary?.metrics || [];
+      const metricsHtml = metrics.length
+        ? `<div class="stage-summary-metrics" style="margin: 12px 0;">
+            ${metrics.map((m) => `<div class="stage-summary-metric"><span class="stage-summary-metric-value">${escapeHtml(productTermLabel(m.value))}</span><span class="stage-summary-metric-label">${escapeHtml(productTermLabel(m.label))}</span></div>`).join("")}
+          </div>`
+        : "";
 
-  // Stage summary cards
-  const summaries = data.stage_summaries || [];
-  document.getElementById("stage-summary-grid").innerHTML = summaries.map((summary) => {
-    const statusClass = summary.status === "completed" ? "is-completed"
-      : summary.status === "in_progress" ? "is-in-progress"
-      : summary.status === "pending_confirmation" ? "is-pending"
-      : "is-not-started";
-    const metrics = summary.metrics || [];
-    const metricsHtml = metrics.length
-      ? `<div class="stage-summary-metrics">
-          ${metrics.map((m) => `<div class="stage-summary-metric"><span class="stage-summary-metric-value">${escapeHtml(productTermLabel(m.value))}</span><span class="stage-summary-metric-label">${escapeHtml(productTermLabel(m.label))}</span></div>`).join("")}
-        </div>`
-      : `<div class="stage-summary-metrics"><span class="muted">暂无指标</span></div>`;
-    return `
-      <div class="stage-summary-card ${statusClass}">
-        <div class="stage-summary-header">
-          <h4 class="stage-summary-title">${escapeHtml(productTermLabel(summary.title))}</h4>
-          ${summary.has_pending_action ? `<span class="pill" style="background:rgba(230,126,34,0.12);color:#e67e22;">需确认</span>` : ""}
-        </div>
-        ${metricsHtml}
-        <p class="stage-summary-hint">${escapeHtml(productTermLabel(summary.summary || summary.next_step_hint || ""))}</p>
-      </div>
-    `;
-  }).join("");
+      const risks = data.risks?.filter((r) => r.stage_id === currentStageData.id) || [];
+      const risksHtml = risks.length
+        ? `<div style="margin-top: 12px;"><strong style="color: #c0392b;">阶段风险：</strong>${risks.map((r) => escapeHtml(productTermLabel(r.description))).join("；")}</div>`
+        : "";
 
-  // Risks
-  const risks = data.risks || [];
-  document.getElementById("overview-risks").innerHTML = risks.length
-    ? risks.map((risk) => `
-        <div class="event-item">
-          <span style="color:${risk.level === "warning" ? "#e67e22" : "#c0392b"};font-size:16px;">${risk.level === "warning" ? "⚠" : "🚫"}</span>
-          <div class="event-item-content">${escapeHtml(productTermLabel(risk.description))}</div>
-        </div>
-      `).join("")
-    : `<div class="event-item"><span>✓</span><div class="event-item-content">当前没有识别到关键风险。</div></div>`;
-
-  // Next steps
-  const steps = data.next_steps || [];
-  document.getElementById("overview-next-steps").innerHTML = steps.length
-    ? steps.map((step, i) => `
-        <div class="event-item">
-          <span style="color:var(--accent);font-weight:600;">${i + 1}.</span>
-          <div class="event-item-content">${escapeHtml(productTermLabel(step.description))} ${step.action ? `· <strong>${escapeHtml(productTermLabel(step.action))}</strong>` : ""}</div>
-        </div>
-      `).join("")
-    : `<div class="event-item"><span>→</span><div class="event-item-content">暂无明确下一步建议。</div></div>`;
-
-  // Events
-  const events = data.recent_events || [];
-  document.getElementById("overview-events").innerHTML = events.length
-    ? events.map((evt) => `
-        <div class="event-item">
-          <span class="event-item-time">${new Date(evt.timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
-          <div class="event-item-content">
-            <span class="event-item-agent">${escapeHtml(evt.agent_name || evt.agent || "系统")}</span>
-            ${escapeHtml(productTermLabel(evt.action || ""))}
-            ${evt.result === "success" ? "✓" : evt.result === "failed" ? "✗" : ""}
+      detail.innerHTML = `
+        <div class="journey-stage-header">
+          <h3>${escapeHtml(currentStageData.name)}</h3>
+          <div class="journey-stage-meta">
+            <span class="pill">${productTermLabel(currentStageData.status)}</span>
+            <span class="muted">总体进度 ${Math.round(overallProgress * 100)}%</span>
           </div>
         </div>
-      `).join("")
-    : `<p class="muted">暂无最近事件</p>`;
+        <div class="journey-stage-body">
+          <p>${escapeHtml(currentStageData.description)}</p>
+          ${metricsHtml}
+          ${risksHtml}
+        </div>
+      `;
+      detail.classList.remove("empty");
+    } else {
+      detail.innerHTML = `<p class="muted">暂无阶段详情</p>`;
+      detail.classList.add("empty");
+    }
+  }
+
+  // Render quick actions
+  const actions = document.getElementById("journey-actions");
+  if (actions) {
+    const nextSteps = data.next_steps || [];
+    const primaryAction = nextSteps[0];
+    state.journeyPrimaryAction = primaryAction;
+    const isStreaming = state.sseConnection.connected && state.sseConnection.runId;
+    const canStartRun = !isStreaming && state.researchTopicConfirmed;
+    actions.innerHTML = `
+      ${isStreaming ? `<button class="primary-button" data-journey-action="view-output">查看 Agent 实时输出</button>` : ""}
+      ${canStartRun ? `<button class="primary-button" data-journey-action="start-run">启动完整执行</button>` : ""}
+      ${primaryAction && !canStartRun && !isStreaming ? `<button class="primary-button" data-journey-action="primary">${escapeHtml(productTermLabel(primaryAction.action || "继续"))}</button>` : ""}
+      <button class="ghost-button" data-journey-action="refresh">刷新状态</button>
+      ${currentStageData?.status === "pending" ? `<button class="ghost-button" data-journey-action="checkpoint" style="color: #e67e22; border-color: #e67e22;">确认检查点</button>` : ""}
+    `;
+  }
 }
 
 // --- Data & Variables Page ---
@@ -6054,7 +5524,7 @@ function renderAgentConsole() {
     const colors = ["#1e6f62", "#a14a18", "#2c5282", "#744210", "#553c9a"];
     const color = colors[Math.abs(agent.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % colors.length];
     return `
-      <div class="agent-console-card ${isSelected ? "is-selected" : ""}" data-agent-id="${escapeHtml(agent.id)}" onclick="selectAgent('${escapeHtml(agent.id)}')">
+      <div class="agent-console-card agent-row ${isSelected ? "is-selected is-active" : ""}" data-agent-id="${escapeHtml(agent.id)}" data-task-id="${escapeHtml(agent.id)}" role="button" tabindex="0" onclick="openAgentDetail('${escapeHtml(agent.id)}')">
         <div class="agent-console-avatar" style="background:${color}">${initial}</div>
         <div class="agent-console-info">
           <p class="agent-console-name">${escapeHtml(agent.name)}</p>
@@ -6074,20 +5544,171 @@ function renderAgentConsole() {
     : "<p class='muted'>暂无研究维度智能体</p>";
 }
 
+function getAgentIds() {
+  return (state.agentsData?.items || []).map((agent) => agent.id).filter(Boolean);
+}
+
+function updateAgentDrawerNavigation() {
+  const ids = getAgentIds();
+  const index = ids.indexOf(state.selectedAgentId);
+  const prevButton = document.getElementById("prev-agent-button");
+  const nextButton = document.getElementById("next-agent-button");
+  if (prevButton) prevButton.disabled = index <= 0;
+  if (nextButton) nextButton.disabled = index < 0 || index >= ids.length - 1;
+}
+
+function closeAgentDetailDrawer() {
+  const drawer = document.getElementById("agent-detail-drawer");
+  if (!drawer) return;
+  drawer.classList.remove("is-open");
+  drawer.setAttribute("aria-hidden", "true");
+}
+
+async function openAgentDetail(agentId) {
+  const drawer = document.getElementById("agent-detail-drawer");
+  if (drawer) {
+    drawer.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+  }
+  await selectAgent(agentId);
+  updateAgentDrawerNavigation();
+}
+
+function navigateToPrevAgent() {
+  const ids = getAgentIds();
+  const index = ids.indexOf(state.selectedAgentId);
+  if (index > 0) void openAgentDetail(ids[index - 1]);
+  updateAgentDrawerNavigation();
+}
+
+function navigateToNextAgent() {
+  const ids = getAgentIds();
+  const index = ids.indexOf(state.selectedAgentId);
+  if (index >= 0 && index < ids.length - 1) void openAgentDetail(ids[index + 1]);
+  updateAgentDrawerNavigation();
+}
+
+function renderAgentArtifactPreview(outputs = []) {
+  const apiError = state.agentDetailPreviewError || state.apiError;
+  if (state.agentDetailPreviewLoading) {
+    return `
+      <div class="agent-detail-preview-state">
+        <strong>正在读取产物正文</strong>
+        <p class="muted">产物内容会在当前右侧抽屉内展开，不跳出工作台。</p>
+      </div>
+    `;
+  }
+  if (apiError) {
+    return `
+      <div class="agent-detail-preview-state is-error">
+        <strong>无法读取产物正文</strong>
+        <p class="muted">${escapeHtml(apiError.message || apiError || "请检查本地产物路径和后端读取权限。")}</p>
+      </div>
+    `;
+  }
+  if (state.agentDetailPreviewContent) {
+    return `
+      <div class="agent-detail-preview-body">
+        <div class="muted">当前产物：${escapeHtml(state.agentDetailPreviewPath || "未命名产物")}</div>
+        <pre>${escapeHtml(state.agentDetailPreviewContent)}</pre>
+      </div>
+    `;
+  }
+  if (!Array.isArray(outputs) || outputs.length === 0) {
+    return `
+      <div class="agent-detail-preview-state">
+        <strong>等待研究完成后自动生成</strong>
+        <p class="muted">该 Agent 暂无可预览产物。完成执行后会在这里显示报告、表格或日志摘要。</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="agent-detail-preview-body">
+      <p class="muted">选择一个产物后在这里预览正文。</p>
+      ${outputs.map((output) => `
+        <button class="ghost-button agent-artifact-preview-button" type="button" data-agent-artifact-path="${escapeHtml(output.path || output.name || "")}">
+          ${escapeHtml(output.label || output.path || output.name || "未命名产物")}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function openAgentArtifactPreview(path) {
+  state.agentDetailPreviewLoading = true;
+  state.agentDetailPreviewError = null;
+  state.agentDetailPreviewPath = path;
+  const preview = document.getElementById("agent-detail-artifact-preview");
+  if (preview) preview.innerHTML = renderAgentArtifactPreview(state.agentDetailData?.agent?.outputs || state.agentDetailData?.outputs || []);
+
+  window.setTimeout(() => {
+    state.agentDetailPreviewLoading = false;
+    state.agentDetailPreviewContent = path
+      ? `产物路径：${path}\n\n当前版本只在抽屉内登记预览入口；完整正文读取将由后端产物读取 API 接管。`
+      : "";
+    if (preview) preview.innerHTML = renderAgentArtifactPreview(state.agentDetailData?.agent?.outputs || state.agentDetailData?.outputs || []);
+  }, 120);
+}
+
+function setupAgentDrawerInteractions() {
+  document.getElementById("close-agent-detail-drawer")?.addEventListener("click", closeAgentDetailDrawer);
+  document.getElementById("prev-agent-button")?.addEventListener("click", navigateToPrevAgent);
+  document.getElementById("next-agent-button")?.addEventListener("click", navigateToNextAgent);
+
+  const panels = [
+    document.getElementById("agent-pipeline-list"),
+    document.getElementById("agent-dimension-list"),
+  ].filter(Boolean);
+  for (const panel of panels) {
+    panel.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const row = target.closest(".agent-row");
+      if (!row) return;
+      void openAgentDetail(row.dataset.agentId || row.dataset.taskId || "");
+    });
+    panel.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const row = target.closest(".agent-row");
+      if (!row) return;
+      event.preventDefault();
+      void openAgentDetail(row.dataset.agentId || row.dataset.taskId || "");
+    });
+  }
+
+  document.getElementById("agent-detail-artifact-preview")?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const output = target.closest("[data-agent-artifact-path]");
+    if (!output) return;
+    openAgentArtifactPreview(output.dataset.agentArtifactPath || "");
+  });
+}
+
 async function selectAgent(agentId) {
   state.selectedAgentId = agentId;
   renderAgentConsole(); // re-render to update selection
 
-  const panel = document.getElementById("agent-detail-panel");
+  const inlinePanel = document.getElementById("agent-detail-panel");
+  const drawerPanel = document.getElementById("agent-detail-drawer-content");
+  const panels = [inlinePanel, drawerPanel].filter(Boolean);
   const idLabel = document.getElementById("agent-detail-id");
-  if (!panel || !idLabel) return;
+  if (!panels.length) return;
 
-  idLabel.textContent = agentId;
-  panel.innerHTML = "<p class='muted'>加载详情...</p>";
+  if (idLabel) idLabel.textContent = agentId;
+  panels.forEach((panel) => {
+    panel.innerHTML = "<p class='muted'>加载详情...</p>";
+  });
 
   try {
     const data = await v2api.agents.get(agentId);
     state.agentDetailData = data;
+    state.agentDetailPreviewLoading = false;
+    state.agentDetailPreviewError = null;
+    state.agentDetailPreviewContent = null;
+    state.agentDetailPreviewPath = null;
 
     const agent = data.agent || {};
     const identity = data.identity || {};
@@ -6095,8 +5716,9 @@ async function selectAgent(agentId) {
     const capabilities = data.capabilities || [];
     const cost = data.cost || {};
     const audit = data.audit_log || [];
+    const outputs = agent.outputs || data.outputs || [];
 
-    panel.innerHTML = `
+    const detailHtml = `
       ${renderEvidenceBanner(data._meta)}
 
       <div class="agent-detail-section">
@@ -6153,8 +5775,612 @@ async function selectAgent(agentId) {
         </div>
       </div>
     `;
+    panels.forEach((panel) => {
+      panel.innerHTML = detailHtml;
+    });
+    const preview = document.getElementById("agent-detail-artifact-preview");
+    if (preview) preview.innerHTML = renderAgentArtifactPreview(outputs);
+    updateAgentDrawerNavigation();
   } catch (error) {
-    panel.innerHTML = `<div class="error-banner"><span>加载智能体详情失败：${escapeHtml(error.message)}</span></div>`;
+    state.agentDetailPreviewError = error;
+    panels.forEach((panel) => {
+      panel.innerHTML = `<div class="error-banner"><span>加载智能体详情失败：${escapeHtml(error.message)}</span></div>`;
+    });
+    const preview = document.getElementById("agent-detail-artifact-preview");
+    if (preview) preview.innerHTML = renderAgentArtifactPreview([]);
+  }
+}
+
+// --- Governance Panel ---
+
+let activeGovernanceTab = "identity";
+
+function switchGovernanceTab(tabName) {
+  activeGovernanceTab = tabName;
+  document.querySelectorAll(".governance-tab").forEach((tab) => {
+    tab.classList.toggle("is-active", tab.dataset.governanceTab === tabName);
+  });
+  document.querySelectorAll(".governance-tab-content").forEach((content) => {
+    content.classList.toggle("is-active", content.id === `governance-tab-${tabName}`);
+  });
+  // Re-render current tab with latest data
+  renderGovernancePanel();
+}
+
+async function loadGovernanceData(projectId) {
+  try {
+    state.governanceIdentityData = await v2api.governance.identity.get(projectId);
+  } catch (error) {
+    state.governanceIdentityData = null;
+  }
+  try {
+    state.governancePermissionsData = await v2api.governance.permissions.get(projectId);
+  } catch (error) {
+    state.governancePermissionsData = null;
+  }
+  try {
+    state.governanceCapabilitiesData = await v2api.governance.capabilities.get(projectId);
+  } catch (error) {
+    state.governanceCapabilitiesData = null;
+  }
+  try {
+    state.governanceCostsData = await v2api.governance.costs.get(projectId);
+  } catch (error) {
+    state.governanceCostsData = null;
+  }
+}
+
+function renderGovernancePanel() {
+  clearV2Error("governance-panel");
+
+  // Evidence banner
+  const bannerHtml = renderEvidenceBanner({ evidence_level: "local_file", service: "governance_panel", generated_at: new Date().toISOString() });
+  const existingBanner = document.querySelector("#view-governance-panel > .evidence-banner");
+  if (existingBanner) existingBanner.remove();
+  if (bannerHtml) {
+    document.getElementById("view-governance-panel").insertAdjacentHTML("afterbegin", bannerHtml);
+  }
+
+  switch (activeGovernanceTab) {
+    case "identity":
+      renderGovernanceIdentityTab();
+      break;
+    case "permissions":
+      renderGovernancePermissionsTab();
+      break;
+    case "capabilities":
+      renderGovernanceCapabilitiesTab();
+      break;
+    case "costs":
+      renderGovernanceCostsTab();
+      break;
+  }
+}
+
+function renderGovernanceIdentityTab() {
+  const body = document.getElementById("governance-identity-body");
+  const statusPill = document.getElementById("governance-identity-status");
+  const data = state.governanceIdentityData;
+
+  if (!data || !data.identity) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🆔</div>
+        <h4>身份注册表尚未初始化</h4>
+        <p class="muted">点击初始化创建默认 Agent 身份。</p>
+        <button class="primary-button" onclick="initGovernanceIdentity()">初始化身份注册表</button>
+      </div>
+    `;
+    if (statusPill) statusPill.textContent = "未初始化";
+    return;
+  }
+
+  const registry = data.identity;
+  const identities = registry.identities || [];
+  const defaults = registry.default_agents || [];
+
+  if (statusPill) statusPill.textContent = registry.status === "active" ? "已激活" : registry.status || "-";
+
+  body.innerHTML = `
+    <div class="governance-section">
+      <h4>已注册身份 (${identities.length})</h4>
+      ${identities.length ? identities.map((id) => `
+        <div class="governance-row">
+          <div class="governance-row-main">
+            <strong>${escapeHtml(id.display_name || id.id)}</strong>
+            <span class="muted">${escapeHtml(id.role || "")} · ${escapeHtml(id.kind || "agent")}</span>
+          </div>
+          <div class="governance-row-meta">
+            <span class="pill ${id.status === "active" ? "is-approved" : ""}">${escapeHtml(id.status || "unknown")}</span>
+            ${id.status === "inactive" ? `<button class="ghost-button" onclick="activateGovernanceAgent('${escapeHtml(id.id)}')">激活</button>` : ""}
+            ${id.status === "active" ? `<button class="ghost-button" onclick="deactivateGovernanceAgent('${escapeHtml(id.id)}')">停用</button>` : ""}
+          </div>
+        </div>
+      `).join("") : "<p class='muted'>暂无已注册身份</p>"}
+    </div>
+    <div class="governance-section" style="margin-top: 18px;">
+      <h4>默认角色模板</h4>
+      ${defaults.map((d) => `
+        <div class="governance-row">
+          <div class="governance-row-main">
+            <strong>${escapeHtml(d.display_name || d.role)}</strong>
+            <span class="muted">${escapeHtml(d.role)}</span>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderGovernancePermissionsTab() {
+  const body = document.getElementById("governance-permissions-body");
+  const checkBody = document.getElementById("governance-permission-check-body");
+  const statusPill = document.getElementById("governance-permissions-status");
+  const data = state.governancePermissionsData;
+
+  if (!data || !data.permissions) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔐</div>
+        <h4>权限策略尚未初始化</h4>
+        <p class="muted">点击初始化创建默认权限策略。</p>
+        <button class="primary-button" onclick="initGovernancePermissions()">初始化权限策略</button>
+      </div>
+    `;
+    if (statusPill) statusPill.textContent = "未初始化";
+    if (checkBody) checkBody.innerHTML = "<p class='muted'>请先初始化权限策略</p>";
+    return;
+  }
+
+  const registry = data.permissions;
+  const policies = registry.policies || [];
+  const actionCatalog = registry.action_catalog || [];
+
+  if (statusPill) statusPill.textContent = registry.status === "active" ? "已激活" : registry.status || "-";
+
+  // Build editable permission matrix
+  const roles = [...new Set(policies.map((p) => p.subject_id))];
+  const matrixHtml = `
+    <div class="permission-matrix-wrapper">
+      <table class="permission-matrix" id="permission-matrix-table">
+        <thead>
+          <tr>
+            <th>Action \\ Agent</th>
+            ${roles.map((r) => `<th>${escapeHtml(r.replace("agent_", "").replace("_01", ""))}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${actionCatalog.map((action) => {
+            const cells = roles.map((role) => {
+              const policy = policies.find((p) => p.subject_id === role);
+              const allowed = policy?.allow?.includes(action);
+              const denied = policy?.deny?.includes(action);
+              const cellClass = denied ? "denied" : allowed ? "allowed" : "neutral";
+              const cellLabel = denied ? "✗" : allowed ? "✓" : "−";
+              return `<td class="${cellClass} editable-cell" data-role="${escapeHtml(role)}" data-action="${escapeHtml(action)}" onclick="togglePermissionCell(this)">${cellLabel}</td>`;
+            }).join("");
+            return `<tr><td class="action-name">${escapeHtml(action)}</td>${cells}</tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="permission-edit-actions" style="margin-top: 12px;">
+      <button class="primary-button" onclick="saveGovernancePermissions()">保存更改</button>
+      <button class="secondary-button" onclick="renderGovernancePermissionsTab()" style="margin-left: 8px;">取消</button>
+    </div>
+  `;
+
+  body.innerHTML = `
+    <div class="governance-section">
+      <h4>权限矩阵 <span class="muted" style="font-size: 12px; font-weight: normal;">（点击单元格切换允许 / 拒绝 / 中性）</span></h4>
+      ${matrixHtml}
+    </div>
+    <div class="governance-section" style="margin-top: 18px;">
+      <h4>策略列表</h4>
+      ${policies.map((p) => `
+        <div class="governance-row">
+          <div class="governance-row-main">
+            <strong>${escapeHtml(p.subject_id)}</strong>
+            <span class="muted">允许: ${p.allow?.length || 0} 项 · 拒绝: ${p.deny?.length || 0} 项</span>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  // Permission check tool
+  if (checkBody) {
+    const agentOptions = roles.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+    const actionOptions = actionCatalog.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+    checkBody.innerHTML = `
+      <div class="permission-check-form">
+        <label>
+          <span>Agent</span>
+          <select id="permission-check-agent">${agentOptions}</select>
+        </label>
+        <label>
+          <span>Action</span>
+          <select id="permission-check-action">${actionOptions}</select>
+        </label>
+        <button class="primary-button" onclick="runPermissionCheck()">检查权限</button>
+      </div>
+      <div id="permission-check-result" class="permission-check-result"></div>
+    `;
+  }
+}
+
+function togglePermissionCell(cell) {
+  const role = cell.getAttribute("data-role");
+  const action = cell.getAttribute("data-action");
+  if (!role || !action) return;
+
+  const currentClass = cell.classList.contains("allowed")
+    ? "allowed"
+    : cell.classList.contains("denied")
+      ? "denied"
+      : "neutral";
+
+  const nextMap = { allowed: "denied", denied: "neutral", neutral: "allowed" };
+  const labelMap = { allowed: "✓", denied: "✗", neutral: "−" };
+  const nextClass = nextMap[currentClass];
+
+  cell.classList.remove("allowed", "denied", "neutral");
+  cell.classList.add(nextClass);
+  cell.textContent = labelMap[nextClass];
+  cell.setAttribute("data-modified", "true");
+}
+
+async function saveGovernancePermissions() {
+  const data = state.governancePermissionsData;
+  if (!data || !data.permissions) return;
+
+  const registry = data.permissions;
+  const policies = registry.policies || [];
+  const actionCatalog = registry.action_catalog || [];
+
+  // Rebuild policies from DOM
+  const cells = document.querySelectorAll("#permission-matrix-table td[data-modified='true']");
+  if (cells.length === 0) {
+    showV2Success("governance-panel", "没有检测到更改");
+    return;
+  }
+
+  // Build a map of role -> {allow: Set, deny: Set}
+  const roleMap = {};
+  for (const p of policies) {
+    roleMap[p.subject_id] = {
+      id: p.id,
+      subject_id: p.subject_id,
+      subject_kind: p.subject_kind || "agent",
+      project_id: p.project_id,
+      allow: new Set(p.allow || []),
+      deny: new Set(p.deny || []),
+    };
+  }
+
+  // Apply all modified cells
+  cells.forEach((cell) => {
+    const role = cell.getAttribute("data-role");
+    const action = cell.getAttribute("data-action");
+    const newState = cell.classList.contains("allowed")
+      ? "allowed"
+      : cell.classList.contains("denied")
+        ? "denied"
+        : "neutral";
+
+    const entry = roleMap[role];
+    if (!entry) return;
+
+    entry.allow.delete(action);
+    entry.deny.delete(action);
+    if (newState === "allowed") entry.allow.add(action);
+    else if (newState === "denied") entry.deny.add(action);
+  });
+
+  // Convert to array format
+  const newPolicies = Object.values(roleMap).map((e) => ({
+    id: e.id,
+    subject_id: e.subject_id,
+    subject_kind: e.subject_kind,
+    project_id: e.project_id,
+    allow: Array.from(e.allow),
+    deny: Array.from(e.deny),
+  }));
+
+  const projectId = state.selectedProjectId;
+  if (!projectId) {
+    showV2Error("governance-panel", "未选择项目");
+    return;
+  }
+
+  try {
+    const result = await v2api.governance.permissions.save(projectId, newPolicies);
+    if (result.status === "saved") {
+      showV2Success("governance-panel", `权限策略已保存（${result.policies_count} 条）`);
+      await loadGovernanceData(projectId);
+    } else {
+      showV2Error("governance-panel", "保存失败：" + (result.error || "未知错误"));
+    }
+  } catch (err) {
+    showV2Error("governance-panel", "保存失败: " + err.message);
+  }
+}
+
+function renderGovernanceCapabilitiesTab() {
+  const body = document.getElementById("governance-capabilities-body");
+  const statusPill = document.getElementById("governance-capabilities-status");
+  const data = state.governanceCapabilitiesData;
+
+  if (!data || !data.capability) {
+    body.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚙️</div>
+        <h4>能力目录尚未索引</h4>
+        <p class="muted">点击索引能力目录（包含 StatsPAI 函数）。</p>
+        <button class="primary-button" onclick="reindexGovernanceCapabilities()">索引能力目录</button>
+      </div>
+    `;
+    if (statusPill) statusPill.textContent = "未索引";
+    return;
+  }
+
+  const registry = data.capability;
+  const capabilities = registry.capabilities || [];
+  const sources = registry.sources || {};
+  const classification = registry.classification || {};
+
+  if (statusPill) statusPill.textContent = `${capabilities.length} 项能力`;
+
+  const sourceHtml = Object.entries(sources).map(([name, info]) => `
+    <div class="governance-row">
+      <div class="governance-row-main">
+        <strong>${escapeHtml(name)}</strong>
+        <span class="muted">${info.available ? `v${escapeHtml(info.version || "?")} · ${info.function_count || 0} 函数` : "不可用"}</span>
+      </div>
+    </div>
+  `).join("");
+
+  const capList = capabilities.slice(0, 50).map((cap) => `
+    <div class="governance-row">
+      <div class="governance-row-main">
+        <strong>${escapeHtml(cap.name)}</strong>
+        <span class="muted">${escapeHtml(cap.namespace || "")} · ${escapeHtml(cap.category || "")} · 风险: ${escapeHtml(cap.risk_level || "?")}</span>
+      </div>
+      <div class="governance-row-meta">
+        <span class="pill ${cap.status === "executable" ? "is-approved" : ""}">${escapeHtml(cap.status || "-")}</span>
+      </div>
+    </div>
+  `).join("");
+
+  const moreMsg = capabilities.length > 50 ? `<p class="muted">... 还有 ${capabilities.length - 50} 项能力</p>` : "";
+
+  body.innerHTML = `
+    <div class="governance-section">
+      <h4>能力来源</h4>
+      ${sourceHtml}
+      <button class="ghost-button" style="margin-top: 8px;" onclick="reindexGovernanceCapabilities()">重新索引</button>
+    </div>
+    <div class="governance-section" style="margin-top: 18px;">
+      <h4>能力列表 (${capabilities.length})</h4>
+      ${capList}
+      ${moreMsg}
+    </div>
+  `;
+}
+
+function renderGovernanceCostsTab() {
+  const summaryBody = document.getElementById("governance-costs-summary-body");
+  const eventsBody = document.getElementById("governance-costs-events-body");
+  const statusPill = document.getElementById("governance-costs-status");
+  const eventsCountPill = document.getElementById("governance-costs-events-count");
+  const data = state.governanceCostsData;
+
+  if (!data || !data.costs) {
+    if (summaryBody) summaryBody.innerHTML = "<p class='muted'>暂无成本数据</p>";
+    if (eventsBody) eventsBody.innerHTML = "<p class='muted'>暂无成本事件</p>";
+    if (statusPill) statusPill.textContent = "-";
+    if (eventsCountPill) eventsCountPill.textContent = "0";
+    return;
+  }
+
+  const summary = data.costs.summary || {};
+  const events = data.costs.events || [];
+  const totalInputTokens = events.reduce((sum, evt) => sum + (Number(evt.input_tokens) || 0), 0);
+  const totalOutputTokens = events.reduce((sum, evt) => sum + (Number(evt.output_tokens) || 0), 0);
+  const totalTokens = totalInputTokens + totalOutputTokens;
+  const totalUsd = events.reduce((sum, evt) => sum + (Number(evt.estimated_usd) || 0), 0);
+  const providerModelSummary = events.reduce((acc, evt) => {
+    const provider = evt.provider || "unknown";
+    const model = evt.model || "unknown";
+    const key = `${provider} / ${model}`;
+    if (!acc[key]) {
+      acc[key] = { count: 0, inputTokens: 0, outputTokens: 0, usd: 0 };
+    }
+    acc[key].count += 1;
+    acc[key].inputTokens += Number(evt.input_tokens) || 0;
+    acc[key].outputTokens += Number(evt.output_tokens) || 0;
+    acc[key].usd += Number(evt.estimated_usd) || 0;
+    return acc;
+  }, {});
+
+  if (statusPill) statusPill.textContent = `总计 $${totalUsd.toFixed(4)}`;
+  if (eventsCountPill) eventsCountPill.textContent = String(events.length);
+
+  if (summaryBody) {
+    summaryBody.innerHTML = `
+      <div class="metric-grid small">
+        <article class="metric-card">
+          <span class="eyebrow">总事件数</span>
+          <strong>${summary.total_events || 0}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="eyebrow">总耗时(秒)</span>
+          <strong>${summary.total_wall_seconds || 0}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="eyebrow">总 Tokens</span>
+          <strong>${totalTokens.toLocaleString()}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="eyebrow">预估成本(USD)</span>
+          <strong>$${totalUsd.toFixed(4)}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="eyebrow">成功 / 失败</span>
+          <strong>${summary.status_counts?.succeeded || 0} / ${summary.status_counts?.failed || 0}</strong>
+        </article>
+      </div>
+      ${Object.entries(summary.capability_counts || {}).length ? `
+        <div style="margin-top: 12px;">
+          <h5>能力使用次数</h5>
+          ${Object.entries(summary.capability_counts).map(([cap, count]) => `
+            <div class="governance-row">
+              <div class="governance-row-main">
+                <span>${escapeHtml(cap)}</span>
+              </div>
+              <div class="governance-row-meta">
+                <span class="pill">${count}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${Object.entries(providerModelSummary).length ? `
+        <div style="margin-top: 12px;">
+          <h5>Provider / Model 汇总</h5>
+          ${Object.entries(providerModelSummary).map(([label, item]) => `
+            <div class="governance-row">
+              <div class="governance-row-main">
+                <span>${escapeHtml(label)}</span>
+                <span class="muted">${item.inputTokens.toLocaleString()} → ${item.outputTokens.toLocaleString()} tokens</span>
+              </div>
+              <div class="governance-row-meta">
+                <span class="pill">${item.count} 次</span>
+                <span class="muted">$${item.usd.toFixed(4)}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    `;
+  }
+
+  if (eventsBody) {
+    eventsBody.innerHTML = events.length ? events.slice().reverse().map((evt) => {
+      const inputTokens = Number(evt.input_tokens) || 0;
+      const outputTokens = Number(evt.output_tokens) || 0;
+      const estimatedUsd = Number(evt.estimated_usd) || 0;
+      const tokenInfo = inputTokens || outputTokens
+        ? `<span class="cost-tokens">${inputTokens.toLocaleString()} → ${outputTokens.toLocaleString()} tokens</span>`
+        : "";
+      const usdInfo = estimatedUsd
+        ? `<span class="cost-usd">$${estimatedUsd.toFixed(4)}</span>`
+        : "";
+      const providerModel = [evt.provider, evt.model].filter(Boolean).join(" / ");
+      return `
+        <div class="cost-event">
+          <span class="cost-actor">${escapeHtml(evt.actor_id || "unknown")}</span>
+          <span class="cost-time">${evt.wall_seconds || 0}s</span>
+          ${tokenInfo}
+          ${usdInfo}
+          ${providerModel ? `<span class="muted">${escapeHtml(providerModel)}</span>` : ""}
+          <span class="cost-cap">${escapeHtml(evt.capability_id || "-")} · ${escapeHtml(evt.status || "-")}</span>
+        </div>
+      `;
+    }).join("") : "<p class='muted'>暂无成本事件</p>";
+  }
+}
+
+// --- Governance Actions ---
+
+async function initGovernanceIdentity() {
+  if (!state.selectedProjectId) return;
+  state.initializingGovernanceIdentity = true;
+  try {
+    state.governanceIdentityData = await v2api.governance.identity.init(state.selectedProjectId);
+    renderGovernancePanel();
+  } catch (error) {
+    showV2Error("governance-panel", `初始化身份失败：${error.message}`);
+  } finally {
+    state.initializingGovernanceIdentity = false;
+  }
+}
+
+async function initGovernancePermissions() {
+  if (!state.selectedProjectId) return;
+  state.initializingGovernancePermissions = true;
+  try {
+    state.governancePermissionsData = await v2api.governance.permissions.init(state.selectedProjectId);
+    renderGovernancePanel();
+  } catch (error) {
+    showV2Error("governance-panel", `初始化权限失败：${error.message}`);
+  } finally {
+    state.initializingGovernancePermissions = false;
+  }
+}
+
+async function reindexGovernanceCapabilities() {
+  if (!state.selectedProjectId) return;
+  state.reindexingCapabilities = true;
+  try {
+    state.governanceCapabilitiesData = await v2api.governance.capabilities.reindex(state.selectedProjectId);
+    renderGovernancePanel();
+  } catch (error) {
+    showV2Error("governance-panel", `索引能力失败：${error.message}`);
+  } finally {
+    state.reindexingCapabilities = false;
+  }
+}
+
+async function activateGovernanceAgent(agentId) {
+  if (!state.selectedProjectId) return;
+  state.activatingAgentId = agentId;
+  try {
+    await v2api.governance.identity.activateAgent(state.selectedProjectId, agentId);
+    state.governanceIdentityData = await v2api.governance.identity.get(state.selectedProjectId);
+    renderGovernancePanel();
+  } catch (error) {
+    showV2Error("governance-panel", `激活 Agent 失败：${error.message}`);
+  } finally {
+    state.activatingAgentId = null;
+  }
+}
+
+async function deactivateGovernanceAgent(agentId) {
+  if (!state.selectedProjectId) return;
+  state.deactivatingAgentId = agentId;
+  try {
+    await v2api.governance.identity.deactivateAgent(state.selectedProjectId, agentId);
+    state.governanceIdentityData = await v2api.governance.identity.get(state.selectedProjectId);
+    renderGovernancePanel();
+  } catch (error) {
+    showV2Error("governance-panel", `停用 Agent 失败：${error.message}`);
+  } finally {
+    state.deactivatingAgentId = null;
+  }
+}
+
+async function runPermissionCheck() {
+  const agentSelect = document.getElementById("permission-check-agent");
+  const actionSelect = document.getElementById("permission-check-action");
+  const resultDiv = document.getElementById("permission-check-result");
+  if (!agentSelect || !actionSelect || !resultDiv) return;
+
+  const agentId = agentSelect.value;
+  const action = actionSelect.value;
+
+  try {
+    const result = await v2api.governance.permissions.check(state.selectedProjectId, { subject_id: agentId, action });
+    const isAllowed = result.allowed;
+    resultDiv.innerHTML = `
+      <div class="permission-check-result-item ${isAllowed ? "is-allowed" : "is-denied"}">
+        <strong>${isAllowed ? "✓ 允许" : "✗ 拒绝"}</strong>
+        <span class="muted">${escapeHtml(result.reason || "")}</span>
+        ${result.policy_id ? `<span class="muted">策略: ${escapeHtml(result.policy_id)}</span>` : ""}
+      </div>
+    `;
+  } catch (error) {
+    resultDiv.innerHTML = `<div class="error-banner"><span>检查失败：${escapeHtml(error.message)}</span></div>`;
   }
 }
 
@@ -6167,13 +6393,13 @@ async function loadV2Data(viewName) {
 
   try {
     switch (viewName) {
-      case "overview":
+      case "journey":
         state.overviewData = await v2api.overview.get(projectId);
         state.journeyData = await v2api.journey.get(projectId);
         state.researchQuestionData = await v2api.researchQuestion.get(projectId);
         state.supervisorPlanData = await v2api.supervisorPlan.get(projectId);
         state.agentTaskQueueData = await v2api.agentTaskQueue.get(projectId);
-        renderOverview();
+        renderJourney();
         renderJourneyBar();
         break;
       case "data-variables":
@@ -6253,6 +6479,10 @@ async function loadV2Data(viewName) {
         state.agentsData = await v2api.agents.list();
         renderAgentConsole();
         break;
+      case "governance-panel":
+        await loadGovernanceData(projectId);
+        renderGovernancePanel();
+        break;
       case "empirical-execution":
         state.overviewData = await v2api.overview.get(projectId);
         try {
@@ -6279,6 +6509,7 @@ async function loadV2Data(viewName) {
       "paper-draft": "draft",
       "artifacts-replication": "artifacts-replication",
       "agent-console": "agent-console",
+      "governance-panel": "governance-panel",
       "empirical-execution": "empirical-execution",
     };
     const viewId = viewIdMap[viewName] || viewName;
@@ -6293,9 +6524,42 @@ async function boot() {
   mountNav();
   mountArchiveInspector();
   mountProjectSelection();
-  mountActions();
-  mountForm();
-  mountAgentClusterEvents();
+  setupAgentDrawerInteractions();
+  document.body.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.matches("[data-close-agent-output]")) {
+      state.agentOutput.visible = false;
+      renderAgentOutputPanel();
+      return;
+    }
+    const journeyButton = target.closest("[data-journey-action]");
+    if (!journeyButton) return;
+    switch (journeyButton.dataset.journeyAction) {
+      case "view-output":
+        state.agentOutput.visible = true;
+        renderAgentOutputPanel();
+        break;
+      case "refresh":
+        void loadV2Data("journey");
+        break;
+      case "checkpoint":
+        void pollCheckpoint();
+        break;
+      case "start-run":
+        void createFullRunFromPlan();
+        break;
+      case "primary": {
+        const primaryAction = state.journeyPrimaryAction;
+        if (primaryAction?.action?.includes("run") || primaryAction?.action?.includes("执行")) {
+          void createFullRunFromPlan();
+        } else {
+          void loadV2Data("journey");
+        }
+        break;
+      }
+    }
+  });
   document.getElementById("run-selector")?.addEventListener("change", (event) => {
     state.selectedRunId = event.target.value || null;
     void loadRunObservability(state.selectedProjectId, state.selectedRunId);
@@ -6430,7 +6694,7 @@ async function boot() {
     if (!reviewButton) return;
     void reviewVariableRoleCandidate(reviewButton.dataset.candidateId || "", reviewButton.dataset.variableRoleCandidateReviewAction || "");
   });
-  document.getElementById("view-overview")?.addEventListener("click", (event) => {
+  document.getElementById("view-journey")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (target.closest("[data-topic-confirm-action]")) {
@@ -6467,6 +6731,19 @@ async function boot() {
       );
       return;
     }
+    const selectBackendButton = target.closest("[data-select-backend-action]");
+    if (selectBackendButton) {
+      const taskId = selectBackendButton.dataset.agentTaskId || "";
+      const selectEl = document.querySelector(`select[data-backend-select][data-agent-task-id="${CSS.escape(taskId)}"]`);
+      const backendId = selectEl?.value || "statspai";
+      void handleSelectBackendAndExecute(taskId, backendId);
+      return;
+    }
+    const executeButton = target.closest("[data-execute-action]");
+    if (executeButton) {
+      void handleExecuteAgentTask(executeButton.dataset.agentTaskId || "");
+      return;
+    }
     const button = target.closest("[data-open-design-action]");
     if (!button) return;
     openDesignAction(state.selectedDatasetPath || button.dataset.datasetPath || "");
@@ -6483,8 +6760,124 @@ async function boot() {
   await refreshProjects();
   // Load default V2 view data
   if (state.selectedProjectId) {
-    await loadV2Data("overview");
+    await loadV2Data("journey");
+  }
+  // Start HITL checkpoint polling after boot
+  startCheckpointPolling();
+}
+
+// ============================================================
+// HITL Checkpoint Polling & Modal
+// ============================================================
+
+function startCheckpointPolling() {
+  stopCheckpointPolling();
+  if (!state.selectedProjectId) return;
+  // Poll immediately once, then every 5 seconds
+  void pollCheckpoint();
+  state.checkpoint.pollIntervalId = window.setInterval(() => {
+    void pollCheckpoint();
+  }, 5000);
+}
+
+function stopCheckpointPolling() {
+  if (state.checkpoint.pollIntervalId) {
+    clearInterval(state.checkpoint.pollIntervalId);
+    state.checkpoint.pollIntervalId = null;
   }
 }
+
+async function pollCheckpoint() {
+  if (!state.selectedProjectId || state.checkpoint.resolving) return;
+  try {
+    const result = await v2api.checkpoints.poll(state.selectedProjectId);
+    const checkpoint = result?.checkpoint || result?.pending?.[0] || null;
+    if (checkpoint) {
+      if (!state.checkpoint.pending || state.checkpoint.pending.id !== checkpoint.id) {
+        state.checkpoint.pending = checkpoint;
+        openCheckpointModal(checkpoint);
+      }
+    } else {
+      if (state.checkpoint.pending) {
+        state.checkpoint.pending = null;
+        closeCheckpointModal();
+      }
+    }
+  } catch (error) {
+    // Silently ignore polling errors to avoid spamming the user
+    console.error("Checkpoint poll failed:", error);
+  }
+}
+
+function openCheckpointModal(checkpoint) {
+  const overlay = document.getElementById("checkpoint-modal-overlay");
+  const stageEl = document.getElementById("checkpoint-modal-stage");
+  const descEl = document.getElementById("checkpoint-modal-description");
+  const payloadEl = document.getElementById("checkpoint-modal-payload");
+  const feedbackEl = document.getElementById("checkpoint-feedback");
+
+  if (!overlay) return;
+
+  const stageMap = {
+    literature_review: "文献综述",
+    identification_strategy: "识别策略",
+    modeling_results: "建模结果",
+    writing: "论文写作",
+  };
+
+  if (stageEl) stageEl.textContent = `阶段: ${stageMap[checkpoint.stage] || checkpoint.stage || "未知"}`;
+  if (descEl) descEl.textContent = checkpoint.description || "系统已完成当前阶段，请审阅结果并决定下一步。";
+  if (payloadEl) {
+    payloadEl.textContent = checkpoint.payload ? JSON.stringify(checkpoint.payload, null, 2) : "无附加数据";
+  }
+  if (feedbackEl) feedbackEl.value = "";
+
+  overlay.style.display = "flex";
+  // Trigger reflow for transition
+  void overlay.offsetWidth;
+  overlay.classList.add("is-visible");
+}
+
+function closeCheckpointModal() {
+  const overlay = document.getElementById("checkpoint-modal-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("is-visible");
+  // Wait for transition to finish before hiding
+  setTimeout(() => {
+    if (!overlay.classList.contains("is-visible")) {
+      overlay.style.display = "none";
+    }
+  }, 250);
+}
+
+async function resolveCheckpoint(action) {
+  const checkpoint = state.checkpoint.pending;
+  if (!checkpoint || !state.selectedProjectId) return;
+
+  const feedbackEl = document.getElementById("checkpoint-feedback");
+  const feedback = feedbackEl?.value?.trim() || "";
+
+  if (action === "modify" && !feedback) {
+    alert("请填写修改意见后再选择\"修改后继续\"。");
+    return;
+  }
+
+  state.checkpoint.resolving = true;
+  try {
+    await v2api.checkpoints.resolve(state.selectedProjectId, checkpoint.id, action, feedback);
+    state.checkpoint.pending = null;
+    closeCheckpointModal();
+  } catch (error) {
+    console.error("Checkpoint resolution failed:", error);
+    alert(`操作失败: ${error instanceof Error ? error.message : "未知错误"}`);
+  } finally {
+    state.checkpoint.resolving = false;
+  }
+}
+
+// Bind checkpoint modal button events
+document.getElementById("checkpoint-btn-approve")?.addEventListener("click", () => resolveCheckpoint("approve"));
+document.getElementById("checkpoint-btn-modify")?.addEventListener("click", () => resolveCheckpoint("modify"));
+document.getElementById("checkpoint-btn-reject")?.addEventListener("click", () => resolveCheckpoint("reject"));
 
 void boot();

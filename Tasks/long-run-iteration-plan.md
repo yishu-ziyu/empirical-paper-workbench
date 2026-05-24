@@ -34,15 +34,22 @@
 每一轮开发都按这个顺序执行：
 
 1. 读取 `AGENTS.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`、`Tasks/workflow.md`、`Tasks/todo.md`。
-2. 把本轮目标写入 `Tasks/todo.md`，只做一个可验收产品增量。
-3. 写 3-8 条 BDD 行为，保存到 `docs/architecture-v2/codex-phase-*.md`。
-4. 写自动化测试并先跑 RED，确认失败原因是功能缺失。
-5. 写最小实现，跑 GREEN。
-6. 跑相邻回归、全量回归、静态检查。
-7. 用右侧内置浏览器或 Playwright 验收真实页面。
-8. 更新 `Tasks/handoff.md`、`Tasks/manifest.md`、`Tasks/review.md`、`Tasks/decision-log.md`。
-9. `git status` 检查影响面，Lore commit，push。
-10. 继续下一轮，除非遇到破坏性操作、外部凭证、真实数据覆盖、线上发布或研究判断分叉。
+2. 若任务超过两轮、预计超过一小时或已经重复失败，先读取 `docs/architecture-v2/long-run-optimization-protocol.md`，并在 `Tasks/round-log.md` 新增本轮记录。
+3. 把本轮目标写入 `Tasks/todo.md`，只做一个可验收产品增量。
+4. 写 3-8 条 BDD 行为，保存到 `docs/architecture-v2/codex-phase-*.md`。
+5. 写自动化测试并先跑 RED，确认失败原因是功能缺失。
+6. 写最小实现，跑 GREEN。
+7. 跑相邻回归、全量回归、静态检查。
+8. 用右侧内置浏览器或 Playwright 验收真实页面。
+9. 更新 `Tasks/round-log.md`、`Tasks/handoff.md`、`Tasks/manifest.md`、`Tasks/review.md`、`Tasks/decision-log.md`。
+10. `git status` 检查影响面，Lore commit，push。
+11. 继续下一轮，除非遇到破坏性操作、外部凭证、真实数据覆盖、线上发布或研究判断分叉。
+
+### 平台期与策略跃迁规则
+
+当连续三轮同类尝试没有实质收益、同一错误重复出现、没有新增证据产物，或无法说清瓶颈位于数据/方法/执行/产品状态/文稿表达中的哪一层时，停止当前微调路线。
+
+进入平台期后必须先分析日志、测试、结果文件或任务记录，定位当前瓶颈；然后选择一个结构性不同的下一步，例如从页面修补转向状态模型、从计划文档转向真实后端执行、从单方法验证转向稳健性矩阵。策略跃迁允许短暂打破非核心约束，但必须在 `Tasks/round-log.md` 写明被打破的约束、修复路径、回滚点和证据文件。
 
 ## 2. 产品主方向
 

@@ -52,3 +52,4 @@
 - P1-Q 已完成；后续视觉优化必须继续服务研究档案和证据浏览，不回到普通 SaaS landing page。
 - P1-R 已完成；后续视觉优化必须保持干净工作台、属性检查器、record/list 和审计线索，不回到纸格背景和大卡片嵌套。
 - Feynman 参考路线：短期不嵌入源码；以 callable external research engine 的 provider/provenance 设计进入本项目。
+- 长程研发轮次必须按 `docs/architecture-v2/long-run-optimization-protocol.md` 和 `Tasks/round-log.md` 记录平台期、瓶颈、策略跃迁、回滚点与证据路径。

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>实证工作台</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231e6f62'/%3E%3Cpath d='M4 11h8v1H4zm1-7h6v1H5zm0 3h6v1H5z' fill='white'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/assets/styles.css?v=20260517-pipeline-mvp-review" />
+    <link rel="stylesheet" href="/assets/styles.css?v=20260522-sse-agent-viz" />
   </head>
   <body>
     <div class="app-shell archive-shell clean-workbench-shell">
@@ -17,7 +17,7 @@
         </div>
 
         <nav class="nav nav-primary product-workspace-nav">
-          <button class="nav-link is-active" data-view="overview">工作台首页</button>
+          <button class="nav-link is-active" data-view="journey">工作台首页</button>
           <button class="nav-link" data-view="data-variables">数据与设计</button>
           <button class="nav-link" data-view="empirical-execution">实证执行</button>
           <button class="nav-link" data-view="paper-draft">结果与草稿</button>
@@ -29,12 +29,7 @@
         <nav class="nav nav-secondary">
           <button class="nav-link" data-view="research-design">工具：研究设计细节</button>
           <button class="nav-link" data-view="agent-console">工具：智能体控制台</button>
-          <button class="nav-link" data-view="dashboard">旧版：总览</button>
-          <button class="nav-link" data-view="projects">旧版：项目</button>
-          <button class="nav-link" data-view="workflow">旧版：工作流</button>
-          <button class="nav-link" data-view="agent-cluster">旧版：智能体集群</button>
-          <button class="nav-link" data-view="artifacts">旧版：产物</button>
-          <button class="nav-link" data-view="drafts">旧版：草稿</button>
+          <button class="nav-link" data-view="governance-panel">工具：治理面板</button>
         </nav>
 
         <div class="sidebar-card">
@@ -62,16 +57,16 @@
         <aside class="archive-inspector inspector-rail" aria-label="档案索引 / 属性检查器">
           <section class="archive-note archive-current-note inspector-section">
             <span class="archive-note-label">属性检查器</span>
-            <h3 id="archive-current-title">工作台首页</h3>
-            <p id="archive-current-summary">从研究问题进入数据、设计、执行、草稿和导出。</p>
+            <h3 id="archive-current-title">研究旅程</h3>
+            <p id="archive-current-summary">从选题到审阅导出的 8 阶段流水线，每阶段需检查点确认。</p>
           </section>
 
           <section class="archive-note inspector-section">
             <span class="archive-note-label">相邻笔记</span>
             <div class="archive-backlinks inspector-link-list">
-              <button class="archive-link is-active" data-inspector-view="overview">
-                <span>工作台首页</span>
-                <small>研究问题与下一步</small>
+              <button class="archive-link is-active" data-inspector-view="journey">
+                <span>研究旅程</span>
+                <small>阶段流水线与检查点</small>
               </button>
               <button class="archive-link" data-inspector-view="data-variables">
                 <span>数据与设计</span>
@@ -107,61 +102,51 @@
           </section>
         </aside>
 
-        <!-- ===== 研究总览 ===== -->
-        <section class="view is-active" id="view-overview">
-          <div id="overview-error" class="error-banner" style="display: none;"></div>
+        <!-- ===== 工作台首页 / 研究旅程 ===== -->
+        <section class="view is-active" id="view-journey">
+          <div id="journey-error" class="error-banner" style="display: none;"></div>
 
-          <section class="panel research-topic-intake" id="research-topic-intake">
-            <div class="topic-intake-layout">
-              <div class="topic-intake-copy">
-                <span class="eyebrow">开始一项实证研究</span>
-                <h2>先确定研究选题，再进入判断环节</h2>
-                <p class="muted">输入研究问题，或从已有项目继续。变量角色、识别设计、执行计划和智能中控会在确认选题后展开。</p>
-              </div>
-              <div class="topic-intake-form">
-                <label for="research-topic-input">输入研究问题</label>
+          <!-- Cold-start intake -->
+          <div id="research-topic-intake" class="journey-intake research-topic-intake">
+            <div class="journey-intake-inner">
+              <span class="eyebrow">开始一项实证研究</span>
+              <h2>输入研究问题，启动阶段流水线</h2>
+              <p class="muted">确认选题后，8 个标准阶段会自动展开。每个阶段完成后需人工检查点确认，方可进入下一阶段。</p>
+              <div class="journey-intake-form">
+                <label for="research-topic-input">研究问题</label>
                 <textarea id="research-topic-input" rows="3" placeholder="例如：培训是否影响工资？"></textarea>
-                <div class="topic-intake-actions">
-                  <button class="primary-button" type="button" data-topic-confirm-action>进入研究判断</button>
+                <div class="journey-intake-actions">
+                  <button class="primary-button" type="button" data-topic-confirm-action>确认选题并进入流水线</button>
                   <button class="ghost-button" type="button" data-topic-use-existing-action>从已有选题继续</button>
                   <button class="ghost-button" type="button" data-topic-start-action>从真实数据候选池开始</button>
                 </div>
                 <p class="muted" id="research-topic-existing">正在读取已有选题...</p>
               </div>
             </div>
-          </section>
+          </div>
 
-          <div class="research-workbench-after-topic is-topic-pending" id="research-workbench-after-topic">
-            <!-- 研究问题卡片 -->
-            <div class="research-question-card" id="research-question-card">
-              <div class="research-question-content">
-                <span class="eyebrow">研究问题</span>
-                <h2 id="overview-question">加载中...</h2>
-                <p class="muted" id="overview-project-meta"></p>
-              </div>
-            </div>
-
-            <!-- 产品主链路：下一步研究决策 -->
+          <!-- Pipeline view -->
+          <div id="research-workbench-after-topic" class="journey-pipeline research-workbench-after-topic is-topic-pending" style="display: none;">
             <section class="panel product-next-action" id="product-next-action">
               <div class="panel-head">
                 <h3>下一步研究决策</h3>
-                <span class="pill">工作流契约</span>
+                <span class="pill">workflow_contract</span>
               </div>
               <div id="product-next-action-body" class="product-next-action-body"></div>
             </section>
 
             <section class="panel workflow-spine-panel">
               <div class="panel-head">
-                <h3>实证论文主链路</h3>
-                <span class="pill">标准阶段</span>
+                <h3>产品主链路</h3>
+                <span class="pill">状态机</span>
               </div>
-              <div class="workflow-spine" id="workflow-spine"></div>
+              <div id="workflow-spine" class="workflow-spine"></div>
             </section>
 
             <section class="panel llm-supervisor-panel" id="llm-supervisor-panel">
               <div class="panel-head">
                 <h3>智能中控</h3>
-                <span class="pill">Supervisor</span>
+                <span class="pill">本地 Codex</span>
               </div>
               <div id="llm-supervisor-body" class="llm-supervisor-body"></div>
             </section>
@@ -177,41 +162,44 @@
             <section class="panel agent-task-queue-panel" id="agent-task-queue-panel">
               <div class="panel-head">
                 <h3>Agent 任务队列</h3>
-                <span class="pill">派工草案</span>
+                <span class="pill">摘要优先</span>
               </div>
               <div id="agent-task-queue-body" class="agent-task-queue-body"></div>
             </section>
 
-            <!-- 阶段摘要网格 -->
-            <div class="stage-summary-grid" id="stage-summary-grid"></div>
+            <!-- Stage progress nodes -->
+            <div class="journey-track" id="journey-track"></div>
 
-            <!-- 底部：风险 + 下一步 -->
-            <div class="panel-grid two-up">
-              <section class="panel">
-                <div class="panel-head">
-                  <h3>关键风险</h3>
-                  <span class="pill">待处理</span>
+            <!-- Current stage detail panel -->
+            <div class="journey-stage-detail" id="journey-stage-detail"></div>
+
+            <!-- Quick actions -->
+            <div class="journey-actions" id="journey-actions"></div>
+          </div>
+
+          <div id="checkpoint-modal-container">
+            <div id="checkpoint-modal-overlay" class="checkpoint-modal-overlay" style="display: none;">
+              <div class="checkpoint-modal" role="dialog" aria-modal="true" aria-labelledby="checkpoint-modal-title">
+                <div class="checkpoint-modal-header">
+                  <div class="checkpoint-modal-icon">&#x23F3;</div>
+                  <div>
+                    <h3 id="checkpoint-modal-title" class="checkpoint-modal-title">需要人工确认</h3>
+                    <p id="checkpoint-modal-stage" class="checkpoint-modal-stage">阶段: 文献综述</p>
+                  </div>
                 </div>
-                <div id="overview-risks" class="stack"></div>
-              </section>
-
-              <section class="panel">
-                <div class="panel-head">
-                  <h3>下一步建议</h3>
-                  <span class="pill">推荐</span>
+                <div class="checkpoint-modal-body">
+                  <p id="checkpoint-modal-description" class="checkpoint-modal-description">系统已完成当前阶段，请审阅结果并决定下一步。</p>
+                  <div id="checkpoint-modal-payload" class="checkpoint-modal-payload"></div>
+                  <label for="checkpoint-feedback" class="checkpoint-modal-label">反馈/修改意见（可选）</label>
+                  <textarea id="checkpoint-feedback" class="checkpoint-modal-textarea" rows="3" placeholder="如需修改，请在此输入具体意见..."></textarea>
                 </div>
-                <div id="overview-next-steps" class="stack"></div>
-              </section>
-            </div>
-
-            <!-- 智能体活动时间线 -->
-            <section class="panel" style="margin-top: 18px;">
-              <div class="panel-head">
-                <h3>智能体活动时间线</h3>
-                <span class="pill">最近事件</span>
+                <div class="checkpoint-modal-actions">
+                  <button id="checkpoint-btn-reject" class="btn danger" type="button">拒绝/终止</button>
+                  <button id="checkpoint-btn-modify" class="btn secondary" type="button">修改后继续</button>
+                  <button id="checkpoint-btn-approve" class="btn primary" type="button">确认/继续</button>
+                </div>
               </div>
-              <div id="overview-events" class="event-timeline"></div>
-            </section>
+            </div>
           </div>
         </section>
 
@@ -685,243 +673,108 @@
               <div id="agent-dimension-list" class="stack"></div>
             </section>
           </div>
-          <div class="panel" style="margin-top: 18px;">
-            <div class="panel-head">
-              <h3>智能体详情</h3>
-              <span class="pill" id="agent-detail-id">未选择</span>
-            </div>
-            <div id="agent-detail-panel" class="stack">
-              <div class="empty-state">
-                <div class="empty-state-icon">🤖</div>
-                <h4>选择左侧智能体查看详情</h4>
-                <p class="muted">身份、权限、能力注册、成本和审计日志。</p>
-              </div>
-            </div>
-          </div>
         </section>
 
-        <!-- ===== 旧版页面（保留） ===== -->
-        <section class="view" id="view-dashboard">
-          <div class="metric-grid" id="metric-grid"></div>
-
-          <div class="panel-grid two-up">
-            <section class="panel">
-              <div class="panel-head">
-                <h3>项目概览</h3>
-                <span class="pill" id="status-pill">加载中</span>
-              </div>
-              <div id="dashboard-projects" class="stack"></div>
-            </section>
-
-            <section class="panel">
-              <div class="panel-head">
-                <h3>当前选中项目</h3>
-                <span class="pill" id="selected-project-pill">未选择</span>
-              </div>
-              <div id="selected-project-summary" class="stack muted"></div>
-            </section>
+        <!-- ===== 治理面板 ===== -->
+        <section class="view" id="view-governance-panel">
+          <div id="governance-panel-error" class="error-banner" style="display: none;"></div>
+          <div class="page-header">
+            <h2>治理面板</h2>
+            <p class="muted">Agent 身份、权限矩阵、能力目录与成本追踪</p>
           </div>
-        </section>
 
-        <section class="view" id="view-projects">
-          <div class="panel-grid two-up">
-            <section class="panel">
-              <div class="panel-head">
-                <h3>项目列表</h3>
-                <span class="pill">多项目</span>
-              </div>
-              <div id="project-list" class="stack"></div>
-            </section>
-
-            <section class="panel">
-              <div class="panel-head">
-                <h3>创建新项目</h3>
-                <span class="pill">向导</span>
-              </div>
-              <form id="project-form" class="form-stack">
-                <label>
-                  <span>项目标识</span>
-                  <input name="slug" placeholder="my-thesis-project" required />
-                </label>
-                <label>
-                  <span>标题</span>
-                  <input name="title" placeholder="我的论文项目" required />
-                </label>
-                <label>
-                  <span>研究问题</span>
-                  <textarea name="question" placeholder="X 对 Y 的影响" required></textarea>
-                </label>
-                <button type="submit" class="primary-button">创建工作区</button>
-              </form>
-              <p id="project-form-result" class="form-result"></p>
-            </section>
+          <div class="governance-tabs">
+            <button class="governance-tab is-active" data-governance-tab="identity" onclick="switchGovernanceTab('identity')">身份</button>
+            <button class="governance-tab" data-governance-tab="permissions" onclick="switchGovernanceTab('permissions')">权限</button>
+            <button class="governance-tab" data-governance-tab="capabilities" onclick="switchGovernanceTab('capabilities')">能力</button>
+            <button class="governance-tab" data-governance-tab="costs" onclick="switchGovernanceTab('costs')">成本</button>
           </div>
-        </section>
 
-        <section class="view" id="view-workflow">
-          <div class="panel-grid two-up">
-            <section class="panel">
+          <div class="governance-tab-content is-active" id="governance-tab-identity">
+            <div class="panel">
               <div class="panel-head">
-                <h3>执行操作</h3>
-                <span class="pill">操作</span>
+                <h3>身份注册表</h3>
+                <span class="pill" id="governance-identity-status">未初始化</span>
               </div>
-              <div class="action-group">
-                <button id="run-dry-button" class="primary-button">试运行</button>
-                <button id="run-live-button" class="primary-button accent">正式运行</button>
-                <button id="orchestrate-button" class="primary-button">编排执行</button>
-                <button id="export-button" class="ghost-button">导出 Word</button>
-              </div>
-              <pre id="execution-log" class="console-box">等待执行…</pre>
-            </section>
-
-            <section class="panel">
-              <div class="panel-head">
-                <h3>阶段面板</h3>
-                <span class="pill">阶段</span>
-              </div>
-              <ol id="workflow-steps" class="workflow-list"></ol>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" id="view-agent-cluster">
-          <!-- Error Banner -->
-          <div id="agent-cluster-error" class="error-banner" style="display: none;"></div>
-
-          <!-- 工作流头部 -->
-          <div id="workflow-header" class="workflow-header">
-            <div class="workflow-header-main">
-              <span class="eyebrow">研究工作流</span>
-              <h2 id="workflow-title">尚未启动研究</h2>
-              <p id="workflow-subtitle" class="muted">输入研究问题并点击启动</p>
-            </div>
-            <div class="workflow-header-meta">
-              <div class="meta-item">
-                <span class="meta-label">阶段</span>
-                <span id="workflow-phase" class="meta-value">-</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">总体进度</span>
-                <span id="workflow-progress" class="meta-value">0%</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">智能体</span>
-                <span id="workflow-agent-count" class="meta-value">0/10</span>
-              </div>
-              <button id="cancel-workflow-button" class="ghost-button" style="display: none;">取消</button>
-              <button id="toggle-artifact-drawer" class="ghost-button">产物</button>
+              <div id="governance-identity-body" class="stack"></div>
             </div>
           </div>
 
-          <!-- 阶段时间线 -->
-          <div id="stage-timeline" class="stage-timeline"></div>
+          <div class="governance-tab-content" id="governance-tab-permissions">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>权限策略</h3>
+                <span class="pill" id="governance-permissions-status">未初始化</span>
+              </div>
+              <div id="governance-permissions-body" class="stack"></div>
+            </div>
+            <div class="panel" style="margin-top: 18px;">
+              <div class="panel-head">
+                <h3>权限检查工具</h3>
+                <span class="pill">快速验证</span>
+              </div>
+              <div id="governance-permission-check-body" class="stack"></div>
+            </div>
+          </div>
 
-          <!-- 智能体集群面板 -->
-          <div id="agent-cluster-panel" class="agent-cluster-panel"></div>
+          <div class="governance-tab-content" id="governance-tab-capabilities">
+            <div class="panel">
+              <div class="panel-head">
+                <h3>能力目录</h3>
+                <span class="pill" id="governance-capabilities-status">未索引</span>
+              </div>
+              <div id="governance-capabilities-body" class="stack"></div>
+            </div>
+          </div>
 
-          <!-- Completion Card (hidden by default) -->
-          <div id="completion-card" class="completion-card" style="display: none;">
-            <div class="completion-card-inner">
-              <div class="completion-icon">✓</div>
-              <div class="completion-content">
-                <h3>研究完成</h3>
-                <p id="completion-summary">所有智能体已完成并行研究</p>
-                <div class="completion-stats" id="completion-stats"></div>
-                <div class="completion-actions">
-                  <button id="view-report-button" class="primary-button">查看最终报告</button>
-                  <button id="promote-artifacts-button" class="ghost-button">导出到项目</button>
-                  <button id="dismiss-completion-button" class="ghost-button">关闭</button>
+          <div class="governance-tab-content" id="governance-tab-costs">
+            <div class="panel-grid two-up">
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>成本汇总</h3>
+                  <span class="pill" id="governance-costs-status">-</span>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Composer Bar -->
-          <div class="composer-bar">
-            <div class="composer-bar-inner">
-              <input
-                id="research-goal-input"
-                type="text"
-                placeholder="输入研究问题，例如：工业机器人应用对劳动力市场匹配效率的影响..."
-              />
-              <button id="start-workflow-button" class="primary-button">启动研究</button>
-            </div>
-          </div>
-
-          <!-- Artifact Drawer (fixed, off-screen by default) -->
-          <div id="artifact-drawer" class="artifact-drawer">
-            <div class="artifact-drawer-header">
-              <h3>产物列表</h3>
-              <button id="close-artifact-drawer" class="ghost-button">关闭</button>
-            </div>
-            <div id="artifact-drawer-content" class="artifact-drawer-content"></div>
-          </div>
-
-          <!-- 智能体详情抽屉 -->
-          <div id="agent-detail-drawer" class="agent-detail-drawer" aria-hidden="true">
-            <div class="agent-detail-drawer-header">
-              <div class="drawer-header-left">
-                <button id="prev-agent-button" class="ghost-button" disabled>←</button>
-                <h3>智能体工作详情</h3>
-                <button id="next-agent-button" class="ghost-button" disabled>→</button>
-              </div>
-              <button id="close-agent-detail-drawer" class="ghost-button">关闭</button>
-            </div>
-            <div id="agent-detail-drawer-content" class="agent-detail-drawer-content"></div>
-          </div>
-
-          <!-- Report Modal -->
-          <div id="report-modal" class="report-modal" style="display: none;">
-            <div class="report-modal-panel">
-              <div class="report-modal-header">
-                <div>
-                  <h3 id="report-modal-title">最终研究报告</h3>
-                  <p id="report-modal-path" class="muted"></p>
+                <div id="governance-costs-summary-body" class="stack"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <h3>成本事件</h3>
+                  <span class="pill" id="governance-costs-events-count">0</span>
                 </div>
-                <button id="close-report-modal" class="ghost-button">关闭</button>
-              </div>
-              <pre id="report-modal-body" class="report-modal-body"></pre>
+                <div id="governance-costs-events-body" class="stack"></div>
+              </section>
             </div>
           </div>
-
-          <!-- Hover Card (absolute positioned, hidden by default) -->
-          <div id="agent-hover-card" class="agent-hover-card" style="display: none;">
-            <div id="agent-hover-card-content"></div>
-          </div>
         </section>
 
-        <section class="view" id="view-artifacts">
-          <div class="panel">
-            <div class="panel-head">
-              <h3>产物面板</h3>
-              <span class="pill">可追溯</span>
-            </div>
-            <div id="artifact-list" class="artifact-grid"></div>
-          </div>
-        </section>
-
-        <section class="view" id="view-drafts">
-          <div class="panel-grid two-up">
-            <section class="panel">
-              <div class="panel-head">
-                <h3>Markdown 草稿</h3>
-                <span class="pill">内部稿</span>
-              </div>
-              <pre id="markdown-preview" class="draft-box">暂无内容</pre>
-            </section>
-
-            <section class="panel">
-              <div class="panel-head">
-                <h3>关键结果与编排记录</h3>
-                <span class="pill">结构化</span>
-              </div>
-              <pre id="results-preview" class="draft-box">暂无内容</pre>
-            </section>
-          </div>
-        </section>
       </main>
     </div>
 
-    <script src="/assets/app.js?v=20260517-pipeline-mvp-review" defer></script>
+    <!-- Agent Real-time Output Panel -->
+    <div id="agent-output-panel" class="agent-output-panel" style="display:none;">
+      <div class="agent-output-header">
+        <strong>Agent 实时输出</strong>
+        <span class="agent-output-status is-disconnected">○ 未连接</span>
+        <button class="ghost-button" data-close-agent-output>关闭</button>
+      </div>
+      <div class="agent-output-body">
+        <p class="muted">等待运行开始...</p>
+      </div>
+    </div>
+
+    <aside id="agent-detail-drawer" class="agent-detail-drawer" aria-hidden="true" aria-label="Agent 详情抽屉">
+      <div class="agent-detail-drawer-header">
+        <button id="prev-agent-button" class="ghost-button" type="button">上一个</button>
+        <strong>Agent 工作详情</strong>
+        <button id="next-agent-button" class="ghost-button" type="button">下一个</button>
+        <button id="close-agent-detail-drawer" class="ghost-button" type="button">关闭</button>
+      </div>
+      <div id="agent-detail-drawer-content" class="agent-detail-drawer-content">
+        <p class="muted">选择一个 Agent 后查看身份、权限、能力、成本和审计记录。</p>
+      </div>
+      <div id="agent-detail-artifact-preview" class="agent-detail-artifact-preview"></div>
+    </aside>
+
+    <script src="/assets/app.js?v=20260522-sse-agent-viz" defer></script>
   </body>
 </html>

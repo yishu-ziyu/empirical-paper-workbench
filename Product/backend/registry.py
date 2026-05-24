@@ -84,6 +84,27 @@ def get_project_by_id(product_root: Path, repo_root: Path, project_id: str) -> d
     raise KeyError(project_id)
 
 
+def get_project_by_id_or_transient(product_root: Path, repo_root: Path, project_id: str) -> dict[str, Any]:
+    try:
+        return get_project_by_id(product_root, repo_root, project_id)
+    except KeyError:
+        root = repo_root.resolve()
+        slug = project_id.removeprefix("proj_").replace("_", "-") or root.name
+        timestamp = utc_now()
+        return {
+            "id": project_id,
+            "slug": slug,
+            "title": root.name,
+            "question": "",
+            "root": str(root),
+            "project_root": str(root),
+            "language": infer_language(root),
+            "source": "transient_runtime",
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+
+
 def add_project(product_root: Path, repo_root: Path, project: dict[str, Any]) -> None:
     payload = read_registry(product_root, repo_root)
     payload["projects"] = [p for p in payload["projects"] if p["slug"] != project["slug"]]

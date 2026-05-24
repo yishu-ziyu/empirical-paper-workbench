@@ -59,7 +59,7 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertTrue(result_path.exists())
         result = json.loads(result_path.read_text(encoding="utf-8"))
         self.assertEqual(result["evidence_level"], "local_execution")
-        self.assertEqual(result["engine"], "python_ols_adapter")
+        self.assertEqual(result["engine"], "statspai")
         self.assertEqual(result["methods"][0]["method_id"], "ols")
         self.assertEqual(result["methods"][0]["task_id"], "baseline_regression")
         self.assertEqual(run["method_execution"]["artifact_path"], "Results/json/method_execution_result.json")
@@ -189,17 +189,17 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202, msg=response.text)
         method_execution = response.json()["method_execution"]
         contract = method_execution["execution_contract"]
-        self.assertEqual(contract["active_backend"], "python_ols_adapter")
+        self.assertEqual(contract["active_backend"], "statspai")
         self.assertEqual(contract["analysis_boundary"], "analysis_ready_numeric_formula_rows")
         self.assertIn("frontend_inference", contract["prohibits"])
         backend_ids = {backend["id"] for backend in contract["available_backends"]}
-        self.assertEqual(backend_ids, {"python_ols_adapter", "statspai", "stata_mcp"})
+        self.assertEqual(backend_ids, {"statspai", "python_ols_adapter", "stata_mcp"})
         backends = {backend["id"]: backend for backend in contract["available_backends"]}
-        self.assertEqual(backends["python_ols_adapter"]["role"], "active_execution")
-        self.assertEqual(backends["python_ols_adapter"]["evidence_level"], "local_execution")
-        self.assertEqual(backends["statspai"]["role"], "candidate_causal_engine")
+        self.assertEqual(backends["statspai"]["role"], "active_execution")
+        self.assertEqual(backends["statspai"]["evidence_level"], "local_execution")
+        self.assertEqual(backends["python_ols_adapter"]["role"], "candidate_execution_engine")
         self.assertEqual(backends["stata_mcp"]["role"], "candidate_reproducibility_engine")
-        self.assertNotEqual(backends["statspai"]["evidence_level"], "local_execution")
+        self.assertNotEqual(backends["python_ols_adapter"]["evidence_level"], "local_execution")
         self.assertNotEqual(backends["stata_mcp"]["evidence_level"], "local_execution")
 
     def test_bdd_9_ols_method_records_data_preflight_and_reproducibility(self) -> None:

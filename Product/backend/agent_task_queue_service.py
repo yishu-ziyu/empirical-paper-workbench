@@ -347,3 +347,71 @@ def unique_preserve_order(values: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def _load_required_queue(project_root: Path) -> dict[str, Any]:
+    queue = load_saved_agent_task_queue(project_root)
+    if not queue:
+        raise AgentTaskQueueBlockedError(
+            "agent_task_queue_required",
+            "Agent Task Queue must exist before this operation.",
+        )
+    return queue
+
+
+def _find_agent_task(queue: dict[str, Any], task_id: str) -> dict[str, Any]:
+    for task in queue.get("tasks", []):
+        if isinstance(task, dict) and task.get("id") == task_id:
+            return task
+    raise AgentTaskQueueBlockedError(
+        "agent_task_not_found",
+        f"Agent task {task_id} does not exist.",
+    )
+
+
+def select_project_agent_task_backend(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    backend_id: str,
+) -> dict[str, Any]:
+    from Product.backend.execution_backend_service import (
+        ExecutionBackendSelectionError,
+        select_execution_backend,
+    )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    select_execution_backend(task, backend_id)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = utc_now()
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    return build_agent_task_queue_response(project, queue)
+
+
+def execute_project_agent_task(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    from Product.backend.execution_backend_service import execute_agent_task_with_backend
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    result = execute_agent_task_with_backend(task, project_root)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = utc_now()
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["execution_result"] = result
+    return response

@@ -1,0 +1,63 @@
+project:
+  slug: card-1993-return-to-education
+  title: "Card (1993): 工具变量估计的教育回报率"
+  language: zh
+  type: seed_template
+  source: "Card, David (1993). Using Geographic Variation in College Proximity to Estimate the Return to Schooling. NBER Working Paper No. 4483."
+
+research:
+  question: "附近是否有四年制大学（nearc4）作为教育年限（educ）的工具变量，能否得到比 OLS 更高的教育回报率估计？"
+  design: quasi-experimental
+  domain: labor_economics
+  key_hypothesis: "OLS 估计存在能力偏差，IV 估计通过地理邻近性外生变化识别因果效应。"
+
+data:
+  source: statspai_builtin
+  dataset_name: card_1995
+  source_url: "https://raw.githubusercontent.com/vincentarelbundock/Rdatasets/master/csv/wooldridge/card.csv"
+  key_variables:
+    outcome: [lwage]
+    treatment: [educ]
+    instruments: [nearc4]
+    controls: [exper, expersq, black, south, smsa]
+    cluster_by: []
+    fixed_effects: []
+  sample_description: "NLSY 1976 年男性青年样本，年龄 24-34 岁。"
+  n_observations: 3010
+  notes: "原始数据包含更多控制变量（如 exper^2, smsa66, reg661-reg668 等），完整分析建议使用完整控制集。"
+
+methods:
+  baseline:
+    candidates: [ols, iv]
+    primary: iv
+    ols_formula: "lwage ~ educ + exper + black + south + smsa + married"
+    iv_formula: "lwage ~ (educ ~ nearc4) + exper + black + south + smsa + married"
+  robustness:
+    candidates: [ols_with_more_controls, iv_with_exper_sq, iv_clustered_se]
+
+manuscript:
+  target_journal: "经济学(季刊) / 世界经济"
+  format: empirical_paper
+  sections:
+    - introduction
+    - literature_review
+    - data_and_variables
+    - empirical_strategy
+    - baseline_results
+    - robustness_checks
+    - conclusion
+
+docs:
+  design_spec: docs/design_spec.md
+  data_dictionary: docs/data_dictionary.md
+  replication_guide: docs/replication_guide.md
+
+empirical_os:
+  version: "0.2.0"
+  required_methods: [ols, iv]
+  recommended_methods: [ols, iv]
+  execution_backend: statspai
+  verification:
+    - ols_coefficient_educ_range: [0.05, 0.10]
+    - iv_coefficient_educ_range: [0.10, 0.20]
+    - first_stage_f_stat_min: 10.0

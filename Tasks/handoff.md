@@ -1,5 +1,31 @@
 # Handoff
 
+## 2026-05-25 补充：P2-AB 质量收口完成
+
+当前 P2-AB 已从“CLI 能跑但前端契约漂移”修复到“CLI + 首页 + Agent Console 重新对齐”。核心变化：
+
+- `Product/cli.py auto-research` 已能以研究题目创建本地 Auto Research Run，默认 `mode=auto` / `execution_policy=best_available`。
+- `Product/backend/auto_research_service.py` 写入能力状态、递归搜索计划、文献线索、变量候选、方法候选、证据缺口、研究报告和 exploratory 草稿。
+- 自动产物仍是草案层：`artifact_policy.status=needs_human_review`、`can_promote=false`，不会覆盖 VariableRoleSet、DesignSpec、RunPlan、FindingCard 或 Manuscript 正式层。
+- 前端首页恢复 topic-first 入口，未确认题目时不再默认铺开全部工作台细节。
+- Agent Console 的身份、权限、能力、成本和审计日志只在右侧 drawer 展开；主工作区只保留可扫读 Agent 列表。
+
+验证证据：
+
+- `python3 -m unittest discover -s tests -v`：282 tests OK，skipped=1。
+- `node --check Product/web/assets/app.js`：通过。
+- `python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py Product/app.py`：通过。
+- `git diff --check -- <本轮 scoped files>`：通过。
+- Playwright 浏览器验收截图：`journey-final-verify.png`、`journey-agent-drawer-clean-verify.png`。
+
+下一轮第一件事：P2-AC 做 Auto Research execution adapter selection，把已生成的 topic/intake/candidates 接到真实 StatsPAI/Python 执行计划，但仍必须先写 evaluator checks 和人工审阅 gate，不允许直接晋升正式结论。
+
+## 2026-05-22 补充：长程优化协议
+
+本轮已把“平台期识别 -> 策略跃迁 -> 打破-修复 -> 证据验收”固化为项目流程。下一轮如果继续 P2-AA、方法执行、论文生成或产品状态机任务，先读取 `docs/architecture-v2/long-run-optimization-protocol.md`，并在 `Tasks/round-log.md` 写入本轮目标、当前最好结果、平台期判断、瓶颈、下一策略、回滚点和证据路径。
+
+关键约束：不能把设计文档、mock JSON、UI 状态或任务骨架当作真实执行证明；真实完成必须能追到命令、日志、测试输出或结果文件。
+
 更新时间：2026-05-17 22:20 CST
 
 ## 当前目标
@@ -2170,3 +2196,63 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - verifier checks 与当前 export package 绑定；重新生成 finding、candidate 或 export package 后必须重新运行核验。
 - DID/IV/RDD/PSM/DML 未来进入真实执行后，还需要方法族专用 verifier checks。
 - 当前工作区还有非本轮改动：`README.md`、`Manuscripts/templates/README.md` 和 `Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/`，不要在 P2-Z commit 中暂存或回滚。
+
+## 2026-05-25 P2-AB Topic-first Auto Research CLI 交接增量
+
+更新时间：2026-05-25 18:10 CST
+
+### 当前目标
+
+把本地高效工作流从“页面驱动状态机”推进到“题目优先 CLI 驱动的 Auto Research Run”。用户给一个研究题目后，系统先创建候选层研究运行包，记录可用能力、递归搜索计划、文献线索、变量候选、方法候选、证据缺口、研究报告和 exploratory 论文草稿。
+
+### 已完成事项
+
+- 新增 BDD：`docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`。
+- 新增测试：`tests/test_auto_research_cli.py`。
+- 新增服务：`Product/backend/auto_research_service.py`。
+- 扩展 CLI：`Product/cli.py` 新增 `auto-research` 子命令。
+- 扩展 registry/governance：未注册本地项目通过 transient runtime project 进入 identity、permission、capability、cost 服务，不写入 Product 全局项目 registry。
+- 更新 durable notes：`Tasks/todo.md`、`Tasks/decision-log.md`、`Tasks/manifest.md`、`Tasks/review.md`。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_auto_research_cli -v` 首次失败，原因是 `auto-research` 子命令不存在。
+- GREEN：`python3 -m unittest tests.test_auto_research_cli -v`，1 test OK。
+- 相邻回归：`python3 -m unittest tests.test_auto_research_cli tests.test_cli_workbench -v`，2 tests OK。
+- 静态检查：`python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py` 通过。
+- JS/格式检查：`node --check Product/web/assets/app.js` 通过；`git diff --check -- <本轮文件>` 通过。
+- 手动 CLI 验收：`python3 Product/cli.py auto-research --topic "人工智能是否影响劳动收入差距" --mode auto --max-depth 2 --max-iterations 5` 返回 `status=completed`、`execution_policy=best_available`，运行目录 `workspace/runs/run_20260524T172441Z_c063b7`。
+- 全量回归：`python3 -m unittest discover -s tests -v` 当前 17 failures，skipped=1；失败均为前端契约类测试，见 `Tasks/review.md`。
+
+### 关键文件路径
+
+- `Product/backend/auto_research_service.py`
+- `Product/cli.py`
+- `Product/backend/registry.py`
+- `Product/backend/identity_service.py`
+- `Product/backend/permission_service.py`
+- `Product/backend/capability_registry.py`
+- `Product/backend/cost_service.py`
+- `tests/test_auto_research_cli.py`
+- `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`
+- `workspace/runs/{run_id}/run_manifest.json`
+- `state/orchestration/literature_clues.jsonl`
+
+### 不能重复探索的结论
+
+- Auto Research CLI 是候选层和草稿层生成器，不是正式层写回器。
+- `execution_policy=best_available` 的意思是尽量使用当前机器可用能力；不可用能力必须写入 `capability_status`，不是伪装成功。
+- CNKI 第一版只能作为文献线索候选，不能静默下载全文，不能成为正式证据。
+- `agentmemory` 是可选 operation memory，不是 canonical state，也不是正式 evidence。
+- 未注册本地项目不应写入 Product 全局 registry；CLI 临时项目用 transient runtime project 视图即可。
+
+### 下一步第一件事
+
+先修复当前 17 个前端契约失败，恢复全量测试绿线。之后再做 P2-AC：把 Auto Research 的 capability registry 与真实 StatsPAI function schema / CNKI assisted search / web literature search 接起来，让候选层从“本地扫描 + 探测”升级为“可审计外部搜索 + 可执行方法候选”。
+
+### 未解决风险
+
+- 当前 Auto Research 不会真正运行 StatsPAI 方法、CNKI 浏览器辅助检索或 LLM Supervisor 子任务，只记录能力状态和候选产物。
+- 变量候选仍是字段名启发式，不能进入论文分析。
+- 全量前端契约失败说明 UI 与历史 BDD 漂移；不应在未修复前继续声称产品前端完整可用。
+- 本轮未 commit；工作树有大量既有改动和未跟踪文件，需要在提交前按文件范围审查。

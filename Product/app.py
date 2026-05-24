@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import asyncio
+import json
+import queue
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from Product.backend.agent_task_queue_service import (
     AgentTaskQueueBlockedError,
     create_project_agent_task_queue,
+    execute_project_agent_task,
     get_project_agent_task_queue,
+    select_project_agent_task_backend,
 )
 from Product.backend.agent_registry_service import get_agent_details, list_agents
 from Product.backend.artifact_service import get_artifact, promote_artifact
@@ -56,6 +62,16 @@ from Product.backend.overview_service import (
     profile_external_dataset_import,
     save_external_dataset_bind_preflight,
 )
+from Product.backend.execution_backend_service import ExecutionBackendSelectionError
+from Product.backend.git_experiment_logger import (
+    commit_stage,
+    get_experiment_history,
+    revert_to_commit,
+)
+from Product.backend.orchestrator import (
+    load_checkpoints,
+    resolve_checkpoint,
+)
 from Product.backend.project_service import (
     MethodExecutionError,
     UnsupportedRunPlanMethodError,
@@ -98,6 +114,7 @@ from Product.backend.reviewer_score_service import (
     generate_project_reviewer_scorecard,
     get_project_reviewer_scorecard,
 )
+from Product.backend.run_event_bus import ensure_queue, get_queue, list_active_runs
 from Product.backend.verifier_service import (
     ExportCandidateRequiredError,
     get_project_verifier_checks,
@@ -137,6 +154,32 @@ from Product.backend.workflow_service import (
     load_artifacts,
     load_tasks,
     start_workflow,
+)
+from Product.backend.identity_service import (
+    IdentityServiceError,
+    activate_agent,
+    deactivate_agent,
+    get_project_identity,
+    init_project_identities,
+)
+from Product.backend.permission_service import (
+    PermissionServiceError,
+    check_permission,
+    get_project_permissions,
+    init_project_permissions,
+    save_project_permissions,
+    update_policy,
+)
+from Product.backend.capability_registry import (
+    CapabilityRegistryError,
+    get_project_capabilities,
+    reindex_capabilities,
+)
+from Product.backend.cost_service import (
+    CostServiceError,
+    finish_cost_event,
+    get_project_costs,
+    start_cost_event,
 )
 
 
@@ -189,6 +232,11 @@ class WorkbenchRunPayload(BaseModel):
 class ResolveGatePayload(BaseModel):
     action: str
     note: str = ""
+
+
+class ResolveCheckpointPayload(BaseModel):
+    status: str
+    user_feedback: str = ""
 
 
 class VariableRolePayload(BaseModel):
@@ -291,6 +339,11 @@ class AgentTaskDispatchReviewPayload(BaseModel):
     note: str = ""
 
 
+class AgentTaskSelectBackendPayload(BaseModel):
+    backend_id: str
+    note: str = ""
+
+
 class ResearchQuestionPayload(BaseModel):
     question: str
     source: str = "user_input"
@@ -304,6 +357,47 @@ class CreateWorkflowPayload(BaseModel):
 
 class PromoteArtifactPayload(BaseModel):
     target: str
+
+
+class GovernanceInitPayload(BaseModel):
+    note: str = ""
+
+
+class GovernancePermissionCheckPayload(BaseModel):
+    subject_id: str
+    action: str
+    note: str = ""
+
+
+class GovernancePermissionPolicyPayload(BaseModel):
+    subject_id: str
+    allow: list[str] = []
+    deny: list[str] = []
+
+
+class GovernancePermissionUpdatePayload(BaseModel):
+    policies: list[GovernancePermissionPolicyPayload]
+
+
+class GovernanceCostEventPayload(BaseModel):
+    workflow_id: str = ""
+    task_id: str = ""
+    actor_id: str
+    capability_id: str
+    event_type: str = "agent_task_run"
+    note: str = ""
+
+
+class GovernanceCostFinishPayload(BaseModel):
+    event_id: str
+    status: str
+    wall_seconds: float = 0.0
+    provider: str = ""
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_usd: float = 0.0
+    note: str = ""
 
 
 @app.get("/api/status")
@@ -865,6 +959,226 @@ def api_v1_review_project_agent_task_dispatch(
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/select-backend")
+def api_v1_select_project_agent_task_backend(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskSelectBackendPayload,
+) -> dict:
+    try:
+        return select_project_agent_task_backend(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.backend_id,
+        )
+    except ExecutionBackendSelectionError as exc:
+        status_code = 400 if exc.code in ("invalid_backend_id", "dispatch_review_required") else 409
+        return error_response(status_code, exc.code, str(exc))
+    except AgentTaskDispatchReviewError as exc:
+        status_code = 400 if exc.code == "invalid_dispatch_review_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/execute")
+def api_v1_execute_project_agent_task(
+    project_id: str,
+    task_id: str,
+) -> dict:
+    try:
+        return execute_project_agent_task(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+        )
+    except AgentTaskDispatchReviewError as exc:
+        status_code = 400 if exc.code == "invalid_dispatch_review_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+# ===== Governance Routes =====
+
+@app.get("/api/v1/projects/{project_id}/governance/identity")
+def api_v1_project_governance_identity(project_id: str) -> dict:
+    try:
+        return get_project_identity(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/identity/init", status_code=201)
+def api_v1_init_project_governance_identity(
+    project_id: str, payload: GovernanceInitPayload,
+) -> dict:
+    try:
+        return init_project_identities(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except IdentityServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/governance/identity/agents/{agent_id}/activate")
+def api_v1_activate_governance_agent(project_id: str, agent_id: str) -> dict:
+    try:
+        return activate_agent(PRODUCT_ROOT, REPO_ROOT, project_id, agent_id)
+    except IdentityServiceError as exc:
+        return error_response(404, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/governance/identity/agents/{agent_id}/deactivate")
+def api_v1_deactivate_governance_agent(project_id: str, agent_id: str) -> dict:
+    try:
+        return deactivate_agent(PRODUCT_ROOT, REPO_ROOT, project_id, agent_id)
+    except IdentityServiceError as exc:
+        return error_response(404, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/governance/permissions")
+def api_v1_project_governance_permissions(project_id: str) -> dict:
+    try:
+        return get_project_permissions(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/permissions/init", status_code=201)
+def api_v1_init_project_governance_permissions(
+    project_id: str, payload: GovernanceInitPayload,
+) -> dict:
+    try:
+        return init_project_permissions(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except PermissionServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/permissions/check")
+def api_v1_check_governance_permission(
+    project_id: str, payload: GovernancePermissionCheckPayload,
+) -> dict:
+    try:
+        return check_permission(
+            PRODUCT_ROOT, REPO_ROOT, project_id,
+            payload.subject_id, payload.action,
+        )
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/governance/permissions/policies/{subject_id}")
+def api_v1_update_governance_permission_policy(
+    project_id: str, subject_id: str, payload: GovernancePermissionPolicyPayload,
+) -> dict:
+    try:
+        return update_policy(
+            PRODUCT_ROOT, REPO_ROOT, project_id,
+            subject_id, payload.allow, payload.deny,
+        )
+    except PermissionServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/governance/permissions")
+def api_v1_save_governance_permissions(
+    project_id: str, payload: GovernancePermissionUpdatePayload,
+) -> dict:
+    try:
+        policies = [p.model_dump() for p in payload.policies]
+        return save_project_permissions(PRODUCT_ROOT, REPO_ROOT, project_id, policies)
+    except PermissionServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/governance/capabilities")
+def api_v1_project_governance_capabilities(project_id: str) -> dict:
+    try:
+        return get_project_capabilities(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/capabilities/reindex", status_code=201)
+def api_v1_reindex_governance_capabilities(
+    project_id: str, payload: GovernanceInitPayload,
+) -> dict:
+    try:
+        return reindex_capabilities(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except CapabilityRegistryError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/governance/costs")
+def api_v1_project_governance_costs(project_id: str) -> dict:
+    try:
+        return get_project_costs(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/costs/start", status_code=201)
+def api_v1_start_governance_cost_event(
+    project_id: str, payload: GovernanceCostEventPayload,
+) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+        project_root = Path(project.get("project_root") or project["root"]).resolve()
+        event_id = start_cost_event(
+            project_root, project_id,
+            payload.workflow_id, payload.task_id,
+            payload.actor_id, payload.capability_id,
+            payload.event_type,
+        )
+        return {
+            "event_id": event_id,
+            "status": "started",
+            "project_id": project_id,
+        }
+    except CostServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/governance/costs/finish")
+def api_v1_finish_governance_cost_event(
+    project_id: str, payload: GovernanceCostFinishPayload,
+) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+        project_root = Path(project.get("project_root") or project["root"]).resolve()
+        return finish_cost_event(
+            project_root, payload.event_id, payload.status,
+            payload.wall_seconds, payload.provider, payload.model,
+            payload.input_tokens, payload.output_tokens, payload.estimated_usd,
+        )
+    except CostServiceError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
 @app.put("/api/v1/projects/{project_id}/run-plan")
 def api_v1_save_project_run_plan(project_id: str, payload: RunPlanPayload) -> dict:
     try:
@@ -1182,6 +1496,18 @@ def api_v1_create_full_run(project_id: str) -> dict:
         return error_response(409, "method_execution_failed", f"{exc.code}: {exc}")
 
 
+@app.get("/api/v1/projects/{project_id}/runs/active")
+def api_v1_project_active_runs(project_id: str) -> dict:
+    """Return active run IDs for this project."""
+    try:
+        get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+    active_runs = list_active_runs()
+    return {"project_id": project_id, "active_runs": active_runs}
+
+
 @app.get("/api/v1/projects/{project_id}/runs")
 def api_v1_runs(project_id: str) -> dict:
     try:
@@ -1248,6 +1574,51 @@ def api_v1_run_events(project_id: str, run_id: str) -> dict:
         return error_response(404, "run_not_found", f"Run {run_id} events do not exist.")
 
 
+@app.get("/api/v1/projects/{project_id}/runs/{run_id}/stream")
+async def api_v1_run_event_stream(project_id: str, run_id: str):
+    """Server-Sent Events endpoint for real-time run updates."""
+    try:
+        get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+    q = get_queue(run_id) or ensure_queue(run_id)
+
+    async def event_generator():
+        yield (
+            "event: connected\n"
+            f"data: {json.dumps({'run_id': run_id, 'status': 'listening'}, ensure_ascii=False)}\n\n"
+        )
+
+        while True:
+            try:
+                event = await asyncio.wait_for(
+                    asyncio.to_thread(q.get, timeout=1.0),
+                    timeout=5.0,
+                )
+                data = json.dumps(event, ensure_ascii=False)
+                yield f"event: {event['type']}\ndata: {data}\n\n"
+
+                if event["type"] in ("run.completed", "run.failed"):
+                    break
+            except (asyncio.TimeoutError, queue.Empty):
+                yield ":keep-alive\n\n"
+            except Exception:
+                break
+
+        yield f"event: closed\ndata: {json.dumps({'run_id': run_id}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.get("/api/v1/projects/{project_id}/runs/{run_id}/steps")
 def api_v1_run_steps(project_id: str, run_id: str) -> dict:
     try:
@@ -1312,6 +1683,90 @@ def api_v1_orchestrate(project_id: str, mode: str = "dry-run") -> dict:
         "mode": mode,
         "orchestration": result,
         "snapshot": get_project_detail_api_view(PRODUCT_ROOT, REPO_ROOT, project_id),
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/experiments")
+def api_v1_project_experiments(project_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    project_root = Path(project.get("project_root", project.get("root", "")))
+    experiments = get_experiment_history(project_root)
+    return {
+        "project_id": project_id,
+        "experiments": experiments,
+    }
+
+
+@app.post("/api/v1/projects/{project_id}/experiments/{commit_hash}/revert")
+def api_v1_revert_experiment(project_id: str, commit_hash: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    project_root = Path(project.get("project_root", project.get("root", "")))
+    result = revert_to_commit(project_root, commit_hash)
+    return {
+        "project_id": project_id,
+        "commit_hash": commit_hash,
+        "reverted": result["reverted"],
+        "reason": result.get("reason", ""),
+        "snapshot": get_project_detail_api_view(PRODUCT_ROOT, REPO_ROOT, project_id),
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/checkpoints")
+def api_v1_project_checkpoints(project_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    project_root = Path(project.get("project_root", project.get("root", "")))
+    checkpoints = load_checkpoints(project_root)
+    return {
+        "project_id": project_id,
+        "checkpoints": checkpoints,
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/checkpoints/pending")
+def api_v1_project_checkpoints_pending(project_id: str) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    project_root = Path(project.get("project_root", project.get("root", "")))
+    checkpoints = load_checkpoints(project_root)
+    pending = [cp for cp in checkpoints if cp.get("status") == "pending"]
+    return {
+        "project_id": project_id,
+        "pending": pending,
+    }
+
+
+@app.post("/api/v1/projects/{project_id}/checkpoints/{checkpoint_id}/resolve")
+def api_v1_resolve_checkpoint(
+    project_id: str, checkpoint_id: str, payload: ResolveCheckpointPayload
+) -> dict:
+    try:
+        project = get_project_by_id(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    project_root = Path(project.get("project_root", project.get("root", "")))
+    result = resolve_checkpoint(
+        project_root=project_root,
+        checkpoint_id=checkpoint_id,
+        status=payload.status,
+        user_feedback=payload.user_feedback,
+    )
+    return {
+        "project_id": project_id,
+        "checkpoint_id": checkpoint_id,
+        "resolved": result.get("resolved", False),
+        "checkpoint": result.get("checkpoint"),
+        "reason": result.get("reason", ""),
     }
 
 

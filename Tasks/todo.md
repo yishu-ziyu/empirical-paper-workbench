@@ -1,5 +1,25 @@
 # Todo
 
+## 2026-05-22 Long-run Optimization Protocol
+
+- [x] 定位项目根目录：`/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
+- [x] 读取项目 `AGENTS.md`、`Tasks/workflow.md`、`Tasks/long-run-iteration-plan.md`、`Tasks/manifest.md`、`Tasks/decision-log.md`，确认本轮只做流程文档固化。
+- [x] 新增 `docs/architecture-v2/long-run-optimization-protocol.md`，定义平台期触发、策略跃迁、打破-修复和证据验收规则。
+- [x] 新增 `Tasks/round-log.md`，作为长程研发轮次账本。
+- [x] 将协议挂载到 `Tasks/long-run-iteration-plan.md`、`Tasks/workflow.md`、`Tasks/manifest.md`、`Tasks/decision-log.md`。
+- [ ] 下一轮 P2-AA、方法执行、论文生成或产品状态机任务开始前，按 `Tasks/round-log.md` 模板记录本轮目标、平台期判断和策略选择。
+
+## 2026-05-25 P2-AB 质量收口：Topic-first Auto Research + 前端契约修复
+
+- [x] 按 BDD/TDD 完成 `auto-research` CLI：用户只给研究题目即可生成本地 Auto Research Run。
+- [x] Auto Mode 默认 `best_available`，写入 `local_data`、`statspai`、`cnki`、`web_search`、`agentmemory`、`llm_supervisor` 能力状态；不可用能力显式记录原因。
+- [x] 自动产出 `research_report.md` 和 `paper_draft_exploratory.md`，但标记 `needs_human_review` / `can_promote=false`，不能静默覆盖正式层。
+- [x] 修复前端契约漂移：工作台首页恢复 topic-first 产品路径，工作台细节在确认选题后展开。
+- [x] 修复 Agent Console 交互：Agent 行支持点击/键盘激活，详情只在右侧 drawer 展开，不再在主工作区重复铺开。
+- [x] 浏览器验收：Playwright 截图 `journey-final-verify.png`、`journey-agent-drawer-clean-verify.png`；drawer 打开后 `inlinePanelsAfter=0`、`drawerOpen=true`。
+- [x] 全量验证：`python3 -m unittest discover -s tests -v`，282 tests OK，skipped=1；`node --check Product/web/assets/app.js`、Python 编译和 scoped `git diff --check` 通过。
+- [ ] 下一步 P2-AC：把 Auto Research Run 的候选层接到真实执行后端选择，优先实现 StatsPAI/Python execution adapter 的“计划 -> 执行 -> evaluator checks -> 人工审阅”闭环。
+
 ## 当前目标
 
 把实证系统从静态阶段页推进到真实执行过程可观察：前端能选择/展示真实 run_id，读取 observability API，并渲染 run steps、events、HITL gates、产物证据、执行者和证据等级。
@@ -624,3 +644,15 @@
 - [x] 自动验证：`python3 -m unittest tests.test_agent_task_queue -v` 8 tests OK；`python3 -m unittest discover -s tests -v` 234 tests OK，skipped=1；Python 编译、JS 语法和 `git diff --check` 通过。
 - [x] 浏览器验收：真实项目在无 approved SupervisorPlan 时显示 `缺少 SupervisorPlan` 且创建按钮 disabled；受控 approved-plan 场景点击创建后显示 2 个任务、2 个详情默认折叠、无 console error；截图保存到 `/tmp/empirical-workbench-agent-task-queue-p2u-final.png` 和 `/tmp/empirical-workbench-agent-task-queue-p2u-approved.png`。
 - [ ] 下一步 P2-V：把 approved Agent Task Queue 推进到“人工派工 / 执行前审计”状态；仍不能自动启动子 Agent 或绕过任务级人工检查。
+
+## 2026-05-25 P2-AB Topic-first Auto Research CLI
+
+- [x] BDD：锁定 `auto-research` 本地高效工作流主入口，默认追求 best-available execution，而不是 fallback-first dry-run。
+- [x] 边界：CNKI / Web / Zotero / StatsPAI / LLM Supervisor / agentmemory 都是可用则启用；不可用时局部降级并写入 capability evidence，不能静默失败。
+- [x] 边界：所有自动产物默认 `exploratory` / `draft` / `needs_human_review`，不能自动晋升正式变量、正式设计、正式 RunPlan 或正式引用。
+- [x] TDD：新增 `tests/test_auto_research_cli.py`；首次 RED 失败原因为 `Product/cli.py` 尚无 `auto-research` 子命令。
+- [x] 实现：新增 `Product.backend.auto_research_service.run_auto_research()`，复用 `create_run_workspace()` 和现有 evidence inventory。
+- [x] CLI：新增 `python3 Product/cli.py auto-research --topic ... --mode auto --max-depth 2 --max-iterations 5`。
+- [x] 兼容：治理层新增 transient runtime project 解析，允许 CLI 直接指向未注册本地项目，同时不污染 Product 全局 registry。
+- [x] 验证：目标测试、相邻 CLI 回归、Python 编译检查通过。
+- [ ] 全量风险：`python3 -m unittest discover -s tests -v` 当前 282 tests 中 17 个前端契约失败，集中在旧 Agent Drawer、首页产品工作区锚点、中文导航契约和 SupervisorPlan 前端面板；需另开前端契约修复轮。

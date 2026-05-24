@@ -1,5 +1,36 @@
 # Review
 
+## 2026-05-22 Long-run Optimization Protocol
+
+### 行为覆盖
+
+- [x] 行为 1：当长程任务超过两轮或出现重复失败时，执行者有明确入口读取协议并记录轮次。
+- [x] 行为 2：当同类微调进入平台期时，流程要求先定位瓶颈，再选择结构性不同的策略跃迁。
+- [x] 行为 3：策略跃迁后的完成声明必须绑定证据路径，不能只依赖骨架文档、mock JSON 或 UI 状态。
+- [ ] 未覆盖行为：下一轮真实 P2-AA 或研究执行任务尚未按新模板跑完整闭环。
+
+### 测试覆盖
+
+- 测试文件：无代码改动，未新增自动化测试。
+- 运行命令：使用文件存在性、关键词检索和 diff 空白检查验证文档落点。
+- 结果：`test -f`、`rg` 链路检索和 `git diff --check` 均通过。
+
+### 实现范围
+
+- 新增 `docs/architecture-v2/long-run-optimization-protocol.md`：项目级长时间优化协议。
+- 新增 `Tasks/round-log.md`：轮次账本与首轮流程固化记录。
+- 更新 `Tasks/long-run-iteration-plan.md`、`Tasks/workflow.md`、`Tasks/manifest.md`、`Tasks/decision-log.md`、`Tasks/todo.md`：把协议接入现有任务入口。
+
+### 手动验收
+
+1. 打开 `Tasks/todo.md`，确认下一轮开始前有明确待办要求使用 `Tasks/round-log.md`。
+2. 打开 `Tasks/round-log.md`，确认模板包含目标、平台期、瓶颈、策略、回滚点和证据路径。
+3. 打开 `docs/architecture-v2/long-run-optimization-protocol.md`，确认平台期触发与策略跃迁规则完整。
+
+### 剩余风险
+
+- 本轮只固化流程，不证明下一轮执行者一定遵守；需要在下一次 P2-AA 或研究执行任务中实际使用并补充 round entry。
+
 ## 2026-05-17 Pipeline MVP Review
 
 ### 行为覆盖
@@ -1232,3 +1263,93 @@
 - 当前 `docx_export_preflight` blocked 是预期状态，不是失败：它说明系统不会把 preview package 误当成最终交付物。
 - verifier checks 依赖当前 export package 和本地 artifact；如果用户切换 run 或重新生成 manuscript candidate，需要重新运行核验。
 - DID/IV/RDD/PSM/DML 仍未有真实执行产物；这些方法未来进入结果后，verifier 需要扩展方法族专用 checks。
+
+## 2026-05-25 P2-AB Topic-first Auto Research CLI
+
+### 行为覆盖
+
+- [x] 题目优先：用户只给研究题目即可创建一次 Auto Research Run。
+- [x] 默认 best-available：CLI 默认 `mode=auto`、`execution_policy=best_available`，不会默认退回 dry-run。
+- [x] 能力状态可审计：`local_data`、`statspai`、`cnki`、`web_search`、`agentmemory`、`llm_supervisor` 都写入 manifest 的 `capability_status`。
+- [x] 递归研究搜索第一版：系统写入 `recursive_search_plan.json`、`literature_clues.jsonl`、变量候选、方法候选和证据缺口。
+- [x] 安全边界：自动研究报告和 exploratory 论文草稿均 `needs_human_review`，不能自动晋升正式层。
+- [x] 临时项目兼容：未注册本地项目也可以运行 CLI，并把治理状态写在项目自己的 `state/product/`。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_auto_research_cli -v` 首次失败，原因是 `Product/cli.py` 没有 `auto-research` 子命令。
+- 目标测试：`python3 -m unittest tests.test_auto_research_cli -v`，1 test OK。
+- 相邻回归：`python3 -m unittest tests.test_auto_research_cli tests.test_cli_workbench -v`，2 tests OK。
+- 静态检查：`python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py` 通过。
+- JS/格式检查：`node --check Product/web/assets/app.js` 通过；`git diff --check -- <本轮文件>` 通过。
+- 手动 CLI 验收：`python3 Product/cli.py auto-research --topic "人工智能是否影响劳动收入差距" --mode auto --max-depth 2 --max-iterations 5` 返回 `status=completed`、`execution_policy=best_available`，运行目录为 `workspace/runs/run_20260524T172441Z_c063b7`。
+- 初始全量回归：`python3 -m unittest discover -s tests -v`，282 tests 运行，17 failures，skipped=1。失败集中在前端契约：旧 Agent Drawer、Agent Task Queue 前端摘要、中文导航、首页 Topic-first/Product workflow、SupervisorPlan 前端面板。
+- 前端契约修复后全量回归：`python3 -m unittest discover -s tests -v`，282 tests OK，skipped=1。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`：新增 Auto Research CLI 行为契约。
+- `tests/test_auto_research_cli.py`：新增题目优先 CLI、best-available manifest、候选层安全边界测试。
+- `Product/backend/auto_research_service.py`：新增本地 Auto Research Run 生成器。
+- `Product/cli.py`：新增 `auto-research` 子命令。
+- `Product/backend/registry.py`：新增 transient runtime project 解析。
+- `Product/backend/identity_service.py`、`Product/backend/permission_service.py`、`Product/backend/capability_registry.py`、`Product/backend/cost_service.py`：允许治理服务处理未注册本地项目。
+
+### 手动验收
+
+1. 在项目根目录运行：
+   `python3 Product/cli.py auto-research --topic "人工智能是否影响劳动收入差距" --mode auto --max-depth 2 --max-iterations 5`
+2. 确认 stdout JSON 中包含 `status=completed`、`mode=auto`、`execution_policy=best_available`。
+3. 打开返回的 `run_root`，确认存在 `research_intent.json`、`recursive_search_plan.json`、`literature_clues.jsonl`、`variable_candidates.json`、`method_candidates.json`、`research_report.md`、`paper_draft_exploratory.md` 和 `run_manifest.json`。
+4. 确认 `run_manifest.json` 中每个能力条目都有 `available/status/reason/can_promote`，且自动产物 `can_promote=false`。
+
+### 剩余风险
+
+- Auto Research 当前第一版只生成候选和草稿，不会真正调度子 Agent 执行，也不会把结果写入正式研究状态。
+- StatsPAI/CNKI/Web/agentmemory/LLM Supervisor 目前是能力探测与审计状态，下一步需要把可用能力接入真实 execution adapter。
+- 变量候选仍是轻量字段启发式，只能帮助用户审阅，不能作为论文分析变量。
+- 全量测试有 17 个前端契约失败，说明当前页面和历史 BDD 契约已漂移；下一轮应先修复前端契约基线，再继续扩展 UI。
+
+## 2026-05-25 P2-AB Frontend Contract Repair And Visual QA
+
+### 行为覆盖
+
+- [x] 首页首屏遵守 topic-first：用户先输入/确认研究问题，工作台细节默认隐藏或摘要化，不再一进来铺开所有能力。
+- [x] 用户可以从真实数据候选池进入 Data & Design 路径，不必在没有题目时面对全部执行面板。
+- [x] Agent Console 只展示可扫读 Agent 列表；点击 Agent 后，身份、权限、能力、成本和审计日志在右侧 drawer 展开。
+- [x] Agent drawer 支持上一个、下一个、关闭；Agent 行支持鼠标点击和键盘激活。
+- [x] Agent 产物预览在 drawer 内提供 loading、empty、error 状态，不跳转外部浏览器。
+- [x] 主工作区不再重复渲染 `agent-detail-panel`，避免详情信息同时出现在列表下方和右侧 drawer。
+
+### 测试覆盖
+
+- 目标前端回归：`node --check Product/web/assets/app.js && python3 -m unittest tests.test_agent_cluster_frontend_interactions tests.test_frontend_chinese_copy tests.test_product_workflow_contract.ProductWorkflowFrontendContractTests -v`，25 tests OK。
+- 全量回归：`python3 -m unittest discover -s tests -v`，282 tests OK，skipped=1。
+- Python 编译：`python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py Product/app.py` 通过。
+- JS 语法：`node --check Product/web/assets/app.js` 通过。
+- 格式检查：`git diff --check -- <本轮 scoped files>` 通过。
+- 浏览器验收：Playwright 打开 `http://127.0.0.1:8767/?v=20260525-p2ab-quality2`，Agent rows=17，`drawerOpen=true`，`drawerHidden=false`，`inlinePanelsAfter=0`。
+- 截图留档：`journey-final-verify.png`、`journey-agent-drawer-clean-verify.png`。
+
+### 实现范围
+
+- `Product/web/index.html`：恢复 `research-topic-intake` / `research-workbench-after-topic` 的 topic-first DOM 契约；新增右侧 Agent drawer；删除主工作区重复 Agent 详情面板。
+- `Product/web/assets/app.js`：新增 Agent drawer 打开、关闭、上/下导航、键盘激活和 drawer 内产物预览状态。
+- `Product/web/assets/styles.css`：新增 Agent drawer、active row、产物预览 loading/empty/error 样式。
+- `tests/test_agent_cluster_frontend_interactions.py`：作为静态契约，锁定右侧 drawer、键盘激活、产物预览和长正文样式。
+
+### 手动验收
+
+1. 保持服务运行：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8767`。
+2. 打开 `http://127.0.0.1:8767/?v=20260525-p2ab-quality2`。
+3. 首页应先围绕研究问题/下一步决策，不应直接展示所有 JSON、日志和 Agent 详情。
+4. 点击左侧 `工具：智能体控制台`。
+5. 点击任意 Agent 行，例如 `Overview`。
+6. 右侧应打开 `Agent 工作详情` drawer，显示身份、权限、能力注册、成本追踪、审计日志和产物预览空状态；主页面下方不再出现第二份详情面板。
+
+### 剩余风险
+
+- Chrome 当前用户 Profile 对 localhost 出现白屏，Playwright 和 HTTP 请求均证明页面可渲染；更像 Chrome 扩展/Profile 层干扰。已用 Playwright 截图作为验收证据，后续可单独排查 Chrome Profile。
+- Agent drawer 的产物正文预览目前是前端状态框架，真实读取 artifact body 的后端 endpoint 还没接入；下一轮需要做 artifact content API。
+- CNKI 自动浏览器辅助仍受 Chrome remote debugging / 人工登录状态限制，当前只记录 `blocked_by_browser_session`。
+- LLM Supervisor 真正调用 Codex 执行仍受 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 开关保护；未开启时只能生成可审计 blocked 状态。

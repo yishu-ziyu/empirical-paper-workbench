@@ -1,0 +1,207 @@
+/**
+ * Nothing Design System — Empirical OS Tokens
+ * ===========================================
+ * Dark-mode-first, monochrome, typographically driven token system.
+ * Based on Nothing Design System v3.0.0 — adapted for data-dense
+ * academic interfaces (regression tables, verifier gates, evidence cards).
+ *
+ * Fonts required (Google Fonts):
+ *   - Space Grotesk (300, 400, 500, 700)
+ *   - Space Mono (400, 700)
+ *   - Doto (variable, 400–700)
+ *
+ * Load via:
+ *   <link href="https://fonts.googleapis.com/css2?family=Doto:wght@400..700&family=Space+Grotesk:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+ */
+
+/* ============================================================
+   1. COLOR SYSTEM — Dark Mode (OLED-first)
+   ============================================================ */
+
+:root {
+  /* Primary palette */
+  --nt-black: #000000;
+  --nt-surface: #111111;
+  --nt-surface-raised: #1A1A1A;
+  --nt-border: #222222;
+  --nt-border-visible: #333333;
+
+  /* Text hierarchy (4 levels max per screen) */
+  --nt-text-disabled: #666666;
+  --nt-text-secondary: #999999;
+  --nt-text-primary: #E8E8E8;
+  --nt-text-display: #FFFFFF;
+
+  /* Accent & status — used sparingly */
+  --nt-accent: #D71921;          /* Signal red: one per screen */
+  --nt-accent-subtle: rgba(215, 25, 33, 0.15);
+  --nt-success: #4A9E5C;
+  --nt-warning: #D4A843;
+  --nt-error: #D71921;
+  --nt-info: #999999;
+  --nt-interactive: #5B9BF6;
+
+  /* Empirical OS specific — monochrome status */
+  --nt-passed: #FFFFFF;
+  --nt-passed-bg: #1A1A1A;
+  --nt-passed-border: #333333;
+  --nt-blocked: #888888;
+  --nt-blocked-bg: #111111;
+  --nt-blocked-border: #222222;
+
+  /* Light mode overrides (toggle via [data-theme="light"]) */
+  --nt-light-bg: #F5F5F5;
+  --nt-light-surface: #FFFFFF;
+  --nt-light-surface-raised: #F0F0F0;
+  --nt-light-border: #E8E8E8;
+  --nt-light-border-visible: #CCCCCC;
+  --nt-light-text-disabled: #999999;
+  --nt-light-text-secondary: #666666;
+  --nt-light-text-primary: #1A1A1A;
+  --nt-light-text-display: #000000;
+}
+
+/* ============================================================
+   2. TYPOGRAPHY
+   ============================================================ */
+
+:root {
+  /* Font stacks */
+  --font-display: "Doto", "Space Mono", monospace;
+  --font-body: "Space Grotesk", "DM Sans", system-ui, sans-serif;
+  --font-data: "Space Mono", "JetBrains Mono", "SF Mono", monospace;
+
+  /* Type scale */
+  --text-display-xl: 72px;
+  --text-display-lg: 48px;
+  --text-display-md: 36px;
+  --text-heading: 24px;
+  --text-subheading: 18px;
+  --text-body: 16px;
+  --text-body-sm: 14px;
+  --text-caption: 12px;
+  --text-label: 11px;
+
+  /* Line heights */
+  --leading-display: 1.0;
+  --leading-heading: 1.2;
+  --leading-body: 1.5;
+  --leading-caption: 1.4;
+  --leading-label: 1.2;
+
+  /* Letter spacing */
+  --tracking-display: -0.03em;
+  --tracking-heading: -0.01em;
+  --tracking-body: 0;
+  --tracking-caption: 0.04em;
+  --tracking-label: 0.08em;
+}
+
+/* ============================================================
+   3. SPACING (8px base)
+   ============================================================ */
+
+:root {
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+}
+
+/* ============================================================
+   4. BORDERS & RADIUS
+   ============================================================ */
+
+:root {
+  --radius-none: 0px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  --border-width-hairline: 0.5px;
+  --border-width-thin: 1px;
+  --border-width-medium: 1.5px;
+  --border-width-thick: 2px;
+}
+
+/* ============================================================
+   5. MOTION
+   ============================================================ */
+
+:root {
+  --duration-micro: 150ms;
+  --duration-transition: 250ms;
+  --duration-modal: 350ms;
+
+  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================
+   6. DOT-MATRIX MOTIF
+   ============================================================ */
+
+:root {
+  --dot-grid: radial-gradient(circle, var(--nt-border-visible) 1px, transparent 1px);
+  --dot-grid-subtle: radial-gradient(circle, var(--nt-border) 0.5px, transparent 0.5px);
+  --dot-grid-size: 16px;
+  --dot-grid-size-subtle: 12px;
+}
+
+/* ============================================================
+   7. EMPIRICAL OS — COMPONENT TOKENS
+   ============================================================ */
+
+:root {
+  /* FindingCard */
+  --finding-border: var(--nt-border-visible);
+  --finding-bg: var(--nt-surface);
+  --finding-radius: var(--radius-sm);
+  --finding-number-font: var(--font-data);
+  --finding-number-size: var(--text-display-md);
+  --finding-label-font: var(--font-data);
+  --finding-label-size: var(--text-label);
+
+  /* VerifierGate */
+  --gate-border-passed: var(--nt-border-visible);
+  --gate-border-blocked: var(--nt-border);
+  --gate-bg-passed: var(--nt-surface-raised);
+  --gate-bg-blocked: var(--nt-surface);
+  --gate-segment-gap: 2px;
+  --gate-segment-height: 8px;
+
+  /* MethodExecutionEvidence */
+  --evidence-border: var(--nt-border-visible);
+  --evidence-bg: var(--nt-black);
+  --evidence-font: var(--font-data);
+  --evidence-font-size: var(--text-caption);
+
+  /* ReviewerScorecard */
+  --scorecard-border: var(--nt-border);
+  --scorecard-bg: var(--nt-surface);
+  --scorebar-height: 4px;
+  --scorebar-bg: var(--nt-border);
+  --scorebar-fill: var(--nt-text-display);
+
+  /* AgentTaskQueue */
+  --taskqueue-border: var(--nt-border);
+  --taskqueue-bg: var(--nt-surface);
+  --task-indent: var(--space-md);
+
+  /* RegressionTable (三线表) */
+  --table-top-line: 1.5px solid var(--nt-text-display);
+  --table-bottom-line: 1.5px solid var(--nt-text-display);
+  --table-header-line: 0.75px solid var(--nt-border-visible);
+  --table-cell-padding: 12px 16px;
+  --table-font: var(--font-data);
+  --table-header-font: var(--font-data);
+  --table-header-size: var(--text-label);
+  --table-cell-size: var(--text-caption);
+}

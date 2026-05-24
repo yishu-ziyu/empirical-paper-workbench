@@ -13,7 +13,7 @@ from Product.backend.registry import get_project_by_id
 
 
 DATASET_SUFFIXES = {".csv", ".dta", ".xlsx", ".xls", ".sav", ".parquet", ".feather"}
-ROLE_KEYS = ("outcome", "treatment", "controls", "instruments", "fixed_effects", "cluster_by")
+ROLE_KEYS = ("outcome", "treatment", "controls", "instruments", "fixed_effects", "cluster_by", "unit_id", "time_variable", "entity_id", "panel_time", "treatment_timing", "running_variable")
 DATASET_IMPORT_PREFLIGHT_PATH = Path("state/product/dataset_import_preflights.json")
 VARIABLE_ROLE_CANDIDATE_PATH = Path("state/product/variable_role_candidates.json")
 VARIABLE_ROLE_DRAFT_PATH = Path("state/product/variable_roles_drafts.json")

@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-05-25：Auto Research 默认 best-available，但正式层仍受人工审阅保护
+
+Decision: `auto-research` CLI 默认按 `execution_policy=best_available` 运行，探测并记录本地数据、StatsPAI、CNKI、Web、agentmemory 和 LLM Supervisor 能力；同时所有自动报告、变量候选、方法候选和 exploratory 草稿都 `can_promote=false`。
+
+Reason: 用户要求“为什么不做最好的”。本地个人科研 OS 应优先使用当前机器可用的最好能力，而不是先做保守 dry-run；但严肃实证研究不能允许模型静默篡改正式变量、设计、运行计划或论文正文。
+
+Rejected: fallback-first dry-run。原因是它会掩盖本地 StatsPAI/数据/Web 等能力已经可用，也不利于暴露缺失能力。
+
+Rejected: Auto Mode 直接写正式层。原因是这会把探索性候选误当成研究结论，破坏论文 Git 式草案层/正式层边界。
+
+## 2026-05-25：高噪声 Agent 详情只进右侧 drawer
+
+Decision: Agent Console 主工作区只展示可扫读 Agent 列表；身份、权限、能力、成本、审计日志和产物预览统一在右侧 `agent-detail-drawer` 展开。
+
+Reason: 用户指出页面信息会冲爆短时记忆。Agent 治理信息是重要证据，但默认铺在主工作区会挤压用户对下一步任务的判断。
+
+Rejected: 主工作区和 drawer 同时渲染同一份 Agent 详情。原因是这造成重复信息和视觉拥挤，违背“默认摘要、点击展开细节”的 clean workbench 规则。
+
+## 2026-05-22：长程研发必须记录平台期与策略跃迁
+
+Decision: 长时间研究开发必须记录平台期判断、当前瓶颈、策略跃迁、回滚点和证据路径。
+
+Reason: 让第八小时的工作仍然有效，关键不是延长执行时间，而是防止模型在平台期内重复同类微调。
+
+Applied to: `docs/architecture-v2/long-run-optimization-protocol.md`、`Tasks/round-log.md`、`Tasks/long-run-iteration-plan.md`、`Tasks/workflow.md`。
+
+Rejected: 只依赖聊天上下文或模型自行记忆下一步。原因是这种方式无法稳定暴露平台期，也无法区分真实执行证据和骨架文件。
+
+Invariant: 不能把设计文档、mock JSON、UI 状态或任务骨架当作真实执行证明。
+
 ## 2026-05-17：Pipeline MVP Review 必须用浏览器证明完整路径
 
 Decision: P2-V 到 P2-Z 收尾不只跑单元测试，还用 Playwright 打开 `http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`，检查首页选题、SupervisorPlan、Agent Task Queue、变量/方法、Findings/Manuscript 和 Review/Export verifier gates。
@@ -740,3 +770,17 @@ Rejected: 低分后自动创建 Agent Task Queue item。原因是任务队列已
 Rejected: 把 deterministic baseline 标为 `local_execution` 或真实 LLM reviewer。原因是当前没有实际调用审稿模型，只是从本地结果/草稿证据生成最小产品评分。
 
 Evidence: `tests/test_reviewer_scorecard.py` 4 tests OK；相邻回归 25 tests OK；全量回归 252 tests OK，skipped=1；浏览器验收 5 个维度、默认折叠详情、任务草案按钮可见、无 console error 和无 4xx/5xx。
+
+## 2026-05-25：Auto Research CLI 默认追求 best-available，但产物只能进入候选层
+
+Decision: 新增 `auto-research` CLI 作为本地高效工作流主入口。用户只给研究题目时，系统创建一次 `workspace/runs/{run_id}`，写入研究意图、能力状态、递归搜索计划、文献线索、变量候选、方法候选、证据缺口、研究报告和 exploratory 论文草稿。
+
+Reason: 本地工作流主线需要比前端更快地验证“题目 -> 变量 -> 数据 -> 方法 -> 证据缺口 -> 下一轮搜索”的闭环。这个入口必须尽量使用当前机器可用能力，而不是一开始退回 demo dry-run。
+
+Rejected: 把 Auto Mode 的变量候选、方法候选或论文草稿直接写入正式 `variable_roles.json`、`design_spec.json` 或 `run_plan.json`。原因是这些输出仍是 exploratory，需要人工审阅后才能进入正式层。
+
+Rejected: CNKI / Web / StatsPAI / agentmemory 不可用时静默跳过。原因是这会让用户误以为系统已完整搜索和执行；不可用必须成为 `capability_status` 的可审计条目。
+
+Rejected: 为了让 CLI 临时项目跑通而写入 Product 全局 `state/projects.json`。原因是测试或一次性本地任务不应该污染产品 registry；治理层改为使用 transient runtime project 视图。
+
+Evidence: `python3 -m unittest tests.test_auto_research_cli -v` 1 test OK；`python3 -m unittest tests.test_auto_research_cli tests.test_cli_workbench -v` 2 tests OK；`python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py` 通过。全量回归当前仍有 17 个既有前端契约失败，需要单独修复。

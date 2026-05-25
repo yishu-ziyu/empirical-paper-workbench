@@ -180,6 +180,25 @@ Each module needs:
 - evidence / provenance access,
 - human review action if it can affect formal research state.
 
+## Agent Activity Panel Direction
+
+The Agent / Audit Console should learn from a notification-feed pattern:
+
+- each item is one agent activity,
+- avatar becomes agent identity,
+- unread dot becomes attention required,
+- file card becomes artifact / evidence card,
+- tabs filter all / needs review / running / blocked / artifacts,
+- actions become approve / revise / reject / open evidence.
+
+This panel should visualize agent work, but it should not become a raw log stream. Default view is compact; technical details open in Inspector or an audit drawer.
+
+After SupervisorPlan approval, Auto Mode should stop at this human gate:
+
+> Agent Task Queue prepared; confirm whether to start real data and method execution.
+
+Do not design the queue as if real execution has already started.
+
 ## Draft vs Formal Boundary
 
 This is critical.

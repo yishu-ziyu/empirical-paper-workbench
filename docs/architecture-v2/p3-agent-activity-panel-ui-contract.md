@@ -230,11 +230,19 @@ Error:
 - The next human gate is clear: start real data / method execution.
 - No formal research state is promoted from this panel without explicit user action.
 
-## Next Grill-Me Decision
+## Confirmed MVP Decision
 
-Decide what the `start_execution` confirmation should require:
+MVP uses one global `start_execution` confirmation.
 
-- just one global confirmation,
-- or per-stage confirmation for data, method, and manuscript stages.
+The global confirmation should appear after the Agent Task Queue is prepared and before any real data / method execution starts.
 
-Recommended: one global confirmation for the MVP, with stage-level pause/reject controls available later if a task becomes blocked or risky.
+The confirmation should summarize:
+
+- execution scope,
+- selected data / method route,
+- evidence requirements,
+- formal-write boundaries,
+- expected artifacts,
+- known risks.
+
+Do not require the user to approve every small task during the MVP. Stage-level pause / reject controls can be added later only for high-risk or blocked stages.

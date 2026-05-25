@@ -6,6 +6,9 @@
 __pycache__/
 *.py[cod]
 
+# Frontend dependencies
+Product/web-react/node_modules/
+
 # Product runtime state
 Product/state/*.json
 Product/state/workflows/

@@ -20,6 +20,19 @@
 - [x] 全量验证：`python3 -m unittest discover -s tests -v`，282 tests OK，skipped=1；`node --check Product/web/assets/app.js`、Python 编译和 scoped `git diff --check` 通过。
 - [ ] 下一步 P2-AC：把 Auto Research Run 的候选层接到真实执行后端选择，优先实现 StatsPAI/Python execution adapter 的“计划 -> 执行 -> evaluator checks -> 人工审阅”闭环。
 
+## 2026-05-25 P3 React Input And Slide Tabs
+
+- [x] 按用户指定的两个 UI 参考，先只做研究输入器和阶段滑动导航，不扩展其他模块。
+- [x] 新增 BDD：`docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`，锁定黑白灰、输入器、附件预览、模式选择、阶段导航和独立 React 入口。
+- [x] 新增 RED 测试：`tests/test_p3_react_input_tabs.py` 首次 5 failures，原因是 `Product/web-react`、输入器、SlideTabs、样式和 App 组合入口不存在。
+- [x] 新增独立 React/Vite 前端：`Product/web-react`，构建输出 `Product/web-dist`，旧 `Product/web` 保留。
+- [x] 实现 `ResearchCommandInput`：题目输入、文件选择/拖拽、长文本粘贴卡片、模式选择和提交状态。
+- [x] 实现 `SlideTabs`：任务书、递归搜索、数据变量、方法设计、执行实验；支持点击、hover 和键盘方向键。
+- [x] 新增 `/react` FastAPI 预览入口，避免覆盖旧首页。
+- [x] 视觉约束：新增 React CSS 只使用黑白灰色阶，不引入彩色强调色。
+- [x] 验证：P3 单测、`npm run build`、`Product/app.py` 编译、scoped `git diff --check`、Playwright 视觉截图和全量回归通过。
+- [ ] 下一步 P3-B：在用户认可输入器和滑动标签质感后，再做右侧审计 Drawer；不要提前把 Agent 队列、证据台、全模块 IA 一次性铺开。
+
 ## 当前目标
 
 把实证系统从静态阶段页推进到真实执行过程可观察：前端能选择/展示真实 run_id，读取 observability API，并渲染 run steps、events、HITL gates、产物证据、执行者和证据等级。

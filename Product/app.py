@@ -186,11 +186,14 @@ from Product.backend.cost_service import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PRODUCT_ROOT = REPO_ROOT / "Product"
 WEB_ROOT = PRODUCT_ROOT / "web"
+WEB_DIST_ROOT = PRODUCT_ROOT / "web-dist"
 
 ensure_registry(PRODUCT_ROOT, REPO_ROOT)
 
 app = FastAPI(title="Econ Workbench Product Shell", version="0.1.0")
 app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
+if (WEB_DIST_ROOT / "assets").exists():
+    app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
 
 
 def error_response(status_code: int, code: str, message: str, details: dict | None = None) -> JSONResponse:
@@ -1845,3 +1848,12 @@ def api_orchestrate_project(slug: str, mode: str = "dry-run") -> dict:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_ROOT / "index.html")
+
+
+@app.get("/react")
+@app.get("/react/")
+def react_index() -> FileResponse:
+    index_path = WEB_DIST_ROOT / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="React preview has not been built. Run npm run build in Product/web-react.")
+    return FileResponse(index_path)

@@ -1182,3 +1182,39 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - CLI stdout 返回 JSON manifest。
 - 本地运行目录：`workspace/runs/{run_id}`。
 - 所有自动生成研究产物均为 `exploratory` / `draft` / `needs_human_review`，`can_promote=false`。
+
+## 2026-05-25 P3 React Input And Slide Tabs
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`
+- `tests/test_p3_react_input_tabs.py`
+
+### 新增 React 前端入口
+
+- `Product/web-react/package.json`
+- `Product/web-react/package-lock.json`
+- `Product/web-react/index.html`
+- `Product/web-react/vite.config.ts`
+- `Product/web-react/tsconfig.json`
+- `Product/web-react/src/main.tsx`
+- `Product/web-react/src/App.tsx`
+- `Product/web-react/src/lib/cn.ts`
+- `Product/web-react/src/components/ResearchCommandInput.tsx`
+- `Product/web-react/src/components/SlideTabs.tsx`
+- `Product/web-react/src/styles.css`
+
+### 构建产物与预览入口
+
+- `Product/web-dist/index.html`
+- `Product/web-dist/assets/`
+- `Product/app.py`：新增 `/react` 与 `/react/` 预览入口；构建 assets 存在时挂载 `/react/assets`。
+
+### 手动验收入口
+
+- `python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8769`
+- `http://127.0.0.1:8769/react/`
+
+### 验收截图
+
+- `artifacts/ui-checks/p3-react-input-tabs.png`

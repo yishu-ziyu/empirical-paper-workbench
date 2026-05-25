@@ -846,3 +846,15 @@ Rejected: 把语义卡继续作为提交后的第一屏。原因是它仍然偏�
 Rejected: 现在就接正式后端写回。原因是本轮目标是低保真交互 Demo，正式 TopicSession / SupervisorPlan 接入要等 UI contract 确认。
 
 Evidence: `python3 -m unittest tests.test_p3_task_brief_demo tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v` 16 tests OK；Playwright 验证 task brief 默认出现且语义卡为 0。
+
+## 2026-05-25：任务书确认后先生成 SupervisorPlan
+
+Decision: 用户确认任务书后，默认进入 `SupervisorPlan` 生成，而不是直接进入递归搜索、数据变量页或方法设计页。
+
+Reason: 这个产品应该像本地科研 OS，而不是固定流水线。SupervisorPlan 是中控层，先判断当前题目应该文献优先、数据优先、方法优先还是执行预检优先，再派发后续阶段。
+
+Rejected: 任务书确认后直接进入递归搜索。原因是递归搜索很重要，但它应该由 Supervisor 判断是否为第一优先分支。
+
+Rejected: 任务书确认后直接进入数据变量页。原因是有些题目需要先通过文献和方法约束确定变量定义，否则会过早陷入字段级操作。
+
+Evidence: 用户在 2026-05-25 明确同意推荐方案；契约已写入 `docs/architecture-v2/p3-task-brief-ui-contract.md`。

@@ -858,3 +858,15 @@ Rejected: 任务书确认后直接进入递归搜索。原因是递归搜索很�
 Rejected: 任务书确认后直接进入数据变量页。原因是有些题目需要先通过文献和方法约束确定变量定义，否则会过早陷入字段级操作。
 
 Evidence: 用户在 2026-05-25 明确同意推荐方案；契约已写入 `docs/architecture-v2/p3-task-brief-ui-contract.md`。
+
+## 2026-05-25：SupervisorPlan Review 默认总计划书摘要加阶段任务树
+
+Decision: `SupervisorPlan Review` 页面默认先显示一张总计划书摘要，下面放可展开的多阶段任务树。
+
+Reason: 用户需要先判断研究路线是否靠谱，再决定是否展开看每个阶段任务。直接展示大流程图或全量任务树会重新造成信息过载。
+
+Rejected: 首屏直接显示完整任务树或大型 workflow graph。原因是细节虽然重要，但不是第一判断对象。
+
+Rejected: 只显示一段自然语言计划。原因是后续要接 Agent Task Queue，必须保留结构化阶段树作为派工基础。
+
+Evidence: 用户在 2026-05-25 明确同意推荐方案；契约已写入 `docs/architecture-v2/p3-supervisor-plan-review-ui-contract.md`。

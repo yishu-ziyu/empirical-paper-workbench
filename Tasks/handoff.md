@@ -2256,3 +2256,58 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - 变量候选仍是字段名启发式，不能进入论文分析。
 - 全量前端契约失败说明 UI 与历史 BDD 漂移；不应在未修复前继续声称产品前端完整可用。
 - 本轮未 commit；工作树有大量既有改动和未跟踪文件，需要在提交前按文件范围审查。
+
+## 2026-05-25 P3 React Input And Slide Tabs 交接增量
+
+更新时间：2026-05-25 18:45 CST
+
+### 当前目标
+
+把用户明确喜欢的两个 UI 原型先落成项目内可运行组件：Claude-style 研究输入器与滑动阶段标签。第一版只使用黑白灰，先建立干净、克制、未来感的入口质感，不继续把所有功能模块铺满屏幕。
+
+### 已完成事项
+
+- 新增 `Product/web-react` React/Vite 独立前端，不覆盖旧 `Product/web`。
+- 新增 `ResearchCommandInput`，支持研究题目输入、文件选择、拖拽上传、长文本粘贴预览、模式选择和提交状态。
+- 新增 `SlideTabs`，支持任务书、递归搜索、数据变量、方法设计、执行实验五个阶段，支持 hover、点击和键盘方向键。
+- 新增 `/react` FastAPI 预览入口，构建产物位于 `Product/web-dist`。
+- 新增 P3 BDD 与测试，锁定“只做两个组件、黑白灰、独立构建、不删除旧前端”的边界。
+
+### 已验证证据
+
+- RED：`python3 -m unittest tests.test_p3_react_input_tabs -v` 首次 5 failures，缺少 React 包、组件、样式和 App 入口。
+- GREEN：`python3 -m unittest tests.test_p3_react_input_tabs -v`，5 tests OK。
+- Build：`cd Product/web-react && npm run build`，Vite build 成功，输出 `Product/web-dist/index.html` 和 assets。
+- 静态检查：`python3 -m py_compile Product/app.py` 通过；scoped `git diff --check` 通过。
+- 浏览器验收：Playwright 打开 `http://127.0.0.1:8769/react/?v=20260525-p3-input-tabs-gray2`，`messages=[]`、`failed=[]`、`overflowX=false`、`tabCount=5`。
+- 全量回归：`python3 -m unittest discover -s tests -v`，287 tests OK，skipped=1。
+
+### 关键文件路径
+
+- `Product/web-react/src/components/ResearchCommandInput.tsx`
+- `Product/web-react/src/components/SlideTabs.tsx`
+- `Product/web-react/src/App.tsx`
+- `Product/web-react/src/styles.css`
+- `Product/web-react/vite.config.ts`
+- `Product/web-dist/index.html`
+- `Product/app.py`
+- `tests/test_p3_react_input_tabs.py`
+- `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`
+- `artifacts/ui-checks/p3-react-input-tabs.png`
+
+### 不能重复探索的结论
+
+- 用户已经明确喜欢给出的 Claude 输入器和滑动标签风格；下一轮 UI 不要再把它泛化成普通 SaaS 或旧档案卡片堆。
+- 本阶段只做两个 primitives；Agent Task Queue、右侧审计 Drawer、全模块重排必须等这两个入口被认可后再继续。
+- 第一版 UI 只使用黑白灰；状态差异用明度、边框、阴影和动效表达。
+- 旧 `Product/web` 暂时保留为回退；只有新 React 入口验收满意后再删除旧前端。
+
+### 下一步第一件事
+
+让用户打开或查看 `http://127.0.0.1:8769/react/` 的输入器和阶段标签。如果质感通过，再做 P3-B：右侧审计 Drawer，并把输入器提交后的草案任务连接到 drawer，而不是在主屏铺开。
+
+### 未解决风险
+
+- 当前 Chrome 用户 Profile 对 localhost 仍可能显示白屏；Playwright 和 HTTP 证明 `/react` 可渲染，疑似 Chrome 扩展/Profile 层干扰。
+- `ResearchCommandInput` 目前只保留前端状态，不上传到后端，也不创建正式研究状态。
+- `SlideTabs` 只切换前端阶段说明，尚未绑定旧产品 API 或 Agent Task Queue。

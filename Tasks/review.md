@@ -1353,3 +1353,48 @@
 - Agent drawer 的产物正文预览目前是前端状态框架，真实读取 artifact body 的后端 endpoint 还没接入；下一轮需要做 artifact content API。
 - CNKI 自动浏览器辅助仍受 Chrome remote debugging / 人工登录状态限制，当前只记录 `blocked_by_browser_session`。
 - LLM Supervisor 真正调用 Codex 执行仍受 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 开关保护；未开启时只能生成可审计 blocked 状态。
+
+## 2026-05-25 P3 React Input And Slide Tabs
+
+### 行为覆盖
+
+- [x] 新 React 首屏以研究题目输入为首要动作。
+- [x] 文件和长文本材料以附件预览卡片呈现，不直接铺满主屏。
+- [x] 工作模式选择集中在输入器底部。
+- [x] 阶段滑动导航只暴露任务书、递归搜索、数据变量、方法设计、执行实验五个研究路径节点。
+- [x] 新组件视觉限定为黑白灰。
+- [x] 新前端独立构建到 `Product/web-dist`，不覆盖旧 `Product/web`。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_p3_react_input_tabs -v` 首次 5 failures，缺少 React 包、组件、样式和 App 入口。
+- GREEN：`python3 -m unittest tests.test_p3_react_input_tabs -v`，5 tests OK。
+- Build：`cd Product/web-react && npm run build`，成功生成 `Product/web-dist`。
+- 静态检查：`python3 -m py_compile Product/app.py` 通过。
+- 格式检查：`git diff --check -- Product/web-react Product/web-dist Product/app.py tests/test_p3_react_input_tabs.py docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md` 通过。
+- 浏览器验收：Playwright 打开 `http://127.0.0.1:8769/react/?v=20260525-p3-input-tabs-gray2`，`messages=[]`、`failed=[]`、`overflowX=false`、`inputHeight=216`、`tabCount=5`。
+- 全量回归：`python3 -m unittest discover -s tests -v`，287 tests OK，skipped=1。
+
+### 实现范围
+
+- `Product/web-react/`：新增 React/Vite 源码、依赖、输入器、滑动标签、黑白灰样式。
+- `Product/web-dist/`：新增本地构建产物，供 `/react` 预览。
+- `Product/app.py`：新增 `/react` 预览路由和 `/react/assets` 静态资源挂载。
+- `.gitignore`：忽略 `Product/web-react/node_modules/`。
+- `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`、`tests/test_p3_react_input_tabs.py`：新增行为与测试契约。
+
+### 手动验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8769`。
+2. 打开 `http://127.0.0.1:8769/react/`。
+3. 首屏应只有黑白灰研究输入器、模式选择、发送按钮和五段滑动标签，不应出现 Agent 队列、审计日志或大面积信息卡片。
+4. 在输入框中输入题目，发送按钮变为可用；按 Enter 后下方摘要显示已接收任务。
+5. 点击 `本地 Codex Supervisor`，应看到三种模式选项。
+6. 点击阶段标签，滑动 cursor 应跟随选中阶段。
+
+### 剩余风险
+
+- Chrome 当前用户 Profile 对 `/react` 仍可能显示白屏；Playwright 渲染正常，疑似 Profile/扩展层问题，需要单独排查。
+- 文件预览只在浏览器内读取，不上传后端；线上产品版本仍需实现上传、云端存储和证据绑定。
+- 输入器提交只更新前端摘要，不创建正式 ResearchQuestion、Agent Task 或运行计划。
+- 右侧审计 Drawer 尚未实现；这是下一轮 P3-B，不应在这轮混入。

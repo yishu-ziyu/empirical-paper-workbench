@@ -784,3 +784,17 @@ Rejected: CNKI / Web / StatsPAI / agentmemory 不可用时静默跳过。原因�
 Rejected: 为了让 CLI 临时项目跑通而写入 Product 全局 `state/projects.json`。原因是测试或一次性本地任务不应该污染产品 registry；治理层改为使用 transient runtime project 视图。
 
 Evidence: `python3 -m unittest tests.test_auto_research_cli -v` 1 test OK；`python3 -m unittest tests.test_auto_research_cli tests.test_cli_workbench -v` 2 tests OK；`python3 -m py_compile Product/cli.py Product/backend/auto_research_service.py Product/backend/registry.py Product/backend/identity_service.py Product/backend/permission_service.py Product/backend/capability_registry.py Product/backend/cost_service.py` 通过。全量回归当前仍有 17 个既有前端契约失败，需要单独修复。
+
+## 2026-05-25：React 新前端先只落用户指定的两个 UI primitives
+
+Decision: 新增 `Product/web-react` 独立 React/Vite 前端，第一阶段只实现 Claude-style 研究输入器和滑动阶段标签，并通过 `/react` 预览。视觉限定为黑白灰；旧 `Product/web` 保留为回退。
+
+Reason: 用户明确说后续不同板块还会有不同 UI 偏好，因此当前不应该急着统一全局模块设计。先把用户已经喜欢的输入器和滑动标签做准，作为后续新前端气质基准。
+
+Rejected: 继续在旧 vanilla 页面里修改输入框和导航。原因是旧页面的信息架构与视觉债务较重，用户已经多次表示不满意；继续小修会拖慢新方向。
+
+Rejected: 这轮同时实现右侧审计 Drawer、Agent Task Queue 和全模块 IA。原因是用户最新指令只要求先做两个给定组件，过早铺开会再次造成屏幕拥挤和设计漂移。
+
+Rejected: 使用绿色、紫色、蓝色等状态色。原因是用户明确要求“基本上只想要黑白灰”；状态差异改用明度、边框、阴影和动效表达。
+
+Evidence: `python3 -m unittest tests.test_p3_react_input_tabs -v` 5 tests OK；`cd Product/web-react && npm run build` 通过；Playwright 打开 `/react` 得到 `messages=[]`、`failed=[]`、`overflowX=false`、`tabCount=5`；全量回归 `287 tests OK, skipped=1`。

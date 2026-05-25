@@ -1,5 +1,22 @@
 # Handoff
 
+## 2026-05-25 补充：P3-B React Workbench 设计契约完成
+
+当前 React 新入口已经不只是输入器原型，而有了后续模块接入前的设计契约。新增契约文件为 `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md`，对应自动化测试为 `tests/test_p3_design_contract.py`。
+
+已锁定的产品规则：
+
+- 一级模块为：研究入口、任务队列、递归搜索、数据与变量、方法设计、执行实验、结果解释、论文草稿、复现导出、Agent 审计。
+- 主屏默认只显示当前决策和 3-5 个关键信号；日志、证据、风险、权限、成本、产物详情进入右侧 Drawer 或按需展开。
+- 视觉语言继续使用黑白灰、低对比、DottedSurface；不使用彩色状态色，不写“当前只验证...”这类防守性文案。
+- 正式层写回必须显式确认；Auto / Agent 只能先进入 draft / exploratory / needs_human_review。
+
+验证证据：
+
+- `python3 -m unittest tests.test_p3_design_contract -v`：4 tests OK。
+
+下一轮第一件事：P3-C 按该契约实现右侧审计 Drawer 和任务队列首个真实模块。不要把旧前端功能整块搬进 React，也不要在首屏摊开 Agent 队列、证据台和执行日志。
+
 ## 2026-05-25 补充：P2-AB 质量收口完成
 
 当前 P2-AB 已从“CLI 能跑但前端契约漂移”修复到“CLI + 首页 + Agent Console 重新对齐”。核心变化：

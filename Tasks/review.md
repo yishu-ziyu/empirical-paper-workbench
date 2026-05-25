@@ -1,5 +1,38 @@
 # Review
 
+## 2026-05-25 P3-B React Workbench Design Contract
+
+### 行为覆盖
+
+- [x] 行为 1：React 工作台明确 10 个一级模块，后续不再按后端技术对象随意堆页面。
+- [x] 行为 2：每个模块默认只显示当前决策和少量关键信号，详情通过右侧 Drawer 或按需展开。
+- [x] 行为 3：视觉语言锁定黑白灰、低对比、DottedSurface、禁止防守性文案和非 SaaS landing page。
+- [x] 行为 4：交互路径从输入题目开始，逐步进入任务书、递归搜索、变量确认、方法前提、执行实验、finding 审阅、证据绑定和导出预检。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_p3_design_contract -v` 首次失败，原因是 `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md` 尚不存在。
+- 目标测试：`python3 -m unittest tests.test_p3_design_contract -v`，4 tests OK。
+
+### 实现范围
+
+- `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md`：新增 React 工作台模块设计契约，定义 10 个模块、信息披露、右侧 Drawer、视觉语言和实现顺序。
+- `tests/test_p3_design_contract.py`：新增契约测试，防止后续模块接入时重新回到信息过载和防守性文案。
+- `Tasks/todo.md`、`Tasks/review.md`、`Tasks/manifest.md`、`Tasks/decision-log.md`、`Tasks/handoff.md`、`Tasks/lessons.md`：写回本轮状态、设计决策和后续规则。
+
+### 手动验收
+
+1. 打开 `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md`。
+2. 检查“模块设计契约”是否覆盖研究入口、任务队列、递归搜索、数据与变量、方法设计、执行实验、结果解释、论文草稿、复现导出、Agent 审计。
+3. 检查每个模块是否说明主屏默认显示什么、详情在哪里展开、什么动作会进入正式层确认。
+4. 打开 `http://127.0.0.1:8770/react`，当前页面仍是输入器和阶段导航；下一轮会按该契约接第一个真实模块。
+
+### 剩余风险
+
+- 本轮是设计契约和测试锁定，未新增可见 UI 模块；视觉验收仍沿用上一轮 `/react` 输入器和点阵背景页面。
+- 右侧审计 Drawer、任务队列和递归搜索还没有在 React 新入口实现；P3-C 必须按契约逐个接入，而不是一次性铺满。
+- Three.js 引入后 Vite 仍有 bundle size warning；后续模块化时需要考虑 lazy loading 或 chunk 拆分。
+
 ## 2026-05-22 Long-run Optimization Protocol
 
 ### 行为覆盖

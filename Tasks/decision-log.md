@@ -1,5 +1,17 @@
 # Decision Log
 
+## 2026-05-25：React 工作台先做模块设计契约，再接具体工作流
+
+Decision: P3-B 先把 React 工作台的 10 个模块、默认摘要、右侧 Drawer、按需展开、正式层写回确认和黑白灰低对比视觉规则写成可测试设计契约。
+
+Reason: 用户指出“其他部分的设计要先规范好，规范好之后才能接入具体工作”。如果直接继续接 Agent 队列、证据台和执行状态，旧问题会复发：主屏信息过载、内部解释文案过多、模块交互不一致。
+
+Rejected: 先把旧前端所有功能复制进 React。原因是这会把原来的拥挤信息架构搬到新入口，违背 topic-first 和 clean workbench 方向。
+
+Rejected: 用大段说明文解释系统边界。原因是用户已明确不接受防守性文案；边界应放在具体审阅、提交、写回动作的确认层。
+
+Invariant: 主屏只承载当前决策；证据、日志、风险、派工、权限和产物详情默认进入右侧 Drawer 或按需展开；正式层写回必须显式确认。
+
 ## 2026-05-25：Auto Research 默认 best-available，但正式层仍受人工审阅保护
 
 Decision: `auto-research` CLI 默认按 `execution_policy=best_available` 运行，探测并记录本地数据、StatsPAI、CNKI、Web、agentmemory 和 LLM Supervisor 能力；同时所有自动报告、变量候选、方法候选和 exploratory 草稿都 `can_promote=false`。

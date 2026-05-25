@@ -2272,20 +2272,24 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - 新增 `SlideTabs`，支持任务书、递归搜索、数据变量、方法设计、执行实验五个阶段，支持 hover、点击和键盘方向键。
 - 新增 `/react` FastAPI 预览入口，构建产物位于 `Product/web-dist`。
 - 新增 P3 BDD 与测试，锁定“只做两个组件、黑白灰、独立构建、不删除旧前端”的边界。
+- 根据用户反馈删除首屏解释性长句和“React 切片/不展开 Agent”防守性文案。
+- 新增 `DottedSurface`，用 Three.js 点阵波面作为初始页背景，并把黑白灰对比降到柔和灰阶。
 
 ### 已验证证据
 
 - RED：`python3 -m unittest tests.test_p3_react_input_tabs -v` 首次 5 failures，缺少 React 包、组件、样式和 App 入口。
 - GREEN：`python3 -m unittest tests.test_p3_react_input_tabs -v`，5 tests OK。
+- 反馈修正 GREEN：`python3 -m unittest tests.test_p3_react_input_tabs -v`，7 tests OK，覆盖无防守性文案、低对比灰阶和 DottedSurface。
 - Build：`cd Product/web-react && npm run build`，Vite build 成功，输出 `Product/web-dist/index.html` 和 assets。
 - 静态检查：`python3 -m py_compile Product/app.py` 通过；scoped `git diff --check` 通过。
-- 浏览器验收：Playwright 打开 `http://127.0.0.1:8769/react/?v=20260525-p3-input-tabs-gray2`，`messages=[]`、`failed=[]`、`overflowX=false`、`tabCount=5`。
+- 浏览器验收：Playwright 打开 `http://127.0.0.1:8770/react`，`messages=[]`、`canvasPresent=true`、`hasDefensiveCopy=false`、`overflowX=false`。
 - 全量回归：`python3 -m unittest discover -s tests -v`，287 tests OK，skipped=1。
 
 ### 关键文件路径
 
 - `Product/web-react/src/components/ResearchCommandInput.tsx`
 - `Product/web-react/src/components/SlideTabs.tsx`
+- `Product/web-react/src/components/DottedSurface.tsx`
 - `Product/web-react/src/App.tsx`
 - `Product/web-react/src/styles.css`
 - `Product/web-react/vite.config.ts`
@@ -2294,12 +2298,15 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - `tests/test_p3_react_input_tabs.py`
 - `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`
 - `artifacts/ui-checks/p3-react-input-tabs.png`
+- `artifacts/ui-checks/p3-react-dotted-surface.png`
 
 ### 不能重复探索的结论
 
 - 用户已经明确喜欢给出的 Claude 输入器和滑动标签风格；下一轮 UI 不要再把它泛化成普通 SaaS 或旧档案卡片堆。
 - 本阶段只做两个 primitives；Agent Task Queue、右侧审计 Drawer、全模块重排必须等这两个入口被认可后再继续。
 - 第一版 UI 只使用黑白灰；状态差异用明度、边框、阴影和动效表达。
+- 首屏不要放内部解释和防守性边界说明；边界说明应在审阅/提交/正式写回动作发生时出现。
+- 用户希望对比度约降到 76%，避免纯黑纯白刺眼效果。
 - 旧 `Product/web` 暂时保留为回退；只有新 React 入口验收满意后再删除旧前端。
 
 ### 下一步第一件事

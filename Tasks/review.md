@@ -1364,11 +1364,14 @@
 - [x] 阶段滑动导航只暴露任务书、递归搜索、数据变量、方法设计、执行实验五个研究路径节点。
 - [x] 新组件视觉限定为黑白灰。
 - [x] 新前端独立构建到 `Product/web-dist`，不覆盖旧 `Product/web`。
+- [x] 首屏不再出现防守性说明文案。
+- [x] 初始页背景有低对比 Three.js 点阵波面，不再是纯黑静态背景。
 
 ### 测试覆盖
 
 - RED：`python3 -m unittest tests.test_p3_react_input_tabs -v` 首次 5 failures，缺少 React 包、组件、样式和 App 入口。
 - GREEN：`python3 -m unittest tests.test_p3_react_input_tabs -v`，5 tests OK。
+- 反馈修正 RED/GREEN：新增首屏文案、低对比和 DottedSurface 契约；首次失败后修复，最终 `python3 -m unittest tests.test_p3_react_input_tabs -v`，7 tests OK。
 - Build：`cd Product/web-react && npm run build`，成功生成 `Product/web-dist`。
 - 静态检查：`python3 -m py_compile Product/app.py` 通过。
 - 格式检查：`git diff --check -- Product/web-react Product/web-dist Product/app.py tests/test_p3_react_input_tabs.py docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md` 通过。
@@ -1378,6 +1381,7 @@
 ### 实现范围
 
 - `Product/web-react/`：新增 React/Vite 源码、依赖、输入器、滑动标签、黑白灰样式。
+- `Product/web-react/src/components/DottedSurface.tsx`：新增 Three.js 点阵背景层。
 - `Product/web-dist/`：新增本地构建产物，供 `/react` 预览。
 - `Product/app.py`：新增 `/react` 预览路由和 `/react/assets` 静态资源挂载。
 - `.gitignore`：忽略 `Product/web-react/node_modules/`。
@@ -1387,7 +1391,7 @@
 
 1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8769`。
 2. 打开 `http://127.0.0.1:8769/react/`。
-3. 首屏应只有黑白灰研究输入器、模式选择、发送按钮和五段滑动标签，不应出现 Agent 队列、审计日志或大面积信息卡片。
+3. 首屏应只有低对比黑白灰点阵背景、研究输入器、模式选择、发送按钮和五段滑动标签；不应出现防守性说明、Agent 队列、审计日志或大面积信息卡片。
 4. 在输入框中输入题目，发送按钮变为可用；按 Enter 后下方摘要显示已接收任务。
 5. 点击 `本地 Codex Supervisor`，应看到三种模式选项。
 6. 点击阶段标签，滑动 cursor 应跟随选中阶段。

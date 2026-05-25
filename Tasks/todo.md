@@ -31,6 +31,8 @@
 - [x] 新增 `/react` FastAPI 预览入口，避免覆盖旧首页。
 - [x] 视觉约束：新增 React CSS 只使用黑白灰色阶，不引入彩色强调色。
 - [x] 验证：P3 单测、`npm run build`、`Product/app.py` 编译、scoped `git diff --check`、Playwright 视觉截图和全量回归通过。
+- [x] 用户反馈修正：删除首屏解释性长句和“React 切片/不展开 Agent”防守性文案，改成更少、更产品化的状态提示。
+- [x] 用户反馈修正：把黑白灰对比从纯黑纯白降到柔和灰阶，并接入 Three.js `DottedSurface` 点阵背景。
 - [ ] 下一步 P3-B：在用户认可输入器和滑动标签质感后，再做右侧审计 Drawer；不要提前把 Agent 队列、证据台、全模块 IA 一次性铺开。
 
 ## 当前目标

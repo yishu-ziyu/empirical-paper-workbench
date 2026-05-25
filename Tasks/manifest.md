@@ -1202,6 +1202,7 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 - `Product/web-react/src/lib/cn.ts`
 - `Product/web-react/src/components/ResearchCommandInput.tsx`
 - `Product/web-react/src/components/SlideTabs.tsx`
+- `Product/web-react/src/components/DottedSurface.tsx`
 - `Product/web-react/src/styles.css`
 
 ### 构建产物与预览入口
@@ -1218,3 +1219,4 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 验收截图
 
 - `artifacts/ui-checks/p3-react-input-tabs.png`
+- `artifacts/ui-checks/p3-react-dotted-surface.png`

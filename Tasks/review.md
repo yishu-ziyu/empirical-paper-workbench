@@ -1435,3 +1435,54 @@
 - 文件预览只在浏览器内读取，不上传后端；线上产品版本仍需实现上传、云端存储和证据绑定。
 - 输入器提交只更新前端摘要，不创建正式 ResearchQuestion、Agent Task 或运行计划。
 - 右侧审计 Drawer 尚未实现；这是下一轮 P3-B，不应在这轮混入。
+
+## 2026-05-25 P3-C Intake To Analysis Workspace
+
+### 产品进展
+
+- 入口页恢复为单一研究输入界面：只有标题、对话框式输入器、附件入口、参数入口、模式选择和发送按钮。
+- 用户提交题目后才进入 `analysis-workspace`，此时才显示阶段导航和语义分析卡片。
+- 语义分析卡片现在承担“草案拆解”作用：研究对象、数据线索、方法线索、证据缺口、下一步任务。
+- 卡片是 draft-only，不会写入正式 VariableRoleSet、DesignSpec、RunPlan、Findings 或 Manuscript。
+
+### 行为覆盖
+
+- [x] 入口页无语义卡、无阶段导航、无 Agent 队列、无审计面板。
+- [x] 提交研究题目后进入分析工作台。
+- [x] 分析工作台显示 5 张低噪声语义卡。
+- [x] 语义卡保持黑白灰 spotlight 视觉，不引入彩色状态体系。
+- [x] 输入器可以向外广播 draft，但不在输入器内部渲染卡片。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v`，2 failures，原因是 App 仍在入口页渲染 `SemanticGlowCards`，且缺 `analysis-workspace`。
+- GREEN：`python3 -m unittest tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v`，12 tests OK。
+- 类型检查：`cd Product/web-react && npx tsc --noEmit` 通过。
+- Build：`cd Product/web-react && npm run build` 通过，输出 `Product/web-dist`。
+- 浏览器自动验收：Playwright 打开 `/react`，初始 `initialCards=0`、`initialStages=0`；提交后 `analysisCards=5`、`stagePanel=1`。
+
+### 实现范围
+
+- `Product/web-react/src/App.tsx`：拆分 intake screen 与 analysis workspace。
+- `Product/web-react/src/components/SemanticGlowCards.tsx`：新增 draft-only 语义分析卡片和 pointer-following GlowCard。
+- `Product/web-react/src/components/ResearchCommandInput.tsx`：新增 `onDraftChange`，保留提交 payload。
+- `Product/web-react/src/styles.css`：新增 analysis workspace、semantic glow card 和响应式样式。
+- `Product/web-react/package.json`、`Product/web-react/package-lock.json`：补齐 React/Three 类型依赖。
+- `Product/web-dist/`：更新 React 构建产物。
+- `docs/architecture-v2/codex-phase-p3-semantic-glow-cards-bdd.md`、`tests/test_p3_semantic_glow_cards.py`、`tests/test_p3_react_input_tabs.py`：更新行为契约。
+
+### 手动验收
+
+1. 打开 `http://127.0.0.1:8770/react?v=20260525-p3c-workspace2`。
+2. 初始页应只看到标题和输入器，不应看到语义卡或阶段导航。
+3. 输入题目：`数字经济是否提升城市劳动力市场匹配效率？使用 CFPS 数据，考虑 DID 和工具变量。`
+4. 点击右下角发送按钮。
+5. 页面应切到分析工作台，顶部显示题目，下面显示阶段导航和 5 张语义卡。
+6. 点击 `新任务` 应回到干净入口页。
+
+### 剩余风险
+
+- 当前语义卡是 deterministic draft parser，不是 LLM Supervisor 的真实语义推理；下一步要接 SupervisorPlan / TopicSession。
+- 卡片仍在同一个 React route 内通过状态切换模拟“页面”；P3-D 应拆为明确阶段页面容器或路由。
+- Vite build 仍提示 JS chunk 超过 500KB，主要来自 Three/framer-motion；后续需要 code splitting。
+- 目前未接后端正式状态，提交不会创建正式 ResearchQuestion。

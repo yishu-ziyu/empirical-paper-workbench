@@ -675,3 +675,15 @@
 - [x] 兼容：治理层新增 transient runtime project 解析，允许 CLI 直接指向未注册本地项目，同时不污染 Product 全局 registry。
 - [x] 验证：目标测试、相邻 CLI 回归、Python 编译检查通过。
 - [ ] 全量风险：`python3 -m unittest discover -s tests -v` 当前 282 tests 中 17 个前端契约失败，集中在旧 Agent Drawer、首页产品工作区锚点、中文导航契约和 SupervisorPlan 前端面板；需另开前端契约修复轮。
+
+## 2026-05-25 P3-C Intake To Analysis Workspace
+
+- [x] BDD：修订 `docs/architecture-v2/codex-phase-p3-semantic-glow-cards-bdd.md`，锁定“入口页只做输入，提交后才进入分析工作台”的产品规则。
+- [x] TDD：新增/修订 `tests/test_p3_semantic_glow_cards.py` 与 `tests/test_p3_react_input_tabs.py`；首次按新规则运行失败，原因是语义卡仍挂在入口页。
+- [x] 实现：`App.tsx` 拆成 `task === null` 的 intake screen 与 `analysis-workspace` 两个状态；首屏只保留标题和研究输入器。
+- [x] 实现：新增 `SemanticGlowCards.tsx`，提交后把题目拆成研究对象、数据线索、方法线索、证据缺口和下一步任务五张 draft-only 卡。
+- [x] 实现：`ResearchCommandInput` 支持 `onDraftChange`，但输入器内部不渲染语义卡，避免入口页信息过载。
+- [x] 视觉：GlowCard 改为黑白灰低对比 spotlight，卡片只在分析页出现；分析页标题收敛为工作台标题尺寸。
+- [x] 类型：补齐 `@types/react`、`@types/react-dom`、`@types/three`，让 React 子项目可跑 `npx tsc --noEmit`。
+- [x] 验证：目标 React 契约 12 tests OK；`npx tsc --noEmit` 通过；`npm run build` 通过；Playwright 入口页 `initialCards=0`、提交后 `analysisCards=5`。
+- [ ] 下一步 P3-D：把分析页拆成真正的阶段页面容器；不同阶段再接不同 UI 组件和真实工作流，不再把所有分析塞在一个页面。

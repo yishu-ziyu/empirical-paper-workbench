@@ -140,6 +140,18 @@ The Supervisor decides whether the research should proceed:
 
 Do not jump directly to recursive search or variable discovery before this SupervisorPlan step.
 
+### 4. SupervisorPlan Review
+
+The confirmed design direction is:
+
+- show a single total plan summary first,
+- place a multi-stage task tree below it,
+- collapse stage details by default,
+- expand details only when the user asks,
+- keep risks / assumptions / evidence requirements in the Inspector.
+
+Do not make the first view a giant workflow graph. The user should first judge whether the route is reasonable, then inspect the task tree.
+
 ## Required Modules to Design
 
 Design the interface system for these modules, but do not make them all visible at once:

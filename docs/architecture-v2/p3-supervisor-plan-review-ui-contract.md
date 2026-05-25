@@ -199,10 +199,16 @@ No state should show raw stack traces by default.
 
 ## Next Grill-Me Decision
 
-Decide how much autonomy an approved SupervisorPlan should have:
+Decide the single automation rule after a SupervisorPlan is approved.
 
-- Option A: approval only creates Agent Task Queue; user manually starts each task.
-- Option B: approval creates queue and starts the first low-risk task automatically.
-- Option C: approval creates queue and Auto Mode runs until the next human gate.
+Confirmed simplification principle:
 
-Recommended: Option C for local Auto Mode, with all outputs marked `draft | exploratory | needs_human_review`; use Option A for cloud / shared-user mode until permissions and cost controls are mature.
+- Do not split the product into two separate local / cloud workflows.
+- Build one product flow first.
+- Local execution is the first implementation environment.
+- Cloud execution should reuse the same product state machine later.
+- The difference is infrastructure, not user-facing workflow.
+
+Recommended rule:
+
+After approval, create the Agent Task Queue and let Auto Mode run until the next human gate. All outputs remain `draft | exploratory | needs_human_review` unless the user explicitly promotes them.

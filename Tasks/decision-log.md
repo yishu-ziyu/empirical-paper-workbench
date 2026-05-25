@@ -870,3 +870,13 @@ Rejected: 首屏直接显示完整任务树或大型 workflow graph。原因是�
 Rejected: 只显示一段自然语言计划。原因是后续要接 Agent Task Queue，必须保留结构化阶段树作为派工基础。
 
 Evidence: 用户在 2026-05-25 明确同意推荐方案；契约已写入 `docs/architecture-v2/p3-supervisor-plan-review-ui-contract.md`。
+
+## 2026-05-25：本地和云端是一套产品流程，不是两套体验
+
+Decision: 不再把批准 SupervisorPlan 后的自动化策略拆成“本地一套、云端一套”。产品只保留一套用户路径：批准计划后创建 Agent Task Queue，并让 Auto Mode 运行到下一个人工 gate；所有产物默认 `draft/exploratory/needs_human_review`。
+
+Reason: 用户要求产品尽量简单。本地优先是实现顺序，云端后续应复用同一状态机；差异应限制在执行环境、数据入口、权限、成本和隔离策略，不应变成两套 UX。
+
+Rejected: local Auto Mode 与 cloud 手动队列两套前端行为。原因是会让产品心智割裂，也会拖慢 MVP。
+
+Evidence: 用户在 2026-05-25 明确纠正“双模式”说法；契约已更新为单一自动化规则。

@@ -38,6 +38,8 @@ The target user starts with a research topic, attaches local data / literature /
 
 The first version is mainly for the user and a few familiar researchers. It should feel powerful, serious, local, and research-native.
 
+The product should not be designed as two different experiences for local and cloud. Design one coherent flow. The local version is the first implementation environment; the cloud version should reuse the same journey and state machine later.
+
 ## Visual Direction
 
 The user strongly prefers:

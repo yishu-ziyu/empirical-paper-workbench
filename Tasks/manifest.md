@@ -24,6 +24,8 @@
 
 ## 关键测试文件
 
+- `tests/test_p3_react_input_tabs.py`
+- `tests/test_p3_design_contract.py`
 - `tests/test_observable_execution.py`
 - `tests/test_observable_execution_frontend.py`
 - `tests/test_agent_cluster_frontend_interactions.py`
@@ -37,6 +39,8 @@
 
 ## 新增设计/方法论文件
 
+- `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`
+- `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md`
 - `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`
 - `docs/architecture-v2/statspai-methodology-synthesis-2026-05-12.md`
 - `docs/architecture-v2/codex-phase-p0-observable-ui-bdd.md`

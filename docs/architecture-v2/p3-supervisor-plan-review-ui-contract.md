@@ -211,4 +211,8 @@ Confirmed simplification principle:
 
 Recommended rule:
 
-After approval, create the Agent Task Queue and let Auto Mode run until the next human gate. All outputs remain `draft | exploratory | needs_human_review` unless the user explicitly promotes them.
+After approval, create the Agent Task Queue and let Auto Mode run until the next human gate. The next gate is: confirm whether to start real data and method execution.
+
+Before that gate, Auto Mode may organize tasks, list evidence requirements, expose risks, and prepare execution readiness. It must not run regressions, write formal results, or generate formal claims.
+
+All outputs remain `draft | exploratory | needs_human_review` unless the user explicitly promotes them.

@@ -880,3 +880,25 @@ Reason: 用户要求产品尽量简单。本地优先是实现顺序，云端后
 Rejected: local Auto Mode 与 cloud 手动队列两套前端行为。原因是会让产品心智割裂，也会拖慢 MVP。
 
 Evidence: 用户在 2026-05-25 明确纠正“双模式”说法；契约已更新为单一自动化规则。
+
+## 2026-05-25：Agent Activity Panel 借鉴通知流，但语义是研究作业账本
+
+Decision: Agent 工作可视化面板采用 notification-feed 式信息结构：每个条目代表一个 Agent 活动，avatar 代表 Agent 身份，未读点代表需要用户注意，文件卡代表证据/产物，tabs 过滤状态。
+
+Reason: 用户提供的通知面板适合展示多 Agent 并行工作的“发生了什么、谁在做、是否需要我处理、产物在哪里”。这比日志流更可扫读，也比大图表更适合高频审阅。
+
+Rejected: 把 Agent 面板做成社交通知。原因是这里不是评论/关注/点赞，而是研究作业账本和审计入口。
+
+Rejected: 默认展示 raw logs/tool calls。原因是会把用户再次拉回工程视角；技术细节应进入 Inspector 或审计 drawer。
+
+Evidence: 契约已写入 `docs/architecture-v2/p3-agent-activity-panel-ui-contract.md`。
+
+## 2026-05-25：Auto Mode 在真实数据/方法执行前停下
+
+Decision: 批准 SupervisorPlan 后，Auto Mode 可以生成 Agent Task Queue、整理证据要求、暴露风险和准备执行就绪状态，但默认停在“是否开始真实数据和方法执行”的人工 gate。
+
+Reason: 这保持产品简单，同时避免系统在用户未确认前直接跑回归、写正式结果或生成正式论断。
+
+Rejected: 批准 SupervisorPlan 后直接跑真实回归。原因是变量、方法和证据要求还需要用户确认；严肃实证不能把计划批准等同于执行授权。
+
+Evidence: 用户在 2026-05-25 明确认可“跑到研究路线和任务队列都生成完，等待用户确认是否开始真实数据/方法执行”。

@@ -176,3 +176,5 @@ Decide what happens after the user accepts the task brief:
 - Option C: ask Supervisor to generate a staged plan first.
 
 Recommended: Option C. The Supervisor should generate a staged plan before recursive search or variable discovery, because it can decide whether the topic needs literature-first, data-first, or method-first exploration.
+
+Confirmed: Option C. After the user accepts the task brief, the product should enter `SupervisorPlan` generation first. The SupervisorPlan decides whether the next branch is literature-first, data-first, method-first, or execution-precheck-first.

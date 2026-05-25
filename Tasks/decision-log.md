@@ -1,5 +1,17 @@
 # Decision Log
 
+## 2026-05-25：Task Brief 页必须从信号面板改成引导式 checkpoint
+
+Decision: P3-D 不继续把当前 Task Brief 卡片做视觉微调，而是要求 Gemini/Kimi 把它重构为“一个主决策 + 缺失信息 checklist + 推荐下一步 + 右侧可选 Inspector”的引导式 checkpoint。
+
+Reason: 用户在真实页面中无法判断自己当前要做什么。当前页面把五个决策信号、Inspector 和 SupervisorPlan 等内部结构放在前台，缺少明确行动路径。
+
+Rejected: 只调整卡片阴影、间距、对比度或字体。原因是问题来自交互叙事缺失，不是表层视觉。
+
+Rejected: 继续让主屏解释“点击卡片查看 Inspector”。原因是这仍然要求用户先理解组件机制，而不是研究任务。
+
+Invariant: 用户在提交题目后的 5 秒内，必须知道当前是在确认研究边界，下一步是生成研究计划，真实执行尚未开始。
+
 ## 2026-05-25：React 工作台先做模块设计契约，再接具体工作流
 
 Decision: P3-B 先把 React 工作台的 10 个模块、默认摘要、右侧 Drawer、按需展开、正式层写回确认和黑白灰低对比视觉规则写成可测试设计契约。

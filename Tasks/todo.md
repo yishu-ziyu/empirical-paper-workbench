@@ -37,6 +37,9 @@
 - [x] P3-B 设计契约锁定 10 个模块：研究入口、任务队列、递归搜索、数据与变量、方法设计、执行实验、结果解释、论文草稿、复现导出、Agent 审计。
 - [x] P3-B 设计契约锁定信息披露规则：主屏只承载当前决策，默认只显示 3-5 个关键信号，详情进入右侧 Drawer 或按需展开。
 - [x] P3-B 设计契约锁定视觉规则：黑白灰、低对比、DottedSurface、禁止防守性文案、不做普通 SaaS landing page。
+- [x] P3-D 审阅：用 Kimi WebBridge 恢复真实浏览器检查，并用 Playwright 复现 Task Brief 页。
+- [x] P3-D 审阅：确认当前 Task Brief 页的主要问题是缺少“下一步决策引导”，而不是单纯视觉 polish。
+- [x] P3-D 交接：新增 `docs/architecture-v2/p3-task-brief-guided-action-review-2026-05-25.md`，把返工方向交给 Gemini/Kimi。
 - [ ] 下一步 P3-C：按设计契约实现右侧审计 Drawer 和任务队列首个真实模块，不把 Agent 队列、证据台、全模块 IA 一次性铺开。
 
 ## 当前目标

@@ -44,6 +44,13 @@ interface ResearchCommandInputProps {
     pastedContent: PastedContent[];
     mode: string;
   }) => void;
+  onDraftChange?: (payload: {
+    message: string;
+    fileCount: number;
+    pastedCount: number;
+    mode: string;
+    hasMaterial: boolean;
+  }) => void;
   disabled?: boolean;
   placeholder?: string;
   maxFiles?: number;
@@ -273,6 +280,7 @@ function ModeSelectorDropdown({
 
 export function ResearchCommandInput({
   onSubmit,
+  onDraftChange,
   disabled = false,
   placeholder = "输入研究题目、数据线索或下一步任务...",
   maxFiles = MAX_FILES,
@@ -292,6 +300,16 @@ export function ResearchCommandInput({
     textareaRef.current.style.height = "auto";
     textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
   }, [message]);
+
+  useEffect(() => {
+    onDraftChange?.({
+      message,
+      fileCount: files.length,
+      pastedCount: pastedContent.length,
+      mode: selectedMode,
+      hasMaterial: message.trim().length > 0 || files.length > 0 || pastedContent.length > 0,
+    });
+  }, [files.length, message, onDraftChange, pastedContent.length, selectedMode]);
 
   const handleFileSelect = useCallback(
     (selectedFiles: FileList | null) => {

@@ -1224,3 +1224,31 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 
 - `artifacts/ui-checks/p3-react-input-tabs.png`
 - `artifacts/ui-checks/p3-react-dotted-surface.png`
+
+## 2026-05-25 P3-C Intake To Analysis Workspace
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p3-semantic-glow-cards-bdd.md`
+- `tests/test_p3_semantic_glow_cards.py`
+- `tests/test_p3_react_input_tabs.py`
+
+### React 源码
+
+- `Product/web-react/src/App.tsx`
+- `Product/web-react/src/components/ResearchCommandInput.tsx`
+- `Product/web-react/src/components/SemanticGlowCards.tsx`
+- `Product/web-react/src/styles.css`
+- `Product/web-react/package.json`
+- `Product/web-react/package-lock.json`
+
+### 构建与验收产物
+
+- `Product/web-dist/index.html`
+- `Product/web-dist/assets/`
+- `artifacts/ui-checks/p3-intake-clean-v2.png`
+- `artifacts/ui-checks/p3-analysis-workspace-glow-cards-v2.png`
+
+### 手动入口
+
+- `http://127.0.0.1:8770/react?v=20260525-p3c-workspace2`

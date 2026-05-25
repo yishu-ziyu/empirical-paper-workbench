@@ -822,3 +822,15 @@ Rejected: 在首页继续用说明文案解释“不会静默改写正式状态�
 Rejected: 保持纯黑纯白强对比。原因是用户要求把对比度从 100% 降到约 76%，更接近干净、克制、未来感的工作台。
 
 Evidence: `python3 -m unittest tests.test_p3_react_input_tabs -v` 7 tests OK；`cd Product/web-react && npm run build` 通过；Playwright 打开 `/react` 检查 `canvasPresent=true`、`hasDefensiveCopy=false`、`overflowX=false`、`h1Color=rgb(228, 228, 228)`。
+
+## 2026-05-25：语义分析卡只进入提交后的分析工作台
+
+Decision: React 入口页只保留研究输入器；语义分析卡、阶段导航和后续工作区只在用户提交题目后进入 `analysis-workspace` 才显示。
+
+Reason: 用户明确指出首屏如果铺开分析信息，会冲爆短时记忆。入口页应先承接“我要研究什么”，卡片是后续分析环节的 UI，而不是首屏装饰。
+
+Rejected: 在输入时实时把语义卡显示在入口页。原因是虽然有科技感，但会让入口页再次变成信息面板，违背 topic-first 产品路径。
+
+Rejected: 把语义卡输出写入正式 ResearchQuestion / VariableRoleSet / DesignSpec。原因是当前只是 deterministic draft parser，不能替代 LLM Supervisor 和人工审阅。
+
+Evidence: `python3 -m unittest tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v` 12 tests OK；`cd Product/web-react && npx tsc --noEmit` 通过；`cd Product/web-react && npm run build` 通过；Playwright 验证 `initialCards=0`、提交后 `analysisCards=5`。

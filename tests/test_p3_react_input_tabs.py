@@ -72,13 +72,15 @@ class ReactInputTabsContractTest(unittest.TestCase):
         self.assertIn("DottedSurface", app_source)
         self.assertNotIn("Dotted Surface", app_source)
 
-    def test_app_composes_only_the_first_two_requested_ui_primitives(self) -> None:
+    def test_app_composes_intake_then_analysis_primitives_without_a_full_dashboard(self) -> None:
         app_path = WEB_REACT_ROOT / "src" / "App.tsx"
         self.assertTrue(app_path.exists(), "React App shell is missing.")
 
         source = app_path.read_text(encoding="utf-8")
         self.assertIn("ResearchCommandInput", source)
+        self.assertIn("SemanticGlowCards", source)
         self.assertIn("SlideTabs", source)
+        self.assertIn("analysis-workspace", source)
         self.assertNotIn("AgentTaskQueue", source)
         self.assertNotIn("RightAuditDrawer", source)
         self.assertNotIn("系统只进入草案层", source)

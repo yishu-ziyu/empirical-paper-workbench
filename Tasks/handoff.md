@@ -2335,3 +2335,55 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - 当前 Chrome 用户 Profile 对 localhost 仍可能显示白屏；Playwright 和 HTTP 证明 `/react` 可渲染，疑似 Chrome 扩展/Profile 层干扰。
 - `ResearchCommandInput` 目前只保留前端状态，不上传到后端，也不创建正式研究状态。
 - `SlideTabs` 只切换前端阶段说明，尚未绑定旧产品 API 或 Agent Task Queue。
+
+## 2026-05-25 P3-C Intake To Analysis Workspace 交接增量
+
+更新时间：2026-05-25 19:30 CST
+
+### 当前目标
+
+把 React 新入口从“输入时直接显示分析卡”修正为“先干净输入，提交后进入分析工作台”。
+
+### 已完成事项
+
+- 入口页只显示标题和 ResearchCommandInput。
+- 提交后进入 `analysis-workspace`。
+- 分析页显示阶段导航和 5 张 SemanticGlowCards。
+- 新增/修订 BDD 与测试。
+- 补齐 React/Three 类型依赖并通过 `tsc --noEmit`。
+
+### 已验证证据
+
+- `python3 -m unittest tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v`，12 tests OK。
+- `cd Product/web-react && npx tsc --noEmit`，通过。
+- `cd Product/web-react && npm run build`，通过；仍有 chunk >500KB 警告。
+- Playwright：初始 `initialCards=0`、`initialStages=0`；提交后 `analysisCards=5`、`stagePanel=1`。
+
+### 关键文件路径
+
+- `Product/web-react/src/App.tsx`
+- `Product/web-react/src/components/SemanticGlowCards.tsx`
+- `Product/web-react/src/components/ResearchCommandInput.tsx`
+- `Product/web-react/src/styles.css`
+- `docs/architecture-v2/codex-phase-p3-semantic-glow-cards-bdd.md`
+- `tests/test_p3_semantic_glow_cards.py`
+- `artifacts/ui-checks/p3-intake-clean-v2.png`
+- `artifacts/ui-checks/p3-analysis-workspace-glow-cards-v2.png`
+
+### 不能重复探索的结论
+
+- 语义卡不属于第一屏。
+- 第一屏不是 dashboard，不展示阶段导航、审计面板、Agent 队列、证据日志或语义分析。
+- 卡片属于提交后的分析阶段，并且仍是 draft-only。
+- 用户给的 GlowCard 方向适合用于后续分析卡，而不是入口页装饰。
+
+### 下一步第一件事
+
+做 P3-D：把 `analysis-workspace` 拆成清晰阶段页面容器。每个阶段先定义 UI 规范，再接真实工作流。
+
+### 未解决风险
+
+- 当前语义分析是规则式 parser，不是 LLM Supervisor。
+- 当前“页面”是 React state 切换，不是真正 route。
+- 构建产物 JS chunk 仍超 500KB。
+- 还没有创建正式 ResearchQuestion 或后端 TopicSession。

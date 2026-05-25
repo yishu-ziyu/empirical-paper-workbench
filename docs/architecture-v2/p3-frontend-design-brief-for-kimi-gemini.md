@@ -197,6 +197,8 @@ After SupervisorPlan approval, Auto Mode should stop at this human gate:
 
 > Agent Task Queue prepared; confirm whether to start real data and method execution.
 
+MVP rule: use one global confirmation button for this gate. Do not add per-stage approval popups by default. The confirmation surface should summarize execution scope, selected data / method route, evidence requirements, formal-write boundaries, expected artifacts, and known risks.
+
 Do not design the queue as if real execution has already started.
 
 ## Draft vs Formal Boundary

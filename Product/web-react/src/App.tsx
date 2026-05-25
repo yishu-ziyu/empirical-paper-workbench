@@ -4,6 +4,8 @@ import { ResearchCommandInput } from "./components/ResearchCommandInput";
 import { SemanticGlowCards, type SemanticDraft } from "./components/SemanticGlowCards";
 import { SlideTabs } from "./components/SlideTabs";
 import { TaskBriefDemo } from "./components/TaskBriefDemo";
+import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
+import { AgentActivityPanel } from "./components/AgentActivityPanel";
 
 interface SubmittedResearchTask {
   message: string;
@@ -23,6 +25,9 @@ export function App() {
   });
   const [analysisSeed, setAnalysisSeed] = useState<SemanticDraft | null>(null);
   const [activeStage, setActiveStage] = useState("brief");
+  const [briefConfirmed, setBriefConfirmed] = useState(false);
+  const [planApproved, setPlanApproved] = useState(false);
+  const [executionStarted, setExecutionStarted] = useState(false);
 
   if (task === null) {
     return (
@@ -67,6 +72,9 @@ export function App() {
             setTask(null);
             setAnalysisSeed(null);
             setActiveStage("brief");
+            setBriefConfirmed(false);
+            setPlanApproved(false);
+            setExecutionStarted(false);
           }}
         >
           新任务
@@ -82,15 +90,55 @@ export function App() {
 
       <section className="stage-panel" aria-label="研究路径">
         <SlideTabs value={activeStage} onChange={setActiveStage} />
-        {activeStage === "brief" ? <TaskBriefDemo draft={analysisSeed ?? draft} /> : null}
+        {activeStage === "brief" ? (
+          !briefConfirmed ? (
+            <TaskBriefDemo
+              draft={analysisSeed ?? draft}
+              onApprove={() => setBriefConfirmed(true)}
+            />
+          ) : !planApproved ? (
+            <SupervisorPlanReview
+              onApprove={() => {
+                setPlanApproved(true);
+              }}
+              onReject={() => {
+                setBriefConfirmed(false);
+              }}
+            />
+          ) : (
+            <AgentActivityPanel
+              executionStarted={executionStarted}
+              onStartExecution={() => {
+                setExecutionStarted(true);
+              }}
+              onBack={() => {
+                setPlanApproved(false);
+              }}
+            />
+          )
+        ) : null}
         {activeStage !== "brief" ? <SemanticGlowCards draft={analysisSeed ?? draft} /> : null}
         <div className="stage-panel__summary">
           <span>当前阶段</span>
-          <strong>{activeStage === "brief" ? "确认研究问题和边界" : "拆解草案信号"}</strong>
+          <strong>
+            {activeStage === "brief"
+              ? !briefConfirmed
+                ? "确认研究问题和边界"
+                : !planApproved
+                ? "审阅 Supervisor 规划路线"
+                : "Agent 任务排队与真实执行阻断"
+              : "拆解草案信号"}
+          </strong>
           <p>
             {activeStage === "brief"
-              ? "先确认任务书，再决定是否进入递归搜索、数据变量和方法设计。"
-              : "这些卡片只用于讨论后续分析页形态，不写入正式研究状态。"}
+              ? !briefConfirmed
+                ? "先确认任务书，再决定是否进入递归搜索、数据变量和方法设计。"
+                : !planApproved
+                ? "批准 Supervisor 规划路线后，将自动派发任务队列并阻断在执行前。"
+                : executionStarted
+                ? "真实执行授权已记录，后续由执行器把日志、产物和审计链写回队列。"
+                : "确认真实执行范围后，再进入本地安全沙盒进行统计模型回归。"
+              : "把输入信号拆为变量、方法和证据线索，供后续分析页接收。"}
           </p>
         </div>
       </section>

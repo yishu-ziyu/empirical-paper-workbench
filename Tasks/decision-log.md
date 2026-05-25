@@ -798,3 +798,15 @@ Rejected: 这轮同时实现右侧审计 Drawer、Agent Task Queue 和全模块 
 Rejected: 使用绿色、紫色、蓝色等状态色。原因是用户明确要求“基本上只想要黑白灰”；状态差异改用明度、边框、阴影和动效表达。
 
 Evidence: `python3 -m unittest tests.test_p3_react_input_tabs -v` 5 tests OK；`cd Product/web-react && npm run build` 通过；Playwright 打开 `/react` 得到 `messages=[]`、`failed=[]`、`overflowX=false`、`tabCount=5`；全量回归 `287 tests OK, skipped=1`。
+
+## 2026-05-25：React 首屏不要解释系统边界，边界说明进入后续审阅层
+
+Decision: 删除首屏标题下的长说明和阶段摘要里的“React 切片/不展开 Agent”防守性文案；首屏只保留研究入口、阶段导航和必要的状态反馈。背景接入低对比 Three.js `DottedSurface`，并把黑白灰从纯黑纯白降到柔和灰阶。
+
+Reason: 用户指出这些说明像开发者在替系统辩解，会破坏首页的产品气质。首屏应该让用户开始研究，而不是解释系统没有做什么；正式层/草案层边界应在提交、审阅和写回动作发生时呈现。
+
+Rejected: 在首页继续用说明文案解释“不会静默改写正式状态”。原因是规则重要，但位置错误；它会增加首屏认知负担。
+
+Rejected: 保持纯黑纯白强对比。原因是用户要求把对比度从 100% 降到约 76%，更接近干净、克制、未来感的工作台。
+
+Evidence: `python3 -m unittest tests.test_p3_react_input_tabs -v` 7 tests OK；`cd Product/web-react && npm run build` 通过；Playwright 打开 `/react` 检查 `canvasPresent=true`、`hasDefensiveCopy=false`、`overflowX=false`、`h1Color=rgb(228, 228, 228)`。

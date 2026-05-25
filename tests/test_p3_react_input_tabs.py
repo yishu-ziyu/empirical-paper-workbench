@@ -57,6 +57,21 @@ class ReactInputTabsContractTest(unittest.TestCase):
         self.assertIn("onKeyDown", source)
         self.assertIn("aria-selected", source)
 
+    def test_dotted_surface_background_uses_three_without_adding_page_copy(self) -> None:
+        component_path = WEB_REACT_ROOT / "src" / "components" / "DottedSurface.tsx"
+        self.assertTrue(component_path.exists(), "DottedSurface component is missing.")
+
+        package = json.loads((WEB_REACT_ROOT / "package.json").read_text(encoding="utf-8"))
+        source = component_path.read_text(encoding="utf-8")
+        app_source = (WEB_REACT_ROOT / "src" / "App.tsx").read_text(encoding="utf-8")
+
+        self.assertIn("three", package.get("dependencies", {}))
+        self.assertIn("import * as THREE from \"three\"", source)
+        self.assertIn("WebGLRenderer", source)
+        self.assertIn("requestAnimationFrame", source)
+        self.assertIn("DottedSurface", app_source)
+        self.assertNotIn("Dotted Surface", app_source)
+
     def test_app_composes_only_the_first_two_requested_ui_primitives(self) -> None:
         app_path = WEB_REACT_ROOT / "src" / "App.tsx"
         self.assertTrue(app_path.exists(), "React App shell is missing.")
@@ -66,6 +81,9 @@ class ReactInputTabsContractTest(unittest.TestCase):
         self.assertIn("SlideTabs", source)
         self.assertNotIn("AgentTaskQueue", source)
         self.assertNotIn("RightAuditDrawer", source)
+        self.assertNotIn("系统只进入草案层", source)
+        self.assertNotIn("这个 React 切片", source)
+        self.assertNotIn("不展开 Agent", source)
 
     def test_new_react_styles_are_black_white_gray_only(self) -> None:
         styles_path = WEB_REACT_ROOT / "src" / "styles.css"
@@ -97,6 +115,22 @@ class ReactInputTabsContractTest(unittest.TestCase):
         ]
         for marker in required_markers:
             self.assertIn(marker, css)
+
+    def test_start_screen_contrast_is_softened_from_pure_black_and_white(self) -> None:
+        styles_path = WEB_REACT_ROOT / "src" / "styles.css"
+        css = styles_path.read_text(encoding="utf-8").lower()
+
+        overly_harsh_tokens = [
+            "#000000",
+            "#ffffff",
+            "#050505",
+            "#0b0b0b",
+        ]
+        for token in overly_harsh_tokens:
+            self.assertNotIn(token, css)
+
+        self.assertIn("--color-bg: #101010", css)
+        self.assertIn("--color-ink: #dddddd", css)
 
 
 if __name__ == "__main__":

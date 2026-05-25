@@ -834,3 +834,15 @@ Rejected: 在输入时实时把语义卡显示在入口页。原因是虽然有�
 Rejected: 把语义卡输出写入正式 ResearchQuestion / VariableRoleSet / DesignSpec。原因是当前只是 deterministic draft parser，不能替代 LLM Supervisor 和人工审阅。
 
 Evidence: `python3 -m unittest tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v` 12 tests OK；`cd Product/web-react && npx tsc --noEmit` 通过；`cd Product/web-react && npm run build` 通过；Playwright 验证 `initialCards=0`、提交后 `analysisCards=5`。
+
+## 2026-05-25：分析工作台第一站是任务书，不是语义卡片
+
+Decision: 用户提交题目后默认进入 `TaskBriefDemo`；语义卡片只作为后续阶段 demo，在切换到非 `brief` 阶段后显示。
+
+Reason: 当前 grill-me 目标是逐板块讨论 UI。任务书页应该先帮助用户确认“我要研究什么、边界是什么、下一步是什么”，而不是立刻展示多张分析卡。
+
+Rejected: 把语义卡继续作为提交后的第一屏。原因是它仍然偏“系统分析结果”，不如任务书页适合承接用户刚输入后的第一判断。
+
+Rejected: 现在就接正式后端写回。原因是本轮目标是低保真交互 Demo，正式 TopicSession / SupervisorPlan 接入要等 UI contract 确认。
+
+Evidence: `python3 -m unittest tests.test_p3_task_brief_demo tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v` 16 tests OK；Playwright 验证 task brief 默认出现且语义卡为 0。

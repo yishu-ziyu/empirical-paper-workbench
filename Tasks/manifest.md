@@ -1252,3 +1252,26 @@ P1-R Safari + Computer Use 验收确认 `http://127.0.0.1:8765/?v=20260513-clean
 ### 手动入口
 
 - `http://127.0.0.1:8770/react?v=20260525-p3c-workspace2`
+
+## 2026-05-25 P3-D Task Brief Demo
+
+### 新增/扩展设计与测试
+
+- `docs/architecture-v2/codex-phase-p3-task-brief-demo-bdd.md`
+- `tests/test_p3_task_brief_demo.py`
+
+### React 源码
+
+- `Product/web-react/src/components/TaskBriefDemo.tsx`
+- `Product/web-react/src/App.tsx`
+- `Product/web-react/src/styles.css`
+
+### 构建与验收产物
+
+- `Product/web-dist/index.html`
+- `Product/web-dist/assets/`
+- `artifacts/ui-checks/p3-task-brief-demo.png`
+
+### 手动入口
+
+- `http://127.0.0.1:8770/react?v=20260525-p3d-task-brief-demo`

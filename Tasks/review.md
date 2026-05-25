@@ -1486,3 +1486,44 @@
 - 卡片仍在同一个 React route 内通过状态切换模拟“页面”；P3-D 应拆为明确阶段页面容器或路由。
 - Vite build 仍提示 JS chunk 超过 500KB，主要来自 Three/framer-motion；后续需要 code splitting。
 - 目前未接后端正式状态，提交不会创建正式 ResearchQuestion。
+
+## 2026-05-25 P3-D Task Brief Demo
+
+### 产品进展
+
+- 提交题目后不再直接进入语义卡片区，而是先进入“任务书 Demo”阶段页。
+- 主屏只显示 5 个必须判断的信号：研究题目、研究边界、数据线索、方法倾向、下一步。
+- 右侧 Inspector 默认折叠高噪声细节：证据要求、风险、正式层边界、派工说明。
+- 切换到 `递归搜索` 等非任务书阶段后，才显示语义卡片作为后续阶段 demo。
+
+### 行为覆盖
+
+- [x] 任务提交后默认进入 task brief stage page。
+- [x] 主屏只保留当前决策信号，不展示全量 dashboard。
+- [x] Inspector 承载证据、风险、边界、派工说明。
+- [x] 语义卡从第一分析页后置到其他阶段。
+- [x] Demo 不写入正式 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan、Finding 或 Manuscript。
+
+### 测试覆盖
+
+- RED：`python3 -m unittest tests.test_p3_task_brief_demo -v` 首次 3 failures，原因是缺 `TaskBriefDemo`、`activeStage` 和 task brief 样式。
+- GREEN：`python3 -m unittest tests.test_p3_task_brief_demo tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v`，16 tests OK。
+- 类型检查：`cd Product/web-react && npx tsc --noEmit` 通过。
+- Build：`cd Product/web-react && npm run build` 通过，仍有 chunk >500KB 警告。
+- Playwright：提交题目后 `hasTaskBrief=true`、`decisions=5`、`inspectorSections=4`、`semanticCards=0`、`overflowX=false`；切到递归搜索后 `semanticCardsAfterSwitch=5`。
+
+### 手动验收
+
+1. 打开 `http://127.0.0.1:8770/react?v=20260525-p3d-task-brief-demo`。
+2. 输入研究题目并点击发送。
+3. 首个分析页应是 `任务书 Demo`，不是语义卡片。
+4. 主屏只应看到 5 个决策卡。
+5. 右侧 Inspector 应显示 4 个可展开条目。
+6. 点击 `递归搜索` 后任务书页隐藏，语义卡才出现。
+
+### 剩余风险
+
+- 这是低保真 Demo，不是最终高保真 UI。
+- 右侧 Inspector 当前是固定栏；是否改成抽屉、浮层或可 pin 面板，需要下一轮 grill-me 决策。
+- 主屏 5 个信号是否过多或过少，需要用户看 Demo 后确认。
+- 仍未接真实 `TopicSession / ResearchQuestion / SupervisorPlan` API。

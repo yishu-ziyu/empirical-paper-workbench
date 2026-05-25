@@ -687,3 +687,13 @@
 - [x] 类型：补齐 `@types/react`、`@types/react-dom`、`@types/three`，让 React 子项目可跑 `npx tsc --noEmit`。
 - [x] 验证：目标 React 契约 12 tests OK；`npx tsc --noEmit` 通过；`npm run build` 通过；Playwright 入口页 `initialCards=0`、提交后 `analysisCards=5`。
 - [ ] 下一步 P3-D：把分析页拆成真正的阶段页面容器；不同阶段再接不同 UI 组件和真实工作流，不再把所有分析塞在一个页面。
+
+## 2026-05-25 P3-D Task Brief Demo
+
+- [x] 写 BDD：任务书阶段页、右侧 Inspector、语义卡后置、draft-only 边界。
+- [x] 写失败测试：`tests/test_p3_task_brief_demo.py`。
+- [x] 实现 `TaskBriefDemo` 低保真阶段页。
+- [x] App 增加 `activeStage`，默认进入任务书；切换到其他阶段后才显示语义卡。
+- [x] 增加黑白灰 task brief / inspector 样式。
+- [x] 运行目标测试、类型检查、build 和 Playwright 验收。
+- [ ] 下一步：围绕“任务书页”进入 grill-me，确认主屏 5 个信号是否合适、右侧 Inspector 是否应该改成抽屉或固定栏。

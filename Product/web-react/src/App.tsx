@@ -3,6 +3,7 @@ import { DottedSurface } from "./components/DottedSurface";
 import { ResearchCommandInput } from "./components/ResearchCommandInput";
 import { SemanticGlowCards, type SemanticDraft } from "./components/SemanticGlowCards";
 import { SlideTabs } from "./components/SlideTabs";
+import { TaskBriefDemo } from "./components/TaskBriefDemo";
 
 interface SubmittedResearchTask {
   message: string;
@@ -21,6 +22,7 @@ export function App() {
     hasMaterial: false,
   });
   const [analysisSeed, setAnalysisSeed] = useState<SemanticDraft | null>(null);
+  const [activeStage, setActiveStage] = useState("brief");
 
   if (task === null) {
     return (
@@ -64,6 +66,7 @@ export function App() {
           onClick={() => {
             setTask(null);
             setAnalysisSeed(null);
+            setActiveStage("brief");
           }}
         >
           新任务
@@ -78,12 +81,17 @@ export function App() {
       </section>
 
       <section className="stage-panel" aria-label="研究路径">
-        <SlideTabs />
-        <SemanticGlowCards draft={analysisSeed ?? draft} />
+        <SlideTabs value={activeStage} onChange={setActiveStage} />
+        {activeStage === "brief" ? <TaskBriefDemo draft={analysisSeed ?? draft} /> : null}
+        {activeStage !== "brief" ? <SemanticGlowCards draft={analysisSeed ?? draft} /> : null}
         <div className="stage-panel__summary">
           <span>当前阶段</span>
-          <strong>确认研究问题和边界</strong>
-          <p>先把题目拆成数据、变量、方法和证据缺口，再进入后续执行。</p>
+          <strong>{activeStage === "brief" ? "确认研究问题和边界" : "拆解草案信号"}</strong>
+          <p>
+            {activeStage === "brief"
+              ? "先确认任务书，再决定是否进入递归搜索、数据变量和方法设计。"
+              : "这些卡片只用于讨论后续分析页形态，不写入正式研究状态。"}
+          </p>
         </div>
       </section>
     </main>

@@ -2387,3 +2387,37 @@ P2-Z：给 Results、Manuscript 和 Export 增加 verifier gates。最低要求�
 - 当前“页面”是 React state 切换，不是真正 route。
 - 构建产物 JS chunk 仍超 500KB。
 - 还没有创建正式 ResearchQuestion 或后端 TopicSession。
+
+## 2026-05-25 P3-D Task Brief Demo 交接增量
+
+更新时间：2026-05-25 20:05 CST
+
+### 当前目标
+
+支持 demo-driven grill-me：先给用户看“任务书 / 研究题目确认页”的低保真 Demo，再讨论这个板块的正式 UI contract。
+
+### 已完成事项
+
+- 新增 `TaskBriefDemo`。
+- `App.tsx` 增加 `activeStage`，默认 `brief`。
+- `brief` 阶段显示任务书主屏和右侧 Inspector。
+- 非 `brief` 阶段显示现有 `SemanticGlowCards`。
+- 新增 P3-D BDD 和测试。
+- 生成验收截图 `artifacts/ui-checks/p3-task-brief-demo.png`。
+
+### 已验证证据
+
+- `python3 -m unittest tests.test_p3_task_brief_demo tests.test_p3_semantic_glow_cards tests.test_p3_react_input_tabs -v`，16 tests OK。
+- `cd Product/web-react && npx tsc --noEmit`，通过。
+- `cd Product/web-react && npm run build`，通过；仍有 chunk >500KB 警告。
+- Playwright：提交后 `hasTaskBrief=true`、`decisions=5`、`inspectorSections=4`、`semanticCards=0`；切到递归搜索后 `semanticCardsAfterSwitch=5`。
+
+### 下一步第一件事
+
+围绕任务书页问用户第一个 grill-me 问题：右侧 Inspector 是固定栏、抽屉，还是点击信号后在右侧展开？
+
+### 未解决风险
+
+- Demo 只验证信息结构，不代表最终高保真视觉。
+- 尚未接后端 TopicSession / ResearchQuestion。
+- 右侧 Inspector 的交互形态还未最终确认。

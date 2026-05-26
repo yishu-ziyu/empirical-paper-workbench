@@ -208,6 +208,23 @@
 
 业务规则：Agent Task Queue 不是最终工作成果。它必须被转换成一轮可审阅、可派工、可验收的 revision round，后续 P4-H/P5 才能消费这些任务并产出真实补证材料。
 
+## 行为 17：审稿式修订轮次必须生成可验收证据包
+
+**Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task
+**And** 部分 task 能绑定到存在的本地 artifact、hash、schema 或可定位字段
+**And** 部分 task 只有 `reason`、`recommended_action` 或 handoff 文本，尚未绑定真实证据
+**When** 用户运行 `Program/paper_revision_evidence_packets.py`
+**Then** 系统必须写出 `Results/json/paper_revision_evidence_packets.json`
+**And** 每个 task 都必须写出 `Reviews/agent_packets/{agent}/{task_id}.md` 草案层证据包
+**And** 能绑定真实 artifact 的 task 状态必须是 `evidence_packet_ready`
+**And** 只有自然语言建议、缺少 artifact/hash/schema/字段证据的 task 状态必须是 `needs_manual_review`
+**And** manifest 必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** 命令不得改写原始 `paper_revision_round.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** manifest 必须写明 Agent Team 调用节奏：证据包执行前调用各任务归属 Agent；证据包写出后收回；重跑质量门、方法门、审稿门或正式写回前再次调用 ReviewerAgent / VerifierAgent。
+
+业务规则：revision round 不是一组待办事项。进入下一轮质量门之前，每条任务都必须变成可打开、可追溯、可判定的证据包；没有真实证据的任务也要明确标成需要人工审阅，而不是用写得像证据的建议文本蒙混过关。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -223,3 +240,4 @@
 - 审稿评分的 Agent Team 调用节奏必须写入 report：method diagnostics 写出后再次调用 MethodAgent 和 ReviewerAgent；scorecard report 写出后收回；下一次只在进入 ManuscriptAgent 扩写或 ExportAgent 预检前再次调用 ReviewerAgent/VerifierAgent。
 - PDF 导出预检的 Agent Team 调用节奏必须写入 manifest：ExportAgent 在 preflight 前调用 ReviewerAgent/VerifierAgent 读取 quality report 和 scorecard；manifest、review doc 和 reproduce scripts 写出后收回；下一次只在用户批准正式层写回或最终 PDF export 前再次调用。
 - 审稿式修订轮次的 Agent Team 调用节奏必须写入 revision round：ReviewerAgent/VerifierAgent/MethodAgent 在 round build 前调用；round manifest 和 review doc 写出后收回；任务执行或正式层写回前再次调用，复核每个 queued task 是否已有验收证据。
+- 审稿式修订证据包必须把“建议文本”和“本地结构化证据”分开：存在 artifact/hash/schema/字段引用的任务才能进入 `evidence_packet_ready`；缺少关键证据的任务必须进入 `needs_manual_review`，等待 P4-I 或人工补证。

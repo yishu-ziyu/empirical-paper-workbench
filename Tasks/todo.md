@@ -904,4 +904,10 @@
 - [x] P5-E2c 真实运行：CLI 输出 `status=evidence_materialized`、`materialized=4`；重跑 PDF 预检后 `required_evidence_missing` 已清零，当前唯一阻断原因是 `section_source_placeholders_remaining`。
 - [x] P5-E2c 验证：新增目标测试 OK；materializer 全文件 5 OK；P5-D/P5-E1/P5-E2 回归 11 OK；Python 编译通过；全量回归 `365 tests OK, skipped=1`。
 - [x] 长程执行约束更新：后续每个 P5/P6 小节点默认最多 20 分钟；超过 20 分钟必须拆成更小节点，或回退判断路线是否走错。Agent Team 优先用于并行调研/只读复核/实现审查；若当前会话线程上限阻断，必须记录原因并继续用本地可验证闭环推进。
-- [ ] 下一步 P5-E2d：处理 `section_source_placeholders_remaining`，目标是用已通过的证据文件生成章节源草案，而不是在 preflight 里硬绕过占位检查。
+- [x] P5-E2d 节点规则：本节点只把 `section_source_placeholders_remaining` 推进为证据绑定的章节源草案；不渲染 PDF/docx，不扩写完整论文，不写正式 `state/product/*`。
+- [x] P5-E2d Agent Team：按用户要求先尝试新建只读 explorer 复核章节源/预检边界，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续按 20 分钟节点完成本地 BDD/TDD/CLI 闭环。
+- [x] P5-E2d BDD/TDD：新增行为 31 和 `tests/test_formal_section_source_drafter.py`；RED 为缺少 `Program/formal_section_source_drafter.py`，GREEN 后覆盖章节源草案生成、缺证据阻断、正式层不改写和 PDF 预检联动。
+- [x] P5-E2d 实现：新增 `Program/formal_section_source_drafter.py` 和 `Program/workbench/formal_section_source_drafter.py`，把 10 个章节源从占位改为 `source_draft_ready`，并绑定每节所需证据路径。
+- [x] P5-E2d 真实运行：CLI 输出 `status=section_source_drafts_ready`、`drafted_sections=10`；重跑 PDF 预检后输出 `status=ready_for_pdf_export_review`、`can_export_pdf_candidate=true`、`blocking_reasons=[]`。
+- [x] P5-E2d 验证：目标测试 2 OK；相邻 PDF/source assembly 回归 8 OK；Python 编译通过；全量回归 `367 tests OK, skipped=1`。
+- [ ] 下一步 P5-E3：在不写正式层的前提下，用章节源草案和证据生成 PDF 候选稿，并保留人工验收门。

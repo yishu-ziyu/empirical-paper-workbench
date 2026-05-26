@@ -1,21 +1,27 @@
 # Empirical Strategy
 
-- Status: `source_placeholder_ready`
+- Status: `source_draft_ready`
 - Agent: `MethodAgent`
 - Target length: `1200-2000 English words / 3-5 pages`
-- Source manifest: `formal_paper_package_manifest.json`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
 - Final paper write: `false`
 
-## Purpose
+## 本节任务
 
 写清识别式、估计方程、关键假设、标准误和方法规范门。
 
-## Evidence required before writing
+## 已绑定证据
 
-- `design_spec`
-- `method_gate_report`
-- `method_diagnostics_report`
+- `design_spec` -> `state/product/design_spec.json`
+- `method_gate_report` -> `Results/json/method_gate_report.json`
+- `method_diagnostics_report` -> `Results/json/method_diagnostics_report.json`
 
-## Draft source
+## 章节源草案
 
-本文件是正式论文包的章节源占位。下一轮由对应 Agent 读取证据后填充内容；在人工确认前不得把本文件视为正式终稿。
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。

@@ -28,6 +28,11 @@ def parse_args() -> argparse.Namespace:
         help="Optional source draft path relative to project root. Defaults to the draft in the quality report.",
     )
     parser.add_argument(
+        "--source-manifest",
+        default=None,
+        help="Optional PDF export manifest path relative to project root. Its next_review_tasks enter the next Supervisor queue.",
+    )
+    parser.add_argument(
         "--output-plan",
         default="Results/json/paper_expansion_plan.json",
         help="Expansion plan path relative to project root.",
@@ -62,6 +67,15 @@ def resolve_source_draft(project_root: Path, args: argparse.Namespace, quality_r
     return resolve_path(project_root, str(draft_value))
 
 
+def load_source_manifest(project_root: Path, value: str | None) -> tuple[Path | None, dict | None]:
+    path = resolve_path(project_root, value)
+    if path is None:
+        return None, None
+    if not path.exists():
+        raise FileNotFoundError(f"PDF export manifest not found: {value}")
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
 def main() -> int:
     args = parse_args()
     project_root = Path(args.project_root).resolve()
@@ -76,7 +90,13 @@ def main() -> int:
     if output_plan is None or output_manuscript is None or output_supervisor_context is None:
         raise ValueError("Output paths are required.")
 
-    plan = build_paper_expansion_plan(project_root, quality_report)
+    source_manifest_path, source_manifest = load_source_manifest(project_root, args.source_manifest)
+    plan = build_paper_expansion_plan(
+        project_root,
+        quality_report,
+        source_manifest=source_manifest,
+        source_manifest_path=source_manifest_path,
+    )
     plan_path = write_paper_expansion_plan(project_root, plan, output_plan)
     source_draft = resolve_source_draft(project_root, args, quality_report)
     manuscript = build_structured_manuscript(project_root, plan, source_draft)

@@ -183,6 +183,17 @@
 
 业务规则：PDF 预检不只是排版检查。它要把“现在能否进入正式论文包”和“下一轮谁补什么证据”写成可复核的产品状态。
 
+## 行为 15：PDF 预检的下一轮任务必须进入 Supervisor / Agent 队列
+
+**Given** PDF export manifest 已经写出 `next_review_tasks`、`export_gate` 和 `agent_team_schedule`
+**When** 用户运行 `Program/paper_package.py --source-manifest <manifest>`
+**Then** `paper_expansion_plan.json` 必须把 manifest 中的 `next_review_tasks` 合并进 `agent_task_queue`
+**And** 每个来自 manifest 的任务必须保留 `source=pdf_export_manifest`、`source_artifact`、负责人 Agent、输入证据、动作建议和审阅状态
+**And** `paper_supervisor_context.json` 必须把 export manifest 加入 `context_sources`
+**And** Supervisor 上下文必须声明 Agent Team 调用节奏：读取 export manifest 前调用 ReviewerAgent / VerifierAgent；合并到 expansion plan 和 supervisor context 后收回；进入正式层写回前再次调用。
+
+业务规则：上一轮 PDF 预检不能停留在“报告已经指出问题”。它必须把问题转成下一轮可派工任务，让 LiteratureAgent、MethodAgent、ManuscriptAgent、ReviewerAgent 和 VerifierAgent 各自处理自己的缺口。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

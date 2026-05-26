@@ -63,12 +63,21 @@ SECTION_TARGETS = {
 }
 
 
-def build_paper_expansion_plan(project_root: Path, quality_report: dict[str, Any]) -> dict[str, Any]:
+def build_paper_expansion_plan(
+    project_root: Path,
+    quality_report: dict[str, Any],
+    *,
+    source_manifest: dict[str, Any] | None = None,
+    source_manifest_path: Path | None = None,
+) -> dict[str, Any]:
     section_checks = quality_report.get("section_checks", {})
     missing_sections = section_checks.get("missing_sections", [])
     verdict = quality_report.get("verdict", [])
     next_tasks = quality_report.get("recommended_next_tasks", [])
     draft_path = str(quality_report.get("draft_path") or "")
+    manifest_tasks = normalize_manifest_review_tasks(project_root, source_manifest, source_manifest_path)
+    agent_task_queue = merge_agent_tasks(normalize_agent_task_queue(next_tasks), manifest_tasks)
+    agent_team_schedule = build_agent_team_schedule(source_manifest, source_manifest_path, project_root)
 
     section_plan = []
     for section in REQUIRED_SECTIONS:
@@ -103,7 +112,11 @@ def build_paper_expansion_plan(project_root: Path, quality_report: dict[str, Any
         },
         "current_verdict": verdict,
         "section_expansion_plan": section_plan,
-        "agent_task_queue": normalize_agent_task_queue(next_tasks),
+        "agent_task_queue": agent_task_queue,
+        "source_export_manifest": (
+            relative_or_absolute(source_manifest_path, project_root) if source_manifest_path is not None else None
+        ),
+        "agent_team_schedule": agent_team_schedule,
         "release_gate": {
             "required_before_review": [
                 "all_required_sections_present",
@@ -226,6 +239,9 @@ def build_supervisor_context_bundle(
         relative_or_absolute(output_plan_path, project_root),
         relative_or_absolute(output_manuscript_path, project_root),
     ]
+    source_export_manifest = expansion_plan.get("source_export_manifest")
+    if source_export_manifest:
+        context_sources.append(str(source_export_manifest))
     for candidate in [
         project_root / "state" / "product" / "research_question.json",
         project_root / "state" / "product" / "variable_role_set.json",
@@ -267,6 +283,7 @@ def build_supervisor_context_bundle(
             },
         ],
         "agent_task_queue": expansion_plan.get("agent_task_queue", []),
+        "agent_team_schedule": expansion_plan.get("agent_team_schedule", {}),
         "release_gate": expansion_plan.get("release_gate", {}),
         "current_verdict": quality_report.get("verdict", []),
         "task_prompt": build_supervisor_task_prompt(quality_report, expansion_plan),
@@ -290,9 +307,116 @@ def normalize_agent_task_queue(tasks: list[dict[str, Any]]) -> list[dict[str, An
                 "reason": task.get("reason"),
                 "inputs": task.get("inputs", []),
                 "status": "ready",
+                "source": task.get("source", "paper_quality_report"),
             }
         )
     return queue
+
+
+def normalize_manifest_review_tasks(
+    project_root: Path,
+    source_manifest: dict[str, Any] | None,
+    source_manifest_path: Path | None,
+) -> list[dict[str, Any]]:
+    if not source_manifest or source_manifest_path is None:
+        return []
+    source_artifact = relative_or_absolute(source_manifest_path, project_root)
+    queue: list[dict[str, Any]] = []
+    for task in source_manifest.get("next_review_tasks", []):
+        task_id = task.get("id")
+        if not task_id:
+            continue
+        queue.append(
+            {
+                "order": 0,
+                "id": task_id,
+                "agent": task.get("agent") or infer_agent_for_review_task(task_id),
+                "reason": task.get("reason") or task.get("recommended_action") or task.get("action"),
+                "action": task.get("recommended_action") or task.get("action") or task.get("reason"),
+                "inputs": task.get("inputs") or infer_manifest_task_inputs(task, source_artifact),
+                "status": "ready_for_supervisor_review",
+                "source": "pdf_export_manifest",
+                "source_artifact": source_artifact,
+                "source_task_source": task.get("source"),
+                "verification": {
+                    "required_before_completion": [
+                        "updated_section_or_diagnostic_artifact",
+                        "reviewer_scorecard_task_cleared",
+                        "export_gate_recomputed",
+                    ]
+                },
+            }
+        )
+    return queue
+
+
+def infer_agent_for_review_task(task_id: str) -> str:
+    if any(marker in task_id for marker in ["literature", "bibliography", "citation", "contribution"]):
+        return "LiteratureAgent"
+    if any(marker in task_id for marker in ["iv", "bartik", "rotemberg", "method", "identification"]):
+        return "MethodAgent"
+    if any(marker in task_id for marker in ["sample", "data", "variable"]):
+        return "DataAgent"
+    if any(marker in task_id for marker in ["export", "manifest", "pdf"]):
+        return "VerifierAgent"
+    return "ManuscriptAgent"
+
+
+def infer_manifest_task_inputs(task: dict[str, Any], source_artifact: str) -> list[str]:
+    inputs = [source_artifact]
+    source = task.get("source")
+    if source == "reviewer_scorecard":
+        inputs.append("Results/json/reviewer_scorecard_report.json")
+    if source == "paper_quality_report":
+        inputs.append("Results/json/paper_quality_report.json")
+    return inputs
+
+
+def merge_agent_tasks(*task_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in task_groups:
+        for task in group:
+            task_id = task.get("id")
+            if not task_id or task_id in seen:
+                continue
+            seen.add(task_id)
+            merged.append(dict(task))
+    for order, task in enumerate(merged, start=1):
+        task["order"] = order
+    return merged
+
+
+def build_agent_team_schedule(
+    source_manifest: dict[str, Any] | None,
+    source_manifest_path: Path | None,
+    project_root: Path,
+) -> dict[str, Any]:
+    base = {
+        "call_when": "before_paper_package_quality_merge",
+        "called_agents": ["ManuscriptAgent", "LiteratureAgent", "MethodAgent", "ReviewerAgent"],
+        "recall_when": "after_paper_expansion_plan_and_supervisor_context_written",
+        "next_call_when": "before_supervisor_execution",
+        "integration_owner": "MainAgent",
+        "boundary": "Agent Team 只把质量门转成草案层任务队列，不改写正式层。",
+    }
+    if source_manifest is None or source_manifest_path is None:
+        return base
+    manifest_schedule = source_manifest.get("agent_team_schedule", {})
+    called_agents = set(base["called_agents"])
+    called_agents.update(manifest_schedule.get("called_agents", []))
+    called_agents.update(["VerifierAgent"])
+    return {
+        "call_when": "before_paper_package_task_merge",
+        "called_agents": sorted(called_agents),
+        "source_manifest": relative_or_absolute(source_manifest_path, project_root),
+        "source_manifest_call_when": manifest_schedule.get("call_when"),
+        "source_manifest_recall_when": manifest_schedule.get("recall_when"),
+        "recall_when": "after_paper_expansion_plan_and_supervisor_context_written",
+        "next_call_when": "before_formal_writeback",
+        "integration_owner": "MainAgent",
+        "boundary": "先读取 PDF export manifest 的审稿任务并合并为草案层队列；写出 expansion plan 和 Supervisor context 后收回；正式层写回前再次调用 ReviewerAgent/VerifierAgent。",
+    }
 
 
 def build_supervisor_task_prompt(quality_report: dict[str, Any], expansion_plan: dict[str, Any]) -> str:

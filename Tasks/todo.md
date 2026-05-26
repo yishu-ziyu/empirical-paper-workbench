@@ -63,6 +63,9 @@
 - [x] P4-D4 实现：新增 `Program/reviewer_scorecard.py` 和 `Program/workbench/reviewer_scorecard.py`，并让 `Program/workbench/paper_quality.py` 识别 `Results/json/reviewer_scorecard_report.json`。
 - [x] P4-D4 真实运行：对当前真实 CFPS/机器人方法诊断生成 Reviewer Scorecard，并刷新 paper quality report；当前总分 61，允许草稿继续，阻断强因果表述和正式导出。
 - [x] P4-E：让 PDF export manifest 读取 quality report 和 reviewer scorecard，导出后显示“论文包审阅入口”、export gate、下一轮自动任务和 Agent Team 调用节奏。
+- [x] P4-F：让 `Program/paper_package.py --source-manifest` 读取 PDF export manifest，把 `next_review_tasks` 合并进 `paper_expansion_plan.json` 和 `paper_supervisor_context.json` 的 Supervisor / Agent 队列。
+- [x] P4-F BDD/TDD：新增行为 15 和 `tests/test_paper_package_quality.py` 覆盖 export manifest 的下一轮任务进入队列、保留来源证据、写入 Agent Team 调用节奏。
+- [x] P4-F 真实运行：基于 `Submissions/cfps_robot_pdf_export_manifest.json` 重新生成 `Results/json/paper_expansion_plan.json`、`Manuscripts/generated/paper_package_draft.md` 和 `Results/json/paper_supervisor_context.json`；当前合并后 `agent_task_queue=11`，其中 6 条来自 PDF 预检 manifest。
 
 ### Agent Team 调用节奏
 
@@ -82,6 +85,10 @@
 - P4-E 已执行回收点：主 Agent 将 quality verdict、scorecard、export gate 和 next review tasks 合并进 `Submissions/cfps_robot_pdf_export_manifest.json` 与 `Submissions/cfps_robot_pdf_first_review.md`；正式 `state/product/*` 和论文正式层未被改写。
 - P4-E 下一次 Agent Team 调用点：用户批准进入正式层写回或最终 PDF export 前，再调用 ReviewerAgent/VerifierAgent 复核 `export_gate.can_export_pdf`、revision tasks 是否清零，以及是否允许生成正式包。
 - P4-E 串行收口：ManuscriptAgent 只在方法门和文献包存在后生成草稿层章节；ExportAgent 在 reviewer scorecard 通过前只生成 PDF/README/manifest 预检包，不提升正式层状态。
+- P4-F 已执行调用点：在 `paper_package --source-manifest` 读取 PDF export manifest 前，调用 ReviewerAgent/VerifierAgent 解释 `next_review_tasks`、`export_gate` 和上一轮 preflight 边界；同时调用 LiteratureAgent/MethodAgent/ManuscriptAgent 判断每条任务应归属哪个执行角色。
+- P4-F 已执行回收点：主 Agent 收回各路判断后，只把 manifest 任务合并到草案层 `paper_expansion_plan.json.agent_task_queue` 和 `paper_supervisor_context.json.agent_task_queue`；不改写正式 `state/product/*`、变量角色、DesignSpec、RunPlan 或正式论文层。
+- P4-F 下一次 Agent Team 调用点：进入正式层写回或最终 PDF export 前，再调用 ReviewerAgent/VerifierAgent 复核 `reviewer_scorecard_task_cleared`、`export_gate_recomputed` 和 `updated_section_or_diagnostic_artifact`，确认每条 manifest 任务已有证据闭环。
+- P4-F 串行收口：主 Agent 是 integration owner；Agent Team 负责证据解释和角色分工，最终队列去重、排序、写盘和测试验证由主 Agent 完成。
 
 ## 2026-05-22 Long-run Optimization Protocol
 

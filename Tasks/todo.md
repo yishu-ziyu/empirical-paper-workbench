@@ -884,4 +884,12 @@
 - [x] 真实项目验收：P5-D 的 10 个缺失证据全部找到现有来源或可派生来源；`variable_role_set` 是 direct alias，另外 9 个是 derivable，`missing_after_scan=0`。
 - [x] 保护边界：resolver 明确 `this_command_mutated_preflight=false`、`this_command_wrote_formal_state=false`、`can_apply_without_human_review=false`，不直接修改 PDF 预检报告、章节源、正式研究状态或 canonical evidence registry。
 - [x] 验证：目标测试 3 OK；P5-D/P5-E1 回归 6 OK；全量回归 360 OK，skipped=1；Python 编译通过；真实 CLI 运行输出 `status=evidence_registry_patch_proposed`、`patch_items=10`。
-- [ ] 下一步 P5-E2a：材料化最高确定性的 3 个证据文件：`variable_role_set`、`sample_profile`、`regression_tables`；完成后重跑 P5-D。P5-E2b 再处理 `robustness_matrix`、`limitations_register`、`figure_manifest`；P5-E2c 再处理文献和上下文来源。
+- [x] P5-E2a 节点规则：本节点只材料化最高确定性的 3 个证据文件：`variable_role_set`、`sample_profile`、`regression_tables`；不写正式 `state/product/*`，不处理图、稳健性、局限和章节正文。后续所有 P5/P6 的 A/B/C/D 小节点最多 20 分钟，超时必须拆解或回退路线。
+- [x] P5-E2a BDD/TDD：新增行为 28 和 `tests/test_formal_evidence_materializer.py`；RED 为缺少 `Program/formal_evidence_materializer.py`，GREEN 后覆盖目标证据材料化、缺 proposal 阻断和未请求证据不写出。
+- [x] P5-E2a 实现：新增 `Program/formal_evidence_materializer.py` 和 `Program/workbench/formal_evidence_materializer.py`，从现有 artifact 生成 `Results/json/formal_evidence_materialization_report.json`、`Reviews/formal_evidence_materialization.md`、`Submissions/formal_package/evidence/variable_role_set.json`、`Results/json/sample_profile.json`、`Results/json/regression_tables.json`。
+- [x] P5-E2a PDF 预检刷新：让 `formal_pdf_export_preflight` 优先读取 `Submissions/formal_package/evidence/variable_role_set.json`；重跑后 `variable_role_set`、`sample_profile`、`regression_tables` 三项 evidence check 已 passed。
+- [x] P5-E2a 风险记录：当前正式变量角色仍绑定旧样例 `Data/Final/analysis_sample.csv`，真实方法执行使用 `Data/Final/cfps_robot_reallocation.csv`；材料化报告保留 `variable_role_dataset_mismatch`，等待后续人工确认或正式变量角色升级。
+- [x] P5-E2a Agent Team：尝试派发 sidecar 复核时因当前环境 agent thread limit 被拒绝；主 Agent 按 20 分钟节点先完成可验证 CLI/TDD/预检刷新，并把下一次 Agent Team 调用点写入材料化报告。
+- [x] P5-E2a 验证：目标测试 3 OK；P5-D/P5-E1/P5-E2a 回归 9 OK；Python 编译通过；真实 CLI 输出 `status=evidence_materialized`、`materialized=3`；全量回归 `363 tests OK, skipped=1`。
+- [ ] 下一步 P5-E2b：在 20 分钟内只材料化 `robustness_matrix`、`limitations_register`、`figure_manifest`，完成后重跑 P5-D；若任一项需要真实计算或人工判断，拆成 E2b-1/E2b-2。
+- [ ] 下一步 P5-E2c：处理章节源占位和文献/上下文来源，不和 E2b 混做；目标是消除 `section_source_placeholders_remaining`。

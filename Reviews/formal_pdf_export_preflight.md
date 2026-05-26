@@ -38,12 +38,12 @@
 - `method_diagnostics_report`: `passed`
 - `method_execution_result`: `passed`
 - `method_gate_report`: `passed`
-- `regression_tables`: `failed`
+- `regression_tables`: `passed`
 - `research_question`: `passed`
 - `reviewer_scorecard_report`: `passed`
 - `robustness_matrix`: `failed`
-- `sample_profile`: `failed`
-- `variable_role_set`: `failed`
+- `sample_profile`: `passed`
+- `variable_role_set`: `passed`
 - `verified_bibliography`: `passed`
 - `verified_context_sources`: `failed`
 
@@ -64,10 +64,7 @@
 - `supply_evidence_domain_notes` / VerifierAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 - `supply_evidence_figure_manifest` / ExecutionAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 - `supply_evidence_limitations_register` / ReviewerAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_regression_tables` / ExecutionAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 - `supply_evidence_robustness_matrix` / MethodAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_sample_profile` / DataAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_variable_role_set` / DataAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 - `supply_evidence_verified_context_sources` / VerifierAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 
 ## 下一步

@@ -1,0 +1,60 @@
+{
+  "schema_version": "p5.variable_role_set_evidence.v1",
+  "evidence_id": "variable_role_set",
+  "generated_at": "2026-05-26T19:36:58.941216+00:00",
+  "source_paths": [
+    "state/product/variable_roles.json",
+    "Results/json/method_execution_result.json"
+  ],
+  "review_status": "needs_human_review",
+  "canonical_write_allowed": false,
+  "source_variable_roles": {
+    "id": "variable_role_set",
+    "version": 2,
+    "status": "approved",
+    "evidence_level": "local_file",
+    "dataset_path": "Data/Final/analysis_sample.csv",
+    "dataset_name": "analysis_sample.csv",
+    "updated_at": "2026-05-14T08:07:36.747442+00:00",
+    "roles": {
+      "outcome": [
+        "wage"
+      ],
+      "treatment": [
+        "trained"
+      ],
+      "controls": [
+        "edu",
+        "experience"
+      ],
+      "instruments": [],
+      "fixed_effects": [],
+      "cluster_by": []
+    },
+    "decision_events": [
+      {
+        "actor": "user",
+        "action": "confirm_variable_roles",
+        "timestamp": "2026-05-12T17:12:31.985647+00:00",
+        "note": "浏览器验收：确认 wage/trained/edu/experience 的变量角色。"
+      },
+      {
+        "actor": "user",
+        "action": "confirm_variable_roles",
+        "timestamp": "2026-05-14T08:07:36.747442+00:00",
+        "note": ""
+      }
+    ]
+  },
+  "source_variable_roles_dataset_path": "Data/Final/analysis_sample.csv",
+  "method_execution_dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+  "method_execution_variables": {
+    "dependent_var": "ln_wage",
+    "treatment": "ln_robot",
+    "formula": "ln_wage ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban"
+  },
+  "warnings": [
+    "variable_role_dataset_mismatch"
+  ],
+  "next_action": "人工确认变量角色是否应提升为当前 CFPS robot 研究的正式 VariableRoleSet。"
+}

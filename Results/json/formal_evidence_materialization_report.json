@@ -1,0 +1,79 @@
+{
+  "schema_version": "p5.formal_evidence_materialization.v1",
+  "generated_at": "2026-05-26T19:36:58.942960+00:00",
+  "source_patch_proposal": "Submissions/formal_package/reproducibility/evidence_registry_patch_proposal.json",
+  "materialization_report": "Results/json/formal_evidence_materialization_report.json",
+  "status": "evidence_materialized",
+  "blocking_reasons": [],
+  "requested_evidence_ids": [
+    "variable_role_set",
+    "sample_profile",
+    "regression_tables"
+  ],
+  "materialized": [
+    {
+      "id": "variable_role_set",
+      "target_path": "Submissions/formal_package/evidence/variable_role_set.json",
+      "source_paths": [
+        "state/product/variable_roles.json",
+        "Results/json/method_execution_result.json"
+      ],
+      "warnings": [
+        "variable_role_dataset_mismatch"
+      ]
+    },
+    {
+      "id": "sample_profile",
+      "target_path": "Results/json/sample_profile.json",
+      "source_paths": [
+        "Results/json/method_execution_result.json"
+      ],
+      "warnings": []
+    },
+    {
+      "id": "regression_tables",
+      "target_path": "Results/json/regression_tables.json",
+      "source_paths": [
+        "Results/json/method_execution_result.json"
+      ],
+      "warnings": []
+    }
+  ],
+  "skipped": [],
+  "warnings": [
+    "variable_role_dataset_mismatch"
+  ],
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "agent_team_schedule": {
+    "call_when": "before_high_confidence_evidence_materialization",
+    "called_agents": [
+      "DataAgent",
+      "ExecutionAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_evidence_files_written",
+    "next_call_when": "before_rerunning_pdf_preflight_or_promoting_formal_state",
+    "integration_owner": "MainAgent",
+    "boundary": "Agent Team 只复核 evidence file 是否可被预检消费；正式状态提升仍需人工确认。"
+  },
+  "next_action": {
+    "id": "rerun_formal_pdf_export_preflight",
+    "label": "重跑 PDF 导出预检",
+    "description": "让 P5-D 读取新材料化的证据文件，确认哪些缺口已经消除。"
+  },
+  "write_boundary": "本节点只从现有本地产物派生正式包证据文件；不写 state/product 正式状态，不生成最终 PDF/docx，也不修改 canonical evidence registry。"
+}

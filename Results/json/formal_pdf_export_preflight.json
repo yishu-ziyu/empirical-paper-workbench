@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_pdf_export_preflight.v1",
-  "generated_at": "2026-05-26T19:05:04.945097+00:00",
+  "generated_at": "2026-05-26T19:37:13.403912+00:00",
   "preflight_report": "Results/json/formal_pdf_export_preflight.json",
   "source_map": "Results/json/formal_manuscript_source_map.json",
   "section_sources_path": "Submissions/formal_package/manuscript/section_sources.json",
@@ -278,17 +278,17 @@
     },
     {
       "id": "regression_tables",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/regression_tables.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/regression_tables.json"
+      ],
       "required_by_sections": [
         "Main Results"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "research_question",
@@ -334,31 +334,32 @@
     },
     {
       "id": "sample_profile",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/sample_profile.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/sample_profile.json"
+      ],
       "required_by_sections": [
         "Data and Measurement"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "variable_role_set",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
+        "Submissions/formal_package/evidence/variable_role_set.json",
         "state/product/variable_role_set.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Submissions/formal_package/evidence/variable_role_set.json"
+      ],
       "required_by_sections": [
         "Data and Measurement"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "verified_bibliography",
@@ -601,23 +602,6 @@
       "review_status": "open"
     },
     {
-      "id": "supply_evidence_regression_tables",
-      "agent": "ExecutionAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "regression_tables",
-      "required_by_sections": [
-        "Main Results"
-      ],
-      "candidate_paths": [
-        "Results/json/regression_tables.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
       "id": "supply_evidence_robustness_matrix",
       "agent": "MethodAgent",
       "source": "formal_pdf_export_preflight",
@@ -627,40 +611,6 @@
       ],
       "candidate_paths": [
         "Results/json/robustness_matrix.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_sample_profile",
-      "agent": "DataAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "sample_profile",
-      "required_by_sections": [
-        "Data and Measurement"
-      ],
-      "candidate_paths": [
-        "Results/json/sample_profile.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_variable_role_set",
-      "agent": "DataAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "variable_role_set",
-      "required_by_sections": [
-        "Data and Measurement"
-      ],
-      "candidate_paths": [
-        "state/product/variable_role_set.json"
       ],
       "issue": [
         "required_evidence_missing"

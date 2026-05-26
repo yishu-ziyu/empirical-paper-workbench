@@ -937,4 +937,10 @@
 - [x] P6-A 实现：新增 `Program/formal_pdf_final_writeback.py` 和 `Program/workbench/formal_pdf_final_writeback.py`，读取 candidate report、final preflight、final approval report 和 writeback approval ledger 后复制候选 PDF 为最终 PDF，并记录 sha256、bytes、路径和 formal state guard。
 - [x] P6-A 真实运行：CLI 输出 `status=final_pdf_written`、`final_pdf=Submissions/formal_package/paper.pdf`、`wrote_final_pdf=true`、`wrote_docx=false`；`paper.pdf` 与 `paper_candidate.pdf` sha256 一致，本仓库仍无 `Submissions/formal_package/paper.docx`。
 - [x] P6-A 验证：目标测试 3 OK；P5-E3/P5-E4/P5-E5/P6-A 相邻回归 10 OK；Python 编译通过。
-- [ ] 下一步 P6-B：在最终 PDF 已写入后，做 docx 导出预检与工具链报告；如果工具链不满足，只写 blocker 和日志，不把 P6-A 状态标成失败。
+- [x] P6-B 节点规则：本节点只做 docx 导出预检与工具链报告；不生成 `Submissions/formal_package/paper.docx`，不改写 `paper.pdf`、`paper_candidate.qmd`、P5/P6 审批账本或正式研究状态。
+- [x] P6-B Agent Team：使用 verifier sidecar Volta 复核边界；采纳其建议，不复用旧 `state/product/docx_export_preflight.json`，改为正式包专用 `Results/json/formal_docx_export_preflight.json` 和 `Reviews/formal_docx_export_preflight.md`。
+- [x] P6-B BDD/TDD：新增 Behavior 36 和 `tests/test_formal_docx_export_preflight.py`；RED 为缺少 `Program/formal_docx_export_preflight.py`，GREEN 后覆盖 ready、最终 PDF 写回未完成阻断、pandoc 缺失阻断。
+- [x] P6-B 实现：新增 `Program/formal_docx_export_preflight.py` 和 `Program/workbench/formal_docx_export_preflight.py`，读取最终 PDF 写回报告、最终批准报告、批准账本和候选 QMD，记录 pandoc 路径/版本与计划导出命令。
+- [x] P6-B 真实运行：CLI 输出 `status=ready_for_docx_export`、`can_export_docx=true`、`wrote_docx=false`；本机 `pandoc 3.9` 可用，本命令未创建 `Submissions/formal_package/paper.docx`。
+- [x] P6-B 验证：目标测试 3 OK；P5-E3/P5-E4/P5-E5/P6-A/P6-B 相邻回归 13 OK；Python 编译和 scoped diff check 通过。
+- [ ] 下一步 P6-C：只在读取 P6-B ready 报告后生成最终 `paper.docx`，并写出 docx 导出报告；如果导出失败，只写 blocker 和日志，不回滚 P6-A 的最终 PDF。

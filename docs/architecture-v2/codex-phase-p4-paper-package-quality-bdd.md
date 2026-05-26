@@ -225,6 +225,23 @@
 
 业务规则：revision round 不是一组待办事项。进入下一轮质量门之前，每条任务都必须变成可打开、可追溯、可判定的证据包；没有真实证据的任务也要明确标成需要人工审阅，而不是用写得像证据的建议文本蒙混过关。
 
+## 行为 18：修订证据包必须进入质量门复核账本
+
+**Given** `paper_revision_evidence_packets.json` 已经列出每条修订任务的 evidence packet 状态
+**And** 每条任务都声明了下一轮质量门、方法门、审稿门或导出预检需要读取的 `gate_recompute_inputs`
+**When** 用户运行 `Program/paper_revision_gate_recompute.py`
+**Then** 系统必须写出 `Results/json/paper_revision_gate_recompute.json`
+**And** 每条任务必须被标记为 `cleared`、`still_blocking` 或 `manual_review_required`
+**And** `needs_manual_review` 的 evidence packet 必须进入 `manual_review_required`
+**And** gate 输入缺失的任务必须进入 `still_blocking`
+**And** 证据包 ready、gate 输入完整、且当前质量门/审稿门/导出门不再引用该任务时必须进入 `cleared`
+**And** 证据包 ready 但当前 gate 产物仍引用该任务时必须进入 `still_blocking`
+**And** 命令不得改写 `paper_revision_evidence_packets.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 复核账本必须写明 Agent Team 调用节奏：重跑 gate 前调用 ReviewerAgent / VerifierAgent；账本写出后收回；正式层写回预检前再次调用。
+
+业务规则：P4-I 不是继续生成更多建议，而是把 P4-H 的证据包变成下一轮门控判断。系统必须明确哪些任务已具备进入正式写回预检的证据，哪些仍阻塞，哪些需要人工补证。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -241,3 +258,4 @@
 - PDF 导出预检的 Agent Team 调用节奏必须写入 manifest：ExportAgent 在 preflight 前调用 ReviewerAgent/VerifierAgent 读取 quality report 和 scorecard；manifest、review doc 和 reproduce scripts 写出后收回；下一次只在用户批准正式层写回或最终 PDF export 前再次调用。
 - 审稿式修订轮次的 Agent Team 调用节奏必须写入 revision round：ReviewerAgent/VerifierAgent/MethodAgent 在 round build 前调用；round manifest 和 review doc 写出后收回；任务执行或正式层写回前再次调用，复核每个 queued task 是否已有验收证据。
 - 审稿式修订证据包必须把“建议文本”和“本地结构化证据”分开：存在 artifact/hash/schema/字段引用的任务才能进入 `evidence_packet_ready`；缺少关键证据的任务必须进入 `needs_manual_review`，等待 P4-I 或人工补证。
+- 质量门复核账本不能把 `manual_review_required` 任务提升为 `cleared`；人工补证、正式层写回预检和最终导出必须在后续节点处理。

@@ -917,4 +917,11 @@
 - [x] P5-E3 实现：新增 `Program/formal_pdf_candidate.py` 和 `Program/workbench/formal_pdf_candidate.py`，从 `formal_pdf_export_preflight.json`、`formal_manuscript_source_map.json`、`section_sources.json` 组装 `paper_candidate.qmd`，并在本机 Quarto/XeLaTeX 工具链可用时渲染候选 PDF。
 - [x] P5-E3 真实运行：CLI 输出 `status=pdf_candidate_ready`；生成 `Submissions/formal_package/manuscript/paper_candidate.qmd`、`Submissions/formal_package/paper_candidate.pdf`、`Results/json/formal_pdf_candidate_report.json`、`Reviews/formal_pdf_candidate.md` 和 `Submissions/formal_package/reproducibility/render_pdf_candidate.sh`；`pdfinfo` 显示候选 PDF 共 10 页。
 - [x] P5-E3 验证：目标测试 2 OK；P5-D/P5-E2d/P5-E3 相邻回归 7 OK；Python 编译通过；`git diff --check` 通过。
-- [ ] 下一步 P5-E4：对 PDF 候选稿做人工审阅/机器审阅入口和最终层写回预检，仍不直接把候选 PDF 晋升为最终投稿稿。
+- [x] P5-E4 节点规则：本节点只对 PDF 候选稿做机器审阅、人工审阅入口和最终写回预检；不把 `paper_candidate.pdf` 晋升为最终 PDF/docx，不写 `state/product/*`，不合并 canonical 方法库。
+- [x] P5-E4 时间盒：拆成 4 个 20 分钟以内的小节点：行为契约、失败测试、CLI/报告实现、真实运行和提交。后续 P5/P6 的 A/B/C/D 小节点继续按 20 分钟封顶，超时必须拆解或回退路线。
+- [x] P5-E4 Agent Team：按要求尝试新建只读 test-engineer 复核 Behavior 33、测试和实现边界，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把线程上限写入候选稿审阅报告的 `agent_team_schedule`。
+- [x] P5-E4 BDD/TDD：新增 Behavior 33 和 `tests/test_formal_pdf_candidate_review.py`；RED 为缺少 `Program/formal_pdf_candidate_review.py`，GREEN 后覆盖候选 PDF 审阅、最终写回预检、候选报告未 ready 阻断、正式层不改写和候选 PDF 字节不变。
+- [x] P5-E4 实现：新增 `Program/formal_pdf_candidate_review.py` 和 `Program/workbench/formal_pdf_candidate_review.py`，读取 `formal_pdf_candidate_report.json`，检查候选 PDF 可读性、章节清单和候选命令写入边界，生成审阅 JSON、审阅 Markdown 和最终写回预检 JSON。
+- [x] P5-E4 真实运行：CLI 输出 `status=ready_for_final_approval_review`、`can_request_final_approval=true`；生成 `Results/json/formal_pdf_candidate_review.json`、`Reviews/formal_pdf_candidate_review.md`、`Results/json/formal_pdf_final_writeback_preflight.json`；报告确认 PDF 可读 10 页、`final_writeback_allowed=false`、formal state guard 未变化。
+- [x] P5-E4 验证：目标测试 2 OK；P5-D/P5-E3/P5-E4 相邻回归 7 OK；Python 编译通过。
+- [ ] 下一步 P5-E5：增加“人工最终批准账本”节点；只有显式批准后，P6-A 才能把候选 PDF/docx 写入最终层。

@@ -1,0 +1,43 @@
+{
+  "schema_version": "p5.formal_pdf_final_writeback_preflight.v1",
+  "generated_at": "2026-05-26T21:13:15.556672+00:00",
+  "status": "ready_for_human_final_approval",
+  "source_review": "Results/json/formal_pdf_candidate_review.json",
+  "candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+  "candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "requires_human_approval": true,
+  "can_request_final_approval": true,
+  "final_writeback_allowed": false,
+  "final_pdf_approved": false,
+  "blocking_reasons": [],
+  "approval_contract": {
+    "required_before_final_writeback": [
+      "human_pdf_candidate_review",
+      "final_output_scope_reviewed",
+      "formal_state_guard_confirmed"
+    ],
+    "approval_path": "state/product/writeback_approvals.json",
+    "ready_for_approval": true,
+    "canonical_write_policy": "候选 PDF 只有人工批准后才能进入最终 PDF/docx 写回节点。"
+  },
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "human_review_pdf_candidate",
+    "label": "人工审阅 PDF 候选稿并决定是否进入最终批准",
+    "requires_human": true
+  }
+}

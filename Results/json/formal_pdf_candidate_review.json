@@ -1,0 +1,225 @@
+{
+  "schema_version": "p5.formal_pdf_candidate_review.v1",
+  "generated_at": "2026-05-26T21:13:15.556672+00:00",
+  "status": "ready_for_final_approval_review",
+  "candidate_layer_only": true,
+  "source_candidate_report": "Results/json/formal_pdf_candidate_report.json",
+  "candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+  "candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "output_report": "Results/json/formal_pdf_candidate_review.json",
+  "output_review": "Reviews/formal_pdf_candidate_review.md",
+  "output_final_preflight": "Results/json/formal_pdf_final_writeback_preflight.json",
+  "section_count": 10,
+  "sections": [
+    {
+      "section": "Abstract",
+      "source_path": "Submissions/formal_package/manuscript/sections/01-abstract.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "100 English words or concise Chinese equivalent",
+      "evidence_requirements": [
+        "approved_findings",
+        "method_gate_report",
+        "verified_bibliography"
+      ]
+    },
+    {
+      "section": "Introduction",
+      "source_path": "Submissions/formal_package/manuscript/sections/02-introduction.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "1800-3000 English words / 4-6 pages",
+      "evidence_requirements": [
+        "research_question",
+        "contribution_matrix",
+        "approved_findings"
+      ]
+    },
+    {
+      "section": "Literature and Contribution",
+      "source_path": "Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md",
+      "agent": "LiteratureAgent",
+      "target_length": "1000-1800 English words / 2-4 pages",
+      "evidence_requirements": [
+        "verified_bibliography",
+        "contribution_matrix",
+        "citation_verification_log"
+      ]
+    },
+    {
+      "section": "Institutional Background / Theory / Context",
+      "source_path": "Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md",
+      "agent": "DomainAgent",
+      "target_length": "800-1500 English words / 2-4 pages",
+      "evidence_requirements": [
+        "domain_notes",
+        "verified_context_sources"
+      ]
+    },
+    {
+      "section": "Data and Measurement",
+      "source_path": "Submissions/formal_package/manuscript/sections/05-data-and-measurement.md",
+      "agent": "DataAgent",
+      "target_length": "800-1500 English words / 2-3 pages",
+      "evidence_requirements": [
+        "variable_role_set",
+        "data_profile",
+        "sample_profile"
+      ]
+    },
+    {
+      "section": "Empirical Strategy",
+      "source_path": "Submissions/formal_package/manuscript/sections/06-empirical-strategy.md",
+      "agent": "MethodAgent",
+      "target_length": "1200-2000 English words / 3-5 pages",
+      "evidence_requirements": [
+        "design_spec",
+        "method_gate_report",
+        "method_diagnostics_report"
+      ]
+    },
+    {
+      "section": "Main Results",
+      "source_path": "Submissions/formal_package/manuscript/sections/07-main-results.md",
+      "agent": "ExecutionAgent",
+      "target_length": "2000-3500 English words / 4-7 pages",
+      "evidence_requirements": [
+        "method_execution_result",
+        "regression_tables",
+        "figure_manifest"
+      ]
+    },
+    {
+      "section": "Robustness / Mechanisms / Heterogeneity",
+      "source_path": "Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md",
+      "agent": "MethodAgent",
+      "target_length": "1500-3000 English words / 3-6 pages",
+      "evidence_requirements": [
+        "robustness_matrix",
+        "method_diagnostics_report"
+      ]
+    },
+    {
+      "section": "Conclusion",
+      "source_path": "Submissions/formal_package/manuscript/sections/09-conclusion.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "500-800 English words / 1-2 pages",
+      "evidence_requirements": [
+        "approved_findings",
+        "limitations_register",
+        "reviewer_scorecard_report"
+      ]
+    },
+    {
+      "section": "References",
+      "source_path": "Submissions/formal_package/manuscript/sections/10-references.md",
+      "agent": "LiteratureAgent",
+      "target_length": "Verified bibliography only",
+      "evidence_requirements": [
+        "verified_bibliography",
+        "citation_verification_log"
+      ]
+    }
+  ],
+  "pdf_metadata": {
+    "status": "readable",
+    "path": "Submissions/formal_package/paper_candidate.pdf",
+    "pages": 10,
+    "bytes": 107169,
+    "title": "Formal Paper Candidate",
+    "author": "Local Empirical Research OS"
+  },
+  "machine_review": {
+    "status": "passed",
+    "checks": [
+      {
+        "id": "candidate_report_ready",
+        "passed": true,
+        "blocking_reason": "candidate_report_not_pdf_ready"
+      },
+      {
+        "id": "candidate_layer_only",
+        "passed": true,
+        "blocking_reason": "candidate_layer_only"
+      },
+      {
+        "id": "candidate_did_not_write_formal_state",
+        "passed": true,
+        "blocking_reason": "candidate_did_not_write_formal_state"
+      },
+      {
+        "id": "candidate_did_not_write_final_outputs",
+        "passed": true,
+        "blocking_reason": "candidate_did_not_write_final_outputs"
+      },
+      {
+        "id": "candidate_formal_state_guard_clean",
+        "passed": true,
+        "blocking_reason": "candidate_formal_state_guard_clean"
+      },
+      {
+        "id": "candidate_pdf_exists",
+        "passed": true,
+        "blocking_reason": "candidate_pdf_exists"
+      },
+      {
+        "id": "candidate_qmd_exists",
+        "passed": true,
+        "blocking_reason": "candidate_qmd_exists"
+      },
+      {
+        "id": "candidate_pdf_readable",
+        "passed": true,
+        "blocking_reason": "candidate_pdf_readable"
+      },
+      {
+        "id": "candidate_has_sections",
+        "passed": true,
+        "blocking_reason": "candidate_has_sections"
+      },
+      {
+        "id": "candidate_render_succeeded",
+        "passed": true,
+        "blocking_reason": "candidate_render_succeeded"
+      }
+    ],
+    "blocking_checks": []
+  },
+  "blocking_reasons": [],
+  "requires_human_approval": true,
+  "can_request_final_approval": true,
+  "final_pdf_approved": false,
+  "final_writeback_allowed": false,
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "agent_team_schedule": {
+    "call_when": "before_pdf_candidate_review",
+    "attempted_in_current_codex_session": true,
+    "current_session_result": "blocked_by_agent_thread_limit",
+    "called_agents": [
+      "ReviewerAgent",
+      "VerifierAgent",
+      "ExportAgent"
+    ],
+    "recall_when": "after_pdf_candidate_review_and_final_preflight_written",
+    "next_call_when": "before_final_pdf_or_docx_approval",
+    "integration_owner": "MainAgent"
+  },
+  "next_action": {
+    "id": "human_review_pdf_candidate",
+    "label": "人工审阅 PDF 候选稿并决定是否进入最终批准",
+    "requires_human": true
+  },
+  "write_boundary": "本节点只生成候选 PDF 审阅报告和最终写回预检；不移动候选 PDF，不生成最终 PDF/docx，不写 state/product 正式状态。"
+}

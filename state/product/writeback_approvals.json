@@ -1,0 +1,83 @@
+{
+  "_meta": {
+    "evidence_level": "local_file",
+    "service": "manuscript_candidate_service"
+  },
+  "approvals": {
+    "manuscript_candidate_finding_trained_effect_results": {
+      "id": "writeback_approval_manuscript_candidate_finding_trained_effect_results",
+      "candidate_id": "manuscript_candidate_finding_trained_effect_results",
+      "finding_id": "finding_trained_effect",
+      "status": "approved",
+      "action": "approve",
+      "actor": "user",
+      "note": "manual validation",
+      "timestamp": "2026-05-13T12:30:15.733643+00:00",
+      "evidence_level": "local_file",
+      "path": "state/product/writeback_approvals.json",
+      "run_id": "run_c424d6a11af7",
+      "run_plan_version": 1,
+      "source_draft_path": "Manuscripts/generated/paper_draft.md",
+      "writeback_preview_path": "Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md",
+      "export_manifest_path": "state/product/export_package_manifest.json",
+      "can_write_back": true
+    }
+  },
+  "schema_version": "product.writeback_approvals.v1",
+  "formal_preflight_approvals": {
+    "formal_writeback_preflight": {
+      "id": "formal_writeback_approval_formal_writeback_preflight",
+      "preflight_id": "formal_writeback_preflight",
+      "status": "approved",
+      "action": "approve",
+      "actor": "user",
+      "note": "批准 P4-J 正式写回预检进入 P5 formal paper package。",
+      "timestamp": "2026-05-26T18:10:33.096970+00:00",
+      "evidence_level": "local_file",
+      "path": "state/product/writeback_approvals.json",
+      "source_preflight": "Results/json/formal_writeback_preflight.json",
+      "source_preview": "Manuscripts/generated/previews/formal_writeback_preflight.md",
+      "writeback_scope_categories": [
+        "sections",
+        "citations",
+        "method_narrative",
+        "result_tables",
+        "reproducibility"
+      ],
+      "can_enter_p5": true,
+      "can_write_formal_package": true,
+      "this_command_wrote_formal_state": false
+    }
+  },
+  "final_pdf_approvals": {
+    "formal_pdf_candidate": {
+      "id": "final_pdf_approval_formal_pdf_candidate",
+      "preflight_id": "formal_pdf_final_writeback_preflight",
+      "status": "approved",
+      "action": "approve",
+      "actor": "user",
+      "note": "批准候选 PDF 进入最终写回。",
+      "timestamp": "2026-05-26T21:32:39.780852+00:00",
+      "evidence_level": "local_file",
+      "path": "state/product/writeback_approvals.json",
+      "source_final_preflight": "Results/json/formal_pdf_final_writeback_preflight.json",
+      "source_review": "Results/json/formal_pdf_candidate_review.json",
+      "candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+      "candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+      "approval_contract": {
+        "required_before_final_writeback": [
+          "human_pdf_candidate_review",
+          "final_output_scope_reviewed",
+          "formal_state_guard_confirmed"
+        ],
+        "approval_path": "state/product/writeback_approvals.json",
+        "ready_for_approval": true,
+        "canonical_write_policy": "候选 PDF 只有人工批准后才能进入最终 PDF/docx 写回节点。"
+      },
+      "can_enter_p6": true,
+      "final_writeback_authorized": true,
+      "this_command_wrote_formal_state": false,
+      "this_command_wrote_final_outputs": false
+    }
+  }
+}

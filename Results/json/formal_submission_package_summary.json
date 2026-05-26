@@ -1,0 +1,161 @@
+{
+  "schema_version": "p6.formal_submission_package_summary.v1",
+  "generated_at": "2026-05-26T23:01:04.042200+00:00",
+  "status": "ready_for_manual_acceptance",
+  "ready_for_manual_acceptance": true,
+  "source_manifest": {
+    "path": "Results/json/formal_submission_package_manifest.json",
+    "exists": true,
+    "sha256": "c69bf5c7a77914690e97a01d142a24096db21feb846596a6497437cc03a2fa04",
+    "status": "formal_submission_package_ready",
+    "schema_version": "p6.formal_submission_package_manifest.v1"
+  },
+  "package_manifest": {
+    "path": "Submissions/formal_package/manifest.json",
+    "exists": true,
+    "status": "formal_submission_package_ready",
+    "schema_version": "p6.formal_submission_package_manifest.v1"
+  },
+  "artifacts": {
+    "paper_pdf": {
+      "id": "paper_pdf",
+      "path": "Submissions/formal_package/paper.pdf",
+      "type": "application/pdf",
+      "exists": true,
+      "bytes": 107169,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "expected_bytes": 107169,
+      "expected_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "package_expected_bytes": 107169,
+      "package_expected_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "source_report": "Results/json/formal_pdf_final_writeback.json"
+    },
+    "paper_docx": {
+      "id": "paper_docx",
+      "path": "Submissions/formal_package/paper.docx",
+      "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "exists": true,
+      "bytes": 14457,
+      "sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "expected_bytes": 14457,
+      "expected_sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "package_expected_bytes": 14457,
+      "package_expected_sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "source_report": "Results/json/formal_docx_export.json"
+    }
+  },
+  "visible_summary": [
+    {
+      "id": "package_status",
+      "label": "正式包状态",
+      "value": "可进入人工验收"
+    },
+    {
+      "id": "final_files",
+      "label": "最终文件",
+      "value": "PDF 107169 bytes / DOCX 14457 bytes"
+    },
+    {
+      "id": "provenance",
+      "label": "来源",
+      "value": "Submissions/formal_package/manifest.json"
+    },
+    {
+      "id": "consistency",
+      "label": "一致性",
+      "value": "文件指纹与 manifest 一致"
+    },
+    {
+      "id": "next_manual_action",
+      "label": "下一步",
+      "value": "打开 PDF 和 DOCX，按验收清单逐项确认"
+    }
+  ],
+  "open_targets": [
+    {
+      "id": "paper_pdf",
+      "label": "打开 PDF",
+      "path": "Submissions/formal_package/paper.pdf",
+      "absolute_path": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Submissions/formal_package/paper.pdf",
+      "type": "pdf",
+      "media_type": "application/pdf",
+      "exists": true,
+      "bytes": 107169,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "open_command": [
+        "open",
+        "Submissions/formal_package/paper.pdf"
+      ]
+    },
+    {
+      "id": "paper_docx",
+      "label": "打开 DOCX",
+      "path": "Submissions/formal_package/paper.docx",
+      "absolute_path": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Submissions/formal_package/paper.docx",
+      "type": "docx",
+      "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "exists": true,
+      "bytes": 14457,
+      "sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "open_command": [
+        "open",
+        "Submissions/formal_package/paper.docx"
+      ]
+    }
+  ],
+  "manual_acceptance": {
+    "status": "pending_manual_acceptance",
+    "next_action": "open_and_review_pdf_docx",
+    "checklist": [
+      {
+        "id": "open_pdf",
+        "label": "打开 PDF，确认页面可读、标题和章节存在"
+      },
+      {
+        "id": "open_docx",
+        "label": "打开 DOCX，确认正文、标题和引用字段可读"
+      },
+      {
+        "id": "fingerprints",
+        "label": "核对 PDF/DOCX sha256 与 manifest 一致"
+      },
+      {
+        "id": "p6_reports",
+        "label": "复核 P6-A/P6-B/P6-C 报告均为 ready/exported"
+      },
+      {
+        "id": "formal_state",
+        "label": "确认本节点没有改写正式研究状态"
+      }
+    ]
+  },
+  "consistency_checks": {
+    "source_manifest_ready": true,
+    "package_manifest_ready": true,
+    "paper_pdf_exists": true,
+    "paper_docx_exists": true,
+    "paper_pdf_hash_matches_submission_manifest": true,
+    "paper_docx_hash_matches_submission_manifest": true,
+    "paper_pdf_bytes_match_submission_manifest": true,
+    "paper_docx_bytes_match_submission_manifest": true,
+    "paper_pdf_hash_matches_package_manifest": true,
+    "paper_docx_hash_matches_package_manifest": true
+  },
+  "blocking_reasons": [],
+  "boundary_flags": {
+    "this_command_opened_files": false,
+    "this_command_rendered_pdf": false,
+    "this_command_rendered_docx": false,
+    "this_command_wrote_final_outputs": false,
+    "this_command_wrote_formal_research_state": false
+  },
+  "formal_state_guard": {
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "open_and_review_pdf_docx",
+    "label": "打开 PDF/DOCX 做人工验收",
+    "description": "产品层可以展示两个打开入口；人工确认后再进入正式验收写回节点。"
+  }
+}

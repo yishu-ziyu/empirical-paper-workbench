@@ -119,6 +119,10 @@
 - P4-I3 真实运行：重跑 `paper_revision_evidence_packets.py` 后 11 条任务全部为 `evidence_packet_ready`、`needs_manual_review=0`；重跑 `paper_revision_gate_recompute.py` 后 11 条均为 `still_blocking`（当前 gate artifacts 仍引用这些任务），`manual_review_required=0`；重跑 `paper_package.py --source-manifest` 后 `agent_tasks=0`。
 - P4-I3 BDD/TDD：新增行为 20 和 `tests/test_paper_revision_evidence_packets.py::test_bdd_20_literature_short_names_resolve_to_canonical_processed_artifacts`；RED 为文献任务仍是 `needs_manual_review`，GREEN 后绑定 processed 文献证据路径。
 - P4-I3 Agent Team 回收点：Hooke 定位路径归一化缺陷，Noether 给出 CNKI/文献证据包第一版字段和人工辅助检索边界；主 Agent 合并为最小路径修复，没有扩展文献重写或正式层写回。
+- P4-I4 已执行：让 `paper_revision_gate_recompute.py` 消费已就绪 evidence packet 对旧 gate 任务引用的回应；gate 输入齐全且 `evidence_packet_ready` 的任务进入 `cleared`，旧 `recommended_next_tasks` / `next_review_tasks` 引用写入 `consumed_gate_matches` 作为审计线索，不再形成重复阻塞。
+- P4-I4 真实运行：重跑 `paper_revision_gate_recompute.py` 后 11 条任务全部 `cleared`、`still_blocking=0`、`manual_review_required=0`，`next_action=formal_writeback_preflight`，共消费 39 条旧 gate 引用；重跑 `paper_package.py --source-manifest` 后 `agent_tasks=0`，`paper_supervisor_context.json` 继续包含 `Results/json/paper_revision_gate_recompute.json`。
+- P4-I4 BDD/TDD：新增行为 21 和 `tests/test_paper_revision_gate_recompute.py::test_bdd_21_ready_evidence_packets_consume_stale_gate_task_references`；RED 为 report 仍是 `needs_revision_work`，GREEN 后进入 `ready_for_formal_writeback_preflight`。
+- P4-I4 Agent Team 回收点：Erdos 只读复核下游 `paper_package.py` 消费者逻辑，确认 P4-I4 不破坏“ready 任务不重新入队”的消费者契约；主 Agent 合并 gate recompute 最小语义变更。
 - P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
 - P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。

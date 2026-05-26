@@ -524,6 +524,23 @@
 
 业务规则：P6-A 是 PDF-first 的最终产物写回节点。它只把已经人工批准的候选 PDF 晋升到最终包，给用户一个稳定、可打开、可验收的正式 PDF 文件；docx 导出、投稿包压缩和云端同步继续拆到后续节点。
 
+### Behavior 36: Final docx export preflight checks the toolchain without generating docx
+
+**Given** `formal_pdf_final_writeback.json` 的状态是 `final_pdf_written` 或 `final_pdf_already_written`
+**And** 最终 PDF、候选 QMD、最终批准报告和批准账本均存在
+**And** `pandoc` 工具链可用
+**When** 用户运行 `Program/formal_docx_export_preflight.py`
+**Then** 系统必须写出 `Results/json/formal_docx_export_preflight.json`
+**And** 系统必须写出 `Reviews/formal_docx_export_preflight.md`
+**And** 报告必须记录最终 PDF、候选 QMD、预期 docx 路径、导出命令、pandoc 路径和版本
+**And** 报告必须声明 `status=ready_for_docx_export`、`can_export_docx=true`
+**And** 报告必须声明 `this_command_wrote_docx=false`、`this_command_wrote_formal_state=false`
+**And** 命令不得生成 `Submissions/formal_package/paper.docx`
+**And** 命令不得修改 `paper.pdf`、`paper_candidate.qmd`、P5/P6 审批账本或正式研究状态
+**And** 如果最终 PDF 写回报告未通过、最终 PDF 缺失、候选 QMD 缺失或 `pandoc` 不可用，系统必须阻断为对应状态，并不得生成 docx。
+
+业务规则：P6-B 只回答“能不能进入 docx 导出执行”。它把投稿兼容格式的工具链、输入源和目标路径讲清楚，但不在预检节点实际生成 docx。这样 P6-C 可以只认一份可审计预检报告来执行导出。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

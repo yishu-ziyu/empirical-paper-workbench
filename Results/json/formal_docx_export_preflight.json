@@ -1,0 +1,50 @@
+{
+  "schema_version": "p6.formal_docx_export_preflight.v1",
+  "generated_at": "2026-05-26T22:06:15.730399+00:00",
+  "status": "ready_for_docx_export",
+  "source_final_pdf_writeback": "Results/json/formal_pdf_final_writeback.json",
+  "source_approval_report": "Results/json/formal_pdf_final_approval.json",
+  "source_approval_ledger": "state/product/writeback_approvals.json",
+  "source_candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "final_pdf": "Submissions/formal_package/paper.pdf",
+  "expected_docx": "Submissions/formal_package/paper.docx",
+  "can_export_docx": true,
+  "blocking_reasons": [],
+  "export_command": [
+    "python3",
+    "Program/export_docx.py",
+    "--project-root",
+    ".",
+    "--source",
+    "Submissions/formal_package/manuscript/paper_candidate.qmd",
+    "--output",
+    "Submissions/formal_package/paper.docx"
+  ],
+  "pandoc": {
+    "available": true,
+    "path": "/opt/homebrew/bin/pandoc",
+    "version": "pandoc 3.9",
+    "checked_bin": "pandoc"
+  },
+  "this_command_wrote_docx": false,
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "run_formal_docx_export",
+    "label": "执行正式 docx 导出",
+    "description": "docx 预检已通过。下一节点可以读取本报告并生成 formal package 的 paper.docx。"
+  }
+}

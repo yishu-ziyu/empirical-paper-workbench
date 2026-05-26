@@ -1,0 +1,10 @@
+COMMAND:
+python3 Program/export_docx.py --project-root /Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板 --source Submissions/formal_package/manuscript/paper_candidate.qmd --output Submissions/formal_package/paper.docx
+
+STDOUT:
+[econ-workbench] exported=Submissions/formal_package/paper.docx
+[econ-workbench] manifest=Submissions/export_manifest.json
+[econ-workbench] log=Results/logs/export_docx.log
+
+
+STDERR:

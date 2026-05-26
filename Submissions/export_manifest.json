@@ -1,0 +1,16 @@
+{
+  "exported_at": "2026-05-26T22:23:41.992680+00:00",
+  "source_markdown": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "output_docx": "Submissions/formal_package/paper.docx",
+  "reference_doc": null,
+  "command": [
+    "pandoc",
+    "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Submissions/formal_package/manuscript/paper_candidate.qmd",
+    "-o",
+    "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Submissions/formal_package/paper.docx",
+    "--citeproc",
+    "--bibliography",
+    "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Manuscripts/references.bib"
+  ],
+  "docx_exists": true
+}

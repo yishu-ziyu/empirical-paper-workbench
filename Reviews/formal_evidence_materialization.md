@@ -7,9 +7,10 @@
 
 ## 已材料化证据
 
-- `figure_manifest` -> `Results/json/figure_manifest.json` (no_rendered_figures_registered)
-- `robustness_matrix` -> `Results/json/robustness_matrix.json` (robustness_items_need_review)
-- `limitations_register` -> `Results/json/limitations_register.json` (limitations_need_human_review)
+- `approved_findings` -> `Results/json/approved_findings.json` (none)
+- `citation_verification_log` -> `Results/json/citation_verification_log.json` (citation_log_needs_manual_review)
+- `domain_notes` -> `Results/json/domain_notes.json` (domain_notes_need_human_review)
+- `verified_context_sources` -> `Results/json/verified_context_sources.json` (verified_context_sources_need_review)
 
 ## 跳过项
 
@@ -17,9 +18,9 @@
 
 ## Warnings
 
-- `limitations_need_human_review`
-- `no_rendered_figures_registered`
-- `robustness_items_need_review`
+- `citation_log_needs_manual_review`
+- `domain_notes_need_human_review`
+- `verified_context_sources_need_review`
 
 ## 下一步
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,10 @@ TARGET_PATHS = {
     "figure_manifest": "Results/json/figure_manifest.json",
     "robustness_matrix": "Results/json/robustness_matrix.json",
     "limitations_register": "Results/json/limitations_register.json",
+    "approved_findings": "Results/json/approved_findings.json",
+    "citation_verification_log": "Results/json/citation_verification_log.json",
+    "domain_notes": "Results/json/domain_notes.json",
+    "verified_context_sources": "Results/json/verified_context_sources.json",
 }
 
 
@@ -150,6 +155,14 @@ def build_evidence_payload(project_root: Path, evidence_id: str) -> tuple[dict[s
         return build_robustness_matrix(project_root)
     if evidence_id == "limitations_register":
         return build_limitations_register(project_root)
+    if evidence_id == "approved_findings":
+        return build_approved_findings(project_root)
+    if evidence_id == "citation_verification_log":
+        return build_citation_verification_log(project_root)
+    if evidence_id == "domain_notes":
+        return build_domain_notes(project_root)
+    if evidence_id == "verified_context_sources":
+        return build_verified_context_sources(project_root)
     raise ValueError(f"unsupported evidence id: {evidence_id}")
 
 
@@ -508,6 +521,234 @@ def build_limitations_register(project_root: Path) -> tuple[dict[str, Any], list
     )
 
 
+def build_approved_findings(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    finding_reviews_path = project_root / "state" / "product" / "finding_reviews.json"
+    candidate_reviews_path = project_root / "state" / "product" / "manuscript_candidate_reviews.json"
+    finding_reviews = load_json_if_exists(finding_reviews_path)
+    candidate_reviews = load_json_if_exists(candidate_reviews_path)
+
+    raw_reviews = list(as_record_list(finding_reviews.get("reviews") or finding_reviews.get("items") or []))
+    raw_reviews.extend(as_record_list(candidate_reviews.get("reviews") or candidate_reviews.get("items") or []))
+
+    findings: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for review in raw_reviews:
+        if review.get("review_status") != "approved" or not review.get("can_write_to_draft"):
+            continue
+        artifact_path = str(review.get("artifact_path") or "")
+        artifact_exists = bool(artifact_path and (project_root / artifact_path).exists())
+        if artifact_path and not artifact_exists:
+            warnings.append("approved_finding_artifact_missing")
+        findings.append(
+            {
+                "review_id": review.get("id"),
+                "finding_id": review.get("finding_id"),
+                "claim": review.get("claim"),
+                "run_id": review.get("run_id"),
+                "artifact_path": artifact_path,
+                "artifact_exists": artifact_exists,
+                "evidence_level": review.get("evidence_level"),
+                "review_status": review.get("review_status"),
+                "source": "finding_reviews",
+            }
+        )
+
+    if not findings:
+        warnings.append("approved_findings_empty")
+
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [finding_reviews_path, candidate_reviews_path]
+        if path.exists()
+    ]
+    needs_review = bool(warnings)
+    return (
+        {
+            "schema_version": "p5.approved_findings.v1",
+            "evidence_id": "approved_findings",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": "needs_human_review" if needs_review else "ready_for_review",
+            "review_status": "needs_human_review" if needs_review else "ready_for_review",
+            "approved_count": len(findings),
+            "findings": findings,
+            "canonical_write_allowed": False,
+            "warnings": sorted(set(warnings)),
+            "next_action": "人工复核 approved finding 是否与当前正式稿章节和最新执行结果一致。",
+        },
+        sorted(set(warnings)),
+    )
+
+
+def build_citation_verification_log(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    literature_report_path = project_root / "Results" / "json" / "literature_package_report.json"
+    verified_bibliography_path = project_root / "Data" / "literature" / "processed" / "verified_bibliography.csv"
+    literature_report = load_json_if_exists(literature_report_path)
+    rows = read_csv_rows(verified_bibliography_path)
+
+    citations = []
+    missing_doi = False
+    unverified = False
+    for row in rows:
+        doi = row.get("doi") or ""
+        verification_status = row.get("verification_status") or ""
+        if not doi:
+            missing_doi = True
+        if verification_status not in {"doi_verified", "verified"}:
+            unverified = True
+        citations.append(
+            {
+                "source_id": row.get("source_id"),
+                "citation_key": row.get("citation_key"),
+                "title": row.get("title"),
+                "authors": row.get("authors"),
+                "year": row.get("year"),
+                "venue": row.get("venue"),
+                "doi": doi,
+                "verification_status": verification_status,
+                "used_in_section": row.get("used_in_section"),
+                "url": row.get("url"),
+            }
+        )
+
+    warnings: list[str] = []
+    if literature_report.get("status") != "approved":
+        warnings.append("citation_log_needs_manual_review")
+    if missing_doi:
+        warnings.append("citation_entries_missing_doi")
+    if unverified:
+        warnings.append("citation_entries_not_fully_verified")
+
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [literature_report_path, verified_bibliography_path]
+        if path.exists()
+    ]
+    needs_review = bool(warnings)
+    return (
+        {
+            "schema_version": "p5.citation_verification_log.v1",
+            "evidence_id": "citation_verification_log",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": "needs_human_review" if needs_review else "ready_for_review",
+            "review_status": "needs_human_review" if needs_review else "ready_for_review",
+            "literature_package_status": literature_report.get("status"),
+            "verification_channels": literature_report.get("verification_channels") or [],
+            "verified_count": len([item for item in citations if item.get("verification_status") in {"doi_verified", "verified"}]),
+            "citations": citations,
+            "cnki_manual_queue": literature_report.get("cnki_manual_queue") or [],
+            "canonical_write_allowed": False,
+            "warnings": sorted(set(warnings)),
+            "next_action": "人工复核 DOI、CNKI 队列和正文引用绑定后，再允许进入正式引用层。",
+        },
+        sorted(set(warnings)),
+    )
+
+
+def build_domain_notes(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    literature_report_path = project_root / "Results" / "json" / "literature_package_report.json"
+    research_question_path = project_root / "state" / "product" / "research_question.json"
+    design_spec_path = project_root / "state" / "product" / "design_spec.json"
+    literature_report = load_json_if_exists(literature_report_path)
+    research_question = load_json_if_exists(research_question_path)
+    design_spec = load_json_if_exists(design_spec_path)
+    inputs = literature_report.get("formal_state_inputs") or {}
+    design_context = inputs.get("design_spec") or design_spec
+    run_context = inputs.get("run_plan") or {}
+
+    warnings = ["domain_notes_need_human_review"]
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [literature_report_path, research_question_path, design_spec_path]
+        if path.exists()
+    ]
+    return (
+        {
+            "schema_version": "p5.domain_notes.v1",
+            "evidence_id": "domain_notes",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": "needs_human_review",
+            "review_status": "needs_human_review",
+            "research_question": {
+                "title": research_question.get("title") or (inputs.get("research_question") or {}).get("title"),
+                "status": research_question.get("status"),
+                "dataset_hint": research_question.get("dataset_hint"),
+            },
+            "data_context": {
+                "dataset_path": run_context.get("dataset_path"),
+                "unit": run_context.get("unit"),
+            },
+            "method_context": {
+                "method_family": design_context.get("method_family"),
+                "method_subtype": design_context.get("method_subtype"),
+            },
+            "literature_context": {
+                "package_status": literature_report.get("status"),
+                "evidence_level": literature_report.get("evidence_level"),
+                "verification_channels": literature_report.get("verification_channels") or [],
+                "missing_evidence": literature_report.get("missing_evidence") or [],
+            },
+            "cnki_manual_queue": literature_report.get("cnki_manual_queue") or [],
+            "canonical_write_allowed": False,
+            "warnings": warnings,
+            "next_action": "人工复核领域语境是否足够支撑正式引言、文献综述和方法选择说明。",
+        },
+        warnings,
+    )
+
+
+def build_verified_context_sources(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    source_registry_path = project_root / "state" / "source_registry.json"
+    orchestration_source_registry_path = project_root / "state" / "orchestration" / "source_registry.json"
+    literature_report_path = project_root / "Results" / "json" / "literature_package_report.json"
+    verified_bibliography_path = project_root / "Data" / "literature" / "processed" / "verified_bibliography.csv"
+    candidate_literature_path = project_root / "Data" / "literature" / "processed" / "candidate_literature.csv"
+
+    source_registry = load_json_if_exists(source_registry_path)
+    if not source_registry:
+        source_registry = load_json_if_exists(orchestration_source_registry_path)
+    literature_report = load_json_if_exists(literature_report_path)
+    verified_rows = read_csv_rows(verified_bibliography_path)
+    candidate_rows = read_csv_rows(candidate_literature_path)
+
+    warnings = ["verified_context_sources_need_review"]
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [
+            source_registry_path,
+            orchestration_source_registry_path,
+            literature_report_path,
+            verified_bibliography_path,
+            candidate_literature_path,
+        ]
+        if path.exists()
+    ]
+    return (
+        {
+            "schema_version": "p5.verified_context_sources.v1",
+            "evidence_id": "verified_context_sources",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": "needs_human_review",
+            "review_status": "needs_human_review",
+            "source_registry": source_registry,
+            "literature_source_summary": {
+                "verified_bibliography_rows": len(verified_rows),
+                "candidate_literature_rows": len(candidate_rows),
+                "verification_channels": literature_report.get("verification_channels") or [],
+                "cnki_manual_queue_count": len(literature_report.get("cnki_manual_queue") or []),
+                "missing_evidence": literature_report.get("missing_evidence") or [],
+            },
+            "canonical_write_allowed": False,
+            "warnings": warnings,
+            "next_action": "人工复核本地数据、Zotero/PDF、CNKI 和候选文献来源后，再允许正式引用和上下文写回。",
+        },
+        warnings,
+    )
+
+
 def write_formal_evidence_materialization_outputs(
     report_path: Path,
     review_path: Path,
@@ -586,6 +827,15 @@ def build_agent_team_schedule(
             agents.add("MethodAgent")
         elif evidence_id == "limitations_register":
             agents.add("ReviewerAgent")
+        elif evidence_id == "approved_findings":
+            agents.add("ReviewerAgent")
+        elif evidence_id == "citation_verification_log":
+            agents.add("LiteratureAgent")
+        elif evidence_id == "domain_notes":
+            agents.add("DomainAgent")
+        elif evidence_id == "verified_context_sources":
+            agents.add("LiteratureAgent")
+            agents.add("DataAgent")
     return {
         "call_when": "before_high_confidence_evidence_materialization",
         "called_agents": sorted(agents),
@@ -631,6 +881,21 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def load_json_if_exists(path: Path) -> dict[str, Any]:
     return load_json(path) if path.exists() else {}
+
+
+def read_csv_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as file:
+        return [dict(row) for row in csv.DictReader(file)]
+
+
+def as_record_list(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        return [item for item in value.values() if isinstance(item, dict)]
+    return []
 
 
 def utc_now() -> str:

@@ -9,7 +9,6 @@
 
 ## 阻断原因
 
-- `required_evidence_missing`
 - `section_source_placeholders_remaining`
 
 ## 章节源检查
@@ -27,12 +26,12 @@
 
 ## 证据检查
 
-- `approved_findings`: `failed`
-- `citation_verification_log`: `failed`
+- `approved_findings`: `passed`
+- `citation_verification_log`: `passed`
 - `contribution_matrix`: `passed`
 - `data_profile`: `passed`
 - `design_spec`: `passed`
-- `domain_notes`: `failed`
+- `domain_notes`: `passed`
 - `figure_manifest`: `passed`
 - `limitations_register`: `passed`
 - `method_diagnostics_report`: `passed`
@@ -45,7 +44,7 @@
 - `sample_profile`: `passed`
 - `variable_role_set`: `passed`
 - `verified_bibliography`: `passed`
-- `verified_context_sources`: `failed`
+- `verified_context_sources`: `passed`
 
 ## 待处理任务
 
@@ -59,10 +58,6 @@
 - `fill_section_robustness_mechanisms_heterogeneity` / MethodAgent: 补写章节源，移除占位内容，并绑定目标长度与证据。
 - `fill_section_conclusion` / ManuscriptAgent: 补写章节源，移除占位内容，并绑定目标长度与证据。
 - `fill_section_references` / LiteratureAgent: 补写章节源，移除占位内容，并绑定目标长度与证据。
-- `supply_evidence_approved_findings` / ReviewerAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_citation_verification_log` / LiteratureAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_domain_notes` / VerifierAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
-- `supply_evidence_verified_context_sources` / VerifierAgent: 补齐该证据文件，或在 evidence registry 中登记可验证替代来源。
 
 ## 下一步
 

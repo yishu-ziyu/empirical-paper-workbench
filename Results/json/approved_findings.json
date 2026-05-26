@@ -1,0 +1,28 @@
+{
+  "schema_version": "p5.approved_findings.v1",
+  "evidence_id": "approved_findings",
+  "generated_at": "2026-05-26T20:16:28.534251+00:00",
+  "source_paths": [
+    "state/product/finding_reviews.json",
+    "state/product/manuscript_candidate_reviews.json"
+  ],
+  "status": "ready_for_review",
+  "review_status": "ready_for_review",
+  "approved_count": 1,
+  "findings": [
+    {
+      "review_id": "review_finding_trained_effect",
+      "finding_id": "finding_trained_effect",
+      "claim": null,
+      "run_id": "run_bb423547439c",
+      "artifact_path": "Results/json/analysis_result.json",
+      "artifact_exists": true,
+      "evidence_level": "local_file",
+      "review_status": "approved",
+      "source": "finding_reviews"
+    }
+  ],
+  "canonical_write_allowed": false,
+  "warnings": [],
+  "next_action": "人工复核 approved finding 是否与当前正式稿章节和最新执行结果一致。"
+}

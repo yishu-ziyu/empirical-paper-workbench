@@ -163,6 +163,71 @@ class FormalEvidenceMaterializerCliTests(unittest.TestCase):
 
         self.assertEqual(self._snapshot_protected_state(), protected_before)
 
+    def test_bdd_30_materializes_findings_citation_context_sources_without_formal_state_mutation(self) -> None:
+        protected_before = self._snapshot_protected_state()
+
+        result = self._run_cli(
+            "--evidence-ids",
+            "approved_findings,citation_verification_log,domain_notes,verified_context_sources",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        approved_findings_path = self.project_root / "Results" / "json" / "approved_findings.json"
+        citation_log_path = self.project_root / "Results" / "json" / "citation_verification_log.json"
+        domain_notes_path = self.project_root / "Results" / "json" / "domain_notes.json"
+        context_sources_path = self.project_root / "Results" / "json" / "verified_context_sources.json"
+        self.assertTrue(approved_findings_path.exists())
+        self.assertTrue(citation_log_path.exists())
+        self.assertTrue(domain_notes_path.exists())
+        self.assertTrue(context_sources_path.exists())
+
+        report = json.loads(
+            (self.project_root / "Results" / "json" / "formal_evidence_materialization_report.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            [item["id"] for item in report["materialized"]],
+            ["approved_findings", "citation_verification_log", "domain_notes", "verified_context_sources"],
+        )
+        self.assertFalse(report["this_command_wrote_formal_state"])
+        self.assertFalse(report["this_command_wrote_final_outputs"])
+        self.assertFalse(report["formal_state_guard"]["changed"])
+        self.assertIn("citation_log_needs_manual_review", report["warnings"])
+        self.assertIn("domain_notes_need_human_review", report["warnings"])
+        self.assertIn("verified_context_sources_need_review", report["warnings"])
+
+        approved_findings = json.loads(approved_findings_path.read_text(encoding="utf-8"))
+        self.assertEqual(approved_findings["evidence_id"], "approved_findings")
+        self.assertEqual(approved_findings["review_status"], "needs_human_review")
+        self.assertEqual(approved_findings["approved_count"], 1)
+        self.assertEqual(approved_findings["findings"][0]["finding_id"], "finding_trained_effect")
+        self.assertEqual(approved_findings["findings"][0]["artifact_path"], "Results/json/analysis_result.json")
+
+        citation_log = json.loads(citation_log_path.read_text(encoding="utf-8"))
+        self.assertEqual(citation_log["evidence_id"], "citation_verification_log")
+        self.assertEqual(citation_log["review_status"], "needs_human_review")
+        self.assertEqual(citation_log["verified_count"], 2)
+        dois = {item["doi"] for item in citation_log["citations"]}
+        self.assertIn("10.1086/705716", dois)
+        self.assertIn("10.1162/rest_a_00754", dois)
+
+        domain_notes = json.loads(domain_notes_path.read_text(encoding="utf-8"))
+        self.assertEqual(domain_notes["evidence_id"], "domain_notes")
+        self.assertEqual(domain_notes["review_status"], "needs_human_review")
+        self.assertEqual(domain_notes["research_question"]["title"], "工业机器人应用对劳动力市场匹配效率的影响")
+        self.assertEqual(domain_notes["method_context"]["method_family"], "iv")
+        self.assertEqual(domain_notes["cnki_manual_queue"][0]["keyword"], "工业机器人 劳动力市场匹配")
+
+        context_sources = json.loads(context_sources_path.read_text(encoding="utf-8"))
+        self.assertEqual(context_sources["evidence_id"], "verified_context_sources")
+        self.assertEqual(context_sources["review_status"], "needs_human_review")
+        self.assertEqual(context_sources["source_registry"]["datasets_root"], "/Users/mahaoxuan/Desktop/实证数据库")
+        self.assertEqual(context_sources["literature_source_summary"]["verified_bibliography_rows"], 2)
+        self.assertEqual(context_sources["literature_source_summary"]["candidate_literature_rows"], 3)
+
+        self.assertEqual(self._snapshot_protected_state(), protected_before)
+
     def _run_cli(self, *extra_args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
@@ -189,6 +254,8 @@ class FormalEvidenceMaterializerCliTests(unittest.TestCase):
             root / "Results" / "json",
             root / "Reviews",
             root / "Submissions" / "formal_package" / "reproducibility",
+            root / "Data" / "literature" / "processed",
+            root / "state",
             root / "state" / "product",
         ]:
             directory.mkdir(parents=True, exist_ok=True)
@@ -274,10 +341,123 @@ class FormalEvidenceMaterializerCliTests(unittest.TestCase):
                         {"id": "figure_manifest", "resolution": "derivable_from_existing_artifact"},
                         {"id": "robustness_matrix", "resolution": "derivable_from_existing_artifact"},
                         {"id": "limitations_register", "resolution": "derivable_from_existing_artifact"},
+                        {"id": "approved_findings", "resolution": "derivable_from_existing_artifact"},
+                        {"id": "citation_verification_log", "resolution": "derivable_from_existing_artifact"},
+                        {"id": "domain_notes", "resolution": "derivable_from_existing_artifact"},
+                        {"id": "verified_context_sources", "resolution": "derivable_from_existing_artifact"},
                     ],
                 },
                 ensure_ascii=False,
                 indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "state" / "product" / "research_question.json").write_text(
+            json.dumps(
+                {
+                    "title": "工业机器人应用对劳动力市场匹配效率的影响",
+                    "status": "confirmed",
+                    "dataset_hint": "CFPS",
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "state" / "product" / "finding_reviews.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "p2.finding_reviews.v1",
+                    "reviews": [
+                        {
+                            "id": "review_finding_trained_effect",
+                            "finding_id": "finding_trained_effect",
+                            "review_status": "approved",
+                            "can_write_to_draft": True,
+                            "run_id": "run_bb423547439c",
+                            "artifact_path": "Results/json/analysis_result.json",
+                            "evidence_level": "local_execution",
+                            "claim": "工业机器人应用与劳动力市场匹配效率变化相关。",
+                        },
+                        {
+                            "id": "review_unapproved",
+                            "finding_id": "finding_unapproved",
+                            "review_status": "needs_revision",
+                            "can_write_to_draft": False,
+                            "artifact_path": "Results/json/missing.json",
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "Results" / "json" / "literature_package_report.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.literature_package.v1",
+                    "status": "needs_human_review",
+                    "evidence_level": "official_source_seed_plus_manual_cnki_queue",
+                    "formal_state_inputs": {
+                        "research_question": {
+                            "title": "工业机器人应用对劳动力市场匹配效率的影响"
+                        },
+                        "design_spec": {
+                            "method_family": "iv",
+                            "method_subtype": "bartik_shift_share_iv",
+                        },
+                        "run_plan": {
+                            "dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+                            "unit": "individual",
+                        },
+                    },
+                    "verification_channels": ["doi", "crossref", "manual_cnki_queue"],
+                    "cnki_manual_queue": [
+                        {"keyword": "工业机器人 劳动力市场匹配", "reason": "补充中文语境与中文核心文献。"}
+                    ],
+                    "missing_evidence": ["cnki_full_text_verification"],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        (root / "Data" / "literature" / "processed" / "verified_bibliography.csv").write_text(
+            "\n".join(
+                [
+                    "source_id,citation_key,title,authors,year,venue,doi,verification_status,used_in_section,url",
+                    "src_acemoglu_restrepo_2020,acemoglu_restrepo_2020,Robots and Jobs,Acemoglu and Restrepo,2020,JPE,10.1086/705716,doi_verified,literature_review,https://doi.org/10.1086/705716",
+                    "src_graetz_michaels_2018,graetz_michaels_2018,Robots at Work,Graetz and Michaels,2018,Review of Economics and Statistics,10.1162/rest_a_00754,doi_verified,literature_review,https://doi.org/10.1162/rest_a_00754",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        (root / "Data" / "literature" / "processed" / "candidate_literature.csv").write_text(
+            "\n".join(
+                [
+                    "source_id,title,source_type,status",
+                    "cand_1,Industrial robots and labor allocation,article,candidate",
+                    "cand_2,Automation and labor market matching,article,candidate",
+                    "cand_3,China robot exposure and employment,article,candidate",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        (root / "state" / "source_registry.json").write_text(
+            json.dumps(
+                {
+                    "datasets_root": "/Users/mahaoxuan/Desktop/实证数据库",
+                    "zotero_root": "/Users/mahaoxuan/Zotero",
+                    "pdf_library_root": "/Users/mahaoxuan/Desktop/论文核心素材库/1_文献/PDF原文",
+                    "cnki_mode": "manual_assisted",
+                },
+                ensure_ascii=False,
             ),
             encoding="utf-8",
         )

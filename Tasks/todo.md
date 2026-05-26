@@ -897,5 +897,11 @@
 - [x] P5-E2b 真实运行：CLI 输出 `status=evidence_materialized`、`materialized=3`；重跑 PDF 预检后这三项 evidence check 已 passed，当前剩余缺口集中在 `approved_findings`、`citation_verification_log`、`domain_notes`、`verified_context_sources` 和章节源占位。
 - [x] P5-E2b Agent Team：当前环境再次触发 agent thread limit，无法新开 sidecar；主 Agent 按 20 分钟节点完成 TDD、真实 CLI 和预检刷新，并把下一次 Agent Team 调用点收敛到 P5-E2c 的文献/上下文/章节源补证。
 - [x] P5-E2b 验证：目标测试 1 OK；materializer 全文件 4 OK；P5-D/P5-E1/P5-E2 回归 10 OK；Python 编译通过；全量回归 `364 tests OK, skipped=1`。
-- [ ] 下一步 P5-E2c：在 20 分钟内只处理 `approved_findings`、`citation_verification_log`、`domain_notes`、`verified_context_sources` 的材料化入口；若章节源占位也要处理，拆成 P5-E2d，不和证据材料化混做。
+- [x] P5-E2c 节点规则：本节点只材料化 `approved_findings`、`citation_verification_log`、`domain_notes`、`verified_context_sources` 四个 finding/文献/上下文证据；不写正式 `state/product/*`，不处理章节源占位，不渲染 PDF/docx。
+- [x] P5-E2c Agent Team：按用户要求先尝试新建只读 explorer，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 TDD/CLI 闭环，并把该限制记录为当前运行约束。
+- [x] P5-E2c BDD/TDD：新增行为 30 和 materializer 测试；RED 为四个目标证据文件未生成，GREEN 后覆盖 approved review、DOI 书目日志、领域笔记、来源 registry 聚合和正式层不改写。
+- [x] P5-E2c 实现：扩展 `Program/workbench/formal_evidence_materializer.py`，兼容 list/dict 两种 finding review 账本，从 `finding_reviews.json`、`literature_package_report.json`、`verified_bibliography.csv`、`candidate_literature.csv`、`source_registry.json` 派生四个 JSON 证据文件。
+- [x] P5-E2c 真实运行：CLI 输出 `status=evidence_materialized`、`materialized=4`；重跑 PDF 预检后 `required_evidence_missing` 已清零，当前唯一阻断原因是 `section_source_placeholders_remaining`。
+- [x] P5-E2c 验证：新增目标测试 OK；materializer 全文件 5 OK；P5-D/P5-E1/P5-E2 回归 11 OK；Python 编译通过；全量回归 `365 tests OK, skipped=1`。
+- [x] 长程执行约束更新：后续每个 P5/P6 小节点默认最多 20 分钟；超过 20 分钟必须拆成更小节点，或回退判断路线是否走错。Agent Team 优先用于并行调研/只读复核/实现审查；若当前会话线程上限阻断，必须记录原因并继续用本地可验证闭环推进。
 - [ ] 下一步 P5-E2d：处理 `section_source_placeholders_remaining`，目标是用已通过的证据文件生成章节源草案，而不是在 preflight 里硬绕过占位检查。

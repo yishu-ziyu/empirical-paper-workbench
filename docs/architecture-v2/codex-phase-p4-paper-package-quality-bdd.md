@@ -415,6 +415,24 @@
 
 业务规则：P5-E2b 把“已有方法诊断和审稿意见”沉淀成 PDF 预检可以读取的正式包证据。它不补跑新回归，不替用户确认局限，也不把没有生成的图表说成已经存在；它只把现有真实证据整理成可审阅、可追踪、可进入下一轮任务分解的结构化文件。
 
+### Behavior 30: Formal evidence materializer turns approved reviews and literature package into reviewable finding, citation and context evidence
+
+**Given** `evidence_registry_patch_proposal.json` 已经把 `approved_findings`、`citation_verification_log`、`domain_notes` 和 `verified_context_sources` 标记为可由现有产物派生
+**And** 当前仓库已经存在 finding review、文献包、verified bibliography、candidate literature、source registry 和研究问题状态
+**When** 用户运行 `Program/formal_evidence_materializer.py --evidence-ids approved_findings,citation_verification_log,domain_notes,verified_context_sources`
+**Then** 系统必须写出 `Results/json/approved_findings.json`
+**And** 系统必须写出 `Results/json/citation_verification_log.json`
+**And** 系统必须写出 `Results/json/domain_notes.json`
+**And** 系统必须写出 `Results/json/verified_context_sources.json`
+**And** `approved_findings` 必须只从已批准 finding review 和对应产物路径派生，不得把未批准发现写成正式可用结论
+**And** `citation_verification_log` 必须从 verified bibliography 和文献包派生，保留 DOI、验证状态和人工复核状态
+**And** `domain_notes` 必须把研究问题、数据语境、方法语境、CNKI 人工检索队列和文献缺口整理成可审阅领域笔记
+**And** `verified_context_sources` 必须登记本地数据根目录、Zotero/PDF/CNKI 等来源通道和候选文献/已验证书目的计数
+**And** 报告必须声明 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写正式研究状态、章节源、最终 PDF/docx 或 canonical evidence registry。
+
+业务规则：P5-E2c 把“已经过审的发现、文献验证和上下文来源”接入 PDF 预检读取路径。它不生成新文献结论，不把 CNKI 人工队列说成已完成，也不替用户批准正式引用；它只把现有真实材料整理成可审阅证据文件。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

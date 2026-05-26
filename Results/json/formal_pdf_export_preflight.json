@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_pdf_export_preflight.v1",
-  "generated_at": "2026-05-26T19:56:33.418305+00:00",
+  "generated_at": "2026-05-26T20:16:28.591497+00:00",
   "preflight_report": "Results/json/formal_pdf_export_preflight.json",
   "source_map": "Results/json/formal_manuscript_source_map.json",
   "section_sources_path": "Submissions/formal_package/manuscript/section_sources.json",
@@ -8,7 +8,6 @@
   "status": "blocked_by_source_gaps",
   "can_export_pdf_candidate": false,
   "blocking_reasons": [
-    "required_evidence_missing",
     "section_source_placeholders_remaining"
   ],
   "section_checks": [
@@ -116,34 +115,34 @@
   "evidence_checks": [
     {
       "id": "approved_findings",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/approved_findings.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/approved_findings.json"
+      ],
       "required_by_sections": [
         "Abstract",
         "Conclusion",
         "Introduction"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "citation_verification_log",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/citation_verification_log.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/citation_verification_log.json"
+      ],
       "required_by_sections": [
         "Literature and Contribution",
         "References"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "contribution_matrix",
@@ -192,17 +191,17 @@
     },
     {
       "id": "domain_notes",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/domain_notes.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/domain_notes.json"
+      ],
       "required_by_sections": [
         "Institutional Background / Theory / Context"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "figure_manifest",
@@ -379,17 +378,17 @@
     },
     {
       "id": "verified_context_sources",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/verified_context_sources.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/verified_context_sources.json"
+      ],
       "required_by_sections": [
         "Institutional Background / Theory / Context"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     }
   ],
   "next_review_tasks": [
@@ -511,77 +510,6 @@
         "section_source_placeholder"
       ],
       "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_approved_findings",
-      "agent": "ReviewerAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "approved_findings",
-      "required_by_sections": [
-        "Abstract",
-        "Conclusion",
-        "Introduction"
-      ],
-      "candidate_paths": [
-        "Results/json/approved_findings.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_citation_verification_log",
-      "agent": "LiteratureAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "citation_verification_log",
-      "required_by_sections": [
-        "Literature and Contribution",
-        "References"
-      ],
-      "candidate_paths": [
-        "Results/json/citation_verification_log.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_domain_notes",
-      "agent": "VerifierAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "domain_notes",
-      "required_by_sections": [
-        "Institutional Background / Theory / Context"
-      ],
-      "candidate_paths": [
-        "Results/json/domain_notes.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_verified_context_sources",
-      "agent": "VerifierAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "verified_context_sources",
-      "required_by_sections": [
-        "Institutional Background / Theory / Context"
-      ],
-      "candidate_paths": [
-        "Results/json/verified_context_sources.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
       "review_status": "open"
     }
   ],

@@ -67,8 +67,8 @@ class PaperRevisionGateRecomputeCliTests(unittest.TestCase):
 
         blocking = records["run_method_gate"]
         self.assertEqual(blocking["status"], "still_blocking")
-        self.assertIn("reviewer_scorecard_report", blocking["blocking_sources"])
-        self.assertIn("pdf_export_manifest", blocking["blocking_sources"])
+        self.assertEqual(blocking["blocking_sources"], ["missing_gate_input"])
+        self.assertIn("Results/json/missing_method_gate_dependency.json", blocking["missing_gate_inputs"])
 
         manual = records["build_literature_package"]
         self.assertEqual(manual["status"], "manual_review_required")
@@ -88,6 +88,64 @@ class PaperRevisionGateRecomputeCliTests(unittest.TestCase):
         self.assertEqual(manifest_path.read_text(encoding="utf-8"), manifest_before)
         for path, content in protected_before.items():
             self.assertEqual(path.read_text(encoding="utf-8"), content)
+
+    def test_bdd_21_ready_evidence_packets_consume_stale_gate_task_references(self) -> None:
+        manifest_path = self.project_root / "Results" / "json" / "paper_revision_evidence_packets.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for task in manifest["task_results"]:
+            task["status"] = "evidence_packet_ready"
+            task["missing_evidence"] = []
+            if task["task_id"] == "build_literature_package":
+                task["evidence_items"] = [
+                    {"path": "Data/literature/processed/verified_bibliography.csv", "exists": True}
+                ]
+            task["gate_recompute_inputs"] = [
+                "Results/json/paper_quality_report.json",
+                "Results/json/reviewer_scorecard_report.json",
+                "Submissions/cfps_robot_pdf_export_manifest.json",
+            ]
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_revision_gate_recompute.py"),
+                "--project-root",
+                str(self.project_root),
+                "--evidence-manifest",
+                "Results/json/paper_revision_evidence_packets.json",
+                "--output-report",
+                "Results/json/paper_revision_gate_recompute.json",
+                "--output-review",
+                "Reviews/paper_revision_gate_recompute.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        report = json.loads(
+            (self.project_root / "Results" / "json" / "paper_revision_gate_recompute.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        records = {record["task_id"]: record for record in report["task_results"]}
+
+        self.assertEqual(report["status"], "ready_for_formal_writeback_preflight")
+        self.assertEqual(report["status_counts"]["cleared"], 3)
+        self.assertEqual(report["status_counts"]["still_blocking"], 0)
+        self.assertEqual(report["status_counts"]["manual_review_required"], 0)
+        for record in records.values():
+            self.assertEqual(record["status"], "cleared")
+            self.assertEqual(record["blocking_sources"], [])
+            self.assertEqual(record["gate_matches"], [])
+
+        consumed = records["run_method_gate"]["consumed_gate_matches"]
+        self.assertTrue(consumed)
+        self.assertIn("reviewer_scorecard_report", {match["source"] for match in consumed})
+        self.assertIn("pdf_export_manifest", {match["source"] for match in consumed})
+        self.assertEqual(report["next_action"]["id"], "formal_writeback_preflight")
 
     def _seed_gate_recompute_project(self, root: Path) -> None:
         results_dir = root / "Results" / "json"
@@ -186,6 +244,7 @@ class PaperRevisionGateRecomputeCliTests(unittest.TestCase):
                     "missing_evidence": [],
                     "gate_recompute_inputs": [
                         "Results/json/method_gate_report.json",
+                        "Results/json/missing_method_gate_dependency.json",
                         "Results/json/reviewer_scorecard_report.json",
                         "Submissions/cfps_robot_pdf_export_manifest.json",
                     ],

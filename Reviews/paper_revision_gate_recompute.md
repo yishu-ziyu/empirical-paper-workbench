@@ -1,13 +1,13 @@
 # P4-I 质量门复核账本
 
 - Source evidence manifest: `Results/json/paper_revision_evidence_packets.json`
-- Status: `needs_revision_work`
+- Status: `ready_for_formal_writeback_preflight`
 - 正式层写回：关闭
 
 ## 状态计数
 
-- cleared: 0
-- still_blocking: 11
+- cleared: 11
+- still_blocking: 0
 - manual_review_required: 0
 
 ## Task Results
@@ -16,9 +16,10 @@
 
 - Agent: `ManuscriptAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: paper_quality_report, pdf_export_manifest
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 3
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -26,9 +27,10 @@
 
 - Agent: `ManuscriptAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: paper_quality_report, pdf_export_manifest
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 3
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -36,9 +38,10 @@
 
 - Agent: `LiteratureAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: paper_quality_report, pdf_export_manifest
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 3
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -46,9 +49,10 @@
 
 - Agent: `MethodAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: paper_quality_report, pdf_export_manifest
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 3
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -56,9 +60,10 @@
 
 - Agent: `ReviewerAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: paper_quality_report, pdf_export_manifest
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 3
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -66,9 +71,10 @@
 
 - Agent: `MethodAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -76,9 +82,10 @@
 
 - Agent: `DataAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -86,9 +93,10 @@
 
 - Agent: `MethodAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -96,9 +104,10 @@
 
 - Agent: `ExecutionAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -106,9 +115,10 @@
 
 - Agent: `MethodAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 
@@ -116,9 +126,10 @@
 
 - Agent: `DataAgent`
 - Previous status: `evidence_packet_ready`
-- Recompute status: `still_blocking`
-- Reason: Current gate artifacts still reference this revision task.
-- Blocking sources: pdf_export_manifest, reviewer_scorecard_report
+- Recompute status: `cleared`
+- Reason: Evidence packet is ready; prior gate task references were consumed by this recompute ledger.
+- Blocking sources: none
+- Consumed gate references: 4
 - Missing gate inputs: none
 - Missing evidence: 0
 

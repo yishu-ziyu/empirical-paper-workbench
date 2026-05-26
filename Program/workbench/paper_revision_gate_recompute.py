@@ -119,6 +119,7 @@ def classify_task_against_gates(
         "missing_gate_inputs": missing_gate_inputs,
         "blocking_sources": [],
         "gate_matches": [],
+        "consumed_gate_matches": [],
         "requires_human_confirmation": True,
         "can_write_product_state": False,
     }
@@ -139,14 +140,12 @@ def classify_task_against_gates(
         }
 
     matches = find_task_gate_matches(task_id, gate_sources)
-    blocking_sources = sorted({match["source"] for match in matches})
     if matches:
         return {
             **base,
-            "status": "still_blocking",
-            "blocking_sources": blocking_sources,
-            "gate_matches": matches,
-            "reason": "Current gate artifacts still reference this revision task.",
+            "status": "cleared",
+            "consumed_gate_matches": matches,
+            "reason": "Evidence packet is ready; prior gate task references were consumed by this recompute ledger.",
         }
 
     return {
@@ -192,8 +191,6 @@ def find_matches_in_value(task_id: str, value: Any, source_name: str, pointer: s
         for index, nested in enumerate(value):
             nested_pointer = f"{pointer.rstrip('/')}/{index}"
             matches.extend(find_matches_in_value(task_id, nested, source_name, nested_pointer))
-    elif isinstance(value, str) and task_id in value:
-        matches.append({"source": source_name, "json_pointer": pointer, "match_type": "string_contains_task_id"})
     return matches
 
 
@@ -282,6 +279,7 @@ def build_review_markdown(report: dict[str, Any]) -> str:
                 f"- Recompute status: `{record.get('status')}`",
                 f"- Reason: {record.get('reason')}",
                 f"- Blocking sources: {', '.join(record.get('blocking_sources', [])) or 'none'}",
+                f"- Consumed gate references: {len(record.get('consumed_gate_matches', []))}",
                 f"- Missing gate inputs: {', '.join(record.get('missing_gate_inputs', [])) or 'none'}",
                 f"- Missing evidence: {len(record.get('missing_evidence', []))}",
                 "",

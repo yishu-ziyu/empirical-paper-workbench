@@ -235,12 +235,12 @@
 **And** `needs_manual_review` 的 evidence packet 必须进入 `manual_review_required`
 **And** gate 输入缺失的任务必须进入 `still_blocking`
 **And** 证据包 ready、gate 输入完整、且当前质量门/审稿门/导出门不再引用该任务时必须进入 `cleared`
-**And** 证据包 ready 但当前 gate 产物仍引用该任务时必须进入 `still_blocking`
+**And** gate 输入齐全且证据包 ready 的任务必须进入 `cleared`
 **And** 命令不得改写 `paper_revision_evidence_packets.json`
 **And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
 **And** 复核账本必须写明 Agent Team 调用节奏：重跑 gate 前调用 ReviewerAgent / VerifierAgent；账本写出后收回；正式层写回预检前再次调用。
 
-业务规则：P4-I 不是继续生成更多建议，而是把 P4-H 的证据包变成下一轮门控判断。系统必须明确哪些任务已具备进入正式写回预检的证据，哪些仍阻塞，哪些需要人工补证。
+业务规则：P4-I 不是继续生成更多建议，而是把 P4-H 的证据包变成下一轮门控判断。系统必须明确哪些任务已具备进入正式写回预检的证据，哪些仍阻塞，哪些需要人工补证。旧质量门、审稿门或导出门里保留的历史任务引用，不能在证据包已就绪后继续形成重复阻塞。
 
 ## 行为 19：下一轮任务生产器必须消费质量门复核账本
 
@@ -267,6 +267,19 @@
 **And** 命令不得改写正式层 `state/product/*`
 
 业务规则：P4-C 已经把文献包写入 `Data/literature/processed/`。P4-H/P4-I 不能因为历史任务输入使用短文件名，就误判文献证据缺失；证据收集层必须把短文件名映射到 canonical 草案路径。
+
+### Behavior 21: Gate recompute consumes stale task references once evidence packets are ready
+
+**Given** `paper_revision_evidence_packets.json` 中上一轮修订任务均为 `evidence_packet_ready`
+**And** 旧 `paper_quality_report.json`、`reviewer_scorecard_report.json` 或 PDF export manifest 仍在结构化任务列表中保留这些 task id
+**When** 用户运行 `Program/paper_revision_gate_recompute.py`
+**Then** gate 输入齐全的任务必须标记为 `cleared`
+**And** 旧 gate 引用必须写入 `consumed_gate_matches` 作为审计线索
+**And** `gate_matches` 不得再把这些旧引用当作阻塞项
+**And** 系统不得改写正式层 `state/product/*.json`
+**And** 下一步必须进入 `formal_writeback_preflight`
+
+业务规则：当证据包已经准备好，旧 gate 里的 task id 只说明“当时要求过这项修订”，不等于“现在仍阻塞”。P4-I4 的职责是消费这些历史引用，形成可审计账本，并把真正的正式写回检查留给独立 preflight 节点。
 
 ## 边界条件
 

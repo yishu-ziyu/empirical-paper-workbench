@@ -924,4 +924,11 @@
 - [x] P5-E4 实现：新增 `Program/formal_pdf_candidate_review.py` 和 `Program/workbench/formal_pdf_candidate_review.py`，读取 `formal_pdf_candidate_report.json`，检查候选 PDF 可读性、章节清单和候选命令写入边界，生成审阅 JSON、审阅 Markdown 和最终写回预检 JSON。
 - [x] P5-E4 真实运行：CLI 输出 `status=ready_for_final_approval_review`、`can_request_final_approval=true`；生成 `Results/json/formal_pdf_candidate_review.json`、`Reviews/formal_pdf_candidate_review.md`、`Results/json/formal_pdf_final_writeback_preflight.json`；报告确认 PDF 可读 10 页、`final_writeback_allowed=false`、formal state guard 未变化。
 - [x] P5-E4 验证：目标测试 2 OK；P5-D/P5-E3/P5-E4 相邻回归 7 OK；Python 编译通过。
-- [ ] 下一步 P5-E5：增加“人工最终批准账本”节点；只有显式批准后，P6-A 才能把候选 PDF/docx 写入最终层。
+- [x] P5-E5 节点规则：本节点只写“人工最终批准账本”，授权 P6-A 可以写最终 PDF/docx；不复制、移动、重命名 `paper_candidate.pdf`，不生成 `paper.pdf`、`paper.docx`，不改写正式研究状态。
+- [x] P5-E5 时间盒：拆成 4 个 20 分钟以内的小节点：Behavior 34、失败测试、CLI/ledger 实现、真实运行和提交。后续 P6-A/P6-B/P6-C 继续遵守每个小节点最多 20 分钟，超时必须拆解或回退路线。
+- [x] P5-E5 Agent Team：使用 verifier sidecar Gibbs 复核批准账本边界；采纳其建议，把最终 PDF 批准写入独立 `final_pdf_approvals.formal_pdf_candidate`，不复用旧的 `formal_preflight_approvals`，避免混淆“包入口审批”和“最终产物写回授权”。
+- [x] P5-E5 BDD/TDD：新增 Behavior 34 和 `tests/test_formal_pdf_final_approval.py`；RED 为缺少 `Program/formal_pdf_final_approval.py`，GREEN 后覆盖 approve、needs_revision、preflight blocked、旧 `approvals` 保留、正式层不改写和最终产物不生成。
+- [x] P5-E5 实现：新增 `Program/formal_pdf_final_approval.py` 和 `Program/workbench/formal_pdf_final_approval.py`，读取 `formal_pdf_final_writeback_preflight.json`，写出 `Results/json/formal_pdf_final_approval.json`、`Reviews/formal_pdf_final_approval.md`，并更新 `state/product/writeback_approvals.json`。
+- [x] P5-E5 真实运行：CLI 输出 `status=approved_for_final_writeback`、`can_enter_p6=true`、`final_writeback_authorized=true`；报告确认 `this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`，本仓库仍无 `Submissions/formal_package/paper.pdf` 或 `paper.docx`。
+- [x] P5-E5 验证：目标测试 3 OK；P5-E4/P5-E5/正式写回审批相邻回归 8 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-A：仅当 `state/product/writeback_approvals.json.final_pdf_approvals.formal_pdf_candidate.status=approved` 时，才允许把候选 PDF/docx 写入最终产物层。

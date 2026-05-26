@@ -486,6 +486,26 @@
 
 业务规则：P5-E4 把“PDF 候选稿已经生成”推进为“可进入最终批准讨论”的审阅证据，而不是直接发布最终论文。它给用户和 Reviewer/Verifier 留出明确验收入口，并为下一节点的最终批准或修订建立结构化 preflight。
 
+### Behavior 34: Human final approval authorizes final writeback without creating final outputs
+
+**Given** `formal_pdf_final_writeback_preflight.json` 的状态是 `ready_for_human_final_approval`
+**And** 预检账本声明 `can_request_final_approval=true`、`requires_human_approval=true`、`final_writeback_allowed=false`
+**And** 候选 PDF 与候选 QMD 已经存在
+**When** 用户运行 `Program/formal_pdf_final_approval.py --action approve`
+**Then** 系统必须把批准记录写入 `state/product/writeback_approvals.json`
+**And** 系统必须保留旧的候选段落写回审批键 `approvals`
+**And** 系统必须写出 `Results/json/formal_pdf_final_approval.json`
+**And** 系统必须写出 `Reviews/formal_pdf_final_approval.md`
+**And** 批准账本必须声明 `status=approved_for_final_writeback`、`can_enter_p6=true`、`final_writeback_authorized=true`
+**And** 批准账本必须声明 `this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`
+**And** 命令不得移动、复制或重命名 `paper_candidate.pdf`
+**And** 命令不得生成最终 `paper.pdf`、`paper.docx` 或正式正文
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 如果用户选择 `needs_revision` 或 `reject`，账本必须声明 `can_enter_p6=false`、`final_writeback_authorized=false`
+**And** 如果最终写回预检没有 ready，系统必须阻断批准并说明阻断原因。
+
+业务规则：P5-E5 是最终 PDF/docx 写回前的人工批准账本。它解决的是“是否允许下一节点写最终产物”，不是自己写最终产物。这样 P6-A 可以只认一条显式批准记录，而不会把候选 PDF 审阅通过误当成最终输出授权。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.pdf_export_preflight_tasks.v1",
-  "generated_at": "2026-05-26T19:37:13.404718+00:00",
+  "generated_at": "2026-05-26T19:56:33.419060+00:00",
   "source_preflight": "Results/json/formal_pdf_export_preflight.json",
   "can_export_pdf_candidate": false,
   "tasks": [
@@ -171,57 +171,6 @@
       ],
       "candidate_paths": [
         "Results/json/domain_notes.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_figure_manifest",
-      "agent": "ExecutionAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "figure_manifest",
-      "required_by_sections": [
-        "Main Results"
-      ],
-      "candidate_paths": [
-        "Results/json/figure_manifest.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_limitations_register",
-      "agent": "ReviewerAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "limitations_register",
-      "required_by_sections": [
-        "Conclusion"
-      ],
-      "candidate_paths": [
-        "Results/json/limitations_register.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_robustness_matrix",
-      "agent": "MethodAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "robustness_matrix",
-      "required_by_sections": [
-        "Robustness / Mechanisms / Heterogeneity"
-      ],
-      "candidate_paths": [
-        "Results/json/robustness_matrix.json"
       ],
       "issue": [
         "required_evidence_missing"

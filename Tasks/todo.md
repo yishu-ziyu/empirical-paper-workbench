@@ -891,5 +891,11 @@
 - [x] P5-E2a 风险记录：当前正式变量角色仍绑定旧样例 `Data/Final/analysis_sample.csv`，真实方法执行使用 `Data/Final/cfps_robot_reallocation.csv`；材料化报告保留 `variable_role_dataset_mismatch`，等待后续人工确认或正式变量角色升级。
 - [x] P5-E2a Agent Team：尝试派发 sidecar 复核时因当前环境 agent thread limit 被拒绝；主 Agent 按 20 分钟节点先完成可验证 CLI/TDD/预检刷新，并把下一次 Agent Team 调用点写入材料化报告。
 - [x] P5-E2a 验证：目标测试 3 OK；P5-D/P5-E1/P5-E2a 回归 9 OK；Python 编译通过；真实 CLI 输出 `status=evidence_materialized`、`materialized=3`；全量回归 `363 tests OK, skipped=1`。
-- [ ] 下一步 P5-E2b：在 20 分钟内只材料化 `robustness_matrix`、`limitations_register`、`figure_manifest`，完成后重跑 P5-D；若任一项需要真实计算或人工判断，拆成 E2b-1/E2b-2。
-- [ ] 下一步 P5-E2c：处理章节源占位和文献/上下文来源，不和 E2b 混做；目标是消除 `section_source_placeholders_remaining`。
+- [x] P5-E2b 节点规则：本节点只材料化 `figure_manifest`、`robustness_matrix`、`limitations_register` 三个审阅证据；不写正式 `state/product/*`，不渲染 PDF/docx，不处理章节源占位和文献/上下文来源。
+- [x] P5-E2b BDD/TDD：新增行为 29 和 `tests/test_formal_evidence_materializer.py`；RED 为缺少 `Results/json/figure_manifest.json`，GREEN 后覆盖三个证据文件、预警状态和正式层不改写。
+- [x] P5-E2b 实现：扩展 `Program/workbench/formal_evidence_materializer.py`，从真实方法诊断、方法门、审稿 scorecard 和可用图表目录材料化 `Results/json/figure_manifest.json`、`Results/json/robustness_matrix.json`、`Results/json/limitations_register.json`。
+- [x] P5-E2b 真实运行：CLI 输出 `status=evidence_materialized`、`materialized=3`；重跑 PDF 预检后这三项 evidence check 已 passed，当前剩余缺口集中在 `approved_findings`、`citation_verification_log`、`domain_notes`、`verified_context_sources` 和章节源占位。
+- [x] P5-E2b Agent Team：当前环境再次触发 agent thread limit，无法新开 sidecar；主 Agent 按 20 分钟节点完成 TDD、真实 CLI 和预检刷新，并把下一次 Agent Team 调用点收敛到 P5-E2c 的文献/上下文/章节源补证。
+- [x] P5-E2b 验证：目标测试 1 OK；materializer 全文件 4 OK；P5-D/P5-E1/P5-E2 回归 10 OK；Python 编译通过；全量回归 `364 tests OK, skipped=1`。
+- [ ] 下一步 P5-E2c：在 20 分钟内只处理 `approved_findings`、`citation_verification_log`、`domain_notes`、`verified_context_sources` 的材料化入口；若章节源占位也要处理，拆成 P5-E2d，不和证据材料化混做。
+- [ ] 下一步 P5-E2d：处理 `section_source_placeholders_remaining`，目标是用已通过的证据文件生成章节源草案，而不是在 preflight 里硬绕过占位检查。

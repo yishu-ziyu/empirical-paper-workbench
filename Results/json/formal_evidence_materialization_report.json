@@ -1,47 +1,58 @@
 {
   "schema_version": "p5.formal_evidence_materialization.v1",
-  "generated_at": "2026-05-26T19:36:58.942960+00:00",
+  "generated_at": "2026-05-26T19:56:17.225202+00:00",
   "source_patch_proposal": "Submissions/formal_package/reproducibility/evidence_registry_patch_proposal.json",
   "materialization_report": "Results/json/formal_evidence_materialization_report.json",
   "status": "evidence_materialized",
   "blocking_reasons": [],
   "requested_evidence_ids": [
-    "variable_role_set",
-    "sample_profile",
-    "regression_tables"
+    "figure_manifest",
+    "robustness_matrix",
+    "limitations_register"
   ],
   "materialized": [
     {
-      "id": "variable_role_set",
-      "target_path": "Submissions/formal_package/evidence/variable_role_set.json",
+      "id": "figure_manifest",
+      "target_path": "Results/json/figure_manifest.json",
       "source_paths": [
-        "state/product/variable_roles.json",
-        "Results/json/method_execution_result.json"
+        "Submissions/cfps_robot_pdf_export_manifest.json",
+        "Submissions/export_manifest.json",
+        "Results/fig/README.md"
       ],
       "warnings": [
-        "variable_role_dataset_mismatch"
+        "no_rendered_figures_registered"
       ]
     },
     {
-      "id": "sample_profile",
-      "target_path": "Results/json/sample_profile.json",
+      "id": "robustness_matrix",
+      "target_path": "Results/json/robustness_matrix.json",
       "source_paths": [
-        "Results/json/method_execution_result.json"
+        "Results/json/method_diagnostics_report.json",
+        "Results/json/method_gate_report.json",
+        "Results/json/cfps_robot_analysis_result.json"
       ],
-      "warnings": []
+      "warnings": [
+        "robustness_items_need_review"
+      ]
     },
     {
-      "id": "regression_tables",
-      "target_path": "Results/json/regression_tables.json",
+      "id": "limitations_register",
+      "target_path": "Results/json/limitations_register.json",
       "source_paths": [
-        "Results/json/method_execution_result.json"
+        "Results/json/reviewer_scorecard_report.json",
+        "Results/json/method_gate_report.json",
+        "Results/json/method_diagnostics_report.json"
       ],
-      "warnings": []
+      "warnings": [
+        "limitations_need_human_review"
+      ]
     }
   ],
   "skipped": [],
   "warnings": [
-    "variable_role_dataset_mismatch"
+    "limitations_need_human_review",
+    "no_rendered_figures_registered",
+    "robustness_items_need_review"
   ],
   "this_command_wrote_formal_state": false,
   "this_command_wrote_final_outputs": false,
@@ -61,8 +72,9 @@
   "agent_team_schedule": {
     "call_when": "before_high_confidence_evidence_materialization",
     "called_agents": [
-      "DataAgent",
       "ExecutionAgent",
+      "MethodAgent",
+      "ReviewerAgent",
       "VerifierAgent"
     ],
     "recall_when": "after_evidence_files_written",

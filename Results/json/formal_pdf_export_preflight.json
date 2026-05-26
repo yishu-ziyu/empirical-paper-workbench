@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_pdf_export_preflight.v1",
-  "generated_at": "2026-05-26T19:37:13.403912+00:00",
+  "generated_at": "2026-05-26T19:56:33.418305+00:00",
   "preflight_report": "Results/json/formal_pdf_export_preflight.json",
   "source_map": "Results/json/formal_manuscript_source_map.json",
   "section_sources_path": "Submissions/formal_package/manuscript/section_sources.json",
@@ -206,31 +206,31 @@
     },
     {
       "id": "figure_manifest",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/figure_manifest.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/figure_manifest.json"
+      ],
       "required_by_sections": [
         "Main Results"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "limitations_register",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/limitations_register.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/limitations_register.json"
+      ],
       "required_by_sections": [
         "Conclusion"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "method_diagnostics_report",
@@ -320,17 +320,17 @@
     },
     {
       "id": "robustness_matrix",
-      "status": "failed",
+      "status": "passed",
       "candidate_paths": [
         "Results/json/robustness_matrix.json"
       ],
-      "existing_paths": [],
+      "existing_paths": [
+        "Results/json/robustness_matrix.json"
+      ],
       "required_by_sections": [
         "Robustness / Mechanisms / Heterogeneity"
       ],
-      "issues": [
-        "required_evidence_missing"
-      ]
+      "issues": []
     },
     {
       "id": "sample_profile",
@@ -560,57 +560,6 @@
       ],
       "candidate_paths": [
         "Results/json/domain_notes.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_figure_manifest",
-      "agent": "ExecutionAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "figure_manifest",
-      "required_by_sections": [
-        "Main Results"
-      ],
-      "candidate_paths": [
-        "Results/json/figure_manifest.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_limitations_register",
-      "agent": "ReviewerAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "limitations_register",
-      "required_by_sections": [
-        "Conclusion"
-      ],
-      "candidate_paths": [
-        "Results/json/limitations_register.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_robustness_matrix",
-      "agent": "MethodAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "robustness_matrix",
-      "required_by_sections": [
-        "Robustness / Mechanisms / Heterogeneity"
-      ],
-      "candidate_paths": [
-        "Results/json/robustness_matrix.json"
       ],
       "issue": [
         "required_evidence_missing"

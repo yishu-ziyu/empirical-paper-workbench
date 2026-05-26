@@ -399,6 +399,22 @@
 
 业务规则：P5-E2a 只把最高置信、可从现有真实产物派生的证据落成目标文件，让 PDF 预检能读取；正式变量角色和研究设定仍由人工确认或后续显式写回命令处理。
 
+### Behavior 29: Formal evidence materializer turns method diagnostics into reviewable figure, robustness and limitation evidence
+
+**Given** `evidence_registry_patch_proposal.json` 已经把 `figure_manifest`、`robustness_matrix` 和 `limitations_register` 标记为可由现有产物派生
+**And** 当前仓库已经存在方法诊断、方法门、审稿评分和结果目录
+**When** 用户运行 `Program/formal_evidence_materializer.py --evidence-ids figure_manifest,robustness_matrix,limitations_register`
+**Then** 系统必须写出 `Results/json/figure_manifest.json`
+**And** 系统必须写出 `Results/json/robustness_matrix.json`
+**And** 系统必须写出 `Results/json/limitations_register.json`
+**And** `figure_manifest` 必须显式记录当前是否已有真实图表文件；如果没有图表文件，状态必须是可审阅的 `no_rendered_figures_registered`，而不是伪造图表
+**And** `robustness_matrix` 必须从真实 `method_diagnostics_report`、`method_gate_report` 和可用稳健性产物派生，通过项、黄灯项、人工审阅项必须分开记录
+**And** `limitations_register` 必须从真实 `reviewer_scorecard_report` 和 `method_gate_report` 派生，保留 formal claim / export blocker 与人工确认标记
+**And** 报告必须声明 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写正式研究状态、章节源、最终 PDF/docx 或 canonical evidence registry。
+
+业务规则：P5-E2b 把“已有方法诊断和审稿意见”沉淀成 PDF 预检可以读取的正式包证据。它不补跑新回归，不替用户确认局限，也不把没有生成的图表说成已经存在；它只把现有真实证据整理成可审阅、可追踪、可进入下一轮任务分解的结构化文件。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

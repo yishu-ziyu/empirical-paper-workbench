@@ -1,0 +1,18 @@
+{
+  "schema_version": "p5.figure_manifest.v1",
+  "evidence_id": "figure_manifest",
+  "generated_at": "2026-05-26T19:56:17.221295+00:00",
+  "source_paths": [
+    "Submissions/cfps_robot_pdf_export_manifest.json",
+    "Submissions/export_manifest.json",
+    "Results/fig/README.md"
+  ],
+  "status": "no_rendered_figures_registered",
+  "review_status": "needs_human_review",
+  "figures": [],
+  "tables_referenced_elsewhere": [
+    "Results/json/regression_tables.json"
+  ],
+  "canonical_write_allowed": false,
+  "next_action": "先渲染或登记真实图表，再进入最终 PDF 导出。"
+}

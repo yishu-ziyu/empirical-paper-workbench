@@ -1,0 +1,158 @@
+{
+  "schema_version": "p5.limitations_register.v1",
+  "evidence_id": "limitations_register",
+  "generated_at": "2026-05-26T19:56:17.224799+00:00",
+  "source_paths": [
+    "Results/json/reviewer_scorecard_report.json",
+    "Results/json/method_gate_report.json",
+    "Results/json/method_diagnostics_report.json"
+  ],
+  "status": "needs_human_review",
+  "review_status": "needs_human_review",
+  "method_family": "iv",
+  "method_subtype": "bartik_shift_share_iv",
+  "overall_score": 61,
+  "overall_verdict": "draft_allowed_with_causal_caveat",
+  "blocks_export_or_formal_claims": true,
+  "limitations": [
+    {
+      "id": "add_weak_iv_robust_interval_or_caveat",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "major",
+      "agent": "MethodAgent",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "weak_iv_robust_inference_ar_or_clr",
+      "recommended_action": "补充 AR/CLR 等弱工具稳健区间；若当前 exactly identified 设定无法给出，则在主结论中加入因果表述 caveat。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "recover_bartik_share_shock_components",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "major",
+      "agent": "DataAgent",
+      "blocking_scope": "formal_claims_and_export",
+      "evidence_source": "shift_share_identification_diagnostics",
+      "recommended_action": "恢复或构造 Bartik share/shock 原始组件，避免把聚合 bartik_iv 当作完整 shift-share 诊断。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "add_rotemberg_weights_review",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "major",
+      "agent": "MethodAgent",
+      "blocking_scope": "formal_claims_and_export",
+      "evidence_source": "shift_share_rotemberg_weights",
+      "recommended_action": "在 share/shock 组件可用后计算或审阅 Rotemberg weights。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "add_leave_one_out_or_alternative_shock_check",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "major",
+      "agent": "ExecutionAgent",
+      "blocking_scope": "formal_claims_and_export",
+      "evidence_source": "leave_one_out_or_alternative_shock",
+      "recommended_action": "补充 leave-one-out 或 alternative shock 稳健性，不能用普通省级稳健性替代。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "write_exclusion_and_shock_exogeneity_review",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "major",
+      "agent": "MethodAgent",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "method_gate_review_items",
+      "recommended_action": "补写排他性限制和 shock exogeneity 的审稿式论证。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "explain_missing_drop_and_analysis_sample",
+      "source": "reviewer_scorecard_report.revision_tasks",
+      "severity": "minor",
+      "agent": "DataAgent",
+      "blocking_scope": "transparency_only",
+      "evidence_source": "sample_consistency",
+      "recommended_action": "解释 raw rows 到 usable rows 的样本流失、缺失处理和外部有效性边界。",
+      "requires_human_acceptance": true,
+      "status": "suggested"
+    },
+    {
+      "id": "yellow_item:missing_leave_one_out_or_alternative_shock",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "missing_leave_one_out_or_alternative_shock",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:missing_shift_share_identification_diagnostics",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "missing_shift_share_identification_diagnostics",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:missing_shift_share_rotemberg_weights",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "missing_shift_share_rotemberg_weights",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:missing_weak_iv_robust_inference",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "missing_weak_iv_robust_inference",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:missing_weak_iv_robust_inference_ar_or_clr",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "missing_weak_iv_robust_inference_ar_or_clr",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:review_exclusion_restriction_argument",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "review_exclusion_restriction_argument",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    },
+    {
+      "id": "yellow_item:review_share_or_shock_exogeneity_position",
+      "source": "method_gate_report.yellow_items",
+      "severity": "major",
+      "blocking_scope": "formal_claims",
+      "evidence_source": "review_share_or_shock_exogeneity_position",
+      "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+      "requires_human_acceptance": true,
+      "status": "open"
+    }
+  ],
+  "gate_status": "yellow",
+  "canonical_write_allowed": false,
+  "claim_boundary": "局限登记表用于写作和导出前审阅；正式结论强度必须由人工基于这些条目确认。"
+}

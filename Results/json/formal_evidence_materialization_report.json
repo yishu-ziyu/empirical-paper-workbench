@@ -1,58 +1,69 @@
 {
   "schema_version": "p5.formal_evidence_materialization.v1",
-  "generated_at": "2026-05-26T19:56:17.225202+00:00",
+  "generated_at": "2026-05-26T20:16:28.537625+00:00",
   "source_patch_proposal": "Submissions/formal_package/reproducibility/evidence_registry_patch_proposal.json",
   "materialization_report": "Results/json/formal_evidence_materialization_report.json",
   "status": "evidence_materialized",
   "blocking_reasons": [],
   "requested_evidence_ids": [
-    "figure_manifest",
-    "robustness_matrix",
-    "limitations_register"
+    "approved_findings",
+    "citation_verification_log",
+    "domain_notes",
+    "verified_context_sources"
   ],
   "materialized": [
     {
-      "id": "figure_manifest",
-      "target_path": "Results/json/figure_manifest.json",
+      "id": "approved_findings",
+      "target_path": "Results/json/approved_findings.json",
       "source_paths": [
-        "Submissions/cfps_robot_pdf_export_manifest.json",
-        "Submissions/export_manifest.json",
-        "Results/fig/README.md"
+        "state/product/finding_reviews.json",
+        "state/product/manuscript_candidate_reviews.json"
+      ],
+      "warnings": []
+    },
+    {
+      "id": "citation_verification_log",
+      "target_path": "Results/json/citation_verification_log.json",
+      "source_paths": [
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/verified_bibliography.csv"
       ],
       "warnings": [
-        "no_rendered_figures_registered"
+        "citation_log_needs_manual_review"
       ]
     },
     {
-      "id": "robustness_matrix",
-      "target_path": "Results/json/robustness_matrix.json",
+      "id": "domain_notes",
+      "target_path": "Results/json/domain_notes.json",
       "source_paths": [
-        "Results/json/method_diagnostics_report.json",
-        "Results/json/method_gate_report.json",
-        "Results/json/cfps_robot_analysis_result.json"
+        "Results/json/literature_package_report.json",
+        "state/product/research_question.json",
+        "state/product/design_spec.json"
       ],
       "warnings": [
-        "robustness_items_need_review"
+        "domain_notes_need_human_review"
       ]
     },
     {
-      "id": "limitations_register",
-      "target_path": "Results/json/limitations_register.json",
+      "id": "verified_context_sources",
+      "target_path": "Results/json/verified_context_sources.json",
       "source_paths": [
-        "Results/json/reviewer_scorecard_report.json",
-        "Results/json/method_gate_report.json",
-        "Results/json/method_diagnostics_report.json"
+        "state/source_registry.json",
+        "state/orchestration/source_registry.json",
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/verified_bibliography.csv",
+        "Data/literature/processed/candidate_literature.csv"
       ],
       "warnings": [
-        "limitations_need_human_review"
+        "verified_context_sources_need_review"
       ]
     }
   ],
   "skipped": [],
   "warnings": [
-    "limitations_need_human_review",
-    "no_rendered_figures_registered",
-    "robustness_items_need_review"
+    "citation_log_needs_manual_review",
+    "domain_notes_need_human_review",
+    "verified_context_sources_need_review"
   ],
   "this_command_wrote_formal_state": false,
   "this_command_wrote_final_outputs": false,
@@ -72,8 +83,9 @@
   "agent_team_schedule": {
     "call_when": "before_high_confidence_evidence_materialization",
     "called_agents": [
-      "ExecutionAgent",
-      "MethodAgent",
+      "DataAgent",
+      "DomainAgent",
+      "LiteratureAgent",
       "ReviewerAgent",
       "VerifierAgent"
     ],

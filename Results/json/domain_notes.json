@@ -1,0 +1,126 @@
+{
+  "schema_version": "p5.domain_notes.v1",
+  "evidence_id": "domain_notes",
+  "generated_at": "2026-05-26T20:16:28.536417+00:00",
+  "source_paths": [
+    "Results/json/literature_package_report.json",
+    "state/product/research_question.json",
+    "state/product/design_spec.json"
+  ],
+  "status": "needs_human_review",
+  "review_status": "needs_human_review",
+  "research_question": {
+    "title": null,
+    "status": "confirmed",
+    "dataset_hint": null
+  },
+  "data_context": {
+    "dataset_path": null,
+    "unit": null
+  },
+  "method_context": {
+    "method_family": null,
+    "method_subtype": null
+  },
+  "literature_context": {
+    "package_status": "needs_human_review",
+    "evidence_level": "official_source_seed_plus_manual_cnki_queue",
+    "verification_channels": [
+      "publisher_url",
+      "doi",
+      "working_paper_url",
+      "cnki_manual_queue",
+      "zotero_manual_import"
+    ],
+    "missing_evidence": [
+      {
+        "id": "cnki_china_context_not_verified",
+        "severity": "medium",
+        "next_step": "用 CNKI 人工辅助检索补齐中国本土核心文献和中文引用格式。"
+      },
+      {
+        "id": "zotero_keys_missing",
+        "severity": "medium",
+        "next_step": "将英文核心文献导入 Zotero，并把 zotero_key 写回 verified_bibliography.csv。"
+      },
+      {
+        "id": "full_text_pdf_hash_missing",
+        "severity": "low",
+        "next_step": "对本地 PDF 做 hash，形成可复查的 PDF 证据链。"
+      }
+    ]
+  },
+  "cnki_manual_queue": [
+    {
+      "query": "工业机器人 AND 就业",
+      "purpose": "寻找中国语境下工业机器人影响就业结构的核心中文文献。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "数据来源",
+        "核心解释变量",
+        "被解释变量",
+        "方法"
+      ]
+    },
+    {
+      "query": "工业机器人 AND 工资",
+      "purpose": "寻找与 ln_wage / 工资回报相关的中文证据。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "工资指标",
+        "控制变量",
+        "机制解释"
+      ]
+    },
+    {
+      "query": "工业机器人 AND 劳动力市场匹配",
+      "purpose": "核验研究问题“工业机器人应用对劳动力市场匹配效率的影响”是否已有本土文献直接讨论。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "匹配效率指标",
+        "样本",
+        "识别策略"
+      ]
+    },
+    {
+      "query": "机器人渗透度 AND 劳动力市场",
+      "purpose": "核验机器人密度/渗透度变量在中文文献中的构造方式。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "机器人变量",
+        "数据来源",
+        "IFR 是否使用"
+      ]
+    },
+    {
+      "query": "机器人 AND bartik_iv_2sls",
+      "purpose": "寻找中文文献中与当前识别策略相近的经验做法。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "工具变量",
+        "Bartik 或 shift-share 设定",
+        "稳健性"
+      ]
+    }
+  ],
+  "canonical_write_allowed": false,
+  "warnings": [
+    "domain_notes_need_human_review"
+  ],
+  "next_action": "人工复核领域语境是否足够支撑正式引言、文献综述和方法选择说明。"
+}

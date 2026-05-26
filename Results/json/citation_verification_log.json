@@ -1,0 +1,203 @@
+{
+  "schema_version": "p5.citation_verification_log.v1",
+  "evidence_id": "citation_verification_log",
+  "generated_at": "2026-05-26T20:16:28.535950+00:00",
+  "source_paths": [
+    "Results/json/literature_package_report.json",
+    "Data/literature/processed/verified_bibliography.csv"
+  ],
+  "status": "needs_human_review",
+  "review_status": "needs_human_review",
+  "literature_package_status": "needs_human_review",
+  "verification_channels": [
+    "publisher_url",
+    "doi",
+    "working_paper_url",
+    "cnki_manual_queue",
+    "zotero_manual_import"
+  ],
+  "verified_count": 9,
+  "citations": [
+    {
+      "source_id": "robot_wage_closest_us",
+      "citation_key": "acemoglu_restrepo_robots_jobs_2020",
+      "title": "Robots and Jobs: Evidence from US Labor Markets",
+      "authors": "Acemoglu, Daron; Restrepo, Pascual",
+      "year": "2020",
+      "venue": "Journal of Political Economy",
+      "doi": "10.1086/705716",
+      "verification_status": "doi_verified",
+      "used_in_section": "Literature and Contribution; Empirical Strategy",
+      "url": null
+    },
+    {
+      "source_id": "robot_data_restat_anchor",
+      "citation_key": "graetz_michaels_robots_work_2018",
+      "title": "Robots at Work",
+      "authors": "Graetz, Georg; Michaels, Guy",
+      "year": "2018",
+      "venue": "Review of Economics and Statistics",
+      "doi": "10.1162/rest_a_00754",
+      "verification_status": "doi_verified",
+      "used_in_section": "Data and Measurement; Literature and Contribution",
+      "url": null
+    },
+    {
+      "source_id": "robot_adjustment_germany",
+      "citation_key": "dauth_findeisen_suedekum_woessner_2021",
+      "title": "The Adjustment of Labor Markets to Robots",
+      "authors": "Dauth, Wolfgang; Findeisen, Sebastian; Suedekum, Jens; Woessner, Nicole",
+      "year": "2021",
+      "venue": "Journal of the European Economic Association",
+      "doi": "10.1093/jeea/jvab012",
+      "verification_status": "doi_verified",
+      "used_in_section": "Literature and Contribution; Robustness / Mechanisms / Heterogeneity",
+      "url": null
+    },
+    {
+      "source_id": "polarization_aer_anchor",
+      "citation_key": "autor_dorn_service_jobs_2013",
+      "title": "The Growth of Low-Skill Service Jobs and the Polarization of the US Labor Market",
+      "authors": "Autor, David H.; Dorn, David",
+      "year": "2013",
+      "venue": "American Economic Review",
+      "doi": "10.1257/aer.103.5.1553",
+      "verification_status": "doi_verified",
+      "used_in_section": "Literature and Contribution; Institutional Background / Theory / Context",
+      "url": null
+    },
+    {
+      "source_id": "task_theory_handbook",
+      "citation_key": "acemoglu_autor_tasks_2011",
+      "title": "Skills, Tasks and Technologies: Implications for Employment and Earnings",
+      "authors": "Acemoglu, Daron; Autor, David",
+      "year": "2011",
+      "venue": "Handbook of Labor Economics",
+      "doi": "10.1016/S0169-7218(11)02410-5",
+      "verification_status": "doi_verified",
+      "used_in_section": "Institutional Background / Theory / Context; Empirical Strategy",
+      "url": null
+    },
+    {
+      "source_id": "automation_task_aer_model",
+      "citation_key": "acemoglu_restrepo_race_2018",
+      "title": "The Race between Man and Machine: Implications of Technology for Growth, Factor Shares, and Employment",
+      "authors": "Acemoglu, Daron; Restrepo, Pascual",
+      "year": "2018",
+      "venue": "American Economic Review",
+      "doi": "10.1257/aer.20160696",
+      "verification_status": "doi_verified",
+      "used_in_section": "Institutional Background / Theory / Context; Empirical Strategy",
+      "url": null
+    },
+    {
+      "source_id": "wage_inequality_task_displacement",
+      "citation_key": "acemoglu_restrepo_tasks_wage_inequality_2022",
+      "title": "Tasks, Automation, and the Rise in U.S. Wage Inequality",
+      "authors": "Acemoglu, Daron; Restrepo, Pascual",
+      "year": "2022",
+      "venue": "Econometrica",
+      "doi": "10.3982/ECTA19815",
+      "verification_status": "doi_verified",
+      "used_in_section": "Literature and Contribution; Main Results",
+      "url": null
+    },
+    {
+      "source_id": "firm_robot_adoption_spillover",
+      "citation_key": "acemoglu_lelarge_restrepo_competing_2020",
+      "title": "Competing with Robots: Firm-Level Evidence from France",
+      "authors": "Acemoglu, Daron; Lelarge, Claire; Restrepo, Pascual",
+      "year": "2020",
+      "venue": "AEA Papers and Proceedings",
+      "doi": "10.1257/pandp.20201003",
+      "verification_status": "doi_verified",
+      "used_in_section": "Literature and Contribution; Robustness / Mechanisms / Heterogeneity",
+      "url": null
+    },
+    {
+      "source_id": "shift_share_method_core",
+      "citation_key": "goldsmith_pinkham_sorkin_swift_bartik_2020",
+      "title": "Bartik Instruments: What, When, Why, and How",
+      "authors": "Goldsmith-Pinkham, Paul; Sorkin, Isaac; Swift, Henry",
+      "year": "2020",
+      "venue": "American Economic Review",
+      "doi": "10.1257/aer.20181047",
+      "verification_status": "doi_verified",
+      "used_in_section": "Empirical Strategy; Robustness / Mechanisms / Heterogeneity",
+      "url": null
+    }
+  ],
+  "cnki_manual_queue": [
+    {
+      "query": "工业机器人 AND 就业",
+      "purpose": "寻找中国语境下工业机器人影响就业结构的核心中文文献。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "数据来源",
+        "核心解释变量",
+        "被解释变量",
+        "方法"
+      ]
+    },
+    {
+      "query": "工业机器人 AND 工资",
+      "purpose": "寻找与 ln_wage / 工资回报相关的中文证据。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "工资指标",
+        "控制变量",
+        "机制解释"
+      ]
+    },
+    {
+      "query": "工业机器人 AND 劳动力市场匹配",
+      "purpose": "核验研究问题“工业机器人应用对劳动力市场匹配效率的影响”是否已有本土文献直接讨论。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "匹配效率指标",
+        "样本",
+        "识别策略"
+      ]
+    },
+    {
+      "query": "机器人渗透度 AND 劳动力市场",
+      "purpose": "核验机器人密度/渗透度变量在中文文献中的构造方式。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "机器人变量",
+        "数据来源",
+        "IFR 是否使用"
+      ]
+    },
+    {
+      "query": "机器人 AND bartik_iv_2sls",
+      "purpose": "寻找中文文献中与当前识别策略相近的经验做法。",
+      "record_fields": [
+        "题名",
+        "作者",
+        "期刊",
+        "年份",
+        "工具变量",
+        "Bartik 或 shift-share 设定",
+        "稳健性"
+      ]
+    }
+  ],
+  "canonical_write_allowed": false,
+  "warnings": [
+    "citation_log_needs_manual_review"
+  ],
+  "next_action": "人工复核 DOI、CNKI 队列和正文引用绑定后，再允许进入正式引用层。"
+}

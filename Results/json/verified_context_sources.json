@@ -1,0 +1,86 @@
+{
+  "schema_version": "p5.verified_context_sources.v1",
+  "evidence_id": "verified_context_sources",
+  "generated_at": "2026-05-26T20:16:28.537329+00:00",
+  "source_paths": [
+    "state/source_registry.json",
+    "state/orchestration/source_registry.json",
+    "Results/json/literature_package_report.json",
+    "Data/literature/processed/verified_bibliography.csv",
+    "Data/literature/processed/candidate_literature.csv"
+  ],
+  "status": "needs_human_review",
+  "review_status": "needs_human_review",
+  "source_registry": {
+    "updated_at": "2026-04-25T00:00:00+08:00",
+    "sources": {
+      "datasets_root": {
+        "path": "/Users/mahaoxuan/Desktop/实证数据库",
+        "type": "raw_dataset_motherlode",
+        "status": "registered",
+        "notes": [
+          "Do not move or rewrite original files.",
+          "Use as external raw source pool.",
+          "Promote only selected files into project-specific Data/Raw or Data/Final later."
+        ]
+      },
+      "zotero_root": {
+        "path": "/Users/mahaoxuan/Zotero",
+        "type": "zotero_library_data_dir",
+        "status": "registered",
+        "notes": [
+          "Contains zotero.sqlite and storage PDFs.",
+          "Use as bibliographic truth source plus attachment pool."
+        ]
+      },
+      "pdf_library_root": {
+        "path": "/Users/mahaoxuan/Desktop/论文核心素材库/1_文献/PDF原文",
+        "type": "curated_pdf_folder",
+        "status": "registered",
+        "notes": [
+          "Use as quick-reading pool.",
+          "Likely overlaps semantically with Zotero even when filenames differ."
+        ]
+      }
+    },
+    "ingestion_policy": {
+      "datasets": "Register first, then select project-specific subsets after topic narrowing.",
+      "literature": "Prefer Zotero metadata as the canonical bibliography source; use PDF library as supplemental full-text pool.",
+      "dedup": "Do not deduplicate by moving files yet. First build candidate overlap sets by filename, title, DOI, and PDF hash if needed."
+    }
+  },
+  "literature_source_summary": {
+    "verified_bibliography_rows": 9,
+    "candidate_literature_rows": 9,
+    "verification_channels": [
+      "publisher_url",
+      "doi",
+      "working_paper_url",
+      "cnki_manual_queue",
+      "zotero_manual_import"
+    ],
+    "cnki_manual_queue_count": 5,
+    "missing_evidence": [
+      {
+        "id": "cnki_china_context_not_verified",
+        "severity": "medium",
+        "next_step": "用 CNKI 人工辅助检索补齐中国本土核心文献和中文引用格式。"
+      },
+      {
+        "id": "zotero_keys_missing",
+        "severity": "medium",
+        "next_step": "将英文核心文献导入 Zotero，并把 zotero_key 写回 verified_bibliography.csv。"
+      },
+      {
+        "id": "full_text_pdf_hash_missing",
+        "severity": "low",
+        "next_step": "对本地 PDF 做 hash，形成可复查的 PDF 证据链。"
+      }
+    ]
+  },
+  "canonical_write_allowed": false,
+  "warnings": [
+    "verified_context_sources_need_review"
+  ],
+  "next_action": "人工复核本地数据、Zotero/PDF、CNKI 和候选文献来源后，再允许正式引用和上下文写回。"
+}

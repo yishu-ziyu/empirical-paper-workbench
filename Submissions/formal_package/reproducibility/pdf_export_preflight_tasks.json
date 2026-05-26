@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.pdf_export_preflight_tasks.v1",
-  "generated_at": "2026-05-26T19:56:33.419060+00:00",
+  "generated_at": "2026-05-26T20:16:28.592624+00:00",
   "source_preflight": "Results/json/formal_pdf_export_preflight.json",
   "can_export_pdf_candidate": false,
   "tasks": [
@@ -122,77 +122,6 @@
         "section_source_placeholder"
       ],
       "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_approved_findings",
-      "agent": "ReviewerAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "approved_findings",
-      "required_by_sections": [
-        "Abstract",
-        "Conclusion",
-        "Introduction"
-      ],
-      "candidate_paths": [
-        "Results/json/approved_findings.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_citation_verification_log",
-      "agent": "LiteratureAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "citation_verification_log",
-      "required_by_sections": [
-        "Literature and Contribution",
-        "References"
-      ],
-      "candidate_paths": [
-        "Results/json/citation_verification_log.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_domain_notes",
-      "agent": "VerifierAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "domain_notes",
-      "required_by_sections": [
-        "Institutional Background / Theory / Context"
-      ],
-      "candidate_paths": [
-        "Results/json/domain_notes.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
-      "review_status": "open"
-    },
-    {
-      "id": "supply_evidence_verified_context_sources",
-      "agent": "VerifierAgent",
-      "source": "formal_pdf_export_preflight",
-      "evidence_id": "verified_context_sources",
-      "required_by_sections": [
-        "Institutional Background / Theory / Context"
-      ],
-      "candidate_paths": [
-        "Results/json/verified_context_sources.json"
-      ],
-      "issue": [
-        "required_evidence_missing"
-      ],
-      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
       "review_status": "open"
     }
   ]

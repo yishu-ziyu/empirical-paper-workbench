@@ -943,4 +943,10 @@
 - [x] P6-B 实现：新增 `Program/formal_docx_export_preflight.py` 和 `Program/workbench/formal_docx_export_preflight.py`，读取最终 PDF 写回报告、最终批准报告、批准账本和候选 QMD，记录 pandoc 路径/版本与计划导出命令。
 - [x] P6-B 真实运行：CLI 输出 `status=ready_for_docx_export`、`can_export_docx=true`、`wrote_docx=false`；本机 `pandoc 3.9` 可用，本命令未创建 `Submissions/formal_package/paper.docx`。
 - [x] P6-B 验证：目标测试 3 OK；P5-E3/P5-E4/P5-E5/P6-A/P6-B 相邻回归 13 OK；Python 编译和 scoped diff check 通过。
-- [ ] 下一步 P6-C：只在读取 P6-B ready 报告后生成最终 `paper.docx`，并写出 docx 导出报告；如果导出失败，只写 blocker 和日志，不回滚 P6-A 的最终 PDF。
+- [x] P6-C 节点规则：本节点只读取 P6-B `ready_for_docx_export` 报告并生成最终 `paper.docx`；不重新跑 P6-B，不改写 `paper.pdf`、`paper_candidate.qmd`、P5/P6 审批账本或正式研究状态。
+- [x] P6-C Agent Team：使用 verifier sidecar Beauvoir 复核边界；采纳其建议，复用 `Program/export_docx.py` 的 pandoc 导出能力，但由 formal 专属 wrapper 写 `Results/json/formal_docx_export.json` 和 `Reviews/formal_docx_export.md`，并记录通用 `Submissions/export_manifest.json` 副产物。
+- [x] P6-C BDD/TDD：新增 Behavior 37 和 `tests/test_formal_docx_export.py`；RED 为缺少 `Program/formal_docx_export.py`，GREEN 后覆盖 ready 导出、预检未 ready 阻断、候选 QMD 缺失阻断、最终 PDF 不回滚和正式状态不改写。
+- [x] P6-C 实现：新增 `Program/formal_docx_export.py` 和 `Program/workbench/formal_docx_export.py`，读取 `formal_docx_export_preflight.json` 后调用通用 exporter，生成正式 docx，并记录 docx sha256、bytes、日志、命令、formal state guard 和 blocker。
+- [x] P6-C 真实运行：CLI 输出 `status=docx_exported`、`docx=Submissions/formal_package/paper.docx`、`wrote_docx=true`；生成 `Submissions/formal_package/paper.docx`、`Results/json/formal_docx_export.json`、`Reviews/formal_docx_export.md`、`Results/logs/formal_docx_export.log` 和通用 `Submissions/export_manifest.json`。
+- [x] P6-C 验证：目标测试 3 OK；P6-A/P6-B/P6-C 相邻回归 9 OK；完整 `python3 -m unittest discover -s tests -v` 383 OK / 1 skipped；Python 编译通过；真实报告确认 `formal_state_guard.changed=false`。
+- [ ] 下一步 P6-D：汇总正式投稿包 manifest 和人工验收说明，只读取 `paper.pdf`、`paper.docx`、P6-A/P6-B/P6-C 报告，不重新渲染 PDF/docx，不改写正式研究状态。

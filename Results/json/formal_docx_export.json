@@ -1,0 +1,50 @@
+{
+  "schema_version": "p6.formal_docx_export.v1",
+  "generated_at": "2026-05-26T22:23:42.000147+00:00",
+  "status": "docx_exported",
+  "source_preflight_report": "Results/json/formal_docx_export_preflight.json",
+  "source_candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "final_pdf": "Submissions/formal_package/paper.pdf",
+  "docx": "Submissions/formal_package/paper.docx",
+  "docx_exists": true,
+  "docx_sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+  "docx_bytes": 14457,
+  "generic_export_manifest": "Submissions/export_manifest.json",
+  "generic_export_manifest_exists": true,
+  "log_path": "Results/logs/formal_docx_export.log",
+  "export_command": [
+    "python3",
+    "Program/export_docx.py",
+    "--project-root",
+    "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板",
+    "--source",
+    "Submissions/formal_package/manuscript/paper_candidate.qmd",
+    "--output",
+    "Submissions/formal_package/paper.docx"
+  ],
+  "export_returncode": 0,
+  "export_stdout": "[econ-workbench] exported=Submissions/formal_package/paper.docx\n[econ-workbench] manifest=Submissions/export_manifest.json\n[econ-workbench] log=Results/logs/export_docx.log\n",
+  "export_stderr": "",
+  "blocking_reasons": [],
+  "this_command_wrote_docx": true,
+  "this_command_wrote_pdf": false,
+  "this_command_wrote_formal_state": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "assemble_submission_package_manifest",
+    "label": "汇总正式投稿包清单",
+    "description": "正式 PDF 和 docx 已生成。下一节点可以汇总 manifest、复现命令和人工验收说明。"
+  }
+}

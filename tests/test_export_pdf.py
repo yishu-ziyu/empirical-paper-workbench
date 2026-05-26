@@ -136,6 +136,86 @@ class ExportPdfCliTests(unittest.TestCase):
         self.assertIn("python3 Program/export_pdf.py", script_text)
         self.assertIn("--source Manuscripts/generated/paper_draft.qmd", script_text)
 
+    def test_bdd_pdf_preflight_reads_quality_and_reviewer_scorecard_gates(self) -> None:
+        """行为 14：PDF 预检必须绑定论文质量门、审稿评分卡和下一轮 Agent Team 节奏。"""
+        run = self.run_paper()
+        self.assertEqual(run.returncode, 0, msg=run.stderr)
+        results_dir = self.project_dir / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        (results_dir / "paper_quality_report.json").write_text(
+            json.dumps(
+                {
+                    "verdict": ["needs_review_loop"],
+                    "recommended_next_tasks": [
+                        {
+                            "id": "expand_empirical_strategy",
+                            "owner": "ManuscriptAgent",
+                            "action": "扩写方法章节并绑定方法门证据",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (results_dir / "reviewer_scorecard_report.json").write_text(
+            json.dumps(
+                {
+                    "overall_score": 61,
+                    "overall_verdict": "draft_allowed_with_causal_caveat",
+                    "blocks_export_or_formal_claims": True,
+                    "revision_tasks": [
+                        {
+                            "id": "add_weak_iv_robust_interval_or_caveat",
+                            "owner": "MethodAgent",
+                            "action": "补充弱工具稳健区间或正式 caveat",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.run_export_pdf(["--preflight-only"])
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        manifest_path = self.project_dir / "Submissions" / "pdf_export_manifest.json"
+        review_doc = self.project_dir / "Submissions" / "pdf_first_review.md"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        review_text = review_doc.read_text(encoding="utf-8")
+        self.assertEqual(
+            manifest["paper_quality_report"]["path"],
+            "Results/json/paper_quality_report.json",
+        )
+        self.assertEqual(manifest["paper_quality_report"]["verdict"], ["needs_review_loop"])
+        self.assertEqual(
+            manifest["reviewer_scorecard"]["path"],
+            "Results/json/reviewer_scorecard_report.json",
+        )
+        self.assertEqual(manifest["reviewer_scorecard"]["overall_score"], 61)
+        self.assertEqual(
+            manifest["reviewer_scorecard"]["overall_verdict"],
+            "draft_allowed_with_causal_caveat",
+        )
+        self.assertFalse(manifest["export_gate"]["can_export_pdf"])
+        self.assertEqual(manifest["export_gate"]["status"], "needs_review")
+        next_task_ids = {task["id"] for task in manifest["next_review_tasks"]}
+        self.assertIn("expand_empirical_strategy", next_task_ids)
+        self.assertIn("add_weak_iv_robust_interval_or_caveat", next_task_ids)
+        self.assertEqual(
+            manifest["agent_team_schedule"]["call_when"],
+            "before_pdf_export_preflight",
+        )
+        self.assertEqual(
+            manifest["agent_team_schedule"]["recall_when"],
+            "after_pdf_export_manifest_written",
+        )
+        self.assertIn("ReviewerAgent", manifest["agent_team_schedule"]["called_agents"])
+        self.assertIn("论文包审阅入口", review_text)
+        self.assertIn("Reviewer Scorecard", review_text)
+        self.assertIn("add_weak_iv_robust_interval_or_caveat", review_text)
+
     @unittest.skipUnless(shutil.which("quarto") and shutil.which("xelatex"), "requires quarto and xelatex")
     def test_bdd_pdf_export_creates_pdf_log_and_manifest(self) -> None:
         """行为 3：PDF 导出必须生成 PDF、日志和可追溯 manifest。"""

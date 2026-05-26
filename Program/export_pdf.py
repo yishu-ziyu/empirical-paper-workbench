@@ -126,6 +126,7 @@ def main() -> int:
         reproduce_script,
         full_reproduce_script,
         preflight,
+        manifest,
     )
 
     if preflight["status"] != "ready":

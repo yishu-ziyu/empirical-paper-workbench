@@ -194,6 +194,20 @@
 
 业务规则：上一轮 PDF 预检不能停留在“报告已经指出问题”。它必须把问题转成下一轮可派工任务，让 LiteratureAgent、MethodAgent、ManuscriptAgent、ReviewerAgent 和 VerifierAgent 各自处理自己的缺口。
 
+## 行为 16：Supervisor / Agent 队列必须生成审稿式修订轮次
+
+**Given** `paper_expansion_plan.json` 已经包含 `agent_task_queue` 和 `agent_team_schedule`
+**And** `paper_supervisor_context.json` 已经列出 LLM Supervisor 上下文来源和正式层写回边界
+**When** 用户运行 `Program/paper_revision_round.py`
+**Then** 系统必须写出 `Results/json/paper_revision_round.json` 和 `Reviews/paper_revision_round.md`
+**And** revision round 必须按 Agent 分组生成 `agent_packets`，每个任务保留来源、输入证据、动作建议、验收证据和状态
+**And** 每个任务必须进入 `queued_for_revision`，不能停留在一段自然语言建议
+**And** revision round 必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** revision round 必须写明 Agent Team 调用节奏：生成 revision round 前调用 ReviewerAgent / VerifierAgent / MethodAgent；写出 round manifest 和 review doc 后收回；执行任务或正式层写回前再次调用。
+
+业务规则：Agent Task Queue 不是最终工作成果。它必须被转换成一轮可审阅、可派工、可验收的 revision round，后续 P4-H/P5 才能消费这些任务并产出真实补证材料。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -208,3 +222,4 @@
 - 方法诊断的 Agent Team 调用节奏必须写入 report：MethodGate yellow 且没有 red blockers 后调用 ExecutionAgent；method diagnostics report 写出后收回；MethodAgent 与 ReviewerAgent 只读取摘要和缺口，不接管执行产物或正式层写回。
 - 审稿评分的 Agent Team 调用节奏必须写入 report：method diagnostics 写出后再次调用 MethodAgent 和 ReviewerAgent；scorecard report 写出后收回；下一次只在进入 ManuscriptAgent 扩写或 ExportAgent 预检前再次调用 ReviewerAgent/VerifierAgent。
 - PDF 导出预检的 Agent Team 调用节奏必须写入 manifest：ExportAgent 在 preflight 前调用 ReviewerAgent/VerifierAgent 读取 quality report 和 scorecard；manifest、review doc 和 reproduce scripts 写出后收回；下一次只在用户批准正式层写回或最终 PDF export 前再次调用。
+- 审稿式修订轮次的 Agent Team 调用节奏必须写入 revision round：ReviewerAgent/VerifierAgent/MethodAgent 在 round build 前调用；round manifest 和 review doc 写出后收回；任务执行或正式层写回前再次调用，复核每个 queued task 是否已有验收证据。

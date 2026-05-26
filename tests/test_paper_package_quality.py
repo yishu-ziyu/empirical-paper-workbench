@@ -390,6 +390,140 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertIn("add_weak_iv_robust_interval_or_caveat", context_task_ids)
         self.assertEqual(context["agent_team_schedule"]["next_call_when"], "before_formal_writeback")
 
+    def test_bdd_11_revision_round_consumes_agent_queue_without_formal_writeback(self) -> None:
+        """行为 16：Agent 队列必须生成审稿式修订轮次，但不改写正式层。"""
+        result = self.run_quality(["--profile", "aer_like"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest_path = self.project_root / "Submissions" / "cfps_robot_pdf_export_manifest.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.pdf_export_manifest.v1",
+                    "export_gate": {"status": "needs_review", "can_export_pdf": False},
+                    "next_review_tasks": [
+                        {
+                            "id": "add_weak_iv_robust_interval_or_caveat",
+                            "source": "reviewer_scorecard",
+                            "agent": "MethodAgent",
+                            "reason": "弱工具变量稳健推断仍需补证。",
+                            "recommended_action": "补充 Anderson-Rubin 置信区间或写明弱工具限制。",
+                            "inputs": ["reviewer_scorecard_report.json", "method_diagnostics_report.json"],
+                        },
+                        {
+                            "id": "explain_missing_drop_and_analysis_sample",
+                            "source": "reviewer_scorecard",
+                            "agent": "DataAgent",
+                            "reason": "样本流失和分析样本口径需要解释。",
+                            "recommended_action": "补充样本筛选流程和 missing drop 说明。",
+                            "inputs": ["reviewer_scorecard_report.json", "Results/json/method_diagnostics_report.json"],
+                        },
+                    ],
+                    "agent_team_schedule": {
+                        "call_when": "before_pdf_export_preflight",
+                        "called_agents": ["ExportAgent", "ReviewerAgent", "VerifierAgent"],
+                        "recall_when": "after_pdf_export_manifest_written",
+                        "next_call_when": "before_formal_writeback_or_final_export",
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_files = [
+            state_dir / "research_question.json",
+            state_dir / "variable_roles.json",
+            state_dir / "variable_role_set.json",
+            state_dir / "design_spec.json",
+            state_dir / "run_plan.json",
+            state_dir / "supervisor_plan.json",
+            state_dir / "agent_task_queue.json",
+        ]
+        for path in protected_files:
+            path.write_text(json.dumps({"path": str(path.relative_to(self.project_root)), "formal": True}), encoding="utf-8")
+        protected_before = {path: path.read_text(encoding="utf-8") for path in protected_files}
+
+        package = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_package.py"),
+                "--project-root",
+                str(self.project_root),
+                "--quality-report",
+                "Results/json/paper_quality_report.json",
+                "--source-manifest",
+                "Submissions/cfps_robot_pdf_export_manifest.json",
+                "--output-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--output-manuscript",
+                "Manuscripts/generated/paper_package_draft.md",
+                "--output-supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(package.returncode, 0, package.stderr)
+
+        revision = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_revision_round.py"),
+                "--project-root",
+                str(self.project_root),
+                "--expansion-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+                "--output-round",
+                "Results/json/paper_revision_round.json",
+                "--output-review",
+                "Reviews/paper_revision_round.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(revision.returncode, 0, revision.stderr)
+
+        round_path = self.project_root / "Results" / "json" / "paper_revision_round.json"
+        review_path = self.project_root / "Reviews" / "paper_revision_round.md"
+        self.assertTrue(round_path.exists())
+        self.assertTrue(review_path.exists())
+        round_doc = json.loads(round_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(round_doc["schema_version"], "p4.paper_revision_round.v1")
+        self.assertTrue(round_doc["draft_layer_only"])
+        self.assertFalse(round_doc["formal_writeback_allowed"])
+        self.assertEqual(round_doc["status"], "ready_for_human_review")
+        self.assertEqual(round_doc["agent_team_schedule"]["call_when"], "before_revision_round_build")
+        self.assertEqual(round_doc["agent_team_schedule"]["recall_when"], "after_revision_round_manifest_written")
+        self.assertEqual(round_doc["agent_team_schedule"]["next_call_when"], "before_revision_task_execution_or_formal_writeback")
+        packet_by_agent = {packet["agent"]: packet for packet in round_doc["agent_packets"]}
+        self.assertIn("MethodAgent", packet_by_agent)
+        self.assertIn("DataAgent", packet_by_agent)
+        weak_iv_task = next(
+            task
+            for task in packet_by_agent["MethodAgent"]["tasks"]
+            if task["id"] == "add_weak_iv_robust_interval_or_caveat"
+        )
+        self.assertEqual(weak_iv_task["status"], "queued_for_revision")
+        self.assertEqual(weak_iv_task["source"], "pdf_export_manifest")
+        self.assertEqual(weak_iv_task["source_artifact"], "Submissions/cfps_robot_pdf_export_manifest.json")
+        self.assertIn("updated_section_or_diagnostic_artifact", weak_iv_task["verification_evidence_required"])
+        self.assertFalse(round_doc["formal_state_guard"]["changed"])
+
+        review_text = review_path.read_text(encoding="utf-8")
+        self.assertIn("审稿式修订轮次", review_text)
+        self.assertIn("正式层写回：关闭", review_text)
+        self.assertIn("MethodAgent", review_text)
+        for path, content in protected_before.items():
+            self.assertEqual(path.read_text(encoding="utf-8"), content)
+
     def _read_report(self) -> dict:
         return json.loads((self.project_root / "Results" / "json" / "paper_quality_report.json").read_text(encoding="utf-8"))
 

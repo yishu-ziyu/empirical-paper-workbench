@@ -156,6 +156,20 @@
 
 业务规则：方法诊断执行层负责把“能从当前数据真实跑出来的诊断”落成可复跑产物；需要文献判断、share/shock 原始组件或人工识别叙事的部分保留为审阅任务。这个阶段推进草稿层证据质量，但不静默提升正式研究设定。
 
+## 行为 13：ReviewerAgent 必须读取真实方法诊断并生成审稿评分卡
+
+**Given** `method_diagnostics_report.json` 和 `method_gate_report.json` 已存在
+**When** 用户运行 reviewer scorecard builder
+**Then** 系统必须写出 `Results/json/reviewer_scorecard_report.json`
+**And** 评分卡必须覆盖 `execution_binding`、`instrument_relevance`、`weak_iv_and_inference_robustness`、`bartik_identification_credibility`、`sample_and_reporting_transparency`
+**And** `reduced_form`、`first_stage_relevance`、`artifact_binding` 已完成时不得继续列为缺失
+**And** 弱工具稳健区间、Bartik share/shock 组件、Rotemberg weights、leave-one-out、排他性论证和样本流失解释必须转成 revision tasks
+**And** 当前 yellow 状态允许继续草稿层，但必须阻断不带 caveat 的强因果表述和正式导出
+**And** 评分卡必须声明 Agent Team 的调用、收回和再次调用节奏
+**And** 命令不得写入 `state/product/reviewer_scorecard.json` 或自动改写 Agent Task Queue。
+
+业务规则：审稿评分卡不是空泛评价。它必须把真实诊断产物转成“可以写草稿 / 不可正式声称 / 下一轮谁来补证据”的产品状态。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -168,3 +182,4 @@
 - 文献包的 Agent Team 调用节奏必须写入 report：候选文献生成后调用 LiteratureAgent、MethodAgent、DataAgent；正式书目被 ManuscriptAgent 引用前收回；主线程只合并为 processed 文献包和质量报告，不直接写正式论文层。
 - 方法门的 Agent Team 调用节奏必须写入 report：DesignSpec / RunPlan approved 后调用 MethodAgent、DataAgent 和 ExecutionAgent；method gate report 写出后收回；真实诊断执行后再次调用 MethodAgent 和 ReviewerAgent；主线程只合并为方法门报告和质量报告，不直接写正式层。
 - 方法诊断的 Agent Team 调用节奏必须写入 report：MethodGate yellow 且没有 red blockers 后调用 ExecutionAgent；method diagnostics report 写出后收回；MethodAgent 与 ReviewerAgent 只读取摘要和缺口，不接管执行产物或正式层写回。
+- 审稿评分的 Agent Team 调用节奏必须写入 report：method diagnostics 写出后再次调用 MethodAgent 和 ReviewerAgent；scorecard report 写出后收回；下一次只在进入 ManuscriptAgent 扩写或 ExportAgent 预检前再次调用 ReviewerAgent/VerifierAgent。

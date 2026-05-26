@@ -297,6 +297,23 @@
 
 业务规则：P4-J 不是直接把草稿写进正式论文，而是把“将要写什么、证据在哪里、还有哪些正式审批条件”列成可审阅预览。用户确认后才进入 P5 的正式 paper package。
 
+### Behavior 23: Human approval records a formal package entry decision without writing formal state
+
+**Given** `formal_writeback_preflight.json` 的状态是 `ready_for_human_approval`
+**And** 预检账本已经列出章节扩写、引用/文献、方法叙述、结果表与复现说明的写回范围
+**When** 用户运行 `Program/formal_writeback_approval.py --action approve`
+**Then** 系统必须把批准记录写入 `state/product/writeback_approvals.json`
+**And** 系统必须写出 `Results/json/formal_writeback_approval.json`
+**And** 系统必须写出 `Reviews/formal_writeback_approval.md`
+**And** 批准账本必须声明 `can_enter_p5=true`
+**And** 批准账本必须保留旧的候选段落写回审批键 `approvals`
+**And** 命令不得改写 `formal_writeback_preflight.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 如果用户选择 `needs_revision` 或 `reject`，账本必须声明 `can_enter_p5=false`
+**And** 如果预检账本没有 ready，系统必须阻断批准并说明阻断原因。
+
+业务规则：P5-A 是正式包入口的人工批准账本。它只记录“是否允许进入 P5”，不生成正式论文、不导出 docx、不改写正式层状态；这样后续 P5 节点可以用同一条批准记录作为正式包生成和导出预检的入口凭证。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

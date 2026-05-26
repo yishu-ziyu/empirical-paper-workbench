@@ -129,6 +129,10 @@
 - P4-J1 BDD/TDD：新增行为 22 和 `tests/test_formal_writeback_preflight.py`；RED 为缺少 `Program/formal_writeback_preflight.py`，GREEN 后覆盖 ready 和 blocked 两条路径。
 - P4-J1 Agent Team 回收点：Mencius 只读复核 P4-J 上下游、正式层保护文件和 `state/product/*` 审批边界；主 Agent 合并为最小预检实现，没有改写正式 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或正式论文层。
 - P4-J 后续 20 分钟节点规则：P5/P6 的每个子节点必须控制在 20 分钟内；超时即拆成更小节点或回退路线，不允许继续堆大黑箱。
+- P5-A 已执行：新增 `Program/formal_writeback_approval.py`，消费 `Results/json/formal_writeback_preflight.json`，把人工批准记录写入 `state/product/writeback_approvals.json` 的 `formal_preflight_approvals`，并生成 `Results/json/formal_writeback_approval.json` 与 `Reviews/formal_writeback_approval.md`。
+- P5-A 真实运行：当前批准状态为 `approved_for_p5`，`can_enter_p5=true`，写回范围 5 类：sections、citations、method_narrative、result_tables、reproducibility；本命令不生成正式论文包、不导出 docx、不改写正式层 state。
+- P5-A BDD/TDD：新增行为 23 和 `tests/test_formal_writeback_approval.py`；RED 为缺少 `Program/formal_writeback_approval.py`，GREEN 后覆盖 approve、needs_revision、preflight blocked 三条路径。
+- P5-A Agent Team 回收点：Averroes 只读复核现有 writeback approval / docx preflight / formal guard 锚点；主 Agent 复用 `writeback_approvals.json` 语义，只追加 formal preflight approval，不重造产品 API。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。
 
 ## 2026-05-22 Long-run Optimization Protocol

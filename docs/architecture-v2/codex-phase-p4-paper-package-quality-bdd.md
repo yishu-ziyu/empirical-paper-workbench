@@ -366,6 +366,21 @@
 
 业务规则：P5-D 是 PDF-first 导出前的证据验收台。它决定“现在能不能进入 PDF 导出审阅”，并把不能导出的原因拆成 Agent 可执行任务；它不渲染 PDF，也不把草案变成正式终稿。
 
+### Behavior 27: Formal evidence registry resolver maps existing artifacts before asking agents to recreate evidence
+
+**Given** `formal_pdf_export_preflight.json` 的状态是 `blocked_by_source_gaps`
+**And** 预检报告中存在 `required_evidence_missing`
+**When** 用户运行 `Program/formal_evidence_registry_resolver.py`
+**Then** 系统必须写出 `Results/json/formal_evidence_registry_resolution.json`
+**And** 系统必须写出 `Reviews/formal_evidence_registry_resolution.md`
+**And** 系统必须写出 `Submissions/formal_package/reproducibility/evidence_registry_patch_proposal.json`
+**And** resolver 必须把缺失证据分为 `direct_alias_available`、`derivable_from_existing_artifact`、`missing_after_scan`
+**And** resolver 必须优先识别当前仓库中已经存在的正式状态、审稿账本、方法执行结果、文献包和质量报告
+**And** resolver 只能生成 patch proposal，不得直接改写 PDF 预检报告、章节源、正式研究状态或 canonical evidence registry
+**And** 每个 patch proposal 必须声明建议绑定路径、证据来源、负责 Agent 和是否需要人工确认。
+
+业务规则：P5-E1 先减少无谓返工。系统在要求 Agent 补证据前，必须先扫描当前仓库已有产物，把“其实已经存在但名字没对上”的材料登记成可审查提案；真正缺失的证据才进入后续生成节点。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

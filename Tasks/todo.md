@@ -872,3 +872,16 @@
 - [x] 保护边界：预检明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
 - [x] 验证：目标测试 3 OK；相邻 P5/PDF 回归 14 OK；Python 编译通过；真实 CLI 运行输出 `can_export_pdf_candidate=false`。
 - [ ] 下一步 P5-E：把 P5-D 的 20 个任务拆成每个 <=20 分钟的小节点，优先补证据索引映射和章节源写作入口，再把通过后的正式源接到 PDF 候选渲染。
+
+## 2026-05-27 P5-E1 Formal Evidence Registry Resolver
+
+- [x] 节点时间盒：P5-E1 只扫描 P5-D 缺失证据，生成 evidence registry patch proposal；不生成目标 evidence files，不改 canonical registry，不改正式层。后续每个 P5-E 子节点控制在 20 分钟内，超过就继续拆。
+- [x] Agent Team：尝试新建 explorer 因线程上限失败，复用既有 Agent 做只读 sidecar；主线实现采用更深的 derivable artifact resolver，并用真实仓库产物交叉校验。
+- [x] BDD：在 `docs/architecture-v2/codex-phase-p4-paper-package-quality-bdd.md` 新增 Behavior 27，定义补证据前必须先扫描已有正式状态、审稿账本、方法执行结果、文献包和质量报告。
+- [x] TDD：新增 `tests/test_formal_evidence_registry_resolver.py`；首次 RED 失败原因是缺少 `Program/formal_evidence_registry_resolver.py`。
+- [x] 实现：新增 `Program/workbench/formal_evidence_registry_resolver.py` 和 CLI wrapper，只生成 resolution report、review markdown 和 patch proposal。
+- [x] 产物：生成 `Results/json/formal_evidence_registry_resolution.json`、`Reviews/formal_evidence_registry_resolution.md`、`Submissions/formal_package/reproducibility/evidence_registry_patch_proposal.json`。
+- [x] 真实项目验收：P5-D 的 10 个缺失证据全部找到现有来源或可派生来源；`variable_role_set` 是 direct alias，另外 9 个是 derivable，`missing_after_scan=0`。
+- [x] 保护边界：resolver 明确 `this_command_mutated_preflight=false`、`this_command_wrote_formal_state=false`、`can_apply_without_human_review=false`，不直接修改 PDF 预检报告、章节源、正式研究状态或 canonical evidence registry。
+- [x] 验证：目标测试 3 OK；P5-D/P5-E1 回归 6 OK；全量回归 360 OK，skipped=1；Python 编译通过；真实 CLI 运行输出 `status=evidence_registry_patch_proposed`、`patch_items=10`。
+- [ ] 下一步 P5-E2a：材料化最高确定性的 3 个证据文件：`variable_role_set`、`sample_profile`、`regression_tables`；完成后重跑 P5-D。P5-E2b 再处理 `robustness_matrix`、`limitations_register`、`figure_manifest`；P5-E2c 再处理文献和上下文来源。

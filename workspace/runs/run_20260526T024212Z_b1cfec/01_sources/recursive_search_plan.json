@@ -1,0 +1,42 @@
+{
+  "topic": "工业机器人暴露是否影响劳动收入再配置？使用 CFPS 与工业机器人暴露数据",
+  "status": "needs_human_review",
+  "max_depth": 2,
+  "max_iterations": 5,
+  "strategy": [
+    "从题目抽取核心概念和中文检索词",
+    "用本地文献、CNKI、Web、Zotero 生成 LiteratureClue 候选",
+    "从候选文献中提取变量、数据源、方法和识别风险",
+    "让缺失证据触发下一轮数据、文献或方法搜索"
+  ],
+  "enabled_sources": [
+    "local_data",
+    "statspai",
+    "web_search"
+  ],
+  "blocked_sources": [
+    {
+      "id": "cnki",
+      "status": "blocked_by_browser_session",
+      "reason": "Chrome DevTools endpoint not detected; CNKI remains manual-assisted",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "agentmemory",
+      "status": "unavailable",
+      "reason": "agentmemory executable not found",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "llm_supervisor",
+      "status": "unavailable",
+      "reason": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC is not enabled",
+      "evidence_level": "local_file",
+      "can_promote": false
+    }
+  ],
+  "evidence_level": "local_file",
+  "can_promote": false
+}

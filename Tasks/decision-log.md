@@ -1,5 +1,55 @@
 # Decision Log
 
+## 2026-05-26：本地 CLI 工作流成为当前主线，云端产品复用同一状态模型
+
+Decision: 当前阶段先完成本地 CLI-first 研究工作流，再继续产品层 UI 深化；云端产品不放弃，但必须复用同一套 ResearchIntent、VariableRoleSet、DesignSpec、RunPlan、RunManifest、JournalSkillRegistry 和 evidence policy。
+
+Reason: 用户明确指出功能层必须先完整跑完真实数据，否则产品 UI 只会继续变成空壳。本地版也是第一批真实用户的最高效工作流。
+
+Rejected: 继续优先做前端页面设计。原因是当前最大的风险不是页面美观，而是真实数据、真实方法、真实日志和正式层保护是否已经成立。
+
+Invariant: UI 可以落后，但 CLI 真实执行链路、运行证据、草案层/正式层边界不能缺失。
+
+## 2026-05-26：真实数据运行必须使用独立 paper config 和独立输出路径
+
+Decision: `Program/run_paper.py` 支持 `--paper-config`，真实 CFPS/机器人运行使用 `Program/config/paper_real_cfps_robot.yaml`，输出写入 `cfps_robot_*` 专属路径。
+
+Reason: 默认 `paper.yaml` 和默认 `Results/json/project_snapshot.json` 是样例/既有工作流入口。真实数据运行如果覆盖默认状态，会让后续跨 session 复盘混乱，也会污染已存在的产品状态。
+
+Rejected: 直接修改默认 `paper.yaml` 指向真实数据。原因是这会把一个具体研究任务变成全局默认，破坏多任务并行和回滚。
+
+Invariant: 每个真实研究任务必须有独立 config、state、snapshot、analysis_result、run log 和 run id。
+
+## 2026-05-26：Auto Research 不能优先选择 demo 数据
+
+Decision: Auto Research 的变量候选生成必须按题目和数据元信息选择最相关数据集；题目包含 CFPS 和机器人时，必须选择 `Data/Final/cfps_robot_reallocation.csv`。
+
+Reason: 用户要求系统能使用真实数据。若真实数据存在但系统仍绑定 `analysis_sample.csv`，说明 Agent 工作流没有真正读懂题目和数据资产。
+
+Rejected: 继续使用 inventory 中第一个数据集。原因是这只是工程遍历顺序，不是研究语义。
+
+Invariant: demo 数据只能在没有更相关真实数据时作为 fallback，且必须显式标记。
+
+## 2026-05-26：AER-like 审稿标准先进入 proposal，canonical 规则必须人工 review
+
+Decision: AER-Skills、Awesome Journal Skills 和 Awesome Agent Skills for Empirical Research 只作为外部专业知识来源；Auto Mode 可以抽取规则和生成 patch proposal，但不能直接写入 canonical 规则库。
+
+Reason: 顶刊审稿标准会影响方法设计、结果解释和正式导出。未审阅规则如果直接阻断或改写正式层，会把外部仓库和模型抽取误当成项目内已确认学术标准。
+
+Rejected: 直接复制外部 AER-Skills 到 canonical 并启用阻断。原因是来源可靠不等于规则已被本项目人工 review，也不等于适用于所有社会科学实证任务。
+
+Invariant: 只有人工 review 后的 canonical 规则可以设置 `blocks_formal_export=true`。
+
+## 2026-05-26：当前 CFPS/机器人结果只能作为 exploratory execution evidence
+
+Decision: `run_cli_real_cfps_robot_20260526_isolated` 证明本地 StatsPAI 执行链路可用，但不能被标记为正式因果结论。
+
+Reason: 当前设计为 observational，尚未完成正式 VariableRoleSet、DesignSpec、RunPlan、Journal Skill gate 和人工确认。
+
+Rejected: 把 OLS 显著系数写成论文结论。原因是执行成功不等于识别成立，显著不等于可发表因果论断。
+
+Invariant: 所有自动产出的结果、报告和草稿默认 `exploratory / draft / needs_human_review`。
+
 ## 2026-05-25：Task Brief 页必须从信号面板改成引导式 checkpoint
 
 Decision: P3-D 不继续把当前 Task Brief 卡片做视觉微调，而是要求 Gemini/Kimi 把它重构为“一个主决策 + 缺失信息 checklist + 推荐下一步 + 右侧可选 Inspector”的引导式 checkpoint。

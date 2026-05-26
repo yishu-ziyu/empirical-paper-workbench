@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 import os
+import re
 import shutil
 import socket
 import uuid
@@ -221,7 +222,7 @@ def build_literature_clues(project_root: Path, inventory: dict[str, Any], topic:
 
 
 def build_variable_candidates(project_root: Path, inventory: dict[str, Any], topic: str) -> dict[str, Any]:
-    dataset = inventory["datasets"][0] if inventory["datasets"] else {}
+    dataset = select_dataset_for_topic(project_root, inventory["datasets"], topic)
     columns = read_csv_columns(project_root / dataset.get("path", "")) if dataset else []
     candidates = {
         "status": "needs_human_review",
@@ -232,12 +233,65 @@ def build_variable_candidates(project_root: Path, inventory: dict[str, Any], top
         "roles": {
             "outcome_candidates": infer_columns(columns, ["wage", "income", "earn", "收入", "工资"]),
             "treatment_candidates": infer_columns(columns, ["ai", "robot", "treat", "policy", "人工智能", "机器人"]),
-            "control_candidates": infer_columns(columns, ["age", "edu", "gender", "experience", "年龄", "教育"]),
+            "control_candidates": infer_columns(
+                columns,
+                ["age", "edu", "gender", "female", "sex", "urban", "experience", "年龄", "教育", "性别", "城市"],
+            ),
             "instrument_candidates": [],
         },
         "rationale": "变量角色为自动候选，必须人工确认后才可进入正式 VariableRoleSet。",
     }
     return candidates
+
+
+def select_dataset_for_topic(project_root: Path, datasets: list[dict[str, Any]], topic: str) -> dict[str, Any]:
+    if not datasets:
+        return {}
+    keywords = topic_keywords(topic)
+
+    def score(dataset: dict[str, Any]) -> tuple[int, int]:
+        name = dataset.get("name", "")
+        path = dataset.get("path", "")
+        metadata = f"{name} {path}".lower()
+        columns = read_csv_columns(project_root / path)
+        column_text = " ".join(columns).lower()
+        points = 0
+        for keyword in keywords:
+            token = keyword.lower()
+            if token and token in metadata:
+                points += 6
+            if token and token in column_text:
+                points += 4
+        if infer_columns(columns, ["wage", "income", "earn", "收入", "工资"]):
+            points += 2
+        if infer_columns(columns, ["ai", "robot", "treat", "policy", "人工智能", "机器人"]):
+            points += 2
+        if "/final/" in f"/{path.lower()}":
+            points += 1
+        if "sample" in name.lower() or "sample" in path.lower():
+            points -= 3
+        return (points, int(dataset.get("size", 0)))
+
+    return max(datasets, key=score)
+
+
+def topic_keywords(topic: str) -> list[str]:
+    lower = topic.lower()
+    keywords = [token for token in lower.replace("？", " ").replace("，", " ").replace(",", " ").split() if token]
+    keyword_map = [
+        (["cfps", "中国家庭追踪"], ["cfps"]),
+        (["机器人", "robot"], ["robot", "机器人", "ln_robot", "year_robot"]),
+        (["人工智能", "ai"], ["ai", "人工智能"]),
+        (["工资", "收入", "劳动收入", "wage", "income", "earn"], ["wage", "income", "earn", "收入", "工资", "ln_wage"]),
+        (["教育", "edu"], ["edu", "education", "edu_last"]),
+        (["年龄", "age"], ["age", "年龄"]),
+        (["性别", "female", "gender"], ["female", "gender", "sex", "性别"]),
+        (["城市", "urban"], ["urban", "城市"]),
+    ]
+    for triggers, expansions in keyword_map:
+        if any(trigger in lower for trigger in triggers):
+            keywords.extend(expansions)
+    return list(dict.fromkeys(keywords))
 
 
 def read_csv_columns(path: Path) -> list[str]:
@@ -252,7 +306,17 @@ def read_csv_columns(path: Path) -> list[str]:
 
 def infer_columns(columns: list[str], tokens: list[str]) -> list[str]:
     lowered = [(column, column.lower()) for column in columns]
-    return [column for column, lower in lowered if any(token.lower() in lower or token in column for token in tokens)]
+    return [column for column, lower in lowered if any(column_matches_token(lower, token) for token in tokens)]
+
+
+def column_matches_token(lower_column: str, token: str) -> bool:
+    token_lower = token.lower()
+    if not token_lower:
+        return False
+    if any(ord(char) > 127 for char in token_lower):
+        return token_lower in lower_column
+    parts = [part for part in re.split(r"[^a-z0-9]+", lower_column) if part]
+    return token_lower == lower_column or token_lower in parts
 
 
 def build_method_candidates(topic: str, variable_candidates: dict[str, Any]) -> list[dict[str, Any]]:

@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "lit_72919f35fb",
+      "source": "local_file",
+      "source_type": "literature_clue",
+      "topic": "工业机器人暴露是否影响劳动收入再配置？使用 CFPS 与工业机器人暴露数据",
+      "title": "README",
+      "path": "Reference/README.md",
+      "suffix": ".md",
+      "evidence_level": "local_file",
+      "status": "candidate",
+      "can_promote": false,
+      "access_status": "metadata_only",
+      "relevance_rationale": "本地文献或参考材料文件，第一版仅登记为候选线索。"
+    }
+  ]
+}

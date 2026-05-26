@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "id": "ols_baseline",
+      "method": "OLS",
+      "status": "candidate",
+      "purpose": "建立探索性基准相关关系，不宣称因果识别。",
+      "evidence_level": "local_file",
+      "can_promote": false,
+      "requirements": [
+        "确认因变量",
+        "确认处理变量",
+        "确认控制变量",
+        "检查缺失值和样本定义"
+      ]
+    },
+    {
+      "id": "identification_upgrade",
+      "method": "DID/IV/RDD/PSM/DML",
+      "status": "needs_evidence",
+      "purpose": "根据题目语义和数据结构选择更强识别策略。",
+      "evidence_level": "local_file",
+      "can_promote": false,
+      "requirements": [
+        "政策冲击或处理时点",
+        "工具变量或断点",
+        "可比对照组",
+        "平行趋势或重叠假设证据"
+      ]
+    }
+  ]
+}

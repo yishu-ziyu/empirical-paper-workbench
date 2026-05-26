@@ -1,0 +1,42 @@
+id: 2026-05-26-aer-skills-import
+status: proposal_only
+created_at: "2026-05-26"
+created_by: codex
+purpose: "Introduce AER-like top-journal review standards as a reviewed methodology plugin, not as an automatically trusted rule set."
+external_sources:
+  - id: aer_skills
+    repo: "https://github.com/brycewang-stanford/AER-skills.git"
+    head: "7e9c44d363c185edf27859096268b6a8256c4a2b"
+    access_check: "git ls-remote --heads"
+  - id: awesome_journal_skills
+    repo: "https://github.com/brycewang-stanford/awesome-journal-skills.git"
+    head: "22ee5589d13f3cca617c32cc18dac80f0a6c5c09"
+    access_check: "git ls-remote --heads"
+  - id: awesome_agent_skills_empirical_research
+    repo: "https://github.com/brycewang-stanford/Awesome-Agent-Skills-for-Empirical-Research.git"
+    head: "e03ff8cf62f1ce8739c4181cead149da5dd84b11"
+    access_check: "git ls-remote --heads"
+rules_boundary:
+  proposal_can:
+    - "extract candidate journal-review checks"
+    - "suggest missing evidence in Method Design"
+    - "generate reviewer-scorecard risks"
+    - "produce patch proposals for canonical review"
+  proposal_cannot:
+    - "block formal export"
+    - "overwrite VariableRoleSet"
+    - "overwrite DesignSpec"
+    - "overwrite RunPlan"
+    - "promote exploratory findings to formal claims"
+canonical_promotion_requires:
+  - "human review"
+  - "source trace"
+  - "rule id stability"
+  - "severity confirmation"
+  - "explicit blocks_formal_export decision"
+initial_scope:
+  - "identification"
+  - "robustness"
+  - "replication"
+  - "submission"
+review_status: "needs_human_review"

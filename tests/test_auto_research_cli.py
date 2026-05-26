@@ -16,6 +16,17 @@ class AutoResearchCliTests(unittest.TestCase):
         for rel in ["Data", "Program", "Results", "Manuscripts", "Reference", "state"]:
             (self.root / rel).mkdir(parents=True)
         (self.root / "Data" / "sample.csv").write_text("wage,ai,age\n10,1,30\n8,0,45\n", encoding="utf-8")
+        (self.root / "Data" / "Final").mkdir(parents=True)
+        (self.root / "Data" / "Final" / "analysis_sample.csv").write_text(
+            "wage,trained,edu,experience\n10,1,12,3\n8,0,9,6\n",
+            encoding="utf-8",
+        )
+        (self.root / "Data" / "Final" / "cfps_robot_reallocation.csv").write_text(
+            "ln_wage,ln_robot,edu_last,age,female,urban\n"
+            "10.1,9.2,12,32,0,1\n"
+            "9.8,8.7,9,43,1,0\n",
+            encoding="utf-8",
+        )
         (self.root / "Reference" / "seed.md").write_text("# 人工智能与劳动收入\n", encoding="utf-8")
 
     def tearDown(self) -> None:
@@ -81,6 +92,46 @@ class AutoResearchCliTests(unittest.TestCase):
         first_clue = json.loads(global_clues.read_text(encoding="utf-8").splitlines()[0])
         self.assertEqual(first_clue["evidence_level"], "local_file")
         self.assertEqual(first_clue["can_promote"], False)
+
+    def test_auto_research_prefers_topic_matched_real_dataset_over_demo_sample(self) -> None:
+        """BDD: 题目含 CFPS/机器人线索时，变量候选必须绑定最相关真实数据，而不是默认样例。"""
+        result = subprocess.run(
+            [
+                "python3",
+                "Product/cli.py",
+                "auto-research",
+                "--project-root",
+                str(self.root),
+                "--topic",
+                "工业机器人暴露是否影响劳动收入再配置？使用 CFPS 与工业机器人暴露数据",
+                "--max-depth",
+                "2",
+                "--max-iterations",
+                "5",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        payload = json.loads(result.stdout)
+        run_root = Path(payload["run_root"])
+        variable_candidates = json.loads(
+            (run_root / "03_strategy" / "variable_candidates.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(
+            variable_candidates["dataset"]["path"],
+            "Data/Final/cfps_robot_reallocation.csv",
+        )
+        self.assertEqual(variable_candidates["roles"]["outcome_candidates"], ["ln_wage"])
+        self.assertEqual(variable_candidates["roles"]["treatment_candidates"], ["ln_robot"])
+        self.assertIn("edu_last", variable_candidates["roles"]["control_candidates"])
+        self.assertIn("age", variable_candidates["roles"]["control_candidates"])
+        self.assertIn("female", variable_candidates["roles"]["control_candidates"])
+        self.assertIn("urban", variable_candidates["roles"]["control_candidates"])
+        self.assertNotIn("ln_wage", variable_candidates["roles"]["control_candidates"])
 
 
 if __name__ == "__main__":

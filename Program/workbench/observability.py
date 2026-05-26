@@ -12,7 +12,7 @@ STEP_DEFINITIONS = [
         "id": "config_load",
         "title": "Load project configuration",
         "actor": "Runtime",
-        "description": "Read paper.yaml and analysis_config.yaml.",
+        "description": "Read the active paper config and analysis_config.yaml.",
     },
     {
         "id": "dataset_intake",

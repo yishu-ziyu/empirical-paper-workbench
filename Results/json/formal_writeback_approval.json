@@ -1,0 +1,62 @@
+{
+  "schema_version": "p5.formal_writeback_approval.v1",
+  "generated_at": "2026-05-26T18:10:33.097967+00:00",
+  "source_preflight": "Results/json/formal_writeback_preflight.json",
+  "approval_path": "state/product/writeback_approvals.json",
+  "status": "approved_for_p5",
+  "action": "approve",
+  "actor": "user",
+  "note": "批准 P4-J 正式写回预检进入 P5 formal paper package。",
+  "blocking_reasons": [],
+  "can_enter_p5": true,
+  "can_write_formal_package": true,
+  "this_command_wrote_formal_state": false,
+  "writeback_scope_categories": [
+    "sections",
+    "citations",
+    "method_narrative",
+    "result_tables",
+    "reproducibility"
+  ],
+  "approval_entry": {
+    "id": "formal_writeback_approval_formal_writeback_preflight",
+    "preflight_id": "formal_writeback_preflight",
+    "status": "approved",
+    "action": "approve",
+    "actor": "user",
+    "note": "批准 P4-J 正式写回预检进入 P5 formal paper package。",
+    "timestamp": "2026-05-26T18:10:33.096970+00:00",
+    "evidence_level": "local_file",
+    "path": "state/product/writeback_approvals.json",
+    "source_preflight": "Results/json/formal_writeback_preflight.json",
+    "source_preview": "Manuscripts/generated/previews/formal_writeback_preflight.md",
+    "writeback_scope_categories": [
+      "sections",
+      "citations",
+      "method_narrative",
+      "result_tables",
+      "reproducibility"
+    ],
+    "can_enter_p5": true,
+    "can_write_formal_package": true,
+    "this_command_wrote_formal_state": false
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "build_p5_formal_paper_package",
+    "label": "生成 P5 正式 paper package",
+    "description": "批准账本已落地，下一节点可以生成正式包 manifest、PDF/docx 预检和复现交付材料。"
+  }
+}

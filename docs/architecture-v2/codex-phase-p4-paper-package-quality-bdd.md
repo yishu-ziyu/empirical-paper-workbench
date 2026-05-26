@@ -170,6 +170,19 @@
 
 业务规则：审稿评分卡不是空泛评价。它必须把真实诊断产物转成“可以写草稿 / 不可正式声称 / 下一轮谁来补证据”的产品状态。
 
+## 行为 14：PDF 导出预检必须绑定论文质量门和审稿评分卡
+
+**Given** `paper_quality_report.json` 和 `reviewer_scorecard_report.json` 已存在
+**When** 用户运行 `Program/export_pdf.py --preflight-only` 或正式导出
+**Then** export manifest 必须包含 paper quality report 的路径、verdict 和 recommended next tasks
+**And** manifest 必须包含 reviewer scorecard 的路径、总分、总体判定、正式导出阻断状态和 revision tasks
+**And** 当 scorecard 标记 `blocks_export_or_formal_claims=true` 或 quality report 仍存在质量门缺口时，manifest 必须写出 `export_gate.can_export_pdf=false`
+**And** manifest 必须合并写出下一轮 `next_review_tasks`，作为 ManuscriptAgent / ReviewerAgent / VerifierAgent 后续任务入口
+**And** PDF review doc 必须显示“论文包审阅入口”、质量报告、审稿评分卡和下一轮任务
+**And** manifest 必须声明 Agent Team 调用节奏：ExportAgent 在预检前调用 ReviewerAgent / VerifierAgent；manifest 写出后收回；只有进入正式写回或最终导出前才再次调用。
+
+业务规则：PDF 预检不只是排版检查。它要把“现在能否进入正式论文包”和“下一轮谁补什么证据”写成可复核的产品状态。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -183,3 +196,4 @@
 - 方法门的 Agent Team 调用节奏必须写入 report：DesignSpec / RunPlan approved 后调用 MethodAgent、DataAgent 和 ExecutionAgent；method gate report 写出后收回；真实诊断执行后再次调用 MethodAgent 和 ReviewerAgent；主线程只合并为方法门报告和质量报告，不直接写正式层。
 - 方法诊断的 Agent Team 调用节奏必须写入 report：MethodGate yellow 且没有 red blockers 后调用 ExecutionAgent；method diagnostics report 写出后收回；MethodAgent 与 ReviewerAgent 只读取摘要和缺口，不接管执行产物或正式层写回。
 - 审稿评分的 Agent Team 调用节奏必须写入 report：method diagnostics 写出后再次调用 MethodAgent 和 ReviewerAgent；scorecard report 写出后收回；下一次只在进入 ManuscriptAgent 扩写或 ExportAgent 预检前再次调用 ReviewerAgent/VerifierAgent。
+- PDF 导出预检的 Agent Team 调用节奏必须写入 manifest：ExportAgent 在 preflight 前调用 ReviewerAgent/VerifierAgent 读取 quality report 和 scorecard；manifest、review doc 和 reproduce scripts 写出后收回；下一次只在用户批准正式层写回或最终 PDF export 前再次调用。

@@ -433,6 +433,24 @@
 
 业务规则：P5-E2c 把“已经过审的发现、文献验证和上下文来源”接入 PDF 预检读取路径。它不生成新文献结论，不把 CNKI 人工队列说成已完成，也不替用户批准正式引用；它只把现有真实材料整理成可审阅证据文件。
 
+### Behavior 31: Formal section source drafter turns placeholders into evidence-bound draft sources
+
+**Given** PDF 导出预检已经只剩 `section_source_placeholders_remaining` 阻断
+**And** `formal_manuscript_source_map.json` 与 `section_sources.json` 已经列出全部必需章节源
+**And** 每个章节要求的证据文件已经存在于 evidence registry 对应路径
+**When** 用户运行 `Program/formal_section_source_drafter.py`
+**Then** 系统必须写出 `Results/json/formal_section_source_draft_report.json`
+**And** 系统必须写出 `Reviews/formal_section_source_draft.md`
+**And** 系统必须把 `Submissions/formal_package/manuscript/section_sources.json` 中全部章节状态更新为 `source_draft_ready`
+**And** 系统必须把每个章节 markdown 从占位内容改写为绑定证据路径的章节源草案
+**And** 每个章节 markdown 不得保留 `source_placeholder_ready` 或 `章节源占位`
+**And** `formal_manuscript_source_map.json` 中的章节状态必须同步为 `source_draft_ready`
+**And** 报告必须列出每个章节的 evidence bindings、Agent 分工和下一步 PDF preflight 动作
+**And** 报告必须声明 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写 `state/product/*` 正式状态、不得生成最终 PDF/docx、不得批准 canonical 方法库或正式论文层。
+
+业务规则：P5-E2d 把“已齐备证据 + 章节源占位”推进为可预检的章节源草案。它让 PDF-first 候选渲染有真实章节输入，但仍把正式论文写回、最终 PDF/docx 和 canonical 规则合并留给后续人工确认节点。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_manuscript_source_map.v1",
-  "generated_at": "2026-05-26T18:45:04.211392+00:00",
+  "generated_at": "2026-05-26T20:35:45.757838+00:00",
   "source_manifest": "Results/json/formal_paper_package_manifest.json",
   "package_root": "Submissions/formal_package",
   "section_sources_path": "Submissions/formal_package/manuscript/section_sources.json",
@@ -15,7 +15,7 @@
       "order": 1,
       "section": "Abstract",
       "source_path": "Submissions/formal_package/manuscript/sections/01-abstract.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "100 English words or concise Chinese equivalent",
       "agent": "ManuscriptAgent",
       "purpose": "用最短篇幅交代问题、数据、方法和核心发现。",
@@ -24,13 +24,45 @@
         "method_gate_report",
         "verified_bibliography"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "approved_findings",
+          "candidate_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "existing_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "method_gate_report",
+          "candidate_paths": [
+            "Results/json/method_gate_report.json"
+          ],
+          "existing_paths": [
+            "Results/json/method_gate_report.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "verified_bibliography",
+          "candidate_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "existing_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 2,
       "section": "Introduction",
       "source_path": "Submissions/formal_package/manuscript/sections/02-introduction.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "1800-3000 English words / 4-6 pages",
       "agent": "ManuscriptAgent",
       "purpose": "把研究问题、核心结论、贡献和文章结构一次讲清楚。",
@@ -39,13 +71,45 @@
         "contribution_matrix",
         "approved_findings"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "research_question",
+          "candidate_paths": [
+            "state/product/research_question.json"
+          ],
+          "existing_paths": [
+            "state/product/research_question.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "contribution_matrix",
+          "candidate_paths": [
+            "Data/literature/processed/contribution_matrix.md"
+          ],
+          "existing_paths": [
+            "Data/literature/processed/contribution_matrix.md"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "approved_findings",
+          "candidate_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "existing_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 3,
       "section": "Literature and Contribution",
       "source_path": "Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "1000-1800 English words / 2-4 pages",
       "agent": "LiteratureAgent",
       "purpose": "把相邻文献、方法文献和本文增量绑定到可核验证据。",
@@ -54,13 +118,45 @@
         "contribution_matrix",
         "citation_verification_log"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "verified_bibliography",
+          "candidate_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "existing_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "contribution_matrix",
+          "candidate_paths": [
+            "Data/literature/processed/contribution_matrix.md"
+          ],
+          "existing_paths": [
+            "Data/literature/processed/contribution_matrix.md"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "citation_verification_log",
+          "candidate_paths": [
+            "Results/json/citation_verification_log.json"
+          ],
+          "existing_paths": [
+            "Results/json/citation_verification_log.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 4,
       "section": "Institutional Background / Theory / Context",
       "source_path": "Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "800-1500 English words / 2-4 pages",
       "agent": "DomainAgent",
       "purpose": "解释变量关系成立的制度背景、理论机制和研究边界。",
@@ -68,13 +164,35 @@
         "domain_notes",
         "verified_context_sources"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "domain_notes",
+          "candidate_paths": [
+            "Results/json/domain_notes.json"
+          ],
+          "existing_paths": [
+            "Results/json/domain_notes.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "verified_context_sources",
+          "candidate_paths": [
+            "Results/json/verified_context_sources.json"
+          ],
+          "existing_paths": [
+            "Results/json/verified_context_sources.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 5,
       "section": "Data and Measurement",
       "source_path": "Submissions/formal_package/manuscript/sections/05-data-and-measurement.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "800-1500 English words / 2-3 pages",
       "agent": "DataAgent",
       "purpose": "说明数据来源、样本构造、变量定义、缺失处理和描述统计。",
@@ -83,13 +201,48 @@
         "data_profile",
         "sample_profile"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "variable_role_set",
+          "candidate_paths": [
+            "Submissions/formal_package/evidence/variable_role_set.json",
+            "state/product/variable_role_set.json"
+          ],
+          "existing_paths": [
+            "Submissions/formal_package/evidence/variable_role_set.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "data_profile",
+          "candidate_paths": [
+            "Results/json/project_snapshot.json",
+            "Results/json/cfps_robot_project_snapshot.json"
+          ],
+          "existing_paths": [
+            "Results/json/project_snapshot.json",
+            "Results/json/cfps_robot_project_snapshot.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "sample_profile",
+          "candidate_paths": [
+            "Results/json/sample_profile.json"
+          ],
+          "existing_paths": [
+            "Results/json/sample_profile.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 6,
       "section": "Empirical Strategy",
       "source_path": "Submissions/formal_package/manuscript/sections/06-empirical-strategy.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "1200-2000 English words / 3-5 pages",
       "agent": "MethodAgent",
       "purpose": "写清识别式、估计方程、关键假设、标准误和方法规范门。",
@@ -98,13 +251,45 @@
         "method_gate_report",
         "method_diagnostics_report"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "design_spec",
+          "candidate_paths": [
+            "state/product/design_spec.json"
+          ],
+          "existing_paths": [
+            "state/product/design_spec.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "method_gate_report",
+          "candidate_paths": [
+            "Results/json/method_gate_report.json"
+          ],
+          "existing_paths": [
+            "Results/json/method_gate_report.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "method_diagnostics_report",
+          "candidate_paths": [
+            "Results/json/method_diagnostics_report.json"
+          ],
+          "existing_paths": [
+            "Results/json/method_diagnostics_report.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 7,
       "section": "Main Results",
       "source_path": "Submissions/formal_package/manuscript/sections/07-main-results.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "2000-3500 English words / 4-7 pages",
       "agent": "ExecutionAgent",
       "purpose": "围绕主表和主图解释估计结果、经济含义和量级。",
@@ -113,13 +298,45 @@
         "regression_tables",
         "figure_manifest"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "method_execution_result",
+          "candidate_paths": [
+            "Results/json/method_execution_result.json"
+          ],
+          "existing_paths": [
+            "Results/json/method_execution_result.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "regression_tables",
+          "candidate_paths": [
+            "Results/json/regression_tables.json"
+          ],
+          "existing_paths": [
+            "Results/json/regression_tables.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "figure_manifest",
+          "candidate_paths": [
+            "Results/json/figure_manifest.json"
+          ],
+          "existing_paths": [
+            "Results/json/figure_manifest.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 8,
       "section": "Robustness / Mechanisms / Heterogeneity",
       "source_path": "Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "1500-3000 English words / 3-6 pages",
       "agent": "MethodAgent",
       "purpose": "组织稳健性、机制检验、异质性和敏感性分析。",
@@ -127,13 +344,35 @@
         "robustness_matrix",
         "method_diagnostics_report"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "robustness_matrix",
+          "candidate_paths": [
+            "Results/json/robustness_matrix.json"
+          ],
+          "existing_paths": [
+            "Results/json/robustness_matrix.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "method_diagnostics_report",
+          "candidate_paths": [
+            "Results/json/method_diagnostics_report.json"
+          ],
+          "existing_paths": [
+            "Results/json/method_diagnostics_report.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 9,
       "section": "Conclusion",
       "source_path": "Submissions/formal_package/manuscript/sections/09-conclusion.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "500-800 English words / 1-2 pages",
       "agent": "ManuscriptAgent",
       "purpose": "收束发现、贡献、局限和下一步研究。",
@@ -142,13 +381,45 @@
         "limitations_register",
         "reviewer_scorecard_report"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "approved_findings",
+          "candidate_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "existing_paths": [
+            "Results/json/approved_findings.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "limitations_register",
+          "candidate_paths": [
+            "Results/json/limitations_register.json"
+          ],
+          "existing_paths": [
+            "Results/json/limitations_register.json"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "reviewer_scorecard_report",
+          "candidate_paths": [
+            "Results/json/reviewer_scorecard_report.json"
+          ],
+          "existing_paths": [
+            "Results/json/reviewer_scorecard_report.json"
+          ],
+          "status": "bound"
+        }
+      ]
     },
     {
       "order": 10,
       "section": "References",
       "source_path": "Submissions/formal_package/manuscript/sections/10-references.md",
-      "status": "source_placeholder_ready",
+      "status": "source_draft_ready",
       "target_length": "Verified bibliography only",
       "agent": "LiteratureAgent",
       "purpose": "只接纳经过 Zotero/CNKI/DOI/OpenAlex/S2 核验的条目。",
@@ -156,7 +427,29 @@
         "verified_bibliography",
         "citation_verification_log"
       ],
-      "can_write_final_paper": false
+      "can_write_final_paper": false,
+      "evidence_bindings": [
+        {
+          "id": "verified_bibliography",
+          "candidate_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "existing_paths": [
+            "Data/literature/processed/verified_bibliography.csv"
+          ],
+          "status": "bound"
+        },
+        {
+          "id": "citation_verification_log",
+          "candidate_paths": [
+            "Results/json/citation_verification_log.json"
+          ],
+          "existing_paths": [
+            "Results/json/citation_verification_log.json"
+          ],
+          "status": "bound"
+        }
+      ]
     }
   ],
   "formal_state_guard": {

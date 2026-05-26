@@ -1,0 +1,324 @@
+---
+title: "Formal Paper Candidate"
+author: "Local Empirical Research OS"
+format:
+  pdf:
+    pdf-engine: xelatex
+    toc: true
+    number-sections: true
+    keep-tex: true
+mainfont: Times New Roman
+CJKmainfont: Songti SC
+header-includes:
+  - \usepackage{xeCJK}
+  - \setCJKmainfont{Songti SC}
+---
+
+<!-- candidate_layer_only: true -->
+<!-- final_pdf_approved: false -->
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/01-abstract.md -->
+<!-- agent: ManuscriptAgent -->
+<!-- target_length: 100 English words or concise Chinese equivalent -->
+# Abstract
+
+- Status: `source_draft_ready`
+- Agent: `ManuscriptAgent`
+- Target length: `100 English words or concise Chinese equivalent`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+用最短篇幅交代问题、数据、方法和核心发现。
+
+## 已绑定证据
+
+- `approved_findings` -> `Results/json/approved_findings.json`
+- `method_gate_report` -> `Results/json/method_gate_report.json`
+- `verified_bibliography` -> `Data/literature/processed/verified_bibliography.csv`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 压缩为目标摘要长度。
+- 只引用已批准 finding 和已验证文献。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/02-introduction.md -->
+<!-- agent: ManuscriptAgent -->
+<!-- target_length: 1800-3000 English words / 4-6 pages -->
+# Introduction
+
+- Status: `source_draft_ready`
+- Agent: `ManuscriptAgent`
+- Target length: `1800-3000 English words / 4-6 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+把研究问题、核心结论、贡献和文章结构一次讲清楚。
+
+## 已绑定证据
+
+- `research_question` -> `state/product/research_question.json`
+- `contribution_matrix` -> `Data/literature/processed/contribution_matrix.md`
+- `approved_findings` -> `Results/json/approved_findings.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md -->
+<!-- agent: LiteratureAgent -->
+<!-- target_length: 1000-1800 English words / 2-4 pages -->
+# Literature and Contribution
+
+- Status: `source_draft_ready`
+- Agent: `LiteratureAgent`
+- Target length: `1000-1800 English words / 2-4 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+把相邻文献、方法文献和本文增量绑定到可核验证据。
+
+## 已绑定证据
+
+- `verified_bibliography` -> `Data/literature/processed/verified_bibliography.csv`
+- `contribution_matrix` -> `Data/literature/processed/contribution_matrix.md`
+- `citation_verification_log` -> `Results/json/citation_verification_log.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md -->
+<!-- agent: DomainAgent -->
+<!-- target_length: 800-1500 English words / 2-4 pages -->
+# Institutional Background / Theory / Context
+
+- Status: `source_draft_ready`
+- Agent: `DomainAgent`
+- Target length: `800-1500 English words / 2-4 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+解释变量关系成立的制度背景、理论机制和研究边界。
+
+## 已绑定证据
+
+- `domain_notes` -> `Results/json/domain_notes.json`
+- `verified_context_sources` -> `Results/json/verified_context_sources.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/05-data-and-measurement.md -->
+<!-- agent: DataAgent -->
+<!-- target_length: 800-1500 English words / 2-3 pages -->
+# Data and Measurement
+
+- Status: `source_draft_ready`
+- Agent: `DataAgent`
+- Target length: `800-1500 English words / 2-3 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+说明数据来源、样本构造、变量定义、缺失处理和描述统计。
+
+## 已绑定证据
+
+- `variable_role_set` -> `Submissions/formal_package/evidence/variable_role_set.json`
+- `data_profile` -> `Results/json/project_snapshot.json`, `Results/json/cfps_robot_project_snapshot.json`
+- `sample_profile` -> `Results/json/sample_profile.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/06-empirical-strategy.md -->
+<!-- agent: MethodAgent -->
+<!-- target_length: 1200-2000 English words / 3-5 pages -->
+# Empirical Strategy
+
+- Status: `source_draft_ready`
+- Agent: `MethodAgent`
+- Target length: `1200-2000 English words / 3-5 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+写清识别式、估计方程、关键假设、标准误和方法规范门。
+
+## 已绑定证据
+
+- `design_spec` -> `state/product/design_spec.json`
+- `method_gate_report` -> `Results/json/method_gate_report.json`
+- `method_diagnostics_report` -> `Results/json/method_diagnostics_report.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/07-main-results.md -->
+<!-- agent: ExecutionAgent -->
+<!-- target_length: 2000-3500 English words / 4-7 pages -->
+# Main Results
+
+- Status: `source_draft_ready`
+- Agent: `ExecutionAgent`
+- Target length: `2000-3500 English words / 4-7 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+围绕主表和主图解释估计结果、经济含义和量级。
+
+## 已绑定证据
+
+- `method_execution_result` -> `Results/json/method_execution_result.json`
+- `regression_tables` -> `Results/json/regression_tables.json`
+- `figure_manifest` -> `Results/json/figure_manifest.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md -->
+<!-- agent: MethodAgent -->
+<!-- target_length: 1500-3000 English words / 3-6 pages -->
+# Robustness / Mechanisms / Heterogeneity
+
+- Status: `source_draft_ready`
+- Agent: `MethodAgent`
+- Target length: `1500-3000 English words / 3-6 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+组织稳健性、机制检验、异质性和敏感性分析。
+
+## 已绑定证据
+
+- `robustness_matrix` -> `Results/json/robustness_matrix.json`
+- `method_diagnostics_report` -> `Results/json/method_diagnostics_report.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/09-conclusion.md -->
+<!-- agent: ManuscriptAgent -->
+<!-- target_length: 500-800 English words / 1-2 pages -->
+# Conclusion
+
+- Status: `source_draft_ready`
+- Agent: `ManuscriptAgent`
+- Target length: `500-800 English words / 1-2 pages`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+收束发现、贡献、局限和下一步研究。
+
+## 已绑定证据
+
+- `approved_findings` -> `Results/json/approved_findings.json`
+- `limitations_register` -> `Results/json/limitations_register.json`
+- `reviewer_scorecard_report` -> `Results/json/reviewer_scorecard_report.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 检查本节证据是否覆盖写作目标。
+- 扩写时保留数据、方法、结果和文献来源的可追溯路径。
+
+<!-- source_path: Submissions/formal_package/manuscript/sections/10-references.md -->
+<!-- agent: LiteratureAgent -->
+<!-- target_length: Verified bibliography only -->
+# References
+
+- Status: `source_draft_ready`
+- Agent: `LiteratureAgent`
+- Target length: `Verified bibliography only`
+- Source map: `Results/json/formal_manuscript_source_map.json`
+- Draft layer: `true`
+- Final paper write: `false`
+
+## 本节任务
+
+只接纳经过 Zotero/CNKI/DOI/OpenAlex/S2 核验的条目。
+
+## 已绑定证据
+
+- `verified_bibliography` -> `Data/literature/processed/verified_bibliography.csv`
+- `citation_verification_log` -> `Results/json/citation_verification_log.json`
+
+## 章节源草案
+
+本节已经绑定可追溯证据，下一步可以由对应 Agent 按目标长度扩写为候选论文段落。正式写回前仍保留人工审阅入口。
+
+## 审阅事项
+
+- 只从 verified bibliography 和 citation verification log 生成引用清单。

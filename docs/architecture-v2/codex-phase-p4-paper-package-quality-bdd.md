@@ -469,6 +469,23 @@
 
 业务规则：P5-E3 把“章节源草案 + PDF 预检通过”推进为可人工验收的 PDF 候选稿。它解决的是审阅和排版闭环，不替用户批准正式层，不把候选 PDF 宣称为最终投稿稿。
 
+### Behavior 33: Formal PDF candidate review creates a final-writeback preflight without promotion
+
+**Given** `formal_pdf_candidate_report.json` 的状态是 `pdf_candidate_ready`
+**And** `paper_candidate.pdf` 与 `paper_candidate.qmd` 已经存在
+**And** 候选报告声明 `candidate_layer_only=true`、`this_command_wrote_formal_state=false`
+**When** 用户运行 `Program/formal_pdf_candidate_review.py`
+**Then** 系统必须写出 `Results/json/formal_pdf_candidate_review.json`
+**And** 系统必须写出 `Reviews/formal_pdf_candidate_review.md`
+**And** 系统必须写出 `Results/json/formal_pdf_final_writeback_preflight.json`
+**And** review report 必须登记 PDF 候选稿、QMD 候选源、原始 candidate report、PDF metadata、章节清单、机器审阅检查和人工审阅入口
+**And** final-writeback preflight 必须声明 `requires_human_approval=true`、`final_writeback_allowed=false`、`can_request_final_approval=true`
+**And** 如果候选 PDF 缺失、候选报告未 ready 或正式层 guard 已变化，命令必须阻断为 `blocked_by_pdf_candidate_review`
+**And** 报告必须声明 `candidate_layer_only=true`、`this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写 `state/product/*` 正式状态、不得移动或复制候选 PDF 为最终 PDF、不得批准最终 PDF/docx、不得合并 canonical 方法库。
+
+业务规则：P5-E4 把“PDF 候选稿已经生成”推进为“可进入最终批准讨论”的审阅证据，而不是直接发布最终论文。它给用户和 Reviewer/Verifier 留出明确验收入口，并为下一节点的最终批准或修订建立结构化 preflight。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

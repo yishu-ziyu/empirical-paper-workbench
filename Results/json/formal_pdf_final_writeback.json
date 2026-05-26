@@ -1,0 +1,40 @@
+{
+  "schema_version": "p6.formal_pdf_final_writeback.v1",
+  "generated_at": "2026-05-26T21:49:56.264509+00:00",
+  "status": "final_pdf_written",
+  "source_candidate_report": "Results/json/formal_pdf_candidate_report.json",
+  "source_final_preflight": "Results/json/formal_pdf_final_writeback_preflight.json",
+  "source_approval_report": "Results/json/formal_pdf_final_approval.json",
+  "source_approval_ledger": "state/product/writeback_approvals.json",
+  "source_candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+  "source_candidate_qmd": "Submissions/formal_package/manuscript/paper_candidate.qmd",
+  "final_pdf": "Submissions/formal_package/paper.pdf",
+  "final_pdf_exists": true,
+  "source_candidate_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+  "final_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+  "source_candidate_pdf_bytes": 107169,
+  "final_pdf_bytes": 107169,
+  "blocking_reasons": [],
+  "final_writeback_authorized": true,
+  "this_command_wrote_final_pdf": true,
+  "this_command_wrote_docx": false,
+  "this_command_wrote_formal_state": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "docx_export_preflight",
+    "label": "进入 docx 导出预检",
+    "description": "最终 PDF 已写入正式包。下一节点检查 docx 工具链和投稿包导出条件。"
+  }
+}

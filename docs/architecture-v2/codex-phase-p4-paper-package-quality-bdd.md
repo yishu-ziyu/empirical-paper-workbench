@@ -506,6 +506,24 @@
 
 业务规则：P5-E5 是最终 PDF/docx 写回前的人工批准账本。它解决的是“是否允许下一节点写最终产物”，不是自己写最终产物。这样 P6-A 可以只认一条显式批准记录，而不会把候选 PDF 审阅通过误当成最终输出授权。
 
+### Behavior 35: Final PDF writeback promotes the approved candidate into the final package
+
+**Given** `formal_pdf_final_approval.json` 的状态是 `approved_for_final_writeback`
+**And** `state/product/writeback_approvals.json` 中 `final_pdf_approvals.formal_pdf_candidate.status=approved`
+**And** 候选 PDF 与候选 QMD 路径和最终写回预检一致
+**When** 用户运行 `Program/formal_pdf_final_writeback.py`
+**Then** 系统必须把 `Submissions/formal_package/paper_candidate.pdf` 复制为 `Submissions/formal_package/paper.pdf`
+**And** 系统必须写出 `Results/json/formal_pdf_final_writeback.json`
+**And** 系统必须写出 `Reviews/formal_pdf_final_writeback.md`
+**And** 报告必须记录候选 PDF 与最终 PDF 的 sha256、bytes 和路径
+**And** 报告必须声明 `status=final_pdf_written`、`final_writeback_authorized=true`
+**And** 报告必须声明 `this_command_wrote_final_pdf=true`、`this_command_wrote_docx=false`、`this_command_wrote_formal_state=false`
+**And** 命令不得修改 `paper_candidate.pdf`、`paper_candidate.qmd`、P5 审批账本或正式研究状态
+**And** 命令不得生成 `paper.docx`
+**And** 如果最终批准缺失、未通过或候选路径与批准账本不一致，系统必须阻断写回，并不得生成最终 PDF。
+
+业务规则：P6-A 是 PDF-first 的最终产物写回节点。它只把已经人工批准的候选 PDF 晋升到最终包，给用户一个稳定、可打开、可验收的正式 PDF 文件；docx 导出、投稿包压缩和云端同步继续拆到后续节点。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -1,7 +1,7 @@
 # Evidence Packet: build_literature_package
 
 - Agent: `LiteratureAgent`
-- Status: `needs_manual_review`
+- Status: `evidence_packet_ready`
 - Formal writeback: `disabled`
 - Human review: `required`
 
@@ -19,13 +19,17 @@
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.literature_package.v1`
 - `Results/json/paper_expansion_plan.json`
-  - sha256: `e7d786ea7b5faedc8d471b34923438f48b4cb94f96c3f9aa53fc5904b672c238`
+  - sha256: `968b35eb915d9bd722123a8455ead37db808904183e3736852346639435c9bef`
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.paper_expansion_plan.v1`
-
-### Missing Evidence
-- `verified_bibliography.csv`: required local artifact was not found
-- `contribution_matrix.md`: required local artifact was not found
+- `Data/literature/processed/verified_bibliography.csv`
+  - sha256: `d2ababd2b400ff662fe180e00016d87b31d8581fe54079754b54ebeb0f328a8a`
+  - evidence_level: `local_artifact`
+  - schema_version: `None`
+- `Data/literature/processed/contribution_matrix.md`
+  - sha256: `236c239a0abc7a365cb83cb89c83d22224ba944d93fc9082e6d01d7462c125d8`
+  - evidence_level: `local_artifact`
+  - schema_version: `None`
 
 ## Draft Output
 
@@ -41,6 +45,8 @@
 
 ## Gate Recompute Inputs
 
+- `Data/literature/processed/contribution_matrix.md`
+- `Data/literature/processed/verified_bibliography.csv`
 - `Results/json/literature_package_report.json`
 - `Results/json/method_gate_report.json`
 - `Results/json/paper_expansion_plan.json`

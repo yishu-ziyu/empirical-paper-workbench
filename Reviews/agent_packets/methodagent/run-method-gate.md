@@ -19,7 +19,7 @@
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.method_gate.v1`
 - `Results/json/paper_expansion_plan.json`
-  - sha256: `e7d786ea7b5faedc8d471b34923438f48b4cb94f96c3f9aa53fc5904b672c238`
+  - sha256: `968b35eb915d9bd722123a8455ead37db808904183e3736852346639435c9bef`
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.paper_expansion_plan.v1`
 - `state/product/design_spec.json`

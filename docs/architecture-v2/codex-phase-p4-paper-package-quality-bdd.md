@@ -256,6 +256,18 @@
 
 业务规则：P4-I1 的复核账本必须真的进入下一轮生产器。系统不能一边生成证据包，一边在下一轮又把同一批已具备证据的任务重新塞回队列；但需要人工补证的任务必须继续留在队列里。
 
+## 行为 20：证据包必须识别文献包的 canonical 路径
+
+**Given** `build_literature_package` 的任务输入仍使用短文件名 `verified_bibliography.csv` 与 `contribution_matrix.md`
+**And** 文献包已经写入 canonical 草案路径 `Data/literature/processed/verified_bibliography.csv` 与 `Data/literature/processed/contribution_matrix.md`
+**When** 用户运行 `Program/paper_revision_evidence_packets.py`
+**Then** `paper_revision_evidence_packets.json` 中 `build_literature_package` 必须进入 `evidence_packet_ready`
+**And** 证据项路径必须指向 `Data/literature/processed/verified_bibliography.csv` 与 `Data/literature/processed/contribution_matrix.md`
+**And** `missing_evidence` 必须为空
+**And** 命令不得改写正式层 `state/product/*`
+
+业务规则：P4-C 已经把文献包写入 `Data/literature/processed/`。P4-H/P4-I 不能因为历史任务输入使用短文件名，就误判文献证据缺失；证据收集层必须把短文件名映射到 canonical 草案路径。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

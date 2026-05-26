@@ -89,6 +89,90 @@ class PaperRevisionEvidencePacketsCliTests(unittest.TestCase):
         for path, content in protected_before.items():
             self.assertEqual(path.read_text(encoding="utf-8"), content)
 
+    def test_bdd_20_literature_short_names_resolve_to_canonical_processed_artifacts(self) -> None:
+        """BDD: literature evidence packets must bind processed literature artifacts."""
+        self._replace_with_literature_revision_round(self.project_root)
+        processed = self.project_root / "Data" / "literature" / "processed"
+        processed.mkdir(parents=True)
+        verified_path = processed / "verified_bibliography.csv"
+        matrix_path = processed / "contribution_matrix.md"
+        verified_path.write_text(
+            "\n".join(
+                [
+                    "source_id,citation_key,title,authors,year,venue,verification_status,contribution_role,used_in_section",
+                    "lit_001,autor2013,The China Syndrome,Autor Dorn Hanson,2013,AER,doi_verified,closest_evidence,related_work",
+                    "lit_002,acemoglu2020,Robots and Jobs,Acemoglu Restrepo,2020,JPE,doi_verified,method_evidence,methodology",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        matrix_path.write_text(
+            "\n".join(
+                [
+                    "| source_id | citation_key | contribution_role | used_in_section | variables_or_method_evidence | difference_from_this_paper | verification_status |",
+                    "| --- | --- | --- | --- | --- | --- | --- |",
+                    "| lit_001 | autor2013 | closest_evidence | related_work | labor market exposure | China CFPS household evidence | doi_verified |",
+                    "| lit_002 | acemoglu2020 | method_evidence | methodology | robot exposure design | city labor market matching focus | doi_verified |",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (self.project_root / "Results" / "json" / "literature_package_report.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.literature_package.v1",
+                    "status": "ready_for_human_review",
+                    "outputs": {
+                        "verified_bibliography": "Data/literature/processed/verified_bibliography.csv",
+                        "contribution_matrix": "Data/literature/processed/contribution_matrix.md",
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        protected_files = list((self.project_root / "state" / "product").glob("*.json"))
+        protected_before = {path: path.read_text(encoding="utf-8") for path in protected_files}
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_revision_evidence_packets.py"),
+                "--project-root",
+                str(self.project_root),
+                "--revision-round",
+                "Results/json/paper_revision_round.json",
+                "--output-manifest",
+                "Results/json/paper_revision_evidence_packets.json",
+                "--output-review",
+                "Reviews/paper_revision_evidence_packets.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        manifest = json.loads(
+            (self.project_root / "Results" / "json" / "paper_revision_evidence_packets.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        records = {record["task_id"]: record for record in manifest["task_results"]}
+        literature = records["build_literature_package"]
+        self.assertEqual(literature["status"], "evidence_packet_ready")
+        self.assertFalse(literature["missing_evidence"])
+        paths = {item["path"] for item in literature["evidence_items"]}
+        self.assertIn("Data/literature/processed/verified_bibliography.csv", paths)
+        self.assertIn("Data/literature/processed/contribution_matrix.md", paths)
+        self.assertIn("Results/json/literature_package_report.json", paths)
+        self.assertFalse(literature["can_write_product_state"])
+        self.assertFalse(manifest["formal_state_guard"]["changed"])
+        for path, content in protected_before.items():
+            self.assertEqual(path.read_text(encoding="utf-8"), content)
+
     def _seed_revision_round_project(self, root: Path) -> None:
         results_dir = root / "Results" / "json"
         state_dir = root / "state" / "product"
@@ -164,6 +248,46 @@ class PaperRevisionEvidencePacketsCliTests(unittest.TestCase):
             ],
         }
         (results_dir / "paper_revision_round.json").write_text(
+            json.dumps(revision_round, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _replace_with_literature_revision_round(self, root: Path) -> None:
+        revision_round = {
+            "schema_version": "p4.paper_revision_round.v1",
+            "round_id": "paper_revision_round_literature_test",
+            "status": "ready_for_human_review",
+            "draft_layer_only": True,
+            "formal_writeback_allowed": False,
+            "agent_packets": [
+                {
+                    "agent": "LiteratureAgent",
+                    "task_count": 1,
+                    "draft_output_dir": "Reviews/agent_packets/literatureagent",
+                    "tasks": [
+                        {
+                            "order": 1,
+                            "id": "build_literature_package",
+                            "agent": "LiteratureAgent",
+                            "source": "paper_quality_report",
+                            "source_artifact": "Results/json/literature_package_report.json",
+                            "reason": "文献包已写入 processed 路径，需要绑定为下一轮证据。",
+                            "action_item": "把 verified bibliography 和 contribution matrix 作为修订证据。",
+                            "inputs": ["verified_bibliography.csv", "contribution_matrix.md"],
+                            "draft_output_path": "Reviews/agent_packets/literatureagent/build-literature-package.md",
+                            "verification_evidence_required": [
+                                "verified_bibliography.csv",
+                                "contribution_matrix.md",
+                            ],
+                            "requires_human_confirmation": True,
+                            "can_write_product_state": False,
+                            "status": "queued_for_revision",
+                        }
+                    ],
+                }
+            ],
+        }
+        (root / "Results" / "json" / "paper_revision_round.json").write_text(
             json.dumps(revision_round, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )

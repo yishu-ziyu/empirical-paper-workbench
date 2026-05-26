@@ -348,6 +348,24 @@
 
 业务规则：P5-C 把 P5-B 的正式包骨架推进到“可以被 ManuscriptAgent / LiteratureAgent / MethodAgent / ExecutionAgent 分工填写”的源文件层。它只创建章节源清单和占位文件，方便下一步 PDF 预检识别缺口；它不生成最终 PDF/docx，也不把草案内容写成正式论文。
 
+### Behavior 26: Formal PDF export preflight checks manuscript sources and evidence before rendering
+
+**Given** `formal_manuscript_source_map.json` 的状态是 `formal_manuscript_sources_ready`
+**And** `section_sources.json` 已列出正式论文必需章节
+**When** 用户运行 `Program/formal_pdf_export_preflight.py`
+**Then** 系统必须写出 `Results/json/formal_pdf_export_preflight.json`
+**And** 系统必须写出 `Reviews/formal_pdf_export_preflight.md`
+**And** 系统必须写出 `Submissions/formal_package/reproducibility/pdf_export_preflight_tasks.json`
+**And** 预检必须逐章检查章节源是否仍是占位、目标长度是否声明、必需证据是否存在
+**And** 预检必须把缺失章节内容、缺失证据和复现缺口转成下一轮 Agent 任务
+**And** 当任一章节仍是占位或任一必需证据缺失时，`can_export_pdf_candidate=false`
+**And** 当所有章节源和必需证据通过时，`can_export_pdf_candidate=true`
+**And** 命令不得生成最终 PDF、docx 或正式正文
+**And** 命令不得改写 `formal_manuscript_source_map.json`、`section_sources.json` 或正式研究状态文件
+**And** 如果 source map 缺失、不 ready、或章节源索引缺失，系统必须阻断 PDF 预检并说明原因。
+
+业务规则：P5-D 是 PDF-first 导出前的证据验收台。它决定“现在能不能进入 PDF 导出审阅”，并把不能导出的原因拆成 Agent 可执行任务；它不渲染 PDF，也不把草案变成正式终稿。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

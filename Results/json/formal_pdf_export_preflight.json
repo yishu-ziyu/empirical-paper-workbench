@@ -1,0 +1,730 @@
+{
+  "schema_version": "p5.formal_pdf_export_preflight.v1",
+  "generated_at": "2026-05-26T19:05:04.945097+00:00",
+  "preflight_report": "Results/json/formal_pdf_export_preflight.json",
+  "source_map": "Results/json/formal_manuscript_source_map.json",
+  "section_sources_path": "Submissions/formal_package/manuscript/section_sources.json",
+  "output_pdf_candidate": "Submissions/formal_package/paper.pdf",
+  "status": "blocked_by_source_gaps",
+  "can_export_pdf_candidate": false,
+  "blocking_reasons": [
+    "required_evidence_missing",
+    "section_source_placeholders_remaining"
+  ],
+  "section_checks": [
+    {
+      "section": "Abstract",
+      "source_path": "Submissions/formal_package/manuscript/sections/01-abstract.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "100 English words or concise Chinese equivalent",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Introduction",
+      "source_path": "Submissions/formal_package/manuscript/sections/02-introduction.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "1800-3000 English words / 4-6 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Literature and Contribution",
+      "source_path": "Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md",
+      "agent": "LiteratureAgent",
+      "target_length": "1000-1800 English words / 2-4 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Institutional Background / Theory / Context",
+      "source_path": "Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md",
+      "agent": "DomainAgent",
+      "target_length": "800-1500 English words / 2-4 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Data and Measurement",
+      "source_path": "Submissions/formal_package/manuscript/sections/05-data-and-measurement.md",
+      "agent": "DataAgent",
+      "target_length": "800-1500 English words / 2-3 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Empirical Strategy",
+      "source_path": "Submissions/formal_package/manuscript/sections/06-empirical-strategy.md",
+      "agent": "MethodAgent",
+      "target_length": "1200-2000 English words / 3-5 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Main Results",
+      "source_path": "Submissions/formal_package/manuscript/sections/07-main-results.md",
+      "agent": "ExecutionAgent",
+      "target_length": "2000-3500 English words / 4-7 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Robustness / Mechanisms / Heterogeneity",
+      "source_path": "Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md",
+      "agent": "MethodAgent",
+      "target_length": "1500-3000 English words / 3-6 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "Conclusion",
+      "source_path": "Submissions/formal_package/manuscript/sections/09-conclusion.md",
+      "agent": "ManuscriptAgent",
+      "target_length": "500-800 English words / 1-2 pages",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    },
+    {
+      "section": "References",
+      "source_path": "Submissions/formal_package/manuscript/sections/10-references.md",
+      "agent": "LiteratureAgent",
+      "target_length": "Verified bibliography only",
+      "status": "failed",
+      "issues": [
+        "section_source_placeholder"
+      ]
+    }
+  ],
+  "evidence_checks": [
+    {
+      "id": "approved_findings",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/approved_findings.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Abstract",
+        "Conclusion",
+        "Introduction"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "citation_verification_log",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/citation_verification_log.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Literature and Contribution",
+        "References"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "contribution_matrix",
+      "status": "passed",
+      "candidate_paths": [
+        "Data/literature/processed/contribution_matrix.md"
+      ],
+      "existing_paths": [
+        "Data/literature/processed/contribution_matrix.md"
+      ],
+      "required_by_sections": [
+        "Introduction",
+        "Literature and Contribution"
+      ],
+      "issues": []
+    },
+    {
+      "id": "data_profile",
+      "status": "passed",
+      "candidate_paths": [
+        "Results/json/project_snapshot.json",
+        "Results/json/cfps_robot_project_snapshot.json"
+      ],
+      "existing_paths": [
+        "Results/json/project_snapshot.json",
+        "Results/json/cfps_robot_project_snapshot.json"
+      ],
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "issues": []
+    },
+    {
+      "id": "design_spec",
+      "status": "passed",
+      "candidate_paths": [
+        "state/product/design_spec.json"
+      ],
+      "existing_paths": [
+        "state/product/design_spec.json"
+      ],
+      "required_by_sections": [
+        "Empirical Strategy"
+      ],
+      "issues": []
+    },
+    {
+      "id": "domain_notes",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/domain_notes.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "figure_manifest",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/figure_manifest.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "limitations_register",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/limitations_register.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Conclusion"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "method_diagnostics_report",
+      "status": "passed",
+      "candidate_paths": [
+        "Results/json/method_diagnostics_report.json"
+      ],
+      "existing_paths": [
+        "Results/json/method_diagnostics_report.json"
+      ],
+      "required_by_sections": [
+        "Empirical Strategy",
+        "Robustness / Mechanisms / Heterogeneity"
+      ],
+      "issues": []
+    },
+    {
+      "id": "method_execution_result",
+      "status": "passed",
+      "candidate_paths": [
+        "Results/json/method_execution_result.json"
+      ],
+      "existing_paths": [
+        "Results/json/method_execution_result.json"
+      ],
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "issues": []
+    },
+    {
+      "id": "method_gate_report",
+      "status": "passed",
+      "candidate_paths": [
+        "Results/json/method_gate_report.json"
+      ],
+      "existing_paths": [
+        "Results/json/method_gate_report.json"
+      ],
+      "required_by_sections": [
+        "Abstract",
+        "Empirical Strategy"
+      ],
+      "issues": []
+    },
+    {
+      "id": "regression_tables",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/regression_tables.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "research_question",
+      "status": "passed",
+      "candidate_paths": [
+        "state/product/research_question.json"
+      ],
+      "existing_paths": [
+        "state/product/research_question.json"
+      ],
+      "required_by_sections": [
+        "Introduction"
+      ],
+      "issues": []
+    },
+    {
+      "id": "reviewer_scorecard_report",
+      "status": "passed",
+      "candidate_paths": [
+        "Results/json/reviewer_scorecard_report.json"
+      ],
+      "existing_paths": [
+        "Results/json/reviewer_scorecard_report.json"
+      ],
+      "required_by_sections": [
+        "Conclusion"
+      ],
+      "issues": []
+    },
+    {
+      "id": "robustness_matrix",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/robustness_matrix.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Robustness / Mechanisms / Heterogeneity"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "sample_profile",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/sample_profile.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "variable_role_set",
+      "status": "failed",
+      "candidate_paths": [
+        "state/product/variable_role_set.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    },
+    {
+      "id": "verified_bibliography",
+      "status": "passed",
+      "candidate_paths": [
+        "Data/literature/processed/verified_bibliography.csv"
+      ],
+      "existing_paths": [
+        "Data/literature/processed/verified_bibliography.csv"
+      ],
+      "required_by_sections": [
+        "Abstract",
+        "Literature and Contribution",
+        "References"
+      ],
+      "issues": []
+    },
+    {
+      "id": "verified_context_sources",
+      "status": "failed",
+      "candidate_paths": [
+        "Results/json/verified_context_sources.json"
+      ],
+      "existing_paths": [],
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "issues": [
+        "required_evidence_missing"
+      ]
+    }
+  ],
+  "next_review_tasks": [
+    {
+      "id": "fill_section_abstract",
+      "agent": "ManuscriptAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Abstract",
+      "source_path": "Submissions/formal_package/manuscript/sections/01-abstract.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_introduction",
+      "agent": "ManuscriptAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Introduction",
+      "source_path": "Submissions/formal_package/manuscript/sections/02-introduction.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_literature_and_contribution",
+      "agent": "LiteratureAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Literature and Contribution",
+      "source_path": "Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_institutional_background_theory_context",
+      "agent": "DomainAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Institutional Background / Theory / Context",
+      "source_path": "Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_data_and_measurement",
+      "agent": "DataAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Data and Measurement",
+      "source_path": "Submissions/formal_package/manuscript/sections/05-data-and-measurement.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_empirical_strategy",
+      "agent": "MethodAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Empirical Strategy",
+      "source_path": "Submissions/formal_package/manuscript/sections/06-empirical-strategy.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_main_results",
+      "agent": "ExecutionAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Main Results",
+      "source_path": "Submissions/formal_package/manuscript/sections/07-main-results.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_robustness_mechanisms_heterogeneity",
+      "agent": "MethodAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Robustness / Mechanisms / Heterogeneity",
+      "source_path": "Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_conclusion",
+      "agent": "ManuscriptAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "Conclusion",
+      "source_path": "Submissions/formal_package/manuscript/sections/09-conclusion.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "fill_section_references",
+      "agent": "LiteratureAgent",
+      "source": "formal_pdf_export_preflight",
+      "source_section": "References",
+      "source_path": "Submissions/formal_package/manuscript/sections/10-references.md",
+      "issue": [
+        "section_source_placeholder"
+      ],
+      "action": "补写章节源，移除占位内容，并绑定目标长度与证据。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_approved_findings",
+      "agent": "ReviewerAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "approved_findings",
+      "required_by_sections": [
+        "Abstract",
+        "Conclusion",
+        "Introduction"
+      ],
+      "candidate_paths": [
+        "Results/json/approved_findings.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_citation_verification_log",
+      "agent": "LiteratureAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "citation_verification_log",
+      "required_by_sections": [
+        "Literature and Contribution",
+        "References"
+      ],
+      "candidate_paths": [
+        "Results/json/citation_verification_log.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_domain_notes",
+      "agent": "VerifierAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "domain_notes",
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "candidate_paths": [
+        "Results/json/domain_notes.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_figure_manifest",
+      "agent": "ExecutionAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "figure_manifest",
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "candidate_paths": [
+        "Results/json/figure_manifest.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_limitations_register",
+      "agent": "ReviewerAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "limitations_register",
+      "required_by_sections": [
+        "Conclusion"
+      ],
+      "candidate_paths": [
+        "Results/json/limitations_register.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_regression_tables",
+      "agent": "ExecutionAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "regression_tables",
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "candidate_paths": [
+        "Results/json/regression_tables.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_robustness_matrix",
+      "agent": "MethodAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "robustness_matrix",
+      "required_by_sections": [
+        "Robustness / Mechanisms / Heterogeneity"
+      ],
+      "candidate_paths": [
+        "Results/json/robustness_matrix.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_sample_profile",
+      "agent": "DataAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "sample_profile",
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "candidate_paths": [
+        "Results/json/sample_profile.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_variable_role_set",
+      "agent": "DataAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "variable_role_set",
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "candidate_paths": [
+        "state/product/variable_role_set.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    },
+    {
+      "id": "supply_evidence_verified_context_sources",
+      "agent": "VerifierAgent",
+      "source": "formal_pdf_export_preflight",
+      "evidence_id": "verified_context_sources",
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "candidate_paths": [
+        "Results/json/verified_context_sources.json"
+      ],
+      "issue": [
+        "required_evidence_missing"
+      ],
+      "action": "补齐该证据文件，或在 evidence registry 中登记可验证替代来源。",
+      "review_status": "open"
+    }
+  ],
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "final_outputs_written": [],
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "agent_team_schedule": {
+    "call_when": "before_formal_pdf_export_preflight",
+    "called_agents": [
+      "DataAgent",
+      "DomainAgent",
+      "ExecutionAgent",
+      "ExportAgent",
+      "LiteratureAgent",
+      "ManuscriptAgent",
+      "MethodAgent",
+      "ReviewerAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_formal_pdf_export_preflight_written",
+    "next_call_when": "before_pdf_candidate_render_or_formal_export",
+    "integration_owner": "MainAgent",
+    "boundary": "Agent Team 只检查 PDF 候选渲染准入；正式论文、PDF/docx 和 state/product 仍需人工确认。",
+    "ready": false
+  },
+  "next_action": {
+    "id": "resolve_pdf_export_preflight_tasks",
+    "label": "补齐 PDF 预检任务",
+    "description": "先处理章节源占位、缺失证据或源清单问题，再重新运行 PDF 导出预检。"
+  },
+  "write_boundary": "本节点只检查正式稿章节源和证据是否达到 PDF-first 候选渲染条件；不生成 PDF/docx，不写正式论文，也不修改 state/product 正式状态。"
+}

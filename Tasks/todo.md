@@ -23,6 +23,8 @@
 ## 2026-05-26 P4-A Paper Package Quality Upgrade
 
 - [x] 记录用户修正：研究产出按“草稿 -> 审阅 -> 终稿”推进，不再使用防御式自我贬低措辞。
+- [x] P4 节点节奏规则：P4-A/B/C/D 以及后续 P4-I1/I2/I3 等每个小节点最多 20 分钟；超过 20 分钟必须拆成更小节点，或判定当前路径需要调整。
+- [x] P4 节点协作规则：每个节点必须写明 Agent Team 何时派出、何时收回、下一次何时再派；主 Agent 负责集成、测试、提交和风险边界。
 - [x] 新增论文包质量标准：`docs/architecture-v2/paper-package-quality-standard-2026-05-26.md`。
 - [x] 新增文献综述闭环方案：`docs/architecture-v2/literature-review-closed-loop-2026-05-26.md`。
 - [x] 新增方法规范门方案：`docs/architecture-v2/method-gate-standard-2026-05-26.md`。
@@ -109,6 +111,11 @@
 - P4-I1 已执行：消费 `paper_revision_evidence_packets.json`，生成质量门复核账本 `Results/json/paper_revision_gate_recompute.json` 和 `Reviews/paper_revision_gate_recompute.md`；真实结果为 0 条 cleared、10 条 still_blocking、1 条 manual_review_required。
 - P4-I1 BDD/TDD：新增行为 18 和 `tests/test_paper_revision_gate_recompute.py`，先确认缺少 `Program/paper_revision_gate_recompute.py` 的 RED，再实现 gate recompute ledger CLI。
 - P4-I1 Agent Team 回收点：ReviewerAgent/VerifierAgent 复核状态规则后收回；下一次只在 formal writeback preflight 前再次调用。
+- P4-I2 已执行：让 `Program/paper_package.py --source-manifest` 消费 `Results/json/paper_revision_gate_recompute.json`，下一轮任务生产器不再把上一轮 `evidence_packet_ready` 的任务重新塞回队列。
+- P4-I2 真实运行：当前真实队列从 11 条收敛为 1 条，只保留 `build_literature_package`，来源 `paper_revision_gate_recompute`，状态 `manual_review_required`，缺口为 `verified_bibliography.csv` 和 `contribution_matrix.md`。
+- P4-I2 BDD/TDD：新增行为 19 和 `tests/test_paper_package_quality.py::test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks`；RED 为 `run_method_gate` 被错误重复入队，GREEN 后只保留人工补证任务。
+- P4-I2 Agent Team 回收点：Wegener 定位任务生产器与门控生产者，Kant 定位测试锚点和 RED 断言；主 Agent 合并最小实现、跑验证并收回两路结果。
+- P4-I3 计划：在 20 分钟节点内先补齐或生成文献人工补证路径：`verified_bibliography.csv`、`contribution_matrix.md` 的真实来源/人工辅助检索闭环；需要重新调用 LiteratureAgent、CNKI/Zotero/Web researcher。
 - P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
 - P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。

@@ -524,6 +524,110 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         for path, content in protected_before.items():
             self.assertEqual(path.read_text(encoding="utf-8"), content)
 
+    def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
+        """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
+        result = self.run_quality(["--profile", "aer_like"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        manifest_path = self.project_root / "Submissions" / "cfps_robot_pdf_export_manifest.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.pdf_export_manifest.v1",
+                    "export_gate": {"status": "needs_review", "can_export_pdf": False},
+                    "next_review_tasks": [
+                        {
+                            "id": "run_method_gate",
+                            "source": "paper_quality_report",
+                            "agent": "MethodAgent",
+                            "reason": "方法门仍被旧 manifest 引用。",
+                            "recommended_action": "重跑方法门。",
+                            "inputs": ["paper_quality_report.json"],
+                        },
+                        {
+                            "id": "build_literature_package",
+                            "source": "paper_quality_report",
+                            "agent": "LiteratureAgent",
+                            "reason": "文献包仍需人工补证。",
+                            "recommended_action": "补齐 verified bibliography 和 contribution matrix。",
+                            "inputs": ["paper_quality_report.json"],
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        recompute_path = self.project_root / "Results" / "json" / "paper_revision_gate_recompute.json"
+        recompute_path.parent.mkdir(parents=True, exist_ok=True)
+        recompute_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.paper_revision_gate_recompute.v1",
+                    "draft_layer_only": True,
+                    "formal_writeback_allowed": False,
+                    "status": "needs_revision_work",
+                    "summary": {"cleared": 0, "still_blocking": 1, "manual_review_required": 1},
+                    "task_results": [
+                        {
+                            "task_id": "run_method_gate",
+                            "previous_status": "evidence_packet_ready",
+                            "status": "still_blocking",
+                            "blocking_sources": ["paper_quality_report", "pdf_export_manifest"],
+                            "missing_evidence": [],
+                        },
+                        {
+                            "task_id": "build_literature_package",
+                            "previous_status": "needs_manual_review",
+                            "status": "manual_review_required",
+                            "blocking_sources": ["paper_quality_report", "pdf_export_manifest"],
+                            "missing_evidence": ["verified_bibliography.csv", "contribution_matrix.md"],
+                        },
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        recompute_before = recompute_path.read_text(encoding="utf-8")
+
+        package = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_package.py"),
+                "--project-root",
+                str(self.project_root),
+                "--quality-report",
+                "Results/json/paper_quality_report.json",
+                "--source-manifest",
+                "Submissions/cfps_robot_pdf_export_manifest.json",
+                "--output-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--output-manuscript",
+                "Manuscripts/generated/paper_package_draft.md",
+                "--output-supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(package.returncode, 0, package.stderr)
+
+        plan = json.loads((self.project_root / "Results" / "json" / "paper_expansion_plan.json").read_text(encoding="utf-8"))
+        task_by_id = {task["id"]: task for task in plan["agent_task_queue"]}
+        self.assertNotIn("run_method_gate", task_by_id)
+        self.assertIn("build_literature_package", task_by_id)
+        self.assertEqual(task_by_id["build_literature_package"]["source"], "paper_revision_gate_recompute")
+        self.assertEqual(task_by_id["build_literature_package"]["status"], "manual_review_required")
+
+        context = json.loads((self.project_root / "Results" / "json" / "paper_supervisor_context.json").read_text(encoding="utf-8"))
+        self.assertIn("Results/json/paper_revision_gate_recompute.json", context["context_sources"])
+        self.assertEqual(recompute_path.read_text(encoding="utf-8"), recompute_before)
+
     def _read_report(self) -> dict:
         return json.loads((self.project_root / "Results" / "json" / "paper_quality_report.json").read_text(encoding="utf-8"))
 

@@ -859,3 +859,16 @@
 - [x] 保护边界：source map 明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
 - [x] 验证：目标测试 3 OK；真实 CLI 运行输出 `formal_manuscript_sources_ready` 和 `can_prepare_pdf_preflight=true`。
 - [ ] 下一步 P5-D：对章节源、文献、方法、结果和复现说明做 PDF-first export preflight；只生成预检与补写任务，不直接输出正式 PDF。
+
+## 2026-05-27 P5-D Formal PDF Export Preflight
+
+- [x] 节点时间盒：P5-D 只处理“正式稿源和证据是否足以进入 PDF 候选渲染”，不生成 PDF、docx 或正式论文正文；超过该边界的渲染接入进入下一节点。
+- [x] Agent Team：复用现有后台审查线程做只读 sidecar；结论是现有 `Program/export_pdf.py` 负责通用 QMD 渲染工具链，P5-D 负责正式论文包章节源和证据准入，两者暂不混合。
+- [x] BDD：在 `docs/architecture-v2/codex-phase-p4-paper-package-quality-bdd.md` 新增 Behavior 26，定义 ready source map 才能运行 PDF-first 预检。
+- [x] TDD：新增 `tests/test_formal_pdf_export_preflight.py`；首次 RED 失败原因是缺少 `Program/formal_pdf_export_preflight.py`。
+- [x] 实现：新增 `Program/workbench/formal_pdf_export_preflight.py` 和 CLI wrapper，检查 `section_sources.json`、章节源占位、目标长度和 evidence registry。
+- [x] 产物：生成 `Results/json/formal_pdf_export_preflight.json`、`Reviews/formal_pdf_export_preflight.md`、`Submissions/formal_package/reproducibility/pdf_export_preflight_tasks.json`。
+- [x] 真实项目验收：当前真实包被正确阻断为 `blocked_by_source_gaps`，原因是 10 个章节源仍为占位，且缺少 approved findings、citation log、domain notes、figure manifest、limitations、regression tables、robustness matrix、sample profile、variable role set、verified context sources。
+- [x] 保护边界：预检明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
+- [x] 验证：目标测试 3 OK；相邻 P5/PDF 回归 14 OK；Python 编译通过；真实 CLI 运行输出 `can_export_pdf_candidate=false`。
+- [ ] 下一步 P5-E：把 P5-D 的 20 个任务拆成每个 <=20 分钟的小节点，优先补证据索引映射和章节源写作入口，再把通过后的正式源接到 PDF 候选渲染。

@@ -596,6 +596,22 @@
 
 业务规则：P6-E1 是正式包进入产品层之前的“入口卡片”节点。它只把 P6-D 的长 manifest 归一化为用户能看懂、UI/API 能消费的紧凑验收状态，告诉用户下一步该打开哪两个文件、核对什么证据；真实 HTTP 接口和页面挂载留到 P6-F。
 
+### Behavior 40: Product API exposes the formal package summary as a read-only acceptance surface
+
+**Given** `state/product/formal_submission_package_summary.json` exists
+**And** the summary status is `ready_for_manual_acceptance`
+**When** the frontend requests `GET /api/v1/projects/{project_id}/formal-submission-package-summary`
+**Then** the API must return the summary fields needed by the product acceptance surface: `visible_summary`, `open_targets`, `manual_acceptance`, `source_manifest`, `consistency_checks`, and `blocking_reasons`
+**And** the response must mark `service=formal_submission_package_service` and `mode=read_only`
+**And** the API must not regenerate PDF/docx, open local files, or mutate `state/product/formal_submission_package_summary.json`
+
+**Given** `state/product/formal_submission_package_summary.json` does not exist
+**When** the frontend requests the same API
+**Then** the API must return structured `409 formal_submission_package_summary_required`
+**And** the error message must direct the caller to generate the P6-E1 summary first.
+
+业务规则：P6-F1 只把已生成的正式包验收摘要接到产品 API，给前端一个确定的读取入口；它不是导出器、审批器、质量评审器，也不改写正式层。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

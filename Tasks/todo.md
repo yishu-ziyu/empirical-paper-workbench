@@ -961,4 +961,9 @@
 - [x] P6-E1 实现：新增 `Program/formal_submission_package_summary.py` 和 `Program/workbench/formal_submission_package_summary.py`，读取 `Results/json/formal_submission_package_manifest.json` 与包内 `manifest.json`，写出 `Results/json/formal_submission_package_summary.json`、`state/product/formal_submission_package_summary.json`、`Reviews/formal_submission_package_summary.md`。
 - [x] P6-E1 真实运行：CLI 输出 `status=ready_for_manual_acceptance`、`ready_for_manual_acceptance=true`；产品层 summary 暴露 PDF/DOCX 打开入口，PDF sha256=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，docx sha256=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`，blocking reasons 为空。
 - [x] P6-E1 验证：目标测试 4 OK；P6-A/P6-B/P6-C/P6-D/P6-E1 相邻回归 17 OK；Python 编译通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，391 tests OK，skipped=1。
-- [ ] 下一步 P6-F：提供正式包 summary 的只读产品 API/CLI 查询入口，让页面或内置浏览器能读取 `state/product/formal_submission_package_summary.json` 并显示“打开 PDF/DOCX、验收清单、阻断原因”。
+- [x] P6-F1 节点规则：按用户新增约束，本节点封顶 20 分钟；只提供正式包 summary 的只读产品 API，不做前端 UI、不打开文件、不重渲染 PDF/docx、不改写正式研究状态。浏览器挂载拆到 P6-F2。
+- [x] P6-F1 Agent Team：使用只读 explorer sidecar Zeno 复核现有 Product API 入口；采纳其建议，新增 `GET /api/v1/projects/{project_id}/formal-submission-package-summary`，并把状态读取封装到独立 backend service，避免前端直接解析 CLI artifact。
+- [x] P6-F1 BDD/TDD：新增 Behavior 40 和 `tests/test_formal_submission_package_summary_api.py`；RED 为 endpoint 404，GREEN 后覆盖成功读取、缺 summary 结构化 409、`_meta.service=formal_submission_package_service`、`mode=read_only` 和 summary 文件字节不变。
+- [x] P6-F1 实现：新增 `Product/backend/formal_submission_package_service.py`，在 `Product/app.py` 暴露只读接口，返回 `visible_summary`、`open_targets`、`manual_acceptance`、`source_manifest`、`consistency_checks`、`blocking_reasons` 和产品元信息。
+- [x] P6-F1 验证：目标测试 2 OK；P6-E1/P6-F1/API 相邻回归 15 OK，skipped=1；Python 编译通过；scoped diff 已复核。
+- [ ] 下一步 P6-F2：把正式包 summary API 挂到产品页面或内置浏览器验收台，显示“打开 PDF/DOCX、验收清单、阻断原因”，并用 Browser 做可视化验收。

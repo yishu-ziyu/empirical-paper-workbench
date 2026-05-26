@@ -68,6 +68,10 @@ from Product.backend.git_experiment_logger import (
     get_experiment_history,
     revert_to_commit,
 )
+from Product.backend.formal_submission_package_service import (
+    FormalSubmissionPackageSummaryRequiredError,
+    get_project_formal_submission_package_summary,
+)
 from Product.backend.orchestrator import (
     load_checkpoints,
     resolve_checkpoint,
@@ -1353,6 +1357,20 @@ def api_v1_project_export_package(project_id: str) -> dict:
         return error_response(409, "full_run_required", str(exc))
     except ValueError as exc:
         return error_response(409, "result_artifact_required", str(exc))
+
+
+@app.get("/api/v1/projects/{project_id}/formal-submission-package-summary")
+def api_v1_project_formal_submission_package_summary(project_id: str) -> dict:
+    try:
+        return get_project_formal_submission_package_summary(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+    except FormalSubmissionPackageSummaryRequiredError:
+        return error_response(
+            409,
+            "formal_submission_package_summary_required",
+            "Run python3 Program/formal_submission_package_summary.py --project-root . before reading the formal submission package summary.",
+        )
 
 
 @app.get("/api/v1/projects/{project_id}/reviewer-scorecard")

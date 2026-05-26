@@ -302,6 +302,94 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertTrue(any(source.endswith("paper_expansion_plan.json") for source in context["context_sources"]))
         self.assertIn("Agent Task Queue", context["task_prompt"])
 
+    def test_bdd_10_export_manifest_next_tasks_enter_supervisor_agent_queue(self) -> None:
+        """行为 15：PDF 预检下一轮任务必须进入 Supervisor / Agent 队列。"""
+        result = self.run_quality(["--profile", "aer_like"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest_path = self.project_root / "Submissions" / "cfps_robot_pdf_export_manifest.json"
+        manifest_path.parent.mkdir(parents=True)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p4.pdf_export_manifest.v1",
+                    "export_gate": {
+                        "status": "needs_review",
+                        "can_export_pdf": False,
+                        "blocking_reasons": ["reviewer_scorecard:blocks_export_or_formal_claims"],
+                    },
+                    "next_review_tasks": [
+                        {
+                            "id": "add_weak_iv_robust_interval_or_caveat",
+                            "source": "reviewer_scorecard",
+                            "agent": "MethodAgent",
+                            "reason": "弱工具变量稳健推断仍需补证。",
+                            "recommended_action": "补充 Anderson-Rubin 置信区间或写明弱工具限制。",
+                            "inputs": ["reviewer_scorecard_report.json", "method_diagnostics_report.json"],
+                        },
+                        {
+                            "id": "expand_empirical_strategy",
+                            "source": "paper_quality_report",
+                            "agent": "ManuscriptAgent",
+                            "reason": "Empirical Strategy 仍需扩写。",
+                            "inputs": ["paper_quality_report.json"],
+                        },
+                    ],
+                    "agent_team_schedule": {
+                        "call_when": "before_pdf_export_preflight",
+                        "called_agents": ["ExportAgent", "ReviewerAgent", "VerifierAgent"],
+                        "recall_when": "after_pdf_export_manifest_written",
+                        "next_call_when": "before_formal_writeback_or_final_export",
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        package = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_package.py"),
+                "--project-root",
+                str(self.project_root),
+                "--quality-report",
+                "Results/json/paper_quality_report.json",
+                "--source-manifest",
+                "Submissions/cfps_robot_pdf_export_manifest.json",
+                "--output-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--output-manuscript",
+                "Manuscripts/generated/paper_package_draft.md",
+                "--output-supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(package.returncode, 0, package.stderr)
+
+        plan = json.loads((self.project_root / "Results" / "json" / "paper_expansion_plan.json").read_text(encoding="utf-8"))
+        task_by_id = {task["id"]: task for task in plan["agent_task_queue"]}
+        self.assertIn("add_weak_iv_robust_interval_or_caveat", task_by_id)
+        weak_iv_task = task_by_id["add_weak_iv_robust_interval_or_caveat"]
+        self.assertEqual(weak_iv_task["source"], "pdf_export_manifest")
+        self.assertEqual(weak_iv_task["source_artifact"], "Submissions/cfps_robot_pdf_export_manifest.json")
+        self.assertEqual(weak_iv_task["agent"], "MethodAgent")
+        self.assertEqual(weak_iv_task["status"], "ready_for_supervisor_review")
+        self.assertIn("Anderson-Rubin", weak_iv_task["action"])
+        self.assertEqual(plan["source_export_manifest"], "Submissions/cfps_robot_pdf_export_manifest.json")
+        self.assertEqual(plan["agent_team_schedule"]["call_when"], "before_paper_package_task_merge")
+        self.assertIn("ReviewerAgent", plan["agent_team_schedule"]["called_agents"])
+        self.assertEqual(plan["agent_team_schedule"]["recall_when"], "after_paper_expansion_plan_and_supervisor_context_written")
+
+        context = json.loads((self.project_root / "Results" / "json" / "paper_supervisor_context.json").read_text(encoding="utf-8"))
+        self.assertIn("Submissions/cfps_robot_pdf_export_manifest.json", context["context_sources"])
+        context_task_ids = {task["id"] for task in context["agent_task_queue"]}
+        self.assertIn("add_weak_iv_robust_interval_or_caveat", context_task_ids)
+        self.assertEqual(context["agent_team_schedule"]["next_call_when"], "before_formal_writeback")
+
     def _read_report(self) -> dict:
         return json.loads((self.project_root / "Results" / "json" / "paper_quality_report.json").read_text(encoding="utf-8"))
 

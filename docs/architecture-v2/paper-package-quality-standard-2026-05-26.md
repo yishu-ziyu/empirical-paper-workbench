@@ -170,6 +170,39 @@ CNKI 第一版定位为中文文献和中文期刊规范的人工辅助检索来
 - appendix
 - human review note
 
+## 审稿式修订任务格式
+
+P4-F 起，系统把论文包修订拆成三类 gate，而不是写成“继续完善论文”：
+
+- `paper_gate`：章节、篇幅、摘要、JEL、关键词、Data Availability Statement、复现 README、正文结构。
+- `evidence_gate`：文献库、贡献矩阵、数据来源、变量定义、表图绑定、citation/source verification。
+- `review_gate`：ReviewerAgent / VerifierAgent / Data Editor 风格意见、方法诊断缺口、正式导出阻断项。
+
+每一条 reviewer comment 必须转成可执行 action item：
+
+```text
+comment -> issue diagnosis -> action item -> manuscript/code location -> verification evidence
+```
+
+任务字段至少包含：
+
+- `id`
+- `agent`
+- `source`
+- `source_artifact`
+- `reason`
+- `action`
+- `inputs`
+- `verification.required_before_completion`
+- `status`
+
+外部规范依据：
+
+- AEA/AER 投稿说明要求经验论文提供 data/code 复现材料、100 words 以内摘要和正文自足的主稿。
+- AEA Data Editor 复现检查把 README、代码运行、数据来源、结果一致性作为进入发表前的实质门槛。
+- 经济学写作规范通常要求 Introduction 交代研究问题、gap、贡献、主结果和文章结构；Literature Review 不能只是逐篇摘要，而应围绕本文贡献组织。
+- 审稿意见处理应保留 editor/referee/data editor 的来源、逐条编号、改动位置和验证证据；关键项优先，避免把每个建议都无边界扩展成新论文。
+
 ## LLM Supervisor 与执行器分工
 
 本项目不是纯 Python 写论文，也不是把自然语言直接丢给模型自由发挥。正确主链路是：

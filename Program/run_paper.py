@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from workbench.config import read_yaml, resolve_project_paths
-from workbench.drafts import build_draft_context, render_template
+from workbench.drafts import build_draft_context, build_qmd_content, render_template
 from workbench.observability import ObservableRun, generate_run_id
 from workbench.results import artifact_record, build_results_index
 from workbench.state import build_project_state, write_json
@@ -162,6 +162,9 @@ def main() -> int:
         observable.start_step("draft_generation")
         write_text(paths["markdown_draft"], markdown_content)
         observable.artifact_written("draft_generation", paths["markdown_draft"], "Markdown draft written.")
+        qmd_content = build_qmd_content(paper_config["project"]["title"], markdown_content)
+        write_text(paths["qmd_draft"], qmd_content)
+        observable.artifact_written("draft_generation", paths["qmd_draft"], "Quarto manuscript source written.")
         write_text(paths["latex_draft"], latex_content)
         observable.artifact_written("draft_generation", paths["latex_draft"], "LaTeX draft written.")
         observable.complete_step(
@@ -169,6 +172,7 @@ def main() -> int:
             "Draft artifacts were generated.",
             artifacts=[
                 str(paths["markdown_draft"].relative_to(project_root)),
+                str(paths["qmd_draft"].relative_to(project_root)),
                 str(paths["latex_draft"].relative_to(project_root)),
             ],
         )
@@ -229,6 +233,7 @@ def main() -> int:
         artifacts = [
             artifact_record(snapshot_path, project_root, "json", "Structured project snapshot"),
             artifact_record(paths["markdown_draft"], project_root, "markdown", "Generated draft in Markdown"),
+            artifact_record(paths["qmd_draft"], project_root, "qmd", "Generated Quarto manuscript source"),
             artifact_record(paths["latex_draft"], project_root, "latex", "Generated draft in LaTeX"),
             artifact_record(log_path, project_root, "log", "Pipeline execution log"),
         ]
@@ -283,6 +288,7 @@ def main() -> int:
         print(f"[econ-workbench] state={paths['state_file'].relative_to(project_root)}")
         print(f"[econ-workbench] index={paths['results_index'].relative_to(project_root)}")
         print(f"[econ-workbench] markdown={paths['markdown_draft'].relative_to(project_root)}")
+        print(f"[econ-workbench] qmd={paths['qmd_draft'].relative_to(project_root)}")
         print(f"[econ-workbench] latex={paths['latex_draft'].relative_to(project_root)}")
         return 0
     except Exception as exc:

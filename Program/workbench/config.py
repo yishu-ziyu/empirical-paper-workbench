@@ -17,12 +17,14 @@ def resolve_project_paths(
 ) -> dict[str, Path]:
     outputs = paper_config["outputs"]
     data = paper_config["data"]
+    markdown_draft = Path(outputs["markdown_draft"])
     return {
         "paper_config": paper_config_path or project_root / "paper.yaml",
         "analysis_config": project_root / "Program" / "config" / "analysis_config.yaml",
         "state_file": project_root / outputs["state_file"],
         "results_index": project_root / outputs["results_index"],
         "markdown_draft": project_root / outputs["markdown_draft"],
+        "qmd_draft": project_root / outputs.get("qmd_draft", str(markdown_draft.with_suffix(".qmd"))),
         "latex_draft": project_root / outputs["latex_draft"],
         "project_snapshot": project_root / outputs.get("project_snapshot", "Results/json/project_snapshot.json"),
         "analysis_result": project_root / outputs.get("analysis_result", "Results/json/analysis_result.json"),

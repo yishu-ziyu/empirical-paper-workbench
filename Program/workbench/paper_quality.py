@@ -331,7 +331,12 @@ def build_method_gate_checks(project_root: Path) -> dict[str, Any]:
 
 
 def build_revision_checks(project_root: Path) -> dict[str, Any]:
-    reviewer_scorecard = project_root / "state" / "product" / "reviewer_scorecard.json"
+    reviewer_scorecard_candidates = [
+        project_root / "Results" / "json" / "reviewer_scorecard_report.json",
+        project_root / "state" / "product" / "reviewer_scorecard.json",
+    ]
+    reviewer_scorecard = next((path for path in reviewer_scorecard_candidates if path.exists()), None)
+    reviewer_payload = load_optional_json(reviewer_scorecard) if reviewer_scorecard else {}
     revision_log_candidates = [
         project_root / "state" / "product" / "revision_log.jsonl",
         project_root / "Submissions" / "pdf_first_review.md",
@@ -340,8 +345,10 @@ def build_revision_checks(project_root: Path) -> dict[str, Any]:
     revision_log = next((path for path in revision_log_candidates if path.exists()), None)
     return {
         "reviewer_scorecard": {
-            "status": "found" if reviewer_scorecard.exists() else "missing",
-            "path": str(reviewer_scorecard) if reviewer_scorecard.exists() else None,
+            "status": "found" if reviewer_scorecard else "missing",
+            "path": relative_or_absolute(reviewer_scorecard, project_root) if reviewer_scorecard else None,
+            "overall_verdict": reviewer_payload.get("overall_verdict"),
+            "blocks_export_or_formal_claims": reviewer_payload.get("blocks_export_or_formal_claims"),
         },
         "revision_log": {
             "status": "found" if revision_log else "missing",
@@ -351,8 +358,17 @@ def build_revision_checks(project_root: Path) -> dict[str, Any]:
             "status": "found" if writeback_preflight.exists() else "missing",
             "path": str(writeback_preflight) if writeback_preflight.exists() else None,
         },
-        "status": "passed" if reviewer_scorecard.exists() and revision_log else "needs_review_loop",
+        "status": "passed" if reviewer_scorecard and revision_log else "needs_review_loop",
     }
+
+
+def load_optional_json(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
 
 
 def build_verdict(

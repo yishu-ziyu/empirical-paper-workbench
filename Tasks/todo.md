@@ -57,7 +57,11 @@
 - [x] P4-D2 真实运行：在 `Data/Final/cfps_robot_reallocation.csv` 上重新估计 `ln_wage ~ (ln_robot ~ bartik_iv) + controls + year FE`，写出 `Results/json/method_diagnostics_report.json`；样本 15,697，聚类 30，2SLS 系数 0.1994，一阶段 F 14.52，partial R2 0.4834，reduced form 系数 0.1400。
 - [x] P4-D2 方法门刷新：`Results/json/method_gate_report.json` 已读取诊断报告，reduced form、robust first-stage、result artifact binding 从 missing 变为 recorded；剩余 yellow 集中在弱工具稳健区间和 Bartik share/shock 组件诊断。
 - [ ] P4-D3：扩展 MethodGate 到 DID/RDD/PSM/DML 的专属 `green/yellow/red` 规则，并接入 Journal Skill Registry / AER-like 方法规则。
-- [ ] P4-D4：让 Reviewer Scorecard 读取 `method_diagnostics_report.json`，把方法诊断变成四维审稿评分和 revision tasks。
+- [x] P4-D4：让 Reviewer Scorecard 读取 `method_diagnostics_report.json`，把方法诊断变成审稿评分和 revision tasks。
+- [x] P4-D4 BDD/TDD：新增行为 13 和 `tests/test_reviewer_scorecard_cli.py`，先确认缺少 `Program/reviewer_scorecard.py` 的 RED，再实现 Reviewer Scorecard CLI。
+- [x] P4-D4 Agent Team 复核：调用 MethodAgent/ReviewerAgent sidecar 复核五维 scorecard、yellow 项转 revision task、以及不阻断草稿层的判定规则。
+- [x] P4-D4 实现：新增 `Program/reviewer_scorecard.py` 和 `Program/workbench/reviewer_scorecard.py`，并让 `Program/workbench/paper_quality.py` 识别 `Results/json/reviewer_scorecard_report.json`。
+- [x] P4-D4 真实运行：对当前真实 CFPS/机器人方法诊断生成 Reviewer Scorecard，并刷新 paper quality report；当前总分 61，允许草稿继续，阻断强因果表述和正式导出。
 - [ ] P4-E：让 PDF export manifest 读取 quality report，导出后显示“论文包审阅入口”和下一轮自动任务。
 
 ### Agent Team 调用节奏
@@ -71,8 +75,9 @@
 - P4-D2 已执行并行介入：ExecutionAgent 负责真实方法诊断设计与执行边界；MethodAgent 负责 IV/Bartik 规范和 manual-review 边界；ReviewerAgent 负责后续 scorecard 字段和不阻断草稿层的 revision task 规则。
 - P4-D2 已执行回收点：主 Agent 关闭三路 Agent，合并为 BDD 行为 12、`Program/method_diagnostics.py`、`Results/json/method_diagnostics_report.json` 和 MethodGate 读取逻辑；正式 `state/product/*` 未被改写。
 - P4-D2 已执行验证点：真实 CFPS/机器人数据完成 2SLS、一阶段、reduced form、OLS 对照和样本一致性诊断；MethodGate 刷新后 reduced form、robust first-stage、result artifact binding 已变为 recorded。
-- P4-D4 下一轮并行介入：MethodAgent 复核 `method_diagnostics_report.json` 的 yellow/needs_manual_review 项；ReviewerAgent 把诊断报告转成四维 scorecard；主 Agent 同步写 BDD/TDD 和 scorecard CLI，不等待在原地。
-- P4-D4 下一轮回收点：主 Agent 对齐方法诊断产物、Reviewer scorecard 和 paper quality report，再决定是否进入 ManuscriptAgent 扩写与 PDF 预检。
+- P4-D4 已执行并行介入：MethodAgent 复核 `method_diagnostics_report.json` 的 yellow/needs_manual_review 项；ReviewerAgent 把诊断报告转成审稿式 scorecard；主 Agent 同步写 BDD/TDD 和 scorecard CLI，不等待在原地。
+- P4-D4 已执行回收点：主 Agent 将 sidecar 输出收敛为行为 13、`Program/reviewer_scorecard.py`、`Results/json/reviewer_scorecard_report.json` 和 paper quality 的 scorecard detection；正式 `state/product/*` 未被改写。
+- P4-D4 下一次 Agent Team 调用点：只有在进入 ManuscriptAgent 扩写或 ExportAgent 预检前，再调用 ReviewerAgent/VerifierAgent 审核 scorecard、revision tasks 和 PDF/manifest 阻断条件。
 - P4-E 串行收口：ManuscriptAgent 只在方法门和文献包存在后生成草稿层章节；ExportAgent 只在 reviewer scorecard 通过后生成 PDF/README/manifest 预检包。
 
 ## 2026-05-22 Long-run Optimization Protocol

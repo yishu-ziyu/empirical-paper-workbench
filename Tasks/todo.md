@@ -106,6 +106,9 @@
 - P4-H 已执行调用点：按 `paper_revision_round.json.agent_packets` 并行调用 LiteratureAgent、DataAgent、MethodAgent、ExecutionAgent、ManuscriptAgent；每个 Agent 只写自己的 evidence packet，写出后立刻收回，由 MainAgent 统一合并状态。
 - P4-H 已执行回收点：主 Agent 将 11 条任务合并为 `Results/json/paper_revision_evidence_packets.json` 和 `Reviews/paper_revision_evidence_packets.md`；10 条有结构化本地 artifact/hash/schema 证据，1 条文献包任务进入 `needs_manual_review`，正式 `state/product/*` 未被改写。
 - P4-H 下一次 Agent Team 调用点：P4-I 重跑质量门、方法门、审稿门和 PDF preflight 前，调用 ReviewerAgent/VerifierAgent 复核每条 evidence packet，并把状态更新为 `cleared`、`still_blocking` 或 `manual_review_required`。
+- P4-I1 已执行：消费 `paper_revision_evidence_packets.json`，生成质量门复核账本 `Results/json/paper_revision_gate_recompute.json` 和 `Reviews/paper_revision_gate_recompute.md`；真实结果为 0 条 cleared、10 条 still_blocking、1 条 manual_review_required。
+- P4-I1 BDD/TDD：新增行为 18 和 `tests/test_paper_revision_gate_recompute.py`，先确认缺少 `Program/paper_revision_gate_recompute.py` 的 RED，再实现 gate recompute ledger CLI。
+- P4-I1 Agent Team 回收点：ReviewerAgent/VerifierAgent 复核状态规则后收回；下一次只在 formal writeback preflight 前再次调用。
 - P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
 - P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。

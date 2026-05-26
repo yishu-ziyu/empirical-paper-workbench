@@ -66,6 +66,15 @@
 - [x] P4-F：让 `Program/paper_package.py --source-manifest` 读取 PDF export manifest，把 `next_review_tasks` 合并进 `paper_expansion_plan.json` 和 `paper_supervisor_context.json` 的 Supervisor / Agent 队列。
 - [x] P4-F BDD/TDD：新增行为 15 和 `tests/test_paper_package_quality.py` 覆盖 export manifest 的下一轮任务进入队列、保留来源证据、写入 Agent Team 调用节奏。
 - [x] P4-F 真实运行：基于 `Submissions/cfps_robot_pdf_export_manifest.json` 重新生成 `Results/json/paper_expansion_plan.json`、`Manuscripts/generated/paper_package_draft.md` 和 `Results/json/paper_supervisor_context.json`；当前合并后 `agent_task_queue=11`，其中 6 条来自 PDF 预检 manifest。
+- [x] P4-G：把 `paper_expansion_plan.json.agent_task_queue` 转成审稿式修订轮次，生成 `Results/json/paper_revision_round.json` 和 `Reviews/paper_revision_round.md`。
+- [x] P4-G BDD/TDD：新增行为 16 和 `tests/test_paper_package_quality.py` 覆盖 revision round、Agent packet、正式层不改写和 Agent Team 调用节奏；目标测试已从缺少 CLI 的 RED 进入 GREEN。
+- [x] P4-G 真实运行：基于当前真实 `Results/json/paper_expansion_plan.json` 生成 11 条 revision items、6 个 Agent packets；`formal_writeback_allowed=false`、`draft_layer_only=true`、`formal_state_guard.changed=false`。
+- [ ] P4-H：消费 `paper_revision_round.json`，按 Agent packet 生成可执行补证任务包；每个 queued task 必须产出草案层证据文件或明确 `needs_manual_review`，不能停在自然语言建议。
+- [ ] P4-I：重跑 `paper_quality_report.json`、`method_gate_report.json`、`reviewer_scorecard_report.json` 和 PDF preflight manifest；每条上一轮任务必须标记 `cleared`、`still_blocking` 或 `manual_review_required`。
+- [ ] P4-J：生成 formal writeback preview，列出会改哪些章节、引用、方法叙述、结果表和复现说明；只做预检，不自动写正式层。
+- [ ] P5：人工批准后生成正式 paper package，包含正文、PDF/PDF 预检、verified bibliography、contribution matrix、method diagnostics、reviewer scorecard、revision log、replication README、manifest 和复现命令。
+- [ ] P6：生成投稿级复现交付包；Verifier 能按 manifest 复跑关键命令，确认表、图、主结果、样本口径和代码版本一致，并输出最终审计报告。
+- [ ] 知识资产化：抽象复用 Agent Team schedule schema、Agent task schema、formal state guard、quality gate vocabulary、Journal/Method Skill Registry 和 verification evidence contract，避免 P4-H 到 P6 重复手写。
 
 ### Agent Team 调用节奏
 
@@ -89,6 +98,13 @@
 - P4-F 已执行回收点：主 Agent 收回各路判断后，只把 manifest 任务合并到草案层 `paper_expansion_plan.json.agent_task_queue` 和 `paper_supervisor_context.json.agent_task_queue`；不改写正式 `state/product/*`、变量角色、DesignSpec、RunPlan 或正式论文层。
 - P4-F 下一次 Agent Team 调用点：进入正式层写回或最终 PDF export 前，再调用 ReviewerAgent/VerifierAgent 复核 `reviewer_scorecard_task_cleared`、`export_gate_recomputed` 和 `updated_section_or_diagnostic_artifact`，确认每条 manifest 任务已有证据闭环。
 - P4-F 串行收口：主 Agent 是 integration owner；Agent Team 负责证据解释和角色分工，最终队列去重、排序、写盘和测试验证由主 Agent 完成。
+- P4-G 已执行调用点：生成 revision round 前调用 ReviewerAgent/VerifierAgent/MethodAgent 复核任务来源、证据要求和正式层边界；同时调用 DataAgent、LiteratureAgent、ManuscriptAgent、ExecutionAgent 作为任务归属方。
+- P4-G 已执行回收点：主 Agent 将 11 条任务收敛为 `Results/json/paper_revision_round.json` 和 `Reviews/paper_revision_round.md`；只写草案层审阅产物，不改写 `state/product/*`。
+- P4-G 下一次 Agent Team 调用点：P4-H 执行任务或 P4-J 正式写回预检前，再调用 ReviewerAgent/VerifierAgent 复核每条任务是否已有 `updated_section_or_diagnostic_artifact`、`reviewer_scorecard_task_cleared` 和 `export_gate_recomputed`。
+- P4-H 计划调用点：按 `paper_revision_round.json.agent_packets` 并行调用 LiteratureAgent、DataAgent、MethodAgent、ExecutionAgent、ManuscriptAgent；每个 Agent 只写自己的 evidence packet，写出后立刻收回，由 MainAgent 统一合并状态。
+- P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
+- P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
+- P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。
 
 ## 2026-05-22 Long-run Optimization Protocol
 

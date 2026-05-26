@@ -835,3 +835,15 @@
 - [x] 增加黑白灰 task brief / inspector 样式。
 - [x] 运行目标测试、类型检查、build 和 Playwright 验收。
 - [ ] 下一步：围绕“任务书页”进入 grill-me，确认主屏 5 个信号是否合适、右侧 Inspector 是否应该改成抽屉或固定栏。
+
+## 2026-05-27 P5-B Formal Package Manifest
+
+- [x] 节点时间盒：P5-B 只处理“审批后正式包 manifest + 目录骨架”，不生成 PDF、docx、正式正文或回归结果，避免超过 20 分钟节点边界。
+- [x] Agent Team：启用只读 sidecar 映射现有 export/package/formal-state 代码；结论是 P5-B 安全写入面应限定在 `Results/json`、`Reviews`、`Submissions/formal_package`。
+- [x] BDD：在 `docs/architecture-v2/codex-phase-p4-paper-package-quality-bdd.md` 新增 Behavior 24，定义 P5-A 审批通过后才能建立正式包清单。
+- [x] TDD：新增 `tests/test_formal_paper_package_manifest.py`；首次 RED 失败原因是缺少 `Program/formal_paper_package_manifest.py`。
+- [x] 实现：新增 `Program/workbench/formal_paper_package_manifest.py` 和 CLI wrapper，读取 `formal_writeback_approval.json` 与 `writeback_approvals.json` 后生成 manifest/review/skeleton。
+- [x] 产物：生成 `Results/json/formal_paper_package_manifest.json`、`Reviews/formal_paper_package_manifest.md`、`Submissions/formal_package/README.md`。
+- [x] 保护边界：manifest 明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
+- [x] 验证：目标测试 3 OK；相邻 P5/P1 export 回归 17 OK；Python 编译通过；真实 CLI 运行输出 `formal_package_manifest_ready`。
+- [ ] 下一步 P5-C：基于 manifest 组装正式稿源文件清单和章节占位，不直接跳到最终 PDF；P5-D 再做 PDF/export preflight。

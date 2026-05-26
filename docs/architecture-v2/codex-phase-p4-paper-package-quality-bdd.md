@@ -314,6 +314,23 @@
 
 业务规则：P5-A 是正式包入口的人工批准账本。它只记录“是否允许进入 P5”，不生成正式论文、不导出 docx、不改写正式层状态；这样后续 P5 节点可以用同一条批准记录作为正式包生成和导出预检的入口凭证。
 
+### Behavior 24: Formal package manifest builds an approved package skeleton without writing final outputs
+
+**Given** `formal_writeback_approval.json` 的状态是 `approved_for_p5`
+**And** `state/product/writeback_approvals.json` 中存在 `formal_preflight_approvals.formal_writeback_preflight.status=approved`
+**When** 用户运行 `Program/formal_paper_package_manifest.py`
+**Then** 系统必须写出 `Results/json/formal_paper_package_manifest.json`
+**And** 系统必须写出 `Reviews/formal_paper_package_manifest.md`
+**And** 系统必须创建 `Submissions/formal_package/` 的空包骨架目录
+**And** manifest 必须把章节扩写、引用/文献、方法叙述、结果表与复现说明映射到正式包目录
+**And** manifest 必须声明 `can_build_package=true`
+**And** manifest 必须声明本命令没有生成最终 PDF、docx 或正式正文
+**And** 命令不得改写 `formal_writeback_approval.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 如果批准报告或批准账本缺失、拒绝或不一致，系统必须阻断正式包骨架生成并说明原因。
+
+业务规则：P5-B 是正式 paper package 的目录和清单入口。它把人工批准后的写回范围组织成可复核的包结构，但仍不写最终论文、不导出 PDF/docx，也不改研究设定。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -910,4 +910,11 @@
 - [x] P5-E2d 实现：新增 `Program/formal_section_source_drafter.py` 和 `Program/workbench/formal_section_source_drafter.py`，把 10 个章节源从占位改为 `source_draft_ready`，并绑定每节所需证据路径。
 - [x] P5-E2d 真实运行：CLI 输出 `status=section_source_drafts_ready`、`drafted_sections=10`；重跑 PDF 预检后输出 `status=ready_for_pdf_export_review`、`can_export_pdf_candidate=true`、`blocking_reasons=[]`。
 - [x] P5-E2d 验证：目标测试 2 OK；相邻 PDF/source assembly 回归 8 OK；Python 编译通过；全量回归 `367 tests OK, skipped=1`。
-- [ ] 下一步 P5-E3：在不写正式层的前提下，用章节源草案和证据生成 PDF 候选稿，并保留人工验收门。
+- [x] P5-E3 节点规则：本节点只把 `source_draft_ready` 章节源和通过的 PDF 预检推进为 PDF 候选稿；不写正式 `state/product/*`，不批准最终 PDF/docx，不合并 canonical 方法库。
+- [x] P5-E3 时间盒：拆成 4 个 20 分钟以内的小节点：导出链路定位、BDD/TDD、候选 PDF CLI 实现、验证提交。若后续节点超过 20 分钟，必须继续拆小或回退路线。
+- [x] P5-E3 Agent Team：按用户要求尝试新建只读 explorer 复核导出链路，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把该限制写入候选 PDF 报告的 `agent_team_schedule`。
+- [x] P5-E3 BDD/TDD：新增 Behavior 32 和 `tests/test_formal_pdf_candidate.py`；RED 为缺少 `Program/formal_pdf_candidate.py`，GREEN 后覆盖候选 QMD/审阅报告/复跑脚本、预检未通过阻断、正式层不改写。
+- [x] P5-E3 实现：新增 `Program/formal_pdf_candidate.py` 和 `Program/workbench/formal_pdf_candidate.py`，从 `formal_pdf_export_preflight.json`、`formal_manuscript_source_map.json`、`section_sources.json` 组装 `paper_candidate.qmd`，并在本机 Quarto/XeLaTeX 工具链可用时渲染候选 PDF。
+- [x] P5-E3 真实运行：CLI 输出 `status=pdf_candidate_ready`；生成 `Submissions/formal_package/manuscript/paper_candidate.qmd`、`Submissions/formal_package/paper_candidate.pdf`、`Results/json/formal_pdf_candidate_report.json`、`Reviews/formal_pdf_candidate.md` 和 `Submissions/formal_package/reproducibility/render_pdf_candidate.sh`；`pdfinfo` 显示候选 PDF 共 10 页。
+- [x] P5-E3 验证：目标测试 2 OK；P5-D/P5-E2d/P5-E3 相邻回归 7 OK；Python 编译通过；`git diff --check` 通过。
+- [ ] 下一步 P5-E4：对 PDF 候选稿做人工审阅/机器审阅入口和最终层写回预检，仍不直接把候选 PDF 晋升为最终投稿稿。

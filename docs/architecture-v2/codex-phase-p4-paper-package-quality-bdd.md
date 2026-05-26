@@ -451,6 +451,24 @@
 
 业务规则：P5-E2d 把“已齐备证据 + 章节源占位”推进为可预检的章节源草案。它让 PDF-first 候选渲染有真实章节输入，但仍把正式论文写回、最终 PDF/docx 和 canonical 规则合并留给后续人工确认节点。
 
+### Behavior 32: Formal PDF candidate renderer turns approved draft sources into a review PDF candidate
+
+**Given** `formal_pdf_export_preflight.json` 已经声明 `can_export_pdf_candidate=true`
+**And** `formal_manuscript_source_map.json` 与 `section_sources.json` 已经列出全部 `source_draft_ready` 章节源
+**And** 每个章节源已经绑定所需 evidence paths
+**When** 用户运行 `Program/formal_pdf_candidate.py`
+**Then** 系统必须写出 `Results/json/formal_pdf_candidate_report.json`
+**And** 系统必须写出 `Reviews/formal_pdf_candidate.md`
+**And** 系统必须写出 `Submissions/formal_package/manuscript/paper_candidate.qmd`
+**And** 在本机 PDF 工具链可用时，系统必须写出 `Submissions/formal_package/paper_candidate.pdf`
+**And** 系统必须写出可复跑脚本 `Submissions/formal_package/reproducibility/render_pdf_candidate.sh`
+**And** 报告必须列出 preflight report、source map、章节源、QMD 候选稿、PDF 候选稿、渲染日志和人工审阅入口
+**And** 如果预检未通过，命令必须阻断渲染并写出 `blocked_by_pdf_preflight` 报告
+**And** 报告必须声明 `candidate_layer_only=true`、`this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写 `state/product/*` 正式状态、不得批准最终 PDF/docx、不得合并 canonical 方法库。
+
+业务规则：P5-E3 把“章节源草案 + PDF 预检通过”推进为可人工验收的 PDF 候选稿。它解决的是审阅和排版闭环，不替用户批准正式层，不把候选 PDF 宣称为最终投稿稿。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -1,0 +1,156 @@
+{
+  "schema_version": "p5.formal_manuscript_section_sources.v1",
+  "generated_at": "2026-05-26T18:45:04.210819+00:00",
+  "source_manifest": "Results/json/formal_paper_package_manifest.json",
+  "draft_layer_only": true,
+  "formal_paper_write_allowed": false,
+  "sections": [
+    {
+      "order": 1,
+      "section": "Abstract",
+      "source_path": "Submissions/formal_package/manuscript/sections/01-abstract.md",
+      "status": "source_placeholder_ready",
+      "target_length": "100 English words or concise Chinese equivalent",
+      "agent": "ManuscriptAgent",
+      "purpose": "用最短篇幅交代问题、数据、方法和核心发现。",
+      "evidence_requirements": [
+        "approved_findings",
+        "method_gate_report",
+        "verified_bibliography"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 2,
+      "section": "Introduction",
+      "source_path": "Submissions/formal_package/manuscript/sections/02-introduction.md",
+      "status": "source_placeholder_ready",
+      "target_length": "1800-3000 English words / 4-6 pages",
+      "agent": "ManuscriptAgent",
+      "purpose": "把研究问题、核心结论、贡献和文章结构一次讲清楚。",
+      "evidence_requirements": [
+        "research_question",
+        "contribution_matrix",
+        "approved_findings"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 3,
+      "section": "Literature and Contribution",
+      "source_path": "Submissions/formal_package/manuscript/sections/03-literature-and-contribution.md",
+      "status": "source_placeholder_ready",
+      "target_length": "1000-1800 English words / 2-4 pages",
+      "agent": "LiteratureAgent",
+      "purpose": "把相邻文献、方法文献和本文增量绑定到可核验证据。",
+      "evidence_requirements": [
+        "verified_bibliography",
+        "contribution_matrix",
+        "citation_verification_log"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 4,
+      "section": "Institutional Background / Theory / Context",
+      "source_path": "Submissions/formal_package/manuscript/sections/04-institutional-background-theory-context.md",
+      "status": "source_placeholder_ready",
+      "target_length": "800-1500 English words / 2-4 pages",
+      "agent": "DomainAgent",
+      "purpose": "解释变量关系成立的制度背景、理论机制和研究边界。",
+      "evidence_requirements": [
+        "domain_notes",
+        "verified_context_sources"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 5,
+      "section": "Data and Measurement",
+      "source_path": "Submissions/formal_package/manuscript/sections/05-data-and-measurement.md",
+      "status": "source_placeholder_ready",
+      "target_length": "800-1500 English words / 2-3 pages",
+      "agent": "DataAgent",
+      "purpose": "说明数据来源、样本构造、变量定义、缺失处理和描述统计。",
+      "evidence_requirements": [
+        "variable_role_set",
+        "data_profile",
+        "sample_profile"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 6,
+      "section": "Empirical Strategy",
+      "source_path": "Submissions/formal_package/manuscript/sections/06-empirical-strategy.md",
+      "status": "source_placeholder_ready",
+      "target_length": "1200-2000 English words / 3-5 pages",
+      "agent": "MethodAgent",
+      "purpose": "写清识别式、估计方程、关键假设、标准误和方法规范门。",
+      "evidence_requirements": [
+        "design_spec",
+        "method_gate_report",
+        "method_diagnostics_report"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 7,
+      "section": "Main Results",
+      "source_path": "Submissions/formal_package/manuscript/sections/07-main-results.md",
+      "status": "source_placeholder_ready",
+      "target_length": "2000-3500 English words / 4-7 pages",
+      "agent": "ExecutionAgent",
+      "purpose": "围绕主表和主图解释估计结果、经济含义和量级。",
+      "evidence_requirements": [
+        "method_execution_result",
+        "regression_tables",
+        "figure_manifest"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 8,
+      "section": "Robustness / Mechanisms / Heterogeneity",
+      "source_path": "Submissions/formal_package/manuscript/sections/08-robustness-mechanisms-heterogeneity.md",
+      "status": "source_placeholder_ready",
+      "target_length": "1500-3000 English words / 3-6 pages",
+      "agent": "MethodAgent",
+      "purpose": "组织稳健性、机制检验、异质性和敏感性分析。",
+      "evidence_requirements": [
+        "robustness_matrix",
+        "method_diagnostics_report"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 9,
+      "section": "Conclusion",
+      "source_path": "Submissions/formal_package/manuscript/sections/09-conclusion.md",
+      "status": "source_placeholder_ready",
+      "target_length": "500-800 English words / 1-2 pages",
+      "agent": "ManuscriptAgent",
+      "purpose": "收束发现、贡献、局限和下一步研究。",
+      "evidence_requirements": [
+        "approved_findings",
+        "limitations_register",
+        "reviewer_scorecard_report"
+      ],
+      "can_write_final_paper": false
+    },
+    {
+      "order": 10,
+      "section": "References",
+      "source_path": "Submissions/formal_package/manuscript/sections/10-references.md",
+      "status": "source_placeholder_ready",
+      "target_length": "Verified bibliography only",
+      "agent": "LiteratureAgent",
+      "purpose": "只接纳经过 Zotero/CNKI/DOI/OpenAlex/S2 核验的条目。",
+      "evidence_requirements": [
+        "verified_bibliography",
+        "citation_verification_log"
+      ],
+      "can_write_final_paper": false
+    }
+  ]
+}

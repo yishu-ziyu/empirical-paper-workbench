@@ -11,6 +11,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { FormalPackageAcceptancePanel } from "./FormalPackageAcceptancePanel";
 
 export interface ArtifactFile {
   name: string;
@@ -523,6 +524,12 @@ export function AgentActivityPanel({ onStartExecution, onBack, executionStarted 
             <span>{executionStarted ? "真实执行已授权" : "开始真实数据与方法执行"}</span>
           </button>
         </div>
+
+        {executionStarted && (
+          <div className="formal-package-acceptance-slot">
+            <FormalPackageAcceptancePanel projectId="proj_undergraduate_thesis" />
+          </div>
+        )}
       </section>
 
       {/* Right Inspector Panel */}

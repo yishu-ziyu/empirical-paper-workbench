@@ -20,6 +20,51 @@
 - [ ] 下一步把 Method Design 的缺失证据提示接入 Journal Skill rules。
 - [ ] 下一步把 Review & Export 的 verifier gates 扩展为 journal-aware gates。
 
+## 2026-05-26 P4-A Paper Package Quality Upgrade
+
+- [x] 记录用户修正：研究产出按“草稿 -> 审阅 -> 终稿”推进，不再使用防御式自我贬低措辞。
+- [x] 新增论文包质量标准：`docs/architecture-v2/paper-package-quality-standard-2026-05-26.md`。
+- [x] 新增文献综述闭环方案：`docs/architecture-v2/literature-review-closed-loop-2026-05-26.md`。
+- [x] 新增方法规范门方案：`docs/architecture-v2/method-gate-standard-2026-05-26.md`。
+- [x] P4-A BDD：写 `docs/architecture-v2/codex-phase-p4-paper-package-quality-bdd.md`，锁定长篇正文、文献包、方法门、修订记录、PDF 导出质量报告和 LLM Supervisor 上下文包。
+- [x] P4-A TDD：新增 CLI quality report / paper package 测试，先证明当前 `run_paper.py/export_pdf.py` 只证明导出链路，不足以证明论文包完整。
+- [x] P4-A 实现：增加 `Program/workbench/paper_quality.py`，读取草稿、bibliography、method gate、manifest 并写出 `Results/json/paper_quality_report.json`。
+- [x] P4-A 实现：增加 `Program/paper_package.py` 和 `Program/workbench/paper_package.py`，生成 `paper_expansion_plan.json`、结构化论文包草稿和 `paper_supervisor_context.json`。
+- [x] P4-A 真实运行：对 `Manuscripts/generated/cfps_robot_paper_draft.md` 生成质量报告、扩写计划、结构化草稿和 LLM Supervisor 上下文包。
+- [x] P4-A 架构边界：明确 Python/StatsPAI/StataMCP 是执行层，local Codex / LLM Supervisor 是研究中控和 Agent 派工层。
+- [x] P4-A LLM 中控入口：新增 `Program/paper_supervisor.py` 和 `Program/workbench/paper_supervisor.py`，启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1` 后调用本地 Codex 生成可审阅 Supervisor 运行产物。
+- [x] P4-A 真实 Supervisor 运行：生成 `Results/json/paper_supervisor_run.json` 和 `docs/workflows/paper_package_supervisor/supervisor_round.md`，状态为 `needs_human_review`，不改写正式层 `research_question/variable_roles/design_spec/run_plan`。
+- [x] P4-A Agent Team 调度记录：确认后续 P4 阶段必须写明并行 Agent Team 介入点、回收点和主线集成验收点，避免串行低效和多 Agent 各自写散。
+- [x] P4-B：完成 DataAgent 变量角色调和，把真实 CFPS/机器人研究线索与旧 `wage/trained` 合成样例拆开；输出 proposal，不直接覆盖正式 `variable_roles.json`。
+- [x] P4-B BDD/TDD：新增行为 9 和 `tests/test_variable_role_reconciliation.py`，先确认缺少 CLI 入口的 RED，再实现最小 proposal CLI。
+- [x] P4-B 实现：新增 `Program/variable_role_reconcile.py` 和 `Program/workbench/variable_role_reconcile.py`，写出 `state/proposals/variable_role_reconciliation.json` 与 `Results/json/variable_role_reconciliation_report.json`。
+- [x] P4-B 真实运行：识别当前正式层两个冲突：旧 dataset `Data/Final/analysis_sample.csv` 与真实 dataset `Data/Final/cfps_robot_reallocation.csv` 冲突；旧 roles `wage/trained/edu/experience` 与真实 roles `ln_wage/ln_robot/female/age/edu_last/urban/bartik_iv/year/provcd` 冲突。
+- [x] P4-B Agent Team 调度：并行调用 DataAgent 做状态/数据映射，调用 Method/Literature sidecar 做变量证据门调研；回收后由主 Agent 集成到 proposal 的 `agent_team_schedule` 和 `role_evidence_matrix`。
+- [x] P4-C：实现 LiteratureAgent 的 `candidate_literature.csv`、`verified_bibliography.csv`、`contribution_matrix.md` 最小闭环。
+- [x] P4-C BDD/TDD：新增行为 10 和 `tests/test_literature_package.py`，先确认缺少 `Program/literature_package.py` 的 RED，再实现最小文献包 CLI。
+- [x] P4-C Agent Team 调研：调用 Literature sidecar 做英文核心文献、DOI/官方来源、证据角色和 CNKI 人工检索队列；回收后并入 seed literature package。
+- [x] P4-C 实现：新增 `Program/literature_package.py` 和 `Program/workbench/literature_package.py`，生成 9 条候选/已校验英文文献、贡献矩阵、CNKI 人工检索队列和 Agent Team 调用节奏。
+- [x] P4-C 真实运行：写出 `Data/literature/processed/candidate_literature.csv`、`verified_bibliography.csv`、`contribution_matrix.md`、`Results/json/literature_package_report.json`；`paper_quality_after_literature_package.json` 显示 `citation_status=passed`、`verified_count=9`、`closest_or_method_count=6`。
+- [x] P4-D：实现 MethodGate baseline 报告，把当前 Bartik IV/2SLS 设计写成 `green/yellow/red` 审阅报告。
+- [x] P4-D BDD/TDD：新增行为 11 和 `tests/test_method_gate_cli.py`，先确认缺少 `Program/method_gate.py` 的 RED，再实现最小方法门 CLI。
+- [x] P4-D Agent Team 调研：并行调用 MethodAgent、ExecutionAgent explorer、ReviewerAgent sidecar；MethodAgent 给出 IV/Bartik 缺失证据，ExecutionAgent 定位执行层挂载点，ReviewerAgent 给出审稿式 scorecard 接入点。
+- [x] P4-D 实现：新增 `Program/method_gate.py` 和 `Program/workbench/method_gate.py`，读取已批准 `DesignSpec` / `RunPlan`，只写 `Results/json/method_gate_report.json`，不改写正式层。
+- [x] P4-D 真实运行：当前 Bartik IV 方法门为 `yellow`，已记录 first-stage F 和 partial R2，同时列出 reduced form、弱工具稳健推断、shift-share 诊断、Rotemberg weights、leave-one-out 等下一轮证据要求。
+- [ ] P4-D2：扩展 MethodGate 到 DID/RDD/PSM/DML 的专属 `green/yellow/red` 规则，并接入 Journal Skill Registry / AER-like 方法规则。
+- [ ] P4-E：让 PDF export manifest 读取 quality report，导出后显示“论文包审阅入口”和下一轮自动任务。
+
+### Agent Team 调用节奏
+
+- P4-B 已执行并行介入：DataAgent 读取真实数据字段和现有变量角色；Method/Literature sidecar 调研变量角色最低证据门、IV 风险和复现规范。三路只提供证据，不直接写正式层。
+- P4-B 已执行回收点：主 Agent 汇总 sidecar 输出，形成 `state/proposals/variable_role_reconciliation.json` 和 `Results/json/variable_role_reconciliation_report.json`；正式 `state/product/variable_roles.json`、`design_spec.json`、`run_plan.json` 未被改写。
+- P4-C 已执行并行介入：LiteratureAgent 调研英文核心文献、DOI、官方来源、证据角色和 CNKI 人工检索路径；主 Agent 同步写 BDD/TDD 和 CLI 契约，没有等待在原地。
+- P4-C 已执行回收点：主 Agent 将调研结果收敛为 processed 文献包，生成 `candidate_literature.csv`、`verified_bibliography.csv`、`contribution_matrix.md` 和 `literature_package_report.json`；未改写 `state/product` 正式层。
+- P4-D 已执行并行介入：MethodAgent 跑 IV/Bartik 方法规范门；ExecutionAgent explorer 定位执行层挂载点和只写报告的边界；ReviewerAgent 准备审稿式 scorecard 接入方式。三路共享已批准 `DesignSpec` / `RunPlan`，但不直接写正式层。
+- P4-D 已执行回收点：主 Agent 将三路结果收敛为 `Results/json/method_gate_report.json`，把当前 Bartik IV 标为 `yellow`，并写入下一轮 Agent Team 调用节奏。
+- P4-D2 下一轮并行介入：ExecutionAgent 执行 reduced form、弱工具稳健推断、shift-share 诊断和 leave-one-out；ReviewerAgent 同步把 MethodGate 结果转成 scorecard；MethodAgent 只在诊断结果回收后再次复核方法门状态。
+- P4-D2 下一轮回收点：主 Agent 对齐方法诊断产物、Reviewer scorecard 和 paper quality report，再决定是否进入 ManuscriptAgent 扩写与 PDF 预检。
+- P4-E 串行收口：ManuscriptAgent 只在方法门和文献包存在后生成草稿层章节；ExportAgent 只在 reviewer scorecard 通过后生成 PDF/README/manifest 预检包。
+
 ## 2026-05-22 Long-run Optimization Protocol
 
 - [x] 定位项目根目录：`/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。

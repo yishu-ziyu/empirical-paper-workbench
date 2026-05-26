@@ -577,6 +577,25 @@
 
 业务规则：P6-D 是正式投稿包的“验收清单”节点。它不再生成论文文件，而是把最终 PDF、最终 docx、来源报告、文件指纹、复现命令和人工打开检查合并到一份可审阅 manifest，让用户知道这一包文件是否可以进入人工验收和产品层展示。
 
+### Behavior 39: Formal package summary exposes a compact product acceptance entry point
+
+**Given** `formal_submission_package_manifest.json` 的状态是 `formal_submission_package_ready`
+**And** `Submissions/formal_package/manifest.json` 已写入
+**And** `paper.pdf` 与 `paper.docx` 的 bytes 和 sha256 与 manifest 记录一致
+**When** 用户运行 `Program/formal_submission_package_summary.py`
+**Then** 系统必须写出 `Results/json/formal_submission_package_summary.json`
+**And** 系统必须写出 `state/product/formal_submission_package_summary.json`
+**And** 系统必须写出 `Reviews/formal_submission_package_summary.md`
+**And** summary 必须声明 `status=ready_for_manual_acceptance`
+**And** summary 必须包含产品层可直接展示的 `visible_summary`、`open_targets`、`manual_acceptance`、`source_manifest`、`consistency_checks` 和 `blocking_reasons`
+**And** `open_targets` 必须分别给出 PDF 与 DOCX 的路径、类型、bytes、sha256 和本地打开命令
+**And** `manual_acceptance.status` 必须是 `pending_manual_acceptance`
+**And** 命令必须声明 `this_command_opened_files=false`、`this_command_rendered_pdf=false`、`this_command_rendered_docx=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_research_state=false`
+**And** 命令不得打开文件、重渲染 PDF/docx、改写最终产物、改写 P6-D manifest 或改写正式研究状态
+**And** 如果 P6-D manifest 未 ready、最终文件缺失、包内 manifest 缺失或 PDF/docx 指纹与 manifest 不一致，系统必须写出 blocker summary，并不得给出可点击验收入口。
+
+业务规则：P6-E1 是正式包进入产品层之前的“入口卡片”节点。它只把 P6-D 的长 manifest 归一化为用户能看懂、UI/API 能消费的紧凑验收状态，告诉用户下一步该打开哪两个文件、核对什么证据；真实 HTTP 接口和页面挂载留到 P6-F。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

@@ -955,4 +955,10 @@
 - [x] P6-D 实现：新增 `Program/formal_submission_package_manifest.py` 和 `Program/workbench/formal_submission_package_manifest.py`，读取 P6-A/P6-B/P6-C 报告与最终 PDF/docx，写出验收 manifest、review markdown 和包内自包含 manifest。
 - [x] P6-D 真实运行：CLI 输出 `status=formal_submission_package_ready`、`package_manifest_written=true`；真实包内 PDF sha256=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，docx sha256=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`，一致性检查全部通过。
 - [x] P6-D 验证：目标测试 4 OK；P6-A/P6-B/P6-C/P6-D 相邻回归 13 OK；Python 编译通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，387 tests OK，skipped=1。
-- [ ] 下一步 P6-E：打开/检查正式 PDF 与 docx 的人工验收入口，并把 CLI 主链路结果转化为产品层可读取的 package summary API/状态文件。
+- [x] P6-E1 节点规则：按用户新增约束，本节点封顶 20 分钟；只把 P6-D 正式投稿包 manifest 转成产品层可读 summary，不做 HTTP API、不打开文件、不重渲染 PDF/docx、不改写正式研究状态。API/浏览器挂载拆到 P6-F。
+- [x] P6-E1 Agent Team：使用 verifier sidecar Hubble 做只读复核；采纳其建议，把 P6-E 拆成“CLI/product state bridge”和后续“HTTP API/UI wiring”两段，避免一个节点同时处理状态归一化和接口集成。
+- [x] P6-E1 BDD/TDD：新增 Behavior 39 和 `tests/test_formal_submission_package_summary.py`；RED 为缺少 `Program/formal_submission_package_summary.py`，GREEN 后覆盖成功 summary、manifest 未 ready 阻断、PDF 缺失阻断、docx hash 不一致阻断和正式层不改写。
+- [x] P6-E1 实现：新增 `Program/formal_submission_package_summary.py` 和 `Program/workbench/formal_submission_package_summary.py`，读取 `Results/json/formal_submission_package_manifest.json` 与包内 `manifest.json`，写出 `Results/json/formal_submission_package_summary.json`、`state/product/formal_submission_package_summary.json`、`Reviews/formal_submission_package_summary.md`。
+- [x] P6-E1 真实运行：CLI 输出 `status=ready_for_manual_acceptance`、`ready_for_manual_acceptance=true`；产品层 summary 暴露 PDF/DOCX 打开入口，PDF sha256=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，docx sha256=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`，blocking reasons 为空。
+- [x] P6-E1 验证：目标测试 4 OK；P6-A/P6-B/P6-C/P6-D/P6-E1 相邻回归 17 OK；Python 编译通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，391 tests OK，skipped=1。
+- [ ] 下一步 P6-F：提供正式包 summary 的只读产品 API/CLI 查询入口，让页面或内置浏览器能读取 `state/product/formal_submission_package_summary.json` 并显示“打开 PDF/DOCX、验收清单、阻断原因”。

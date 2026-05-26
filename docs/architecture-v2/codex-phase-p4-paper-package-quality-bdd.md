@@ -281,6 +281,22 @@
 
 业务规则：当证据包已经准备好，旧 gate 里的 task id 只说明“当时要求过这项修订”，不等于“现在仍阻塞”。P4-I4 的职责是消费这些历史引用，形成可审计账本，并把真正的正式写回检查留给独立 preflight 节点。
 
+### Behavior 22: Formal writeback preflight creates a human-reviewable writeback preview without changing formal state
+
+**Given** `paper_revision_gate_recompute.json` 的状态是 `ready_for_formal_writeback_preflight`
+**And** 每条上一轮修订任务都已经是 `cleared`
+**When** 用户运行 `Program/formal_writeback_preflight.py`
+**Then** 系统必须写出 `Results/json/formal_writeback_preflight.json`
+**And** 系统必须写出 `Reviews/formal_writeback_preflight.md`
+**And** 系统必须写出草案层 `Manuscripts/generated/previews/formal_writeback_preflight.md`
+**And** 预检账本必须列出将进入正式层人工审批的章节扩写、引用/文献、方法叙述、结果表与复现说明
+**And** 预检账本必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`、`requires_human_approval=true`
+**And** 命令不得改写 `paper_revision_gate_recompute.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 预检账本必须写明 Agent Team 调用节奏：正式写回预检前调用 ReviewerAgent / VerifierAgent；预检账本写出后收回；人工批准后才进入 P5 formal package。
+
+业务规则：P4-J 不是直接把草稿写进正式论文，而是把“将要写什么、证据在哪里、还有哪些正式审批条件”列成可审阅预览。用户确认后才进入 P5 的正式 paper package。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

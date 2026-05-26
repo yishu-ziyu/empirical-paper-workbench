@@ -74,8 +74,8 @@
 - [x] P4-H：消费 `paper_revision_round.json`，按 Agent packet 生成可执行补证任务包；每个 queued task 必须产出草案层证据文件或明确 `needs_manual_review`，不能停在自然语言建议。
 - [x] P4-H BDD/TDD：新增行为 17 和 `tests/test_paper_revision_evidence_packets.py`，先确认缺少 `Program/paper_revision_evidence_packets.py` 的 RED，再实现 evidence packet CLI。
 - [x] P4-H 真实运行：基于当前真实 `Results/json/paper_revision_round.json` 生成 `Results/json/paper_revision_evidence_packets.json`、`Reviews/paper_revision_evidence_packets.md` 和 11 个 `Reviews/agent_packets/*/*.md`；当前 10 条 `evidence_packet_ready`，1 条 `needs_manual_review`（文献包缺 `verified_bibliography.csv` 和 `contribution_matrix.md`），`formal_writeback_allowed=false`、`formal_state_guard.changed=false`。
-- [ ] P4-I：重跑 `paper_quality_report.json`、`method_gate_report.json`、`reviewer_scorecard_report.json` 和 PDF preflight manifest；每条上一轮任务必须标记 `cleared`、`still_blocking` 或 `manual_review_required`。
-- [ ] P4-J：生成 formal writeback preview，列出会改哪些章节、引用、方法叙述、结果表和复现说明；只做预检，不自动写正式层。
+- [x] P4-I：重跑 `paper_quality_report.json`、`method_gate_report.json`、`reviewer_scorecard_report.json` 和 PDF preflight manifest；每条上一轮任务必须标记 `cleared`、`still_blocking` 或 `manual_review_required`。
+- [x] P4-J：生成 formal writeback preview，列出会改哪些章节、引用、方法叙述、结果表和复现说明；只做预检，不自动写正式层。
 - [ ] P5：人工批准后生成正式 paper package，包含正文、PDF/PDF 预检、verified bibliography、contribution matrix、method diagnostics、reviewer scorecard、revision log、replication README、manifest 和复现命令。
 - [ ] P6：生成投稿级复现交付包；Verifier 能按 manifest 复跑关键命令，确认表、图、主结果、样本口径和代码版本一致，并输出最终审计报告。
 - [ ] 知识资产化：抽象复用 Agent Team schedule schema、Agent task schema、formal state guard、quality gate vocabulary、Journal/Method Skill Registry 和 verification evidence contract，避免 P4-H 到 P6 重复手写。
@@ -124,7 +124,11 @@
 - P4-I4 BDD/TDD：新增行为 21 和 `tests/test_paper_revision_gate_recompute.py::test_bdd_21_ready_evidence_packets_consume_stale_gate_task_references`；RED 为 report 仍是 `needs_revision_work`，GREEN 后进入 `ready_for_formal_writeback_preflight`。
 - P4-I4 Agent Team 回收点：Erdos 只读复核下游 `paper_package.py` 消费者逻辑，确认 P4-I4 不破坏“ready 任务不重新入队”的消费者契约；主 Agent 合并 gate recompute 最小语义变更。
 - P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
-- P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
+- P4-J1 已执行：新增 `Program/formal_writeback_preflight.py`，消费 `Results/json/paper_revision_gate_recompute.json`，生成正式写回预检账本 `Results/json/formal_writeback_preflight.json`、审阅稿 `Reviews/formal_writeback_preflight.md` 和预览稿 `Manuscripts/generated/previews/formal_writeback_preflight.md`。
+- P4-J1 真实运行：当前状态为 `ready_for_human_approval`，写回范围 5 类：章节、引用/文献、方法叙述、结果表、复现说明；`formal_writeback_allowed=false`、`requires_human_approval=true`、`formal_state_guard.changed=false`。
+- P4-J1 BDD/TDD：新增行为 22 和 `tests/test_formal_writeback_preflight.py`；RED 为缺少 `Program/formal_writeback_preflight.py`，GREEN 后覆盖 ready 和 blocked 两条路径。
+- P4-J1 Agent Team 回收点：Mencius 只读复核 P4-J 上下游、正式层保护文件和 `state/product/*` 审批边界；主 Agent 合并为最小预检实现，没有改写正式 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或正式论文层。
+- P4-J 后续 20 分钟节点规则：P5/P6 的每个子节点必须控制在 20 分钟内；超时即拆成更小节点或回退路线，不允许继续堆大黑箱。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。
 
 ## 2026-05-22 Long-run Optimization Protocol

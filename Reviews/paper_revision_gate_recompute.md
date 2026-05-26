@@ -7,8 +7,8 @@
 ## 状态计数
 
 - cleared: 0
-- still_blocking: 10
-- manual_review_required: 1
+- still_blocking: 11
+- manual_review_required: 0
 
 ## Task Results
 
@@ -35,12 +35,12 @@
 ### build_literature_package
 
 - Agent: `LiteratureAgent`
-- Previous status: `needs_manual_review`
-- Recompute status: `manual_review_required`
-- Reason: Evidence packet still requires human or external-source review.
-- Blocking sources: none
+- Previous status: `evidence_packet_ready`
+- Recompute status: `still_blocking`
+- Reason: Current gate artifacts still reference this revision task.
+- Blocking sources: paper_quality_report, pdf_export_manifest
 - Missing gate inputs: none
-- Missing evidence: 2
+- Missing evidence: 0
 
 ### run_method_gate
 

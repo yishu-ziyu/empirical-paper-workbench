@@ -31,10 +31,10 @@ NAMED_ARTIFACTS = {
         "Manuscripts/generated/paper_draft.md",
     ],
     "verified_bibliography.csv": [
-        "verified_bibliography.csv",
+        "Data/literature/processed/verified_bibliography.csv",
     ],
     "contribution_matrix.md": [
-        "contribution_matrix.md",
+        "Data/literature/processed/contribution_matrix.md",
     ],
 }
 TASK_ARTIFACTS = {
@@ -224,6 +224,7 @@ def resolve_candidate_path(project_root: Path, value: str) -> tuple[str, Path]:
 
 def discover_named_artifact(project_root: Path, filename: str) -> Path | None:
     for root in [
+        project_root / "Data" / "literature" / "processed",
         project_root / "workspace" / "runs",
         project_root / "Results",
         project_root / "Manuscripts",

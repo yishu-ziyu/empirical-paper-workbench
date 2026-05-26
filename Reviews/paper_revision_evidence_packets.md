@@ -6,8 +6,8 @@
 
 ## 状态计数
 
-- evidence_packet_ready: 10
-- needs_manual_review: 1
+- evidence_packet_ready: 11
+- needs_manual_review: 0
 
 ## Agent Team 调用节奏
 
@@ -38,10 +38,10 @@
 ### build_literature_package
 
 - Agent: `LiteratureAgent`
-- Status: `needs_manual_review`
+- Status: `evidence_packet_ready`
 - Evidence packet: `Reviews/agent_packets/literatureagent/build-literature-package.md`
-- Evidence items: 2
-- Missing evidence: 2
+- Evidence items: 4
+- Missing evidence: 0
 
 ### run_method_gate
 

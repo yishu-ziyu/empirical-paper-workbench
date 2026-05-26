@@ -23,11 +23,11 @@
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.paper_quality.v1`
 - `Results/json/paper_expansion_plan.json`
-  - sha256: `e7d786ea7b5faedc8d471b34923438f48b4cb94f96c3f9aa53fc5904b672c238`
+  - sha256: `968b35eb915d9bd722123a8455ead37db808904183e3736852346639435c9bef`
   - evidence_level: `structured_local_artifact`
   - schema_version: `p4.paper_expansion_plan.v1`
 - `Manuscripts/generated/paper_package_draft.md`
-  - sha256: `ac41cb6f835350207758396d64159ba5430c16705e6435e0c071bbb1c299ddf7`
+  - sha256: `7a6d8ead4b2df6768e285e9a3f06df6eb6313cb0c07b542a4f441f39af16ee38`
   - evidence_level: `local_artifact`
   - schema_version: `None`
 - `Manuscripts/generated/paper_draft.md`

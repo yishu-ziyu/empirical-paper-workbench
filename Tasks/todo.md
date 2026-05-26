@@ -115,7 +115,10 @@
 - P4-I2 真实运行：当前真实队列从 11 条收敛为 1 条，只保留 `build_literature_package`，来源 `paper_revision_gate_recompute`，状态 `manual_review_required`，缺口为 `verified_bibliography.csv` 和 `contribution_matrix.md`。
 - P4-I2 BDD/TDD：新增行为 19 和 `tests/test_paper_package_quality.py::test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks`；RED 为 `run_method_gate` 被错误重复入队，GREEN 后只保留人工补证任务。
 - P4-I2 Agent Team 回收点：Wegener 定位任务生产器与门控生产者，Kant 定位测试锚点和 RED 断言；主 Agent 合并最小实现、跑验证并收回两路结果。
-- P4-I3 计划：在 20 分钟节点内先补齐或生成文献人工补证路径：`verified_bibliography.csv`、`contribution_matrix.md` 的真实来源/人工辅助检索闭环；需要重新调用 LiteratureAgent、CNKI/Zotero/Web researcher。
+- P4-I3 已执行：修复证据包收集层对文献包 canonical 路径的识别，`verified_bibliography.csv` 和 `contribution_matrix.md` 现在映射到 `Data/literature/processed/*`，不再被误判为缺失。
+- P4-I3 真实运行：重跑 `paper_revision_evidence_packets.py` 后 11 条任务全部为 `evidence_packet_ready`、`needs_manual_review=0`；重跑 `paper_revision_gate_recompute.py` 后 11 条均为 `still_blocking`（当前 gate artifacts 仍引用这些任务），`manual_review_required=0`；重跑 `paper_package.py --source-manifest` 后 `agent_tasks=0`。
+- P4-I3 BDD/TDD：新增行为 20 和 `tests/test_paper_revision_evidence_packets.py::test_bdd_20_literature_short_names_resolve_to_canonical_processed_artifacts`；RED 为文献任务仍是 `needs_manual_review`，GREEN 后绑定 processed 文献证据路径。
+- P4-I3 Agent Team 回收点：Hooke 定位路径归一化缺陷，Noether 给出 CNKI/文献证据包第一版字段和人工辅助检索边界；主 Agent 合并为最小路径修复，没有扩展文献重写或正式层写回。
 - P4-I 计划调用点：质量门和审稿门重跑前调用 ReviewerAgent/VerifierAgent；重跑完成后收回并把每条任务状态更新为 cleared/still_blocking/manual_review_required。
 - P4-J 计划调用点：正式层写回预检前再次调用 ReviewerAgent/VerifierAgent；只有人工批准后才进入 P5 正式 package。
 - P5/P6 计划调用点：正式 package 和复现交付阶段调用 VerifierAgent、ExportAgent、ReviewerAgent；manifest 复跑和最终审计完成后收回，云端产品化前不再扩展 UI。

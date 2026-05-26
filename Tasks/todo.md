@@ -79,6 +79,11 @@
 - [ ] P5：人工批准后生成正式 paper package，包含正文、PDF/PDF 预检、verified bibliography、contribution matrix、method diagnostics、reviewer scorecard、revision log、replication README、manifest 和复现命令。
 - [ ] P6：生成投稿级复现交付包；Verifier 能按 manifest 复跑关键命令，确认表、图、主结果、样本口径和代码版本一致，并输出最终审计报告。
 - [ ] 知识资产化：抽象复用 Agent Team schedule schema、Agent task schema、formal state guard、quality gate vocabulary、Journal/Method Skill Registry 和 verification evidence contract，避免 P4-H 到 P6 重复手写。
+- [x] P6-F2 节点节奏规则升级：P4/P5/P6 的 A/B/C/D 等任意小节点最多 20 分钟；超时必须拆解为更小节点，或判定路线错误并回退，不再硬拖。
+- [x] P6-F2 Agent Team 调用：Rawls 只读探查 React 工作流、AgentActivityPanel 挂载点和 P3 契约测试；主 Agent 负责 BDD/TDD、集成、浏览器验收、提交。
+- [x] P6-F2 BDD/TDD：新增行为 41，新增 `tests/test_p6_formal_package_acceptance_surface.py`，先确认缺少正式包验收台的 RED，再实现最小 UI 接面。
+- [x] P6-F2 实现：新增 `FormalPackageAcceptancePanel`，在 Agent 账本真实执行授权后读取 `GET /api/v1/projects/{project_id}/formal-submission-package-summary`，展示只读验收摘要、PDF/DOCX 打开目标、人工验收清单、一致性检查和阻断原因。
+- [x] P6-F2 验证：目标测试、相邻回归、React build、`git diff --check` 和 Playwright 浏览器验收通过；截图写入 `artifacts/ui-checks/p6-formal-package-acceptance.png`。
 
 ### Agent Team 调用节奏
 

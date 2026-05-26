@@ -612,6 +612,19 @@
 
 业务规则：P6-F1 只把已生成的正式包验收摘要接到产品 API，给前端一个确定的读取入口；它不是导出器、审批器、质量评审器，也不改写正式层。
 
+### Behavior 41: React workbench renders the formal package summary as a read-only acceptance bench
+
+**Given** `GET /api/v1/projects/{project_id}/formal-submission-package-summary` returns a summary with `status=ready_for_manual_acceptance`
+**And** the summary contains PDF and DOCX `open_targets`
+**When** the user reaches the post-execution acceptance surface in the React workbench
+**Then** the page must render a formal package acceptance bench
+**And** the bench must display visible summary rows, PDF and DOCX open targets, manual acceptance checklist, consistency checks, and blocking reasons
+**And** the bench must mark itself as read-only and must not expose a button that approves, rewrites, regenerates, or opens files silently
+**And** if the API returns `409 formal_submission_package_summary_required`, the bench must show a recoverable waiting state that tells the user to generate the P6-E1 summary first
+**And** the bench must not fake a ready state from mock data when the API is unavailable.
+
+业务规则：P6-F2 把 P6-F1 的只读 API 接到产品页面，让用户在内置浏览器里看见“正式包现在能不能验收、打开哪两个文件、按什么清单验收、有没有阻断原因”。它仍然不是审批节点，不打开本地文件，不重新导出 PDF/docx，也不改写正式层。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

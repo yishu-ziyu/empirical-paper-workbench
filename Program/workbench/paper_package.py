@@ -76,7 +76,13 @@ def build_paper_expansion_plan(
     next_tasks = quality_report.get("recommended_next_tasks", [])
     draft_path = str(quality_report.get("draft_path") or "")
     manifest_tasks = normalize_manifest_review_tasks(project_root, source_manifest, source_manifest_path)
-    agent_task_queue = merge_agent_tasks(normalize_agent_task_queue(next_tasks), manifest_tasks)
+    recompute_path, recompute = load_revision_gate_recompute(project_root)
+    agent_task_queue = apply_revision_gate_recompute(
+        merge_agent_tasks(normalize_agent_task_queue(next_tasks), manifest_tasks),
+        recompute,
+        recompute_path,
+        project_root,
+    )
     agent_team_schedule = build_agent_team_schedule(source_manifest, source_manifest_path, project_root)
 
     section_plan = []
@@ -115,6 +121,9 @@ def build_paper_expansion_plan(
         "agent_task_queue": agent_task_queue,
         "source_export_manifest": (
             relative_or_absolute(source_manifest_path, project_root) if source_manifest_path is not None else None
+        ),
+        "source_revision_gate_recompute": (
+            relative_or_absolute(recompute_path, project_root) if recompute_path is not None else None
         ),
         "agent_team_schedule": agent_team_schedule,
         "release_gate": {
@@ -242,6 +251,9 @@ def build_supervisor_context_bundle(
     source_export_manifest = expansion_plan.get("source_export_manifest")
     if source_export_manifest:
         context_sources.append(str(source_export_manifest))
+    source_revision_gate_recompute = expansion_plan.get("source_revision_gate_recompute")
+    if source_revision_gate_recompute:
+        context_sources.append(str(source_revision_gate_recompute))
     for candidate in [
         project_root / "state" / "product" / "research_question.json",
         project_root / "state" / "product" / "variable_role_set.json",
@@ -385,6 +397,89 @@ def merge_agent_tasks(*task_groups: list[dict[str, Any]]) -> list[dict[str, Any]
     for order, task in enumerate(merged, start=1):
         task["order"] = order
     return merged
+
+
+def load_revision_gate_recompute(project_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+    path = project_root / "Results" / "json" / "paper_revision_gate_recompute.json"
+    if not path.exists():
+        return None, None
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
+def apply_revision_gate_recompute(
+    tasks: list[dict[str, Any]],
+    recompute: dict[str, Any] | None,
+    recompute_path: Path | None,
+    project_root: Path,
+) -> list[dict[str, Any]]:
+    if not recompute or recompute_path is None:
+        return tasks
+
+    task_results = {
+        item.get("task_id"): item
+        for item in recompute.get("task_results", [])
+        if item.get("task_id")
+    }
+    filtered: list[dict[str, Any]] = []
+    for task in tasks:
+        result = task_results.get(task.get("id"))
+        if result is None:
+            filtered.append(task)
+            continue
+        if result.get("status") == "manual_review_required":
+            continue
+        if result.get("previous_status") == "evidence_packet_ready":
+            continue
+        if result.get("status") == "cleared":
+            continue
+        filtered.append(task)
+
+    for result in task_results.values():
+        if result.get("status") != "manual_review_required":
+            continue
+        filtered.append(build_manual_review_task_from_recompute(result, recompute_path, project_root))
+
+    return merge_agent_tasks(filtered)
+
+
+def build_manual_review_task_from_recompute(
+    result: dict[str, Any],
+    recompute_path: Path,
+    project_root: Path,
+) -> dict[str, Any]:
+    task_id = str(result["task_id"])
+    missing = [format_missing_evidence(item) for item in result.get("missing_evidence", [])]
+    reason = "需要人工补齐证据。"
+    if missing:
+        reason = f"需要人工补齐证据：{', '.join(missing)}。"
+    source_artifact = relative_or_absolute(recompute_path, project_root)
+    return {
+        "order": 0,
+        "id": task_id,
+        "agent": infer_agent_for_review_task(task_id),
+        "reason": reason,
+        "action": "补齐人工证据后重跑质量门复核账本。",
+        "inputs": [source_artifact, *missing],
+        "status": "manual_review_required",
+        "source": "paper_revision_gate_recompute",
+        "source_artifact": source_artifact,
+        "blocking_sources": result.get("blocking_sources", []),
+        "missing_evidence": missing,
+        "verification": {
+            "required_before_completion": [
+                "missing_evidence_files_created",
+                "paper_revision_gate_recompute_rerun",
+            ]
+        },
+    }
+
+
+def format_missing_evidence(item: Any) -> str:
+    if isinstance(item, dict):
+        path = item.get("path")
+        if path:
+            return str(path)
+    return str(item)
 
 
 def build_agent_team_schedule(

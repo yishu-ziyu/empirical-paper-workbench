@@ -242,6 +242,20 @@
 
 业务规则：P4-I 不是继续生成更多建议，而是把 P4-H 的证据包变成下一轮门控判断。系统必须明确哪些任务已具备进入正式写回预检的证据，哪些仍阻塞，哪些需要人工补证。
 
+## 行为 19：下一轮任务生产器必须消费质量门复核账本
+
+**Given** `paper_revision_gate_recompute.json` 已经写出上一轮修订任务的复核结果
+**And** PDF export manifest 或 paper quality report 仍包含上一轮任务 id
+**When** 用户运行 `Program/paper_package.py --source-manifest <manifest>`
+**Then** `paper_expansion_plan.json` 的 `agent_task_queue` 不得重新加入已有 `previous_status=evidence_packet_ready` 的任务
+**And** `manual_review_required` 的任务必须保留在 `agent_task_queue`
+**And** 被保留的人工任务必须标明来源是 `paper_revision_gate_recompute`
+**And** `paper_supervisor_context.json` 必须把 `Results/json/paper_revision_gate_recompute.json` 加入 `context_sources`
+**And** 任务生产器不得改写 `paper_revision_gate_recompute.json`
+**And** 任务生产器不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+
+业务规则：P4-I1 的复核账本必须真的进入下一轮生产器。系统不能一边生成证据包，一边在下一轮又把同一批已具备证据的任务重新塞回队列；但需要人工补证的任务必须继续留在队列里。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

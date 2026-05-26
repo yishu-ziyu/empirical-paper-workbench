@@ -18,6 +18,9 @@ TARGET_PATHS = {
     "variable_role_set": "Submissions/formal_package/evidence/variable_role_set.json",
     "sample_profile": "Results/json/sample_profile.json",
     "regression_tables": "Results/json/regression_tables.json",
+    "figure_manifest": "Results/json/figure_manifest.json",
+    "robustness_matrix": "Results/json/robustness_matrix.json",
+    "limitations_register": "Results/json/limitations_register.json",
 }
 
 
@@ -141,6 +144,12 @@ def build_evidence_payload(project_root: Path, evidence_id: str) -> tuple[dict[s
         return build_sample_profile(project_root)
     if evidence_id == "regression_tables":
         return build_regression_tables(project_root)
+    if evidence_id == "figure_manifest":
+        return build_figure_manifest(project_root)
+    if evidence_id == "robustness_matrix":
+        return build_robustness_matrix(project_root)
+    if evidence_id == "limitations_register":
+        return build_limitations_register(project_root)
     raise ValueError(f"unsupported evidence id: {evidence_id}")
 
 
@@ -261,6 +270,244 @@ def build_regression_tables(project_root: Path) -> tuple[dict[str, Any], list[st
     )
 
 
+def build_figure_manifest(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    figure_dirs = [
+        project_root / "Results" / "fig",
+        project_root / "Results" / "figures",
+        project_root / "Submissions" / "formal_package" / "figures",
+    ]
+    manifest_candidates = [
+        project_root / "Submissions" / "cfps_robot_pdf_export_manifest.json",
+        project_root / "Submissions" / "export_manifest.json",
+        project_root / "Results" / "fig" / "README.md",
+    ]
+    figure_suffixes = {".png", ".jpg", ".jpeg", ".svg", ".pdf"}
+    figures: list[dict[str, Any]] = []
+    for directory in figure_dirs:
+        if not directory.exists():
+            continue
+        for path in sorted(directory.rglob("*")):
+            if path.is_file() and path.suffix.lower() in figure_suffixes:
+                figures.append(
+                    {
+                        "id": path.stem,
+                        "path": relative_or_absolute(path, project_root),
+                        "format": path.suffix.lower().lstrip("."),
+                        "status": "registered",
+                    }
+                )
+
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in manifest_candidates
+        if path.exists()
+    ]
+    if not source_paths:
+        source_paths = [
+            relative_or_absolute(directory, project_root)
+            for directory in figure_dirs
+            if directory.exists()
+        ]
+
+    warnings: list[str] = []
+    status = "registered"
+    review_status = "ready_for_review"
+    next_action = "核对图表编号、caption、正文引用和导出格式。"
+    if not figures:
+        status = "no_rendered_figures_registered"
+        review_status = "needs_human_review"
+        warnings.append("no_rendered_figures_registered")
+        next_action = "先渲染或登记真实图表，再进入最终 PDF 导出。"
+
+    return (
+        {
+            "schema_version": "p5.figure_manifest.v1",
+            "evidence_id": "figure_manifest",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": status,
+            "review_status": review_status,
+            "figures": figures,
+            "tables_referenced_elsewhere": ["Results/json/regression_tables.json"],
+            "canonical_write_allowed": False,
+            "next_action": next_action,
+        },
+        warnings,
+    )
+
+
+def build_robustness_matrix(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    diagnostics_path = project_root / "Results" / "json" / "method_diagnostics_report.json"
+    gate_path = project_root / "Results" / "json" / "method_gate_report.json"
+    analysis_path = project_root / "Results" / "json" / "cfps_robot_analysis_result.json"
+    diagnostics_report = load_json_if_exists(diagnostics_path)
+    gate_report = load_json_if_exists(gate_path)
+    analysis_result = load_json_if_exists(analysis_path)
+
+    checks: list[dict[str, Any]] = []
+    for diagnostic in diagnostics_report.get("diagnostics") or []:
+        status = diagnostic.get("status")
+        checks.append(
+            {
+                "id": diagnostic.get("id"),
+                "status": status,
+                "scope": diagnostic.get("scope"),
+                "source": "method_diagnostics_report",
+                "outputs": diagnostic.get("outputs") or {},
+                "review_items": diagnostic.get("review_items") or [],
+                "requires_human_review": status in {"yellow", "needs_manual_review", "red"},
+            }
+        )
+
+    existing_ids = {item.get("id") for item in checks}
+    for diagnostic in gate_report.get("diagnostics") or []:
+        diagnostic_id = diagnostic.get("id")
+        if diagnostic_id in existing_ids:
+            continue
+        status = diagnostic.get("status")
+        checks.append(
+            {
+                "id": diagnostic_id,
+                "status": status,
+                "source": "method_gate_report",
+                "observed": diagnostic.get("observed"),
+                "review_items": [],
+                "requires_human_review": status in {"yellow", "needs_manual_review", "failed", "red"},
+            }
+        )
+
+    robustness_findings = []
+    for finding in (analysis_result.get("robustness_findings") or {}).get("_findings") or []:
+        robustness_findings.append(
+            {
+                "id": finding.get("name"),
+                "label": finding.get("label"),
+                "status": finding.get("severity"),
+                "value": finding.get("value"),
+                "interpretation": finding.get("interpretation"),
+                "source": "cfps_robot_analysis_result",
+            }
+        )
+
+    warnings: list[str] = []
+    needs_review = any(item.get("requires_human_review") for item in checks)
+    if needs_review:
+        warnings.append("robustness_items_need_review")
+
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [diagnostics_path, gate_path, analysis_path]
+        if path.exists()
+    ]
+    return (
+        {
+            "schema_version": "p5.robustness_matrix.v1",
+            "evidence_id": "robustness_matrix",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "method_family": diagnostics_report.get("method_family") or gate_report.get("method_family"),
+            "method_subtype": diagnostics_report.get("method_subtype") or gate_report.get("method_subtype"),
+            "status": "completed_with_review_items" if needs_review else "ready_for_review",
+            "review_status": "needs_human_review" if needs_review else "ready_for_review",
+            "checks": checks,
+            "supplemental_robustness_findings": robustness_findings,
+            "gate_status": gate_report.get("gate_status"),
+            "required_evidence": gate_report.get("required_evidence") or [],
+            "yellow_items": gate_report.get("yellow_items") or [],
+            "red_items": gate_report.get("red_items") or [],
+            "blocking_items": gate_report.get("blocking_items") or [],
+            "recommended_next_tasks": gate_report.get("recommended_next_tasks") or [],
+            "canonical_write_allowed": False,
+            "interpretation_boundary": "该矩阵支持草案中的稳健性讨论和下一轮任务拆解；正式强因果表述仍取决于黄灯和人工审阅项是否关闭。",
+        },
+        warnings,
+    )
+
+
+def build_limitations_register(project_root: Path) -> tuple[dict[str, Any], list[str]]:
+    scorecard_path = project_root / "Results" / "json" / "reviewer_scorecard_report.json"
+    gate_path = project_root / "Results" / "json" / "method_gate_report.json"
+    diagnostics_path = project_root / "Results" / "json" / "method_diagnostics_report.json"
+    scorecard = load_json_if_exists(scorecard_path)
+    gate_report = load_json_if_exists(gate_path)
+    diagnostics_report = load_json_if_exists(diagnostics_path)
+
+    limitations: list[dict[str, Any]] = []
+    for task in scorecard.get("revision_tasks") or []:
+        limitations.append(
+            {
+                "id": task.get("id"),
+                "source": "reviewer_scorecard_report.revision_tasks",
+                "severity": task.get("severity"),
+                "agent": task.get("agent"),
+                "blocking_scope": task.get("blocking_scope"),
+                "evidence_source": task.get("evidence_source"),
+                "recommended_action": task.get("recommended_action"),
+                "requires_human_acceptance": bool(task.get("requires_human_acceptance")),
+                "status": task.get("status"),
+            }
+        )
+
+    for item in gate_report.get("yellow_items") or []:
+        limitations.append(
+            {
+                "id": f"yellow_item:{item}",
+                "source": "method_gate_report.yellow_items",
+                "severity": "major",
+                "blocking_scope": "formal_claims",
+                "evidence_source": item,
+                "recommended_action": "关闭该方法门黄灯项，或在正文中保留明确局限说明。",
+                "requires_human_acceptance": True,
+                "status": "open",
+            }
+        )
+
+    for item in gate_report.get("blocking_items") or []:
+        limitations.append(
+            {
+                "id": f"blocking_item:{item}",
+                "source": "method_gate_report.blocking_items",
+                "severity": "blocking",
+                "blocking_scope": "export",
+                "evidence_source": item,
+                "recommended_action": "补齐阻断证据后再进入导出。",
+                "requires_human_acceptance": True,
+                "status": "open",
+            }
+        )
+
+    blocks_export = bool(scorecard.get("blocks_export_or_formal_claims") or gate_report.get("blocking_items"))
+    warnings: list[str] = []
+    if limitations or blocks_export:
+        warnings.append("limitations_need_human_review")
+
+    source_paths = [
+        relative_or_absolute(path, project_root)
+        for path in [scorecard_path, gate_path, diagnostics_path]
+        if path.exists()
+    ]
+    return (
+        {
+            "schema_version": "p5.limitations_register.v1",
+            "evidence_id": "limitations_register",
+            "generated_at": utc_now(),
+            "source_paths": source_paths,
+            "status": "needs_human_review" if limitations or blocks_export else "ready_for_review",
+            "review_status": "needs_human_review" if limitations or blocks_export else "ready_for_review",
+            "method_family": scorecard.get("method_family") or gate_report.get("method_family") or diagnostics_report.get("method_family"),
+            "method_subtype": scorecard.get("method_subtype") or gate_report.get("method_subtype") or diagnostics_report.get("method_subtype"),
+            "overall_score": scorecard.get("overall_score"),
+            "overall_verdict": scorecard.get("overall_verdict"),
+            "blocks_export_or_formal_claims": blocks_export,
+            "limitations": limitations,
+            "gate_status": gate_report.get("gate_status"),
+            "canonical_write_allowed": False,
+            "claim_boundary": "局限登记表用于写作和导出前审阅；正式结论强度必须由人工基于这些条目确认。",
+        },
+        warnings,
+    )
+
+
 def write_formal_evidence_materialization_outputs(
     report_path: Path,
     review_path: Path,
@@ -333,6 +580,12 @@ def build_agent_team_schedule(
             agents.add("ExecutionAgent")
         elif evidence_id == "sample_profile":
             agents.add("DataAgent")
+        elif evidence_id == "figure_manifest":
+            agents.add("ExecutionAgent")
+        elif evidence_id == "robustness_matrix":
+            agents.add("MethodAgent")
+        elif evidence_id == "limitations_register":
+            agents.add("ReviewerAgent")
     return {
         "call_when": "before_high_confidence_evidence_materialization",
         "called_agents": sorted(agents),
@@ -374,6 +627,10 @@ def first_method(method_result: dict[str, Any]) -> dict[str, Any]:
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_json_if_exists(path: Path) -> dict[str, Any]:
+    return load_json(path) if path.exists() else {}
 
 
 def utc_now() -> str:

@@ -7,9 +7,9 @@
 
 ## 已材料化证据
 
-- `variable_role_set` -> `Submissions/formal_package/evidence/variable_role_set.json` (variable_role_dataset_mismatch)
-- `sample_profile` -> `Results/json/sample_profile.json` (none)
-- `regression_tables` -> `Results/json/regression_tables.json` (none)
+- `figure_manifest` -> `Results/json/figure_manifest.json` (no_rendered_figures_registered)
+- `robustness_matrix` -> `Results/json/robustness_matrix.json` (robustness_items_need_review)
+- `limitations_register` -> `Results/json/limitations_register.json` (limitations_need_human_review)
 
 ## 跳过项
 
@@ -17,7 +17,9 @@
 
 ## Warnings
 
-- `variable_role_dataset_mismatch`
+- `limitations_need_human_review`
+- `no_rendered_figures_registered`
+- `robustness_items_need_review`
 
 ## 下一步
 

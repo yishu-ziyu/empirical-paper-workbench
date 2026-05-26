@@ -1,0 +1,367 @@
+{
+  "schema_version": "p5.robustness_matrix.v1",
+  "evidence_id": "robustness_matrix",
+  "generated_at": "2026-05-26T19:56:17.222437+00:00",
+  "source_paths": [
+    "Results/json/method_diagnostics_report.json",
+    "Results/json/method_gate_report.json",
+    "Results/json/cfps_robot_analysis_result.json"
+  ],
+  "method_family": "iv",
+  "method_subtype": "bartik_shift_share_iv",
+  "status": "completed_with_review_items",
+  "review_status": "needs_human_review",
+  "checks": [
+    {
+      "id": "baseline_iv_2sls_binding",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "coef": 0.19938432274696538,
+        "std_error": 0.07799752334411218,
+        "t_stat": 2.5562904333168976,
+        "p_value": 0.010579477572494778,
+        "conf_int": [
+          0.04651198610918339,
+          0.3522566593847474
+        ],
+        "nobs": 15697,
+        "cov_type": "clustered",
+        "cluster_by": [
+          "provcd"
+        ]
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "first_stage_relevance",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "first_stage_f": 14.52341272056966,
+        "first_stage_p": 0.00013842841708078257,
+        "partial_r_squared": 0.4834380117414607,
+        "rsquared": 0.4971640079818628,
+        "f_dist": "chi2(1)"
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "robust_first_stage_f_or_kp",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "statistic": 14.52341272056966,
+        "p_value": 0.00013842841708078257,
+        "backend": "linearmodels_first_stage_clustered"
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "weak_iv_robust_inference_ar_or_clr",
+      "status": "yellow",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "anderson_rubin": {
+          "stat": null,
+          "p_value": null,
+          "distribution": "None",
+          "valid": false
+        },
+        "clr": null,
+        "note": "exactly_identified_model_ar_overidentification_test_not_available"
+      },
+      "review_items": [
+        "weak_iv_robust_ci_follow_up"
+      ],
+      "requires_human_review": true
+    },
+    {
+      "id": "reduced_form",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "coef": 0.139983926993472,
+        "std_error": 0.024635057227647646,
+        "t_stat": 5.682305736086119,
+        "p_value": 1.3289082173302963e-08,
+        "conf_int": [
+          0.09170010207019946,
+          0.18826775191674455
+        ],
+        "nobs": 15697,
+        "cov_type": "cluster",
+        "cluster_by": [
+          "provcd"
+        ]
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "ols_comparison",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "coef": 0.09752669182028739,
+        "std_error": 0.01779693125874759,
+        "t_stat": 5.479972384135093,
+        "p_value": 4.253922275490386e-08,
+        "conf_int": [
+          0.06264534751780702,
+          0.13240803612276775
+        ],
+        "nobs": 15697,
+        "cov_type": "cluster",
+        "cluster_by": [
+          "provcd"
+        ]
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "sample_consistency",
+      "status": "yellow",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "status": "yellow",
+        "raw_rows": 34315,
+        "usable_rows": 15697,
+        "expected_sample_size": null,
+        "review_items": [
+          "raw_rows_differ_from_usable_rows_after_missing_drop"
+        ]
+      },
+      "review_items": [
+        "raw_rows_differ_from_usable_rows_after_missing_drop"
+      ],
+      "requires_human_review": true
+    },
+    {
+      "id": "shift_share_identification_diagnostics",
+      "status": "yellow",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "component_available": false,
+        "component_columns": [],
+        "instrument_variance": 1.4248984776799036,
+        "instrument_missing_share": 0.0,
+        "review_items": [
+          "missing_shift_share_components"
+        ]
+      },
+      "review_items": [
+        "missing_shift_share_components"
+      ],
+      "requires_human_review": true
+    },
+    {
+      "id": "shift_share_rotemberg_weights",
+      "status": "needs_manual_review",
+      "scope": "manual_review",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "max_leave_one_out": 10
+      },
+      "review_items": [
+        "missing_shift_share_components"
+      ],
+      "requires_human_review": true
+    },
+    {
+      "id": "leave_one_out_or_alternative_shock",
+      "status": "needs_manual_review",
+      "scope": "manual_review",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "component_available": false
+      },
+      "review_items": [
+        "missing_shift_share_components"
+      ],
+      "requires_human_review": true
+    },
+    {
+      "id": "artifact_binding",
+      "status": "green",
+      "scope": "machine_run",
+      "source": "method_diagnostics_report",
+      "outputs": {
+        "diagnostics_artifact_path": "Results/json/method_diagnostics_report.json",
+        "task_scoped": true
+      },
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "first_stage_f",
+      "status": "passed",
+      "source": "method_gate_report",
+      "observed": 14.03,
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "partial_r_squared",
+      "status": "recorded",
+      "source": "method_gate_report",
+      "observed": 0.4834,
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "dwh_endogeneity_test",
+      "status": "recorded",
+      "source": "method_gate_report",
+      "observed": 14.27,
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "cluster_count",
+      "status": "recorded",
+      "source": "method_gate_report",
+      "observed": 30,
+      "review_items": [],
+      "requires_human_review": false
+    },
+    {
+      "id": "result_artifact_binding",
+      "status": "recorded",
+      "source": "method_gate_report",
+      "observed": {
+        "diagnostics_artifact_path": "Results/json/method_diagnostics_report.json",
+        "task_scoped": true
+      },
+      "review_items": [],
+      "requires_human_review": false
+    }
+  ],
+  "supplemental_robustness_findings": [
+    {
+      "id": "violations_none",
+      "label": "Self-reported violations",
+      "status": "ok",
+      "value": "none",
+      "interpretation": "`result.violations()` returned an empty list.",
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "estimate",
+      "label": "Coefficient on ln_robot",
+      "status": "info",
+      "value": 0.10390744733857095,
+      "interpretation": null,
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "ci_width",
+      "label": "95% CI width (≈ 2·1.96·SE)",
+      "status": "info",
+      "value": 0.023078649639299766,
+      "interpretation": null,
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "evalue",
+      "label": "E-value (VanderWeele-Ding)",
+      "status": "check_failed",
+      "value": null,
+      "interpretation": "e-value computation failed: AttributeError",
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "oster_delta_star",
+      "label": "Oster δ*-for-zero (selection-ratio threshold)",
+      "status": "ok",
+      "value": 23.470787736934227,
+      "interpretation": "|δ*| ≥ 1 — unobservables would have to be at least as important as observables to flip the sign",
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "oster_beta_adjusted",
+      "label": "Oster β* (bias-adjusted estimate at δ=1)",
+      "status": "info",
+      "value": 0.0994803506213013,
+      "interpretation": null,
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "sensemakr_rv",
+      "label": "Sensemakr Robustness Value (RV, q=1)",
+      "status": "ok",
+      "value": 0.13934844462836599,
+      "interpretation": "RV = 0.139 — confounders explaining ≥ 13.9% of treatment & outcome residual variance would null the result",
+      "source": "cfps_robot_analysis_result"
+    },
+    {
+      "id": "sensemakr_rv_qa",
+      "label": "Sensemakr RV (q=1, α=0.05 — significance threshold)",
+      "status": "info",
+      "value": 0.12410654183894104,
+      "interpretation": null,
+      "source": "cfps_robot_analysis_result"
+    }
+  ],
+  "gate_status": "yellow",
+  "required_evidence": [
+    "exclusion_restriction_review",
+    "leave_one_out_or_alternative_shock",
+    "shift_share_identification_diagnostics",
+    "shift_share_identification_narrative_review",
+    "shift_share_rotemberg_weights",
+    "weak_iv_robust_inference_ar_or_clr"
+  ],
+  "yellow_items": [
+    "missing_leave_one_out_or_alternative_shock",
+    "missing_shift_share_identification_diagnostics",
+    "missing_shift_share_rotemberg_weights",
+    "missing_weak_iv_robust_inference",
+    "missing_weak_iv_robust_inference_ar_or_clr",
+    "review_exclusion_restriction_argument",
+    "review_share_or_shock_exogeneity_position"
+  ],
+  "red_items": [],
+  "blocking_items": [],
+  "recommended_next_tasks": [
+    {
+      "id": "run_weak_iv_robust_inference",
+      "agent": "ExecutionAgent",
+      "reason": "补 Anderson-Rubin / CLR 等弱工具稳健推断。",
+      "required_evidence": [
+        "weak_iv_robust_inference_ar_or_clr",
+        "robust_first_stage_f_or_kp"
+      ]
+    },
+    {
+      "id": "review_exclusion_restriction",
+      "agent": "MethodAgent",
+      "reason": "审阅 Bartik 工具变量排他性约束和识别叙事。",
+      "required_evidence": [
+        "exclusion_restriction_review"
+      ]
+    },
+    {
+      "id": "run_shift_share_diagnostics",
+      "agent": "ExecutionAgent",
+      "reason": "补 Rotemberg weights、leave-one-out 或 shock-level / exposure-level 诊断。",
+      "required_evidence": [
+        "shift_share_identification_diagnostics"
+      ]
+    }
+  ],
+  "canonical_write_allowed": false,
+  "interpretation_boundary": "该矩阵支持草案中的稳健性讨论和下一轮任务拆解；正式强因果表述仍取决于黄灯和人工审阅项是否关闭。"
+}

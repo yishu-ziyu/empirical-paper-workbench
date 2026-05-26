@@ -1,0 +1,265 @@
+{
+  "schema_version": "p4.formal_writeback_preflight.v1",
+  "generated_at": "2026-05-26T17:52:49.770959+00:00",
+  "source_gate_recompute": "Results/json/paper_revision_gate_recompute.json",
+  "status": "ready_for_human_approval",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "requires_human_approval": true,
+  "blocking_reasons": [],
+  "source_status_counts": {
+    "cleared": 11,
+    "still_blocking": 0,
+    "manual_review_required": 0
+  },
+  "writeback_scope": [
+    {
+      "order": 1,
+      "category": "sections",
+      "label": "章节扩写",
+      "approval_question": "是否把扩写后的章节结构纳入正式 paper package？",
+      "task_ids": [
+        "expand_working_paper_sections",
+        "fix_submission_metadata"
+      ],
+      "evidence_refs": [
+        {
+          "path": "Reviews/agent_packets/manuscriptagent/expand-working-paper-sections.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/manuscriptagent/fix-submission-metadata.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Manuscripts/generated/paper_package_draft.md",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        }
+      ],
+      "approval_status": "pending_human_approval",
+      "requires_human_confirmation": true,
+      "can_write_product_state": false
+    },
+    {
+      "order": 2,
+      "category": "citations",
+      "label": "引用与文献",
+      "approval_question": "是否接受当前文献清单、贡献矩阵和引用边界？",
+      "task_ids": [
+        "build_literature_package"
+      ],
+      "evidence_refs": [
+        {
+          "path": "Reviews/agent_packets/literatureagent/build-literature-package.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Data/literature/processed/verified_bibliography.csv",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Data/literature/processed/contribution_matrix.md",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        }
+      ],
+      "approval_status": "pending_human_approval",
+      "requires_human_confirmation": true,
+      "can_write_product_state": false
+    },
+    {
+      "order": 3,
+      "category": "method_narrative",
+      "label": "方法叙述",
+      "approval_question": "是否把方法门诊断和识别边界写入正式方法章节？",
+      "task_ids": [
+        "run_method_gate",
+        "add_weak_iv_robust_interval_or_caveat",
+        "add_rotemberg_weights_review",
+        "write_exclusion_and_shock_exogeneity_review"
+      ],
+      "evidence_refs": [
+        {
+          "path": "Reviews/agent_packets/methodagent/run-method-gate.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/methodagent/add-weak-iv-robust-interval-or-caveat.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/methodagent/add-rotemberg-weights-review.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/methodagent/write-exclusion-and-shock-exogeneity-review.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/method_gate_report.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/method_diagnostics_report.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        }
+      ],
+      "approval_status": "pending_human_approval",
+      "requires_human_confirmation": true,
+      "can_write_product_state": false
+    },
+    {
+      "order": 4,
+      "category": "result_tables",
+      "label": "结果表与样本说明",
+      "approval_question": "是否把当前结果表、样本口径和数据诊断纳入正式结果章节？",
+      "task_ids": [
+        "add_leave_one_out_or_alternative_shock_check",
+        "recover_bartik_share_shock_components",
+        "explain_missing_drop_and_analysis_sample"
+      ],
+      "evidence_refs": [
+        {
+          "path": "Reviews/agent_packets/executionagent/add-leave-one-out-or-alternative-shock-check.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/dataagent/recover-bartik-share-shock-components.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Reviews/agent_packets/dataagent/explain-missing-drop-and-analysis-sample.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/method_execution_result.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/project_snapshot.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        }
+      ],
+      "approval_status": "pending_human_approval",
+      "requires_human_confirmation": true,
+      "can_write_product_state": false
+    },
+    {
+      "order": 5,
+      "category": "reproducibility",
+      "label": "复现说明",
+      "approval_question": "是否进入 P5 正式包并生成复现交付材料？",
+      "task_ids": [
+        "run_reviewer_revision_loop"
+      ],
+      "evidence_refs": [
+        {
+          "path": "Reviews/agent_packets/revieweragent/run-reviewer-revision-loop.md",
+          "source": "agent_packet",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/reviewer_scorecard_report.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Submissions/cfps_robot_pdf_export_manifest.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        },
+        {
+          "path": "Results/json/paper_quality_report.json",
+          "source": "canonical_artifact",
+          "exists": true,
+          "evidence_level": "local_file"
+        }
+      ],
+      "approval_status": "pending_human_approval",
+      "requires_human_confirmation": true,
+      "can_write_product_state": false
+    }
+  ],
+  "preview_path": "Manuscripts/generated/previews/formal_writeback_preflight.md",
+  "approval_contract": {
+    "required_before_p5": [
+      "human_approval_record",
+      "writeback_scope_reviewed",
+      "formal_state_guard_confirmed"
+    ],
+    "approval_path": "state/product/writeback_approvals.json",
+    "docx_preflight_path": "state/product/docx_export_preflight.json",
+    "ready_for_approval": true,
+    "canonical_write_policy": "本节点只生成草案层预览；人工批准后，P5 才能写正式 paper package、docx preflight 和 export manifest。"
+  },
+  "agent_team_schedule": {
+    "call_when": "before_formal_writeback_preflight",
+    "called_agents": [
+      "ReviewerAgent",
+      "VerifierAgent",
+      "ManuscriptAgent",
+      "LiteratureAgent",
+      "MethodAgent",
+      "ExecutionAgent",
+      "ExportAgent"
+    ],
+    "recall_when": "after_formal_writeback_preflight_written",
+    "next_call_when": "after_human_approval_before_p5_formal_package",
+    "integration_owner": "MainAgent",
+    "boundary": "Agent Team 只复核写回范围、证据和风险；正式写回由 P5 在人工批准后执行。"
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "human_approve_formal_package",
+    "label": "人工批准正式包写回",
+    "description": "审阅 formal writeback preview 后，决定是否进入 P5 正式 paper package。"
+  }
+}

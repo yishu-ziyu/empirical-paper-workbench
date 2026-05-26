@@ -847,3 +847,15 @@
 - [x] 保护边界：manifest 明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
 - [x] 验证：目标测试 3 OK；相邻 P5/P1 export 回归 17 OK；Python 编译通过；真实 CLI 运行输出 `formal_package_manifest_ready`。
 - [ ] 下一步 P5-C：基于 manifest 组装正式稿源文件清单和章节占位，不直接跳到最终 PDF；P5-D 再做 PDF/export preflight。
+
+## 2026-05-27 P5-C Formal Manuscript Source Assembly
+
+- [x] 节点时间盒：P5-C 只处理“正式稿源装配清单 + 章节源占位”，不生成最终 PDF、docx 或正式正文；超过该边界的写作和导出进入 P5-D/P6。
+- [x] Agent Team：尝试新建 verifier sidecar 时因线程上限被拒绝，已复用现有后台审查线程；主线不等待，避免阻塞 20 分钟节点。
+- [x] BDD：在 `docs/architecture-v2/codex-phase-p4-paper-package-quality-bdd.md` 新增 Behavior 25，定义 ready manifest 才能装配章节源。
+- [x] TDD：新增 `tests/test_formal_manuscript_source_assembly.py`；首次 RED 失败原因是缺少 `Program/formal_manuscript_source_assembly.py`。
+- [x] 实现：新增 `Program/workbench/formal_manuscript_source_assembly.py` 和 CLI wrapper，复用 `REQUIRED_SECTIONS` / `SECTION_TARGETS` 生成 10 个章节源占位和 `section_sources.json`。
+- [x] 产物：生成 `Results/json/formal_manuscript_source_map.json`、`Reviews/formal_manuscript_source_map.md`、`Submissions/formal_package/manuscript/section_sources.json` 和 10 个章节源占位文件。
+- [x] 保护边界：source map 明确 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`，并记录 formal state guard。
+- [x] 验证：目标测试 3 OK；真实 CLI 运行输出 `formal_manuscript_sources_ready` 和 `can_prepare_pdf_preflight=true`。
+- [ ] 下一步 P5-D：对章节源、文献、方法、结果和复现说明做 PDF-first export preflight；只生成预检与补写任务，不直接输出正式 PDF。

@@ -331,6 +331,23 @@
 
 业务规则：P5-B 是正式 paper package 的目录和清单入口。它把人工批准后的写回范围组织成可复核的包结构，但仍不写最终论文、不导出 PDF/docx，也不改研究设定。
 
+### Behavior 25: Formal manuscript source assembly maps package sections into source placeholders without exporting the paper
+
+**Given** `formal_paper_package_manifest.json` 的状态是 `formal_package_manifest_ready`
+**And** manifest 声明 `can_build_package=true`
+**When** 用户运行 `Program/formal_manuscript_source_assembly.py`
+**Then** 系统必须写出 `Results/json/formal_manuscript_source_map.json`
+**And** 系统必须写出 `Reviews/formal_manuscript_source_map.md`
+**And** 系统必须写出 `Submissions/formal_package/manuscript/section_sources.json`
+**And** 系统必须为正式论文必需章节创建草案源占位文件
+**And** 每个章节源必须声明目标长度、负责 Agent、输入证据和当前状态
+**And** 源装配清单必须声明本命令没有生成最终 PDF、docx 或正式正文
+**And** 命令不得改写 `formal_paper_package_manifest.json`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`
+**And** 如果 manifest 缺失、不 ready、或正式包目录结构不完整，系统必须阻断源装配并说明原因。
+
+业务规则：P5-C 把 P5-B 的正式包骨架推进到“可以被 ManuscriptAgent / LiteratureAgent / MethodAgent / ExecutionAgent 分工填写”的源文件层。它只创建章节源清单和占位文件，方便下一步 PDF 预检识别缺口；它不生成最终 PDF/docx，也不把草案内容写成正式论文。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

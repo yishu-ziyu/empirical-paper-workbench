@@ -1,0 +1,264 @@
+{
+  "schema_version": "p5.regression_tables.v1",
+  "evidence_id": "regression_tables",
+  "generated_at": "2026-05-26T19:36:58.942552+00:00",
+  "source_paths": [
+    "Results/json/method_execution_result.json"
+  ],
+  "review_status": "ready_for_review",
+  "tables": [
+    {
+      "table_id": "regression_table_1",
+      "run_id": "run_612f02a059d1",
+      "task_id": "robot_wage_iv_baseline",
+      "method_id": "iv",
+      "estimator": "iv",
+      "formula": "ln_wage ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+      "nobs": 34315,
+      "dependent_var": "ln_wage",
+      "treatment": "ln_robot",
+      "coefficient_rows": [
+        {
+          "term": "female",
+          "coefficient": -0.475301692173,
+          "standard_error": 0.0295444437263,
+          "t_statistic": -16.0881972263,
+          "p_value": 0.0
+        },
+        {
+          "term": "age",
+          "coefficient": -0.000212649483214,
+          "standard_error": 0.00169732729283,
+          "t_statistic": -0.125288893995,
+          "p_value": 0.900296449179
+        },
+        {
+          "term": "edu_last",
+          "coefficient": 0.244957348323,
+          "standard_error": 0.0181031684848,
+          "t_statistic": 13.5316176319,
+          "p_value": 0.0
+        },
+        {
+          "term": "urban",
+          "coefficient": 0.0943502869577,
+          "standard_error": 0.0249760934076,
+          "t_statistic": 3.77774425647,
+          "p_value": 0.000158839883742
+        },
+        {
+          "term": "ln_robot",
+          "coefficient": 0.199384322747,
+          "standard_error": 0.0793435494782,
+          "t_statistic": 2.51300423813,
+          "p_value": 0.0119807291718
+        }
+      ],
+      "diagnostics": {
+        "R-squared": 0.1861711920936353,
+        "N instruments": 1,
+        "N endogenous": 1,
+        "First-stage F (ln_robot)": 14685.767541320043,
+        "First-stage F p-value (ln_robot)": 0.0,
+        "Partial R² (ln_robot)": 0.4834380117414607,
+        "Hausman F-stat": 283.98755308421084,
+        "Hausman p-value": 0.0,
+        "KP rk LM": 230791840.32185534,
+        "KP rk LM p-value": 0.0,
+        "KP rk Wald F": 15821.294847346873,
+        "OP effective F error": "\"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\""
+      },
+      "summary_text": "================================================================================\nModel: IV-2SLS\nMethod: Two-Stage Least Squares\nDependent Variable: ln_wage\n================================================================================\n          Coefficient  Std. Error  t-statistic  P>|t|  [0.025  0.975]\nfemale        -0.4753      0.0295     -16.0882 0.0000 -0.5332 -0.4174\nage           -0.0002      0.0017      -0.1253 0.9003 -0.0035  0.0031\nedu_last       0.2450      0.0181      13.5316 0.0000  0.2095  0.2804\nurban          0.0944      0.0250       3.7777 0.0002  0.0454  0.1433\nln_robot       0.1994      0.0793       2.5130 0.0120  0.0439  0.3549\n\nModel Diagnostics:\n--------------------\nR-squared           : 0.1862\nN instruments       : 1.0000\nN endogenous        : 1.0000\nFirst-stage F (ln_robot): 14685.7675\nFirst-stage F p-value (ln_robot): 0.0000\nPartial R² (ln_robot): 0.4834\nHausman F-stat      : 283.9876\nHausman p-value     : 0.0000\nKP rk LM            : 230791840.3219\nKP rk LM p-value    : 0.0000\nKP rk Wald F        : 15821.2948\nOP effective F error: \"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\"\n================================================================================"
+    },
+    {
+      "table_id": "regression_table_2",
+      "run_id": "run_612f02a059d1",
+      "task_id": "robot_wage_ols_comparison",
+      "method_id": "ols",
+      "estimator": "ols",
+      "formula": "ln_wage ~ ln_robot + female + age + edu_last + urban",
+      "nobs": 15697,
+      "dependent_var": "ln_wage",
+      "treatment": "ln_robot",
+      "coefficient_rows": [
+        {
+          "term": "intercept",
+          "coefficient": 8.6687724564,
+          "standard_error": 0.0694017607,
+          "t_statistic": 124.9070970647,
+          "p_value": 0.0
+        },
+        {
+          "term": "ln_robot",
+          "coefficient": 0.1039074473,
+          "standard_error": 0.0058946931,
+          "t_statistic": 17.6272870145,
+          "p_value": 1.5209199652e-69
+        },
+        {
+          "term": "female",
+          "coefficient": -0.4672968328,
+          "standard_error": 0.0144660267,
+          "t_statistic": -32.3030534939,
+          "p_value": 6.33724813858e-229
+        },
+        {
+          "term": "age",
+          "coefficient": 7.76137e-05,
+          "standard_error": 0.0006671744,
+          "t_statistic": 0.1163319389,
+          "p_value": 0.90738947384
+        },
+        {
+          "term": "edu_last",
+          "coefficient": 0.2417239977,
+          "standard_error": 0.0054825833,
+          "t_statistic": 44.0894345642,
+          "p_value": 0.0
+        },
+        {
+          "term": "urban",
+          "coefficient": 0.1276513243,
+          "standard_error": 0.0155706694,
+          "t_statistic": 8.1981911686,
+          "p_value": 2.44031063159e-16
+        }
+      ],
+      "diagnostics": {
+        "nobs": 15697,
+        "parameter_count": 6,
+        "model_rank": 6,
+        "residual_degrees_of_freedom": 15691,
+        "residual_standard_error": 0.8837805305,
+        "residual_sum_of_squares": 12255.7383984239
+      },
+      "summary_text": null
+    },
+    {
+      "table_id": "regression_table_3",
+      "run_id": "run_612f02a059d1",
+      "task_id": "robot_manu_iv",
+      "method_id": "iv",
+      "estimator": "iv",
+      "formula": "manu_dummy ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+      "nobs": 34315,
+      "dependent_var": "ln_wage",
+      "treatment": "ln_robot",
+      "coefficient_rows": [
+        {
+          "term": "female",
+          "coefficient": -0.0231944918961,
+          "standard_error": 0.0113612067998,
+          "t_statistic": -2.0416077828,
+          "p_value": 0.0412048209974
+        },
+        {
+          "term": "age",
+          "coefficient": -0.00247976416182,
+          "standard_error": 0.000474709527968,
+          "t_statistic": -5.22389386925,
+          "p_value": 1.77126780798e-07
+        },
+        {
+          "term": "edu_last",
+          "coefficient": -0.0350600916021,
+          "standard_error": 0.00629419142831,
+          "t_statistic": -5.57038244807,
+          "p_value": 2.57772361234e-08
+        },
+        {
+          "term": "urban",
+          "coefficient": -0.0249492257686,
+          "standard_error": 0.0121652359108,
+          "t_statistic": -2.05091873435,
+          "p_value": 0.0402891272727
+        },
+        {
+          "term": "ln_robot",
+          "coefficient": 0.0798431464061,
+          "standard_error": 0.0222977162482,
+          "t_statistic": 3.58087509821,
+          "p_value": 0.000343336034355
+        }
+      ],
+      "diagnostics": {
+        "R-squared": 0.035748029944072335,
+        "N instruments": 1,
+        "N endogenous": 1,
+        "First-stage F (ln_robot)": 17481.996437978763,
+        "First-stage F p-value (ln_robot)": 0.0,
+        "Partial R² (ln_robot)": 0.4895821155449943,
+        "Hausman F-stat": 69.96940851219787,
+        "Hausman p-value": 1.1102230246251565e-16,
+        "KP rk LM": 318854345.370475,
+        "KP rk LM p-value": 0.0,
+        "KP rk Wald F": 18732.933871205383,
+        "OP effective F error": "\"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\""
+      },
+      "summary_text": "================================================================================\nModel: IV-2SLS\nMethod: Two-Stage Least Squares\nDependent Variable: manu_dummy\n================================================================================\n          Coefficient  Std. Error  t-statistic  P>|t|  [0.025  0.975]\nfemale        -0.0232      0.0114      -2.0416 0.0412 -0.0455 -0.0009\nage           -0.0025      0.0005      -5.2239 0.0000 -0.0034 -0.0015\nedu_last      -0.0351      0.0063      -5.5704 0.0000 -0.0474 -0.0227\nurban         -0.0249      0.0122      -2.0509 0.0403 -0.0488 -0.0011\nln_robot       0.0798      0.0223       3.5809 0.0003  0.0361  0.1235\n\nModel Diagnostics:\n--------------------\nR-squared           : 0.0357\nN instruments       : 1.0000\nN endogenous        : 1.0000\nFirst-stage F (ln_robot): 17481.9964\nFirst-stage F p-value (ln_robot): 0.0000\nPartial R² (ln_robot): 0.4896\nHausman F-stat      : 69.9694\nHausman p-value     : 0.0000\nKP rk LM            : 318854345.3705\nKP rk LM p-value    : 0.0000\nKP rk Wald F        : 18732.9339\nOP effective F error: \"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\"\n================================================================================"
+    },
+    {
+      "table_id": "regression_table_4",
+      "run_id": "run_612f02a059d1",
+      "task_id": "robot_isei_iv",
+      "method_id": "iv",
+      "estimator": "iv",
+      "formula": "ISEI_score ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+      "nobs": 34315,
+      "dependent_var": "ln_wage",
+      "treatment": "ln_robot",
+      "coefficient_rows": [
+        {
+          "term": "female",
+          "coefficient": 1.12182266088,
+          "standard_error": 0.201822912138,
+          "t_statistic": 5.55854641063,
+          "p_value": 2.74423774815e-08
+        },
+        {
+          "term": "age",
+          "coefficient": -0.168602710449,
+          "standard_error": 0.0108562098943,
+          "t_statistic": -15.5307996272,
+          "p_value": 0.0
+        },
+        {
+          "term": "edu_last",
+          "coefficient": 5.41567923359,
+          "standard_error": 0.0898609905716,
+          "t_statistic": 60.2683397463,
+          "p_value": 0.0
+        },
+        {
+          "term": "urban",
+          "coefficient": 3.80870814753,
+          "standard_error": 0.168015539605,
+          "t_statistic": 22.6691762907,
+          "p_value": 0.0
+        },
+        {
+          "term": "ln_robot",
+          "coefficient": 0.999491092491,
+          "standard_error": 0.279269437427,
+          "t_statistic": 3.57901084055,
+          "p_value": 0.000345460286731
+        }
+      ],
+      "diagnostics": {
+        "R-squared": 0.43912547510472066,
+        "N instruments": 1,
+        "N endogenous": 1,
+        "First-stage F (ln_robot)": 24410.943558626397,
+        "First-stage F p-value (ln_robot)": 0.0,
+        "Partial R² (ln_robot)": 0.4573055333379328,
+        "Hausman F-stat": 38.58971658864794,
+        "Hausman p-value": 5.300442307287767e-10,
+        "KP rk LM": 707317864.5299014,
+        "KP rk LM p-value": 0.0,
+        "KP rk Wald F": 27237.865043489182,
+        "OP effective F error": "\"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\""
+      },
+      "summary_text": "================================================================================\nModel: IV-2SLS\nMethod: Two-Stage Least Squares\nDependent Variable: ISEI_score\n================================================================================\n          Coefficient  Std. Error  t-statistic  P>|t|  [0.025  0.975]\nfemale         1.1218      0.2018       5.5585 0.0000  0.7262  1.5174\nage           -0.1686      0.0109     -15.5308 0.0000 -0.1899 -0.1473\nedu_last       5.4157      0.0899      60.2683 0.0000  5.2396  5.5918\nurban          3.8087      0.1680      22.6692 0.0000  3.4794  4.1380\nln_robot       0.9995      0.2793       3.5790 0.0003  0.4521  1.5469\n\nModel Diagnostics:\n--------------------\nR-squared           : 0.4391\nN instruments       : 1.0000\nN endogenous        : 1.0000\nFirst-stage F (ln_robot): 24410.9436\nFirst-stage F p-value (ln_robot): 0.0000\nPartial R² (ln_robot): 0.4573\nHausman F-stat      : 38.5897\nHausman p-value     : 0.0000\nKP rk LM            : 707317864.5299\nKP rk LM p-value    : 0.0000\nKP rk Wald F        : 27237.8650\nOP effective F error: \"None of [Index(['ln_robot', 'bartik_iv', 'female', 'age', 'edu_last', 'urban'], dtype='str')] are in the [columns]\"\n================================================================================"
+    }
+  ]
+}

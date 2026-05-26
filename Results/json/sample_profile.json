@@ -1,0 +1,54 @@
+{
+  "schema_version": "p5.sample_profile.v1",
+  "evidence_id": "sample_profile",
+  "generated_at": "2026-05-26T19:36:58.942093+00:00",
+  "source_paths": [
+    "Results/json/method_execution_result.json"
+  ],
+  "review_status": "ready_for_review",
+  "dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+  "nobs": 34315,
+  "rows_read": 34315,
+  "usable_numeric_rows": 34315,
+  "dropped_rows": 0,
+  "required_fields": [
+    "pid",
+    "provcd",
+    "urban",
+    "ln_wage",
+    "manu_dummy",
+    "ISEI_score",
+    "part_time",
+    "female",
+    "age",
+    "edu_last",
+    "year",
+    "year_robot",
+    "robot_density",
+    "ln_robot",
+    "bartik_iv",
+    "provcd_num"
+  ],
+  "checks": [
+    {
+      "id": "dataset_file_exists",
+      "label": "数据文件存在",
+      "status": "passed",
+      "detail": "Data/Final/cfps_robot_reallocation.csv"
+    },
+    {
+      "id": "required_fields_present",
+      "label": "公式字段存在",
+      "status": "passed",
+      "detail": "pid, provcd, urban, ln_wage, manu_dummy, ISEI_score, part_time, female, age, edu_last, year, year_robot, robot_density, ln_robot, bartik_iv, provcd_num"
+    },
+    {
+      "id": "numeric_formula_rows_available",
+      "label": "公式字段可转为数值",
+      "status": "passed",
+      "detail": "usable=34315, dropped=0"
+    }
+  ],
+  "method_task_id": "robot_wage_iv_baseline",
+  "run_id": "run_612f02a059d1"
+}

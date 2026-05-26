@@ -381,6 +381,24 @@
 
 业务规则：P5-E1 先减少无谓返工。系统在要求 Agent 补证据前，必须先扫描当前仓库已有产物，把“其实已经存在但名字没对上”的材料登记成可审查提案；真正缺失的证据才进入后续生成节点。
 
+### Behavior 28: Formal evidence materializer writes high-confidence evidence files without mutating formal state
+
+**Given** `evidence_registry_patch_proposal.json` 已经把 `variable_role_set`、`sample_profile` 和 `regression_tables` 标记为可直接绑定或可由现有产物派生
+**When** 用户运行 `Program/formal_evidence_materializer.py --evidence-ids variable_role_set,sample_profile,regression_tables`
+**Then** 系统必须写出 `Results/json/formal_evidence_materialization_report.json`
+**And** 系统必须写出 `Reviews/formal_evidence_materialization.md`
+**And** 系统必须写出 `Submissions/formal_package/evidence/variable_role_set.json`
+**And** 系统必须写出 `Results/json/sample_profile.json`
+**And** 系统必须写出 `Results/json/regression_tables.json`
+**And** `variable_role_set` 证据只能从现有 `state/product/variable_roles.json` 或 proposal 派生为正式包证据副本，不得改写 `state/product/variable_role_set.json`
+**And** 如果变量角色数据路径与真实方法执行数据路径不一致，报告必须写出 `variable_role_dataset_mismatch` warning 并保留人工审阅状态
+**And** `sample_profile` 必须从真实 `method_execution_result` 的 `data_preflight` 和样本量派生
+**And** `regression_tables` 必须从真实 `method_execution_result` 的系数、标准误、统计量、诊断和公式派生
+**And** 报告必须声明 `this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/variable_role_set.json`、`state/product/design_spec.json`、`state/product/run_plan.json`、`state/product/supervisor_plan.json` 或 `state/product/agent_task_queue.json`。
+
+业务规则：P5-E2a 只把最高置信、可从现有真实产物派生的证据落成目标文件，让 PDF 预检能读取；正式变量角色和研究设定仍由人工确认或后续显式写回命令处理。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

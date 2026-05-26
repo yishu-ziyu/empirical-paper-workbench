@@ -30,7 +30,10 @@ EVIDENCE_REGISTRY: dict[str, list[str]] = {
     "citation_verification_log": ["Results/json/citation_verification_log.json"],
     "domain_notes": ["Results/json/domain_notes.json"],
     "verified_context_sources": ["Results/json/verified_context_sources.json"],
-    "variable_role_set": ["state/product/variable_role_set.json"],
+    "variable_role_set": [
+        "Submissions/formal_package/evidence/variable_role_set.json",
+        "state/product/variable_role_set.json",
+    ],
     "data_profile": [
         "Results/json/project_snapshot.json",
         "Results/json/cfps_robot_project_snapshot.json",

@@ -31,13 +31,14 @@ def build_method_gate_report(project_root: Path, *, profile: str = "aer_like") -
     method_subtype = infer_method_subtype(design_spec, task, method_family)
     variables = extract_variables(design_spec, task)
     dataset_profile = profile_dataset(project_root, design_spec.get("dataset_path") or run_plan.get("dataset_path") or "")
+    method_diagnostics = read_json(project_root / "Results" / "json" / "method_diagnostics_report.json")
     method_workflow = next(
         (method for method in build_method_workflows(design_spec) if method.get("id") == method_family),
         None,
     )
 
     pre_checks = build_pre_checks(design_spec, run_plan, task, variables, dataset_profile)
-    diagnostics = build_diagnostics(design_spec, task, dataset_profile)
+    diagnostics = build_diagnostics(design_spec, task, dataset_profile, method_diagnostics)
     yellow_items = build_yellow_items(pre_checks, diagnostics, method_subtype)
     red_items = build_red_items(pre_checks, diagnostics)
     gate_status = choose_gate_status(red_items, yellow_items)
@@ -63,6 +64,7 @@ def build_method_gate_report(project_root: Path, *, profile: str = "aer_like") -
             "status": run_plan.get("status"),
             "task_id": task.get("id"),
         },
+        "method_diagnostics_ref": build_method_diagnostics_ref(method_diagnostics),
         "method_workflow_ref": method_workflow or {},
         "variables": variables,
         "dataset_profile": dataset_profile,
@@ -201,7 +203,12 @@ def build_pre_checks(
     return checks
 
 
-def build_diagnostics(design_spec: dict[str, Any], task: dict[str, Any], dataset_profile: dict[str, Any]) -> list[dict[str, Any]]:
+def build_diagnostics(
+    design_spec: dict[str, Any],
+    task: dict[str, Any],
+    dataset_profile: dict[str, Any],
+    method_diagnostics: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     strategy = design_spec.get("identification_strategy") or {}
     first_stage = strategy.get("first_stage_diagnostics") or (design_spec.get("diagnostics") or {}).get("first_stage") or {}
     task_diag = task.get("diagnostics") or task.get("reference_result") or {}
@@ -219,18 +226,19 @@ def build_diagnostics(design_spec: dict[str, Any], task: dict[str, Any], dataset
     dwh_f = first_non_null(first_stage.get("dwh_f_statistic"), (design_spec.get("diagnostics") or {}).get("dwh", {}).get("f_statistic"))
     dwh_p = first_non_null(first_stage.get("dwh_p_value"), (design_spec.get("diagnostics") or {}).get("dwh", {}).get("p_value"))
     cluster_count = estimate_cluster_count(dataset_profile)
+    computed = collect_method_diagnostics(method_diagnostics or {})
     return [
         diagnostic("first_stage_f", "passed" if f_stat is not None and float(f_stat) > 10 else "missing", observed=f_stat, threshold=10),
         diagnostic("partial_r_squared", "recorded" if partial_r2 is not None else "missing", observed=partial_r2),
         diagnostic("dwh_endogeneity_test", "recorded" if dwh_f is not None or dwh_p is not None else "missing", observed=dwh_f, p_value=dwh_p),
         diagnostic("cluster_count", "recorded" if cluster_count is not None else "missing", observed=cluster_count),
-        diagnostic("reduced_form", "missing"),
-        diagnostic("robust_first_stage_f_or_kp", "missing"),
-        diagnostic("weak_iv_robust_inference_ar_or_clr", "missing"),
-        diagnostic("shift_share_identification_diagnostics", "missing"),
-        diagnostic("shift_share_rotemberg_weights", "missing"),
-        diagnostic("leave_one_out_or_alternative_shock", "missing"),
-        diagnostic("result_artifact_binding", "missing"),
+        diagnostic_from_computed(computed, "reduced_form", "missing"),
+        diagnostic_from_computed(computed, "robust_first_stage_f_or_kp", "missing"),
+        diagnostic_from_computed(computed, "weak_iv_robust_inference_ar_or_clr", "missing"),
+        diagnostic_from_computed(computed, "shift_share_identification_diagnostics", "missing"),
+        diagnostic_from_computed(computed, "shift_share_rotemberg_weights", "missing"),
+        diagnostic_from_computed(computed, "leave_one_out_or_alternative_shock", "missing"),
+        diagnostic_from_computed(computed, "result_artifact_binding", "missing"),
     ]
 
 
@@ -238,7 +246,7 @@ def build_yellow_items(pre_checks: list[dict[str, Any]], diagnostics: list[dict[
     items = [
         f"missing_{item['id']}"
         for item in diagnostics
-        if item.get("status") == "missing"
+        if item.get("status") in {"missing", "needs_manual_review", "blocked", "yellow"}
         and item["id"]
         in {
             "reduced_form",
@@ -279,6 +287,58 @@ def build_red_items(pre_checks: list[dict[str, Any]], diagnostics: list[dict[str
     if first_stage and first_stage.get("status") == "missing":
         items.append("missing_first_stage_diagnostics")
     return sorted(set(items))
+
+
+def build_method_diagnostics_ref(method_diagnostics: dict[str, Any]) -> dict[str, Any]:
+    if not method_diagnostics:
+        return {
+            "path": "Results/json/method_diagnostics_report.json",
+            "status": "missing",
+        }
+    return {
+        "path": "Results/json/method_diagnostics_report.json",
+        "schema_version": method_diagnostics.get("schema_version"),
+        "status": method_diagnostics.get("status"),
+        "generated_at": method_diagnostics.get("generated_at"),
+    }
+
+
+def collect_method_diagnostics(method_diagnostics: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    by_id = {
+        str(item.get("id")): item
+        for item in method_diagnostics.get("diagnostics", [])
+        if item.get("id")
+    }
+    aliases = {
+        "robust_first_stage_f_or_kp": "robust_first_stage_f_or_kp",
+        "weak_iv_robust_inference_ar_or_clr": "weak_iv_robust_inference_ar_or_clr",
+        "result_artifact_binding": "artifact_binding",
+    }
+    for target, source in aliases.items():
+        if target not in by_id and source in by_id:
+            by_id[target] = by_id[source]
+    return by_id
+
+
+def diagnostic_from_computed(computed: dict[str, dict[str, Any]], id_: str, fallback_status: str) -> dict[str, Any]:
+    item = computed.get(id_)
+    if not item:
+        return diagnostic(id_, fallback_status)
+    status = item.get("status")
+    if status == "green":
+        mapped_status = "recorded"
+    elif status in {"yellow", "needs_manual_review", "blocked", "red"}:
+        mapped_status = status
+    else:
+        mapped_status = "recorded"
+    payload = diagnostic(id_, mapped_status)
+    outputs = item.get("outputs")
+    if outputs:
+        payload["observed"] = outputs
+    review_items = item.get("review_items")
+    if review_items:
+        payload["review_items"] = review_items
+    return payload
 
 
 def choose_gate_status(red_items: list[str], yellow_items: list[str]) -> str:

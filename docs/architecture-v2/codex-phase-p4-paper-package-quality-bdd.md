@@ -143,6 +143,19 @@
 
 业务规则：方法门不是简单判断“能不能跑回归”，而是把可机器检查的前置条件、需要执行补证的诊断、必须人工/LLM 审阅的识别假设分开。第一版 MethodGate 只写草案层报告，让 paper quality、ReviewerAgent 和后续执行器读取，不直接改正式研究设定。
 
+## 行为 12：ExecutionAgent 必须把 MethodGate 的 yellow 缺口推进为真实方法诊断产物
+
+**Given** 用户已经确认 DesignSpec 和 RunPlan，并且 MethodGate 对 Bartik IV 给出 `yellow` 状态
+**When** 用户运行 method diagnostics builder
+**Then** 系统必须写出 `Results/json/method_diagnostics_report.json`
+**And** 报告必须包含 `method_family`、`method_subtype`、`variables`、`dataset_profile`、`diagnostics`、`source_artifacts`、`reproducibility`、`formal_state_write` 和 `agent_team_schedule`
+**And** 系统必须真实估计 `baseline_iv_2sls_binding`、`first_stage_relevance`、`reduced_form`、`ols_comparison`、`sample_consistency` 和 `artifact_binding`
+**And** 对当前只有聚合后 `bartik_iv` 的数据，`shift_share_identification_diagnostics`、`shift_share_rotemberg_weights` 和行业级 `leave_one_out` 必须保留为可审阅缺口，而不能用省份级稳健性伪装成 shift-share 专项诊断
+**And** 报告必须声明 Agent Team 的第一次调用、执行诊断后的收回、以及 ReviewerAgent 二次审阅的再次调用节奏
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+
+业务规则：方法诊断执行层负责把“能从当前数据真实跑出来的诊断”落成可复跑产物；需要文献判断、share/shock 原始组件或人工识别叙事的部分保留为审阅任务。这个阶段推进草稿层证据质量，但不静默提升正式研究设定。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
@@ -154,3 +167,4 @@
 - Agent Team 调用节奏必须写入 proposal：主线程负责状态合并；DataAgent、MethodAgent、LiteratureAgent 可以并行提出证据包；收回阶段只合并为 proposal 和报告，不直接写正式层。
 - 文献包的 Agent Team 调用节奏必须写入 report：候选文献生成后调用 LiteratureAgent、MethodAgent、DataAgent；正式书目被 ManuscriptAgent 引用前收回；主线程只合并为 processed 文献包和质量报告，不直接写正式论文层。
 - 方法门的 Agent Team 调用节奏必须写入 report：DesignSpec / RunPlan approved 后调用 MethodAgent、DataAgent 和 ExecutionAgent；method gate report 写出后收回；真实诊断执行后再次调用 MethodAgent 和 ReviewerAgent；主线程只合并为方法门报告和质量报告，不直接写正式层。
+- 方法诊断的 Agent Team 调用节奏必须写入 report：MethodGate yellow 且没有 red blockers 后调用 ExecutionAgent；method diagnostics report 写出后收回；MethodAgent 与 ReviewerAgent 只读取摘要和缺口，不接管执行产物或正式层写回。

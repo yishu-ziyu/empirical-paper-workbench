@@ -1,0 +1,132 @@
+{
+  "schema_version": "p6.formal_submission_package_manifest.v1",
+  "generated_at": "2026-05-26T22:43:10.142258+00:00",
+  "status": "formal_submission_package_ready",
+  "package_root": "Submissions/formal_package",
+  "package_manifest": "Submissions/formal_package/manifest.json",
+  "package_manifest_written": true,
+  "artifacts": {
+    "paper_pdf": {
+      "path": "Submissions/formal_package/paper.pdf",
+      "exists": true,
+      "bytes": 107169,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "source_report": "Results/json/formal_pdf_final_writeback.json"
+    },
+    "paper_docx": {
+      "path": "Submissions/formal_package/paper.docx",
+      "exists": true,
+      "bytes": 14457,
+      "sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "source_report": "Results/json/formal_docx_export.json"
+    }
+  },
+  "input_reports": {
+    "p6a": {
+      "path": "Results/json/formal_pdf_final_writeback.json",
+      "exists": true,
+      "schema_version": "p6.formal_pdf_final_writeback.v1",
+      "status": "final_pdf_written",
+      "blocking_reasons": []
+    },
+    "p6b": {
+      "path": "Results/json/formal_docx_export_preflight.json",
+      "exists": true,
+      "schema_version": "p6.formal_docx_export_preflight.v1",
+      "status": "ready_for_docx_export",
+      "blocking_reasons": []
+    },
+    "p6c": {
+      "path": "Results/json/formal_docx_export.json",
+      "exists": true,
+      "schema_version": "p6.formal_docx_export.v1",
+      "status": "docx_exported",
+      "blocking_reasons": []
+    }
+  },
+  "consistency_checks": {
+    "pdf_hash_matches_p6a": true,
+    "docx_hash_matches_p6c": true,
+    "pdf_bytes_match_p6a": true,
+    "docx_bytes_match_p6c": true,
+    "p6b_expected_docx_matches_p6c": true,
+    "p6c_final_pdf_matches_p6a": true,
+    "p6c_candidate_qmd_matches_p6a": true
+  },
+  "manual_acceptance": {
+    "human_status": "pending_manual_acceptance",
+    "checklist": [
+      {
+        "id": "open_pdf",
+        "label": "打开 PDF，确认页面可读、标题和章节存在"
+      },
+      {
+        "id": "open_docx",
+        "label": "打开 DOCX，确认正文、标题和引用字段可读"
+      },
+      {
+        "id": "fingerprints",
+        "label": "核对 PDF/DOCX sha256 与 manifest 一致"
+      },
+      {
+        "id": "p6_reports",
+        "label": "复核 P6-A/P6-B/P6-C 报告均为 ready/exported"
+      },
+      {
+        "id": "formal_state",
+        "label": "确认本节点没有改写正式研究状态"
+      }
+    ]
+  },
+  "reproduce_commands": [
+    [
+      "python3",
+      "Program/formal_pdf_final_writeback.py",
+      "--project-root",
+      "."
+    ],
+    [
+      "python3",
+      "Program/formal_docx_export_preflight.py",
+      "--project-root",
+      "."
+    ],
+    [
+      "python3",
+      "Program/formal_docx_export.py",
+      "--project-root",
+      "."
+    ],
+    [
+      "python3",
+      "Program/formal_submission_package_manifest.py",
+      "--project-root",
+      "."
+    ]
+  ],
+  "blocking_reasons": [],
+  "boundary_flags": {
+    "this_command_rendered_pdf": false,
+    "this_command_rendered_docx": false,
+    "this_command_wrote_final_outputs": false,
+    "this_command_wrote_formal_state": false
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "manual_submission_package_acceptance",
+    "label": "人工验收正式投稿包",
+    "description": "打开 PDF 和 DOCX，按 manifest 核对文件指纹、来源报告和复现命令。"
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "schema_version": "p5.formal_paper_package_manifest.v1",
+  "generated_at": "2026-05-26T18:24:37.245174+00:00",
+  "source_approval": "Results/json/formal_writeback_approval.json",
+  "approval_state_path": "state/product/writeback_approvals.json",
+  "package_root": "Submissions/formal_package",
+  "status": "formal_package_manifest_ready",
+  "blocking_reasons": [],
+  "can_build_package": true,
+  "this_command_wrote_formal_state": false,
+  "this_command_wrote_final_outputs": false,
+  "final_outputs_written": [],
+  "package_sections": [
+    {
+      "order": 1,
+      "category": "sections",
+      "label": "章节扩写",
+      "directory": "Submissions/formal_package/manuscript",
+      "approved_by_p5a": true,
+      "write_status": "skeleton_only",
+      "evidence_level": "local_file",
+      "expected_artifacts": [
+        "section_drafts",
+        "section_index"
+      ]
+    },
+    {
+      "order": 2,
+      "category": "citations",
+      "label": "引用与文献",
+      "directory": "Submissions/formal_package/literature",
+      "approved_by_p5a": true,
+      "write_status": "skeleton_only",
+      "evidence_level": "local_file",
+      "expected_artifacts": [
+        "verified_bibliography",
+        "contribution_matrix"
+      ]
+    },
+    {
+      "order": 3,
+      "category": "method_narrative",
+      "label": "方法叙述",
+      "directory": "Submissions/formal_package/methods",
+      "approved_by_p5a": true,
+      "write_status": "skeleton_only",
+      "evidence_level": "local_file",
+      "expected_artifacts": [
+        "method_gate_report",
+        "method_diagnostics_report"
+      ]
+    },
+    {
+      "order": 4,
+      "category": "result_tables",
+      "label": "结果表与样本说明",
+      "directory": "Submissions/formal_package/results",
+      "approved_by_p5a": true,
+      "write_status": "skeleton_only",
+      "evidence_level": "local_file",
+      "expected_artifacts": [
+        "regression_tables",
+        "sample_profile"
+      ]
+    },
+    {
+      "order": 5,
+      "category": "reproducibility",
+      "label": "复现说明",
+      "directory": "Submissions/formal_package/reproducibility",
+      "approved_by_p5a": true,
+      "write_status": "skeleton_only",
+      "evidence_level": "local_file",
+      "expected_artifacts": [
+        "replication_readme",
+        "artifact_manifest"
+      ]
+    }
+  ],
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "agent_team_schedule": {
+    "call_when": "after_p5a_human_approval_before_package_build",
+    "called_agents": [
+      "ManuscriptAgent",
+      "LiteratureAgent",
+      "MethodAgent",
+      "ExecutionAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_formal_package_manifest_written",
+    "next_call_when": "before_pdf_or_docx_export_preflight",
+    "integration_owner": "MainAgent",
+    "boundary": "本节点只组织正式包骨架；各 Agent 后续补齐章节、文献、方法、结果和复现材料，最终 PDF/docx 由独立导出节点处理。",
+    "ready": true
+  },
+  "next_action": {
+    "id": "assemble_formal_manuscript_sources",
+    "label": "装配正式论文源文件",
+    "description": "读取正式包 manifest，开始把已批准的章节、文献、方法、结果和复现说明装配为正式源文件。"
+  }
+}

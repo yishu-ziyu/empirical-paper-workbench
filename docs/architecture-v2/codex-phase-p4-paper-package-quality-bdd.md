@@ -1,0 +1,156 @@
+# P4-A Paper Package Quality BDD
+
+日期：2026-05-26
+
+## 目标
+
+把真实数据 CLI 运行产物升级为可审阅的论文包。
+
+一个 paper package 至少包含：
+
+- 长篇论文草稿。
+- PDF 或 PDF 预检结果。
+- 文献综述闭环产物。
+- 方法规范门报告。
+- 复现脚本和 manifest。
+- 质量报告。
+
+## 行为 1：CLI 必须生成 paper quality report
+
+**Given** 用户已经运行真实 `run_paper.py` 并生成 Markdown / Quarto 草稿  
+**When** 用户运行 paper package quality check  
+**Then** 系统写出 `Results/json/paper_quality_report.json`  
+**And** 报告包含 `profile`、`word_count`、`format_checks`、`section_checks`、`citation_checks`、`method_gate_checks`、`revision_checks`、`verdict`  
+**And** 报告写入 manifest 或导出预检可以读取的位置。
+
+业务规则：PDF 是否生成成功只代表导出链路可用；paper quality report 才回答这篇论文包现在差什么。
+
+## 行为 1.1：AER-like 档位必须启用投稿元数据硬门
+
+**Given** 用户或 Supervisor 将论文包目标设为 `aer_like`  
+**When** 系统生成 quality report  
+**Then** `format_checks` 必须检查摘要是否超过 100 words  
+**And** 必须检查 JEL codes、keywords、Data Availability Statement  
+**And** 如果缺失或超限，`verdict` 包含 `format_gate_required`  
+**And** `recommended_next_tasks` 包含 `fix_submission_metadata`。
+
+业务规则：AER-like 不是一句口号，而是一个会改变 CLI 验收结果的质量档。
+
+## 行为 2：长度和结构必须进入质量报告
+
+**Given** 草稿正文短于 working paper 门槛  
+**When** 系统生成 quality report  
+**Then** `verdict` 包含 `too_thin`  
+**And** `section_checks` 明确列出缺失章节或过短章节  
+**And** `recommended_next_tasks` 包含扩写 Introduction、Literature、Data、Empirical Strategy、Results 或 Robustness 的任务。
+
+业务规则：论文可以先生成短草稿，但短草稿必须自动进入扩写队列。
+
+## 行为 3：文献综述必须检查 bibliography 闭环
+
+**Given** 项目存在或缺失 `verified_bibliography.csv` 与 `contribution_matrix.md`  
+**When** 系统生成 quality report  
+**Then** `citation_checks` 必须显示 Zotero / DOI / CNKI / local PDF 的校验状态  
+**And** 如果缺少已校验文献，`verdict` 包含 `needs_literature_review`  
+**And** 报告给出 LiteratureAgent 下一步任务。
+
+业务规则：文献综述章节需要引用库和贡献矩阵支撑，不能只靠自然语言生成。
+
+## 行为 4：方法规范门必须进入主链路
+
+**Given** RunPlan 使用 OLS、DID、IV、RDD、PSM 或 DML  
+**When** 系统生成 quality report  
+**Then** `method_gate_checks` 读取或生成对应方法门状态  
+**And** 如果方法门缺失，`verdict` 包含 `method_gate_required`  
+**And** 报告列出需要补的 pre-checks 和 diagnostics。
+
+业务规则：方法门在正式估计之前发生，也必须在论文包导出前可见。
+
+## 行为 5：审稿式修订循环必须留下记录
+
+**Given** 系统已经生成 draft、finding、reviewer scorecard 或 export preflight  
+**When** 系统生成 quality report  
+**Then** `revision_checks` 必须记录当前是否存在 reviewer scorecard、revision log、writeback preflight  
+**And** 如果缺少审稿记录，报告给出 ReviewerAgent 下一步任务。
+
+业务规则：论文草稿进入更高水平版本，需要审稿意见、修订记录和再次生成。
+
+## 行为 6：PDF 导出必须读取 paper quality report
+
+**Given** `paper_quality_report.json` 已存在  
+**When** 用户运行 `Program/export_pdf.py --preflight-only` 或正式导出  
+**Then** export manifest 包含 paper quality report 的路径和 verdict  
+**And** 复现脚本包含重新运行 quality check 的命令。
+
+业务规则：PDF 是论文包的展示物，必须绑定质量报告和复现命令。
+
+## 行为 7：论文包主链路必须生成 LLM Supervisor 上下文包
+
+**Given** paper quality report 已经指出论文包还缺文献、方法门、审稿循环或章节扩写  
+**When** 用户运行 `Program/paper_package.py`  
+**Then** 系统必须写出 `Results/json/paper_supervisor_context.json`  
+**And** 上下文包必须列出 quality report、扩写计划、结构化草稿、ResearchQuestion、DesignSpec、RunPlan 和真实执行结果等可用来源  
+**And** 上下文包必须明确 `local_codex` 是研究中控，`statspai`、`python`、`stata_mcp` 是执行后端  
+**And** 上下文包必须生成可交给本地 Codex Supervisor 的任务提示词和 Agent Task Queue。
+
+业务规则：Python 脚本不替代 AI 中控。脚本负责整理证据、质量门和可复现执行；LLM Supervisor 负责研究路线、派工、文献判断、方法升级、审稿式修订和写作推进。
+
+## 行为 8：本地 Codex Supervisor 执行必须显式开关、持久化、可审阅
+
+**Given** `Results/json/paper_supervisor_context.json` 已经存在  
+**When** 用户运行 `Program/paper_supervisor.py`  
+**Then** 如果未启用 `EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1`，系统必须结构化阻断，不能写出假的 Supervisor 结果  
+**And** 如果执行开关已启用，本地 Codex 必须读取上下文包并生成 `docs/workflows/paper_package_supervisor/supervisor_round.md`  
+**And** 系统必须写出 `Results/json/paper_supervisor_run.json`，记录 provider、上下文路径、原始输出路径、Agent Task Queue、verdict、人工确认状态和正式层写回边界  
+**And** 该命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+
+业务规则：LLM Supervisor 是研究中控入口，但它的第一层输出仍是草案层和 proposal 层；正式变量、设计、运行计划和论文正式层必须通过后续人工确认或显式写回命令。
+
+## 行为 9：变量角色调和只能生成 proposal，不能静默改写正式层
+
+**Given** 用户已经确认 ResearchQuestion，项目同时存在已批准的 VariableRoleSet、DesignSpec 和 RunPlan  
+**And** VariableRoleSet 仍指向旧样本或旧变量角色，但 DesignSpec / RunPlan 已指向真实研究数据和真实方法设定  
+**When** 用户运行 variable role reconciliation  
+**Then** 系统必须写出 `state/proposals/variable_role_reconciliation.json` 和 `Results/json/variable_role_reconciliation_report.json`  
+**And** proposal 必须列出正式变量角色与 DesignSpec / RunPlan / 数据字段之间的冲突  
+**And** proposal 必须给出建议变量角色、证据来源、缺失证据、方法风险和 Agent Team 后续分工  
+**And** proposal 的状态必须是 `needs_human_review`，`formal_state_write.can_promote` 必须为 `false`  
+**And** 命令不得改写 `state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+
+业务规则：Auto Mode 可以根据真实字段和专家方法库提出变量角色修订建议，但不能把启发式或中控模型判断直接写成正式研究设定。正式变量角色必须经过人工确认或显式 promotion 命令。
+
+## 行为 10：LiteratureAgent 必须生成可被质量门读取的文献包
+
+**Given** 用户已经确认 ResearchQuestion，项目存在 DesignSpec、RunPlan 或变量角色调和 proposal  
+**When** 用户运行 literature package builder  
+**Then** 系统必须写出 `Data/literature/processed/candidate_literature.csv`、`Data/literature/processed/verified_bibliography.csv`、`Data/literature/processed/contribution_matrix.md` 和 `Results/json/literature_package_report.json`  
+**And** `verified_bibliography.csv` 至少包含 5 条 `verification_status != needs_manual_review` 的文献记录  
+**And** `contribution_matrix.md` 必须把 `source_id` 绑定到贡献角色、使用章节、变量/方法证据和与本研究的差异  
+**And** literature package report 必须列出 CNKI 人工辅助检索队列、Zotero/DOI/OpenAlex 等校验线索、缺失证据和 Agent Team 调用节奏  
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+
+业务规则：文献综述不是一段自然语言，而是一组可追踪来源、贡献矩阵和引用证据。第一版可以用 seed literature package 启动，但必须把 CNKI / Zotero / DOI 校验状态和人工补证路径显式写出。
+
+## 行为 11：MethodAgent 必须把 IV / Bartik 方法规范门写成可审阅报告
+
+**Given** 用户已经确认 DesignSpec 和 RunPlan，并且 RunPlan 使用 Bartik / shift-share 风格 IV  
+**When** 用户运行 method gate builder  
+**Then** 系统必须写出 `Results/json/method_gate_report.json`  
+**And** 报告必须包含 `method_family`、`method_subtype`、`gate_status`、`variables`、`pre_checks`、`diagnostics`、`required_evidence`、`blocking_items`、`recommended_next_tasks` 和 `agent_team_schedule`  
+**And** 对当前 Bartik IV，如果一阶段 F 和 partial R² 已存在但 reduced form、弱工具稳健推断、shift-share 专项诊断和排除限制人工审阅仍缺失，`gate_status` 必须是 `yellow`  
+**And** 报告必须声明 Agent Team 的调用、收回和再次调用节奏  
+**And** 命令不得改写 `state/product/research_question.json`、`state/product/variable_roles.json`、`state/product/design_spec.json` 或 `state/product/run_plan.json`。
+
+业务规则：方法门不是简单判断“能不能跑回归”，而是把可机器检查的前置条件、需要执行补证的诊断、必须人工/LLM 审阅的识别假设分开。第一版 MethodGate 只写草案层报告，让 paper quality、ReviewerAgent 和后续执行器读取，不直接改正式研究设定。
+
+## 边界条件
+
+- 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。
+- AER-like 规则没有被用户选择时，不阻断普通草稿；一旦进入 `aer_like` profile，摘要、JEL、关键词、数据可得性说明进入 hard gate。
+- 没有 PDF 工具链时，仍可生成 PDF preflight 和 quality report。
+- 真实数据文件不默认复制进 Git；只记录路径、hash、shape 和来源。
+- LLM Supervisor 可以生成草案层计划、章节草稿、patch proposal 和审稿意见；正式层论文、canonical 方法库和最终 PDF 必须经过人工确认后写回。
+- 本地 Codex 执行默认关闭；CLI 必须把关闭状态作为可解释 blocker，而不是静默降级成 mock。
+- Agent Team 调用节奏必须写入 proposal：主线程负责状态合并；DataAgent、MethodAgent、LiteratureAgent 可以并行提出证据包；收回阶段只合并为 proposal 和报告，不直接写正式层。
+- 文献包的 Agent Team 调用节奏必须写入 report：候选文献生成后调用 LiteratureAgent、MethodAgent、DataAgent；正式书目被 ManuscriptAgent 引用前收回；主线程只合并为 processed 文献包和质量报告，不直接写正式论文层。
+- 方法门的 Agent Team 调用节奏必须写入 report：DesignSpec / RunPlan approved 后调用 MethodAgent、DataAgent 和 ExecutionAgent；method gate report 写出后收回；真实诊断执行后再次调用 MethodAgent 和 ReviewerAgent；主线程只合并为方法门报告和质量报告，不直接写正式层。

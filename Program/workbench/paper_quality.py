@@ -1,0 +1,443 @@
+from __future__ import annotations
+
+import csv
+import json
+import re
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+REQUIRED_SECTIONS = [
+    "Abstract",
+    "Introduction",
+    "Literature and Contribution",
+    "Institutional Background / Theory / Context",
+    "Data and Measurement",
+    "Empirical Strategy",
+    "Main Results",
+    "Robustness / Mechanisms / Heterogeneity",
+    "Conclusion",
+    "References",
+]
+
+
+SECTION_ALIASES = {
+    "Abstract": ["abstract", "摘要"],
+    "Introduction": ["introduction", "引言", "介绍"],
+    "Literature and Contribution": ["literature", "contribution", "文献", "贡献"],
+    "Institutional Background / Theory / Context": ["background", "theory", "context", "背景", "理论", "制度"],
+    "Data and Measurement": ["data", "measurement", "变量", "数据"],
+    "Empirical Strategy": ["empirical strategy", "identification", "research design", "识别", "实证策略", "研究设计"],
+    "Main Results": ["results", "main results", "结果", "主结果"],
+    "Robustness / Mechanisms / Heterogeneity": ["robustness", "mechanism", "heterogeneity", "稳健", "机制", "异质"],
+    "Conclusion": ["conclusion", "结论"],
+    "References": ["references", "参考文献", "bibliography"],
+}
+
+
+@dataclass(frozen=True)
+class LiteraturePackage:
+    verified_bibliography: Path | None
+    contribution_matrix: Path | None
+    verified_count: int
+    closest_or_method_count: int
+
+
+def build_paper_quality_report(
+    project_root: Path,
+    draft_path: Path | None = None,
+    profile: str = "general_working_paper",
+) -> dict[str, Any]:
+    draft = resolve_draft_path(project_root, draft_path)
+    draft_text = draft.read_text(encoding="utf-8") if draft.exists() else ""
+    word_count = count_words(draft_text)
+    format_checks = build_format_checks(draft_text, profile)
+    section_checks = build_section_checks(draft_text)
+    literature = find_literature_package(project_root)
+    citation_checks = build_citation_checks(literature)
+    method_gate_checks = build_method_gate_checks(project_root)
+    revision_checks = build_revision_checks(project_root)
+    verdict = build_verdict(
+        word_count,
+        format_checks,
+        section_checks,
+        citation_checks,
+        method_gate_checks,
+        revision_checks,
+    )
+    recommended_next_tasks = build_recommended_next_tasks(
+        verdict,
+        format_checks,
+        section_checks,
+        citation_checks,
+        method_gate_checks,
+        revision_checks,
+    )
+
+    return {
+        "schema_version": "p4.paper_quality.v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "profile": profile,
+        "draft_path": relative_or_absolute(draft, project_root),
+        "word_count": word_count,
+        "format_checks": format_checks,
+        "section_checks": section_checks,
+        "citation_checks": citation_checks,
+        "method_gate_checks": method_gate_checks,
+        "revision_checks": revision_checks,
+        "verdict": verdict,
+        "recommended_next_tasks": recommended_next_tasks,
+    }
+
+
+def write_paper_quality_report(project_root: Path, report: dict[str, Any], output_path: Path | None = None) -> Path:
+    output = output_path or (project_root / "Results" / "json" / "paper_quality_report.json")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return output
+
+
+def resolve_draft_path(project_root: Path, draft_path: Path | None) -> Path:
+    if draft_path is not None:
+        return draft_path if draft_path.is_absolute() else project_root / draft_path
+    candidates = [
+        project_root / "Manuscripts" / "generated" / "cfps_robot_paper_draft.md",
+        project_root / "Manuscripts" / "generated" / "paper_draft.md",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[-1]
+
+
+def count_words(text: str) -> dict[str, Any]:
+    chinese_chars = re.findall(r"[\u4e00-\u9fff]", text)
+    latin_words = re.findall(r"[A-Za-z][A-Za-z0-9_'-]*", text)
+    return {
+        "main_text_words": len(latin_words),
+        "main_text_chinese_chars": len(chinese_chars),
+        "approx_total_units": len(latin_words) + len(chinese_chars),
+        "thresholds": {
+            "english_min_words": 7000,
+            "english_target_words": "9000-14000",
+            "aer_like_target_pages": "30-38",
+            "aer_like_upper_pages": 40,
+            "chinese_min_chars": 10000,
+            "chinese_target_chars": "12000-18000",
+        },
+    }
+
+
+def build_format_checks(text: str, profile: str) -> dict[str, Any]:
+    abstract_text = extract_section_body(text, "Abstract")
+    abstract_words = len(re.findall(r"[A-Za-z][A-Za-z0-9_'-]*", abstract_text))
+    abstract_chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", abstract_text))
+    has_jel = bool(re.search(r"(?im)^\s*(jel|jel codes?|jel classification)\s*[:：]", text))
+    has_keywords = bool(re.search(r"(?im)^\s*(keywords?|关键词)\s*[:：]", text))
+    has_data_availability = bool(
+        re.search(r"(?im)^\s*#*\s*(data availability|data and code availability|数据可得性|数据和代码可得性)", text)
+    )
+
+    warnings: list[str] = []
+    hard_errors: list[str] = []
+    if abstract_words == 0 and abstract_chinese_chars == 0:
+        warnings.append("missing_abstract_body")
+    if not has_jel:
+        warnings.append("missing_jel")
+    if not has_keywords:
+        warnings.append("missing_keywords")
+    if not has_data_availability:
+        warnings.append("missing_data_availability_statement")
+
+    if profile == "aer_like":
+        if abstract_words > 100:
+            hard_errors.append("abstract_over_100_words")
+        if not has_jel:
+            hard_errors.append("missing_jel")
+        if not has_keywords:
+            hard_errors.append("missing_keywords")
+        if not has_data_availability:
+            hard_errors.append("missing_data_availability_statement")
+
+    return {
+        "profile": profile,
+        "abstract": {
+            "english_word_count": abstract_words,
+            "chinese_char_count": abstract_chinese_chars,
+            "aer_like_limit_words": 100,
+            "status": "too_long" if profile == "aer_like" and abstract_words > 100 else "passed",
+        },
+        "metadata": {
+            "jel": "found" if has_jel else "missing",
+            "keywords": "found" if has_keywords else "missing",
+            "data_availability_statement": "found" if has_data_availability else "missing",
+        },
+        "warnings": warnings,
+        "hard_errors": hard_errors,
+        "status": "blocked" if hard_errors else "passed",
+    }
+
+
+def extract_section_body(text: str, section: str) -> str:
+    aliases = SECTION_ALIASES[section]
+    lines = text.splitlines()
+    start: int | None = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            continue
+        heading = stripped.lstrip("#").strip().lower()
+        if any(alias in heading for alias in aliases):
+            start = index + 1
+            break
+    if start is None:
+        return ""
+    body: list[str] = []
+    for line in lines[start:]:
+        if line.strip().startswith("#"):
+            break
+        body.append(line)
+    return "\n".join(body).strip()
+
+
+def build_section_checks(text: str) -> dict[str, Any]:
+    headings = extract_headings(text)
+    present: list[str] = []
+    missing: list[str] = []
+    for section in REQUIRED_SECTIONS:
+        if section_present(section, headings):
+            present.append(section)
+        else:
+            missing.append(section)
+    return {
+        "required_sections": REQUIRED_SECTIONS,
+        "present_sections": present,
+        "missing_sections": missing,
+        "detected_headings": headings,
+        "status": "passed" if not missing else "needs_expansion",
+    }
+
+
+def extract_headings(text: str) -> list[str]:
+    headings: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
+            if heading:
+                headings.append(heading)
+    return headings
+
+
+def section_present(section: str, headings: list[str]) -> bool:
+    aliases = SECTION_ALIASES[section]
+    normalized_headings = [heading.lower() for heading in headings]
+    return any(any(alias in heading for alias in aliases) for heading in normalized_headings)
+
+
+def find_literature_package(project_root: Path) -> LiteraturePackage:
+    candidates = sorted((project_root / "workspace" / "runs").glob("*/02_literature/verified_bibliography.csv"))
+    project_candidates = [
+        project_root / "Data" / "literature" / "processed" / "verified_bibliography.csv",
+        project_root / "state" / "product" / "verified_bibliography.csv",
+    ]
+    verified = next((path for path in project_candidates + candidates if path.exists()), None)
+    contribution_candidates = []
+    if verified is not None:
+        contribution_candidates.append(verified.parent / "contribution_matrix.md")
+    contribution_candidates.extend(
+        [
+            project_root / "Data" / "literature" / "processed" / "contribution_matrix.md",
+            project_root / "state" / "product" / "contribution_matrix.md",
+        ]
+    )
+    contribution = next((path for path in contribution_candidates if path.exists()), None)
+    verified_count, closest_or_method_count = count_verified_literature(verified) if verified else (0, 0)
+    return LiteraturePackage(verified, contribution, verified_count, closest_or_method_count)
+
+
+def count_verified_literature(path: Path) -> tuple[int, int]:
+    try:
+        with path.open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, csv.Error):
+        return 0, 0
+    verified_rows = [
+        row for row in rows if (row.get("verification_status") or "").strip() not in {"", "needs_manual_review"}
+    ]
+    contribution_rows = [
+        row
+        for row in verified_rows
+        if (row.get("contribution_role") or "").strip() in {"closest_paper", "method_reference"}
+    ]
+    return len(verified_rows), len(contribution_rows)
+
+
+def build_citation_checks(literature: LiteraturePackage) -> dict[str, Any]:
+    return {
+        "verified_bibliography": {
+            "status": "found" if literature.verified_bibliography else "missing",
+            "path": str(literature.verified_bibliography) if literature.verified_bibliography else None,
+            "verified_count": literature.verified_count,
+            "closest_or_method_count": literature.closest_or_method_count,
+        },
+        "contribution_matrix": {
+            "status": "found" if literature.contribution_matrix else "missing",
+            "path": str(literature.contribution_matrix) if literature.contribution_matrix else None,
+        },
+        "status": (
+            "passed"
+            if literature.verified_bibliography and literature.contribution_matrix and literature.verified_count >= 5
+            else "needs_literature_review"
+        ),
+    }
+
+
+def build_method_gate_checks(project_root: Path) -> dict[str, Any]:
+    candidates = [
+        project_root / "Results" / "json" / "method_gate_report.json",
+        project_root / "state" / "product" / "method_gate.json",
+    ]
+    candidates.extend(sorted((project_root / "workspace" / "runs").glob("*/03_design/method_gate_report.json")))
+    report_path = next((path for path in candidates if path.exists()), None)
+    if report_path is None:
+        return {
+            "status": "missing",
+            "path": None,
+            "gate_status": None,
+            "method_family": None,
+            "required_evidence": [],
+        }
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {
+            "status": "invalid",
+            "path": str(report_path),
+            "gate_status": "red",
+            "method_family": None,
+            "required_evidence": [],
+        }
+    return {
+        "status": "found",
+        "path": str(report_path),
+        "gate_status": payload.get("gate_status"),
+        "method_family": payload.get("method_family"),
+        "required_evidence": payload.get("required_evidence", []),
+        "blocking_items": payload.get("blocking_items", []),
+    }
+
+
+def build_revision_checks(project_root: Path) -> dict[str, Any]:
+    reviewer_scorecard = project_root / "state" / "product" / "reviewer_scorecard.json"
+    revision_log_candidates = [
+        project_root / "state" / "product" / "revision_log.jsonl",
+        project_root / "Submissions" / "pdf_first_review.md",
+    ]
+    writeback_preflight = project_root / "state" / "product" / "manuscript_export_package.json"
+    revision_log = next((path for path in revision_log_candidates if path.exists()), None)
+    return {
+        "reviewer_scorecard": {
+            "status": "found" if reviewer_scorecard.exists() else "missing",
+            "path": str(reviewer_scorecard) if reviewer_scorecard.exists() else None,
+        },
+        "revision_log": {
+            "status": "found" if revision_log else "missing",
+            "path": str(revision_log) if revision_log else None,
+        },
+        "writeback_preflight": {
+            "status": "found" if writeback_preflight.exists() else "missing",
+            "path": str(writeback_preflight) if writeback_preflight.exists() else None,
+        },
+        "status": "passed" if reviewer_scorecard.exists() and revision_log else "needs_review_loop",
+    }
+
+
+def build_verdict(
+    word_count: dict[str, Any],
+    format_checks: dict[str, Any],
+    section_checks: dict[str, Any],
+    citation_checks: dict[str, Any],
+    method_gate_checks: dict[str, Any],
+    revision_checks: dict[str, Any],
+) -> list[str]:
+    verdict: list[str] = []
+    if word_count["main_text_words"] < 7000 and word_count["main_text_chinese_chars"] < 10000:
+        verdict.append("too_thin")
+    if format_checks["status"] != "passed":
+        verdict.append("format_gate_required")
+    if section_checks["status"] != "passed":
+        verdict.append("missing_sections")
+    if citation_checks["status"] != "passed":
+        verdict.append("needs_literature_review")
+    if method_gate_checks["status"] != "found":
+        verdict.append("method_gate_required")
+    if revision_checks["status"] != "passed":
+        verdict.append("needs_review_loop")
+    return verdict or ["ready_for_review"]
+
+
+def build_recommended_next_tasks(
+    verdict: list[str],
+    format_checks: dict[str, Any],
+    section_checks: dict[str, Any],
+    citation_checks: dict[str, Any],
+    method_gate_checks: dict[str, Any],
+    revision_checks: dict[str, Any],
+) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    if "too_thin" in verdict or "missing_sections" in verdict:
+        tasks.append(
+            {
+                "id": "expand_working_paper_sections",
+                "agent": "ManuscriptAgent",
+                "reason": "正文结构或篇幅还没有达到 working paper 初稿区间。",
+                "inputs": section_checks.get("missing_sections", []),
+            }
+        )
+    if "format_gate_required" in verdict:
+        tasks.append(
+            {
+                "id": "fix_submission_metadata",
+                "agent": "ManuscriptAgent",
+                "reason": "补齐摘要、JEL、关键词和数据可得性说明，使草稿进入目标投稿规范。",
+                "inputs": format_checks.get("hard_errors", []),
+            }
+        )
+    if citation_checks["status"] != "passed":
+        tasks.append(
+            {
+                "id": "build_literature_package",
+                "agent": "LiteratureAgent",
+                "reason": "补齐 Zotero/CNKI/DOI 证据和贡献矩阵。",
+                "inputs": ["verified_bibliography.csv", "contribution_matrix.md"],
+            }
+        )
+    if method_gate_checks["status"] != "found":
+        tasks.append(
+            {
+                "id": "run_method_gate",
+                "agent": "MethodAgent",
+                "reason": "在正式估计和论文导出前生成方法规范门报告。",
+                "inputs": ["DesignSpec", "RunPlan", "method_family"],
+            }
+        )
+    if revision_checks["status"] != "passed":
+        tasks.append(
+            {
+                "id": "run_reviewer_revision_loop",
+                "agent": "ReviewerAgent",
+                "reason": "形成审稿意见、修订记录和再次生成路径。",
+                "inputs": ["paper_draft", "paper_quality_report"],
+            }
+        )
+    return tasks
+
+
+def relative_or_absolute(path: Path, project_root: Path) -> str:
+    try:
+        return str(path.relative_to(project_root))
+    except ValueError:
+        return str(path)

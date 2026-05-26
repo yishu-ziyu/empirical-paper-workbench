@@ -1,0 +1,572 @@
+{
+  "schema_version": "p4.variable_role_reconciliation.v1",
+  "proposal_id": "p4b_variable_role_reconciliation_20260526T091705Z",
+  "proposal_type": "variable_role_reconciliation",
+  "generated_at": "2026-05-26T09:17:05.468110+00:00",
+  "status": "needs_human_review",
+  "evidence_level": "local_file",
+  "write_policy": {
+    "mode": "proposal_only",
+    "does_not_modify": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json"
+    ],
+    "requires_human_approval_to_apply": true
+  },
+  "formal_state_write": {
+    "can_promote": false,
+    "requires_human_review": true,
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json"
+    ]
+  },
+  "formal_state_inputs": {
+    "research_question": {
+      "path": "state/product/research_question.json",
+      "exists": true,
+      "version": 7,
+      "status": "confirmed",
+      "question": "工业机器人应用对劳动力市场匹配效率的影响",
+      "evidence_level": "local_file"
+    },
+    "variable_roles": {
+      "path": "state/product/variable_roles.json",
+      "exists": true,
+      "version": 2,
+      "status": "approved",
+      "dataset_path": "Data/Final/analysis_sample.csv",
+      "evidence_level": "local_file",
+      "roles": {
+        "outcome": [
+          "wage"
+        ],
+        "treatment": [
+          "trained"
+        ],
+        "controls": [
+          "edu",
+          "experience"
+        ],
+        "instruments": [],
+        "fixed_effects": [],
+        "cluster_by": []
+      }
+    },
+    "design_spec": {
+      "path": "state/product/design_spec.json",
+      "exists": true,
+      "version": 2,
+      "status": "approved",
+      "dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+      "research_question": "工业机器人暴露是否改变劳动者工资回报？——来自中国CFPS微观数据的证据",
+      "variables": {
+        "outcome": [
+          "ln_wage"
+        ],
+        "treatment": [
+          "ln_robot"
+        ],
+        "controls": [
+          "female",
+          "age",
+          "edu_last",
+          "urban"
+        ],
+        "instruments": [
+          "bartik_iv"
+        ],
+        "fixed_effects": [
+          "year"
+        ],
+        "cluster_by": [
+          "provcd"
+        ]
+      },
+      "identification_strategy": {
+        "name": "bartik_iv_2sls",
+        "summary": "利用Bartik工具变量（2008年省级行业就业份额 × 美国行业机器人运行存量对数）处理机器人暴露的内生性问题，采用IV-2SLS估计省级机器人密度对数与劳动者工资回报之间的因果关系。",
+        "assumptions": [
+          "相关性假设：Bartik工具变量与内生解释变量ln_robot显著相关（第一阶段F > 10）",
+          "排他性约束：工具变量仅通过预测机器人暴露影响结果，不直接影响劳动者工资",
+          "同质性假设：行业机器人冲击对不同地区的影响方向一致"
+        ],
+        "threats": [
+          "产业结构可能反映制造业基础、开放程度和发展路径，排他性约束存在讨论空间",
+          "遗漏变量偏误：地区层面未观测因素可能同时影响机器人应用和工资",
+          "弱工具变量风险：第一阶段F统计量需大于Stock-Yogo临界值"
+        ],
+        "first_stage_diagnostics": {
+          "f_statistic": 14.03,
+          "partial_r_squared": 0.4834,
+          "dwh_f_statistic": 14.27,
+          "dwh_p_value": 0.0007
+        }
+      }
+    },
+    "run_plan": {
+      "path": "state/product/run_plan.json",
+      "exists": true,
+      "version": 2,
+      "status": "approved",
+      "dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+      "tasks": [
+        {
+          "id": "robot_wage_iv_baseline",
+          "label": "工业机器人暴露对工资回报的IV-2SLS估计（基准）",
+          "status": "planned",
+          "design_spec_id": "design_spec",
+          "formula": "ln_wage ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+          "instrument_formula": "ln_robot ~ bartik_iv + female + age + edu_last + urban",
+          "estimator": "iv",
+          "fixed_effects": [
+            "year"
+          ],
+          "cluster_by": [
+            "provcd"
+          ],
+          "evidence_level": "local_file",
+          "priority": "P0",
+          "expected_sample_size": 15697,
+          "reference_result": {
+            "treatment_coefficient": 0.1994,
+            "first_stage_f": 14.03,
+            "partial_r_squared": 0.4834
+          }
+        },
+        {
+          "id": "robot_wage_ols_comparison",
+          "label": "OLS对比估计（用于DWH内生性检验对照）",
+          "status": "planned",
+          "design_spec_id": "design_spec",
+          "formula": "ln_wage ~ ln_robot + female + age + edu_last + urban",
+          "estimator": "ols",
+          "fixed_effects": [
+            "year"
+          ],
+          "cluster_by": [
+            "provcd"
+          ],
+          "evidence_level": "local_file",
+          "priority": "P1"
+        },
+        {
+          "id": "robot_manu_iv",
+          "label": "工业机器人暴露对制造业就业的IV估计",
+          "status": "planned",
+          "design_spec_id": "design_spec",
+          "formula": "manu_dummy ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+          "instrument_formula": "ln_robot ~ bartik_iv + female + age + edu_last + urban",
+          "estimator": "iv",
+          "fixed_effects": [
+            "year"
+          ],
+          "cluster_by": [
+            "provcd"
+          ],
+          "evidence_level": "local_file",
+          "priority": "P1"
+        },
+        {
+          "id": "robot_isei_iv",
+          "label": "工业机器人暴露对职业层级ISEI的IV估计",
+          "status": "planned",
+          "design_spec_id": "design_spec",
+          "formula": "ISEI_score ~ (ln_robot ~ bartik_iv) + female + age + edu_last + urban",
+          "instrument_formula": "ln_robot ~ bartik_iv + female + age + edu_last + urban",
+          "estimator": "iv",
+          "fixed_effects": [
+            "year"
+          ],
+          "cluster_by": [
+            "provcd"
+          ],
+          "evidence_level": "local_file",
+          "priority": "P1"
+        }
+      ]
+    }
+  },
+  "detected_conflicts": [
+    {
+      "id": "formal_variable_roles_use_legacy_dataset",
+      "severity": "high",
+      "formal_field": "state/product/variable_roles.json:dataset_path",
+      "current_value": "Data/Final/analysis_sample.csv",
+      "recommended_value": "Data/Final/cfps_robot_reallocation.csv",
+      "evidence_paths": [
+        "state/product/variable_roles.json",
+        "state/product/design_spec.json",
+        "state/product/run_plan.json"
+      ]
+    },
+    {
+      "id": "formal_variable_roles_disagree_with_design_spec",
+      "severity": "high",
+      "formal_field": "state/product/variable_roles.json:roles",
+      "current_value": {
+        "outcome": [
+          "wage"
+        ],
+        "treatment": [
+          "trained"
+        ],
+        "controls": [
+          "edu",
+          "experience"
+        ],
+        "instruments": [],
+        "fixed_effects": [],
+        "cluster_by": []
+      },
+      "recommended_value": {
+        "outcome": [
+          "ln_wage"
+        ],
+        "treatment": [
+          "ln_robot"
+        ],
+        "controls": [
+          "female",
+          "age",
+          "edu_last",
+          "urban"
+        ],
+        "instruments": [
+          "bartik_iv"
+        ],
+        "fixed_effects": [
+          "year"
+        ],
+        "cluster_by": [
+          "provcd"
+        ]
+      },
+      "role_diffs": {
+        "outcome": {
+          "current": [
+            "wage"
+          ],
+          "recommended": [
+            "ln_wage"
+          ]
+        },
+        "treatment": {
+          "current": [
+            "trained"
+          ],
+          "recommended": [
+            "ln_robot"
+          ]
+        },
+        "controls": {
+          "current": [
+            "edu",
+            "experience"
+          ],
+          "recommended": [
+            "female",
+            "age",
+            "edu_last",
+            "urban"
+          ]
+        },
+        "instruments": {
+          "current": [],
+          "recommended": [
+            "bartik_iv"
+          ]
+        },
+        "fixed_effects": {
+          "current": [],
+          "recommended": [
+            "year"
+          ]
+        },
+        "cluster_by": {
+          "current": [],
+          "recommended": [
+            "provcd"
+          ]
+        }
+      },
+      "evidence_paths": [
+        "state/product/variable_roles.json",
+        "state/product/design_spec.json"
+      ]
+    }
+  ],
+  "recommended_variable_roles": {
+    "dataset_path": "Data/Final/cfps_robot_reallocation.csv",
+    "dataset_name": "cfps_robot_reallocation.csv",
+    "roles": {
+      "outcome": [
+        "ln_wage"
+      ],
+      "treatment": [
+        "ln_robot"
+      ],
+      "controls": [
+        "female",
+        "age",
+        "edu_last",
+        "urban"
+      ],
+      "instruments": [
+        "bartik_iv"
+      ],
+      "fixed_effects": [
+        "year"
+      ],
+      "cluster_by": [
+        "provcd"
+      ]
+    }
+  },
+  "dataset_profile": {
+    "path": "Data/Final/cfps_robot_reallocation.csv",
+    "exists": true,
+    "suffix": ".csv",
+    "columns": [
+      "pid",
+      "provcd",
+      "urban",
+      "ln_wage",
+      "manu_dummy",
+      "ISEI_score",
+      "part_time",
+      "female",
+      "age",
+      "edu_last",
+      "year",
+      "year_robot",
+      "robot_density",
+      "ln_robot",
+      "bartik_iv",
+      "provcd_num"
+    ],
+    "row_count": 34315,
+    "size_bytes": 3729019
+  },
+  "missing_dataset_fields": [],
+  "risk_flags": [
+    {
+      "id": "instrument_requires_exclusion_restriction_review",
+      "severity": "high",
+      "message": "工具变量进入正式层前，需要单独证明相关性、排他性约束和构造来源。"
+    },
+    {
+      "id": "research_question_scope_needs_alignment",
+      "severity": "medium",
+      "message": "题目层口径与 DesignSpec 口径不完全一致，需要确认是收窄到工资回报，还是保留劳动力匹配效率的总题目。"
+    }
+  ],
+  "role_evidence_matrix": [
+    {
+      "role": "outcome",
+      "fields": [
+        "ln_wage"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "codebook_definition",
+        "source_dataset_and_provenance",
+        "unit_of_observation",
+        "time_period_or_measurement_timing",
+        "construction_formula_or_raw_field",
+        "missingness_distribution_variation",
+        "research_question_alignment"
+      ],
+      "risk_flags": [
+        "missing_codebook_definition",
+        "constructed_variable_without_formula",
+        "multiple_testing_or_outcome_mining_risk",
+        "needs_human_review"
+      ]
+    },
+    {
+      "role": "treatment",
+      "fields": [
+        "ln_robot"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "intervention_or_exposure_definition",
+        "assignment_or_take_up_mechanism",
+        "source_dataset_and_provenance",
+        "time_period_or_measurement_timing",
+        "variation_by_unit_or_time",
+        "role_specific_identification_claim"
+      ],
+      "risk_flags": [
+        "name_only_heuristic",
+        "ambiguous_unit_or_time",
+        "reverse_causality_risk",
+        "needs_human_review"
+      ]
+    },
+    {
+      "role": "controls",
+      "fields": [
+        "female",
+        "age",
+        "edu_last",
+        "urban"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "pre_treatment_timing",
+        "confounder_or_design_role",
+        "supporting_literature_or_design_note",
+        "missingness_distribution_variation"
+      ],
+      "risk_flags": [
+        "post_treatment_control_risk",
+        "mediator_or_collider_risk",
+        "sample_selection_or_attrition_risk",
+        "needs_human_review"
+      ]
+    },
+    {
+      "role": "instruments",
+      "fields": [
+        "bartik_iv"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "instrument_construction_provenance",
+        "first_stage_relevance",
+        "weak_iv_diagnostics",
+        "exclusion_restriction_narrative",
+        "direct_path_to_outcome_review",
+        "supporting_literature_or_design_note"
+      ],
+      "risk_flags": [
+        "instrument_relevance_unchecked",
+        "instrument_weak_first_stage_risk",
+        "instrument_exclusion_untestable",
+        "instrument_direct_path_to_outcome_risk",
+        "needs_human_review"
+      ]
+    },
+    {
+      "role": "fixed_effects",
+      "fields": [
+        "year"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "panel_or_group_structure",
+        "variation_left_after_absorption",
+        "design_reason_for_absorption"
+      ],
+      "risk_flags": [
+        "over_absorption_risk",
+        "ambiguous_unit_or_time",
+        "needs_human_review"
+      ]
+    },
+    {
+      "role": "cluster_by",
+      "fields": [
+        "provcd"
+      ],
+      "status": "exploratory_draft_needs_human_review",
+      "evidence_requirements": [
+        "treatment_assignment_level",
+        "error_correlation_level",
+        "cluster_count"
+      ],
+      "risk_flags": [
+        "few_clusters_risk",
+        "cluster_level_mismatch_risk",
+        "needs_human_review"
+      ]
+    }
+  ],
+  "evidence_requirements": [
+    {
+      "role": "outcome",
+      "fields": [
+        "ln_wage"
+      ],
+      "required_evidence": [
+        "变量定义",
+        "单位和变换方式",
+        "缺失率",
+        "结果变量与研究问题的对应关系"
+      ]
+    },
+    {
+      "role": "treatment",
+      "fields": [
+        "ln_robot"
+      ],
+      "required_evidence": [
+        "处理变量定义",
+        "构造来源",
+        "内生性风险",
+        "时间和地区层级"
+      ]
+    },
+    {
+      "role": "controls",
+      "fields": [
+        "female",
+        "age",
+        "edu_last",
+        "urban"
+      ],
+      "required_evidence": [
+        "控制变量选择依据",
+        "遗漏变量风险",
+        "与文献基准设定的对应关系"
+      ]
+    },
+    {
+      "role": "instruments",
+      "fields": [
+        "bartik_iv"
+      ],
+      "required_evidence": [
+        "第一阶段相关性",
+        "排他性约束论证",
+        "弱工具变量诊断",
+        "构造 provenance"
+      ]
+    }
+  ],
+  "review_questions": [
+    "是否将正式 VariableRoleSet 从 Data/Final/analysis_sample.csv 调和到 Data/Final/cfps_robot_reallocation.csv？",
+    "是否确认 outcome=['ln_wage']、treatment=['ln_robot'] 作为下一轮真实执行入口？",
+    "题目“工业机器人应用对劳动力市场匹配效率的影响”是否需要同步到 DesignSpec 的更窄工资回报口径，还是保留为更宽研究问题？"
+  ],
+  "agent_team_schedule": {
+    "call_when": "after_proposal_written",
+    "recall_when": "before_formal_writeback",
+    "integration_owner": "main_codex_thread",
+    "parallel_lanes": [
+      {
+        "agent": "DataAgent",
+        "task": "核验字段、样本口径、缺失率和变量构造 provenance。",
+        "output": "data_evidence_package"
+      },
+      {
+        "agent": "MethodAgent",
+        "task": "核验变量角色是否满足 IV / DID / OLS 等方法前置条件。",
+        "output": "method_gate_package"
+      },
+      {
+        "agent": "LiteratureAgent",
+        "task": "核验变量选择是否有文献依据和可引用来源。",
+        "output": "literature_variable_evidence_package"
+      }
+    ],
+    "next_call_after_integration": "after_human_review_approves_or_requests_revision",
+    "boundary": "Agent Team 只写证据包和 proposal，不直接写 state/product 正式层。"
+  }
+}

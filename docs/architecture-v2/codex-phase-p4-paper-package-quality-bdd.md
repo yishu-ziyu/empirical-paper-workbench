@@ -558,6 +558,25 @@
 
 业务规则：P6-C 是正式包的投稿兼容格式导出节点。它只把已经通过 P6-B 预检的候选 QMD 渲染为最终 `paper.docx`，并留下可复核的命令、日志和文件指纹；PDF-first 的正式成果保持不变。
 
+### Behavior 38: Formal submission manifest summarizes the final package for manual acceptance
+
+**Given** `formal_pdf_final_writeback.json` 的状态是 `final_pdf_written` 或 `final_pdf_already_written`
+**And** `formal_docx_export_preflight.json` 的状态是 `ready_for_docx_export`
+**And** `formal_docx_export.json` 的状态是 `docx_exported`
+**And** `Submissions/formal_package/paper.pdf` 与 `Submissions/formal_package/paper.docx` 均存在
+**When** 用户运行 `Program/formal_submission_package_manifest.py`
+**Then** 系统必须写出 `Results/json/formal_submission_package_manifest.json`
+**And** 系统必须写出 `Reviews/formal_submission_package_acceptance.md`
+**And** 系统必须写出投稿包内 `Submissions/formal_package/manifest.json`
+**And** 报告必须记录 PDF/docx 的路径、bytes、sha256 和来源报告
+**And** 报告必须记录 P6-A/P6-B/P6-C 的状态、schema version、阻断原因和一致性检查
+**And** 报告必须声明 `status=formal_submission_package_ready`
+**And** 报告必须声明 `this_command_rendered_pdf=false`、`this_command_rendered_docx=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`
+**And** 命令不得修改 `paper.pdf`、`paper.docx`、`paper_candidate.pdf`、`paper_candidate.qmd`、P6-A/P6-B/P6-C 报告、P5/P6 审批账本或正式研究状态
+**And** 如果 PDF/docx 缺失、P6-A/P6-B/P6-C 任一报告未 ready/exported，或文件指纹与来源报告不一致，系统必须写出 blocker 报告，并不得写投稿包内 manifest。
+
+业务规则：P6-D 是正式投稿包的“验收清单”节点。它不再生成论文文件，而是把最终 PDF、最终 docx、来源报告、文件指纹、复现命令和人工打开检查合并到一份可审阅 manifest，让用户知道这一包文件是否可以进入人工验收和产品层展示。
+
 ## 边界条件
 
 - 没有 Zotero 或 CNKI 权限时，可以生成 literature gap，不阻塞草稿生成。

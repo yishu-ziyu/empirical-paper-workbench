@@ -949,4 +949,10 @@
 - [x] P6-C 实现：新增 `Program/formal_docx_export.py` 和 `Program/workbench/formal_docx_export.py`，读取 `formal_docx_export_preflight.json` 后调用通用 exporter，生成正式 docx，并记录 docx sha256、bytes、日志、命令、formal state guard 和 blocker。
 - [x] P6-C 真实运行：CLI 输出 `status=docx_exported`、`docx=Submissions/formal_package/paper.docx`、`wrote_docx=true`；生成 `Submissions/formal_package/paper.docx`、`Results/json/formal_docx_export.json`、`Reviews/formal_docx_export.md`、`Results/logs/formal_docx_export.log` 和通用 `Submissions/export_manifest.json`。
 - [x] P6-C 验证：目标测试 3 OK；P6-A/P6-B/P6-C 相邻回归 9 OK；完整 `python3 -m unittest discover -s tests -v` 383 OK / 1 skipped；Python 编译通过；真实报告确认 `formal_state_guard.changed=false`。
-- [ ] 下一步 P6-D：汇总正式投稿包 manifest 和人工验收说明，只读取 `paper.pdf`、`paper.docx`、P6-A/P6-B/P6-C 报告，不重新渲染 PDF/docx，不改写正式研究状态。
+- [x] P6-D 节点规则：本节点只汇总正式投稿包 manifest 和人工验收说明；只读取 `paper.pdf`、`paper.docx`、P6-A/P6-B/P6-C 报告，不重新渲染 PDF/docx，不改写正式研究状态。后续每个小节点继续最多 20 分钟，超时必须拆小或回退路线。
+- [x] P6-D Agent Team：使用 verifier sidecar Anscombe 复核边界；采纳其建议，输出 `Results/json/formal_submission_package_manifest.json`、`Reviews/formal_submission_package_acceptance.md` 和包内 `Submissions/formal_package/manifest.json`，并强制记录 PDF/docx 指纹、一致性检查、人工验收清单和“不渲染/不改正式状态”边界。
+- [x] P6-D BDD/TDD：新增 Behavior 38 和 `tests/test_formal_submission_package_manifest.py`；RED 为缺少 `Program/formal_submission_package_manifest.py`，GREEN 后覆盖成功 manifest、P6-C 未 exported 阻断、docx 缺失阻断、P6-A hash 不一致阻断和正式层不改写。
+- [x] P6-D 实现：新增 `Program/formal_submission_package_manifest.py` 和 `Program/workbench/formal_submission_package_manifest.py`，读取 P6-A/P6-B/P6-C 报告与最终 PDF/docx，写出验收 manifest、review markdown 和包内自包含 manifest。
+- [x] P6-D 真实运行：CLI 输出 `status=formal_submission_package_ready`、`package_manifest_written=true`；真实包内 PDF sha256=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，docx sha256=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`，一致性检查全部通过。
+- [x] P6-D 验证：目标测试 4 OK；P6-A/P6-B/P6-C/P6-D 相邻回归 13 OK；Python 编译通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，387 tests OK，skipped=1。
+- [ ] 下一步 P6-E：打开/检查正式 PDF 与 docx 的人工验收入口，并把 CLI 主链路结果转化为产品层可读取的 package summary API/状态文件。

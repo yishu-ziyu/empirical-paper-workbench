@@ -1,0 +1,259 @@
+{
+  "schema_version": "p5.formal_evidence_registry_resolution.v1",
+  "generated_at": "2026-05-26T19:20:57.216766+00:00",
+  "source_preflight_report": "Results/json/formal_pdf_export_preflight.json",
+  "resolution_report": "Results/json/formal_evidence_registry_resolution.json",
+  "status": "evidence_registry_patch_proposed",
+  "blocking_reasons": [],
+  "preflight_status": "blocked_by_source_gaps",
+  "missing_evidence_count": 10,
+  "evidence_resolutions": [
+    {
+      "id": "approved_findings",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "state/product/finding_reviews.json",
+        "state/product/manuscript_candidate_reviews.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/approved_findings.json",
+        "state/product/finding_reviews.json",
+        "state/product/manuscript_candidate_reviews.json"
+      ],
+      "required_by_sections": [
+        "Abstract",
+        "Conclusion",
+        "Introduction"
+      ],
+      "agent": "ReviewerAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `approved_findings`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "approved finding review records can be converted into an approved findings evidence file"
+    },
+    {
+      "id": "citation_verification_log",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/verified_bibliography.csv"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/citation_verification_log.json",
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/verified_bibliography.csv"
+      ],
+      "required_by_sections": [
+        "Literature and Contribution",
+        "References"
+      ],
+      "agent": "LiteratureAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `citation_verification_log`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "literature package records verification channels and missing citation evidence"
+    },
+    {
+      "id": "domain_notes",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/literature_package_report.json",
+        "state/product/research_question.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/domain_notes.json",
+        "Results/json/literature_package_report.json",
+        "state/product/research_question.json"
+      ],
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "agent": "VerifierAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `domain_notes`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "literature package contains research context and CNKI/manual queues"
+    },
+    {
+      "id": "figure_manifest",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Submissions/cfps_robot_pdf_export_manifest.json",
+        "Submissions/export_manifest.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/figure_manifest.json",
+        "Submissions/cfps_robot_pdf_export_manifest.json",
+        "Submissions/export_manifest.json"
+      ],
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "agent": "ExecutionAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `figure_manifest`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "PDF export manifest lists rendered manuscript outputs and can seed figure/table references"
+    },
+    {
+      "id": "limitations_register",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/reviewer_scorecard_report.json",
+        "Results/json/method_gate_report.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/limitations_register.json",
+        "Results/json/reviewer_scorecard_report.json",
+        "Results/json/method_gate_report.json"
+      ],
+      "required_by_sections": [
+        "Conclusion"
+      ],
+      "agent": "ReviewerAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `limitations_register`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "reviewer scorecard stores revision tasks and limits that can seed a limitations register"
+    },
+    {
+      "id": "regression_tables",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/method_execution_result.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/regression_tables.json",
+        "Results/json/method_execution_result.json"
+      ],
+      "required_by_sections": [
+        "Main Results"
+      ],
+      "agent": "ExecutionAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `regression_tables`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "method execution result stores coefficients, standard errors and model summaries"
+    },
+    {
+      "id": "robustness_matrix",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/method_diagnostics_report.json",
+        "Results/json/method_gate_report.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/robustness_matrix.json",
+        "Results/json/method_diagnostics_report.json",
+        "Results/json/method_gate_report.json"
+      ],
+      "required_by_sections": [
+        "Robustness / Mechanisms / Heterogeneity"
+      ],
+      "agent": "MethodAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `robustness_matrix`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "method diagnostics report stores robustness and diagnostic checks"
+    },
+    {
+      "id": "sample_profile",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/method_execution_result.json",
+        "Results/json/project_snapshot.json",
+        "Results/json/cfps_robot_project_snapshot.json"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/sample_profile.json",
+        "Results/json/method_execution_result.json",
+        "Results/json/project_snapshot.json",
+        "Results/json/cfps_robot_project_snapshot.json"
+      ],
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "agent": "DataAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `sample_profile`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "method execution result includes data_preflight rows, sample and formula fields"
+    },
+    {
+      "id": "variable_role_set",
+      "resolution": "direct_alias_available",
+      "selected_paths": [
+        "state/product/variable_roles.json",
+        "state/proposals/variable_role_reconciliation.json"
+      ],
+      "candidate_paths_checked": [
+        "state/product/variable_role_set.json",
+        "state/product/variable_roles.json",
+        "state/proposals/variable_role_reconciliation.json"
+      ],
+      "required_by_sections": [
+        "Data and Measurement"
+      ],
+      "agent": "DataAgent",
+      "requires_human_confirmation": true,
+      "action": "把 `variable_role_set` 的 existing path 作为可审查 alias 加入 evidence registry patch proposal。",
+      "reason": "current product state stores the approved variable role set under the existing variable_roles file"
+    },
+    {
+      "id": "verified_context_sources",
+      "resolution": "derivable_from_existing_artifact",
+      "selected_paths": [
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/candidate_literature.csv"
+      ],
+      "candidate_paths_checked": [
+        "Results/json/verified_context_sources.json",
+        "Results/json/literature_package_report.json",
+        "Data/literature/processed/candidate_literature.csv"
+      ],
+      "required_by_sections": [
+        "Institutional Background / Theory / Context"
+      ],
+      "agent": "VerifierAgent",
+      "requires_human_confirmation": true,
+      "action": "由现有结构化产物派生 `verified_context_sources`，生成目标 evidence file 后再重跑 PDF 预检。",
+      "reason": "literature package records official-source seeds and manual verification channels"
+    }
+  ],
+  "patch_summary": {
+    "total": 10,
+    "by_resolution": {
+      "derivable_from_existing_artifact": 9,
+      "direct_alias_available": 1
+    },
+    "requires_human_confirmation": 10
+  },
+  "this_command_mutated_preflight": false,
+  "this_command_wrote_formal_state": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "agent_team_schedule": {
+    "call_when": "after_formal_pdf_preflight_blocks_on_evidence",
+    "called_agents": [
+      "DataAgent",
+      "ExecutionAgent",
+      "LiteratureAgent",
+      "MethodAgent",
+      "ReviewerAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_evidence_registry_resolution_written",
+    "next_call_when": "before_deriving_missing_evidence_files_or_applying_registry_patch",
+    "integration_owner": "MainAgent",
+    "boundary": "Agent Team 只提出证据绑定/派生建议；canonical registry 和正式层写回必须人工确认。"
+  },
+  "next_action": {
+    "id": "review_evidence_registry_patch_proposal",
+    "label": "审阅证据注册表修复提案",
+    "description": "先确认可绑定或可派生的本地产物，再生成目标 evidence files 并重跑 PDF 预检。"
+  },
+  "write_boundary": "本节点只生成 evidence registry patch proposal；不改 PDF 预检报告、不改章节源、不改 state/product 正式研究状态，也不写 canonical 规则库。"
+}

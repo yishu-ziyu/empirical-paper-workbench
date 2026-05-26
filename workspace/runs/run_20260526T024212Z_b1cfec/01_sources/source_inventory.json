@@ -1,0 +1,395 @@
+{
+  "project_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板",
+  "layout": "generic_aer",
+  "datasets": [
+    {
+      "name": "analysis_sample.csv",
+      "path": "Data/Final/analysis_sample.csv",
+      "suffix": ".csv",
+      "size": 172
+    },
+    {
+      "name": "cfps_robot_reallocation.csv",
+      "path": "Data/Final/cfps_robot_reallocation.csv",
+      "suffix": ".csv",
+      "size": 3729019
+    },
+    {
+      "name": "cfps2010famecon_202008.dta",
+      "path": "Data/Raw/cfps2010famecon_202008.dta",
+      "suffix": ".dta",
+      "size": 79096409
+    }
+  ],
+  "code_files": [
+    {
+      "name": "00_main_results.do",
+      "path": "Program/Analysis/00_main_results.do",
+      "suffix": ".do",
+      "size": 348
+    },
+    {
+      "name": "10_robustness_checks.do",
+      "path": "Program/Analysis/10_robustness_checks.do",
+      "suffix": ".do",
+      "size": 526
+    },
+    {
+      "name": "00_build_final_data.do",
+      "path": "Program/Clean/00_build_final_data.do",
+      "suffix": ".do",
+      "size": 355
+    },
+    {
+      "name": "export_docx.py",
+      "path": "Program/export_docx.py",
+      "suffix": ".py",
+      "size": 2491
+    },
+    {
+      "name": "master.do",
+      "path": "Program/master.do",
+      "suffix": ".do",
+      "size": 380
+    },
+    {
+      "name": "run_paper.py",
+      "path": "Program/run_paper.py",
+      "suffix": ".py",
+      "size": 13279
+    },
+    {
+      "name": "setup.do",
+      "path": "Program/setup.do",
+      "suffix": ".do",
+      "size": 620
+    },
+    {
+      "name": "__init__.py",
+      "path": "Program/workbench/__init__.py",
+      "suffix": ".py",
+      "size": 61
+    },
+    {
+      "name": "__init__.py",
+      "path": "Program/workbench/auto_empirical/__init__.py",
+      "suffix": ".py",
+      "size": 744
+    },
+    {
+      "name": "capabilities.py",
+      "path": "Program/workbench/auto_empirical/capabilities.py",
+      "suffix": ".py",
+      "size": 1296
+    },
+    {
+      "name": "evaluator.py",
+      "path": "Program/workbench/auto_empirical/evaluator.py",
+      "suffix": ".py",
+      "size": 1650
+    },
+    {
+      "name": "guards.py",
+      "path": "Program/workbench/auto_empirical/guards.py",
+      "suffix": ".py",
+      "size": 1990
+    },
+    {
+      "name": "ledger.py",
+      "path": "Program/workbench/auto_empirical/ledger.py",
+      "suffix": ".py",
+      "size": 930
+    },
+    {
+      "name": "registry.py",
+      "path": "Program/workbench/auto_empirical/registry.py",
+      "suffix": ".py",
+      "size": 2457
+    },
+    {
+      "name": "search_space.py",
+      "path": "Program/workbench/auto_empirical/search_space.py",
+      "suffix": ".py",
+      "size": 1190
+    },
+    {
+      "name": "config.py",
+      "path": "Program/workbench/config.py",
+      "suffix": ".py",
+      "size": 1435
+    },
+    {
+      "name": "drafts.py",
+      "path": "Program/workbench/drafts.py",
+      "suffix": ".py",
+      "size": 1141
+    },
+    {
+      "name": "export.py",
+      "path": "Program/workbench/export.py",
+      "suffix": ".py",
+      "size": 1493
+    },
+    {
+      "name": "observability.py",
+      "path": "Program/workbench/observability.py",
+      "suffix": ".py",
+      "size": 9672
+    },
+    {
+      "name": "results.py",
+      "path": "Program/workbench/results.py",
+      "suffix": ".py",
+      "size": 632
+    },
+    {
+      "name": "state.py",
+      "path": "Program/workbench/state.py",
+      "suffix": ".py",
+      "size": 1380
+    },
+    {
+      "name": "statspai_runner.py",
+      "path": "Program/workbench/statspai_runner.py",
+      "suffix": ".py",
+      "size": 1371
+    }
+  ],
+  "results_files": [
+    {
+      "name": "cfps_robot_index.json",
+      "path": "Results/cfps_robot_index.json",
+      "suffix": ".json",
+      "size": 990
+    },
+    {
+      "name": "README.md",
+      "path": "Results/fig/README.md",
+      "suffix": ".md",
+      "size": 39
+    },
+    {
+      "name": "index.json",
+      "path": "Results/index.json",
+      "suffix": ".json",
+      "size": 920
+    },
+    {
+      "name": "README.md",
+      "path": "Results/json/README.md",
+      "suffix": ".md",
+      "size": 97
+    },
+    {
+      "name": "analysis_result.json",
+      "path": "Results/json/analysis_result.json",
+      "suffix": ".json",
+      "size": 6817
+    },
+    {
+      "name": "cfps_robot_analysis_result.json",
+      "path": "Results/json/cfps_robot_analysis_result.json",
+      "suffix": ".json",
+      "size": 6817
+    },
+    {
+      "name": "cfps_robot_project_snapshot.json",
+      "path": "Results/json/cfps_robot_project_snapshot.json",
+      "suffix": ".json",
+      "size": 6625
+    },
+    {
+      "name": "iv_diag_result.json",
+      "path": "Results/json/iv_diag_result.json",
+      "suffix": ".json",
+      "size": 1701
+    },
+    {
+      "name": "method_execution_result.json",
+      "path": "Results/json/method_execution_result.json",
+      "suffix": ".json",
+      "size": 37309
+    },
+    {
+      "name": "project_snapshot.json",
+      "path": "Results/json/project_snapshot.json",
+      "suffix": ".json",
+      "size": 6625
+    },
+    {
+      "name": "statspai_execution_result.json",
+      "path": "Results/json/statspai_execution_result.json",
+      "suffix": ".json",
+      "size": 3277
+    },
+    {
+      "name": "README.md",
+      "path": "Results/logs/README.md",
+      "suffix": ".md",
+      "size": 82
+    },
+    {
+      "name": "README.md",
+      "path": "Results/tab/README.md",
+      "suffix": ".md",
+      "size": 39
+    }
+  ],
+  "literature_files": [
+    {
+      "name": "README.md",
+      "path": "Reference/README.md",
+      "suffix": ".md",
+      "size": 93,
+      "sha256": "823931767234937ec00cce6029d3d170d5133fcefa3f5f48ece8fb7d749a86f1"
+    }
+  ],
+  "reference_files": [
+    {
+      "name": "README.md",
+      "path": "Reference/README.md",
+      "suffix": ".md",
+      "size": 93
+    }
+  ],
+  "manuscript_sections": [
+    {
+      "name": "README.md",
+      "path": "Manuscripts/en/README.md",
+      "suffix": ".md",
+      "size": 77
+    },
+    {
+      "name": "README.md",
+      "path": "Manuscripts/generated/README.md",
+      "suffix": ".md",
+      "size": 149
+    },
+    {
+      "name": "cfps_robot_paper_draft.md",
+      "path": "Manuscripts/generated/cfps_robot_paper_draft.md",
+      "suffix": ".md",
+      "size": 1835
+    },
+    {
+      "name": "paper_draft.md",
+      "path": "Manuscripts/generated/paper_draft.md",
+      "suffix": ".md",
+      "size": 1880
+    },
+    {
+      "name": "manuscript_candidate_finding_trained_effect_results.md",
+      "path": "Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md",
+      "suffix": ".md",
+      "size": 1634
+    },
+    {
+      "name": "README.md",
+      "path": "Manuscripts/templates/README.md",
+      "suffix": ".md",
+      "size": 2061
+    },
+    {
+      "name": "材料登记.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/00_原始材料/材料登记.md",
+      "suffix": ".md",
+      "size": 2666
+    },
+    {
+      "name": "官方模板校准记录.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/01_格式规范/官方模板校准记录.md",
+      "suffix": ".md",
+      "size": 2232
+    },
+    {
+      "name": "格式规范抽取表.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/01_格式规范/格式规范抽取表.md",
+      "suffix": ".md",
+      "size": 4641
+    },
+    {
+      "name": "范文模板规格说明书.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/01_格式规范/范文模板规格说明书.md",
+      "suffix": ".md",
+      "size": 9731
+    },
+    {
+      "name": "README.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/02_latex模板/build/paper_v21_hqu/figures/archive/README.md",
+      "suffix": ".md",
+      "size": 919
+    },
+    {
+      "name": "FIGURE_PLAN_legacy_2026-04-28.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/02_latex模板/build/paper_v21_hqu/figures/archive/legacy_unused_2026-04-28/FIGURE_PLAN_legacy_2026-04-28.md",
+      "suffix": ".md",
+      "size": 6012
+    },
+    {
+      "name": "论文正文_raw.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/03_正文迁移/论文正文_raw.md",
+      "suffix": ".md",
+      "size": 117543
+    },
+    {
+      "name": "迁移记录.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/03_正文迁移/迁移记录.md",
+      "suffix": ".md",
+      "size": 1072
+    },
+    {
+      "name": "编译记录.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/04_编译输出/编译记录.md",
+      "suffix": ".md",
+      "size": 3371
+    },
+    {
+      "name": "后续修订清单.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/05_对照检查/后续修订清单.md",
+      "suffix": ".md",
+      "size": 5334
+    },
+    {
+      "name": "对照检查清单.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/05_对照检查/对照检查清单.md",
+      "suffix": ".md",
+      "size": 3586
+    },
+    {
+      "name": "华侨大学本科论文LaTeX工作流.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/06_工作流固化/华侨大学本科论文LaTeX工作流.md",
+      "suffix": ".md",
+      "size": 5176
+    },
+    {
+      "name": "PROJECT_DIRECTION.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/PROJECT_DIRECTION.md",
+      "suffix": ".md",
+      "size": 1980
+    },
+    {
+      "name": "lessons.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/tasks/lessons.md",
+      "suffix": ".md",
+      "size": 141
+    },
+    {
+      "name": "todo.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/tasks/todo.md",
+      "suffix": ".md",
+      "size": 9475
+    },
+    {
+      "name": "项目找回提示词.md",
+      "path": "Manuscripts/templates/华侨大学本科论文LaTeX模板_2026-05-17/项目找回提示词.md",
+      "suffix": ".md",
+      "size": 1599
+    },
+    {
+      "name": "README.md",
+      "path": "Manuscripts/zh/README.md",
+      "suffix": ".md",
+      "size": 65
+    }
+  ]
+}

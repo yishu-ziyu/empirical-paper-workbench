@@ -14,6 +14,11 @@ from workbench.statspai_runner import run_statspai_paper
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Phase A econ workbench pipeline.")
     parser.add_argument("--project-root", default=".", help="Absolute or relative project root.")
+    parser.add_argument(
+        "--paper-config",
+        default="paper.yaml",
+        help="Project-relative or absolute paper configuration file.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Skip analysis execution and only emit artifacts.")
     parser.add_argument("--run-id", default=None, help="Stable run id for observable execution files.")
     return parser.parse_args()
@@ -33,6 +38,20 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def resolve_config_path(project_root: Path, value: str) -> Path:
+    configured = Path(value)
+    if configured.is_absolute():
+        return configured.resolve()
+    return (project_root / configured).resolve()
+
+
+def display_path(path: Path, project_root: Path) -> str:
+    try:
+        return str(path.relative_to(project_root))
+    except ValueError:
+        return str(path)
+
+
 def main() -> int:
     args = parse_args()
     project_root = Path(args.project_root).resolve()
@@ -42,15 +61,16 @@ def main() -> int:
 
     try:
         observable.start_step("config_load")
-        paper_config = read_yaml(project_root / "paper.yaml")
+        paper_config_path = resolve_config_path(project_root, args.paper_config)
+        paper_config = read_yaml(paper_config_path)
         analysis_config = read_yaml(project_root / "Program" / "config" / "analysis_config.yaml")
-        paths = resolve_project_paths(project_root, paper_config)
+        paths = resolve_project_paths(project_root, paper_config, paper_config_path)
         ensure_directories(paths)
         observable.complete_step(
             "config_load",
             "Project configuration loaded.",
             metadata={
-                "paper_config": "paper.yaml",
+                "paper_config": display_path(paper_config_path, project_root),
                 "analysis_config": "Program/config/analysis_config.yaml",
             },
         )
@@ -73,7 +93,7 @@ def main() -> int:
             "gate_dataset_fields",
             "dataset_intake",
             "Confirm detected dataset fields",
-            "The system detected outcome, treatment, and controls from paper.yaml. A user can correct them before trusting downstream analysis.",
+            "The system detected outcome, treatment, and controls from the active paper config. A user can correct them before trusting downstream analysis.",
             "analysis_execution",
             ["accept_detected_fields", "edit_variable_roles", "pause_run"],
             metadata=dataset_metadata,
@@ -171,11 +191,11 @@ def main() -> int:
                 "robustness_findings": analysis_payload["robustness_findings"],
                 "result_payload": analysis_payload["result_payload"],
             }
-        snapshot_path = paths["results_json_dir"] / "project_snapshot.json"
+        snapshot_path = paths["project_snapshot"]
         write_json(snapshot_path, snapshot_payload)
         observable.artifact_written("state_index", snapshot_path, "Structured project snapshot written.")
 
-        log_path = paths["results_logs_dir"] / "run_paper.log"
+        log_path = paths["run_log"]
         write_text(
             log_path,
             "\n".join(
@@ -192,7 +212,7 @@ def main() -> int:
         )
         observable.artifact_written("state_index", log_path, "Pipeline execution log written.")
 
-        analysis_result_path = paths["results_json_dir"] / "analysis_result.json"
+        analysis_result_path = paths["analysis_result"]
         if analysis_payload is not None:
             write_json(
                 analysis_result_path,

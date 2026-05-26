@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "name": "analysis_sample.csv",
+      "path": "Data/Final/analysis_sample.csv",
+      "suffix": ".csv",
+      "size": 172
+    },
+    {
+      "name": "cfps_robot_reallocation.csv",
+      "path": "Data/Final/cfps_robot_reallocation.csv",
+      "suffix": ".csv",
+      "size": 3729019
+    },
+    {
+      "name": "cfps2010famecon_202008.dta",
+      "path": "Data/Raw/cfps2010famecon_202008.dta",
+      "suffix": ".dta",
+      "size": 79096409
+    }
+  ]
+}

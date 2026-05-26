@@ -1,0 +1,61 @@
+project:
+  slug: cfps-robot-labor-reallocation
+  title: "工业机器人暴露与劳动收入再配置"
+  language: zh
+  final_output: docx
+  internal_formats:
+    - markdown
+    - latex
+
+research:
+  question: "工业机器人暴露是否影响劳动收入再配置？"
+  contribution: "用已整理的 CFPS 个体样本与省级工业机器人暴露指标验证本地实证 OS 的真实数据执行链路。"
+  current_stage: exploratory-real-data-cli
+  target_journey:
+    - question-definition
+    - data-readiness
+    - variable-role-review
+    - identification-design
+    - baseline-estimation
+    - robustness
+    - interpretation
+    - manuscript-drafting
+    - review-export
+
+data:
+  final_dataset: Data/Final/cfps_robot_reallocation.csv
+  unit_of_analysis: "individual-year"
+  sample_definition: "CFPS individual-year observations matched with provincial industrial robot exposure measures; exploratory complete-case handling is delegated to the execution engine."
+  key_variables:
+    outcome:
+      - ln_wage
+    treatment:
+      - ln_robot
+    controls:
+      - edu_last
+      - age
+      - female
+      - urban
+    instruments: []
+
+methods:
+  baseline:
+    family: "ols"
+    candidates:
+      - ols
+      - iv
+      - did
+  robustness:
+    - missingness-audit
+    - alternative-controls
+    - clustered-standard-errors
+    - identification-boundary-review
+
+outputs:
+  markdown_draft: Manuscripts/generated/cfps_robot_paper_draft.md
+  latex_draft: Manuscripts/generated/cfps_robot_paper_draft.tex
+  results_index: Results/cfps_robot_index.json
+  state_file: state/cfps_robot_project_state.json
+  project_snapshot: Results/json/cfps_robot_project_snapshot.json
+  analysis_result: Results/json/cfps_robot_analysis_result.json
+  run_log: Results/logs/cfps_robot_run_paper.log

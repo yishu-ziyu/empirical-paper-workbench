@@ -39,6 +39,11 @@
 
 ## 新增设计/方法论文件
 
+- `docs/architecture-v2/north-star-cli-first-research-os-plan-2026-05-26.md`
+- `docs/architecture-v2/journal-skill-registry-design-2026-05-26.md`
+- `docs/architecture-v2/codex-phase-p2-real-data-cli-full-run-bdd.md`
+- `Program/methodology/README.md`
+- `Program/methodology/proposals/2026-05-26-aer-skills-import/proposal.yml`
 - `docs/architecture-v2/codex-phase-p3-react-input-tabs-bdd.md`
 - `docs/architecture-v2/codex-phase-p3-react-workbench-design-contract.md`
 - `docs/architecture-v2/codex-phase-p2-auto-research-cli-bdd.md`
@@ -65,6 +70,7 @@
 
 ## 新增/扩展 API
 
+- CLI：`python3 Program/run_paper.py --project-root . --paper-config Program/config/paper_real_cfps_robot.yaml --run-id run_cli_real_cfps_robot_20260526_isolated`
 - CLI：`python3 Product/cli.py auto-research --topic "<研究题目>" --mode auto --max-depth 2 --max-iterations 5`
 - `GET /api/v1/projects/{project_id}/runs/{run_id}/observability`
 - `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/dispatch-review` records human dispatch review for a queued Agent task.
@@ -176,6 +182,16 @@
 
 ## 手动验收产物
 
+- `Program/config/paper_real_cfps_robot.yaml`：真实 CFPS/机器人研究任务配置。
+- `state/runs/run_cli_real_cfps_robot_20260526_isolated/`：真实 CLI live run 的 observability 目录。
+- `state/cfps_robot_project_state.json`：真实 CFPS/机器人任务的独立项目状态。
+- `Results/cfps_robot_index.json`：真实 CFPS/机器人任务的结果索引。
+- `Results/json/cfps_robot_project_snapshot.json`：真实 CFPS/机器人任务的结构化快照。
+- `Results/json/cfps_robot_analysis_result.json`：StatsPAI 执行结果，样本量 15,697，`ln_robot` OLS 系数 0.1039，仍为 exploratory。
+- `Results/logs/cfps_robot_run_paper.log`：真实 CLI live run 日志。
+- `Manuscripts/generated/cfps_robot_paper_draft.md`：真实 CLI live run 生成的 Markdown 草稿。
+- `Manuscripts/generated/cfps_robot_paper_draft.tex`：真实 CLI live run 生成的 LaTeX 草稿。
+- `workspace/runs/run_20260526T024212Z_b1cfec/`：修正后的 Auto Research run，已绑定 `Data/Final/cfps_robot_reallocation.csv`。
 - `workspace/runs/run_20260524T172441Z_c063b7/`：P2-AB Auto Research CLI 手动验收生成的本地运行目录，包含 `run_manifest.json`、`research_report.md`、`paper_draft_exploratory.md`、候选变量/方法和文献线索。
 - `journey-final-verify.png`：P2-AB 首页/工作台浏览器验收截图。
 - `journey-agent-drawer-clean-verify.png`：P2-AB Agent drawer 浏览器验收截图，确认详情只在右侧抽屉展开。

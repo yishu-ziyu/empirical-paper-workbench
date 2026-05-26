@@ -1,0 +1,89 @@
+{
+  "run_id": "run_20260526T024212Z_b1cfec",
+  "run_root": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/workspace/runs/run_20260526T024212Z_b1cfec",
+  "status": "completed",
+  "mode": "auto",
+  "execution_policy": "best_available",
+  "research_intent": {
+    "topic": "工业机器人暴露是否影响劳动收入再配置？使用 CFPS 与工业机器人暴露数据",
+    "status": "exploratory",
+    "mode": "auto",
+    "execution_policy": "best_available",
+    "max_depth": 2,
+    "max_iterations": 5,
+    "evidence_level": "local_file",
+    "can_promote": false,
+    "created_at": "2026-05-26T02:42:12.200081+00:00"
+  },
+  "capability_status": [
+    {
+      "id": "local_data",
+      "status": "available",
+      "reason": "local datasets detected",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "statspai",
+      "status": "available",
+      "reason": "statspai module importable",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "cnki",
+      "status": "blocked_by_browser_session",
+      "reason": "Chrome DevTools endpoint not detected; CNKI remains manual-assisted",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "web_search",
+      "status": "available",
+      "reason": "network connectivity check succeeded",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "agentmemory",
+      "status": "unavailable",
+      "reason": "agentmemory executable not found",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "llm_supervisor",
+      "status": "unavailable",
+      "reason": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC is not enabled",
+      "evidence_level": "local_file",
+      "can_promote": false
+    }
+  ],
+  "artifact_policy": {
+    "status": "needs_human_review",
+    "labels": [
+      "exploratory",
+      "draft",
+      "needs_human_review"
+    ],
+    "can_promote": false,
+    "formal_state_write_policy": "do_not_overwrite_variable_roles_design_spec_or_run_plan"
+  },
+  "artifacts": [
+    "workspace/runs/run_20260526T024212Z_b1cfec/00_intake/research_intent.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/01_sources/source_inventory.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/01_sources/dataset_inventory.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/01_sources/literature_inventory.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/01_sources/recursive_search_plan.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/03_strategy/variable_candidates.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/03_strategy/method_candidates.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/03_strategy/evidence_gaps.json",
+    "workspace/runs/run_20260526T024212Z_b1cfec/02_literature/literature_clues.jsonl",
+    "workspace/runs/run_20260526T024212Z_b1cfec/06_writing/research_report.md",
+    "workspace/runs/run_20260526T024212Z_b1cfec/06_writing/paper_draft_exploratory.md",
+    "workspace/runs/run_20260526T024212Z_b1cfec/run_manifest.json"
+  ],
+  "created_at": "2026-05-26T02:42:12.200081+00:00",
+  "evidence_level": "local_file",
+  "can_promote": false
+}

@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "id": "capability_cnki",
+      "label": "cnki capability is not fully available",
+      "status": "blocked_by_browser_session",
+      "reason": "Chrome DevTools endpoint not detected; CNKI remains manual-assisted",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "capability_agentmemory",
+      "label": "agentmemory capability is not fully available",
+      "status": "unavailable",
+      "reason": "agentmemory executable not found",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "capability_llm_supervisor",
+      "label": "llm_supervisor capability is not fully available",
+      "status": "unavailable",
+      "reason": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC is not enabled",
+      "evidence_level": "local_file",
+      "can_promote": false
+    },
+    {
+      "id": "method_identification_upgrade",
+      "label": "DID/IV/RDD/PSM/DML requires additional evidence",
+      "status": "needs_evidence",
+      "requirements": [
+        "政策冲击或处理时点",
+        "工具变量或断点",
+        "可比对照组",
+        "平行趋势或重叠假设证据"
+      ],
+      "evidence_level": "local_file",
+      "can_promote": false
+    }
+  ]
+}

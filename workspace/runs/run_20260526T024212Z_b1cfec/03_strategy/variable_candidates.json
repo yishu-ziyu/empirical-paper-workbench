@@ -1,0 +1,47 @@
+{
+  "status": "needs_human_review",
+  "evidence_level": "local_file",
+  "can_promote": false,
+  "dataset": {
+    "name": "cfps_robot_reallocation.csv",
+    "path": "Data/Final/cfps_robot_reallocation.csv",
+    "suffix": ".csv",
+    "size": 3729019
+  },
+  "columns": [
+    "pid",
+    "provcd",
+    "urban",
+    "ln_wage",
+    "manu_dummy",
+    "ISEI_score",
+    "part_time",
+    "female",
+    "age",
+    "edu_last",
+    "year",
+    "year_robot",
+    "robot_density",
+    "ln_robot",
+    "bartik_iv",
+    "provcd_num"
+  ],
+  "roles": {
+    "outcome_candidates": [
+      "ln_wage"
+    ],
+    "treatment_candidates": [
+      "year_robot",
+      "robot_density",
+      "ln_robot"
+    ],
+    "control_candidates": [
+      "urban",
+      "female",
+      "age",
+      "edu_last"
+    ],
+    "instrument_candidates": []
+  },
+  "rationale": "变量角色为自动候选，必须人工确认后才可进入正式 VariableRoleSet。"
+}

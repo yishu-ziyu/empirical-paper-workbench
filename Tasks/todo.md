@@ -1,5 +1,25 @@
 # Todo
 
+## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
+
+- [x] 明确主线：先把本地 CLI 高效工作流跑通，再把同一套状态和证据模型接到云端产品。
+- [x] 新增北极星计划：`docs/architecture-v2/north-star-cli-first-research-os-plan-2026-05-26.md`。
+- [x] 新增真实数据 CLI 行为文档：`docs/architecture-v2/codex-phase-p2-real-data-cli-full-run-bdd.md`。
+- [x] 让 `Program/run_paper.py` 支持 `--paper-config`，避免真实数据运行覆盖默认 `paper.yaml` 输出。
+- [x] 新增真实 CFPS/机器人配置：`Program/config/paper_real_cfps_robot.yaml`。
+- [x] 完成真实 CLI live run：`run_cli_real_cfps_robot_20260526_isolated`。
+- [x] 真实运行写出独立 state、results index、snapshot、analysis result、run log、Markdown/LaTeX 草稿和 observability。
+- [x] 修复 Auto Research 数据选择：题目包含 CFPS/机器人时优先选择 `Data/Final/cfps_robot_reallocation.csv`，不再使用 demo `analysis_sample.csv`。
+- [x] 修复启发式变量匹配：不再把 `ln_wage` 因为包含 `age` 而误放入 controls。
+- [x] 新增 Journal Skill Registry 设计：`docs/architecture-v2/journal-skill-registry-design-2026-05-26.md`。
+- [x] 新增方法库边界：`Program/methodology/README.md`。
+- [x] 新增 AER-like proposal 入口：`Program/methodology/proposals/2026-05-26-aer-skills-import/proposal.yml`。
+- [ ] 下一步实现 `JournalSkillRegistry` 读取器：能区分 proposal 和 canonical，并保证 proposal 不能阻断 formal export。
+- [ ] 下一步实现 `state/product/journal_review.json` 的读写服务和 API。
+- [ ] 下一步把 Task Brief 的“审稿标准：AER-like 顶刊标准”选择接入后端状态。
+- [ ] 下一步把 Method Design 的缺失证据提示接入 Journal Skill rules。
+- [ ] 下一步把 Review & Export 的 verifier gates 扩展为 journal-aware gates。
+
 ## 2026-05-22 Long-run Optimization Protocol
 
 - [x] 定位项目根目录：`/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。

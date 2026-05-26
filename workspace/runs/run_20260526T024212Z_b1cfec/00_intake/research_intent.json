@@ -1,0 +1,11 @@
+{
+  "topic": "工业机器人暴露是否影响劳动收入再配置？使用 CFPS 与工业机器人暴露数据",
+  "status": "exploratory",
+  "mode": "auto",
+  "execution_policy": "best_available",
+  "max_depth": 2,
+  "max_iterations": 5,
+  "evidence_level": "local_file",
+  "can_promote": false,
+  "created_at": "2026-05-26T02:42:12.200081+00:00"
+}

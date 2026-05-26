@@ -931,4 +931,10 @@
 - [x] P5-E5 实现：新增 `Program/formal_pdf_final_approval.py` 和 `Program/workbench/formal_pdf_final_approval.py`，读取 `formal_pdf_final_writeback_preflight.json`，写出 `Results/json/formal_pdf_final_approval.json`、`Reviews/formal_pdf_final_approval.md`，并更新 `state/product/writeback_approvals.json`。
 - [x] P5-E5 真实运行：CLI 输出 `status=approved_for_final_writeback`、`can_enter_p6=true`、`final_writeback_authorized=true`；报告确认 `this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`，本仓库仍无 `Submissions/formal_package/paper.pdf` 或 `paper.docx`。
 - [x] P5-E5 验证：目标测试 3 OK；P5-E4/P5-E5/正式写回审批相邻回归 8 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-A：仅当 `state/product/writeback_approvals.json.final_pdf_approvals.formal_pdf_candidate.status=approved` 时，才允许把候选 PDF/docx 写入最终产物层。
+- [x] P6-A 节点规则：本节点只把已批准的 `paper_candidate.pdf` 晋升为最终 `paper.pdf`；不生成 docx，不改写 P5 审批账本，不改写正式研究状态。docx 导出预检拆到 P6-B，避免单节点超过 20 分钟。
+- [x] P6-A Agent Team：使用 verifier sidecar Lagrange 复核 P6-A 边界；采纳其“审批后才能写最终产物、不得改写 P5 账本和正式状态”的保护建议，同时把 docx 写回拆出到 P6-B。
+- [x] P6-A BDD/TDD：新增 Behavior 35 和 `tests/test_formal_pdf_final_writeback.py`；RED 为缺少 `Program/formal_pdf_final_writeback.py`，GREEN 后覆盖批准后写最终 PDF、未批准阻断、候选路径与批准账本不一致阻断。
+- [x] P6-A 实现：新增 `Program/formal_pdf_final_writeback.py` 和 `Program/workbench/formal_pdf_final_writeback.py`，读取 candidate report、final preflight、final approval report 和 writeback approval ledger 后复制候选 PDF 为最终 PDF，并记录 sha256、bytes、路径和 formal state guard。
+- [x] P6-A 真实运行：CLI 输出 `status=final_pdf_written`、`final_pdf=Submissions/formal_package/paper.pdf`、`wrote_final_pdf=true`、`wrote_docx=false`；`paper.pdf` 与 `paper_candidate.pdf` sha256 一致，本仓库仍无 `Submissions/formal_package/paper.docx`。
+- [x] P6-A 验证：目标测试 3 OK；P5-E3/P5-E4/P5-E5/P6-A 相邻回归 10 OK；Python 编译通过。
+- [ ] 下一步 P6-B：在最终 PDF 已写入后，做 docx 导出预检与工具链报告；如果工具链不满足，只写 blocker 和日志，不把 P6-A 状态标成失败。

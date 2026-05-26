@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -34,3 +35,60 @@ def build_draft_context(
         "mode": mode,
     }
 
+
+def build_qmd_content(title: str, markdown_content: str) -> str:
+    quoted_title = json.dumps(title, ensure_ascii=False)
+    stable_markdown = stabilize_markdown_for_pdf(markdown_content)
+    return "\n".join(
+        [
+            "---",
+            f"title: {quoted_title}",
+            "lang: zh",
+            "format:",
+            "  pdf:",
+            "    pdf-engine: xelatex",
+            "documentclass: ctexart",
+            "keep-tex: true",
+            "---",
+            "",
+            stable_markdown.rstrip(),
+            "",
+        ]
+    )
+
+
+def stabilize_markdown_for_pdf(markdown_content: str) -> str:
+    replacements = {
+        "## Question": "## 研究问题",
+        "## Data": "## 数据",
+        "## Identification": "## 识别策略",
+        "## Estimator": "## 估计方法",
+        "## Results": "## 结果",
+        "## Robustness": "## 稳健性检查",
+        "## References": "## 参考文献",
+        "**Outcome**": "**结果变量**",
+        "**Treatment**": "**处理变量**",
+        "**Design (auto-detected)**": "**自动识别设计**",
+        "Sample size": "样本规模",
+        "Missingness (top 5)": "缺失值最高的 5 个字段",
+        "Verdict": "判断",
+        "**Method**": "**方法**",
+        "**Function**": "**函数**",
+        "**Rationale**": "**理由**",
+        "**Key assumptions**": "**关键假设**",
+        "**Coefficient on": "**系数：",
+        "ℹ️": "Info:",
+        "✅": "Pass:",
+        "⚙️": "Note:",
+        "≈": "approximately",
+        "≥": ">=",
+        "≤": "<=",
+        "ε": "epsilon",
+        "β": "beta",
+        "δ": "delta",
+        "α": "alpha",
+    }
+    stable = markdown_content
+    for source, target in replacements.items():
+        stable = stable.replace(source, target)
+    return stable

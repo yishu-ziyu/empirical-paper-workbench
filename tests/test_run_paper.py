@@ -57,11 +57,19 @@ class RunPaperDryRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
         markdown_path = self.project_dir / "Manuscripts" / "generated" / "paper_draft.md"
+        qmd_path = self.project_dir / "Manuscripts" / "generated" / "paper_draft.qmd"
         latex_path = self.project_dir / "Manuscripts" / "generated" / "paper_draft.tex"
 
         self.assertTrue(markdown_path.exists())
+        self.assertTrue(qmd_path.exists())
         self.assertTrue(latex_path.exists())
         self.assertIn("研究问题", markdown_path.read_text())
+        qmd_content = qmd_path.read_text()
+        self.assertIn("format:", qmd_content)
+        self.assertIn("pdf-engine: xelatex", qmd_content)
+        self.assertIn("## 研究问题", qmd_content)
+        self.assertNotIn("✅", qmd_content)
+        self.assertNotIn("ℹ️", qmd_content)
         self.assertIn("\\section{研究问题}", latex_path.read_text())
 
     def test_dry_run_can_use_an_explicit_paper_config_without_overwriting_default(self) -> None:
@@ -117,6 +125,7 @@ methods:
   robustness: []
 outputs:
   markdown_draft: Manuscripts/generated/real_override_draft.md
+  qmd_draft: Manuscripts/generated/real_override_draft.qmd
   latex_draft: Manuscripts/generated/real_override_draft.tex
   results_index: Results/real_override_index.json
   state_file: state/real_override_project_state.json
@@ -139,6 +148,7 @@ outputs:
         override_analysis_result = self.project_dir / "Results" / "json" / "real_override_analysis_result.json"
         override_run_log = self.project_dir / "Results" / "logs" / "real_override_run_paper.log"
         override_markdown = self.project_dir / "Manuscripts" / "generated" / "real_override_draft.md"
+        override_qmd = self.project_dir / "Manuscripts" / "generated" / "real_override_draft.qmd"
         run_steps = self.project_dir / "state" / "runs" / "run_test_real_override" / "run_steps.json"
 
         default_state_after = default_state.read_text(encoding="utf-8") if default_state.exists() else None
@@ -151,13 +161,16 @@ outputs:
         self.assertFalse(override_analysis_result.exists())
         self.assertTrue(override_run_log.exists())
         self.assertTrue(override_markdown.exists())
+        self.assertTrue(override_qmd.exists())
 
         snapshot = json.loads(override_snapshot.read_text())
+        index = json.loads(override_index.read_text())
         steps_payload = json.loads(run_steps.read_text())
         steps = steps_payload["items"]
 
         self.assertEqual(snapshot["project"]["slug"], "real-override")
         self.assertEqual(snapshot["data"]["final_dataset"], "Data/Final/real_override.csv")
+        self.assertIn("qmd", {artifact["kind"] for artifact in index["artifacts"]})
         config_step = next(step for step in steps if step["id"] == "config_load")
         self.assertEqual(config_step["metadata"]["paper_config"], "Program/config/paper_real_override.yaml")
 

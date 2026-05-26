@@ -2,8 +2,9 @@ project:
   slug: cfps-robot-labor-reallocation
   title: "工业机器人暴露与劳动收入再配置"
   language: zh
-  final_output: docx
+  final_output: pdf
   internal_formats:
+    - qmd
     - markdown
     - latex
 
@@ -53,6 +54,7 @@ methods:
 
 outputs:
   markdown_draft: Manuscripts/generated/cfps_robot_paper_draft.md
+  qmd_draft: Manuscripts/generated/cfps_robot_paper_draft.qmd
   latex_draft: Manuscripts/generated/cfps_robot_paper_draft.tex
   results_index: Results/cfps_robot_index.json
   state_file: state/cfps_robot_project_state.json

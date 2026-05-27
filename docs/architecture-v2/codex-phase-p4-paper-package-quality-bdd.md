@@ -294,6 +294,33 @@
 
 业务规则：扩写完不能直接继续堆正文。VerifierAgent 要先把“这段话是否有证据来源”讲清楚，防止 ManuscriptAgent 把草案写得越来越像正式结论却缺少反查路径。
 
+## 行为 16.6：通过语义核验的章节必须生成可审阅论断账本
+
+**Given** `manuscript_section_semantic_review.json` 已经声明 Main Results 通过语义核验
+**And** Main Results 章节草案仍停留在草案层
+**When** 用户运行 `Program/manuscript_section_claim_ledger.py --section "Main Results"`
+**Then** 系统必须写出 `Results/json/manuscript_section_claim_ledger.json`
+**And** 系统必须写出 `Reviews/manuscript_section_claim_ledger.md`
+**And** 每条 claim 必须包含 claim text、section、source finding、bound evidence ids、review status 和 next action
+**And** ledger 必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** ledger 不得改写章节正文或 `state/product/*` 正式层文件。
+
+业务规则：论文写作不能只靠一段自然语言草案往前滚。通过核验的章节要沉淀成“论断-证据-下一步”的账本，后续扩写、审稿和 PDF 预检都从同一份账本读取。
+
+## 行为 16.7：缺少已审批论断文本时不得编造 claim
+
+**Given** `approved_findings.json` 中存在已审批 finding
+**But** 该 finding 还没有 `claim` 或 `claim_text`
+**And** Main Results 章节草案仍停留在草案层
+**When** 用户运行 `Program/manuscript_section_claim_ledger.py --section "Main Results"`
+**Then** 系统必须写出 claim ledger
+**And** ledger 必须进入 `claim_ledger_needs_revision`
+**And** 对应 section 必须记录 `no_approved_finding_claim_detected_in_section`
+**And** 系统不得从章节正文或回归表里自动编造 claim
+**And** ledger 不得改写章节正文或 `state/product/*` 正式层文件。
+
+业务规则：真实项目里 approved finding 可能先有运行证据和审批状态，但还没沉淀成一句可进入论文的论断。此时系统要暴露缺口，让 VerifierAgent / ManuscriptAgent 回到草案层补齐，而不是替用户生成正式论断。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

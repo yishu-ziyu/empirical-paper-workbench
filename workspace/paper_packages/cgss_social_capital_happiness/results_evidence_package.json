@@ -1,0 +1,112 @@
+{
+  "schema_version": "p6.cgss_results_evidence_package.v1",
+  "generated_at": "2026-05-27T13:15:25.769027+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "source_artifacts": {
+    "minimal_model": {
+      "path": "Results/json/cgss_social_capital_happiness_minimal_model.json",
+      "schema_version": "p6.cgss_minimal_model.v1",
+      "status": "completed_needs_human_review"
+    },
+    "ordered_robustness": {
+      "path": "Results/json/cgss_social_capital_happiness_ordered_robustness.json",
+      "schema_version": "p6.cgss_ordered_robustness.v1",
+      "status": "completed_needs_human_review"
+    }
+  },
+  "source_models": {
+    "minimal_model_status": "completed_needs_human_review",
+    "ordered_robustness_status": "completed_needs_human_review"
+  },
+  "boundary_flags": {
+    "modified_formal_package": false,
+    "modified_formal_variable_roles": false,
+    "promoted_to_canonical_claim": false
+  },
+  "status": "ready_for_paper_draft_input",
+  "blocking_reasons": [],
+  "dataset": {
+    "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "year": "2023",
+    "source": "CGSS2023.dta"
+  },
+  "variables": {
+    "outcome": "happiness <- a36",
+    "social_capital": {
+      "index": "social_capital_index",
+      "source_items": [
+        "a33 trust",
+        "a31a neighbor_social",
+        "a31b friend_social",
+        "a311 leisure_social"
+      ]
+    },
+    "controls": [
+      "female",
+      "age",
+      "education_level",
+      "log_income",
+      "health",
+      "urban_hukou",
+      "province fixed effects"
+    ],
+    "ordered_outcome_levels": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "primary_result": {
+    "ols": {
+      "model": "baseline_index",
+      "variable": "social_capital_index",
+      "coef": 0.16575366465966088,
+      "std_error": 0.01870151531710479,
+      "p_value": 7.780985384938017e-19,
+      "nobs": 5310
+    },
+    "ordered_logit": {
+      "model": "ordered_logit_index",
+      "variable": "social_capital_index",
+      "coef": 0.4049733043163175,
+      "std_error": 0.04239022727731643,
+      "p_value": 1.2543655302918154e-21,
+      "nobs": 5310,
+      "outcome_levels": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  },
+  "evidence_consistency": {
+    "sample_nobs_match": true,
+    "ordered_method_gate": "passed",
+    "social_capital_direction": "consistent_positive"
+  },
+  "human_review_checklist": [
+    "outcome_measurement",
+    "social_capital_index_construction",
+    "control_variable_set",
+    "ordered_model_interpretation",
+    "literature_support_for_mechanism"
+  ],
+  "writing_inputs": {
+    "result_sentence_seed": "在 CGSS2023 样本中，社会资本指数与居民主观幸福感呈正向相关；OLS 系数约为 0.1658，Ordered Logit 系数约为 0.4050。",
+    "table_title_seed": "社会资本与居民主观幸福感：OLS 与 Ordered Logit 结果",
+    "paper_section_targets": [
+      "数据与变量",
+      "实证结果",
+      "稳健性检验"
+    ]
+  },
+  "next_tasks": [
+    "human_review_cgss_variable_roles",
+    "build_cgss_literature_review_seed",
+    "draft_cgss_social_capital_happiness_paper"
+  ]
+}

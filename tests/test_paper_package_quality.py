@@ -42,6 +42,7 @@ class PaperPackageQualityCliTests(unittest.TestCase):
             "word_count",
             "format_checks",
             "section_checks",
+            "section_length_checks",
             "citation_checks",
             "method_gate_checks",
             "revision_checks",
@@ -60,6 +61,53 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         task_ids = {task["id"] for task in report["recommended_next_tasks"]}
         self.assertIn("expand_working_paper_sections", task_ids)
         self.assertIn("Introduction", report["section_checks"]["required_sections"])
+
+    def test_bdd_2_1_present_but_thin_sections_enter_length_gate(self) -> None:
+        """行为 2.1：总字数够长也不能掩盖核心章节过薄。"""
+        draft = self.project_root / "Manuscripts" / "generated" / "paper_draft.md"
+        long_intro = " ".join(["market"] * 7200)
+        draft.write_text(
+            "# Industrial Robot Adoption and Labor Market Matching\n\n"
+            "## Abstract\n\n"
+            "This paper studies industrial robot adoption and labor market matching.\n\n"
+            "## Introduction\n\n"
+            f"{long_intro}\n\n"
+            "## Literature and Contribution\n\n"
+            "A short placeholder.\n\n"
+            "## Institutional Background\n\n"
+            "Context is briefly noted.\n\n"
+            "## Data and Measurement\n\n"
+            "CFPS and robot exposure are mentioned.\n\n"
+            "## Empirical Strategy\n\n"
+            "The model is stated.\n\n"
+            "## Main Results\n\n"
+            "Results are summarized.\n\n"
+            "## Robustness\n\n"
+            "Robustness is pending.\n\n"
+            "## Conclusion\n\n"
+            "The paper concludes.\n\n"
+            "## References\n\n"
+            "Acemoglu and Restrepo.\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_quality()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self._read_report()
+
+        self.assertGreater(report["word_count"]["main_text_words"], 7000)
+        self.assertIn("section_length_gate_required", report["verdict"])
+        length_checks = report["section_length_checks"]
+        self.assertEqual(length_checks["status"], "needs_expansion")
+        self.assertIn("Literature and Contribution", length_checks["summary"]["too_short_sections"])
+        self.assertIn("Main Results", length_checks["summary"]["too_short_sections"])
+        self.assertEqual(length_checks["sections"]["Literature and Contribution"]["status"], "too_short")
+        self.assertEqual(length_checks["sections"]["Main Results"]["status"], "too_short")
+        task_by_id = {task["id"]: task for task in report["recommended_next_tasks"]}
+        self.assertIn("expand_underdeveloped_sections", task_by_id)
+        task_sections = {item["section"] for item in task_by_id["expand_underdeveloped_sections"]["inputs"]}
+        self.assertIn("Literature and Contribution", task_sections)
+        self.assertIn("Main Results", task_sections)
 
     def test_bdd_3_missing_bibliography_becomes_literature_task(self) -> None:
         result = self.run_quality()

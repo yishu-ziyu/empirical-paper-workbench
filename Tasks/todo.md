@@ -1160,3 +1160,58 @@
 - [x] 真实运行：当前真实项目以 `--decision defer` 记录为 `pending_human_manual_acceptance`，PDF/DOCX hash 已锁定，`accepted=false`，下一步为 `open_and_review_pdf_docx`。
 - [x] 验证：目标测试 4 OK；相邻 summary 回归合计 9 OK；Python 编译通过；真实 CLI 运行通过；命令声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`。
 - [ ] 下一步 P6-H5：在用户实际打开 PDF/DOCX 后，用同一 CLI 写入 `accept`、`needs_revision` 或 `reject` 的真实人工决定；不自动替用户接受。
+
+## 2026-05-27 P6-H5a Formal Package Human Review Handoff
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只交接人工审阅文件位置和审阅清单，不重跑论文、不改稿、不生成新 PDF/DOCX、不替用户接受。
+- [x] Agent Team：本节点不派新 Agent。原因是任务已收敛为人工审阅交接，继续派发会增加沟通成本；下一次 Agent Team 调用点为用户给出 `needs_revision` 或 `reject` 后，由 ReviewerAgent/ManuscriptAgent/MethodAgent 按问题类型拆分修订任务。
+- [x] 审阅文件：正式 PDF 为 `Submissions/formal_package/paper.pdf`；正式 DOCX 为 `Submissions/formal_package/paper.docx`；包清单为 `Submissions/formal_package/manifest.json`。
+- [x] 审阅重点：先看 PDF/DOCX 是否能打开、标题和章节结构是否像一篇论文、摘要/引言/文献/数据/方法/结果/结论是否完整、表格和证据说明是否可读、是否有明显空段/模板话/乱码/格式问题。
+- [x] 当前验收状态：重新以 `--decision defer` 记录为 `pending_human_manual_acceptance`，说明系统等待用户审阅；这不是通过，也不是退修。
+- [ ] 下一步 P6-H5b：用户审阅后，执行 `accept`、`needs_revision` 或 `reject`。若是 `needs_revision`，必须把用户意见拆成 <=20 分钟的小节点进入修订队列。
+
+## 2026-05-27 P6-I1 CGSS Topic-To-Paper Capability Audit
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只判断新题目“社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析”能不能复用当前正式论文包，不写正式变量角色、不改设计方案、不生成新论文。
+- [x] 结论：当前正式包是机器人/CFPS 题目，不能直接拿来冒充 CGSS 幸福感题目；新题目必须重新走数据绑定、变量画像、方法设计和论文写作。
+- [x] 实现：新增 `Program/topic_to_paper_capability_audit.py` 与 `Program/workbench/topic_to_paper_capability_audit.py`，写出 `Results/json/topic_to_paper_capability_audit.json` 和 `Reviews/topic_to_paper_capability_audit.md`。
+- [x] 验证：`python3 -m unittest tests.test_topic_to_paper_capability_audit -v` 2 tests OK；真实 CLI 运行通过。
+
+## 2026-05-27 P6-I2 CGSS Data Discovery And Variable Candidate Profile
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只读取本机 CGSS 数据元信息并生成候选变量，不把候选变量写成正式角色。
+- [x] Agent Team：把真实 CGSS 数据发现交给 sidecar 只读完成；回收结论为 CGSS2023、CGSS2021、CGSS2018 都存在，并包含幸福感、信任、社会交往、社会支持和常用人口学控制变量。
+- [x] 实现：新增 `Program/cgss_topic_variable_discovery.py` 与 `Program/workbench/cgss_topic_variable_discovery.py`，读取 `.dta` metadata，写出 `Results/json/cgss_social_capital_happiness_variable_candidates.json` 和 `Reviews/cgss_social_capital_happiness_variable_candidates.md`。
+- [x] 初步候选：因变量优先看 `a36/A36/D36/D1`；社会资本优先看信任 `a33/A33`、交往频率 `a31a/a31b/a311`、社会支持 `c11*/c12*`；控制变量优先看性别、年龄、教育、收入、健康、户籍和省份。
+- [x] 验证：`python3 -m unittest tests.test_cgss_topic_variable_discovery -v` 2 tests OK；真实 CGSS 目录运行通过。
+
+## 2026-05-27 P6-I3 CGSS Minimal Model
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只跑 CGSS2023 最小基准模型，产物停留在探索性结果，不写正式论文包。
+- [x] 实现：新增 `Program/cgss_minimal_model.py` 与 `Program/workbench/cgss_minimal_model.py`，读取 CGSS2023，清洗特殊缺失值，构造幸福感、信任、邻里交往、朋友交往、休闲社交和社会资本指数，并加入性别、年龄、教育、收入、健康、户籍、省份控制。
+- [x] 真实结果：CGSS2023 样本量为 5310；社会资本指数系数约 `0.1658`，稳健标准误约 `0.0187`，p 值小于 `0.001`；信任和休闲社交也呈正向关系，邻里/朋友交往在当前模型中不稳定。
+- [x] 调试记录：发现 `log_income` 被错误当作分类变量后已修复为连续变量，并新增测试防止回归表出现 `log_income[T.*]` 这类错误。
+- [x] 产物：`Results/json/cgss_social_capital_happiness_minimal_model.json` 与 `Reviews/cgss_social_capital_happiness_minimal_model.md`。
+- [x] 验证：`python3 -m unittest tests.test_cgss_minimal_model -v` 1 test OK；P6-I scoped 回归 5 tests OK；真实 CLI 运行通过。
+- [x] 下一步 P6-I4：补有序因变量稳健性和方法门禁，优先跑 ordered logit / ordered probit 候选；如果超过 20 分钟，拆成“方法可用性检查”和“稳健性运行”两个节点。
+
+## 2026-05-27 P6-I4 CGSS Ordered Outcome Robustness
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只补幸福感有序因变量的 ordered logit 稳健性，不晋升正式变量角色，不写正式论文包。
+- [x] BDD/TDD：新增 `tests/test_cgss_ordered_robustness.py`，先确认缺少 `Program.workbench.cgss_ordered_robustness` 的 RED，再实现 GREEN；覆盖“可跑有序模型”和“幸福感等级不足时被方法门禁拦住”两个行为。
+- [x] 实现：新增 `Program/cgss_ordered_robustness.py` 与 `Program/workbench/cgss_ordered_robustness.py`，复用 CGSS2023 分析样本，按 `happiness` 1-5 等级估计 ordered logit，并写出 JSON 与 Markdown 审阅报告。
+- [x] 真实结果：CGSS2023 样本量为 5310，幸福感覆盖 1-5 五个等级，方法门禁通过；`social_capital_index` ordered logit 系数约 `0.4050`，标准误约 `0.0424`，p 值小于 `0.001`，方向与 OLS 一致。
+- [x] 产物：`Results/json/cgss_social_capital_happiness_ordered_robustness.json` 与 `Reviews/cgss_social_capital_happiness_ordered_robustness.md`。
+- [x] 验证：`python3 -m unittest tests.test_cgss_ordered_robustness -v` 2 tests OK；P6-I scoped 回归 7 tests OK；真实 CLI 运行通过。
+- [x] 下一步 P6-I5：把 OLS 与 Ordered Logit 合并成“结果证据包”，生成论文写作可消费的表格摘要和变量口径待确认清单；仍不写正式 paper package。
+
+## 2026-05-27 P6-I5 CGSS Results Evidence Package
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只合并 OLS 与 Ordered Logit 的结果证据，供后续论文草稿消费，不写正式 paper package，不晋升正式变量角色。
+- [x] Agent Team：派发 verifier sidecar 做只读复核；回收建议后补齐 `source_artifacts`、输入 schema/status、变量口径、method gate 阻断测试，并保留正式层边界 flags。
+- [x] BDD/TDD：新增 `tests/test_cgss_results_evidence_package.py`，先确认缺少 `Program.workbench.cgss_results_evidence_package` 的 RED，再实现 GREEN；覆盖 OLS/Ordered 合并、缺模型阻断、Ordered gate 未通过阻断、审阅文件写出。
+- [x] 实现：新增 `Program/cgss_results_evidence_package.py` 与 `Program/workbench/cgss_results_evidence_package.py`，读取 `cgss_social_capital_happiness_minimal_model.json` 和 `cgss_social_capital_happiness_ordered_robustness.json`，写出结果证据包 JSON 与 Markdown。
+- [x] 真实结果：证据包状态为 `ready_for_paper_draft_input`；OLS 与 Ordered Logit 的核心变量都是 `social_capital_index`，样本量都为 5310，方向一致为正；写作种子句已生成。
+- [x] 产物：`Results/json/cgss_social_capital_happiness_results_evidence_package.json` 与 `Reviews/cgss_social_capital_happiness_results_evidence_package.md`。
+- [x] 验证：`python3 -m unittest tests.test_cgss_results_evidence_package -v` 4 tests OK；P6-I scoped 回归 11 tests OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-I6：从结果证据包生成“变量角色审阅草案”，要求把因变量、社会资本指数、控制变量的选择理由写清楚，但仍等待人工确认后才能进入正式变量角色。

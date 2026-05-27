@@ -602,6 +602,85 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         for path, content in protected_before.items():
             self.assertEqual(path.read_text(encoding="utf-8"), content)
 
+    def test_bdd_11_1_revision_round_materializes_manuscript_section_work_orders(self) -> None:
+        """行为 16.1：薄弱章节必须变成可打开的 ManuscriptAgent 工单。"""
+        result = self.run_quality(["--profile", "aer_like"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        package = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_package.py"),
+                "--project-root",
+                str(self.project_root),
+                "--quality-report",
+                "Results/json/paper_quality_report.json",
+                "--output-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--output-manuscript",
+                "Manuscripts/generated/paper_package_draft.md",
+                "--output-supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(package.returncode, 0, package.stderr)
+
+        revision = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_revision_round.py"),
+                "--project-root",
+                str(self.project_root),
+                "--expansion-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+                "--output-round",
+                "Results/json/paper_revision_round.json",
+                "--output-review",
+                "Reviews/paper_revision_round.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(revision.returncode, 0, revision.stderr)
+
+        round_doc = json.loads((self.project_root / "Results" / "json" / "paper_revision_round.json").read_text(encoding="utf-8"))
+        work_orders = round_doc["manuscript_section_work_orders"]
+        order_by_section = {item["section"]: item for item in work_orders}
+        self.assertIn("Main Results", order_by_section)
+        main_results = order_by_section["Main Results"]
+        self.assertEqual(main_results["agent"], "ManuscriptAgent")
+        self.assertTrue(main_results["draft_layer_only"])
+        self.assertFalse(main_results["formal_writeback_allowed"])
+        self.assertFalse(main_results["can_write_product_state"])
+        self.assertEqual(main_results["status"], "ready_for_section_drafting")
+        self.assertEqual(main_results["draft_output_path"], "Manuscripts/sections/main-results.md")
+        self.assertEqual(
+            main_results["work_order_path"],
+            "Reviews/agent_packets/manuscriptagent/sections/main-results.md",
+        )
+        self.assertIn("main_regression_table", main_results["required_evidence"])
+
+        work_order_path = self.project_root / main_results["work_order_path"]
+        self.assertTrue(work_order_path.exists())
+        work_order = work_order_path.read_text(encoding="utf-8")
+        self.assertIn("# Main Results", work_order)
+        self.assertIn("Agent: ManuscriptAgent", work_order)
+        self.assertIn("Final paper write: false", work_order)
+        self.assertIn("main_regression_table", work_order)
+        self.assertFalse(round_doc["formal_state_guard"]["changed"])
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

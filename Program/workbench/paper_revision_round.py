@@ -72,6 +72,7 @@ def build_paper_revision_round(
 ) -> dict[str, Any]:
     tasks = normalize_revision_items(project_root, expansion_plan, expansion_plan_path)
     packets = build_agent_packets(tasks)
+    section_work_orders = build_manuscript_section_work_orders(project_root, expansion_plan, expansion_plan_path)
     schedule = build_agent_team_schedule(expansion_plan, tasks)
     before = formal_state_before or snapshot_formal_state(project_root)
     after = snapshot_formal_state(project_root)
@@ -97,6 +98,8 @@ def build_paper_revision_round(
         "source_contexts": build_source_contexts(project_root, expansion_plan, supervisor_context),
         "revision_items": tasks,
         "agent_packets": packets,
+        "manuscript_section_work_orders": section_work_orders,
+        "section_work_order_count": len(section_work_orders),
         "agent_team_schedule": schedule,
         "formal_state_guard": diff_formal_state(before, after),
         "next_action": {
@@ -111,6 +114,55 @@ def write_paper_revision_round(path: Path, revision_round: dict[str, Any]) -> Pa
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(revision_round, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def write_manuscript_section_work_order_files(
+    project_root: Path,
+    revision_round: dict[str, Any],
+) -> list[Path]:
+    written: list[Path] = []
+    for work_order in revision_round.get("manuscript_section_work_orders", []):
+        relative_path = work_order.get("work_order_path")
+        if not relative_path:
+            continue
+        path = project_root / str(relative_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_manuscript_section_work_order_markdown(work_order), encoding="utf-8")
+        written.append(path)
+    return written
+
+
+def build_manuscript_section_work_order_markdown(work_order: dict[str, Any]) -> str:
+    lines = [
+        f"# {work_order.get('section')}",
+        "",
+        f"- Agent: {work_order.get('agent')}",
+        f"- Status: {work_order.get('status')}",
+        f"- Source task: `{work_order.get('source_task_id')}`",
+        f"- Source plan: `{work_order.get('source_expansion_plan')}`",
+        f"- Draft output: `{work_order.get('draft_output_path')}`",
+        f"- Draft layer only: {str(work_order.get('draft_layer_only')).lower()}",
+        f"- Final paper write: {str(work_order.get('formal_writeback_allowed')).lower()}",
+        f"- Product state write: {str(work_order.get('can_write_product_state')).lower()}",
+        "",
+        "## Current / Target",
+        "",
+        f"- Current: `{json.dumps(work_order.get('current_units', {}), ensure_ascii=False)}`",
+        f"- Target: `{json.dumps(work_order.get('target_units', {}), ensure_ascii=False)}`",
+        "",
+        "## Writing Instruction",
+        "",
+        str(work_order.get("writing_instruction") or ""),
+        "",
+        "## Required Evidence",
+        "",
+    ]
+    for evidence in work_order.get("required_evidence", []):
+        lines.append(f"- {evidence}")
+    lines.extend(["", "## Verification", ""])
+    for item in work_order.get("verification", {}).get("required_before_completion", []):
+        lines.append(f"- {item}")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def build_revision_review_markdown(revision_round: dict[str, Any]) -> str:
@@ -212,6 +264,40 @@ def normalize_revision_items(
     return items
 
 
+def build_manuscript_section_work_orders(
+    project_root: Path,
+    expansion_plan: dict[str, Any],
+    expansion_plan_path: Path,
+) -> list[dict[str, Any]]:
+    source_plan = relative_or_absolute(expansion_plan_path, project_root)
+    work_orders: list[dict[str, Any]] = []
+    for order, packet in enumerate(expansion_plan.get("manuscript_section_task_packets", []), start=1):
+        section = str(packet.get("section") or f"Section {order}")
+        source_task_id = str(packet.get("source_task_id") or "expand_underdeveloped_sections")
+        work_orders.append(
+            {
+                "order": order,
+                "section": section,
+                "agent": str(packet.get("owner_agent") or "ManuscriptAgent"),
+                "source_task_id": source_task_id,
+                "source_expansion_plan": source_plan,
+                "status": "ready_for_section_drafting",
+                "draft_output_path": str(packet.get("output_path") or f"Manuscripts/sections/{slugify(section)}.md"),
+                "work_order_path": build_section_work_order_path(section),
+                "current_units": packet.get("current_units", {}),
+                "target_units": packet.get("target_units", {}),
+                "required_evidence": packet.get("required_evidence", []),
+                "writing_instruction": packet.get("writing_instruction"),
+                "draft_layer_only": bool(packet.get("draft_layer_only", True)),
+                "formal_writeback_allowed": bool(packet.get("formal_writeback_allowed", False)),
+                "can_write_product_state": False,
+                "requires_human_confirmation": True,
+                "verification": packet.get("verification", {}),
+            }
+        )
+    return work_orders
+
+
 def build_agent_packets(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for task in tasks:
@@ -283,6 +369,10 @@ def build_round_id(expansion_plan: dict[str, Any], tasks: list[dict[str, Any]]) 
 
 def build_draft_output_path(agent: str, task_id: str) -> str:
     return f"Reviews/agent_packets/{slugify(agent)}/{slugify(task_id)}.md"
+
+
+def build_section_work_order_path(section: str) -> str:
+    return f"Reviews/agent_packets/manuscriptagent/sections/{slugify(section)}.md"
 
 
 def build_agent_handoff_prompt(agent: str, tasks: list[dict[str, Any]]) -> str:

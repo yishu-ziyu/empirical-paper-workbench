@@ -223,6 +223,18 @@
 
 业务规则：Agent Task Queue 不是最终工作成果。它必须被转换成一轮可审阅、可派工、可验收的 revision round，后续 P4-H/P5 才能消费这些任务并产出真实补证材料。
 
+## 行为 16.1：薄弱章节必须生成 ManuscriptAgent 章节工单
+
+**Given** `paper_expansion_plan.json` 已经包含 `manuscript_section_task_packets`
+**When** 用户运行 `Program/paper_revision_round.py`
+**Then** `paper_revision_round.json` 必须写出 `manuscript_section_work_orders`
+**And** 每个章节工单必须保留章节名、草案输出路径、所需证据、写作指令、验收条件和来源任务
+**And** 系统必须写出 `Reviews/agent_packets/manuscriptagent/sections/{section}.md`
+**And** 章节工单必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`、`can_write_product_state=false`
+**And** 命令不得改写 `state/product/*` 正式层文件。
+
+业务规则：章节扩写不能停在 JSON 里的嵌套字段。ManuscriptAgent 需要拿到一份能打开、能审阅、能逐项验收的章节工单，然后再进入下一轮真实写作或证据绑定。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

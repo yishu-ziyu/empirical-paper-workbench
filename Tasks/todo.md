@@ -8,6 +8,16 @@
 - [x] Agent Team 规则：节点开始前判断是否有可并行的调研、只读复核、测试定位或审计任务；能提高质量或速度时必须派出 Agent Team，回收后由主 Agent 集成和验证。
 - [x] 记录规则：每个节点完成后在本文件记录实际产物、验证结果、Agent Team 调用/回收点和下一节点；不能只在聊天里说明。
 
+## 2026-05-27 P6-I7 CGSS Literature Seed Package
+
+- [x] 节点目标：为“社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析”生成可审阅文献综述种子包，先补齐理论、测量、CGSS 场景、中文文献队列和有序因变量方法支持。
+- [x] BDD/TDD：新增 `tests/test_cgss_literature_seed_package.py`，先确认缺少 `Program.workbench.cgss_literature_seed_package` 的 RED，再实现最小核心模块和 CLI。
+- [x] Agent Team 调用：Literature sidecar 调研 CGSS 官方说明、社会资本经典理论、主观幸福感测量、中文 CGSS 文献和 ordered outcome 方法；Explorer sidecar 只读定位现有 `literature_package`、CNKI 人工队列、paper quality 和 AER proposal 接入点。
+- [x] 实现范围：新增 `Program/workbench/cgss_literature_seed_package.py` 和 `Program/cgss_literature_seed_package.py`；生成 10 条种子文献、变量支持、机制地图、方法支持、CNKI 人工检索队列和后续任务。
+- [x] 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_seed_package.json` 和 `Reviews/cgss_social_capital_happiness_literature_seed_package.md`；状态为 `needs_human_literature_review`。
+- [x] 正式层边界：本节点不修改正式 bibliography、正式 manuscript、正式 variable roles、DesignSpec、RunPlan 或 `state/product/*`。
+- [ ] 下一步 P6-I8：把 seed sources 接入 CNKI/Zotero/Scholar 校验预检，生成 `verified_bibliography` 候选和引用绑定表；仍需人工批准后才进入正式参考文献。
+
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 
 - [x] 明确主线：先把本地 CLI 高效工作流跑通，再把同一套状态和证据模型接到云端产品。

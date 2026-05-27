@@ -20,7 +20,11 @@
 - [x] P6-I8 实现：新增 `Program/workbench/cgss_literature_source_verification_preflight.py` 和 `Program/cgss_literature_source_verification_preflight.py`，把 10 条 seed sources 转成 candidate bibliography、CNKI 队列、Zotero/Scholar 队列和引用绑定目标。
 - [x] P6-I8 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_source_verification_preflight.json` 和 `Reviews/cgss_social_capital_happiness_literature_source_verification_preflight.md`；状态为 `needs_source_verification`。
 - [x] P6-I8 正式层边界：本节点不写 `verified_bibliography.csv`、不写 contribution matrix、不写正式 manuscript、不写 `state/product/*`。
-- [ ] 下一步 P6-I9：执行可访问来源的元数据校验和引用绑定候选生成；CNKI 条目仍保留人工辅助检索，Zotero/Scholar 条目需补 DOI/BibTeX。
+- [x] P6-I9 BDD/TDD：新增 `tests/test_cgss_verified_bibliography_candidates.py`，先确认缺少 `Program.workbench.cgss_verified_bibliography_candidates` 的 RED，再实现候选参考文献和引用绑定模块。
+- [x] P6-I9 实现：新增 `Program/workbench/cgss_verified_bibliography_candidates.py` 和 `Program/cgss_verified_bibliography_candidates.py`，把来源预检推进为 7 条可审阅参考文献候选、3 条人工/数据库辅助核验队列和 7 条引用绑定候选。
+- [x] P6-I9 真实运行：写出 `Results/json/cgss_social_capital_happiness_verified_bibliography_candidates.json` 和 `Reviews/cgss_social_capital_happiness_verified_bibliography_candidates.md`；状态为 `needs_human_bibliography_approval`。
+- [x] P6-I9 正式层边界：本节点不写 `verified_bibliography.csv`、不写 contribution matrix、不写正式 manuscript、不写 `state/product/*`。
+- [ ] 下一步 P6-I10：人工批准后写入 `verified_bibliography.csv` 与 citation bindings，随后生成 CGSS 文献综述正文草稿；如果仍未批准，先生成“待批准文献综述草稿包”供审阅。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -81,7 +81,12 @@
 - [x] P6-J5 真实运行：写出 `Results/json/cgss_social_capital_happiness_run_plan_seed.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed.md`；状态为 `needs_human_run_plan_seed_review`。
 - [x] P6-J5 正式层边界：本节点不写正式 RunPlan、不写正式 DesignSpec、不写正式变量角色、不运行模型、不生成论文、不写 `state/product/*`；`promotion.allowed=false`，批准后才允许进入执行节点。
 - [x] P6-J5 验证：目标测试 5 OK；CGSS DesignSpec/OLS/Ordered Logit 相邻回归 13 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-J6：如果 RunPlan seed 通过人工审阅，按 seed 执行 OLS 和 Ordered Logit，并合并生成 CGSS 结果证据包；如果未批准，先生成 RunPlan seed 审阅决策节点，不直接跑模型。
+- [x] P6-J6a BDD/TDD：新增 `tests/test_cgss_run_plan_seed_approval.py`，先确认缺少 `Program.workbench.cgss_run_plan_seed_approval` 的 RED，再实现 RunPlan seed 人工审阅决策模块和 CLI。
+- [x] P6-J6a 实现：新增 `Program/workbench/cgss_run_plan_seed_approval.py` 和 `Program/cgss_run_plan_seed_approval.py`；支持 `defer/approve/revise/reject`，其中 `approve` 必须带 reviewer 和 note，才生成 approved RunPlan seed sidecar。
+- [x] P6-J6a 真实运行：默认 `defer` 写出 `Results/json/cgss_social_capital_happiness_run_plan_seed_approval.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed_approval.md`；状态为 `pending_human_run_plan_seed_decision`，未生成 approved seed。
+- [x] P6-J6a 正式层边界：本节点不写正式 RunPlan、不运行模型、不写 `state/product/*`；批准后的 sidecar 仍只允许进入草案执行。
+- [x] P6-J6a 验证：目标测试 5 OK；CGSS RunPlan/DesignSpec/OLS/Ordered Logit 相邻回归 18 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-J6b：若用户明确批准 RunPlan seed，生成 `cgss_social_capital_happiness_run_plan_seed_approved.json`，然后按 seed 执行 OLS 和 Ordered Logit，并合并生成 CGSS 结果证据包；若选择修订或拒绝，先更新 RunPlan seed，不直接跑模型。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -83,6 +83,7 @@ def build_paper_expansion_plan(
         recompute_path,
         project_root,
     )
+    manuscript_section_task_packets = build_manuscript_section_task_packets(agent_task_queue)
     agent_team_schedule = build_agent_team_schedule(source_manifest, source_manifest_path, project_root)
 
     section_plan = []
@@ -119,6 +120,7 @@ def build_paper_expansion_plan(
         "current_verdict": verdict,
         "section_expansion_plan": section_plan,
         "agent_task_queue": agent_task_queue,
+        "manuscript_section_task_packets": manuscript_section_task_packets,
         "source_export_manifest": (
             relative_or_absolute(source_manifest_path, project_root) if source_manifest_path is not None else None
         ),
@@ -295,6 +297,7 @@ def build_supervisor_context_bundle(
             },
         ],
         "agent_task_queue": expansion_plan.get("agent_task_queue", []),
+        "manuscript_section_task_packets": expansion_plan.get("manuscript_section_task_packets", []),
         "agent_team_schedule": expansion_plan.get("agent_team_schedule", {}),
         "release_gate": expansion_plan.get("release_gate", {}),
         "current_verdict": quality_report.get("verdict", []),
@@ -311,18 +314,40 @@ def write_supervisor_context_bundle(path: Path, bundle: dict[str, Any]) -> Path:
 def normalize_agent_task_queue(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     queue = []
     for order, task in enumerate(tasks, start=1):
-        queue.append(
-            {
-                "order": order,
-                "id": task.get("id"),
-                "agent": task.get("agent"),
-                "reason": task.get("reason"),
-                "inputs": task.get("inputs", []),
-                "status": "ready",
-                "source": task.get("source", "paper_quality_report"),
-            }
-        )
+        normalized = {
+            "order": order,
+            "id": task.get("id"),
+            "agent": task.get("agent"),
+            "reason": task.get("reason"),
+            "inputs": task.get("inputs", []),
+            "status": "ready",
+            "source": task.get("source", "paper_quality_report"),
+        }
+        if task.get("section_expansion_packet"):
+            normalized["section_expansion_packet"] = task["section_expansion_packet"]
+        queue.append(normalized)
     return queue
+
+
+def build_manuscript_section_task_packets(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    section_tasks: list[dict[str, Any]] = []
+    for task in tasks:
+        packet = task.get("section_expansion_packet")
+        if not isinstance(packet, dict):
+            continue
+        if packet.get("owner_agent") != "ManuscriptAgent":
+            continue
+        for section in packet.get("sections", []):
+            if not isinstance(section, dict):
+                continue
+            section_task = dict(section)
+            section_task["source_task_id"] = task.get("id")
+            section_task["owner_agent"] = packet.get("owner_agent")
+            section_task["draft_layer_only"] = packet.get("draft_layer_only")
+            section_task["formal_writeback_allowed"] = packet.get("formal_writeback_allowed")
+            section_task["verification"] = packet.get("verification", {})
+            section_tasks.append(section_task)
+    return section_tasks
 
 
 def normalize_manifest_review_tasks(

@@ -91,6 +91,10 @@
 - [x] P6-G1 真实运行：当前 CFPS/机器人草稿被点名 Data、Empirical Strategy、Main Results、Robustness 四个章节过薄，已写入 `Results/json/paper_quality_report.json`，供下一轮 ManuscriptAgent 扩写。
 - [x] P6-G2 BDD/TDD：给 `expand_underdeveloped_sections` 增加 `section_expansion_packet` 验收，先验证缺包失败，再实现通过。
 - [x] P6-G2 实现：`section_expansion_packet` 逐章交付目标篇幅、证据要求、草案输出路径和正式层写回边界；`too_long` 章节不再进入扩写包，后续单独走压缩节点。
+- [x] P6-G3 节点规则：本节点限定 20 分钟内完成“章节扩写包进入 paper package”，不写章节正文、不调用正式写回、不扩展 UI。
+- [x] P6-G3 Agent Team：Sartre 只读复核 `paper_package` 队列契约，指出 `normalize_agent_task_queue()` 丢失 `section_expansion_packet`；主 Agent 回收后只修白名单透传和章节任务展开。
+- [x] P6-G3 BDD/TDD：在 `test_bdd_8_builds_expansion_plan_and_structured_manuscript` 中增加 `section_expansion_packet` 和 `manuscript_section_task_packets` 验收，先确认 RED，再做最小实现。
+- [x] P6-G3 实现：`paper_expansion_plan.json.agent_task_queue` 保留 ManuscriptAgent 的 `section_expansion_packet`，并新增 `manuscript_section_task_packets`，逐章暴露 section、output_path、required_evidence、draft/formal 写回边界和 verification。
 
 ### Agent Team 调用节奏
 

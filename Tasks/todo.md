@@ -1013,3 +1013,12 @@
 - [x] 实现：新增 `Program/manuscript_section_draft_expansion.py` 和 `Program/workbench/manuscript_section_draft_expansion.py`，读取 `manuscript_section_evidence_bindings.json`，把 Main Results 的主回归表、approved findings 和系数解释来源整理成可审阅章节草案。
 - [x] 真实运行：CLI 输出 `status=section_drafts_expanded`、`expanded=1`、`blocked=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_draft_expansion_report.json`、`Reviews/manuscript_section_draft_expansion.md`，并更新 `Manuscripts/sections/main-results.md`。
 - [x] 验证：目标测试 1 OK；paper package quality 回归 17 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。
+
+## 2026-05-27 P6-G6c Main Results Semantic Review
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只对 `Main Results` 扩写草案做 VerifierAgent 语义核验，不改章节正文、不扩写下一节、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：新建 subagent 仍受线程上限阻断；改为复用既有 Franklin sidecar 做只读复核，不阻塞主线 BDD/TDD/CLI 闭环。
+- [x] BDD/TDD：新增 Behavior 16.5 和 `test_bdd_11_5_main_results_semantic_review_verifies_bound_claims`；RED 为缺少 `Program/manuscript_section_semantic_review.py`，GREEN 后覆盖 evidence id 声明、草案层边界、正式写回关闭、核心 claim 反查和 Agent Team 调用节奏。
+- [x] 实现：新增 `Program/manuscript_section_semantic_review.py` 和 `Program/workbench/manuscript_section_semantic_review.py`，读取 `manuscript_section_draft_expansion_report.json` 与章节草案，只读生成 semantic review JSON 和人工审阅 Markdown。
+- [x] 真实运行：CLI 输出 `status=semantic_review_passed`、`passed=1`、`needs_revision=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_semantic_review.json` 和 `Reviews/manuscript_section_semantic_review.md`。
+- [x] 验证：目标测试 1 OK；paper package quality 回归 18 OK；Python 编译通过；真实 CLI 运行通过。

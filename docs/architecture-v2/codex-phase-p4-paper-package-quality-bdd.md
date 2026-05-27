@@ -280,6 +280,20 @@
 
 业务规则：章节扩写是 ManuscriptAgent 的草案层写作动作。它可以把真实证据整理成可审阅段落，但每个论断都必须能回到 evidence binding；正式层写回仍等待人工确认。
 
+## 行为 16.5：章节语义核验必须反查草案论断和已消费证据
+
+**Given** `manuscript_section_draft_expansion_report.json` 已经写出 Main Results 的草案扩写记录
+**And** `Manuscripts/sections/main-results.md` 已经列出 consumed evidence 和草案正文
+**When** 用户运行 `Program/manuscript_section_semantic_review.py --section "Main Results"`
+**Then** 系统必须写出 `Results/json/manuscript_section_semantic_review.json`
+**And** 系统必须写出 `Reviews/manuscript_section_semantic_review.md`
+**And** review 必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** review 必须逐条检查已消费证据是否在章节中声明、章节是否仍停留草案层、核心 claim 是否能回到已绑定 evidence id
+**And** review 必须给出 `passed` / `needs_revision` 的 section verdict 和下一步建议
+**And** 该节点不得改写章节正文或 `state/product/*` 正式层文件。
+
+业务规则：扩写完不能直接继续堆正文。VerifierAgent 要先把“这段话是否有证据来源”讲清楚，防止 ManuscriptAgent 把草案写得越来越像正式结论却缺少反查路径。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

@@ -55,7 +55,13 @@
 - [x] P6-J1 实现：扩展 `Program/workbench/topic_to_paper_capability_audit.py`，新增 `plain_language_summary`、`paper_package_acceptance_target`、`capability_gap_matrix` 和 `agent_team_routing`；新题目只返回 CGSS 接入任务，不混入旧 CFPS/机器人论文修订项。
 - [x] P6-J1 真实运行：用“社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析”生成 `Results/json/topic_to_paper_capability_audit.json` 和 `Reviews/topic_to_paper_capability_audit.md`；状态为 `new_topic_requires_data_binding`，第一调用 Agent 为 DataAgent。
 - [x] P6-J1 正式层边界：本节点只写审阅报告和 JSON audit，不生成新论文、不改写正式 package、不接受 package、不改写 `state/product/*`。
-- [ ] 下一步 P6-J2：实现 `run_cgss_data_discovery`，扫描本地 CGSS 数据文件、年份、字段、样本规模和可读性，生成 DatasetBinding 草案。
+- [x] P6-J2 Agent Team：派发 Archimedes 只读定位现有 CGSS metadata / dataset binding 复用点；回收结论为优先复用 `cgss_topic_variable_discovery.py` 的 `.dta` metadata 读取和候选变量分类，不重造大数据读取链路。
+- [x] P6-J2 BDD/TDD：新增 `tests/test_cgss_data_discovery.py`，先确认缺少 `Program.workbench.cgss_data_discovery` 的 RED，再实现 DatasetBinding 草案模块和 CLI。
+- [x] P6-J2 实现：新增 `Program/workbench/cgss_data_discovery.py` 和 `Program/run_cgss_data_discovery.py`；扫描本地 CGSS `.dta`，记录年份、路径、文件大小、样本量、字段数、可读性、证据等级、同年份编码表/问卷和字段画像预览。
+- [x] P6-J2 真实运行：用本机 `A004CGSS中国综合社会调查` 目录生成 `Results/json/cgss_social_capital_happiness_data_discovery.json` 与 `Reviews/cgss_social_capital_happiness_data_discovery.md`；推荐 `CGSS2023.dta`，样本量 11326，字段数 439，状态为 `needs_human_dataset_binding_review`。
+- [x] P6-J2 正式层边界：本节点只写数据发现 JSON 和审阅 Markdown，不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`。
+- [x] P6-J2 验证：目标测试 4 OK；相邻 topic audit / variable discovery 回归合计 9 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-J3：把 DatasetBinding 草案接到变量角色草案入口，要求只读取已推荐 CGSS2023 的字段画像，生成“为什么选这些变量”的专家式审阅说明；仍不写正式变量角色。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

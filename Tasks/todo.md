@@ -9,7 +9,18 @@
 - [x] 真实输出：状态为 `needs_human_dataset_index_review`；候选首位为 `外部源数据`，匹配理由包括 `ifr`、`robot`、`工业机器人`、`机器人`；同时返回 CLDS、CFPS、CGSS、CMDS 等候选数据族。
 - [x] 正式层边界：本节点不修改原始数据、不写正式 manuscript、不写正式 bibliography、不写 RunPlan、不写 `state/product/*`。
 - [x] 验证：`python3 -m unittest tests.test_dataset_motherlode_index -v` 通过 6 项；`python3 -m py_compile Program/dataset_motherlode_index.py Program/workbench/dataset_motherlode_index.py tests/test_dataset_motherlode_index.py` 通过；scoped `git diff --check` 通过。
-- [ ] 下一步 P7-B：实现 Literature Discovery / Project Bibliography seed，先做 query planning、source registry、candidate/project bibliography 状态，不把候选文献直接升为正式 bibliography。
+- [x] 下一步 P7-B：已进入 Literature Discovery / Project Bibliography seed。
+
+## 2026-05-28 P7-B Literature Discovery / Project Bibliography Seed
+
+- [x] 节点目标：把“参考文献从哪里来”产品化为 LiteratureAgent 种子层：查询计划、来源注册表、候选检索记录、project bibliography 状态链和人工审阅包。
+- [x] BDD/TDD：新增 `tests/test_literature_discovery_seed.py`，覆盖中英文查询扩展、Dataset Motherlode Index 上下文注入、来源注册表、候选记录 claim 门禁、JSON/Markdown 输出。
+- [x] 实现范围：新增 `Program/workbench/literature_discovery_seed.py` 和 `Program/literature_discovery_seed.py`；新增计划 `docs/superpowers/plans/2026-05-28-literature-discovery-bibliography-seed.md`。
+- [x] 真实运行：`python3 Program/literature_discovery_seed.py --project-root . --topic "工业机器人对劳动力市场匹配效率的影响" --dataset-index Results/json/dataset_motherlode_index.json` 写出 `Results/json/literature_discovery_seed.json` 与 `Reviews/literature_discovery_seed.md`。
+- [x] 真实输出：状态为 `needs_human_literature_discovery_review`；生成 13 条查询、8 类来源入口、13 条候选检索记录；包含 IFR、CLDS、CFPS、CMDS、CGSS 等数据上下文查询。
+- [x] 正式层边界：本节点不执行网络检索、不下载全文、不写正式 bibliography、不写正式 manuscript、不写 project bibliography、不写 `state/product/*`。
+- [x] 验证：`python3 -m unittest tests.test_literature_discovery_seed -v` 通过 5 项；`python3 -m py_compile Program/literature_discovery_seed.py Program/workbench/literature_discovery_seed.py tests/test_literature_discovery_seed.py` 通过；scoped `git diff --check` 通过。
+- [ ] 下一步 P7-C：实现 Level 3 Manuscript Quality Gate，先把完整论文、长度、章节、引用候选、表/图/方法/审阅清单转成机器可验收门禁。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -75,7 +75,13 @@
 - [x] P6-J4 方法边界：当前可以进入 OLS 基准模型和 Ordered Logit 有序模型；DID/IV/RDD/PSM/DML 因缺少处理时间、工具变量、断点、二元处理定义或因果处理设定，暂不进入运行计划。
 - [x] P6-J4 正式层边界：本节点不写正式 DesignSpec、不写 RunPlan、不写正式变量角色、不生成论文、不写 `state/product/*`；`promotion.allowed=false`，批准后才允许进入 RunPlan 草案。
 - [x] P6-J4 验证：目标测试 5 OK；CGSS 数据发现/变量发现/数据绑定/DesignSpec 状态机/方法门禁相邻回归 27 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。
-- [ ] 下一步 P6-J5：基于 DesignSpec 草案生成 RunPlan seed 和最小执行预检，明确 OLS/Ordered Logit 的输入构造、缺失值处理、模型输出表和失败解释；仍不写正式 RunPlan。
+- [x] P6-J5 Agent Team：派发 Herschel 后台执行 RunPlan seed 收尾；主 Agent 回收后复核输出、修正中文命令可读性并重新验证。
+- [x] P6-J5 BDD/TDD：新增 `tests/test_cgss_run_plan_seed.py`，先确认缺少 `Program.workbench.cgss_run_plan_seed` 的 RED，再实现 CGSS RunPlan seed 模块和 CLI。
+- [x] P6-J5 实现：新增 `Program/workbench/cgss_run_plan_seed.py` 和 `Program/run_cgss_run_plan_seed.py`；把 CGSS DesignSpec 草案转成可审阅 RunPlan seed，明确原始字段到执行变量的构造规则、OLS/Ordered Logit 命令、预期产物和失败解释。
+- [x] P6-J5 真实运行：写出 `Results/json/cgss_social_capital_happiness_run_plan_seed.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed.md`；状态为 `needs_human_run_plan_seed_review`。
+- [x] P6-J5 正式层边界：本节点不写正式 RunPlan、不写正式 DesignSpec、不写正式变量角色、不运行模型、不生成论文、不写 `state/product/*`；`promotion.allowed=false`，批准后才允许进入执行节点。
+- [x] P6-J5 验证：目标测试 5 OK；CGSS DesignSpec/OLS/Ordered Logit 相邻回归 13 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-J6：如果 RunPlan seed 通过人工审阅，按 seed 执行 OLS 和 Ordered Logit，并合并生成 CGSS 结果证据包；如果未批准，先生成 RunPlan seed 审阅决策节点，不直接跑模型。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

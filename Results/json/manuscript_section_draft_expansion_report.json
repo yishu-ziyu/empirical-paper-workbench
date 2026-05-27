@@ -1,0 +1,64 @@
+{
+  "schema_version": "p6.manuscript_section_draft_expansion.v1",
+  "generated_at": "2026-05-27T04:09:20.435813+00:00",
+  "status": "section_drafts_expanded",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "source_evidence_bindings": "Results/json/manuscript_section_evidence_bindings.json",
+  "summary": {
+    "requested": 1,
+    "expanded": 1,
+    "blocked": 0
+  },
+  "sections": [
+    {
+      "section": "Main Results",
+      "status": "section_draft_expanded",
+      "path": "Manuscripts/sections/main-results.md",
+      "blocking_reasons": [],
+      "consumed_evidence": [
+        {
+          "evidence_id": "main_regression_table",
+          "path": "Results/json/regression_tables.json",
+          "sha256": "34df595330fa9280af2ed85ded2f198a91c1c2a006fb39a3c52c2102071f4ecb",
+          "evidence_level": "local_artifact"
+        },
+        {
+          "evidence_id": "approved_findings",
+          "path": "Results/json/approved_findings.json",
+          "sha256": "417f8c5c1327ed61c952a20d06f6cd1e276a39e9125bdaf7884f8512ba5361f4",
+          "evidence_level": "local_artifact"
+        },
+        {
+          "evidence_id": "coefficient_interpretation",
+          "path": "Results/json/approved_findings.json",
+          "sha256": "417f8c5c1327ed61c952a20d06f6cd1e276a39e9125bdaf7884f8512ba5361f4",
+          "evidence_level": "local_artifact"
+        }
+      ]
+    }
+  ],
+  "agent_team_schedule": {
+    "call_when": "after_bound_evidence_selected",
+    "called_agents": [
+      "ManuscriptAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_target_section_draft_expanded",
+    "next_call_when": "before_section_semantic_review",
+    "boundary": "ManuscriptAgent 只扩写草案层；VerifierAgent 随后反查 consumed evidence 与章节论断。"
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  }
+}

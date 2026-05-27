@@ -1,0 +1,65 @@
+{
+  "schema_version": "p6.manuscript_section_claim_ledger.v1",
+  "generated_at": "2026-05-27T04:09:20.563426+00:00",
+  "status": "claim_ledger_ready",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "source_semantic_review": "Results/json/manuscript_section_semantic_review.json",
+  "summary": {
+    "sections": 1,
+    "claims": 1,
+    "needs_revision": 0
+  },
+  "sections": [
+    {
+      "section": "Main Results",
+      "path": "Manuscripts/sections/main-results.md",
+      "status": "claim_ledger_ready",
+      "claims": [
+        {
+          "claim_id": "main-results::finding_trained_effect",
+          "section": "Main Results",
+          "claim_text": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199384322747（SE=0.0793435494782, p=0.0119807291718, N=34315）。",
+          "source_finding_id": "finding_trained_effect",
+          "source_finding_status": "approved",
+          "source_evidence_level": "local_file",
+          "bound_evidence_ids": [
+            "approved_findings",
+            "coefficient_interpretation",
+            "main_regression_table"
+          ],
+          "review_status": "ready_for_next_review",
+          "next_action": {
+            "id": "keep_claim_in_draft_review_queue",
+            "owner_agent": "VerifierAgent",
+            "reason": "论断已在章节草案中出现，并绑定到已消费证据；下一步进入更严格审稿或相邻章节一致性检查。"
+          }
+        }
+      ],
+      "claim_proposals": [],
+      "missing_reasons": []
+    }
+  ],
+  "agent_team_schedule": {
+    "call_when": "after_section_semantic_review_passed",
+    "called_agents": [
+      "VerifierAgent",
+      "ManuscriptAgent"
+    ],
+    "recall_when": "before_next_section_expansion_or_pdf_preflight",
+    "boundary": "VerifierAgent 复核 claim ledger；ManuscriptAgent 后续只消费 ready_for_next_review 的草案论断。"
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  }
+}

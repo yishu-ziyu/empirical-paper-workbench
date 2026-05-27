@@ -14,6 +14,7 @@ DEFAULT_LITERATURE_REVIEW_PACKET_PATH = Path(
 DEFAULT_METHOD_STRUCTURE_GATE_PACKET_PATH = Path(
     "Results/json/cgss_social_capital_happiness_method_structure_gate_packet.json"
 )
+DEFAULT_RESULT_PATH = Path("Results/json/cgss_social_capital_happiness_revision_task_queue.json")
 DEFAULT_REVIEW_PATH = Path("Reviews/cgss_social_capital_happiness_revision_task_queue.md")
 
 
@@ -349,6 +350,19 @@ def write_revision_task_queue_review(
     absolute_review.parent.mkdir(parents=True, exist_ok=True)
     absolute_review.write_text(render_review(queue), encoding="utf-8")
     return absolute_review
+
+
+def write_revision_task_queue_outputs(
+    project_root: Path,
+    queue: dict[str, Any],
+    result_path: Path,
+    review_path: Path,
+) -> tuple[Path, Path]:
+    absolute_result = project_root / result_path
+    absolute_result.parent.mkdir(parents=True, exist_ok=True)
+    absolute_result.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    review = write_revision_task_queue_review(project_root, queue, review_path)
+    return absolute_result, review
 
 
 def render_review(queue: dict[str, Any]) -> str:

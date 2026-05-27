@@ -36,7 +36,12 @@
 - [x] P6-I12 实现：新增 `Program/workbench/cgss_revision_task_queue.py` 和 `Program/cgss_revision_task_queue.py`，把文献种子包、文献综述草稿包和方法结构门禁包转成 LiteratureAgent / MethodAgent / WriterAgent / ReviewerAgent 四类草案层任务。
 - [x] P6-I12 正式层边界：本节点不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
 - [x] P6-I12 真实运行：写出 `Results/json/cgss_social_capital_happiness_revision_task_queue.json` 和 `Reviews/cgss_social_capital_happiness_revision_task_queue.md`；schema 为 `p6.cgss_revision_task_queue.v1`，状态为 `needs_human_revision_queue_approval`，共 8 条草案层任务；不写 `state/product/agent_task_queue.json`。
-- [ ] 下一步 P6-I13：人工批准修订任务队列后，再按 Agent 包生成具体草案层审阅工单；继续禁止正式层写回。
+- [x] P6-I13 BDD/TDD：新增 `tests/test_cgss_revision_work_orders.py`，先确认缺少 `Program.workbench.cgss_revision_work_orders` 的 RED，再实现批准门和队列到工单 adapter。
+- [x] P6-I13 实现：新增 `Program/workbench/cgss_revision_work_orders.py` 和 `Program/cgss_revision_work_orders.py`；只有 queue 带有 `human_approval.status=approved`、`decision=human_approve_cgss_revision_task_queue` 且状态为 `approved_for_agent_work_orders` 时，才把 `task_id/output_target` 映射成草案工单。
+- [x] P6-I13 真实运行：当前真实队列输出 `status=blocked_revision_queue_not_approved`、`work_orders=0`、`written_work_orders=0`，写出 `Results/json/cgss_social_capital_happiness_revision_work_orders.json` 与 `Reviews/cgss_social_capital_happiness_revision_work_orders.md`；没有创建 `Reviews/agent_packets/...` 工单文件。
+- [x] P6-I13 正式层边界：本节点不写正式 manuscript、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`；未批准时硬阻断，而不是只靠文案提醒。
+- [x] P6-I13 验证：目标队列/工单测试 12 OK；P6-I CGSS 链路回归 48 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-I14：如果人工批准 `Reviews/cgss_social_capital_happiness_revision_task_queue.md` 中的 8 条修订任务，则写入显式 approval sidecar，再展开 `Reviews/agent_packets/...` 草案工单；否则先按用户意见修订队列。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from Program.workbench.cgss_revision_task_queue import (
     build_cgss_revision_task_queue,
+    write_revision_task_queue_outputs,
     write_revision_task_queue_review,
 )
 
@@ -119,7 +120,29 @@ class CgssRevisionTaskQueueTests(unittest.TestCase):
             self.assertIn('"status": "needs_human_revision_queue_approval"', text)
             self.assertFalse((Path(tmpdir) / "state/product/agent_task_queue.json").exists())
 
-    def test_bdd_59_cli_reads_existing_packets_and_writes_only_review_output(self) -> None:
+    def test_bdd_59_writes_machine_queue_json_without_product_state(self) -> None:
+        queue = build_cgss_revision_task_queue(
+            self._literature_seed_package(),
+            self._literature_review_packet(),
+            self._method_structure_gate_packet(),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result_path, review_path = write_revision_task_queue_outputs(
+                Path(tmpdir),
+                queue,
+                Path("Results/json/cgss_social_capital_happiness_revision_task_queue.json"),
+                Path("Reviews/cgss_social_capital_happiness_revision_task_queue.md"),
+            )
+
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema_version"], "p6.cgss_revision_task_queue.v1")
+            self.assertEqual(payload["status"], "needs_human_revision_queue_approval")
+            self.assertEqual(len(payload["agent_task_queue"]), 8)
+            self.assertTrue(review_path.exists())
+            self.assertFalse((Path(tmpdir) / "state/product/agent_task_queue.json").exists())
+
+    def test_bdd_59_cli_reads_existing_packets_and_writes_review_and_machine_queue(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_root = Path(tmpdir)
             self._write_json(project_root / "Results/json/seed.json", self._literature_seed_package())
@@ -138,6 +161,8 @@ class CgssRevisionTaskQueueTests(unittest.TestCase):
                     "Results/json/literature.json",
                     "--method-structure-gate-packet",
                     "Results/json/method.json",
+                    "--output-result",
+                    "Results/json/cgss_social_capital_happiness_revision_task_queue.json",
                     "--output-review",
                     "Reviews/cgss_social_capital_happiness_revision_task_queue.md",
                 ],
@@ -149,9 +174,9 @@ class CgssRevisionTaskQueueTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("status=needs_human_revision_queue_approval", result.stdout)
-            self.assertNotIn("cgss_revision_task_queue=Results/json", result.stdout)
+            self.assertIn("cgss_revision_task_queue=Results/json", result.stdout)
             self.assertTrue((project_root / "Reviews/cgss_social_capital_happiness_revision_task_queue.md").exists())
-            self.assertFalse((project_root / "Results/json/cgss_social_capital_happiness_revision_task_queue.json").exists())
+            self.assertTrue((project_root / "Results/json/cgss_social_capital_happiness_revision_task_queue.json").exists())
             self.assertFalse((project_root / "state/product/agent_task_queue.json").exists())
 
     def _agent_packet(self, queue: dict, agent: str) -> dict:

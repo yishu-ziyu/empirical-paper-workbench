@@ -71,17 +71,24 @@ def build_section_claims(
             if item.get("evidence_id")
         }
     )
+    evidence_paths = {
+        str(item.get("evidence_id")): str(item.get("path"))
+        for item in section_review.get("consumed_evidence", [])
+        if item.get("evidence_id") and item.get("path")
+    }
     claims = [
         build_claim_record(section_name, finding, evidence_ids)
         for finding in approved_findings
         if finding_claim(finding) and finding_claim(finding) in section_text
     ]
+    claim_proposals = [] if claims else build_claim_proposals(project_root, section_name, approved_findings, evidence_ids, evidence_paths)
     missing_reasons = [] if claims else ["no_approved_finding_claim_detected_in_section"]
     return {
         "section": section_name,
         "path": path_value,
         "status": "claim_ledger_ready" if claims else "needs_revision",
         "claims": claims,
+        "claim_proposals": claim_proposals,
         "missing_reasons": missing_reasons,
     }
 
@@ -114,6 +121,106 @@ def build_claim_record(section_name: str, finding: dict[str, Any], evidence_ids:
     }
 
 
+def build_claim_proposals(
+    project_root: Path,
+    section_name: str,
+    approved_findings: list[dict[str, Any]],
+    evidence_ids: list[str],
+    evidence_paths: dict[str, str],
+) -> list[dict[str, Any]]:
+    table = load_primary_regression_table(project_root, evidence_paths)
+    if table is None:
+        return []
+    return [
+        build_claim_proposal_record(section_name, finding, table, evidence_ids)
+        for finding in approved_findings
+        if not finding_claim(finding)
+    ]
+
+
+def build_claim_proposal_record(
+    section_name: str,
+    finding: dict[str, Any],
+    table: dict[str, Any],
+    evidence_ids: list[str],
+) -> dict[str, Any]:
+    treatment = str(table.get("treatment") or "")
+    dependent_var = str(table.get("dependent_var") or "")
+    estimator = str(table.get("estimator") or table.get("method_id") or "model")
+    coefficient = table.get("coefficient")
+    standard_error = table.get("standard_error")
+    p_value = table.get("p_value")
+    nobs = table.get("nobs")
+    claim_text = (
+        f"草案提案：在 {estimator} 规格中，{treatment} 对 {dependent_var} 的估计系数为 {coefficient}"
+        f"（SE={standard_error}, p={p_value}, N={nobs}）。"
+    )
+    return {
+        "proposal_id": f"{section_slug(section_name)}::{finding_id(finding)}::claim_proposal",
+        "section": section_name,
+        "proposed_claim_text": claim_text,
+        "source_finding_id": finding_id(finding),
+        "source_finding_status": finding.get("status") or finding.get("review_status"),
+        "source_evidence_level": finding.get("evidence_level"),
+        "source_table_id": table.get("table_id"),
+        "method_id": table.get("method_id"),
+        "estimator": table.get("estimator"),
+        "dependent_var": dependent_var,
+        "treatment": treatment,
+        "coefficient": coefficient,
+        "standard_error": standard_error,
+        "p_value": p_value,
+        "nobs": nobs,
+        "bound_evidence_ids": evidence_ids,
+        "review_status": "needs_human_review",
+        "warnings": ["draft_proposal_not_approved_claim"],
+        "next_action": {
+            "id": "review_claim_proposal_before_promotion",
+            "owner_agent": "VerifierAgent",
+            "reason": "已根据真实回归表生成草案论断提案；人工批准前不得进入 claims 或正式正文。",
+        },
+    }
+
+
+def load_primary_regression_table(project_root: Path, evidence_paths: dict[str, str]) -> dict[str, Any] | None:
+    path_value = evidence_paths.get("main_regression_table") or evidence_paths.get("regression_tables")
+    if not path_value:
+        return None
+    path = project_root / path_value
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    for table in payload.get("tables", []):
+        normalized = normalize_regression_table(table)
+        if normalized is not None:
+            return normalized
+    return None
+
+
+def normalize_regression_table(table: dict[str, Any]) -> dict[str, Any] | None:
+    treatment = table.get("treatment")
+    if not treatment:
+        return None
+    coefficient_row = next(
+        (row for row in table.get("coefficient_rows", []) if row.get("term") == treatment),
+        None,
+    )
+    if coefficient_row is None:
+        return None
+    return {
+        "table_id": table.get("table_id"),
+        "task_id": table.get("task_id"),
+        "method_id": table.get("method_id"),
+        "estimator": table.get("estimator"),
+        "dependent_var": table.get("dependent_var"),
+        "treatment": treatment,
+        "nobs": table.get("nobs"),
+        "coefficient": coefficient_row.get("coefficient"),
+        "standard_error": coefficient_row.get("standard_error"),
+        "p_value": coefficient_row.get("p_value"),
+    }
+
+
 def load_approved_findings(project_root: Path) -> list[dict[str, Any]]:
     path = project_root / "Results" / "json" / "approved_findings.json"
     if not path.exists():
@@ -141,11 +248,15 @@ def section_slug(value: str) -> str:
 
 def build_summary(sections: list[dict[str, Any]]) -> dict[str, int]:
     counts = Counter(section.get("status") for section in sections)
-    return {
+    summary = {
         "sections": len(sections),
         "claims": sum(len(section.get("claims", [])) for section in sections),
         "needs_revision": counts.get("needs_revision", 0),
     }
+    claim_proposals = sum(len(section.get("claim_proposals", [])) for section in sections)
+    if claim_proposals:
+        summary["claim_proposals"] = claim_proposals
+    return summary
 
 
 def write_manuscript_section_claim_ledger(path: Path, report: dict[str, Any]) -> Path:
@@ -175,6 +286,19 @@ def build_manuscript_section_claim_ledger_markdown(report: dict[str, Any]) -> st
                     f"- 来源 finding：`{claim.get('source_finding_id')}`",
                     f"- 证据：`{', '.join(claim.get('bound_evidence_ids', []))}`",
                     f"- 下一步：`{claim.get('next_action', {}).get('id')}`",
+                ]
+            )
+        for proposal in section.get("claim_proposals", []):
+            lines.extend(
+                [
+                    "",
+                    f"### {proposal.get('proposal_id')}",
+                    "",
+                    f"- 草案论断提案：{proposal.get('proposed_claim_text')}",
+                    f"- 来源 finding：`{proposal.get('source_finding_id')}`",
+                    f"- 来源表：`{proposal.get('source_table_id')}`",
+                    f"- 审阅状态：`{proposal.get('review_status')}`",
+                    f"- 下一步：`{proposal.get('next_action', {}).get('id')}`",
                 ]
             )
         for reason in section.get("missing_reasons", []):

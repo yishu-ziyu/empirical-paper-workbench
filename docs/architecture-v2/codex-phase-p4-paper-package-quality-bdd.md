@@ -321,6 +321,22 @@
 
 业务规则：真实项目里 approved finding 可能先有运行证据和审批状态，但还没沉淀成一句可进入论文的论断。此时系统要暴露缺口，让 VerifierAgent / ManuscriptAgent 回到草案层补齐，而不是替用户生成正式论断。
 
+## 行为 16.8：缺少已审批论断文本时必须生成草案论断提案
+
+**Given** `approved_findings.json` 中存在已审批 finding
+**But** 该 finding 还没有 `claim` 或 `claim_text`
+**And** 章节语义核验已经通过
+**And** 已消费证据中存在主回归表，包含处理变量系数、标准误、p 值和样本量
+**When** 用户运行 `Program/manuscript_section_claim_ledger.py --section "Main Results"`
+**Then** claim ledger 必须保留 `claim_ledger_needs_revision`
+**And** section 必须生成 `claim_proposals`
+**And** 每条 proposal 必须包含 proposed claim text、source finding、source table、coefficient、standard error、p value、nobs 和 bound evidence ids
+**And** proposal 的 `review_status` 必须是 `needs_human_review`
+**And** proposal 不得进入 `claims`
+**And** ledger 不得改写章节正文或 `state/product/*` 正式层文件。
+
+业务规则：缺 claim 不能让流程停在“发现问题”。系统应把真实回归证据整理成可审阅的草案论断提案，让用户或 VerifierAgent 判断是否批准为正式 finding claim。提案不是正式结论，必须保留人工审阅门。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

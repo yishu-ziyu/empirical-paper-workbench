@@ -1534,6 +1534,163 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
         self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
 
+    def test_bdd_11_8_missing_claim_text_generates_reviewable_claim_proposal(self) -> None:
+        """行为 16.8：缺少已审批论断文本时必须生成草案论断提案。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        section_path = self.project_root / "Manuscripts" / "sections" / "main-results.md"
+        section_path.parent.mkdir(parents=True)
+        section_path.write_text(
+            "\n".join(
+                [
+                    "# Main Results",
+                    "",
+                    "- Draft layer: `true`",
+                    "- Final paper write: `false`",
+                    "",
+                    "## 已消费证据",
+                    "",
+                    "- `main_regression_table` -> `Results/json/regression_tables.json`",
+                    "- `approved_findings` -> `Results/json/approved_findings.json`",
+                    "- `coefficient_interpretation` -> `Results/json/method_execution_result.json`",
+                    "",
+                    "## 草案正文",
+                    "",
+                    "主表结果显示机器人暴露和工资之间存在正向关系。",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        section_before = section_path.read_text(encoding="utf-8")
+
+        results_dir = self.project_root / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        (results_dir / "approved_findings.json").write_text(
+            json.dumps(
+                {
+                    "findings": [
+                        {
+                            "finding_id": "finding_without_claim",
+                            "review_status": "approved",
+                            "claim": None,
+                            "evidence_level": "local_file",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (results_dir / "regression_tables.json").write_text(
+            json.dumps(
+                {
+                    "tables": [
+                        {
+                            "table_id": "regression_table_1",
+                            "task_id": "robot_wage_iv_baseline",
+                            "method_id": "iv",
+                            "estimator": "iv",
+                            "dependent_var": "ln_wage",
+                            "treatment": "ln_robot",
+                            "nobs": 34315,
+                            "coefficient_rows": [
+                                {
+                                    "term": "ln_robot",
+                                    "coefficient": 0.199384322747,
+                                    "standard_error": 0.0793435494782,
+                                    "p_value": 0.0119807291718,
+                                }
+                            ],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (results_dir / "manuscript_section_semantic_review.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "p6.manuscript_section_semantic_review.v1",
+                    "status": "semantic_review_passed",
+                    "draft_layer_only": True,
+                    "formal_writeback_allowed": False,
+                    "sections": [
+                        {
+                            "section": "Main Results",
+                            "path": "Manuscripts/sections/main-results.md",
+                            "verdict": "passed",
+                            "checks": [{"id": "core_claim_grounded", "status": "passed"}],
+                            "consumed_evidence": [
+                                {
+                                    "evidence_id": "main_regression_table",
+                                    "path": "Results/json/regression_tables.json",
+                                },
+                                {"evidence_id": "approved_findings", "path": "Results/json/approved_findings.json"},
+                                {
+                                    "evidence_id": "coefficient_interpretation",
+                                    "path": "Results/json/method_execution_result.json",
+                                },
+                            ],
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        completed = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_section_claim_ledger.py"),
+                "--project-root",
+                str(self.project_root),
+                "--semantic-review",
+                "Results/json/manuscript_section_semantic_review.json",
+                "--section",
+                "Main Results",
+                "--output-ledger",
+                "Results/json/manuscript_section_claim_ledger.json",
+                "--output-review",
+                "Reviews/manuscript_section_claim_ledger.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+        ledger = json.loads((results_dir / "manuscript_section_claim_ledger.json").read_text(encoding="utf-8"))
+        self.assertEqual(ledger["status"], "claim_ledger_needs_revision")
+        self.assertEqual(ledger["summary"], {"sections": 1, "claims": 0, "claim_proposals": 1, "needs_revision": 1})
+        section = ledger["sections"][0]
+        self.assertEqual(section["claims"], [])
+        proposal = section["claim_proposals"][0]
+        self.assertEqual(proposal["review_status"], "needs_human_review")
+        self.assertEqual(proposal["source_finding_id"], "finding_without_claim")
+        self.assertEqual(proposal["source_table_id"], "regression_table_1")
+        self.assertEqual(proposal["coefficient"], 0.199384322747)
+        self.assertEqual(proposal["standard_error"], 0.0793435494782)
+        self.assertEqual(proposal["p_value"], 0.0119807291718)
+        self.assertEqual(proposal["nobs"], 34315)
+        self.assertIn("ln_robot", proposal["proposed_claim_text"])
+        self.assertIn("ln_wage", proposal["proposed_claim_text"])
+        self.assertEqual(
+            proposal["bound_evidence_ids"],
+            ["approved_findings", "coefficient_interpretation", "main_regression_table"],
+        )
+        self.assertEqual(proposal["next_action"]["id"], "review_claim_proposal_before_promotion")
+        self.assertFalse(ledger["formal_writeback_allowed"])
+        self.assertFalse(ledger["formal_state_guard"]["changed"])
+        self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

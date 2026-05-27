@@ -1031,3 +1031,12 @@
 - [x] 实现：新增 `Program/manuscript_section_claim_ledger.py` 和 `Program/workbench/manuscript_section_claim_ledger.py`，读取 `manuscript_section_semantic_review.json` 与 `approved_findings.json`，只把章节中真实出现且已有 approved claim text 的论断写入账本。
 - [x] 真实运行：当前真实 `Results/json/approved_findings.json` 的 approved finding 仍缺 `claim` 文本，因此 CLI 输出 `status=claim_ledger_needs_revision`、`claims=0`、`needs_revision=1`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_claim_ledger.json` 和 `Reviews/manuscript_section_claim_ledger.md`，缺口为 `no_approved_finding_claim_detected_in_section`。
 - [x] 验证：新增目标测试 OK；paper package quality 回归 20 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。
+
+## 2026-05-27 P6-G6e Main Results Claim Proposal
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只把缺失 approved claim 文本的 `Main Results` 转成草案层 claim proposal，不批准论断、不改正文、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：按要求尝试新建 Verifier sidecar 复核节点，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把 proposal 标记为 `needs_human_review`。
+- [x] BDD/TDD：新增 Behavior 16.8 和 `test_bdd_11_8_missing_claim_text_generates_reviewable_claim_proposal`；RED 为 summary 缺少 `claim_proposals`，GREEN 后覆盖 proposal 字段、正式层不改写和不进入 `claims`。
+- [x] 实现：扩展 `Program/workbench/manuscript_section_claim_ledger.py`，在 approved finding 缺 `claim` 但主回归表存在时，从真实回归表抽取 coefficient、standard error、p value 和 N，生成可审阅草案论断提案。
+- [x] 真实运行：CLI 输出 `status=claim_ledger_needs_revision`、`claims=0`、`claim_proposals=1`、`needs_revision=1`、`formal_writeback_allowed=false`；proposal 绑定 `regression_table_1` 和 `finding_trained_effect`。
+- [x] 验证：新增目标测试 OK；相邻 16.6/16.7 OK；paper package quality 回归 21 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，406 tests OK，skipped=1。

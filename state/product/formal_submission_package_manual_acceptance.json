@@ -1,0 +1,56 @@
+{
+  "schema_version": "p6.formal_submission_package_manual_acceptance.v1",
+  "generated_at": "2026-05-27T05:44:29.749251+00:00",
+  "source_summary": {
+    "path": "state/product/formal_submission_package_summary.json",
+    "exists": true,
+    "status": "ready_for_manual_acceptance",
+    "ready_for_manual_acceptance": true,
+    "sha256": "5f344ccb80021eec4d391908b9625888856cfa54f4b4a621fb70058afded43c8"
+  },
+  "status": "pending_human_manual_acceptance",
+  "decision": "defer",
+  "actor": "codex",
+  "note": "等待用户打开 PDF 和 DOCX 后确认；本节点不代表用户接受正式包。",
+  "accepted": false,
+  "needs_revision": false,
+  "accepted_artifacts": {
+    "paper_pdf": {
+      "path": "Submissions/formal_package/paper.pdf",
+      "exists": true,
+      "bytes": 107169,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "summary_bytes": 107169,
+      "summary_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "hash_matches_summary": true,
+      "bytes_match_summary": true
+    },
+    "paper_docx": {
+      "path": "Submissions/formal_package/paper.docx",
+      "exists": true,
+      "bytes": 14457,
+      "sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "summary_bytes": 14457,
+      "summary_sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+      "hash_matches_summary": true,
+      "bytes_match_summary": true
+    }
+  },
+  "blocking_reasons": [],
+  "boundary_flags": {
+    "this_command_opened_files": false,
+    "this_command_rendered_pdf": false,
+    "this_command_rendered_docx": false,
+    "this_command_wrote_final_outputs": false,
+    "this_command_wrote_formal_research_state": false
+  },
+  "formal_state_guard": {
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "open_and_review_pdf_docx",
+    "label": "打开 PDF 和 DOCX 人工审阅",
+    "description": "正式包已 ready，等待用户打开 PDF 和 DOCX 后做接受、退回或拒绝决定。"
+  }
+}

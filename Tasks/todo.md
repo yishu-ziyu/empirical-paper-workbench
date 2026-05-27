@@ -1141,4 +1141,14 @@
 - [x] 实现：`formal_submission_package_summary` 新增 `approved_candidate_snapshot` 聚合字段，并在 `visible_summary` 中加入 `approved_candidate_authority`，明确 `paper.pdf` 是当前正式包权威稿，`paper_candidate.pdf` 是后续草案/历史候选。
 - [x] 真实运行：重跑 `Program/formal_submission_package_summary.py --project-root .`，输出 `status=ready_for_manual_acceptance`、`approved_candidate_snapshot.status=available`、`authority=formal_pdf_final_writeback`、`current_candidate.treatment=historical_candidate_or_next_draft`。
 - [x] 验证：目标测试 1 OK；summary 测试 5 OK；相邻 P6-H1/H2/H3 链路 11 OK；Python 编译通过；真实 summary review 已列出“权威稿”摘要。
-- [ ] 下一步 P6-H4：把正式包验收摘要接入一个 CLI 级人工验收记录节点，记录用户是否接受 PDF/DOCX，而不是继续生成新候选稿。
+- [x] 下一步 P6-H4：把正式包验收摘要接入一个 CLI 级人工验收记录节点，记录用户是否接受 PDF/DOCX，而不是继续生成新候选稿。
+
+## 2026-05-27 P6-H4 Formal Package Manual Acceptance Record
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只建立正式包人工验收记录 CLI，不生成新候选稿，不重渲染 PDF，不导出 DOCX，不改 `paper.pdf`、`paper.docx`、`manifest.json` 或正式研究状态。
+- [x] Agent Team：尝试新建只读 sidecar 失败，原因仍为 `agent thread limit reached`；改为复用 Franklin sidecar。sidecar 建议的最小节点名为 `formal_submission_package_manual_acceptance`，并确认应保护正式包产物和 `state/product/*` 正式研究状态。
+- [x] BDD/TDD：新增 Behavior 47；RED 先确认为缺少 `Program/formal_submission_package_manual_acceptance.py`，随后补最小实现；补充 `defer` 决策，避免 Codex 在未获得用户确认时伪造“已接受”。
+- [x] 实现：新增 `Program/formal_submission_package_manual_acceptance.py` 和 `Program/workbench/formal_submission_package_manual_acceptance.py`，消费 `state/product/formal_submission_package_summary.json`，写出 `Results/json/formal_submission_package_manual_acceptance.json`、`state/product/formal_submission_package_manual_acceptance.json` 与 `Reviews/formal_submission_package_manual_acceptance.md`。
+- [x] 真实运行：当前真实项目以 `--decision defer` 记录为 `pending_human_manual_acceptance`，PDF/DOCX hash 已锁定，`accepted=false`，下一步为 `open_and_review_pdf_docx`。
+- [x] 验证：目标测试 4 OK；相邻 summary 回归合计 9 OK；Python 编译通过；真实 CLI 运行通过；命令声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`。
+- [ ] 下一步 P6-H5：在用户实际打开 PDF/DOCX 后，用同一 CLI 写入 `accept`、`needs_revision` 或 `reject` 的真实人工决定；不自动替用户接受。

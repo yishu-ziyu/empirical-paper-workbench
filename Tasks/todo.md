@@ -1121,4 +1121,14 @@
 - [x] 实现：新增 `Program/formal_package_provenance_lock_check.py` 和 `Program/workbench/formal_package_provenance_lock_check.py`，读取 final writeback、docx export、submission manifest、summary 和包内 manifest，写出 `Results/json/formal_package_provenance_lock_check.json` 与 `Reviews/formal_package_provenance_lock_check.md`。
 - [x] 真实运行：CLI 输出 `status=ready_for_manual_acceptance_with_provenance_warning`、`can_continue_manual_acceptance=true`；最终 `paper.pdf` 与 `paper.docx` 产物锁一致，当前 `paper_candidate.pdf` 相对最终写回记录发生漂移，且 bytes 同为 107169 但 sha256 不同，warning=`candidate_pdf_drifted_from_final_writeback_source`、`candidate_pdf_same_size_but_hash_changed`。
 - [x] 验证：目标测试 4 OK；相邻正式包链路回归 18 OK；真实 CLI 运行通过；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`。
-- [ ] 下一步 P6-H2：用 20 分钟小节点处理 candidate 漂移决策。推荐先做 `freeze_approved_candidate_snapshot`：保存最终写回时的权威 candidate 指纹和来源说明，把当前 `paper_candidate.pdf` 标成“后续草案/历史候选”，避免用户验收时把候选层和正式层混在一起。
+- [x] 下一步 P6-H2：用 20 分钟小节点处理 candidate 漂移决策。推荐先做 `freeze_approved_candidate_snapshot`：保存最终写回时的权威 candidate 指纹和来源说明，把当前 `paper_candidate.pdf` 标成“后续草案/历史候选”，避免用户验收时把候选层和正式层混在一起。
+
+## 2026-05-27 P6-H2 Approved Candidate Snapshot Freeze
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只冻结已批准 candidate 的来源权威，不重渲染 PDF，不导出 DOCX，不改 `state/product/*`，不改 `paper.pdf`、`paper.docx`、`paper_candidate.pdf` 或 `manifest.json`。
+- [x] Agent Team：复用 Franklin sidecar 做只读复核，确认应读取 P6-H1 provenance lock、final writeback、formal package 产物和 summary；建议写 package-local sidecar `Submissions/formal_package/provenance/approved_candidate_snapshot.json`，并保持正式产物不可变。
+- [x] BDD/TDD：新增 Behavior 45 和 `tests/test_formal_package_candidate_snapshot_freeze.py`；RED 为缺少 `Program/formal_package_candidate_snapshot_freeze.py`，GREEN 后覆盖权威快照写入、broken provenance blocker、正式产物不变和正式状态不变。
+- [x] 实现：新增 `Program/formal_package_candidate_snapshot_freeze.py` 和 `Program/workbench/formal_package_candidate_snapshot_freeze.py`，读取 `formal_package_provenance_lock_check.json` 与 `formal_pdf_final_writeback.json`，写出 `Results/json/formal_package_candidate_snapshot_freeze.json`、`Reviews/formal_package_candidate_snapshot_freeze.md` 和 `Submissions/formal_package/provenance/approved_candidate_snapshot.json`。
+- [x] 真实运行：CLI 输出 `status=approved_candidate_snapshot_frozen`、`snapshot_written=true`；批准时 candidate 的权威 hash 为 `1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，由 `Submissions/formal_package/paper.pdf` 恢复；当前 `paper_candidate.pdf` 被标记为 `historical_candidate_or_next_draft`。
+- [x] 验证：目标测试 2 OK；相邻正式包来源链路回归 10 OK；真实 CLI 运行通过；Python 编译和 scoped `git diff --check` 通过；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`。
+- [ ] 下一步 P6-H3：把 `approved_candidate_snapshot.json` 接入正式包验收摘要或导出审计视图，让用户验收时只看到“正式包权威稿”和“当前候选草案”的清晰区分。

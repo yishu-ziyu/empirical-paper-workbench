@@ -1,0 +1,81 @@
+{
+  "schema_version": "p6.formal_package_candidate_snapshot_freeze.v1",
+  "generated_at": "2026-05-27T05:16:39Z",
+  "status": "approved_candidate_snapshot_frozen",
+  "snapshot_written": true,
+  "snapshot": {
+    "path": "Submissions/formal_package/provenance/approved_candidate_snapshot.json",
+    "exists_after_write": true
+  },
+  "provenance_lock": {
+    "path": "Results/json/formal_package_provenance_lock_check.json",
+    "status": "ready_for_manual_acceptance_with_provenance_warning",
+    "can_continue_manual_acceptance": true,
+    "blocking_reasons": [],
+    "warning_reasons": [
+      "candidate_pdf_drifted_from_final_writeback_source",
+      "candidate_pdf_same_size_but_hash_changed"
+    ]
+  },
+  "final_writeback": {
+    "path": "Results/json/formal_pdf_final_writeback.json",
+    "status": "final_pdf_written",
+    "source_candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+    "source_candidate_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+    "source_candidate_pdf_bytes": 107169,
+    "final_pdf": "Submissions/formal_package/paper.pdf",
+    "final_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+    "final_pdf_bytes": 107169
+  },
+  "approved_candidate_snapshot": {
+    "schema_version": "p6.approved_candidate_snapshot.v1",
+    "generated_at": "2026-05-27T05:16:39Z",
+    "status": "approved_candidate_snapshot_frozen",
+    "authority": "formal_pdf_final_writeback",
+    "approved_candidate": {
+      "source_candidate_path_at_writeback": "Submissions/formal_package/paper_candidate.pdf",
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "bytes": 107169
+    },
+    "recovered_from": {
+      "path": "Submissions/formal_package/paper.pdf",
+      "exists": true,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "bytes": 107169,
+      "reason": "final_pdf_hash_matches_recorded_candidate_source"
+    },
+    "current_candidate": {
+      "path": "Submissions/formal_package/paper_candidate.pdf",
+      "exists": true,
+      "sha256": "07bcaebc586f445a01fc34b95bb63bec82e5ac57ff465ea4770149da2d38ca88",
+      "bytes": 107169,
+      "authoritative_for_current_formal_package": false,
+      "treatment": "historical_candidate_or_next_draft",
+      "warning_reasons": [
+        "candidate_pdf_drifted_from_final_writeback_source",
+        "candidate_pdf_same_size_but_hash_changed"
+      ]
+    }
+  },
+  "blocking_reasons": [],
+  "warning_reasons_resolved_as": [
+    "candidate_source_authority_frozen"
+  ],
+  "boundary_flags": {
+    "this_command_rendered_pdf": false,
+    "this_command_rendered_docx": false,
+    "this_command_wrote_final_outputs": false,
+    "this_command_wrote_formal_state": false,
+    "this_command_wrote_provenance_snapshot": true
+  },
+  "formal_state_guard": {
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_actions": [
+    {
+      "action": "continue_manual_acceptance_with_approved_candidate_snapshot",
+      "reason": "the approved candidate bytes are now represented by a stable provenance sidecar"
+    }
+  ]
+}

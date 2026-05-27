@@ -82,7 +82,11 @@ def main() -> int:
     print(f"[econ-workbench] manuscript_section_claim_ledger={ledger_path.relative_to(project_root)}")
     print(f"[econ-workbench] manuscript_section_claim_ledger_md={review_path.relative_to(project_root)}")
     print(f"[econ-workbench] status={report.get('status')}")
-    print(f"[econ-workbench] claims={summary.get('claims', 0)} needs_revision={summary.get('needs_revision', 0)}")
+    print(
+        f"[econ-workbench] claims={summary.get('claims', 0)} "
+        f"claim_proposals={summary.get('claim_proposals', 0)} "
+        f"needs_revision={summary.get('needs_revision', 0)}"
+    )
     print(f"[econ-workbench] formal_writeback_allowed={str(report.get('formal_writeback_allowed')).lower()}")
     return 0
 

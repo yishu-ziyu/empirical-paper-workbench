@@ -100,7 +100,12 @@
 - [x] P6-J8 真实运行：写出 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`、`Results/json/cgss_social_capital_happiness_paper_assembly.json` 和 `Reviews/cgss_social_capital_happiness_paper_assembly.md`；状态为 `needs_human_exploratory_paper_review`，正文中文字符数 5399，超过最低 5000 门槛。
 - [x] P6-J8 正式层边界：本节点只生成草案层完整稿、assembly JSON 和审阅报告；不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`。`Manuscripts/generated/*` 与 `Results/json/*` 仍按 `.gitignore` 作为本地运行产物保留。
 - [x] P6-J8 验证：目标测试 3 OK；相邻 CGSS 章节路由 / 结果证据包 / 文献综述草稿包回归 15 OK；Python 编译通过；真实 CLI 运行通过；P6-J8 相关文件 scoped `git diff --check` 通过。
-- [ ] 下一步 P6-J9：对 `Manuscripts/generated/cgss_social_capital_happiness_paper.md` 做 PDF/HTML 预检，生成可打开的审阅产物和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`。
+- [x] P6-J9 BDD/TDD：新增 `tests/test_cgss_pdf_preflight.py`，先确认缺少 `Program.workbench.cgss_pdf_preflight` 的 RED，再实现草案 PDF/HTML 预检器。
+- [x] P6-J9 实现：新增 `Program/workbench/cgss_pdf_preflight.py` 和 `Program/cgss_pdf_preflight.py`；读取 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`，优先用 `pandoc + xelatex` 生成 PDF，失败时回退 HTML 并记录渲染诊断。
+- [x] P6-J9 真实运行：写出 `Submissions/cgss_social_capital_happiness/paper.pdf`、`Results/json/cgss_social_capital_happiness_pdf_preflight.json` 和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`；状态为 `pdf_preflight_ready`，PDF 大小 187320 bytes。
+- [x] P6-J9 正式层边界：本节点只做草案 PDF 预检，不写正式 manuscript、不写正式 package、不写 `state/product/*`。`Submissions/*` 与 `Results/json/*` 仍按 `.gitignore` 作为本地运行产物保留。
+- [x] P6-J9 验证：目标测试 3 OK；PDF / paper assembly / section router 相邻回归 9 OK；Python 编译通过；真实 CLI 运行通过；`file Submissions/cgss_social_capital_happiness/paper.pdf` 确认为 PDF document version 1.7。
+- [ ] 下一步 P6-K：接入 AER-like / 顶刊方法规范门，默认建议开启但只在用户选择顶刊标准时强制；先输出方法缺口与补证任务，不直接改正式论文。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

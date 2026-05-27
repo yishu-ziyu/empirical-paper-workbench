@@ -105,9 +105,24 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertEqual(length_checks["sections"]["Main Results"]["status"], "too_short")
         task_by_id = {task["id"]: task for task in report["recommended_next_tasks"]}
         self.assertIn("expand_underdeveloped_sections", task_by_id)
-        task_sections = {item["section"] for item in task_by_id["expand_underdeveloped_sections"]["inputs"]}
+        expansion_task = task_by_id["expand_underdeveloped_sections"]
+        task_sections = {item["section"] for item in expansion_task["inputs"]}
         self.assertIn("Literature and Contribution", task_sections)
         self.assertIn("Main Results", task_sections)
+        packet = expansion_task["section_expansion_packet"]
+        self.assertEqual(packet["source"], "section_length_checks")
+        self.assertTrue(packet["draft_layer_only"])
+        self.assertFalse(packet["formal_writeback_allowed"])
+        self.assertEqual(packet["owner_agent"], "ManuscriptAgent")
+        self.assertEqual(packet["source_quality_report"], "Results/json/paper_quality_report.json")
+        packet_by_section = {item["section"]: item for item in packet["sections"]}
+        literature_packet = packet_by_section["Literature and Contribution"]
+        self.assertEqual(literature_packet["output_path"], "Manuscripts/sections/literature-and-contribution.md")
+        self.assertIn("verified_bibliography.csv", literature_packet["required_evidence"])
+        results_packet = packet_by_section["Main Results"]
+        self.assertIn("main_regression_table", results_packet["required_evidence"])
+        self.assertIn("section_length_checks.status=passed", packet["verification"]["required_before_completion"])
+        self.assertIn("no_state_product_writeback", packet["verification"]["required_before_completion"])
 
     def test_bdd_3_missing_bibliography_becomes_literature_task(self) -> None:
         result = self.run_quality()

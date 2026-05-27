@@ -89,6 +89,8 @@
 - [x] P6-G1 BDD/TDD：新增行为 2.1 和目标测试，先确认“全文够长但核心章节过薄”不会被现有 quality gate 抓住的 RED。
 - [x] P6-G1 实现：`paper_quality_report.json` 新增 `section_length_checks`，逐章记录英文词数、中文字符数、目标区间和状态；`verdict` 新增 `section_length_gate_required`；`recommended_next_tasks` 新增 `expand_underdeveloped_sections`。
 - [x] P6-G1 真实运行：当前 CFPS/机器人草稿被点名 Data、Empirical Strategy、Main Results、Robustness 四个章节过薄，已写入 `Results/json/paper_quality_report.json`，供下一轮 ManuscriptAgent 扩写。
+- [x] P6-G2 BDD/TDD：给 `expand_underdeveloped_sections` 增加 `section_expansion_packet` 验收，先验证缺包失败，再实现通过。
+- [x] P6-G2 实现：`section_expansion_packet` 逐章交付目标篇幅、证据要求、草案输出路径和正式层写回边界；`too_long` 章节不再进入扩写包，后续单独走压缩节点。
 
 ### Agent Team 调用节奏
 

@@ -1214,4 +1214,14 @@
 - [x] 真实结果：证据包状态为 `ready_for_paper_draft_input`；OLS 与 Ordered Logit 的核心变量都是 `social_capital_index`，样本量都为 5310，方向一致为正；写作种子句已生成。
 - [x] 产物：`Results/json/cgss_social_capital_happiness_results_evidence_package.json` 与 `Reviews/cgss_social_capital_happiness_results_evidence_package.md`。
 - [x] 验证：`python3 -m unittest tests.test_cgss_results_evidence_package -v` 4 tests OK；P6-I scoped 回归 11 tests OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-I6：从结果证据包生成“变量角色审阅草案”，要求把因变量、社会资本指数、控制变量的选择理由写清楚，但仍等待人工确认后才能进入正式变量角色。
+- [x] 下一步 P6-I6：从结果证据包生成“变量角色审阅草案”，要求把因变量、社会资本指数、控制变量的选择理由写清楚，但仍等待人工确认后才能进入正式变量角色。
+
+## 2026-05-27 P6-I6 CGSS Variable Role Review Draft
+
+- [x] 节点时间盒：本节点控制在 20 分钟内；只生成变量角色审阅草案，不写 `state/product/variable_roles.json`，不改 `DesignSpec`、`RunPlan` 或正式论文包。
+- [x] Agent Team：复用 verifier sidecar 做只读复核；回收意见后补齐正式层边界、OLS/Ordered Logit 结果证据、原始变量候选映射和 pending 人工审阅决定。
+- [x] BDD/TDD：新增 `tests/test_cgss_variable_role_review_draft.py`，先确认缺少 `Program.workbench.cgss_variable_role_review_draft` 的 RED，再实现 GREEN；覆盖可审阅草案、证据包未 ready 阻断、草案文件写出和正式层不改写。
+- [x] 实现：新增 `Program/cgss_variable_role_review_draft.py` 与 `Program/workbench/cgss_variable_role_review_draft.py`，读取结果证据包和变量候选画像，写出 `Results/json/cgss_social_capital_happiness_variable_role_review_draft.json` 与 `Reviews/cgss_social_capital_happiness_variable_role_review_draft.md`。
+- [x] 真实结果：草案状态为 `needs_human_role_review`；因变量为 `happiness <- a36`，核心解释变量为 `social_capital_index`，来源题项为 `a33/a31a/a31b/a311`，控制变量包括性别、年龄、教育、收入、健康、户籍和省份固定效应；模型证据显示 OLS 和 Ordered Logit 样本量均为 5310、方向一致为正。
+- [x] 验证：目标测试 3 OK；P6-I scoped 回归 14 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 下一步 P6-I7：生成 CGSS 文献综述种子包。要求接入 Scholar/CNKI/Zotero 或本地文献来源，形成“社会资本—主观幸福感”的文献、机制和变量依据；仍不写正式论文正文。

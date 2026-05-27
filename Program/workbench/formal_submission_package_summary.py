@@ -10,6 +10,7 @@ from workbench.export import relative_or_absolute
 
 
 DEFAULT_SOURCE_MANIFEST = "Results/json/formal_submission_package_manifest.json"
+DEFAULT_APPROVED_CANDIDATE_SNAPSHOT = "Submissions/formal_package/provenance/approved_candidate_snapshot.json"
 DEFAULT_OUTPUT_REPORT = "Results/json/formal_submission_package_summary.json"
 DEFAULT_OUTPUT_SUMMARY = "state/product/formal_submission_package_summary.json"
 DEFAULT_OUTPUT_REVIEW = "Reviews/formal_submission_package_summary.md"
@@ -29,6 +30,7 @@ def build_formal_submission_package_summary(
     project_root: Path,
     *,
     source_manifest_path: Path,
+    approved_candidate_snapshot_path: Path | None = None,
     formal_state_before: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], int]:
     before = formal_state_before or snapshot_protected_formal_state(project_root)
@@ -37,6 +39,10 @@ def build_formal_submission_package_summary(
     package_manifest_path = resolve_project_path(project_root, str(source_manifest.get("package_manifest") or ""))
     package_manifest = load_json(package_manifest_path) if package_manifest_path else {}
     artifacts = build_artifacts(project_root, source_manifest, package_manifest)
+    approved_candidate_snapshot = build_approved_candidate_snapshot_summary(
+        project_root,
+        approved_candidate_snapshot_path or project_root / DEFAULT_APPROVED_CANDIDATE_SNAPSHOT,
+    )
     consistency_checks = build_consistency_checks(source_manifest, package_manifest, artifacts)
     blocking_reasons = build_blocking_reasons(
         source_manifest_path=source_manifest_path,
@@ -68,7 +74,14 @@ def build_formal_submission_package_summary(
             "schema_version": package_manifest.get("schema_version"),
         },
         "artifacts": artifacts,
-        "visible_summary": build_visible_summary(ready, artifacts, source_manifest, blocking_reasons),
+        "approved_candidate_snapshot": approved_candidate_snapshot,
+        "visible_summary": build_visible_summary(
+            ready,
+            artifacts,
+            source_manifest,
+            blocking_reasons,
+            approved_candidate_snapshot,
+        ),
         "open_targets": build_open_targets(project_root, artifacts) if ready else [],
         "manual_acceptance": build_manual_acceptance(source_manifest, ready),
         "consistency_checks": consistency_checks,
@@ -84,6 +97,29 @@ def build_formal_submission_package_summary(
         "next_action": build_next_action(ready, blocking_reasons),
     }
     return summary, 0 if ready else 2
+
+
+def build_approved_candidate_snapshot_summary(project_root: Path, snapshot_path: Path) -> dict[str, Any]:
+    snapshot = load_json(snapshot_path)
+    if not snapshot:
+        return {
+            "status": "missing",
+            "path": relative_or_absolute(snapshot_path, project_root),
+            "exists": False,
+            "authority": None,
+            "approved_candidate": {},
+            "recovered_from": {},
+            "current_candidate": {},
+        }
+    return {
+        "status": "available",
+        "path": relative_or_absolute(snapshot_path, project_root),
+        "exists": snapshot_path.exists(),
+        "authority": snapshot.get("authority"),
+        "approved_candidate": snapshot.get("approved_candidate") or {},
+        "recovered_from": snapshot.get("recovered_from") or {},
+        "current_candidate": snapshot.get("current_candidate") or {},
+    }
 
 
 def build_artifacts(
@@ -224,8 +260,9 @@ def build_visible_summary(
     artifacts: dict[str, dict[str, Any]],
     source_manifest: dict[str, Any],
     blocking_reasons: list[str],
+    approved_candidate_snapshot: dict[str, Any],
 ) -> list[dict[str, str]]:
-    return [
+    items = [
         {
             "id": "package_status",
             "label": "正式包状态",
@@ -252,6 +289,20 @@ def build_visible_summary(
             "value": "打开 PDF 和 DOCX，按验收清单逐项确认" if ready else "先修复 blocker，再重新生成 summary",
         },
     ]
+    if approved_candidate_snapshot.get("status") == "available":
+        current_candidate = approved_candidate_snapshot.get("current_candidate") or {}
+        items.insert(
+            3,
+            {
+                "id": "approved_candidate_authority",
+                "label": "权威稿",
+                "value": (
+                    f"{(approved_candidate_snapshot.get('recovered_from') or {}).get('path')} 是当前正式包权威稿；"
+                    f"{current_candidate.get('path')} 标记为 {current_candidate.get('treatment')}"
+                ),
+            },
+        )
+    return items
 
 
 def build_open_targets(project_root: Path, artifacts: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:

@@ -15,6 +15,7 @@
 - **正式包状态**：可进入人工验收
 - **最终文件**：PDF 107169 bytes / DOCX 14457 bytes
 - **来源**：Submissions/formal_package/manifest.json
+- **权威稿**：Submissions/formal_package/paper.pdf 是当前正式包权威稿；Submissions/formal_package/paper_candidate.pdf 标记为 historical_candidate_or_next_draft
 - **一致性**：文件指纹与 manifest 一致
 - **下一步**：打开 PDF 和 DOCX，按验收清单逐项确认
 

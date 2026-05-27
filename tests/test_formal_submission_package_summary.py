@@ -63,6 +63,26 @@ class FormalSubmissionPackageSummaryCliTests(unittest.TestCase):
         self.assertEqual(self._snapshot_protected_formal_state(), protected_before)
         self.assertEqual(self._snapshot_immutable_inputs(), immutable_before)
 
+    def test_bdd_46_exposes_approved_candidate_snapshot_in_acceptance_summary(self) -> None:
+        self._seed_approved_candidate_snapshot()
+
+        result = self._run_cli()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        summary = json.loads(
+            (self.project_root / "state" / "product" / "formal_submission_package_summary.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        snapshot_summary = summary["approved_candidate_snapshot"]
+        self.assertEqual(snapshot_summary["status"], "available")
+        self.assertEqual(snapshot_summary["authority"], "formal_pdf_final_writeback")
+        self.assertEqual(snapshot_summary["approved_candidate"]["sha256"], summary["artifacts"]["paper_pdf"]["sha256"])
+        self.assertEqual(snapshot_summary["recovered_from"]["path"], "Submissions/formal_package/paper.pdf")
+        self.assertFalse(snapshot_summary["current_candidate"]["authoritative_for_current_formal_package"])
+        self.assertEqual(snapshot_summary["current_candidate"]["treatment"], "historical_candidate_or_next_draft")
+        self.assertIn("approved_candidate_authority", {item["id"] for item in summary["visible_summary"]})
+
     def test_bdd_39_blocks_when_submission_manifest_is_not_ready(self) -> None:
         report_path = self.project_root / "Results" / "json" / "formal_submission_package_manifest.json"
         payload = json.loads(report_path.read_text(encoding="utf-8"))
@@ -156,6 +176,43 @@ class FormalSubmissionPackageSummaryCliTests(unittest.TestCase):
             "Results/json/formal_submission_package_manifest.json",
         ]
         return {path: (self.project_root / path).read_bytes() for path in paths}
+
+    def _seed_approved_candidate_snapshot(self) -> None:
+        package_dir = self.project_root / "Submissions" / "formal_package"
+        snapshot_path = package_dir / "provenance" / "approved_candidate_snapshot.json"
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        paper_pdf = package_dir / "paper.pdf"
+        snapshot_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p6.approved_candidate_snapshot.v1",
+                    "status": "approved_candidate_snapshot_frozen",
+                    "authority": "formal_pdf_final_writeback",
+                    "approved_candidate": {
+                        "source_candidate_path_at_writeback": "Submissions/formal_package/paper_candidate.pdf",
+                        "sha256": self._sha256(paper_pdf),
+                        "bytes": paper_pdf.stat().st_size,
+                    },
+                    "recovered_from": {
+                        "path": "Submissions/formal_package/paper.pdf",
+                        "exists": True,
+                        "sha256": self._sha256(paper_pdf),
+                        "bytes": paper_pdf.stat().st_size,
+                    },
+                    "current_candidate": {
+                        "path": "Submissions/formal_package/paper_candidate.pdf",
+                        "exists": True,
+                        "sha256": "draft-hash",
+                        "bytes": paper_pdf.stat().st_size,
+                        "authoritative_for_current_formal_package": False,
+                        "treatment": "historical_candidate_or_next_draft",
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
     def _seed_project(self, root: Path) -> None:
         results_dir = root / "Results" / "json"

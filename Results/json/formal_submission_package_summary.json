@@ -1,6 +1,6 @@
 {
   "schema_version": "p6.formal_submission_package_summary.v1",
-  "generated_at": "2026-05-26T23:01:04.042200+00:00",
+  "generated_at": "2026-05-27T05:33:25.113649+00:00",
   "status": "ready_for_manual_acceptance",
   "ready_for_manual_acceptance": true,
   "source_manifest": {
@@ -44,6 +44,36 @@
       "source_report": "Results/json/formal_docx_export.json"
     }
   },
+  "approved_candidate_snapshot": {
+    "status": "available",
+    "path": "Submissions/formal_package/provenance/approved_candidate_snapshot.json",
+    "exists": true,
+    "authority": "formal_pdf_final_writeback",
+    "approved_candidate": {
+      "source_candidate_path_at_writeback": "Submissions/formal_package/paper_candidate.pdf",
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "bytes": 107169
+    },
+    "recovered_from": {
+      "path": "Submissions/formal_package/paper.pdf",
+      "exists": true,
+      "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+      "bytes": 107169,
+      "reason": "final_pdf_hash_matches_recorded_candidate_source"
+    },
+    "current_candidate": {
+      "path": "Submissions/formal_package/paper_candidate.pdf",
+      "exists": true,
+      "sha256": "07bcaebc586f445a01fc34b95bb63bec82e5ac57ff465ea4770149da2d38ca88",
+      "bytes": 107169,
+      "authoritative_for_current_formal_package": false,
+      "treatment": "historical_candidate_or_next_draft",
+      "warning_reasons": [
+        "candidate_pdf_drifted_from_final_writeback_source",
+        "candidate_pdf_same_size_but_hash_changed"
+      ]
+    }
+  },
   "visible_summary": [
     {
       "id": "package_status",
@@ -59,6 +89,11 @@
       "id": "provenance",
       "label": "来源",
       "value": "Submissions/formal_package/manifest.json"
+    },
+    {
+      "id": "approved_candidate_authority",
+      "label": "权威稿",
+      "value": "Submissions/formal_package/paper.pdf 是当前正式包权威稿；Submissions/formal_package/paper_candidate.pdf 标记为 historical_candidate_or_next_draft"
     },
     {
       "id": "consistency",

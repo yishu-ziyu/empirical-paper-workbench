@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from workbench.formal_submission_package_summary import (
+    DEFAULT_APPROVED_CANDIDATE_SNAPSHOT,
     DEFAULT_OUTPUT_REPORT,
     DEFAULT_OUTPUT_REVIEW,
     DEFAULT_OUTPUT_SUMMARY,
@@ -17,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Expose the formal submission package as a compact product acceptance state.")
     parser.add_argument("--project-root", default=".", help="Absolute or relative project root.")
     parser.add_argument("--source-manifest", default=DEFAULT_SOURCE_MANIFEST, help="P6-D formal package manifest report.")
+    parser.add_argument("--approved-candidate-snapshot", default=DEFAULT_APPROVED_CANDIDATE_SNAPSHOT)
     parser.add_argument(
         "--output-report",
         default=DEFAULT_OUTPUT_REPORT,
@@ -41,6 +43,7 @@ def main() -> int:
     summary, exit_code = build_formal_submission_package_summary(
         project_root,
         source_manifest_path=project_root / args.source_manifest,
+        approved_candidate_snapshot_path=project_root / args.approved_candidate_snapshot,
     )
     report_path, summary_path, review_path = write_formal_submission_package_summary_outputs(
         project_root / args.output_report,

@@ -95,6 +95,10 @@
 - [x] P6-G3 Agent Team：Sartre 只读复核 `paper_package` 队列契约，指出 `normalize_agent_task_queue()` 丢失 `section_expansion_packet`；主 Agent 回收后只修白名单透传和章节任务展开。
 - [x] P6-G3 BDD/TDD：在 `test_bdd_8_builds_expansion_plan_and_structured_manuscript` 中增加 `section_expansion_packet` 和 `manuscript_section_task_packets` 验收，先确认 RED，再做最小实现。
 - [x] P6-G3 实现：`paper_expansion_plan.json.agent_task_queue` 保留 ManuscriptAgent 的 `section_expansion_packet`，并新增 `manuscript_section_task_packets`，逐章暴露 section、output_path、required_evidence、draft/formal 写回边界和 verification。
+- [x] P6-G4 节点规则：本节点限定 20 分钟内完成“章节任务包物化为可打开工单”，不写章节正文、不改正式层、不扩展 UI。
+- [x] P6-G4 Agent Team：Lovelace 只读复核测试挂载点和正式层保护边界；主 Agent 同步写 RED 测试和最小实现。
+- [x] P6-G4 BDD/TDD：新增行为 16.1 和测试 `test_bdd_11_1_revision_round_materializes_manuscript_section_work_orders`，先确认 revision round 缺少 `manuscript_section_work_orders` 的 RED。
+- [x] P6-G4 实现：`paper_revision_round.py` 消费 `manuscript_section_task_packets`，写出 `manuscript_section_work_orders` 和 `Reviews/agent_packets/manuscriptagent/sections/*.md` 草案层工单。
 
 ### Agent Team 调用节奏
 

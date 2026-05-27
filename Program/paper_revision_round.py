@@ -7,6 +7,7 @@ from pathlib import Path
 from workbench.paper_revision_round import (
     build_paper_revision_round,
     snapshot_formal_state,
+    write_manuscript_section_work_order_files,
     write_paper_revision_round,
     write_revision_review_markdown,
 )
@@ -73,10 +74,12 @@ def main() -> int:
     )
     round_path = write_paper_revision_round(output_round_path, revision_round)
     review_path = write_revision_review_markdown(output_review_path, revision_round)
+    section_work_order_paths = write_manuscript_section_work_order_files(project_root, revision_round)
 
     print(f"[econ-workbench] paper_revision_round={round_path.relative_to(project_root)}")
     print(f"[econ-workbench] revision_review={review_path.relative_to(project_root)}")
     print(f"[econ-workbench] agent_packets={len(revision_round.get('agent_packets', []))}")
+    print(f"[econ-workbench] manuscript_section_work_orders={len(section_work_order_paths)}")
     print(f"[econ-workbench] formal_writeback_allowed={str(revision_round.get('formal_writeback_allowed')).lower()}")
     return 0
 

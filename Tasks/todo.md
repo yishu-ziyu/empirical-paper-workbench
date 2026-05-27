@@ -987,3 +987,11 @@
 - [x] P6-F1 实现：新增 `Product/backend/formal_submission_package_service.py`，在 `Product/app.py` 暴露只读接口，返回 `visible_summary`、`open_targets`、`manual_acceptance`、`source_manifest`、`consistency_checks`、`blocking_reasons` 和产品元信息。
 - [x] P6-F1 验证：目标测试 2 OK；P6-E1/P6-F1/API 相邻回归 15 OK，skipped=1；Python 编译通过；scoped diff 已复核。
 - [ ] 下一步 P6-F2：把正式包 summary API 挂到产品页面或内置浏览器验收台，显示“打开 PDF/DOCX、验收清单、阻断原因”，并用 Browser 做可视化验收。
+
+## 2026-05-27 P6-G5 Manuscript Section Scaffold
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只把 P6-G4 的 ManuscriptAgent 章节工单落成 `Manuscripts/sections/*.md` 草案入口，不扩写正文、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：使用只读 explorer sidecar Pascal 复核可复用链路；采纳其建议，不复用 P5 formal section source drafter，单独实现 `paper_revision_round -> draft section scaffold`。
+- [x] BDD/TDD：新增 Behavior 16.2 和 `test_bdd_11_2_section_work_orders_create_draft_section_scaffolds`；RED 为缺少 `Program/manuscript_section_scaffold.py`，GREEN 后覆盖章节文件生成、report/review 写出和正式层不改写。
+- [x] 实现：新增 `Program/manuscript_section_scaffold.py` 和 `Program/workbench/manuscript_section_scaffold.py`，读取 `paper_revision_round.json.manuscript_section_work_orders`，写出章节草案入口、scaffold report 和 review markdown。
+- [x] 验证：目标测试 1 OK；paper package quality 回归 15 OK；Python 编译通过；真实 CLI 输出 `status=section_scaffolds_ready`、`section_scaffolds=9`、`formal_state_guard.changed=false`，并生成 `Manuscripts/sections/main-results.md` 等 9 个章节入口。

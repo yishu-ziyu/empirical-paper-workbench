@@ -1131,4 +1131,14 @@
 - [x] 实现：新增 `Program/formal_package_candidate_snapshot_freeze.py` 和 `Program/workbench/formal_package_candidate_snapshot_freeze.py`，读取 `formal_package_provenance_lock_check.json` 与 `formal_pdf_final_writeback.json`，写出 `Results/json/formal_package_candidate_snapshot_freeze.json`、`Reviews/formal_package_candidate_snapshot_freeze.md` 和 `Submissions/formal_package/provenance/approved_candidate_snapshot.json`。
 - [x] 真实运行：CLI 输出 `status=approved_candidate_snapshot_frozen`、`snapshot_written=true`；批准时 candidate 的权威 hash 为 `1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，由 `Submissions/formal_package/paper.pdf` 恢复；当前 `paper_candidate.pdf` 被标记为 `historical_candidate_or_next_draft`。
 - [x] 验证：目标测试 2 OK；相邻正式包来源链路回归 10 OK；真实 CLI 运行通过；Python 编译和 scoped `git diff --check` 通过；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`。
-- [ ] 下一步 P6-H3：把 `approved_candidate_snapshot.json` 接入正式包验收摘要或导出审计视图，让用户验收时只看到“正式包权威稿”和“当前候选草案”的清晰区分。
+- [x] 下一步 P6-H3：把 `approved_candidate_snapshot.json` 接入正式包验收摘要或导出审计视图，让用户验收时只看到“正式包权威稿”和“当前候选草案”的清晰区分。
+
+## 2026-05-27 P6-H3 Formal Acceptance Summary Candidate Authority
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只把 P6-H2 的 `approved_candidate_snapshot.json` 接入正式包 summary，不改 UI，不重写正式包，不改正式研究状态。
+- [x] Agent Team：复用 Franklin sidecar 只读定位 summary CLI/module/test 和最小字段，回收结论为只改 `Program/formal_submission_package_summary.py`、`Program/workbench/formal_submission_package_summary.py`、`tests/test_formal_submission_package_summary.py` 及 summary 输出。
+- [x] BDD/TDD：新增 Behavior 46，先确认 summary 缺少 `approved_candidate_snapshot` 的 RED，再实现 GREEN。
+- [x] 实现：`formal_submission_package_summary` 新增 `approved_candidate_snapshot` 聚合字段，并在 `visible_summary` 中加入 `approved_candidate_authority`，明确 `paper.pdf` 是当前正式包权威稿，`paper_candidate.pdf` 是后续草案/历史候选。
+- [x] 真实运行：重跑 `Program/formal_submission_package_summary.py --project-root .`，输出 `status=ready_for_manual_acceptance`、`approved_candidate_snapshot.status=available`、`authority=formal_pdf_final_writeback`、`current_candidate.treatment=historical_candidate_or_next_draft`。
+- [x] 验证：目标测试 1 OK；summary 测试 5 OK；相邻 P6-H1/H2/H3 链路 11 OK；Python 编译通过；真实 summary review 已列出“权威稿”摘要。
+- [ ] 下一步 P6-H4：把正式包验收摘要接入一个 CLI 级人工验收记录节点，记录用户是否接受 PDF/DOCX，而不是继续生成新候选稿。

@@ -1,0 +1,91 @@
+{
+  "schema_version": "p6.formal_package_provenance_lock_check.v1",
+  "generated_at": "2026-05-27T05:02:31.304343+00:00",
+  "status": "ready_for_manual_acceptance_with_provenance_warning",
+  "final_package_acceptance": {
+    "can_continue_manual_acceptance": true,
+    "status": "available"
+  },
+  "final_writeback": {
+    "path": "Results/json/formal_pdf_final_writeback.json",
+    "exists": true,
+    "status": "final_pdf_written",
+    "source_candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",
+    "source_candidate_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+    "final_pdf": "Submissions/formal_package/paper.pdf",
+    "final_pdf_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0"
+  },
+  "candidate_source_lock": {
+    "status": "drifted",
+    "path": "Submissions/formal_package/paper_candidate.pdf",
+    "exists": true,
+    "recorded_bytes": 107169,
+    "current_bytes": 107169,
+    "recorded_sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+    "current_sha256": "07bcaebc586f445a01fc34b95bb63bec82e5ac57ff465ea4770149da2d38ca88",
+    "warning_reasons": [
+      "candidate_pdf_drifted_from_final_writeback_source",
+      "candidate_pdf_same_size_but_hash_changed"
+    ]
+  },
+  "final_artifact_lock": {
+    "status": "consistent",
+    "artifacts": {
+      "paper_pdf": {
+        "path": "Submissions/formal_package/paper.pdf",
+        "exists": true,
+        "bytes": 107169,
+        "sha256": "1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0",
+        "blocking_reasons": []
+      },
+      "paper_docx": {
+        "path": "Submissions/formal_package/paper.docx",
+        "exists": true,
+        "bytes": 14457,
+        "sha256": "77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc",
+        "blocking_reasons": []
+      }
+    },
+    "blocking_reasons": []
+  },
+  "acceptance_lock": {
+    "status": "ready",
+    "submission_manifest_status": "formal_submission_package_ready",
+    "package_manifest_status": "formal_submission_package_ready",
+    "submission_summary_status": "ready_for_manual_acceptance",
+    "ready_for_manual_acceptance": true,
+    "blocking_reasons": []
+  },
+  "blocking_reasons": [],
+  "warning_reasons": [
+    "candidate_pdf_drifted_from_final_writeback_source",
+    "candidate_pdf_same_size_but_hash_changed"
+  ],
+  "boundary_flags": {
+    "this_command_rendered_pdf": false,
+    "this_command_rendered_docx": false,
+    "this_command_wrote_final_outputs": false,
+    "this_command_wrote_formal_state": false
+  },
+  "formal_state_guard": {
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_actions": [
+    {
+      "id": "freeze_approved_candidate_snapshot",
+      "label": "冻结已批准候选稿快照",
+      "description": "把最终写回时使用的候选稿指纹作为权威快照保存，当前候选稿另列为后续草案。"
+    },
+    {
+      "id": "rerun_short_final_writeback_chain",
+      "label": "重跑短链路写回",
+      "description": "如果当前候选稿才是新的权威草案，重新走最终批准、PDF 写回、DOCX 导出和 manifest 生成。"
+    },
+    {
+      "id": "demote_current_candidate_as_historical",
+      "label": "把当前候选稿降级为历史草案",
+      "description": "保留当前 paper_candidate.pdf，但明确它不是本次 formal package 的来源。"
+    }
+  ]
+}

@@ -1111,4 +1111,14 @@
 - [x] 本地审计：`paper.pdf` hash=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，`paper.docx` hash=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`；`formal_submission_package_summary.json` 当前为 `ready_for_manual_acceptance` 且 `blocking_reasons=[]`。
 - [x] Agent Team 复核发现：最终 `paper.pdf` 与 `paper.docx` 包自身一致，但当前磁盘上的 `Submissions/formal_package/paper_candidate.pdf` hash=`07bcaebc586f445a01fc34b95bb63bec82e5ac57ff465ea4770149da2d38ca88`，与 `formal_pdf_final_writeback.json` 记录的 `source_candidate_sha256=1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0` 不一致。
 - [x] 全量验证：`python3 -m unittest discover -s tests -v` 通过，409 tests OK，skipped=1，用时 272.469s。
-- [ ] 下一步 P6-H1：做 `formal_package_provenance_lock_check` 小节点，只比较 final writeback 记录、当前 candidate PDF、最终 PDF、docx 和 submission manifest 的 provenance 一致性；不重渲染、不导出、不改正式层。若 candidate 漂移确认存在，输出锁定报告并决定是冻结批准时 candidate、重新跑短链审批，还是把 candidate 从最终验收视图中降级为历史候选。
+- [x] 下一步 P6-H1：做 `formal_package_provenance_lock_check` 小节点，只比较 final writeback 记录、当前 candidate PDF、最终 PDF、docx 和 submission manifest 的 provenance 一致性；不重渲染、不导出、不改正式层。若 candidate 漂移确认存在，输出锁定报告并决定是冻结批准时 candidate、重新跑短链审批，还是把 candidate 从最终验收视图中降级为历史候选。
+
+## 2026-05-27 P6-H1 Formal Package Provenance Lock Check
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只做正式投稿包来源锁校验，不重渲染 PDF，不导出 DOCX，不改 `state/product/*`，不改写 final package 产物。
+- [x] Agent Team：复用 Franklin sidecar 做只读复核，主线不等待空转；sidecar 要求只输出当前 provenance 状态、P6-H1 应检测的 warning/blocker 和 acceptance tests。
+- [x] BDD/TDD：新增 Behavior 44 和 `tests/test_formal_package_provenance_lock_check.py`；RED 为缺少 `Program/formal_package_provenance_lock_check.py`，GREEN 后覆盖来源锁定、候选稿漂移 warning、最终 PDF hash 破坏 blocker、summary 未 ready blocker 和输入文件不变。
+- [x] 实现：新增 `Program/formal_package_provenance_lock_check.py` 和 `Program/workbench/formal_package_provenance_lock_check.py`，读取 final writeback、docx export、submission manifest、summary 和包内 manifest，写出 `Results/json/formal_package_provenance_lock_check.json` 与 `Reviews/formal_package_provenance_lock_check.md`。
+- [x] 真实运行：CLI 输出 `status=ready_for_manual_acceptance_with_provenance_warning`、`can_continue_manual_acceptance=true`；最终 `paper.pdf` 与 `paper.docx` 产物锁一致，当前 `paper_candidate.pdf` 相对最终写回记录发生漂移，且 bytes 同为 107169 但 sha256 不同，warning=`candidate_pdf_drifted_from_final_writeback_source`、`candidate_pdf_same_size_but_hash_changed`。
+- [x] 验证：目标测试 4 OK；相邻正式包链路回归 18 OK；真实 CLI 运行通过；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_final_outputs=false`、`this_command_wrote_formal_state=false`。
+- [ ] 下一步 P6-H2：用 20 分钟小节点处理 candidate 漂移决策。推荐先做 `freeze_approved_candidate_snapshot`：保存最终写回时的权威 candidate 指纹和来源说明，把当前 `paper_candidate.pdf` 标成“后续草案/历史候选”，避免用户验收时把候选层和正式层混在一起。

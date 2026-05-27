@@ -1803,6 +1803,103 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
         self.assertEqual(approved_findings_path.read_text(encoding="utf-8"), approved_findings_before)
 
+    def test_bdd_11_10_approved_claim_proposal_creates_patch_without_formal_writeback(self) -> None:
+        """行为 16.10：已批准草案论断只能先生成正式层补丁提案。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        section_path = self.project_root / "Manuscripts" / "sections" / "main-results.md"
+        section_path.parent.mkdir(parents=True)
+        section_path.write_text("# Main Results\n\n草案正文。\n", encoding="utf-8")
+        section_before = section_path.read_text(encoding="utf-8")
+
+        results_dir = self.project_root / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        approved_findings_path = results_dir / "approved_findings.json"
+        approved_findings_path.write_text(
+            json.dumps({"findings": [{"finding_id": "finding_without_claim", "review_status": "approved"}]}),
+            encoding="utf-8",
+        )
+        approved_findings_before = approved_findings_path.read_text(encoding="utf-8")
+
+        proposal_id = "main-results::finding_without_claim::claim_proposal"
+        review_path = results_dir / "manuscript_claim_proposal_review.json"
+        review_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p6.manuscript_claim_proposal_review.v1",
+                    "status": "claim_proposal_approved_for_promotion",
+                    "promotion_allowed": True,
+                    "promoted_to_claims": False,
+                    "formal_writeback_allowed": False,
+                    "source_claim_ledger": "Results/json/manuscript_section_claim_ledger.json",
+                    "proposal": {
+                        "proposal_id": proposal_id,
+                        "section": "Main Results",
+                        "proposed_claim_text": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199。",
+                        "source_finding_id": "finding_without_claim",
+                        "source_table_id": "regression_table_1",
+                        "coefficient": 0.199384322747,
+                        "standard_error": 0.0793435494782,
+                        "p_value": 0.0119807291718,
+                        "nobs": 34315,
+                        "review_status": "needs_human_review",
+                    },
+                    "human_review": {
+                        "proposal_id": proposal_id,
+                        "action": "approve",
+                        "reviewer": "mahaoxuan",
+                        "note": "同意作为下一步正式论断写回候选。",
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        completed = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_claim_promotion_patch.py"),
+                "--project-root",
+                str(self.project_root),
+                "--review-report",
+                "Results/json/manuscript_claim_proposal_review.json",
+                "--target-approved-findings",
+                "Results/json/approved_findings.json",
+                "--output-report",
+                "Results/json/manuscript_claim_promotion_patch.json",
+                "--output-review",
+                "Reviews/manuscript_claim_promotion_patch.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+        patch = json.loads((results_dir / "manuscript_claim_promotion_patch.json").read_text(encoding="utf-8"))
+        self.assertEqual(patch["status"], "claim_promotion_patch_ready")
+        self.assertTrue(patch["ready_for_apply"])
+        self.assertFalse(patch["applied"])
+        self.assertFalse(patch["formal_writeback_allowed"])
+        operation = patch["patch_operations"][0]
+        self.assertEqual(operation["type"], "add_claim_to_approved_finding")
+        self.assertEqual(operation["target_path"], "Results/json/approved_findings.json")
+        self.assertEqual(operation["source_finding_id"], "finding_without_claim")
+        self.assertEqual(operation["source_table_id"], "regression_table_1")
+        self.assertEqual(operation["proposal_id"], proposal_id)
+        self.assertIn("ln_robot", operation["claim_text"])
+        self.assertEqual(patch["human_review_evidence"]["action"], "approve")
+        self.assertFalse(patch["formal_state_guard"]["changed"])
+        self.assertEqual(patch["next_action"]["id"], "apply_claim_promotion_patch_after_human_confirm")
+        self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+        self.assertEqual(approved_findings_path.read_text(encoding="utf-8"), approved_findings_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

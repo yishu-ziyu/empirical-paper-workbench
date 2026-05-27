@@ -337,6 +337,19 @@
 
 业务规则：缺 claim 不能让流程停在“发现问题”。系统应把真实回归证据整理成可审阅的草案论断提案，让用户或 VerifierAgent 判断是否批准为正式 finding claim。提案不是正式结论，必须保留人工审阅门。
 
+## 行为 16.9：草案论断提案必须经过显式人工审阅才能进入下一步
+
+**Given** `manuscript_section_claim_ledger.json` 中存在 `claim_proposals`
+**And** proposal 的 `review_status` 是 `needs_human_review`
+**When** 用户显式提交 `approve`、`reject` 或 `needs_revision` 审阅动作
+**Then** 系统必须写出独立的 claim proposal review ledger
+**And** ledger 必须记录 proposal id、审阅动作、审阅人、审阅备注、来源 finding、来源表和 proposed claim text
+**And** `approve` 只能把 proposal 标记为 `approved_for_promotion`
+**And** 本步骤不得把 proposal 直接写入 `claims`
+**And** 本步骤不得改写 `approved_findings.json`、章节草案或 `state/product/*` 正式层文件。
+
+业务规则：人工同意是进入下一步的门槛，不等于本节点已经完成正式论断写回。这样可以把“人类判断”变成可审计的状态，而不是在代码里静默把草案升格成正式结论。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

@@ -61,7 +61,14 @@
 - [x] P6-J2 真实运行：用本机 `A004CGSS中国综合社会调查` 目录生成 `Results/json/cgss_social_capital_happiness_data_discovery.json` 与 `Reviews/cgss_social_capital_happiness_data_discovery.md`；推荐 `CGSS2023.dta`，样本量 11326，字段数 439，状态为 `needs_human_dataset_binding_review`。
 - [x] P6-J2 正式层边界：本节点只写数据发现 JSON 和审阅 Markdown，不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`。
 - [x] P6-J2 验证：目标测试 4 OK；相邻 topic audit / variable discovery 回归合计 9 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-J3：把 DatasetBinding 草案接到变量角色草案入口，要求只读取已推荐 CGSS2023 的字段画像，生成“为什么选这些变量”的专家式审阅说明；仍不写正式变量角色。
+- [x] P6-J3 Agent Team：派发 Gibbs 只读定位 DatasetBinding -> 变量角色草案的最小接入点；回收结论为优先做草案层 DatasetBinding 约束过滤，不能改 `state/product/variable_roles.json`、DesignSpec、RunPlan 或正式包。
+- [x] P6-J3 BDD/TDD：新增 `tests/test_cgss_dataset_bound_variable_role_draft.py`，先确认缺少 `Program.workbench.cgss_dataset_bound_variable_role_draft` 的 RED，再实现 DatasetBinding 约束后的变量角色草案模块和 CLI。
+- [x] P6-J3 实现：新增 `Program/workbench/cgss_dataset_bound_variable_role_draft.py` 和 `Program/run_cgss_dataset_bound_variable_role_draft.py`；只读取推荐数据集 CGSS2023 对应的候选变量，输出因变量、社会资本多维题项和控制变量的选择理由。
+- [x] P6-J3 真实运行：写出 `Results/json/cgss_social_capital_happiness_dataset_bound_variable_role_draft.json` 与 `Reviews/cgss_social_capital_happiness_dataset_bound_variable_role_draft.md`；状态为 `needs_human_dataset_bound_role_review`，推荐数据为 CGSS2023，样本量 11326，字段数 439。
+- [x] P6-J3 变量草案：因变量为 `happiness <- a36`；社会资本草案为 `a33/a31a/a31b/a311` 多维结构；控制变量候选为 `a2/a3a/a7a/a7b/a15/a18/a21/a8a/a8b/s41`；2021/2018 候选只保留为排除计数和后续稳健性候选，不进入主草案。
+- [x] P6-J3 正式层边界：本节点不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
+- [x] P6-J3 验证：目标测试 4 OK；真实 CLI 运行通过；审阅 Markdown 已包含数据绑定、变量理由、审阅门禁和正式层边界。
+- [ ] 下一步 P6-J4：进入 DesignSpec 草案入口，把已绑定数据和变量角色草案转成“横截面 OLS/Ordered Logit 的设计说明、不可用 DID/IV/RDD 的原因、需要文献支持的识别风险”；仍不写正式 DesignSpec。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -115,7 +115,11 @@
 - [x] P6-L 真实运行：`python3 Program/cgss_reviewer_revision_loop.py` 写出 `Reviews/cgss_social_capital_happiness_reviewer_report.md`、`Reviews/cgss_social_capital_happiness_revision_task_queue.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`；状态为 `needs_human_revision_review`，生成 6 条修订任务。
 - [x] P6-L 审稿覆盖：覆盖论文结构、文献综述、数据和变量、识别策略、结果解释、稳健性缺口、投稿规范缺口和需要人类判断的问题。
 - [x] P6-L 正式层边界：本节点只写草案层审稿报告、修订任务队列和 Rev1 草稿；不写正式 manuscript、不写正式 bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`。
-- [ ] 下一步 P6-M：形成 `workspace/paper_packages/cgss_social_capital_happiness/` 可验收 paper package，汇总 paper、PDF/HTML 预检、证据包、文献包、方法门、审稿报告、修订队列、复现 README 和 manifest。
+- [x] P6-M BDD/TDD：新增 `tests/test_cgss_paper_package_builder.py`，先确认缺少 `Program.workbench.cgss_paper_package_builder` 的 RED，再实现可验收 paper package builder。
+- [x] P6-M 实现：新增 `Program/workbench/cgss_paper_package_builder.py` 和 `Program/cgss_paper_package_builder.py`；汇总 Rev1 paper、PDF/HTML 预检产物、结果证据包、文献综述草稿包、方法门、审稿报告、修订队列、复现 README 和 manifest。
+- [x] P6-M 真实运行：`python3 Program/cgss_paper_package_builder.py` 写出 `workspace/paper_packages/cgss_social_capital_happiness/`；状态为 `needs_human_paper_package_review`，`rendered_artifact=paper.pdf`，共 9 个文件。
+- [x] P6-M 验收边界：manifest 标记真实运行产物、草稿层产物和需要人工审阅产物；本节点不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`。
+- [ ] 下一步人工审阅：打开 package 下的 `paper.md`、`paper.pdf`、`method_gate.md`、`reviewer_report.md`、`revision_task_queue.md` 和 `manifest.json`，决定是否批准进入正式层或继续 Rev2 修订。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

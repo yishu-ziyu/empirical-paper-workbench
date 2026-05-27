@@ -1,0 +1,82 @@
+{
+  "schema_version": "p6.cgss_paper_package.v1",
+  "generated_at": "2026-05-27T14:33:33.885921+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析",
+  "package_dir": "workspace/paper_packages/cgss_social_capital_happiness",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "boundary_flags": {
+    "modified_formal_manuscript": false,
+    "modified_verified_bibliography": false,
+    "modified_product_state": false
+  },
+  "files": [
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md",
+      "target": "paper.md",
+      "kind": "draft_layer"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Results/json/cgss_social_capital_happiness_results_evidence_package.json",
+      "target": "results_evidence_package.json",
+      "kind": "real_run"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json",
+      "target": "literature_review_packet.json",
+      "kind": "draft_layer"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Reviews/cgss_social_capital_happiness_method_gate.md",
+      "target": "method_gate.md",
+      "kind": "human_review_required"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Reviews/cgss_social_capital_happiness_reviewer_report.md",
+      "target": "reviewer_report.md",
+      "kind": "human_review_required"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Reviews/cgss_social_capital_happiness_revision_task_queue.md",
+      "target": "revision_task_queue.md",
+      "kind": "human_review_required"
+    },
+    {
+      "source": "/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/Submissions/cgss_social_capital_happiness/paper.pdf",
+      "target": "paper.pdf",
+      "kind": "real_run"
+    },
+    {
+      "source": "",
+      "target": "reproducibility_readme.md",
+      "kind": "generated_package_metadata"
+    },
+    {
+      "source": "",
+      "target": "manifest.json",
+      "kind": "generated_package_metadata"
+    }
+  ],
+  "warnings": [],
+  "rendered_artifact": "paper.pdf",
+  "real_run_artifacts": [
+    "results_evidence_package.json",
+    "paper.pdf"
+  ],
+  "draft_layer_artifacts": [
+    "paper.md",
+    "literature_review_packet.json"
+  ],
+  "human_review_required": [
+    "method_gate.md",
+    "reviewer_report.md",
+    "revision_task_queue.md"
+  ],
+  "status": "needs_human_paper_package_review",
+  "missing_targets": [],
+  "next_tasks": [
+    "human_open_paper_md_and_pdf",
+    "human_review_method_gate_reviewer_report_revision_queue",
+    "decide_formal_layer_promotion_or_next_revision"
+  ]
+}

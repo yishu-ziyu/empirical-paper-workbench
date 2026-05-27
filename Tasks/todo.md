@@ -90,7 +90,12 @@
 - [x] P6-J6b 实现：新增 `Program/workbench/cgss_run_plan_seed_executor.py` 和 `Program/cgss_run_plan_seed_executor.py`；未批准时生成阻断记录，批准后执行 OLS、Ordered Logit，并合并 `cgss_social_capital_happiness_results_evidence_package`。
 - [x] P6-J6b 真实运行：先验证无 approved seed 时 `status=blocked_run_plan_seed_not_approved`；随后用目标模式继续指令记录草案层 approve sidecar，再真实执行 CGSS OLS 与 Ordered Logit，输出 `Results/json/cgss_social_capital_happiness_run_plan_seed_execution.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed_execution.md`。
 - [x] P6-J6b 正式层边界：本节点仍不写正式 RunPlan、不写 `state/product/*`、不把结果升级为正式结论；模型结果进入 `completed_needs_human_result_review`，证据包进入 `ready_for_paper_draft_input`。
-- [ ] 下一步 P6-J7：把结果证据包路由到 Manuscript 草案章节，生成“数据与变量 / 模型设定 / 实证结果”三段可审阅正文，并补最低字数、引用占位和证据绑定检查。
+- [x] P6-J7 BDD/TDD：新增 `tests/test_cgss_manuscript_section_router.py`，先确认缺少 `Program.workbench.cgss_manuscript_section_router` 的 RED，再实现结果证据包到论文章节草案的路由器。
+- [x] P6-J7 实现：新增 `Program/workbench/cgss_manuscript_section_router.py` 和 `Program/cgss_manuscript_section_router.py`；把结果证据包和文献综述草稿包转成 4 个可审阅章节：文献综述与研究贡献、数据与变量、实证策略、主要实证结果。
+- [x] P6-J7 真实运行：写出 `Reviews/cgss_social_capital_happiness_manuscript_sections.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_sections/*.md`；状态为 `needs_human_manuscript_section_review`，4 个章节均达到最低中文字符门槛，合计 2996 字符。
+- [x] P6-J7 正式层边界：本节点只写草案层章节和审阅报告，不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`；`Results/json/cgss_social_capital_happiness_manuscript_sections.json` 受 `.gitignore` 忽略，作为本地运行产物保留。
+- [x] P6-J7 验证：目标测试 3 OK；相邻 CGSS 结果证据包 / RunPlan seed 执行器 / 文献综述草稿包回归 15 OK；Python 编译通过；P6-J7 相关文件 scoped `git diff --check` 通过。全局 `git diff --check` 被无关前端测试文件 `tests/test_p3_task_brief_demo.py` 的历史尾随空格阻断，未纳入本节点。
+- [ ] 下一步 P6-J8：把 4 个分节草稿组装成完整探索性论文 Markdown，生成 paper assembly JSON 和人工审阅报告；最低目标为完整正文不少于 5000 个中文字符，仍只进入草案层。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

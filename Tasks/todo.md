@@ -1022,3 +1022,12 @@
 - [x] 实现：新增 `Program/manuscript_section_semantic_review.py` 和 `Program/workbench/manuscript_section_semantic_review.py`，读取 `manuscript_section_draft_expansion_report.json` 与章节草案，只读生成 semantic review JSON 和人工审阅 Markdown。
 - [x] 真实运行：CLI 输出 `status=semantic_review_passed`、`passed=1`、`needs_revision=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_semantic_review.json` 和 `Reviews/manuscript_section_semantic_review.md`。
 - [x] 验证：目标测试 1 OK；paper package quality 回归 18 OK；Python 编译通过；真实 CLI 运行通过。
+
+## 2026-05-27 P6-G6d Main Results Claim Ledger
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只把通过语义核验的 `Main Results` 转成草案层 claim ledger，不扩写正文、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：按要求尝试新建 Verifier sidecar 复核节点，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把下一次 Agent Team 调用点写入 claim ledger。
+- [x] BDD/TDD：新增 Behavior 16.6 和 16.7，覆盖“通过语义核验的章节必须生成论断账本”和“缺少已审批论断文本时不得编造 claim”；RED 为缺少 `Program/manuscript_section_claim_ledger.py`，GREEN 后覆盖 ready ledger、needs_revision ledger、正式层不改写和 Agent Team 调用节奏。
+- [x] 实现：新增 `Program/manuscript_section_claim_ledger.py` 和 `Program/workbench/manuscript_section_claim_ledger.py`，读取 `manuscript_section_semantic_review.json` 与 `approved_findings.json`，只把章节中真实出现且已有 approved claim text 的论断写入账本。
+- [x] 真实运行：当前真实 `Results/json/approved_findings.json` 的 approved finding 仍缺 `claim` 文本，因此 CLI 输出 `status=claim_ledger_needs_revision`、`claims=0`、`needs_revision=1`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_claim_ledger.json` 和 `Reviews/manuscript_section_claim_ledger.md`，缺口为 `no_approved_finding_claim_detected_in_section`。
+- [x] 验证：新增目标测试 OK；paper package quality 回归 20 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。

@@ -86,7 +86,11 @@
 - [x] P6-J6a 真实运行：默认 `defer` 写出 `Results/json/cgss_social_capital_happiness_run_plan_seed_approval.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed_approval.md`；状态为 `pending_human_run_plan_seed_decision`，未生成 approved seed。
 - [x] P6-J6a 正式层边界：本节点不写正式 RunPlan、不运行模型、不写 `state/product/*`；批准后的 sidecar 仍只允许进入草案执行。
 - [x] P6-J6a 验证：目标测试 5 OK；CGSS RunPlan/DesignSpec/OLS/Ordered Logit 相邻回归 18 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-J6b：若用户明确批准 RunPlan seed，生成 `cgss_social_capital_happiness_run_plan_seed_approved.json`，然后按 seed 执行 OLS 和 Ordered Logit，并合并生成 CGSS 结果证据包；若选择修订或拒绝，先更新 RunPlan seed，不直接跑模型。
+- [x] P6-J6b BDD/TDD：新增 `tests/test_cgss_run_plan_seed_executor.py`，先确认缺少 `Program.workbench.cgss_run_plan_seed_executor` 的 RED，再实现 approved seed 执行器和 CLI。
+- [x] P6-J6b 实现：新增 `Program/workbench/cgss_run_plan_seed_executor.py` 和 `Program/cgss_run_plan_seed_executor.py`；未批准时生成阻断记录，批准后执行 OLS、Ordered Logit，并合并 `cgss_social_capital_happiness_results_evidence_package`。
+- [x] P6-J6b 真实运行：先验证无 approved seed 时 `status=blocked_run_plan_seed_not_approved`；随后用目标模式继续指令记录草案层 approve sidecar，再真实执行 CGSS OLS 与 Ordered Logit，输出 `Results/json/cgss_social_capital_happiness_run_plan_seed_execution.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed_execution.md`。
+- [x] P6-J6b 正式层边界：本节点仍不写正式 RunPlan、不写 `state/product/*`、不把结果升级为正式结论；模型结果进入 `completed_needs_human_result_review`，证据包进入 `ready_for_paper_draft_input`。
+- [ ] 下一步 P6-J7：把结果证据包路由到 Manuscript 草案章节，生成“数据与变量 / 模型设定 / 实证结果”三段可审阅正文，并补最低字数、引用占位和证据绑定检查。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

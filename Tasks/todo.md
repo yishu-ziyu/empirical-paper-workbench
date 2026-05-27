@@ -1,5 +1,16 @@
 # Todo
 
+## 2026-05-28 P7-A Dataset Motherlode Index
+
+- [x] 节点目标：把用户本地公开实证数据库母库接入 Empirical Research OS 的 DataAgent 起点，形成只读、可搜索、可人工审阅的数据源 manifest。
+- [x] BDD/TDD：新增 `tests/test_dataset_motherlode_index.py`，覆盖只读数据源登记、数据族 metadata 扫描、工业机器人/劳动力题目匹配、嵌套路径关键词提示、隐藏系统文件过滤、JSON/Markdown 输出。
+- [x] 实现范围：新增 `Program/workbench/dataset_motherlode_index.py` 和 `Program/dataset_motherlode_index.py`；新增计划 `docs/superpowers/plans/2026-05-28-dataset-motherlode-index.md`。
+- [x] 真实运行：`python3 Program/dataset_motherlode_index.py --project-root . --data-root "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库" --topic "工业机器人对劳动力市场匹配效率的影响"` 写出 `Results/json/dataset_motherlode_index.json` 与 `Reviews/dataset_motherlode_index.md`。
+- [x] 真实输出：状态为 `needs_human_dataset_index_review`；候选首位为 `外部源数据`，匹配理由包括 `ifr`、`robot`、`工业机器人`、`机器人`；同时返回 CLDS、CFPS、CGSS、CMDS 等候选数据族。
+- [x] 正式层边界：本节点不修改原始数据、不写正式 manuscript、不写正式 bibliography、不写 RunPlan、不写 `state/product/*`。
+- [x] 验证：`python3 -m unittest tests.test_dataset_motherlode_index -v` 通过 6 项；`python3 -m py_compile Program/dataset_motherlode_index.py Program/workbench/dataset_motherlode_index.py tests/test_dataset_motherlode_index.py` 通过；scoped `git diff --check` 通过。
+- [ ] 下一步 P7-B：实现 Literature Discovery / Project Bibliography seed，先做 query planning、source registry、candidate/project bibliography 状态，不把候选文献直接升为正式 bibliography。
+
 ## 2026-05-27 Global Node Execution Contract
 
 - [x] 小节点时间上限：P4/P5/P6 以及后续所有形如 `P*-A/B/C/D`、`P*-G1/G2/H1/H2` 的小节点，单节点最多 20 分钟。

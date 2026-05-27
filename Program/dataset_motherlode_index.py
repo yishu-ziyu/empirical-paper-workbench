@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from Program.workbench.dataset_motherlode_index import (  # noqa: E402
+    DEFAULT_DATA_ROOT,
+    DEFAULT_REPORT_PATH,
+    DEFAULT_REVIEW_PATH,
+    build_dataset_motherlode_index,
+    write_report,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Index the empirical dataset motherlode without formal writeback.")
+    parser.add_argument("--project-root", default=".")
+    parser.add_argument("--data-root", default=str(DEFAULT_DATA_ROOT))
+    parser.add_argument("--topic", default="")
+    parser.add_argument("--output-report", default=str(DEFAULT_REPORT_PATH))
+    parser.add_argument("--output-review", default=str(DEFAULT_REVIEW_PATH))
+    args = parser.parse_args()
+
+    project_root = Path(args.project_root).resolve()
+    report = build_dataset_motherlode_index(Path(args.data_root), args.topic)
+    report_path, review_path = write_report(
+        project_root,
+        report,
+        Path(args.output_report),
+        Path(args.output_review),
+    )
+    print(f"[econ-workbench] dataset_motherlode_index={report_path.relative_to(project_root)}")
+    print(f"[econ-workbench] dataset_motherlode_review={review_path.relative_to(project_root)}")
+    print(f"[econ-workbench] status={report['status']}")
+    return 0 if report["status"] == "needs_human_dataset_index_review" else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,51 @@
+{
+  "schema_version": "p6.manuscript_claim_promotion_patch.v1",
+  "generated_at": "2026-05-27T03:31:41.841108+00:00",
+  "status": "claim_promotion_patch_ready",
+  "source_review_report": "Results/json/manuscript_claim_proposal_review.json",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "ready_for_apply": true,
+  "applied": false,
+  "patch_operations": [
+    {
+      "operation_id": "main-results::finding_trained_effect::claim_proposal::promote_claim",
+      "type": "add_claim_to_approved_finding",
+      "target_path": "Results/json/approved_findings.json",
+      "source_finding_id": "finding_trained_effect",
+      "source_table_id": "regression_table_1",
+      "proposal_id": "main-results::finding_trained_effect::claim_proposal",
+      "claim_text": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199384322747（SE=0.0793435494782, p=0.0119807291718, N=34315）。",
+      "review_report": "Results/json/manuscript_section_claim_ledger.json",
+      "reviewer": "mahaoxuan",
+      "review_note": "同意作为下一步正式论断写回候选。"
+    }
+  ],
+  "human_review_evidence": {
+    "proposal_id": "main-results::finding_trained_effect::claim_proposal",
+    "action": "approve",
+    "reviewer": "mahaoxuan",
+    "note": "同意作为下一步正式论断写回候选。",
+    "reviewed_at": "2026-05-27T03:03:52.587941+00:00"
+  },
+  "blocking_reasons": [],
+  "this_command_wrote_formal_state": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "apply_claim_promotion_patch_after_human_confirm",
+    "owner_agent": "VerifierAgent",
+    "reason": "补丁已生成；下一节点可以在显式确认后应用到正式 finding。"
+  }
+}

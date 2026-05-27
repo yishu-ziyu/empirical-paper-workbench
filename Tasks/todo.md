@@ -1058,3 +1058,11 @@
 - [x] 实现：新增 `Program/manuscript_claim_promotion_patch.py` 和 `Program/workbench/manuscript_claim_promotion_patch.py`，读取 `manuscript_claim_proposal_review.json`，写出 `Results/json/manuscript_claim_promotion_patch.json` 与 `Reviews/manuscript_claim_promotion_patch.md`。
 - [x] 真实运行：CLI 输出 `status=claim_promotion_patch_ready`、`ready_for_apply=true`、`applied=false`、`formal_writeback_allowed=false`；patch operation 指向 `Results/json/approved_findings.json` 中的 `finding_trained_effect`。
 - [x] 验证：新增目标测试 OK；paper package quality 回归 23 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；全量 `python3 -m unittest discover -s tests -v` 为 408 tests OK，skipped=1，耗时 160.148s。
+
+## 2026-05-27 P6-G6h Claim Promotion Apply
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只在显式 `--confirm-apply`、审阅人和备注都存在时，把 claim promotion patch 写入 `Results/json/approved_findings.json`，不写章节、PDF/docx 或 `state/product/*`。
+- [x] BDD/TDD：新增 Behavior 16.11 和 `test_bdd_11_11_explicit_apply_writes_claim_to_approved_finding_only`；RED 为缺少 `Program/manuscript_claim_promotion_apply.py`，GREEN 后覆盖 before/after hash、审阅证据、正式 finding claim 写入和边界文件不变。
+- [x] 实现：新增 `Program/manuscript_claim_promotion_apply.py` 和 `Program/workbench/manuscript_claim_promotion_apply.py`，消费 `manuscript_claim_promotion_patch.json`，写出 apply report 与 review markdown。
+- [x] 真实运行：CLI 输出 `status=claim_promotion_patch_applied`、`applied=true`、`formal_writeback_allowed=true`；真实 `approved_findings.json` 的 `finding_trained_effect.claim` 已写入已审阅论断，并保留 proposal id、source table、reviewer 和 before/after hash。
+- [x] 验证：新增目标测试 OK；paper package quality 回归 24 OK；全量测试 `409 tests OK / skipped=1`；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。

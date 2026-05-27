@@ -1900,6 +1900,120 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
         self.assertEqual(approved_findings_path.read_text(encoding="utf-8"), approved_findings_before)
 
+    def test_bdd_11_11_explicit_apply_writes_claim_to_approved_finding_only(self) -> None:
+        """行为 16.11：正式论断补丁必须经过显式 apply 才能写回 approved findings。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        section_path = self.project_root / "Manuscripts" / "sections" / "main-results.md"
+        section_path.parent.mkdir(parents=True)
+        section_path.write_text("# Main Results\n\n草案正文。\n", encoding="utf-8")
+        section_before = section_path.read_text(encoding="utf-8")
+
+        results_dir = self.project_root / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        approved_findings_path = results_dir / "approved_findings.json"
+        approved_findings_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p5.approved_findings.v1",
+                    "review_status": "ready_for_review",
+                    "findings": [
+                        {
+                            "finding_id": "finding_without_claim",
+                            "review_status": "approved",
+                            "claim": None,
+                            "evidence_level": "local_file",
+                        }
+                    ],
+                    "canonical_write_allowed": False,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        proposal_id = "main-results::finding_without_claim::claim_proposal"
+        claim_text = "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199。"
+        patch_path = results_dir / "manuscript_claim_promotion_patch.json"
+        patch_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p6.manuscript_claim_promotion_patch.v1",
+                    "status": "claim_promotion_patch_ready",
+                    "ready_for_apply": True,
+                    "applied": False,
+                    "formal_writeback_allowed": False,
+                    "patch_operations": [
+                        {
+                            "operation_id": f"{proposal_id}::promote_claim",
+                            "type": "add_claim_to_approved_finding",
+                            "target_path": "Results/json/approved_findings.json",
+                            "source_finding_id": "finding_without_claim",
+                            "source_table_id": "regression_table_1",
+                            "proposal_id": proposal_id,
+                            "claim_text": claim_text,
+                        }
+                    ],
+                    "human_review_evidence": {
+                        "proposal_id": proposal_id,
+                        "action": "approve",
+                        "reviewer": "mahaoxuan",
+                        "note": "同意作为下一步正式论断写回候选。",
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        completed = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_claim_promotion_apply.py"),
+                "--project-root",
+                str(self.project_root),
+                "--patch-report",
+                "Results/json/manuscript_claim_promotion_patch.json",
+                "--output-report",
+                "Results/json/manuscript_claim_promotion_apply.json",
+                "--output-review",
+                "Reviews/manuscript_claim_promotion_apply.md",
+                "--reviewer",
+                "mahaoxuan",
+                "--note",
+                "确认写入正式 finding claim。",
+                "--confirm-apply",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+        apply_report = json.loads((results_dir / "manuscript_claim_promotion_apply.json").read_text(encoding="utf-8"))
+        self.assertEqual(apply_report["status"], "claim_promotion_patch_applied")
+        self.assertTrue(apply_report["formal_writeback_allowed"])
+        self.assertTrue(apply_report["applied"])
+        self.assertTrue(apply_report["this_command_wrote_approved_findings"])
+        self.assertFalse(apply_report["this_command_wrote_sections"])
+        self.assertFalse(apply_report["formal_state_guard"]["changed"])
+        self.assertNotEqual(apply_report["approved_findings_before_sha256"], apply_report["approved_findings_after_sha256"])
+        self.assertEqual(apply_report["applied_operations"][0]["proposal_id"], proposal_id)
+        self.assertEqual(apply_report["application_review"]["reviewer"], "mahaoxuan")
+
+        approved_findings = json.loads(approved_findings_path.read_text(encoding="utf-8"))
+        finding = approved_findings["findings"][0]
+        self.assertEqual(finding["claim"], claim_text)
+        self.assertEqual(finding["claim_source_proposal_id"], proposal_id)
+        self.assertEqual(finding["claim_source_table_id"], "regression_table_1")
+        self.assertEqual(finding["claim_promotion_review"]["note"], "确认写入正式 finding claim。")
+        self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

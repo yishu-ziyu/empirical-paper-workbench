@@ -362,6 +362,17 @@
 
 业务规则：`approve` 之后进入的是“可应用补丁”，不是静默写回。论文状态像 Git 一样先产生 patch，再由后续显式 apply 节点进入正式层。
 
+## 行为 16.11：正式论断补丁必须经过显式 apply 才能写回 approved findings
+
+**Given** `manuscript_claim_promotion_patch.json` 的状态是 `claim_promotion_patch_ready`
+**And** patch operation 指向 `Results/json/approved_findings.json` 中已审批的 finding
+**When** 用户显式运行 apply 命令并提供审阅人、备注和确认开关
+**Then** 系统才可以把 claim 写入目标 finding
+**And** 写回报告必须记录 before/after hash、proposal id、来源表、审阅人和审阅备注
+**And** 本步骤不得改写章节草案、PDF/docx 或 `state/product/*` 正式状态文件。
+
+业务规则：这是草案论断正式进入 finding 的最小写回门。它把“人工同意”落到一个可审计的正式层变更里，但仍不自动继续生成正文或导出。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

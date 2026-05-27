@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_pdf_candidate_review.v1",
-  "generated_at": "2026-05-26T21:13:15.556672+00:00",
+  "generated_at": "2026-05-27T04:27:49.549627+00:00",
   "status": "ready_for_final_approval_review",
   "candidate_layer_only": true,
   "source_candidate_report": "Results/json/formal_pdf_candidate_report.json",

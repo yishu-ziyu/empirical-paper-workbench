@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.formal_pdf_final_writeback_preflight.v1",
-  "generated_at": "2026-05-26T21:13:15.556672+00:00",
+  "generated_at": "2026-05-27T04:27:49.549627+00:00",
   "status": "ready_for_human_final_approval",
   "source_review": "Results/json/formal_pdf_candidate_review.json",
   "candidate_pdf": "Submissions/formal_package/paper_candidate.pdf",

@@ -281,6 +281,21 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         task_ids = {task["id"] for task in plan["agent_task_queue"]}
         self.assertIn("build_literature_package", task_ids)
         self.assertIn("run_method_gate", task_ids)
+        task_by_id = {task["id"]: task for task in plan["agent_task_queue"]}
+        expansion_task = task_by_id["expand_underdeveloped_sections"]
+        self.assertIn("section_expansion_packet", expansion_task)
+        packet = expansion_task["section_expansion_packet"]
+        self.assertEqual(packet["owner_agent"], "ManuscriptAgent")
+        self.assertTrue(packet["draft_layer_only"])
+        self.assertFalse(packet["formal_writeback_allowed"])
+        self.assertIn("no_state_product_writeback", packet["verification"]["required_before_completion"])
+        manuscript_section_tasks = plan["manuscript_section_task_packets"]
+        self.assertTrue(manuscript_section_tasks)
+        packet_by_section = {item["section"]: item for item in manuscript_section_tasks}
+        self.assertIn("Main Results", packet_by_section)
+        self.assertEqual(packet_by_section["Main Results"]["owner_agent"], "ManuscriptAgent")
+        self.assertEqual(packet_by_section["Main Results"]["output_path"], "Manuscripts/sections/main-results.md")
+        self.assertIn("main_regression_table", packet_by_section["Main Results"]["required_evidence"])
 
         manuscript = manuscript_path.read_text(encoding="utf-8")
         for section in [

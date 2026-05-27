@@ -266,6 +266,20 @@
 
 业务规则：章节草案扩写前要先知道“每段话能引用什么证据”。P6-G6a 不写正文，只建立章节到真实 artifact 的证据索引，并把缺口留给后续 Agent 或人工补证。
 
+## 行为 16.4：章节草案扩写必须只消费已绑定证据
+
+**Given** `manuscript_section_evidence_bindings.json` 已经把 Main Results 的主表、approved findings 和系数解释绑定到真实 artifact
+**When** 用户运行 `Program/manuscript_section_draft_expansion.py --section "Main Results"`
+**Then** 系统必须更新 `Manuscripts/sections/main-results.md` 的草案正文
+**And** 系统必须写出 `Results/json/manuscript_section_draft_expansion_report.json`
+**And** 系统必须写出 `Reviews/manuscript_section_draft_expansion.md`
+**And** 该章节必须声明 `status=section_draft_expanded`、`draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** 草案必须列出它实际消费的 evidence id、路径和 hash，不能把未绑定证据写成既成结论
+**And** 如果目标章节仍有 `missing_evidence`，该章节必须阻断扩写并进入人工补证
+**And** 该节点仍然不能改写 `state/product/*`
+
+业务规则：章节扩写是 ManuscriptAgent 的草案层写作动作。它可以把真实证据整理成可审阅段落，但每个论断都必须能回到 evidence binding；正式层写回仍等待人工确认。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

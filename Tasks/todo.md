@@ -1087,3 +1087,10 @@
 - [x] Agent Team：按用户要求尝试派发只读 explorer 定位 PDF 渲染链路，但当前环境返回 `agent thread limit reached`；主 Agent 直接复用既有 `formal_pdf_candidate` 链路，不重复造轮子。
 - [x] 真实运行：`Program/formal_pdf_candidate.py --render-mode auto` 输出 `status=pdf_candidate_ready`、`output_pdf_exists=true`；Quarto 调用 xelatex 完成 3 轮编译，生成 `Submissions/formal_package/paper_candidate.pdf`。
 - [x] 验证：`python3 -m unittest tests.test_formal_pdf_candidate -v` 2 tests OK；候选 PDF bytes=107169，QMD bytes=10886，复跑脚本 bytes=633；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`。
+
+## 2026-05-27 P6-G6l PDF Candidate Machine Review
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只做候选 PDF 机器审阅与最终写回预检，不批准最终 PDF、不复制为 `paper.pdf`、不生成 docx、不写 `state/product/*`。
+- [x] Agent Team：按用户要求尝试派发 Verifier sidecar 复核候选 PDF 审阅入口，但当前环境返回 `agent thread limit reached`；主 Agent 用既有 `formal_pdf_candidate_review` CLI 完成本地可验证闭环。
+- [x] 真实运行：`Program/formal_pdf_candidate_review.py` 输出 `status=ready_for_final_approval_review`、`can_request_final_approval=true`；`formal_pdf_final_writeback_preflight.json` 输出 `status=ready_for_human_final_approval`、`final_writeback_allowed=false`。
+- [x] 验证：`python3 -m unittest tests.test_formal_pdf_candidate_review -v` 2 tests OK；PDF metadata 为 `readable`、pages=10、bytes=107169；机器审阅 10 项检查全部 passed，`formal_state_guard.changed=false`。

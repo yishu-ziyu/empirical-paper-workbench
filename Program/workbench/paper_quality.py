@@ -37,6 +37,64 @@ SECTION_ALIASES = {
 }
 
 
+SECTION_LENGTH_STANDARDS = {
+    "Abstract": {
+        "min_english_words": 100,
+        "max_english_words": 180,
+        "min_chinese_chars": 180,
+        "max_chinese_chars": 300,
+    },
+    "Introduction": {
+        "min_english_words": 1800,
+        "max_english_words": 3000,
+        "min_chinese_chars": 2800,
+        "max_chinese_chars": 5000,
+    },
+    "Literature and Contribution": {
+        "min_english_words": 1000,
+        "max_english_words": 1800,
+        "min_chinese_chars": 1500,
+        "max_chinese_chars": 3000,
+    },
+    "Institutional Background / Theory / Context": {
+        "min_english_words": 800,
+        "max_english_words": 1500,
+        "min_chinese_chars": 1200,
+        "max_chinese_chars": 2500,
+    },
+    "Data and Measurement": {
+        "min_english_words": 800,
+        "max_english_words": 1500,
+        "min_chinese_chars": 1200,
+        "max_chinese_chars": 2500,
+    },
+    "Empirical Strategy": {
+        "min_english_words": 1200,
+        "max_english_words": 2000,
+        "min_chinese_chars": 1800,
+        "max_chinese_chars": 3500,
+    },
+    "Main Results": {
+        "min_english_words": 2000,
+        "max_english_words": 3500,
+        "min_chinese_chars": 3000,
+        "max_chinese_chars": 6000,
+    },
+    "Robustness / Mechanisms / Heterogeneity": {
+        "min_english_words": 1500,
+        "max_english_words": 3000,
+        "min_chinese_chars": 2200,
+        "max_chinese_chars": 5000,
+    },
+    "Conclusion": {
+        "min_english_words": 500,
+        "max_english_words": 800,
+        "min_chinese_chars": 800,
+        "max_chinese_chars": 1300,
+    },
+}
+
+
 @dataclass(frozen=True)
 class LiteraturePackage:
     verified_bibliography: Path | None
@@ -55,6 +113,7 @@ def build_paper_quality_report(
     word_count = count_words(draft_text)
     format_checks = build_format_checks(draft_text, profile)
     section_checks = build_section_checks(draft_text)
+    section_length_checks = build_section_length_checks(draft_text, profile)
     literature = find_literature_package(project_root)
     citation_checks = build_citation_checks(literature)
     method_gate_checks = build_method_gate_checks(project_root)
@@ -63,6 +122,7 @@ def build_paper_quality_report(
         word_count,
         format_checks,
         section_checks,
+        section_length_checks,
         citation_checks,
         method_gate_checks,
         revision_checks,
@@ -71,6 +131,7 @@ def build_paper_quality_report(
         verdict,
         format_checks,
         section_checks,
+        section_length_checks,
         citation_checks,
         method_gate_checks,
         revision_checks,
@@ -84,6 +145,7 @@ def build_paper_quality_report(
         "word_count": word_count,
         "format_checks": format_checks,
         "section_checks": section_checks,
+        "section_length_checks": section_length_checks,
         "citation_checks": citation_checks,
         "method_gate_checks": method_gate_checks,
         "revision_checks": revision_checks,
@@ -113,12 +175,11 @@ def resolve_draft_path(project_root: Path, draft_path: Path | None) -> Path:
 
 
 def count_words(text: str) -> dict[str, Any]:
-    chinese_chars = re.findall(r"[\u4e00-\u9fff]", text)
-    latin_words = re.findall(r"[A-Za-z][A-Za-z0-9_'-]*", text)
+    units = count_text_units(text)
     return {
-        "main_text_words": len(latin_words),
-        "main_text_chinese_chars": len(chinese_chars),
-        "approx_total_units": len(latin_words) + len(chinese_chars),
+        "main_text_words": units["english_word_count"],
+        "main_text_chinese_chars": units["chinese_char_count"],
+        "approx_total_units": units["english_word_count"] + units["chinese_char_count"],
         "thresholds": {
             "english_min_words": 7000,
             "english_target_words": "9000-14000",
@@ -128,6 +189,12 @@ def count_words(text: str) -> dict[str, Any]:
             "chinese_target_chars": "12000-18000",
         },
     }
+
+
+def count_text_units(text: str) -> dict[str, int]:
+    chinese_chars = re.findall(r"[\u4e00-\u9fff]", text)
+    latin_words = re.findall(r"[A-Za-z][A-Za-z0-9_'-]*", text)
+    return {"english_word_count": len(latin_words), "chinese_char_count": len(chinese_chars)}
 
 
 def build_format_checks(text: str, profile: str) -> dict[str, Any]:
@@ -218,6 +285,69 @@ def build_section_checks(text: str) -> dict[str, Any]:
         "detected_headings": headings,
         "status": "passed" if not missing else "needs_expansion",
     }
+
+
+def build_section_length_checks(text: str, profile: str) -> dict[str, Any]:
+    sections: dict[str, Any] = {}
+    too_short_sections: list[str] = []
+    too_long_sections: list[str] = []
+    missing_sections: list[str] = []
+    for section in REQUIRED_SECTIONS:
+        if section == "References":
+            sections[section] = {
+                "status": "not_applicable",
+                "reason": "references_are_checked_by_citation_package",
+            }
+            continue
+        standard = section_length_standard(section, profile)
+        body = extract_section_body(text, section)
+        units = count_text_units(body)
+        if not body:
+            status = "missing"
+            missing_sections.append(section)
+        elif units["english_word_count"] < standard["min_english_words"] and (
+            units["chinese_char_count"] < standard["min_chinese_chars"]
+        ):
+            status = "too_short"
+            too_short_sections.append(section)
+        elif units["english_word_count"] > standard["max_english_words"] or (
+            units["chinese_char_count"] > standard["max_chinese_chars"]
+        ):
+            status = "too_long"
+            too_long_sections.append(section)
+        else:
+            status = "passed"
+        sections[section] = {
+            **units,
+            **standard,
+            "status": status,
+            "target_english_words": f"{standard['min_english_words']}-{standard['max_english_words']}",
+            "target_chinese_chars": f"{standard['min_chinese_chars']}-{standard['max_chinese_chars']}",
+        }
+
+    if missing_sections or too_short_sections:
+        status = "needs_expansion"
+    elif too_long_sections:
+        status = "needs_compression"
+    else:
+        status = "passed"
+    return {
+        "profile": profile,
+        "sections": sections,
+        "summary": {
+            "missing_sections": missing_sections,
+            "too_short_sections": too_short_sections,
+            "too_long_sections": too_long_sections,
+        },
+        "status": status,
+    }
+
+
+def section_length_standard(section: str, profile: str) -> dict[str, int]:
+    standard = dict(SECTION_LENGTH_STANDARDS[section])
+    if profile == "aer_like" and section == "Abstract":
+        standard["max_english_words"] = 100
+    return standard
 
 
 def extract_headings(text: str) -> list[str]:
@@ -375,6 +505,7 @@ def build_verdict(
     word_count: dict[str, Any],
     format_checks: dict[str, Any],
     section_checks: dict[str, Any],
+    section_length_checks: dict[str, Any],
     citation_checks: dict[str, Any],
     method_gate_checks: dict[str, Any],
     revision_checks: dict[str, Any],
@@ -386,6 +517,8 @@ def build_verdict(
         verdict.append("format_gate_required")
     if section_checks["status"] != "passed":
         verdict.append("missing_sections")
+    if section_length_checks["status"] != "passed":
+        verdict.append("section_length_gate_required")
     if citation_checks["status"] != "passed":
         verdict.append("needs_literature_review")
     if method_gate_checks["status"] != "found":
@@ -399,6 +532,7 @@ def build_recommended_next_tasks(
     verdict: list[str],
     format_checks: dict[str, Any],
     section_checks: dict[str, Any],
+    section_length_checks: dict[str, Any],
     citation_checks: dict[str, Any],
     method_gate_checks: dict[str, Any],
     revision_checks: dict[str, Any],
@@ -413,6 +547,23 @@ def build_recommended_next_tasks(
                 "inputs": section_checks.get("missing_sections", []),
             }
         )
+    if "section_length_gate_required" in verdict:
+        thin_sections = build_underdeveloped_section_inputs(section_length_checks)
+        if thin_sections:
+            tasks.append(
+                {
+                    "id": "expand_underdeveloped_sections",
+                    "agent": "ManuscriptAgent",
+                    "reason": "核心章节已存在，但篇幅没有达到 working paper 可审阅的最低厚度。",
+                    "inputs": thin_sections,
+                    "verification": {
+                        "required_before_completion": [
+                            "section_length_checks.status=passed",
+                            "updated_section_drafts",
+                        ]
+                    },
+                }
+            )
     if "format_gate_required" in verdict:
         tasks.append(
             {
@@ -450,6 +601,34 @@ def build_recommended_next_tasks(
             }
         )
     return tasks
+
+
+def build_underdeveloped_section_inputs(section_length_checks: dict[str, Any]) -> list[dict[str, Any]]:
+    sections = section_length_checks.get("sections", {})
+    summary = section_length_checks.get("summary", {})
+    section_names = [
+        *summary.get("missing_sections", []),
+        *summary.get("too_short_sections", []),
+        *summary.get("too_long_sections", []),
+    ]
+    inputs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for section in section_names:
+        if section in seen:
+            continue
+        seen.add(section)
+        check = sections.get(section, {})
+        inputs.append(
+            {
+                "section": section,
+                "status": check.get("status"),
+                "english_word_count": check.get("english_word_count", 0),
+                "chinese_char_count": check.get("chinese_char_count", 0),
+                "target_english_words": check.get("target_english_words"),
+                "target_chinese_chars": check.get("target_chinese_chars"),
+            }
+        )
+    return inputs
 
 
 def relative_or_absolute(path: Path, project_root: Path) -> str:

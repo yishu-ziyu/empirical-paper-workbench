@@ -84,6 +84,11 @@
 - [x] P6-F2 BDD/TDD：新增行为 41，新增 `tests/test_p6_formal_package_acceptance_surface.py`，先确认缺少正式包验收台的 RED，再实现最小 UI 接面。
 - [x] P6-F2 实现：新增 `FormalPackageAcceptancePanel`，在 Agent 账本真实执行授权后读取 `GET /api/v1/projects/{project_id}/formal-submission-package-summary`，展示只读验收摘要、PDF/DOCX 打开目标、人工验收清单、一致性检查和阻断原因。
 - [x] P6-F2 验证：目标测试、相邻回归、React build、`git diff --check` 和 Playwright 浏览器验收通过；截图写入 `artifacts/ui-checks/p6-formal-package-acceptance.png`。
+- [x] P6-G1 节点节奏：本节点限定为 20 分钟内完成“逐章长度 quality gate”，不扩展 UI、PDF 或正式写回。
+- [x] P6-G1 Agent Team 调用：Franklin 只读定位 paper quality/BDD/test 挂载点，Mill 调研 AEA/AER/AEJ 可机器化长度与结构规则；主 Agent 回收后只落地逐章长度 gate。
+- [x] P6-G1 BDD/TDD：新增行为 2.1 和目标测试，先确认“全文够长但核心章节过薄”不会被现有 quality gate 抓住的 RED。
+- [x] P6-G1 实现：`paper_quality_report.json` 新增 `section_length_checks`，逐章记录英文词数、中文字符数、目标区间和状态；`verdict` 新增 `section_length_gate_required`；`recommended_next_tasks` 新增 `expand_underdeveloped_sections`。
+- [x] P6-G1 真实运行：当前 CFPS/机器人草稿被点名 Data、Empirical Strategy、Main Results、Robustness 四个章节过薄，已写入 `Results/json/paper_quality_report.json`，供下一轮 ManuscriptAgent 扩写。
 
 ### Agent Team 调用节奏
 

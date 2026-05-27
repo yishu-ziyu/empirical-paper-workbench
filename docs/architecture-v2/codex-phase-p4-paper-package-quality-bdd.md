@@ -46,6 +46,18 @@
 
 业务规则：论文可以先生成短草稿，但短草稿必须自动进入扩写队列。
 
+## 行为 2.1：章节存在但篇幅不足也必须进入质量门
+
+**Given** 草稿总字数已经超过 working paper 最低门槛
+**And** Literature、Data、Empirical Strategy、Results 或 Robustness 等核心章节只是占位文本
+**When** 系统生成 quality report
+**Then** `section_length_checks` 必须逐章给出英文词数、中文字符数、目标区间和状态
+**And** 低于章节最低门槛的章节状态为 `too_short`
+**And** `verdict` 包含 `section_length_gate_required`
+**And** `recommended_next_tasks` 包含 `expand_underdeveloped_sections`，并列出需要扩写的具体章节。
+
+业务规则：论文不能靠堆长某一个章节通过验收；每个核心研究章节都要达到可审阅的最小厚度。
+
 ## 行为 3：文献综述必须检查 bibliography 闭环
 
 **Given** 项目存在或缺失 `verified_bibliography.csv` 与 `contribution_matrix.md`  

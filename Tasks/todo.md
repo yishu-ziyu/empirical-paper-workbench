@@ -46,7 +46,11 @@
 - [x] P6-I14 实现：新增 `Program/workbench/cgss_revision_queue_approval.py` 和 `Program/cgss_revision_queue_approval.py`；支持 `defer/approve/revise/reject`，其中 `approve` 必须带 reviewer 和 note，才生成 `Results/json/cgss_social_capital_happiness_revision_task_queue_approved.json`。
 - [x] P6-I14 真实运行：默认 `defer` 写出 `Results/json/cgss_social_capital_happiness_revision_queue_approval.json` 与 `Reviews/cgss_social_capital_happiness_revision_queue_approval.md`；状态为 `pending_human_revision_queue_decision`，未生成 approved queue。
 - [x] P6-I14 验证：approval/queue/work-order 目标测试 17 OK；P6-I CGSS 链路回归 53 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-I15：用户明确 `approve` 后，用 approved queue 运行 `Program/cgss_revision_work_orders.py` 展开 `Reviews/agent_packets/...` 草案工单；如果选择 `revise/reject`，先修订队列而不是展开工单。
+- [x] P6-I15 Agent Team：派发 Hume 负责审批路由器实现；主 Agent 回收后补齐机器可读 router JSON、复核正式层边界并运行回归验证。
+- [x] P6-I15 BDD/TDD：新增 `tests/test_cgss_revision_approval_router.py`，覆盖 `defer/revise/reject/approve` 四种人工决策路由；未批准时不写 Agent 工单，批准且存在 approved queue 时才展开草案层工单。
+- [x] P6-I15 实现：新增 `Program/workbench/cgss_revision_approval_router.py` 和 `Program/cgss_revision_approval_router.py`；默认读取 `Results/json/cgss_social_capital_happiness_revision_queue_approval.json`，写出 router JSON 与审阅 Markdown。
+- [x] P6-I15 真实运行：当前真实 approval 为 `decision=defer`，路由状态为 `waiting_for_human_revision_queue_decision`，`work_orders=0`，不写 `Reviews/agent_packets/...`、不写正式 manuscript、不写 `state/product/*`。
+- [ ] 下一步 P6-I16：若用户明确 `approve`，用 approved queue 进入 Agent 草案工单执行；若选择 `revise/reject`，先修订或重建任务队列，不展开工单。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

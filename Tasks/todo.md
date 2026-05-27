@@ -31,7 +31,18 @@
 - [x] 真实输出：状态为 `needs_human_level3_quality_review`；`gate_status=red`；当前 CGSS 包结构完整、长度达标，但参考文献候选条目未逐条标记“候选/待人工核验”，需要 `mark_candidate_references_for_human_review`。
 - [x] 正式层边界：本节点只生成质量门禁 JSON 和审阅报告，不改写论文、不改写正式 bibliography、不改写 project bibliography、不写 `state/product/*`。
 - [x] 验证：`python3 -m unittest tests.test_level3_manuscript_quality_gate -v` 通过 5 项；`python3 -m py_compile Program/level3_manuscript_quality_gate.py Program/workbench/level3_manuscript_quality_gate.py tests/test_level3_manuscript_quality_gate.py` 通过；scoped `git diff --check` 通过。
-- [ ] 下一步 P7-D：把 P7-A/B/C 串成首版 Auto Mode acceptance chain，先读数据索引、文献发现 seed、Level 3 gate，输出可操作的修复队列或 package readiness summary。
+- [x] 下一步 P7-D：已串成首版 Auto Mode acceptance chain。
+
+## 2026-05-28 P7-D Auto Mode Acceptance Chain
+
+- [x] 节点目标：把 P7-A 数据母库索引、P7-B 文献发现 seed、P7-C Level 3 质量门串成一个 Auto Mode package readiness 和 repair queue 入口。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_acceptance_chain.py`，覆盖 red Level 3 gate 生成修复队列、yellow ready gate 进入 `needs_human_final_review`、组件状态聚合、信任层聚合、缺失输入阻断、JSON/Markdown 输出。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_acceptance_chain.py` 和 `Program/auto_mode_acceptance_chain.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-acceptance-chain.md`。
+- [x] 真实运行：`python3 Program/auto_mode_acceptance_chain.py --project-root . --dataset-index Results/json/dataset_motherlode_index.json --literature-seed Results/json/literature_discovery_seed.json --level3-gate Results/json/level3_manuscript_quality_gate.json` 写出 `Results/json/auto_mode_acceptance_chain.json` 与 `Reviews/auto_mode_acceptance_chain.md`。
+- [x] 真实输出：状态为 `needs_auto_mode_repair`；修复队列包含 `mark_candidate_references_for_human_review` 和 `human_review_level3_package_artifacts`；组件状态和信任层均已聚合展示。
+- [x] 正式层边界：本节点只写验收链路 JSON 和 Markdown，不写正式论文、不写正式 bibliography、不写 project bibliography、不写 `state/product/*`。
+- [x] 验证：`python3 -m unittest tests.test_auto_mode_acceptance_chain -v` 通过 5 项；P7-A/B/C/D 回归 21 项通过；`python3 -m py_compile` 通过；scoped `git diff --check` 通过。
+- [ ] 下一步 P7-E：按 repair queue 生成草稿层 patch proposal，为 `paper.md` 的参考文献候选逐条追加“候选/待人工核验”标记，但仍不改正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

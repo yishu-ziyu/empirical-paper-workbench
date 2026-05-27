@@ -95,7 +95,12 @@
 - [x] P6-J7 真实运行：写出 `Reviews/cgss_social_capital_happiness_manuscript_sections.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_sections/*.md`；状态为 `needs_human_manuscript_section_review`，4 个章节均达到最低中文字符门槛，合计 2996 字符。
 - [x] P6-J7 正式层边界：本节点只写草案层章节和审阅报告，不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`；`Results/json/cgss_social_capital_happiness_manuscript_sections.json` 受 `.gitignore` 忽略，作为本地运行产物保留。
 - [x] P6-J7 验证：目标测试 3 OK；相邻 CGSS 结果证据包 / RunPlan seed 执行器 / 文献综述草稿包回归 15 OK；Python 编译通过；P6-J7 相关文件 scoped `git diff --check` 通过。全局 `git diff --check` 被无关前端测试文件 `tests/test_p3_task_brief_demo.py` 的历史尾随空格阻断，未纳入本节点。
-- [ ] 下一步 P6-J8：把 4 个分节草稿组装成完整探索性论文 Markdown，生成 paper assembly JSON 和人工审阅报告；最低目标为完整正文不少于 5000 个中文字符，仍只进入草案层。
+- [x] P6-J8 BDD/TDD：新增 `tests/test_cgss_exploratory_paper_assembler.py`，先确认缺少 `Program.workbench.cgss_exploratory_paper_assembler` 的 RED；随后收紧薄输入样例，确认完整论文不足 5000 中文字符会被测试抓住，再补足组装正文。
+- [x] P6-J8 实现：新增 `Program/workbench/cgss_exploratory_paper_assembler.py` 和 `Program/cgss_exploratory_paper_assembler.py`；把 4 个分节草稿、结果证据包和文献综述草稿包组装为完整探索性论文 Markdown，包含摘要、引言、文献综述、数据变量、实证策略、主要结果、稳健性计划、结论、参考文献候选和人工审阅清单。
+- [x] P6-J8 真实运行：写出 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`、`Results/json/cgss_social_capital_happiness_paper_assembly.json` 和 `Reviews/cgss_social_capital_happiness_paper_assembly.md`；状态为 `needs_human_exploratory_paper_review`，正文中文字符数 5399，超过最低 5000 门槛。
+- [x] P6-J8 正式层边界：本节点只生成草案层完整稿、assembly JSON 和审阅报告；不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`。`Manuscripts/generated/*` 与 `Results/json/*` 仍按 `.gitignore` 作为本地运行产物保留。
+- [x] P6-J8 验证：目标测试 3 OK；相邻 CGSS 章节路由 / 结果证据包 / 文献综述草稿包回归 15 OK；Python 编译通过；真实 CLI 运行通过；P6-J8 相关文件 scoped `git diff --check` 通过。
+- [ ] 下一步 P6-J9：对 `Manuscripts/generated/cgss_social_capital_happiness_paper.md` 做 PDF/HTML 预检，生成可打开的审阅产物和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

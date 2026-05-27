@@ -1049,3 +1049,12 @@
 - [x] 实现：新增 `Program/manuscript_claim_proposal_review.py` 和 `Program/workbench/manuscript_claim_proposal_review.py`，消费 `manuscript_section_claim_ledger.json` 中的 proposal，写出 `Results/json/manuscript_claim_proposal_review.json` 与 `Reviews/manuscript_claim_proposal_review.md`。
 - [x] 真实运行：CLI 输出 `status=claim_proposal_approved_for_promotion`、`promotion_allowed=true`、`promoted_to_claims=false`、`formal_writeback_allowed=false`；真实 proposal 为 `main-results::finding_trained_effect::claim_proposal`。
 - [x] 验证：新增目标测试 OK；paper package quality 回归 22 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，407 tests OK，skipped=1。
+
+## 2026-05-27 P6-G6g Claim Promotion Patch
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只把 `approved_for_promotion` 的 claim proposal 转成正式层写回补丁提案，不直接改 `approved_findings.json`、章节草案、PDF/docx 或 `state/product/*`。
+- [x] Agent Team：按要求尝试新建 Verifier sidecar 复核节点，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把本节点限制为 patch proposal。
+- [x] BDD/TDD：新增 Behavior 16.10 和 `test_bdd_11_10_approved_claim_proposal_creates_patch_without_formal_writeback`；RED 为缺少 `Program/manuscript_claim_promotion_patch.py`，GREEN 后覆盖 patch operation、人工审阅证据、正式层不改写。
+- [x] 实现：新增 `Program/manuscript_claim_promotion_patch.py` 和 `Program/workbench/manuscript_claim_promotion_patch.py`，读取 `manuscript_claim_proposal_review.json`，写出 `Results/json/manuscript_claim_promotion_patch.json` 与 `Reviews/manuscript_claim_promotion_patch.md`。
+- [x] 真实运行：CLI 输出 `status=claim_promotion_patch_ready`、`ready_for_apply=true`、`applied=false`、`formal_writeback_allowed=false`；patch operation 指向 `Results/json/approved_findings.json` 中的 `finding_trained_effect`。
+- [x] 验证：新增目标测试 OK；paper package quality 回归 23 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；全量 `python3 -m unittest discover -s tests -v` 为 408 tests OK，skipped=1，耗时 160.148s。

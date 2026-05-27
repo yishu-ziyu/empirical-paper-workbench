@@ -350,6 +350,18 @@
 
 业务规则：人工同意是进入下一步的门槛，不等于本节点已经完成正式论断写回。这样可以把“人类判断”变成可审计的状态，而不是在代码里静默把草案升格成正式结论。
 
+## 行为 16.10：已批准草案论断只能先生成正式层补丁提案
+
+**Given** `manuscript_claim_proposal_review.json` 的状态是 `claim_proposal_approved_for_promotion`
+**And** `promotion_allowed` 是 `true`
+**When** 系统准备把该 proposal 进入正式 finding claim
+**Then** 系统必须先写出独立的 claim promotion patch
+**And** patch 必须记录目标文件、目标 finding、proposal id、来源表、拟写入 claim 文本和人工审阅证据
+**And** 本步骤不得直接修改 `approved_findings.json`
+**And** 本步骤不得改写章节草案或 `state/product/*` 正式层文件。
+
+业务规则：`approve` 之后进入的是“可应用补丁”，不是静默写回。论文状态像 Git 一样先产生 patch，再由后续显式 apply 节点进入正式层。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

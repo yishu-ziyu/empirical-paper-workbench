@@ -1102,3 +1102,13 @@
 - [ ] 下一步 P6-G6n：在 P6-G6m 已批准后，把 `paper_candidate.pdf` 晋升为正式 `paper.pdf`；不重新渲染，不改审批账本。
 - [x] 真实运行：`Program/formal_pdf_candidate_review.py` 输出 `status=ready_for_final_approval_review`、`can_request_final_approval=true`；`formal_pdf_final_writeback_preflight.json` 输出 `status=ready_for_human_final_approval`、`final_writeback_allowed=false`。
 - [x] 验证：`python3 -m unittest tests.test_formal_pdf_candidate_review -v` 2 tests OK；PDF metadata 为 `readable`、pages=10、bytes=107169；机器审阅 10 项检查全部 passed，`formal_state_guard.changed=false`。
+
+## 2026-05-27 P6-H0 Formal Package Audit And Timebox Enforcement
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只做正式包完成度审计和节奏校准，不渲染 PDF，不生成 docx，不改写正式研究状态，不扩展 UI。
+- [x] 用户新增硬约束升级：P4/P5/P6 任意 A/B/C/D/G6x/Hx 小节点最多 20 分钟；超过 20 分钟必须拆成更小节点，或判断当前路线走错并回退。质量标准不降低，靠更小切片、真实验证和 Agent Team 提速。
+- [x] Agent Team：尝试沿用 Verifier sidecar 做只读复核；新建线程受 `agent thread limit reached` 限制时，复用现有 Franklin 线程完成正式包审计。主 Agent 不等待空转，同时本地执行 hash 审计和全量测试。
+- [x] 本地审计：`paper.pdf` hash=`1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0`，`paper.docx` hash=`77964d6a73a3be4abf9d128c17d61dd50e18eb0982c963b838e4c049cf7129cc`；`formal_submission_package_summary.json` 当前为 `ready_for_manual_acceptance` 且 `blocking_reasons=[]`。
+- [x] Agent Team 复核发现：最终 `paper.pdf` 与 `paper.docx` 包自身一致，但当前磁盘上的 `Submissions/formal_package/paper_candidate.pdf` hash=`07bcaebc586f445a01fc34b95bb63bec82e5ac57ff465ea4770149da2d38ca88`，与 `formal_pdf_final_writeback.json` 记录的 `source_candidate_sha256=1dc03960fb232e198d64a60807d510939986b2905f504dd8d379f2edfbdf7ff0` 不一致。
+- [x] 全量验证：`python3 -m unittest discover -s tests -v` 通过，409 tests OK，skipped=1，用时 272.469s。
+- [ ] 下一步 P6-H1：做 `formal_package_provenance_lock_check` 小节点，只比较 final writeback 记录、当前 candidate PDF、最终 PDF、docx 和 submission manifest 的 provenance 一致性；不重渲染、不导出、不改正式层。若 candidate 漂移确认存在，输出锁定报告并决定是冻结批准时 candidate、重新跑短链审批，还是把 candidate 从最终验收视图中降级为历史候选。

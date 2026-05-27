@@ -13,16 +13,30 @@
     {
       "review_id": "review_finding_trained_effect",
       "finding_id": "finding_trained_effect",
-      "claim": null,
+      "claim": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199384322747（SE=0.0793435494782, p=0.0119807291718, N=34315）。",
       "run_id": "run_bb423547439c",
       "artifact_path": "Results/json/analysis_result.json",
       "artifact_exists": true,
       "evidence_level": "local_file",
       "review_status": "approved",
-      "source": "finding_reviews"
+      "source": "finding_reviews",
+      "claim_source_proposal_id": "main-results::finding_trained_effect::claim_proposal",
+      "claim_source_table_id": "regression_table_1",
+      "claim_promoted_at": "2026-05-27T03:55:28.504511+00:00",
+      "claim_promotion_review": {
+        "action": "apply",
+        "reviewer": "mahaoxuan",
+        "note": "确认写入正式findingclaim"
+      }
     }
   ],
   "canonical_write_allowed": false,
   "warnings": [],
-  "next_action": "人工复核 approved finding 是否与当前正式稿章节和最新执行结果一致。"
+  "next_action": "人工复核 approved finding 是否与当前正式稿章节和最新执行结果一致。",
+  "last_claim_promotion": {
+    "proposal_id": "main-results::finding_trained_effect::claim_proposal",
+    "finding_id": "finding_trained_effect",
+    "applied_at": "2026-05-27T03:55:28.504511+00:00",
+    "reviewer": "mahaoxuan"
+  }
 }

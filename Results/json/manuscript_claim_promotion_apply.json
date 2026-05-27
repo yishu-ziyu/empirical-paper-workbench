@@ -1,0 +1,55 @@
+{
+  "schema_version": "p6.manuscript_claim_promotion_apply.v1",
+  "generated_at": "2026-05-27T03:55:28.505359+00:00",
+  "status": "claim_promotion_patch_applied",
+  "source_patch_report": "Results/json/manuscript_claim_promotion_patch.json",
+  "target_approved_findings": "Results/json/approved_findings.json",
+  "formal_writeback_allowed": true,
+  "applied": true,
+  "applied_operations": [
+    {
+      "operation_id": "main-results::finding_trained_effect::claim_proposal::promote_claim",
+      "type": "add_claim_to_approved_finding",
+      "target_path": "Results/json/approved_findings.json",
+      "source_finding_id": "finding_trained_effect",
+      "source_table_id": "regression_table_1",
+      "proposal_id": "main-results::finding_trained_effect::claim_proposal",
+      "claim_text": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199384322747（SE=0.0793435494782, p=0.0119807291718, N=34315）。",
+      "review_report": "Results/json/manuscript_section_claim_ledger.json",
+      "reviewer": "mahaoxuan",
+      "review_note": "同意作为下一步正式论断写回候选。"
+    }
+  ],
+  "application_review": {
+    "action": "apply",
+    "reviewer": "mahaoxuan",
+    "note": "确认写入正式findingclaim",
+    "applied_at": "2026-05-27T03:55:28.505412+00:00"
+  },
+  "approved_findings_before_sha256": "417f8c5c1327ed61c952a20d06f6cd1e276a39e9125bdaf7884f8512ba5361f4",
+  "approved_findings_after_sha256": "85aa76539f9aa53e2729a106e5dc86d6a7f4aae9dba78586d0fe43630e372597",
+  "blocking_reasons": [],
+  "this_command_wrote_approved_findings": true,
+  "this_command_wrote_sections": false,
+  "this_command_wrote_docx": false,
+  "this_command_wrote_pdf": false,
+  "this_command_wrote_state_product": false,
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  },
+  "next_action": {
+    "id": "rerun_manuscript_section_claim_ledger",
+    "label": "重跑章节论断账本",
+    "description": "正式 finding 已有 claim，下一步可重新检查 Main Results 是否消费该论断。"
+  }
+}

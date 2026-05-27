@@ -1,6 +1,6 @@
 {
   "schema_version": "p5.pdf_export_preflight_tasks.v1",
-  "generated_at": "2026-05-26T20:36:01.647060+00:00",
+  "generated_at": "2026-05-27T04:12:38.419469+00:00",
   "source_preflight": "Results/json/formal_pdf_export_preflight.json",
   "can_export_pdf_candidate": true,
   "tasks": []

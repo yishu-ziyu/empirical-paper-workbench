@@ -1073,3 +1073,10 @@
 - [x] Agent Team：再次尝试派发 sidecar explorer 复核下一节点拆法，但运行环境返回 `agent thread limit reached`；本节点改为本地执行，不把时间耗在调度失败上。
 - [x] 真实运行：先重跑 claim ledger 得到 `claim_ledger_needs_revision`，缺口为 `no_approved_finding_claim_detected_in_section`；随后重跑 `manuscript_section_draft_expansion -> manuscript_section_semantic_review -> manuscript_section_claim_ledger`，最终输出 `claim_ledger_ready`、`claims=1`、`needs_revision=0`。
 - [x] 验证：`test_bdd_11_6_passed_section_review_creates_reviewable_claim_ledger` OK；三个报告的 `formal_state_guard.changed=false`；`Main Results` 已消费 `finding_trained_effect.claim`，但仍处于草案层。
+
+## 2026-05-27 P6-G6j PDF Export Preflight Refresh
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只刷新 PDF 导出前置预检，不渲染 PDF、不生成 docx、不改写正式研究状态。若后续 PDF 渲染超过 20 分钟，必须拆成“定位渲染器 / 候选渲染 / 验收记录”更小节点。
+- [x] 节点效率规则：P4/P5/P6 任意 A/B/C/D/G6x 小节点默认最多 20 分钟；超过即拆解或回退路线，不允许把多个目标塞进一个节点。
+- [x] 真实运行：`formal_pdf_export_preflight` 输出 `status=ready_for_pdf_export_review`、`can_export_pdf_candidate=true`、`blocking_reasons=[]`、`formal_state_guard.changed=false`。
+- [x] 验证：`python3 -m unittest tests.test_formal_pdf_export_preflight -v` 3 tests OK；预检 review 显示章节源与 19 项证据检查全部 passed；下一步为 `render_pdf_candidate`。

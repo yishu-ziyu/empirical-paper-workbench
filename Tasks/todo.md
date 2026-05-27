@@ -105,7 +105,12 @@
 - [x] P6-J9 真实运行：写出 `Submissions/cgss_social_capital_happiness/paper.pdf`、`Results/json/cgss_social_capital_happiness_pdf_preflight.json` 和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`；状态为 `pdf_preflight_ready`，PDF 大小 187320 bytes。
 - [x] P6-J9 正式层边界：本节点只做草案 PDF 预检，不写正式 manuscript、不写正式 package、不写 `state/product/*`。`Submissions/*` 与 `Results/json/*` 仍按 `.gitignore` 作为本地运行产物保留。
 - [x] P6-J9 验证：目标测试 3 OK；PDF / paper assembly / section router 相邻回归 9 OK；Python 编译通过；真实 CLI 运行通过；`file Submissions/cgss_social_capital_happiness/paper.pdf` 确认为 PDF document version 1.7。
-- [ ] 下一步 P6-K：接入 AER-like / 顶刊方法规范门，默认建议开启但只在用户选择顶刊标准时强制；先输出方法缺口与补证任务，不直接改正式论文。
+- [x] P6-K BDD/TDD：新增 `tests/test_cgss_method_gate.py`，先确认缺少 `Program.workbench.cgss_method_gate` 的 RED，再实现 CGSS AER-like 方法规范门。
+- [x] P6-K 实现：新增 `Program/workbench/cgss_method_gate.py` 和 `Program/cgss_method_gate.py`；默认 `working_paper` 只建议方法门，`--profile aer_like` 强制输出人工审阅 gate。
+- [x] P6-K 真实运行：`python3 Program/cgss_method_gate.py --profile aer_like` 写出 `Results/json/cgss_social_capital_happiness_method_gate.json` 和 `Reviews/cgss_social_capital_happiness_method_gate.md`；状态为 `needs_human_method_gate_review`，`gate_status=yellow`。
+- [x] P6-K 方法检查：覆盖变量定义、OLS + Ordered Logit 适配、社会资本理论/文献依据、基础控制变量、稳健性/异质性/机制计划、反向因果和遗漏变量风险；结果数字绑定到 `cgss_social_capital_happiness_results_evidence_package.json`。
+- [x] P6-K 正式层边界：本节点只写草案层方法门 JSON 和人工审阅报告，不写正式 manuscript、不写正式 bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`。
+- [ ] 下一步 P6-L：生成审稿式 reviewer report、revision task queue 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`，消费 P6-K 方法门风险与缺口。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -1092,5 +1092,13 @@
 
 - [x] 节点时间盒：本节点封顶 20 分钟；只做候选 PDF 机器审阅与最终写回预检，不批准最终 PDF、不复制为 `paper.pdf`、不生成 docx、不写 `state/product/*`。
 - [x] Agent Team：按用户要求尝试派发 Verifier sidecar 复核候选 PDF 审阅入口，但当前环境返回 `agent thread limit reached`；主 Agent 用既有 `formal_pdf_candidate_review` CLI 完成本地可验证闭环。
+
+## 2026-05-27 P6-G6m+ 节点执行校准
+
+- [x] 用户新增硬约束：后续每一个小节点最多 20 分钟；超过即拆分或回退路线判断，不再把多个目标塞进单个节点。
+- [x] 启动约束：每个节点开始前写清“只解决什么、产物是什么、验收命令是什么”。
+- [x] 收尾约束：每个节点结束时写清“是否 20 分钟内闭环、是否需要拆下一节点、Agent Team 是否成功调用或为何受限”。
+- [ ] 下一步 P6-G6m：仅记录候选 PDF 的人工最终批准；不复制为最终 `paper.pdf`，不生成 docx，不改写正式研究状态。
+- [ ] 下一步 P6-G6n：在 P6-G6m 已批准后，把 `paper_candidate.pdf` 晋升为正式 `paper.pdf`；不重新渲染，不改审批账本。
 - [x] 真实运行：`Program/formal_pdf_candidate_review.py` 输出 `status=ready_for_final_approval_review`、`can_request_final_approval=true`；`formal_pdf_final_writeback_preflight.json` 输出 `status=ready_for_human_final_approval`、`final_writeback_allowed=false`。
 - [x] 验证：`python3 -m unittest tests.test_formal_pdf_candidate_review -v` 2 tests OK；PDF metadata 为 `readable`、pages=10、bytes=107169；机器审阅 10 项检查全部 passed，`formal_state_guard.changed=false`。

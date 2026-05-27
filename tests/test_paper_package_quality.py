@@ -780,6 +780,143 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertIn("## 草案正文", main_results)
         self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
 
+    def test_bdd_11_3_section_scaffolds_bind_real_evidence_or_explicit_gaps(self) -> None:
+        """行为 16.3：章节入口必须绑定到真实证据或显式缺口。"""
+        result = self.run_quality(["--profile", "aer_like"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        results_dir = self.project_root / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        (results_dir / "regression_tables.json").write_text(
+            json.dumps({"tables": [{"id": "baseline", "coefficient": 0.12}]}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (results_dir / "approved_findings.json").write_text(
+            json.dumps({"findings": [{"id": "f1", "status": "approved", "claim": "机器人暴露影响匹配效率。"}]}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (results_dir / "method_execution_result.json").write_text(
+            json.dumps({"coefficients": [{"term": "robot_exposure", "estimate": 0.12}]}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        package = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_package.py"),
+                "--project-root",
+                str(self.project_root),
+                "--quality-report",
+                "Results/json/paper_quality_report.json",
+                "--output-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--output-manuscript",
+                "Manuscripts/generated/paper_package_draft.md",
+                "--output-supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(package.returncode, 0, package.stderr)
+
+        revision = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "paper_revision_round.py"),
+                "--project-root",
+                str(self.project_root),
+                "--expansion-plan",
+                "Results/json/paper_expansion_plan.json",
+                "--supervisor-context",
+                "Results/json/paper_supervisor_context.json",
+                "--output-round",
+                "Results/json/paper_revision_round.json",
+                "--output-review",
+                "Reviews/paper_revision_round.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(revision.returncode, 0, revision.stderr)
+
+        scaffold = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_section_scaffold.py"),
+                "--project-root",
+                str(self.project_root),
+                "--revision-round",
+                "Results/json/paper_revision_round.json",
+                "--output-report",
+                "Results/json/manuscript_section_scaffold_report.json",
+                "--output-review",
+                "Reviews/manuscript_section_scaffold.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
+
+        bindings = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_section_evidence_bindings.py"),
+                "--project-root",
+                str(self.project_root),
+                "--revision-round",
+                "Results/json/paper_revision_round.json",
+                "--scaffold-report",
+                "Results/json/manuscript_section_scaffold_report.json",
+                "--output-report",
+                "Results/json/manuscript_section_evidence_bindings.json",
+                "--output-review",
+                "Reviews/manuscript_section_evidence_bindings.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(bindings.returncode, 0, bindings.stderr)
+
+        report_path = self.project_root / "Results" / "json" / "manuscript_section_evidence_bindings.json"
+        review_path = self.project_root / "Reviews" / "manuscript_section_evidence_bindings.md"
+        self.assertTrue(report_path.exists())
+        self.assertTrue(review_path.exists())
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["schema_version"], "p6.manuscript_section_evidence_bindings.v1")
+        self.assertTrue(report["draft_layer_only"])
+        self.assertFalse(report["formal_writeback_allowed"])
+        self.assertFalse(report["formal_state_guard"]["changed"])
+        self.assertIn(report["status"], ["section_evidence_bindings_ready", "section_evidence_bindings_with_gaps"])
+
+        section_by_name = {item["section"]: item for item in report["sections"]}
+        self.assertIn("Main Results", section_by_name)
+        main_results = section_by_name["Main Results"]
+        self.assertEqual(main_results["status"], "evidence_bound")
+        binding_by_id = {item["evidence_id"]: item for item in main_results["bindings"]}
+        for evidence_id in ["main_regression_table", "approved_findings", "coefficient_interpretation"]:
+            self.assertEqual(binding_by_id[evidence_id]["status"], "bound")
+            self.assertTrue(binding_by_id[evidence_id]["primary_path"])
+            self.assertEqual(binding_by_id[evidence_id]["evidence_level"], "local_artifact")
+            self.assertIn("sha256", binding_by_id[evidence_id])
+
+        self.assertGreaterEqual(report["summary"]["bound"], 3)
+        self.assertIn("missing_evidence", report["summary"])
+        self.assertEqual(report["agent_team_schedule"]["call_when"], "after_evidence_binding_report_written")
+        review_text = review_path.read_text(encoding="utf-8")
+        self.assertIn("章节证据绑定索引", review_text)
+        self.assertIn("Main Results", review_text)
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

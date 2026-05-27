@@ -995,3 +995,12 @@
 - [x] BDD/TDD：新增 Behavior 16.2 和 `test_bdd_11_2_section_work_orders_create_draft_section_scaffolds`；RED 为缺少 `Program/manuscript_section_scaffold.py`，GREEN 后覆盖章节文件生成、report/review 写出和正式层不改写。
 - [x] 实现：新增 `Program/manuscript_section_scaffold.py` 和 `Program/workbench/manuscript_section_scaffold.py`，读取 `paper_revision_round.json.manuscript_section_work_orders`，写出章节草案入口、scaffold report 和 review markdown。
 - [x] 验证：目标测试 1 OK；paper package quality 回归 15 OK；Python 编译通过；真实 CLI 输出 `status=section_scaffolds_ready`、`section_scaffolds=9`、`formal_state_guard.changed=false`，并生成 `Manuscripts/sections/main-results.md` 等 9 个章节入口。
+
+## 2026-05-27 P6-G6a Manuscript Section Evidence Bindings
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只把章节入口绑定到真实 artifact 或显式缺口，不扩写正文、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：按要求尝试新建只读 explorer 复核证据映射，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把下一次 Agent Team 调用点写入 evidence binding report。
+- [x] BDD/TDD：新增 Behavior 16.3 和 `test_bdd_11_3_section_scaffolds_bind_real_evidence_or_explicit_gaps`；RED 为缺少 `Program/manuscript_section_evidence_bindings.py`，GREEN 后覆盖真实证据绑定、显式 missing evidence、正式层不改写和 Agent Team 调用节奏。
+- [x] 实现：新增 `Program/manuscript_section_evidence_bindings.py` 和 `Program/workbench/manuscript_section_evidence_bindings.py`，读取 `paper_revision_round.json.manuscript_section_work_orders` 与 `manuscript_section_scaffold_report.json`，为每个 required evidence 记录路径、bytes、sha256、evidence level 或缺口。
+- [x] 真实运行：CLI 输出 `status=section_evidence_bindings_ready`、`bound=27`、`missing=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_evidence_bindings.json` 和 `Reviews/manuscript_section_evidence_bindings.md`，Main Results 已绑定 `regression_tables.json`、`approved_findings.json` 和 coefficient 解释来源。
+- [x] 验证：目标测试 1 OK；paper package quality 回归 16 OK；Python 编译通过；scoped `git diff --check` 通过。

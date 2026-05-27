@@ -250,6 +250,22 @@
 
 业务规则：章节工单只是任务说明，章节入口才是 ManuscriptAgent 真正工作的文件表面。P6-G5 只把工单落到草案层章节文件，让后续扩写、证据绑定和人工审阅都能围绕稳定文件推进。
 
+## 行为 16.3：章节入口必须绑定到真实证据或显式缺口
+
+**Given** `paper_revision_round.json` 已经包含 `manuscript_section_work_orders`
+**And** `manuscript_section_scaffold_report.json` 已经写出章节入口
+**And** 项目中已经存在部分章节所需的真实 artifact，例如回归表、approved finding、文献包、方法门或变量画像
+**When** 用户运行 `Program/manuscript_section_evidence_bindings.py`
+**Then** 系统必须写出 `Results/json/manuscript_section_evidence_bindings.json`
+**And** 系统必须写出 `Reviews/manuscript_section_evidence_bindings.md`
+**And** 每个章节都必须列出 required evidence 的绑定结果：已找到的证据给出路径、bytes、sha256 和 evidence level；未找到的证据进入 `missing_evidence`
+**And** Main Results 等能找到主表和 approved findings 的章节必须把 `main_regression_table`、`approved_findings`、`coefficient_interpretation` 绑定到真实本地 artifact
+**And** report 必须声明 `draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** report 必须写明 Agent Team 调用节奏：证据绑定报告写出后调用 ManuscriptAgent / VerifierAgent；章节证据缺口审阅后收回；章节扩写前再次调用 ManuscriptAgent
+**And** 命令不得改写 `state/product/*` 正式层文件，也不得把缺失证据伪装成已找到。
+
+业务规则：章节草案扩写前要先知道“每段话能引用什么证据”。P6-G6a 不写正文，只建立章节到真实 artifact 的证据索引，并把缺口留给后续 Agent 或人工补证。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

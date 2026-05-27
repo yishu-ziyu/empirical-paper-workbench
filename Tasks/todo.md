@@ -42,7 +42,21 @@
 - [x] 真实输出：状态为 `needs_auto_mode_repair`；修复队列包含 `mark_candidate_references_for_human_review` 和 `human_review_level3_package_artifacts`；组件状态和信任层均已聚合展示。
 - [x] 正式层边界：本节点只写验收链路 JSON 和 Markdown，不写正式论文、不写正式 bibliography、不写 project bibliography、不写 `state/product/*`。
 - [x] 验证：`python3 -m unittest tests.test_auto_mode_acceptance_chain -v` 通过 5 项；P7-A/B/C/D 回归 21 项通过；`python3 -m py_compile` 通过；scoped `git diff --check` 通过。
-- [ ] 下一步 P7-E：按 repair queue 生成草稿层 patch proposal，为 `paper.md` 的参考文献候选逐条追加“候选/待人工核验”标记，但仍不改正式层。
+- [x] 下一步 P7-E：按 repair queue 生成草稿层 patch proposal，为 `paper.md` 的参考文献候选逐条追加“候选/待人工核验”标记，但仍不改正式层。
+
+## 2026-05-28 P7-E Reference Marker Patch Proposal
+
+- [x] 节点目标：把 P7-D repair queue 中的 `mark_candidate_references_for_human_review` 做成草稿层 patch proposal，修复 Level 3 引用标记缺口，但不覆盖原 paper package。
+- [x] BDD/TDD：新增 `tests/test_reference_marker_patch_proposal.py`，覆盖未标记候选引用补标记、已标记引用幂等、JSON/Markdown/候选稿输出、正式层边界、缺少候选参考文献节阻断。
+- [x] RED 记录：`python3 -m unittest tests.test_reference_marker_patch_proposal -v` 首次失败原因为缺少 `Program.workbench.reference_marker_patch_proposal`。
+- [x] 实现范围：新增 `Program/workbench/reference_marker_patch_proposal.py` 和 `Program/reference_marker_patch_proposal.py`；新增计划 `docs/superpowers/plans/2026-05-28-reference-marker-patch-proposal.md`。
+- [x] 真实运行：`python3 Program/reference_marker_patch_proposal.py --project-root . --source-paper workspace/paper_packages/cgss_social_capital_happiness/paper.md --candidate-paper Manuscripts/generated/cgss_social_capital_happiness_paper_reference_marked.md --output-report Results/json/reference_marker_patch_proposal.json --output-review Reviews/reference_marker_patch_proposal.md`。
+- [x] 真实输出：状态为 `needs_human_reference_marker_review`；候选稿路径为 `Manuscripts/generated/cgss_social_capital_happiness_paper_reference_marked.md`；8 条参考文献候选均追加 `（候选，待人工核验）`。
+- [x] 候选稿复验：`python3 Program/level3_manuscript_quality_gate.py --project-root . --paper Manuscripts/generated/cgss_social_capital_happiness_paper_reference_marked.md --package-manifest workspace/paper_packages/cgss_social_capital_happiness/manifest.json --output-report Results/json/level3_manuscript_quality_gate_reference_marker_candidate.json --output-review Reviews/level3_manuscript_quality_gate_reference_marker_candidate.md` 输出 `gate_status=yellow`、`ready_for_level3_review=true`。
+- [x] 验收链复验：`python3 Program/auto_mode_acceptance_chain.py --project-root . --dataset-index Results/json/dataset_motherlode_index.json --literature-seed Results/json/literature_discovery_seed.json --level3-gate Results/json/level3_manuscript_quality_gate_reference_marker_candidate.json --output-report Results/json/auto_mode_acceptance_chain_reference_marker_candidate.json --output-review Reviews/auto_mode_acceptance_chain_reference_marker_candidate.md` 输出 `package_readiness=needs_human_final_review`，repair queue 为空。
+- [x] 正式层边界：本节点只写 proposal JSON、审阅报告和草稿层候选稿；不覆盖 `workspace/paper_packages/cgss_social_capital_happiness/paper.md`，不写正式 manuscript，不写正式 bibliography，不写 project bibliography，不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P7-A/B/C/D/E 回归 26 OK；Python 编译通过；P7-E 相关文件 scoped `git diff --check` 通过。
+- [ ] 下一步 P7-F：把 candidate repair proposal 接入“人工批准后提升为下一轮 paper package candidate”的 approval router，仍保持正式层写回硬门禁。
 
 ## 2026-05-27 Global Node Execution Contract
 

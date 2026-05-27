@@ -67,6 +67,55 @@ class TopicToPaperCapabilityAuditCliTests(unittest.TestCase):
         self.assertIn("paper_pdf_missing", report["blocking_reasons"])
         self.assertEqual(report["current_topic_reproducibility"], "not_reproducible_until_formal_package_ready")
 
+    def test_bdd_49_new_cgss_topic_outputs_plain_language_gap_matrix(self) -> None:
+        self._write_json(
+            self.project_root / "state" / "product" / "research_question.json",
+            {
+                "question": "工业机器人应用对劳动力市场匹配效率的影响",
+                "status": "confirmed",
+            },
+        )
+
+        result = self._run_cli("社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析")
+        self.assertEqual(result.returncode, 3, result.stderr)
+
+        report = self._read_report()
+        self.assertEqual(report["status"], "new_topic_requires_data_binding")
+        self.assertEqual(report["paper_package_acceptance_target"]["level"], "master_thesis_or_course_paper_first_draft_pdf_package")
+        self.assertIn("先把题目、数据、变量、方法、文献和修订链路接起来", report["plain_language_summary"])
+
+        matrix = report["capability_gap_matrix"]
+        self.assertEqual(
+            [item["id"] for item in matrix],
+            [
+                "topic_to_data_binding",
+                "expert_variable_role_selection",
+                "method_family_gate",
+                "literature_review_loop",
+                "review_revision_and_export_loop",
+            ],
+        )
+        self.assertEqual(matrix[0]["owner_agent"], "DataAgent")
+        self.assertEqual(matrix[0]["status"], "needs_work")
+        self.assertIn("CGSS", matrix[0]["current_state"])
+        self.assertEqual(matrix[1]["owner_agent"], "Supervisor+MethodAgent")
+        self.assertEqual(matrix[2]["owner_agent"], "MethodAgent")
+        self.assertEqual(matrix[3]["owner_agent"], "LiteratureAgent")
+        self.assertEqual(matrix[4]["owner_agent"], "ReviewerAgent+ExportAgent")
+        self.assertTrue(all(item["done_when"] for item in matrix))
+
+        routing = report["agent_team_routing"]
+        self.assertEqual(routing["first_agent_to_call"], "DataAgent")
+        self.assertIn("run_cgss_data_discovery", routing["next_cli_nodes"])
+        self.assertIn("bind_topic_to_cgss_dataset", report["next_tasks"])
+        self.assertIn("run_cgss_data_discovery", report["next_tasks"])
+        self.assertNotIn("run_weak_iv_robust_inference", report["next_tasks"])
+
+        review = (self.project_root / "Reviews" / "topic_to_paper_capability_audit.md").read_text(encoding="utf-8")
+        self.assertIn("先追求：硕士课程论文/毕业论文初稿级完整 PDF 包", review)
+        self.assertIn("DataAgent：把 CGSS 数据、字段和样本口径接到题目", review)
+        self.assertIn("这不是不能写文章，而是还没有把 CGSS 新题目接入主链路", review)
+
     def _run_cli(self, topic: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [

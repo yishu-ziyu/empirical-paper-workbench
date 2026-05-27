@@ -556,6 +556,7 @@ def build_recommended_next_tasks(
                     "agent": "ManuscriptAgent",
                     "reason": "核心章节已存在，但篇幅没有达到 working paper 可审阅的最低厚度。",
                     "inputs": thin_sections,
+                    "section_expansion_packet": build_section_expansion_packet(thin_sections),
                     "verification": {
                         "required_before_completion": [
                             "section_length_checks.status=passed",
@@ -609,7 +610,6 @@ def build_underdeveloped_section_inputs(section_length_checks: dict[str, Any]) -
     section_names = [
         *summary.get("missing_sections", []),
         *summary.get("too_short_sections", []),
-        *summary.get("too_long_sections", []),
     ]
     inputs: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -629,6 +629,79 @@ def build_underdeveloped_section_inputs(section_length_checks: dict[str, Any]) -
             }
         )
     return inputs
+
+
+def build_section_expansion_packet(section_inputs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "source": "section_length_checks",
+        "source_quality_report": "Results/json/paper_quality_report.json",
+        "owner_agent": "ManuscriptAgent",
+        "draft_layer_only": True,
+        "formal_writeback_allowed": False,
+        "sections": [build_section_expansion_item(section_input) for section_input in section_inputs],
+        "verification": {
+            "required_before_completion": [
+                "section_length_checks.status=passed",
+                "updated_section_drafts",
+                "human_review_before_formal_writeback",
+                "no_state_product_writeback",
+            ]
+        },
+    }
+
+
+def build_section_expansion_item(section_input: dict[str, Any]) -> dict[str, Any]:
+    section = str(section_input.get("section") or "")
+    return {
+        "section": section,
+        "status": section_input.get("status"),
+        "current_units": {
+            "english_word_count": section_input.get("english_word_count", 0),
+            "chinese_char_count": section_input.get("chinese_char_count", 0),
+        },
+        "target_units": {
+            "english_words": section_input.get("target_english_words"),
+            "chinese_chars": section_input.get("target_chinese_chars"),
+        },
+        "required_evidence": section_evidence_requirements(section),
+        "writing_instruction": section_writing_instruction(section),
+        "output_path": f"Manuscripts/sections/{slugify_section(section)}.md",
+    }
+
+
+def section_evidence_requirements(section: str) -> list[str]:
+    requirements = {
+        "Abstract": ["approved_findings", "method_gate_report", "verified_bibliography.csv"],
+        "Introduction": ["research_question", "contribution_matrix.md", "approved_findings"],
+        "Literature and Contribution": ["verified_bibliography.csv", "contribution_matrix.md", "closest_papers"],
+        "Institutional Background / Theory / Context": ["domain_notes", "mechanism_hypotheses", "literature_context"],
+        "Data and Measurement": ["dataset_profile", "variable_dictionary", "sample_construction_log"],
+        "Empirical Strategy": ["design_spec", "run_plan", "method_gate_report"],
+        "Main Results": ["main_regression_table", "approved_findings", "coefficient_interpretation"],
+        "Robustness / Mechanisms / Heterogeneity": [
+            "robustness_matrix",
+            "mechanism_or_heterogeneity_results",
+            "method_gate_report",
+        ],
+        "Conclusion": ["approved_findings", "limitations_register", "reviewer_scorecard_report"],
+    }
+    return requirements.get(section, ["section_source_notes", "verified_evidence"])
+
+
+def section_writing_instruction(section: str) -> str:
+    instructions = {
+        "Literature and Contribution": "先按相邻问题、识别方法和本文增量组织文献，再把每一类贡献绑定到已核验来源。",
+        "Data and Measurement": "补齐数据来源、样本筛选、变量定义、缺失处理和描述统计，不把未校验字段写成正式事实。",
+        "Empirical Strategy": "写清估计方程、识别假设、标准误、方法门状态和仍需人工判断的边界。",
+        "Main Results": "围绕主表和主图解释系数方向、量级、显著性、经济含义和与研究问题的关系。",
+        "Robustness / Mechanisms / Heterogeneity": "把稳健性、机制、异质性和敏感性结果按证据强度分层组织。",
+    }
+    return instructions.get(section, "补齐本节论证链、证据来源和与全文主问题的连接。")
+
+
+def slugify_section(section: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", section.lower()).strip("-")
+    return slug or "section"
 
 
 def relative_or_absolute(path: Path, project_root: Path) -> str:

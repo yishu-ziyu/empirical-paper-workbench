@@ -54,7 +54,8 @@
 **Then** `section_length_checks` 必须逐章给出英文词数、中文字符数、目标区间和状态
 **And** 低于章节最低门槛的章节状态为 `too_short`
 **And** `verdict` 包含 `section_length_gate_required`
-**And** `recommended_next_tasks` 包含 `expand_underdeveloped_sections`，并列出需要扩写的具体章节。
+**And** `recommended_next_tasks` 包含 `expand_underdeveloped_sections`，并列出需要扩写的具体章节
+**And** 该任务必须包含 `section_expansion_packet`，把每个薄弱章节的目标篇幅、证据要求、草案输出路径和正式层写回边界交给 ManuscriptAgent。
 
 业务规则：论文不能靠堆长某一个章节通过验收；每个核心研究章节都要达到可审阅的最小厚度。
 

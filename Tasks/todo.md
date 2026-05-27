@@ -51,6 +51,11 @@
 - [x] P6-I15 实现：新增 `Program/workbench/cgss_revision_approval_router.py` 和 `Program/cgss_revision_approval_router.py`；默认读取 `Results/json/cgss_social_capital_happiness_revision_queue_approval.json`，写出 router JSON 与审阅 Markdown。
 - [x] P6-I15 真实运行：当前真实 approval 为 `decision=defer`，路由状态为 `waiting_for_human_revision_queue_decision`，`work_orders=0`，不写 `Reviews/agent_packets/...`、不写正式 manuscript、不写 `state/product/*`。
 - [ ] 下一步 P6-I16：若用户明确 `approve`，用 approved queue 进入 Agent 草案工单执行；若选择 `revise/reject`，先修订或重建任务队列，不展开工单。
+- [x] P6-J1 BDD/TDD：扩展 `tests/test_topic_to_paper_capability_audit.py`，要求新 CGSS 题目输出人话版验收目标、五类缺口矩阵和 Agent Team 路由；先确认缺少 `paper_package_acceptance_target` 的 RED，再实现。
+- [x] P6-J1 实现：扩展 `Program/workbench/topic_to_paper_capability_audit.py`，新增 `plain_language_summary`、`paper_package_acceptance_target`、`capability_gap_matrix` 和 `agent_team_routing`；新题目只返回 CGSS 接入任务，不混入旧 CFPS/机器人论文修订项。
+- [x] P6-J1 真实运行：用“社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析”生成 `Results/json/topic_to_paper_capability_audit.json` 和 `Reviews/topic_to_paper_capability_audit.md`；状态为 `new_topic_requires_data_binding`，第一调用 Agent 为 DataAgent。
+- [x] P6-J1 正式层边界：本节点只写审阅报告和 JSON audit，不生成新论文、不改写正式 package、不接受 package、不改写 `state/product/*`。
+- [ ] 下一步 P6-J2：实现 `run_cgss_data_discovery`，扫描本地 CGSS 数据文件、年份、字段、样本规模和可读性，生成 DatasetBinding 草案。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

@@ -32,7 +32,11 @@
 - [x] P6-I11 实现：新增 `Program/workbench/cgss_method_structure_gate_packet.py` 和 `Program/cgss_method_structure_gate_packet.py`，把 OLS/Ordered Logit 结果、方法边界、DID/IV/RDD/PSM/DML 暂不进入条件和章节长度标准统一成审阅文件。
 - [x] P6-I11 真实运行：写出 `Results/json/cgss_social_capital_happiness_method_structure_gate_packet.json` 和 `Reviews/cgss_social_capital_happiness_method_structure_gate_packet.md`；状态为 `needs_human_method_structure_approval`。
 - [x] P6-I11 正式层边界：本节点不写正式 manuscript、不写 DesignSpec/RunPlan、不写 `state/product/*`。
-- [ ] 下一步 P6-I12：生成审稿式修订循环计划，把文献、方法、结构三个待批准包转成 Reviewer/Method/Literature/Writer 四类 Agent 任务队列。
+- [x] P6-I12 BDD/TDD：新增 `tests/test_cgss_revision_task_queue.py`，先确认缺少 `Program.workbench.cgss_revision_task_queue` 的 RED，再实现审稿式修订任务队列。
+- [x] P6-I12 实现：新增 `Program/workbench/cgss_revision_task_queue.py` 和 `Program/cgss_revision_task_queue.py`，把文献种子包、文献综述草稿包和方法结构门禁包转成 LiteratureAgent / MethodAgent / WriterAgent / ReviewerAgent 四类草案层任务。
+- [x] P6-I12 正式层边界：本节点不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
+- [x] P6-I12 真实运行：写出 `Results/json/cgss_social_capital_happiness_revision_task_queue.json` 和 `Reviews/cgss_social_capital_happiness_revision_task_queue.md`；schema 为 `p6.cgss_revision_task_queue.v1`，状态为 `needs_human_revision_queue_approval`，共 8 条草案层任务；不写 `state/product/agent_task_queue.json`。
+- [ ] 下一步 P6-I13：人工批准修订任务队列后，再按 Agent 包生成具体草案层审阅工单；继续禁止正式层写回。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

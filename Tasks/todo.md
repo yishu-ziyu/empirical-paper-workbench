@@ -1080,3 +1080,10 @@
 - [x] 节点效率规则：P4/P5/P6 任意 A/B/C/D/G6x 小节点默认最多 20 分钟；超过即拆解或回退路线，不允许把多个目标塞进一个节点。
 - [x] 真实运行：`formal_pdf_export_preflight` 输出 `status=ready_for_pdf_export_review`、`can_export_pdf_candidate=true`、`blocking_reasons=[]`、`formal_state_guard.changed=false`。
 - [x] 验证：`python3 -m unittest tests.test_formal_pdf_export_preflight -v` 3 tests OK；预检 review 显示章节源与 19 项证据检查全部 passed；下一步为 `render_pdf_candidate`。
+
+## 2026-05-27 P6-G6k PDF Candidate Render
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只渲染候选层 `paper_candidate.pdf` 和 `paper_candidate.qmd`，不批准最终 PDF、不生成 docx、不写 `state/product/*`。
+- [x] Agent Team：按用户要求尝试派发只读 explorer 定位 PDF 渲染链路，但当前环境返回 `agent thread limit reached`；主 Agent 直接复用既有 `formal_pdf_candidate` 链路，不重复造轮子。
+- [x] 真实运行：`Program/formal_pdf_candidate.py --render-mode auto` 输出 `status=pdf_candidate_ready`、`output_pdf_exists=true`；Quarto 调用 xelatex 完成 3 轮编译，生成 `Submissions/formal_package/paper_candidate.pdf`。
+- [x] 验证：`python3 -m unittest tests.test_formal_pdf_candidate -v` 2 tests OK；候选 PDF bytes=107169，QMD bytes=10886，复跑脚本 bytes=633；报告声明 `formal_state_guard.changed=false`、`this_command_wrote_formal_state=false`、`this_command_wrote_final_outputs=false`。

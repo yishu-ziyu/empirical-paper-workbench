@@ -1004,3 +1004,12 @@
 - [x] 实现：新增 `Program/manuscript_section_evidence_bindings.py` 和 `Program/workbench/manuscript_section_evidence_bindings.py`，读取 `paper_revision_round.json.manuscript_section_work_orders` 与 `manuscript_section_scaffold_report.json`，为每个 required evidence 记录路径、bytes、sha256、evidence level 或缺口。
 - [x] 真实运行：CLI 输出 `status=section_evidence_bindings_ready`、`bound=27`、`missing=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_evidence_bindings.json` 和 `Reviews/manuscript_section_evidence_bindings.md`，Main Results 已绑定 `regression_tables.json`、`approved_findings.json` 和 coefficient 解释来源。
 - [x] 验证：目标测试 1 OK；paper package quality 回归 16 OK；Python 编译通过；scoped `git diff --check` 通过。
+
+## 2026-05-27 P6-G6b Main Results Evidence-Bound Draft Expansion
+
+- [x] 节点时间盒：按用户新增约束，本节点封顶 20 分钟；只扩写 `Main Results` 草案层正文，不扩写全稿、不生成 PDF/docx、不写正式 `state/product/*`。
+- [x] Agent Team：按要求尝试新建只读 verifier/explorer sidecar 复核章节扩写边界，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把下一次 Agent Team 调用点写入扩写报告。
+- [x] BDD/TDD：新增 Behavior 16.4 和 `test_bdd_11_4_main_results_expansion_consumes_bound_evidence_only`；RED 为缺少 `Program/manuscript_section_draft_expansion.py`，GREEN 后覆盖 Main Results 只消费已绑定证据、章节草案写出、正式层不改写和 Agent Team 调用节奏。
+- [x] 实现：新增 `Program/manuscript_section_draft_expansion.py` 和 `Program/workbench/manuscript_section_draft_expansion.py`，读取 `manuscript_section_evidence_bindings.json`，把 Main Results 的主回归表、approved findings 和系数解释来源整理成可审阅章节草案。
+- [x] 真实运行：CLI 输出 `status=section_drafts_expanded`、`expanded=1`、`blocked=0`、`formal_writeback_allowed=false`；生成 `Results/json/manuscript_section_draft_expansion_report.json`、`Reviews/manuscript_section_draft_expansion.md`，并更新 `Manuscripts/sections/main-results.md`。
+- [x] 验证：目标测试 1 OK；paper package quality 回归 17 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。

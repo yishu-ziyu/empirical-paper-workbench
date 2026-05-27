@@ -1,0 +1,102 @@
+{
+  "schema_version": "p6.manuscript_section_semantic_review.v1",
+  "generated_at": "2026-05-27T04:09:20.498812+00:00",
+  "status": "semantic_review_passed",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "source_draft_expansion_report": "Results/json/manuscript_section_draft_expansion_report.json",
+  "summary": {
+    "requested": 1,
+    "passed": 1,
+    "needs_revision": 0
+  },
+  "sections": [
+    {
+      "section": "Main Results",
+      "path": "Manuscripts/sections/main-results.md",
+      "verdict": "passed",
+      "checks": [
+        {
+          "id": "section_file_exists",
+          "status": "passed",
+          "rule": "章节草案文件必须存在。"
+        },
+        {
+          "id": "section_declares_draft_layer",
+          "status": "passed",
+          "rule": "章节必须显式留在草案层。"
+        },
+        {
+          "id": "section_blocks_formal_writeback",
+          "status": "passed",
+          "rule": "章节不得声明可写入正式层。"
+        },
+        {
+          "id": "consumed_evidence_declared",
+          "status": "passed",
+          "rule": "每个 consumed evidence id 必须出现在章节的已消费证据区。",
+          "missing_evidence_ids": []
+        },
+        {
+          "id": "core_claim_grounded",
+          "status": "passed",
+          "rule": "核心结果论断必须同时绑定主表、approved finding 和系数解释。",
+          "required_evidence_ids": [
+            "approved_findings",
+            "coefficient_interpretation",
+            "main_regression_table"
+          ],
+          "claim_detected": true
+        }
+      ],
+      "consumed_evidence": [
+        {
+          "evidence_id": "main_regression_table",
+          "path": "Results/json/regression_tables.json",
+          "sha256": "34df595330fa9280af2ed85ded2f198a91c1c2a006fb39a3c52c2102071f4ecb",
+          "evidence_level": "local_artifact"
+        },
+        {
+          "evidence_id": "approved_findings",
+          "path": "Results/json/approved_findings.json",
+          "sha256": "417f8c5c1327ed61c952a20d06f6cd1e276a39e9125bdaf7884f8512ba5361f4",
+          "evidence_level": "local_artifact"
+        },
+        {
+          "evidence_id": "coefficient_interpretation",
+          "path": "Results/json/approved_findings.json",
+          "sha256": "417f8c5c1327ed61c952a20d06f6cd1e276a39e9125bdaf7884f8512ba5361f4",
+          "evidence_level": "local_artifact"
+        }
+      ],
+      "next_action": {
+        "id": "continue_section_review_or_expand_next_section",
+        "owner_agent": "Supervisor",
+        "reason": "Main Results 已通过本轮只读语义核验，可以进入下一节扩写或更严格的审稿式复核。"
+      }
+    }
+  ],
+  "agent_team_schedule": {
+    "call_when": "before_section_semantic_review",
+    "called_agents": [
+      "VerifierAgent",
+      "ManuscriptAgent"
+    ],
+    "recall_when": "after_semantic_review_written",
+    "next_call_when": "before_expanding_next_section_or_formal_preflight",
+    "boundary": "VerifierAgent 只读核验章节论断；ManuscriptAgent 只在后续修订节点接收反馈。"
+  },
+  "formal_state_guard": {
+    "protected_paths": [
+      "state/product/research_question.json",
+      "state/product/variable_roles.json",
+      "state/product/variable_role_set.json",
+      "state/product/design_spec.json",
+      "state/product/run_plan.json",
+      "state/product/supervisor_plan.json",
+      "state/product/agent_task_queue.json"
+    ],
+    "changed": false,
+    "changed_paths": []
+  }
+}

@@ -1066,3 +1066,10 @@
 - [x] 实现：新增 `Program/manuscript_claim_promotion_apply.py` 和 `Program/workbench/manuscript_claim_promotion_apply.py`，消费 `manuscript_claim_promotion_patch.json`，写出 apply report 与 review markdown。
 - [x] 真实运行：CLI 输出 `status=claim_promotion_patch_applied`、`applied=true`、`formal_writeback_allowed=true`；真实 `approved_findings.json` 的 `finding_trained_effect.claim` 已写入已审阅论断，并保留 proposal id、source table、reviewer 和 before/after hash。
 - [x] 验证：新增目标测试 OK；paper package quality 回归 24 OK；全量测试 `409 tests OK / skipped=1`；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。
+
+## 2026-05-27 P6-G6i Claim Ledger Consumption
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只重跑章节草案扩写、语义核验和章节论断账本，验证刚写回的正式 claim 是否被 `Main Results` 草案消费，不新增代码。
+- [x] Agent Team：再次尝试派发 sidecar explorer 复核下一节点拆法，但运行环境返回 `agent thread limit reached`；本节点改为本地执行，不把时间耗在调度失败上。
+- [x] 真实运行：先重跑 claim ledger 得到 `claim_ledger_needs_revision`，缺口为 `no_approved_finding_claim_detected_in_section`；随后重跑 `manuscript_section_draft_expansion -> manuscript_section_semantic_review -> manuscript_section_claim_ledger`，最终输出 `claim_ledger_ready`、`claims=1`、`needs_revision=0`。
+- [x] 验证：`test_bdd_11_6_passed_section_review_creates_reviewable_claim_ledger` OK；三个报告的 `formal_state_guard.changed=false`；`Main Results` 已消费 `finding_trained_effect.claim`，但仍处于草案层。

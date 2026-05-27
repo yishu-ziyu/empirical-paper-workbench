@@ -16,7 +16,11 @@
 - [x] 实现范围：新增 `Program/workbench/cgss_literature_seed_package.py` 和 `Program/cgss_literature_seed_package.py`；生成 10 条种子文献、变量支持、机制地图、方法支持、CNKI 人工检索队列和后续任务。
 - [x] 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_seed_package.json` 和 `Reviews/cgss_social_capital_happiness_literature_seed_package.md`；状态为 `needs_human_literature_review`。
 - [x] 正式层边界：本节点不修改正式 bibliography、正式 manuscript、正式 variable roles、DesignSpec、RunPlan 或 `state/product/*`。
-- [ ] 下一步 P6-I8：把 seed sources 接入 CNKI/Zotero/Scholar 校验预检，生成 `verified_bibliography` 候选和引用绑定表；仍需人工批准后才进入正式参考文献。
+- [x] P6-I8 BDD/TDD：新增 `tests/test_cgss_literature_source_verification_preflight.py`，先确认缺少来源校验预检模块的 RED，再实现最小 CLI。
+- [x] P6-I8 实现：新增 `Program/workbench/cgss_literature_source_verification_preflight.py` 和 `Program/cgss_literature_source_verification_preflight.py`，把 10 条 seed sources 转成 candidate bibliography、CNKI 队列、Zotero/Scholar 队列和引用绑定目标。
+- [x] P6-I8 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_source_verification_preflight.json` 和 `Reviews/cgss_social_capital_happiness_literature_source_verification_preflight.md`；状态为 `needs_source_verification`。
+- [x] P6-I8 正式层边界：本节点不写 `verified_bibliography.csv`、不写 contribution matrix、不写正式 manuscript、不写 `state/product/*`。
+- [ ] 下一步 P6-I9：执行可访问来源的元数据校验和引用绑定候选生成；CNKI 条目仍保留人工辅助检索，Zotero/Scholar 条目需补 DOI/BibTeX。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

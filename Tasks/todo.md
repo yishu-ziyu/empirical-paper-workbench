@@ -1040,3 +1040,12 @@
 - [x] 实现：扩展 `Program/workbench/manuscript_section_claim_ledger.py`，在 approved finding 缺 `claim` 但主回归表存在时，从真实回归表抽取 coefficient、standard error、p value 和 N，生成可审阅草案论断提案。
 - [x] 真实运行：CLI 输出 `status=claim_ledger_needs_revision`、`claims=0`、`claim_proposals=1`、`needs_revision=1`、`formal_writeback_allowed=false`；proposal 绑定 `regression_table_1` 和 `finding_trained_effect`。
 - [x] 验证：新增目标测试 OK；相邻 16.6/16.7 OK；paper package quality 回归 21 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，406 tests OK，skipped=1。
+
+## 2026-05-27 P6-G6f Claim Proposal Human Review
+
+- [x] 节点时间盒：本节点封顶 20 分钟；只记录 `claim_proposal` 的显式人工审阅动作，不晋升正式 claim、不改章节、不生成 PDF/docx、不写正式 `state/product/*`。如果后续小节点超过 20 分钟，必须继续拆小或回退路线。
+- [x] Agent Team：按要求尝试新建 Verifier sidecar 复核节点，但当前环境返回 `collab spawn failed: agent thread limit reached`；主 Agent 继续本地 BDD/TDD/CLI 闭环，并把 `approve` 结果限制为 `approved_for_promotion`。
+- [x] BDD/TDD：新增 Behavior 16.9 和 `test_bdd_11_9_claim_proposal_review_records_human_decision_without_promotion`；RED 为缺少 `Program/manuscript_claim_proposal_review.py`，GREEN 后覆盖 approve 审阅账本、正式层不改写和 proposal 不进入 `claims`。
+- [x] 实现：新增 `Program/manuscript_claim_proposal_review.py` 和 `Program/workbench/manuscript_claim_proposal_review.py`，消费 `manuscript_section_claim_ledger.json` 中的 proposal，写出 `Results/json/manuscript_claim_proposal_review.json` 与 `Reviews/manuscript_claim_proposal_review.md`。
+- [x] 真实运行：CLI 输出 `status=claim_proposal_approved_for_promotion`、`promotion_allowed=true`、`promoted_to_claims=false`、`formal_writeback_allowed=false`；真实 proposal 为 `main-results::finding_trained_effect::claim_proposal`。
+- [x] 验证：新增目标测试 OK；paper package quality 回归 22 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过；完整回归 `python3 -m unittest discover -s tests -v` 通过，407 tests OK，skipped=1。

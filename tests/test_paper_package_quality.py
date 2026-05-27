@@ -1691,6 +1691,118 @@ class PaperPackageQualityCliTests(unittest.TestCase):
         self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
         self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
 
+    def test_bdd_11_9_claim_proposal_review_records_human_decision_without_promotion(self) -> None:
+        """行为 16.9：草案论断提案必须经过显式人工审阅才能进入下一步。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True)
+        protected_path = state_dir / "agent_task_queue.json"
+        protected_path.write_text(json.dumps({"formal": True, "queue": []}), encoding="utf-8")
+        protected_before = protected_path.read_text(encoding="utf-8")
+
+        section_path = self.project_root / "Manuscripts" / "sections" / "main-results.md"
+        section_path.parent.mkdir(parents=True)
+        section_path.write_text("# Main Results\n\n草案正文。\n", encoding="utf-8")
+        section_before = section_path.read_text(encoding="utf-8")
+
+        results_dir = self.project_root / "Results" / "json"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        approved_findings_path = results_dir / "approved_findings.json"
+        approved_findings_path.write_text(
+            json.dumps({"findings": [{"finding_id": "finding_without_claim", "review_status": "approved"}]}),
+            encoding="utf-8",
+        )
+        approved_findings_before = approved_findings_path.read_text(encoding="utf-8")
+
+        proposal_id = "main-results::finding_without_claim::claim_proposal"
+        claim_ledger_path = results_dir / "manuscript_section_claim_ledger.json"
+        claim_ledger_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "p6.manuscript_section_claim_ledger.v1",
+                    "status": "claim_ledger_needs_revision",
+                    "draft_layer_only": True,
+                    "formal_writeback_allowed": False,
+                    "summary": {"sections": 1, "claims": 0, "claim_proposals": 1, "needs_revision": 1},
+                    "sections": [
+                        {
+                            "section": "Main Results",
+                            "path": "Manuscripts/sections/main-results.md",
+                            "status": "needs_revision",
+                            "claims": [],
+                            "claim_proposals": [
+                                {
+                                    "proposal_id": proposal_id,
+                                    "section": "Main Results",
+                                    "proposed_claim_text": "草案提案：在 iv 规格中，ln_robot 对 ln_wage 的估计系数为 0.199。",
+                                    "source_finding_id": "finding_without_claim",
+                                    "source_table_id": "regression_table_1",
+                                    "coefficient": 0.199384322747,
+                                    "standard_error": 0.0793435494782,
+                                    "p_value": 0.0119807291718,
+                                    "nobs": 34315,
+                                    "bound_evidence_ids": [
+                                        "approved_findings",
+                                        "coefficient_interpretation",
+                                        "main_regression_table",
+                                    ],
+                                    "review_status": "needs_human_review",
+                                }
+                            ],
+                            "missing_reasons": ["no_approved_finding_claim_detected_in_section"],
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        completed = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "Program" / "manuscript_claim_proposal_review.py"),
+                "--project-root",
+                str(self.project_root),
+                "--claim-ledger",
+                "Results/json/manuscript_section_claim_ledger.json",
+                "--proposal-id",
+                proposal_id,
+                "--action",
+                "approve",
+                "--reviewer",
+                "mahaoxuan",
+                "--note",
+                "同意作为下一步正式论断写回候选。",
+                "--output-report",
+                "Results/json/manuscript_claim_proposal_review.json",
+                "--output-review",
+                "Reviews/manuscript_claim_proposal_review.md",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+        review = json.loads((results_dir / "manuscript_claim_proposal_review.json").read_text(encoding="utf-8"))
+        self.assertEqual(review["status"], "claim_proposal_approved_for_promotion")
+        self.assertTrue(review["promotion_allowed"])
+        self.assertFalse(review["promoted_to_claims"])
+        self.assertFalse(review["formal_writeback_allowed"])
+        decision = review["human_review"]
+        self.assertEqual(decision["action"], "approve")
+        self.assertEqual(decision["reviewer"], "mahaoxuan")
+        self.assertEqual(decision["note"], "同意作为下一步正式论断写回候选。")
+        self.assertEqual(decision["proposal_id"], proposal_id)
+        self.assertEqual(review["proposal"]["source_finding_id"], "finding_without_claim")
+        self.assertEqual(review["proposal"]["source_table_id"], "regression_table_1")
+        self.assertIn("ln_robot", review["proposal"]["proposed_claim_text"])
+        self.assertEqual(review["next_action"]["id"], "promote_reviewed_proposal_in_separate_node")
+        self.assertFalse(review["formal_state_guard"]["changed"])
+        self.assertEqual(section_path.read_text(encoding="utf-8"), section_before)
+        self.assertEqual(protected_path.read_text(encoding="utf-8"), protected_before)
+        self.assertEqual(approved_findings_path.read_text(encoding="utf-8"), approved_findings_before)
+
     def test_bdd_19_gate_producer_consumes_recompute_without_requeueing_evidence_ready_tasks(self) -> None:
         """行为 19：下一轮任务生产器必须消费质量门复核账本。"""
         result = self.run_quality(["--profile", "aer_like"])

@@ -28,7 +28,11 @@
 - [x] P6-I10 实现：新增 `Program/workbench/cgss_literature_review_draft_packet.py` 和 `Program/cgss_literature_review_draft_packet.py`，生成理论基础、变量测量、中国经验和方法衔接 4 个综述段落块。
 - [x] P6-I10 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json` 和 `Reviews/cgss_social_capital_happiness_literature_review_draft_packet.md`；状态为 `needs_human_literature_review_draft_approval`。
 - [x] P6-I10 正式层边界：本节点不写 `Manuscripts/sections/literature-and-contribution.md`、不写正式参考文献、不写 `state/product/*`。
-- [ ] 下一步 P6-I11：在人工未批准前，继续生成“方法规范门禁 + 论文结构长度标准”的草稿包；批准后再把综述写入正式 section。
+- [x] P6-I11 BDD/TDD：新增 `tests/test_cgss_method_structure_gate_packet.py`，先确认缺少 `Program.workbench.cgss_method_structure_gate_packet` 的 RED，再实现方法规范和论文结构门禁包。
+- [x] P6-I11 实现：新增 `Program/workbench/cgss_method_structure_gate_packet.py` 和 `Program/cgss_method_structure_gate_packet.py`，把 OLS/Ordered Logit 结果、方法边界、DID/IV/RDD/PSM/DML 暂不进入条件和章节长度标准统一成审阅文件。
+- [x] P6-I11 真实运行：写出 `Results/json/cgss_social_capital_happiness_method_structure_gate_packet.json` 和 `Reviews/cgss_social_capital_happiness_method_structure_gate_packet.md`；状态为 `needs_human_method_structure_approval`。
+- [x] P6-I11 正式层边界：本节点不写正式 manuscript、不写 DesignSpec/RunPlan、不写 `state/product/*`。
+- [ ] 下一步 P6-I12：生成审稿式修订循环计划，把文献、方法、结构三个待批准包转成 Reviewer/Method/Literature/Writer 四类 Agent 任务队列。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

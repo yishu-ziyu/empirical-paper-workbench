@@ -110,7 +110,12 @@
 - [x] P6-K 真实运行：`python3 Program/cgss_method_gate.py --profile aer_like` 写出 `Results/json/cgss_social_capital_happiness_method_gate.json` 和 `Reviews/cgss_social_capital_happiness_method_gate.md`；状态为 `needs_human_method_gate_review`，`gate_status=yellow`。
 - [x] P6-K 方法检查：覆盖变量定义、OLS + Ordered Logit 适配、社会资本理论/文献依据、基础控制变量、稳健性/异质性/机制计划、反向因果和遗漏变量风险；结果数字绑定到 `cgss_social_capital_happiness_results_evidence_package.json`。
 - [x] P6-K 正式层边界：本节点只写草案层方法门 JSON 和人工审阅报告，不写正式 manuscript、不写正式 bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`。
-- [ ] 下一步 P6-L：生成审稿式 reviewer report、revision task queue 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`，消费 P6-K 方法门风险与缺口。
+- [x] P6-L BDD/TDD：新增 `tests/test_cgss_reviewer_revision_loop.py`，先确认缺少 `Program.workbench.cgss_reviewer_revision_loop` 的 RED，再实现审稿式修订循环。
+- [x] P6-L 实现：新增 `Program/workbench/cgss_reviewer_revision_loop.py` 和 `Program/cgss_reviewer_revision_loop.py`；消费探索性论文、paper assembly、P6-K 方法门、结果证据包和文献综述草稿包。
+- [x] P6-L 真实运行：`python3 Program/cgss_reviewer_revision_loop.py` 写出 `Reviews/cgss_social_capital_happiness_reviewer_report.md`、`Reviews/cgss_social_capital_happiness_revision_task_queue.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`；状态为 `needs_human_revision_review`，生成 6 条修订任务。
+- [x] P6-L 审稿覆盖：覆盖论文结构、文献综述、数据和变量、识别策略、结果解释、稳健性缺口、投稿规范缺口和需要人类判断的问题。
+- [x] P6-L 正式层边界：本节点只写草案层审稿报告、修订任务队列和 Rev1 草稿；不写正式 manuscript、不写正式 bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`。
+- [ ] 下一步 P6-M：形成 `workspace/paper_packages/cgss_social_capital_happiness/` 可验收 paper package，汇总 paper、PDF/HTML 预检、证据包、文献包、方法门、审稿报告、修订队列、复现 README 和 manifest。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

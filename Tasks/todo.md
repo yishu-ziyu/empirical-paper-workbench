@@ -68,7 +68,14 @@
 - [x] P6-J3 变量草案：因变量为 `happiness <- a36`；社会资本草案为 `a33/a31a/a31b/a311` 多维结构；控制变量候选为 `a2/a3a/a7a/a7b/a15/a18/a21/a8a/a8b/s41`；2021/2018 候选只保留为排除计数和后续稳健性候选，不进入主草案。
 - [x] P6-J3 正式层边界：本节点不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
 - [x] P6-J3 验证：目标测试 4 OK；真实 CLI 运行通过；审阅 Markdown 已包含数据绑定、变量理由、审阅门禁和正式层边界。
-- [ ] 下一步 P6-J4：进入 DesignSpec 草案入口，把已绑定数据和变量角色草案转成“横截面 OLS/Ordered Logit 的设计说明、不可用 DID/IV/RDD 的原因、需要文献支持的识别风险”；仍不写正式 DesignSpec。
+- [x] P6-J4 Agent Team：派发 Mill 只读定位现有 DesignSpec/RunPlan 入口；回收结论为正式层由 `Product/backend/design_spec_service.py` 写 `state/product/*`，本节点只能新增草案层，不走正式保存服务。
+- [x] P6-J4 BDD/TDD：新增 `tests/test_cgss_design_spec_draft.py`，先确认缺少 `Program.workbench.cgss_design_spec_draft` 的 RED，再实现 CGSS 研究设计草案模块和 CLI。
+- [x] P6-J4 实现：新增 `Program/workbench/cgss_design_spec_draft.py` 和 `Program/run_cgss_design_spec_draft.py`；把已绑定 CGSS2023 数据和变量角色草案转成横截面 OLS / Ordered Logit 设计说明、识别边界、方法族门禁和审阅门禁。
+- [x] P6-J4 真实运行：写出 `Results/json/cgss_social_capital_happiness_design_spec_draft.json` 与 `Reviews/cgss_social_capital_happiness_design_spec_draft.md`；状态为 `needs_human_design_spec_review`。
+- [x] P6-J4 方法边界：当前可以进入 OLS 基准模型和 Ordered Logit 有序模型；DID/IV/RDD/PSM/DML 因缺少处理时间、工具变量、断点、二元处理定义或因果处理设定，暂不进入运行计划。
+- [x] P6-J4 正式层边界：本节点不写正式 DesignSpec、不写 RunPlan、不写正式变量角色、不生成论文、不写 `state/product/*`；`promotion.allowed=false`，批准后才允许进入 RunPlan 草案。
+- [x] P6-J4 验证：目标测试 5 OK；CGSS 数据发现/变量发现/数据绑定/DesignSpec 状态机/方法门禁相邻回归 27 OK；Python 编译通过；真实 CLI 运行通过；scoped `git diff --check` 通过。
+- [ ] 下一步 P6-J5：基于 DesignSpec 草案生成 RunPlan seed 和最小执行预检，明确 OLS/Ordered Logit 的输入构造、缺失值处理、模型输出表和失败解释；仍不写正式 RunPlan。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

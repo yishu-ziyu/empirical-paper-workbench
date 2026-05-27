@@ -24,7 +24,11 @@
 - [x] P6-I9 实现：新增 `Program/workbench/cgss_verified_bibliography_candidates.py` 和 `Program/cgss_verified_bibliography_candidates.py`，把来源预检推进为 7 条可审阅参考文献候选、3 条人工/数据库辅助核验队列和 7 条引用绑定候选。
 - [x] P6-I9 真实运行：写出 `Results/json/cgss_social_capital_happiness_verified_bibliography_candidates.json` 和 `Reviews/cgss_social_capital_happiness_verified_bibliography_candidates.md`；状态为 `needs_human_bibliography_approval`。
 - [x] P6-I9 正式层边界：本节点不写 `verified_bibliography.csv`、不写 contribution matrix、不写正式 manuscript、不写 `state/product/*`。
-- [ ] 下一步 P6-I10：人工批准后写入 `verified_bibliography.csv` 与 citation bindings，随后生成 CGSS 文献综述正文草稿；如果仍未批准，先生成“待批准文献综述草稿包”供审阅。
+- [x] P6-I10 BDD/TDD：新增 `tests/test_cgss_literature_review_draft_packet.py`，先确认缺少 `Program.workbench.cgss_literature_review_draft_packet` 的 RED，再实现待批准文献综述草稿包。
+- [x] P6-I10 实现：新增 `Program/workbench/cgss_literature_review_draft_packet.py` 和 `Program/cgss_literature_review_draft_packet.py`，生成理论基础、变量测量、中国经验和方法衔接 4 个综述段落块。
+- [x] P6-I10 真实运行：写出 `Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json` 和 `Reviews/cgss_social_capital_happiness_literature_review_draft_packet.md`；状态为 `needs_human_literature_review_draft_approval`。
+- [x] P6-I10 正式层边界：本节点不写 `Manuscripts/sections/literature-and-contribution.md`、不写正式参考文献、不写 `state/product/*`。
+- [ ] 下一步 P6-I11：在人工未批准前，继续生成“方法规范门禁 + 论文结构长度标准”的草稿包；批准后再把综述写入正式 section。
 
 ## 2026-05-26 North Star：CLI-first Real Empirical Flow + Journal Skill Registry
 

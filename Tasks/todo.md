@@ -20,7 +20,18 @@
 - [x] 真实输出：状态为 `needs_human_literature_discovery_review`；生成 13 条查询、8 类来源入口、13 条候选检索记录；包含 IFR、CLDS、CFPS、CMDS、CGSS 等数据上下文查询。
 - [x] 正式层边界：本节点不执行网络检索、不下载全文、不写正式 bibliography、不写正式 manuscript、不写 project bibliography、不写 `state/product/*`。
 - [x] 验证：`python3 -m unittest tests.test_literature_discovery_seed -v` 通过 5 项；`python3 -m py_compile Program/literature_discovery_seed.py Program/workbench/literature_discovery_seed.py tests/test_literature_discovery_seed.py` 通过；scoped `git diff --check` 通过。
-- [ ] 下一步 P7-C：实现 Level 3 Manuscript Quality Gate，先把完整论文、长度、章节、引用候选、表/图/方法/审阅清单转成机器可验收门禁。
+- [x] 下一步 P7-C：已实现 Level 3 Manuscript Quality Gate。
+
+## 2026-05-28 P7-C Level 3 Manuscript Quality Gate
+
+- [x] 节点目标：把 Auto Mode 是否交付 Level 3 可人工审阅论文包转成可执行门禁，覆盖结构、长度、候选引用标记、paper package 信任层和正式层边界。
+- [x] BDD/TDD：新增 `tests/test_level3_manuscript_quality_gate.py`，覆盖完整论文通过结构/长度最低门、不完整论文阻断、候选引用必须标记待人工核验、manifest 区分真实运行/草稿层/人工审阅、JSON/Markdown 输出。
+- [x] 实现范围：新增 `Program/workbench/level3_manuscript_quality_gate.py` 和 `Program/level3_manuscript_quality_gate.py`；新增计划 `docs/superpowers/plans/2026-05-28-level3-manuscript-quality-gate.md`。
+- [x] 真实运行：`python3 Program/level3_manuscript_quality_gate.py --project-root . --paper workspace/paper_packages/cgss_social_capital_happiness/paper.md --package-manifest workspace/paper_packages/cgss_social_capital_happiness/manifest.json` 写出 `Results/json/level3_manuscript_quality_gate.json` 与 `Reviews/level3_manuscript_quality_gate.md`。
+- [x] 真实输出：状态为 `needs_human_level3_quality_review`；`gate_status=red`；当前 CGSS 包结构完整、长度达标，但参考文献候选条目未逐条标记“候选/待人工核验”，需要 `mark_candidate_references_for_human_review`。
+- [x] 正式层边界：本节点只生成质量门禁 JSON 和审阅报告，不改写论文、不改写正式 bibliography、不改写 project bibliography、不写 `state/product/*`。
+- [x] 验证：`python3 -m unittest tests.test_level3_manuscript_quality_gate -v` 通过 5 项；`python3 -m py_compile Program/level3_manuscript_quality_gate.py Program/workbench/level3_manuscript_quality_gate.py tests/test_level3_manuscript_quality_gate.py` 通过；scoped `git diff --check` 通过。
+- [ ] 下一步 P7-D：把 P7-A/B/C 串成首版 Auto Mode acceptance chain，先读数据索引、文献发现 seed、Level 3 gate，输出可操作的修复队列或 package readiness summary。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -235,6 +235,21 @@
 
 业务规则：章节扩写不能停在 JSON 里的嵌套字段。ManuscriptAgent 需要拿到一份能打开、能审阅、能逐项验收的章节工单，然后再进入下一轮真实写作或证据绑定。
 
+## 行为 16.2：章节工单必须生成草案层章节入口
+
+**Given** `paper_revision_round.json` 已经包含 `manuscript_section_work_orders`
+**And** 每个工单已经给出 `draft_output_path`、所需证据、写作指令和验收条件
+**When** 用户运行 `Program/manuscript_section_scaffold.py`
+**Then** 系统必须写出 `Results/json/manuscript_section_scaffold_report.json`
+**And** 系统必须写出 `Reviews/manuscript_section_scaffold.md`
+**And** 系统必须为每个章节写出 `Manuscripts/sections/{section}.md`
+**And** 每个章节文件必须保留章节标题、来源工单、证据清单、验收条件和 `## 草案正文`
+**And** scaffold report 必须声明 `status=section_scaffolds_ready`、`draft_layer_only=true`、`formal_writeback_allowed=false`
+**And** report 必须写明 Agent Team 调用节奏：章节入口 manifest 写出后调用 ManuscriptAgent；章节草案文件写出后收回；证据绑定扩写前再次调用 ManuscriptAgent
+**And** 命令不得改写 `state/product/*` 正式层文件。
+
+业务规则：章节工单只是任务说明，章节入口才是 ManuscriptAgent 真正工作的文件表面。P6-G5 只把工单落到草案层章节文件，让后续扩写、证据绑定和人工审阅都能围绕稳定文件推进。
+
 ## 行为 17：审稿式修订轮次必须生成可验收证据包
 
 **Given** `paper_revision_round.json` 已经包含多个 `queued_for_revision` Agent task

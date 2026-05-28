@@ -56,7 +56,19 @@
 - [x] 验收链复验：`python3 Program/auto_mode_acceptance_chain.py --project-root . --dataset-index Results/json/dataset_motherlode_index.json --literature-seed Results/json/literature_discovery_seed.json --level3-gate Results/json/level3_manuscript_quality_gate_reference_marker_candidate.json --output-report Results/json/auto_mode_acceptance_chain_reference_marker_candidate.json --output-review Reviews/auto_mode_acceptance_chain_reference_marker_candidate.md` 输出 `package_readiness=needs_human_final_review`，repair queue 为空。
 - [x] 正式层边界：本节点只写 proposal JSON、审阅报告和草稿层候选稿；不覆盖 `workspace/paper_packages/cgss_social_capital_happiness/paper.md`，不写正式 manuscript，不写正式 bibliography，不写 project bibliography，不写 `state/product/*`。
 - [x] 验证：目标测试 5 OK；P7-A/B/C/D/E 回归 26 OK；Python 编译通过；P7-E 相关文件 scoped `git diff --check` 通过。
-- [ ] 下一步 P7-F：把 candidate repair proposal 接入“人工批准后提升为下一轮 paper package candidate”的 approval router，仍保持正式层写回硬门禁。
+- [x] 下一步 P7-F：已转入 Method Knowledge Base，把 `Program/methodology` proposal/canonical 边界做成可查询 CLI 知识库。
+
+## 2026-05-28 P7-F Method Knowledge Base
+
+- [x] 节点目标：把 MethodAgent 可用的方法规则来源产品化为 CLI-first Method Knowledge Base，读取 `Program/methodology` 的 README、proposal 和 canonical 规则，输出可审阅方法检查。
+- [x] BDD/TDD：新增 `tests/test_method_knowledge_base.py`，覆盖 canonical/proposal 分层、CGSS OLS + Ordered Logit 查询、AER-like profile 不越权阻断、JSON/Markdown 输出、缺少方法库来源阻断。
+- [x] RED 记录：`python3 -m unittest tests.test_method_knowledge_base -v` 首次失败原因为缺少 `Program.workbench.method_knowledge_base`。
+- [x] 实现范围：新增 `Program/workbench/method_knowledge_base.py` 和 `Program/method_knowledge_base.py`；新增计划 `docs/superpowers/plans/2026-05-28-method-knowledge-base.md`。
+- [x] 真实运行：`python3 Program/method_knowledge_base.py --project-root . --query "CGSS 主观幸福感 社会资本 OLS Ordered Logit 横截面 AER-like" --profile aer_like` 写出 `Results/json/method_knowledge_base.json` 与 `Reviews/method_knowledge_base.md`。
+- [x] 真实输出：状态为 `needs_human_method_kb_review`；当前项目有 1 个 AER-like proposal 来源、0 个 canonical 规则、0 个 reviewed canonical blocking 规则；返回 6 个 CGSS OLS + Ordered Logit 方法检查。
+- [x] 正式层边界：本节点不联网、不同步外部仓库、不提升 proposal 到 canonical，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan 或 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P7-A/B/C/D/E/F 回归 31 OK；Python 编译通过；P7-F 相关文件 scoped `git diff --check` 通过。
+- [ ] 下一步 P7-G：实现 Statistical Adapter Contract，把 OLS/Ordered Logit/IV/DID 等执行结果标准化为 Auto Mode 可消费的统计适配器契约。
 
 ## 2026-05-27 Global Node Execution Contract
 

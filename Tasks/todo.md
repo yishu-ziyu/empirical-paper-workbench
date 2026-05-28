@@ -512,7 +512,22 @@
 - [x] 真实输出：`status=blocked_by_next_gate_workflow_continuation_execute`、`workflow_continuation_result_reviewed=false`、`can_continue_to_selected_route_execution=false`、`selected_route_execution_preflight_records=0`、`workflow_continuation_executed=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_workflow_continuation_result_review.json`。
 - [x] 正式层边界：本节点只写 P7-AM result review JSON 和 Markdown；不运行 continuation、不执行 selected route、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 7 OK；P7-A/.../AM 回归 267 OK；Python 编译通过。
-- [ ] 下一步 P7-AN：实现 selected route execute gate（只消费 P7-AM result review，ready 且显式确认后才执行 selected route command）；默认因 P7-AM blocked 而 blocked。
+- [x] 下一步 P7-AN：已实现 selected route execute gate（只消费 P7-AM result review，ready 且显式确认后才执行 selected route command）；默认因 P7-AM blocked 而 blocked。
+
+## 2026-05-28 P7-AN Auto Mode Formal Package Next Gate Selected Route Execute
+
+- [x] 组件效果：把 P7-AM continuation result review 转成 selected route execute gate；dry-run 只展示 selected route execute command，execute 必须显式确认、reviewer 和 note 才会调用既有 `auto_mode_formal_package_selected_route_execute.py`。
+- [x] 当前真实效果：仓库里的 P7-AM 仍是 `blocked_by_next_gate_workflow_continuation_execute`，所以本节点输出 `blocked_by_workflow_continuation_result_review`，selected route execute command 为 0，没有运行 selected route execute。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_selected_route_execute.json`；只有 `status=next_gate_selected_route_execute_command_executed` 且 `selected_route_execute_manifest_recorded=true` 时，才允许审阅既有 selected route execute manifest 并进入 route-specific artifact executor。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_selected_route_execute.py`，覆盖 ready dry-run、当前 blocked、P7-AM 缺失/无效/未 ready、selected route preflight record 合约、execute 确认和元数据、confirmed selected route execute、缺失 selected route execute command 文件、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_selected_route_execute`。
+- [x] Agent Team：未调用；本节点是单一 selected route execute gate 小切片，主要风险由 result-review/record-contract/confirmed execute 单测和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_selected_route_execute.py` 和 `Program/auto_mode_formal_package_next_gate_selected_route_execute.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-next-gate-selected-route-execute.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_selected_route_execute.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_selected_route_execute.py --project-root . --next-gate-workflow-continuation-result-review Results/json/auto_mode_formal_package_next_gate_workflow_continuation_result_review.json --mode dry-run --output-execute Results/json/auto_mode_formal_package_next_gate_selected_route_execute.json --output-review Reviews/auto_mode_formal_package_next_gate_selected_route_execute.md`。
+- [x] 真实输出：`status=blocked_by_workflow_continuation_result_review`、`selected_route_execute_command=0`、`selected_route_execute_command_executed=false`、`selected_route_execute_manifest_recorded=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_selected_route_execute.json`，未写 `workspace/formal_package_selected_route_execute/auto_mode/selected_route_execute_manifest.json`。
+- [x] 正式层边界：本节点只写 P7-AN execute JSON 和 Markdown；只有 ready+确认时才调用既有 selected route execute gate。当前真实运行不运行 selected route execute、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 8 OK；P7-A/.../AN 回归 275 OK；Python 编译通过。
+- [ ] 暂停点：按用户要求，完成 P7-AN 并记录后暂停目标；下一步恢复时从 P7-AO selected route execute result review / manifest review 开始。
 
 ## 2026-05-27 Global Node Execution Contract
 

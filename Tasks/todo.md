@@ -527,7 +527,22 @@
 - [x] 真实输出：`status=blocked_by_workflow_continuation_result_review`、`selected_route_execute_command=0`、`selected_route_execute_command_executed=false`、`selected_route_execute_manifest_recorded=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_selected_route_execute.json`，未写 `workspace/formal_package_selected_route_execute/auto_mode/selected_route_execute_manifest.json`。
 - [x] 正式层边界：本节点只写 P7-AN execute JSON 和 Markdown；只有 ready+确认时才调用既有 selected route execute gate。当前真实运行不运行 selected route execute、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 8 OK；P7-A/.../AN 回归 275 OK；Python 编译通过。
-- [ ] 暂停点：按用户要求，完成 P7-AN 并记录后暂停目标；下一步恢复时从 P7-AO selected route execute result review / manifest review 开始。
+- [x] 暂停点：已按用户要求在 P7-AN 完成并记录后暂停；本轮从 P7-AO selected route execute result review / manifest review 恢复。
+
+## 2026-05-28 P7-AO Auto Mode Formal Package Next Gate Selected Route Execute Result Review
+
+- [x] 组件效果：把 P7-AN selected route execute gate 的结果、既有 selected route execute report 和 selected route execute manifest 合并审阅；只有 P7-AN 已确认执行且 manifest 干净时，才把输入交给 route-specific artifact executor。
+- [x] 当前真实效果：仓库里的 P7-AN 仍是 `blocked_by_workflow_continuation_result_review`，所以本节点输出 `blocked_by_next_gate_selected_route_execute`，route-specific artifact executor input 为 0，没有运行任何路线产物执行器。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_selected_route_execute_result_review.json`；只有 `status=next_gate_selected_route_execute_result_review_ready` 且 `can_continue_to_route_specific_artifact_executor=true` 时，才允许使用 `route_specific_artifact_executor_input_records` 对接既有 selected route execute report 和 manifest。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_selected_route_execute_result_review.py`，覆盖 confirmed P7-AN + clean manifest ready、当前 blocked、P7-AN 缺失/无效/未完成、selected route execute report 合约、manifest 清洁边界、只写 result review、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_selected_route_execute_result_review`。
+- [x] Agent Team：未调用；本节点是单一 result/manifest review 小切片，主要风险由 P7-AN/result/manifest 合约单测和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_selected_route_execute_result_review.py` 和 `Program/auto_mode_formal_package_next_gate_selected_route_execute_result_review.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-next-gate-selected-route-execute-result-review.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_selected_route_execute_result_review.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_selected_route_execute_result_review.py --project-root . --next-gate-selected-route-execute Results/json/auto_mode_formal_package_next_gate_selected_route_execute.json --selected-route-execute Results/json/auto_mode_formal_package_selected_route_execute.json --selected-route-execute-manifest workspace/formal_package_selected_route_execute/auto_mode/selected_route_execute_manifest.json --output-result-review Results/json/auto_mode_formal_package_next_gate_selected_route_execute_result_review.json --output-review Reviews/auto_mode_formal_package_next_gate_selected_route_execute_result_review.md`。
+- [x] 真实输出：`status=blocked_by_next_gate_selected_route_execute`、`selected_route_execute_result_reviewed=false`、`can_continue_to_route_specific_artifact_executor=false`、`selected_route_execute_manifest_recorded=false`、`route_specific_artifact_executor_input_records=0`、`route_specific_artifact_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_selected_route_execute_result_review.json`。
+- [x] 正式层边界：本节点只写 P7-AO result review JSON 和 Markdown；不运行 route-specific artifact executor、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；P7-A/.../AO 回归 282 OK；Python 编译通过。
+- [ ] 下一步 P7-AP：实现 P7-AO 到 route-specific artifact executor 的 continuation gate（只消费 P7-AO result review，ready 且显式确认后才进入既有 artifact executor）；默认因 P7-AO blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

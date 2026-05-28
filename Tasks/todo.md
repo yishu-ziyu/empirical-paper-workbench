@@ -350,7 +350,21 @@
 - [x] 真实输出：`status=blocked_by_selected_route_execute`、`route_specific_command_executed=false`、`route_specific_artifact_executed=false`、`delegated_status=`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；没有 execute manifest，未运行 delegated command，未写 `state/product/auto_mode_formal_package_route_specific_artifact_executor.json`。
 - [x] 正式层边界：当前真实 blocked 不写产物；ready + confirmed execute 时只调用所选路线对应的既有命令。PDF/DOCX/package 会写各自正式包产物或 manifest；manual acceptance 会写既有人工验收 report/state；不重跑模型，不修改 DesignSpec/RunPlan/统计产物。
 - [x] 验证：目标测试 8 OK；P7-A/.../AB 回归 182 OK；Python 编译通过。
-- [ ] 下一步 P7-AC：实现 route-specific artifact verification gate（读取 P7-AB 和 delegated report，核验所选产物是否真正存在且指纹/状态一致）；默认因 P7-AB blocked 而 blocked。
+- [x] 下一步 P7-AC：已实现 route-specific artifact verification gate（读取 P7-AB 和 delegated report，核验所选产物是否真正存在且指纹/状态一致）；默认因 P7-AB blocked 而 blocked。
+
+## 2026-05-28 P7-AC Auto Mode Formal Package Route-Specific Artifact Verification
+
+- [x] 组件效果：把 P7-AB route-specific artifact executor 接成验证门；只有 P7-AB 完成且 delegated report 与真实文件路径、bytes、sha256 一致时，才输出 route-specific artifact verified。
+- [x] 当前真实效果：仓库里的 P7-AB 仍是 `blocked_by_selected_route_execute`，所以本节点输出 `blocked_by_route_specific_artifact_executor`，没有验证任何产物，也没有写 product state。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_route_specific_artifact_verification.py`，覆盖 PDF 指纹复验、当前 blocked、executor/delegated report 缺失或错误、executor completion contract、PDF/DOCX 路径和指纹、package manifest、manual acceptance state、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_route_specific_artifact_verification`。
+- [x] Agent Team：未调用；本节点是单一 route artifact verifier 小切片，主要风险由四类路线的 report/file/state 指纹单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_route_specific_artifact_verification.py` 和 `Program/auto_mode_formal_package_route_specific_artifact_verification.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-route-specific-artifact-verification.md`；新增审阅输出 `Reviews/auto_mode_formal_package_route_specific_artifact_verification.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_route_specific_artifact_verification.py --project-root . --route-specific-artifact-executor Results/json/auto_mode_formal_package_route_specific_artifact_executor.json --output-verification Results/json/auto_mode_formal_package_route_specific_artifact_verification.json --output-review Reviews/auto_mode_formal_package_route_specific_artifact_verification.md`。
+- [x] 真实输出：`status=blocked_by_route_specific_artifact_executor`、`route_type=`、`verified_route_type=`、`delegated_status=`、`route_specific_artifact_verified=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`；artifact verification records 为空，未写 `state/product/auto_mode_formal_package_route_specific_artifact_verification.json`。
+- [x] 正式层边界：本节点只写 P7-AC verification JSON/Markdown；不执行 delegated command，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不写 `state/product/*`，不修改 DesignSpec/RunPlan/统计产物。
+- [x] 验证：目标测试 8 OK；P7-A/.../AC 回归 190 OK；Python 编译通过。
+- [ ] 下一步 P7-AD：实现 verified route completion ledger（把通过 P7-AC 的单路线验证结果登记为可进入下一 Auto Mode gate 的只读账本）；默认因 P7-AC blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

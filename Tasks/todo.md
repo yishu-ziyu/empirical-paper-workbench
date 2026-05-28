@@ -267,7 +267,20 @@
 - [x] 真实输出：`status=blocked_by_candidate_promotion_execution_preflight`、`can_promote_with_confirmation=false`、`promotion_operations=0`、`candidate_targets_promoted=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 promotion manifest，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_promotion_execute.json`。
 - [x] 正式层边界：confirmed promote 可写 formal package target 和 promotion manifest；默认/current blocked 不写；不写 `state/product/*`，不渲染 PDF/DOCX，不重跑模型。
 - [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V 回归 133 OK；Python 编译通过。
-- [ ] 下一步 P7-W：实现 promoted formal package verification gate；默认因 P7-V blocked 而 blocked，确认正式成果文件和 manifest 后再进入后续 package verification/export。
+- [x] 下一步 P7-W：已实现 promoted formal package verification gate；默认因 P7-V blocked 而 blocked，确认正式成果文件和 manifest 后再进入后续 package verification/export。
+
+## 2026-05-28 P7-W Auto Mode Formal Target Adapter Promoted Package Verification Gate
+
+- [x] 组件效果：把 P7-V 的 promotion manifest 接成正式包复验节点；只有 P7-V completed 且 formal target 文件存在、bytes 和 SHA256 全匹配时，才标记 formal package verified。
+- [x] 当前真实效果：仓库里的 P7-V 仍是 blocked，所以本节点输出 `blocked_by_candidate_promotion_execute`，没有验证正式包。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_promoted_package_verification.py`，覆盖 completed promotion 复验、当前 blocked、manifest 缺失/错误、execute 未完成、正式目标缺失/变更/越界、边界越界、CLI 默认 blocked、只写 report/review。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_target_adapter_promoted_package_verification`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_promoted_package_verification.py` 和 `Program/auto_mode_formal_target_adapter_promoted_package_verification.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-promoted-package-verification.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_promoted_package_verification.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_promoted_package_verification.py --project-root . --candidate-promotion-execute Results/json/auto_mode_formal_target_adapter_candidate_promotion_execute.json --promotion-manifest workspace/formal_target_adapter_candidate_promotion/auto_mode/formal_target_adapter_candidate_promotion_manifest.json --output-verification Results/json/auto_mode_formal_target_adapter_promoted_package_verification.json --output-review Reviews/auto_mode_formal_target_adapter_promoted_package_verification.md`。
+- [x] 真实输出：`status=blocked_by_candidate_promotion_execute`、`formal_package_verified=false`、`promoted_formal_targets_verified=false`、`formal_target_verification_records=0`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 promotion manifest，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_promoted_package_verification.json`。
+- [x] 正式层边界：本节点只验证 P7-V 已提升的 formal package target；不复制/修复/覆盖正式成果，不写 `state/product/*`，不渲染 PDF/DOCX，不重跑模型。
+- [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W 回归 141 OK；Python 编译通过。
+- [ ] 下一步 P7-X：实现 verified formal package export/acceptance preflight；默认因 P7-W blocked 而 blocked，只有正式包复验通过后才进入导出或终态验收。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -176,7 +176,20 @@
 - [x] 真实输出：状态为 `blocked_by_target_adapter_readiness`；`adapter_execution_plan=0`、`execution_manifest_recorded=false`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 execution manifest，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
 - [x] 正式层边界：本节点只写 target adapter execution gate JSON 和 Markdown；不执行 adapter，不创建 candidate target，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O 回归 85 OK；Python 编译通过；P7-O scoped `git diff --check` 通过。
-- [ ] 下一步 P7-P：实现 adapter materialization preflight，消费 P7-O execution manifest；默认因 P7-O blocked 而 blocked，不 materialize、不写正式层。
+- [x] 下一步 P7-P：已实现 adapter materialization preflight；当前真实状态因 P7-O blocked 且未记录 execution manifest 而 blocked，不 materialize、不写正式层。
+
+## 2026-05-28 P7-P Auto Mode Formal Target Adapter Materialization Preflight
+
+- [x] 节点目标：消费 P7-O target adapter execution report 和 execution manifest，生成 adapter materialization preflight；本节点只判断是否可请求下一道显式 materialize 命令，不创建 candidate target。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_materialization_preflight.py`，覆盖 recorded execution manifest 生成 materialization plan、当前 P7-O blocked 阻断、missing/invalid manifest 阻断、execution report 未进入 recorded-manifest 状态阻断、bad adapter execution plan 阻断、CLI 默认 blocked、只写 report/review 不 materialize。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_target_adapter_materialization_preflight -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_target_adapter_materialization_preflight`。
+- [x] Agent Team：未调用；本节点是单一 schema/CLI 小切片，主要风险可由 P7-O/P7-P 目标测试和全链路回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_materialization_preflight.py` 和 `Program/auto_mode_formal_target_adapter_materialization_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-materialization-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_materialization_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_materialization_preflight.py --project-root . --target-adapter-execution Results/json/auto_mode_formal_target_adapter_execution.json --execution-manifest workspace/formal_target_adapter_execution/auto_mode/formal_target_adapter_execution_manifest.json --output-preflight Results/json/auto_mode_formal_target_adapter_materialization_preflight.json --output-review Reviews/auto_mode_formal_target_adapter_materialization_preflight.md`。
+- [x] 真实输出：状态为 `blocked_by_target_adapter_execution`；`materialization_plan=0`、`can_request_adapter_materialization=false`、`requires_explicit_materialize_command=false`、`candidate_targets_materialized=false`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 execution manifest，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
+- [x] 正式层边界：本节点只写 materialization preflight JSON 和 Markdown；不 materialize candidate target，不执行 target adapter，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P 回归 92 OK；Python 编译通过；P7-P scoped `git diff --check` 通过。
+- [ ] 下一步 P7-Q：实现显式 adapter materialization execute gate；默认因 P7-P blocked 而 blocked，不创建 candidate target、不写正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

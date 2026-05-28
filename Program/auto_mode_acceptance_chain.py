@@ -12,8 +12,10 @@ from Program.workbench.auto_mode_acceptance_chain import (  # noqa: E402
     DEFAULT_DATASET_INDEX_PATH,
     DEFAULT_LEVEL3_GATE_PATH,
     DEFAULT_LITERATURE_SEED_PATH,
+    DEFAULT_METHOD_KB_PATH,
     DEFAULT_REPORT_PATH,
     DEFAULT_REVIEW_PATH,
+    DEFAULT_STATISTICAL_CONTRACT_PATH,
     build_auto_mode_acceptance_chain,
     load_json,
     write_report,
@@ -26,6 +28,8 @@ def main() -> int:
     parser.add_argument("--dataset-index", default=str(DEFAULT_DATASET_INDEX_PATH))
     parser.add_argument("--literature-seed", default=str(DEFAULT_LITERATURE_SEED_PATH))
     parser.add_argument("--level3-gate", default=str(DEFAULT_LEVEL3_GATE_PATH))
+    parser.add_argument("--method-kb", default=str(DEFAULT_METHOD_KB_PATH))
+    parser.add_argument("--statistical-contract", default=str(DEFAULT_STATISTICAL_CONTRACT_PATH))
     parser.add_argument("--output-report", default=str(DEFAULT_REPORT_PATH))
     parser.add_argument("--output-review", default=str(DEFAULT_REVIEW_PATH))
     args = parser.parse_args()
@@ -34,14 +38,24 @@ def main() -> int:
     dataset_index = load_json(project_root / args.dataset_index) if (project_root / args.dataset_index).exists() else {}
     literature_seed = load_json(project_root / args.literature_seed) if (project_root / args.literature_seed).exists() else {}
     level3_gate = load_json(project_root / args.level3_gate) if (project_root / args.level3_gate).exists() else {}
+    method_knowledge_base = load_json(project_root / args.method_kb) if (project_root / args.method_kb).exists() else {}
+    statistical_adapter_contract = (
+        load_json(project_root / args.statistical_contract)
+        if (project_root / args.statistical_contract).exists()
+        else {}
+    )
     report = build_auto_mode_acceptance_chain(
         dataset_index=dataset_index,
         literature_seed=literature_seed,
         level3_gate=level3_gate,
+        method_knowledge_base=method_knowledge_base,
+        statistical_adapter_contract=statistical_adapter_contract,
         source_paths={
             "dataset_index": str(Path(args.dataset_index)),
             "literature_seed": str(Path(args.literature_seed)),
             "level3_gate": str(Path(args.level3_gate)),
+            "method_knowledge_base": str(Path(args.method_kb)),
+            "statistical_adapter_contract": str(Path(args.statistical_contract)),
         },
     )
     report_path, review_path = write_report(

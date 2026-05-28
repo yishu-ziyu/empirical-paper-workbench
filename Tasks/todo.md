@@ -80,7 +80,19 @@
 - [x] 真实输出：状态为 `needs_human_statistical_adapter_review`；生成 6 个 normalized results，其中 OLS 2 个、Ordered Logit 1 个、IV 3 个，capability matrix 均为 `contract_ready`。
 - [x] 正式层边界：本节点只读取已有执行/证据 JSON，不重跑模型、不调用 StatsPAI/Stata/Python 后端、不覆盖执行产物，不写正式 manuscript、正式 bibliography、DesignSpec、RunPlan 或 `state/product/*`。
 - [x] 验证：目标测试 5 OK；P7-A/B/C/D/E/F/G 回归 36 OK；Python 编译通过；P7-G 相关文件 scoped `git diff --check` 通过。
-- [ ] 下一步 P7-H：把 Method KB 和 Statistical Adapter Contract 接入 Auto Mode acceptance chain，使最终 package readiness 能同时读取方法规则和统计结果 contract。
+- [x] 下一步 P7-H：已把 Method KB 和 Statistical Adapter Contract 接入 Auto Mode acceptance chain，使最终 package readiness 能同时读取方法规则和统计结果 contract。
+
+## 2026-05-28 P7-H Auto Mode Method + Statistical Contract Chain
+
+- [x] 节点目标：把 P7-F Method Knowledge Base 与 P7-G Statistical Adapter Contract 接入 P7-D Auto Mode acceptance chain，让最终 package readiness 同时读取数据、文献、Level 3 论文门、方法规则和统计结果契约。
+- [x] BDD/TDD：扩展 `tests/test_auto_mode_acceptance_chain.py`，覆盖五组件聚合、method/stat review-ready 进入人工终审、缺失 method/stat 输入阻断并路由修复、统计契约不完整触发 repair、method/stat readiness summary、JSON/Markdown 输出。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_acceptance_chain -v` 首次失败原因为 `build_auto_mode_acceptance_chain()` 尚不接受 `method_knowledge_base` 和 `statistical_adapter_contract` 参数。
+- [x] 实现范围：扩展 `Program/workbench/auto_mode_acceptance_chain.py` 与 `Program/auto_mode_acceptance_chain.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-method-stat-chain.md`；新增审阅输出 `Reviews/auto_mode_acceptance_chain_method_stat_integrated.md`。
+- [x] 真实运行：`python3 Program/auto_mode_acceptance_chain.py --project-root . --dataset-index Results/json/dataset_motherlode_index.json --literature-seed Results/json/literature_discovery_seed.json --level3-gate Results/json/level3_manuscript_quality_gate_reference_marker_candidate.json --method-kb Results/json/method_knowledge_base.json --statistical-contract Results/json/statistical_adapter_contract.json --output-report Results/json/auto_mode_acceptance_chain_method_stat_integrated.json --output-review Reviews/auto_mode_acceptance_chain_method_stat_integrated.md`。
+- [x] 真实输出：状态为 `needs_human_final_review`；五个组件均纳入 `component_statuses`；Method KB summary 显示 6 个推荐检查、1 个 proposal 来源、0 个 reviewed canonical blocking rules；Statistical Adapter Contract summary 显示 6 个 normalized results、6 个 contract-ready results，观测方法为 IV、OLS、Ordered Logit；repair queue 为空。
+- [x] 正式层边界：本节点只写验收链路 JSON 和 Markdown，不重跑模型、不提升 proposal 到 canonical，不覆盖统计执行产物，不写正式论文、正式 bibliography、project bibliography、DesignSpec、RunPlan 或 `state/product/*`。
+- [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H 回归 39 OK；Python 编译通过；P7-H tracked scoped `git diff --check` 通过。
+- [ ] 下一步 P7-I：把 `needs_human_final_review` 转成一个可人工签收的 final review packet / promotion decision router，但仍默认不写正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

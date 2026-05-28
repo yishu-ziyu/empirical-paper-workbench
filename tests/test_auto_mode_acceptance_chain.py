@@ -14,6 +14,8 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
             dataset_index=self._dataset_index(),
             literature_seed=self._literature_seed(),
             level3_gate=self._level3_gate(gate_status="red", ready=False),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
             source_paths=self._source_paths(),
         )
 
@@ -29,6 +31,8 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
             dataset_index=self._dataset_index(),
             literature_seed=self._literature_seed(),
             level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
             source_paths=self._source_paths(),
         )
 
@@ -36,12 +40,16 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
         self.assertEqual(chain["repair_queue"], [])
         self.assertIn("review_level3_quality_gate", chain["human_review_checklist"])
         self.assertIn("review_literature_discovery_seed", chain["human_review_checklist"])
+        self.assertIn("review_method_knowledge_base", chain["human_review_checklist"])
+        self.assertIn("review_statistical_adapter_contract", chain["human_review_checklist"])
 
-    def test_bdd_p7d_reports_component_statuses_and_artifact_layers(self) -> None:
+    def test_bdd_p7h_reports_five_component_statuses_and_artifact_layers(self) -> None:
         chain = build_auto_mode_acceptance_chain(
             dataset_index=self._dataset_index(),
             literature_seed=self._literature_seed(),
             level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
             source_paths=self._source_paths(),
         )
 
@@ -49,15 +57,23 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
         self.assertEqual(statuses["dataset_motherlode_index"], "needs_human_dataset_index_review")
         self.assertEqual(statuses["literature_discovery_seed"], "needs_human_literature_discovery_review")
         self.assertEqual(statuses["level3_manuscript_quality_gate"], "needs_human_level3_quality_review")
+        self.assertEqual(statuses["method_knowledge_base"], "needs_human_method_kb_review")
+        self.assertEqual(statuses["statistical_adapter_contract"], "needs_human_statistical_adapter_review")
         self.assertIn("results_evidence_package.json", chain["artifact_layers"]["real_run_artifacts"])
+        self.assertIn("statistical_adapter_contract.json", chain["artifact_layers"]["real_run_artifacts"])
         self.assertIn("paper.md", chain["artifact_layers"]["draft_layer_artifacts"])
+        self.assertIn("method_knowledge_base.json", chain["artifact_layers"]["draft_layer_artifacts"])
         self.assertIn("method_gate.md", chain["artifact_layers"]["human_review_required"])
+        self.assertIn("method_knowledge_base.md", chain["artifact_layers"]["human_review_required"])
+        self.assertIn("statistical_adapter_contract.md", chain["artifact_layers"]["human_review_required"])
 
     def test_bdd_p7d_blocks_when_required_inputs_are_missing(self) -> None:
         chain = build_auto_mode_acceptance_chain(
             dataset_index={},
             literature_seed=self._literature_seed(),
             level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
             source_paths=self._source_paths(),
         )
 
@@ -65,11 +81,61 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
         self.assertEqual(chain["package_readiness"], "blocked")
         self.assertIn("dataset_motherlode_index", chain["missing_inputs"])
 
+    def test_bdd_p7h_blocks_and_routes_missing_method_or_stat_contracts(self) -> None:
+        chain = build_auto_mode_acceptance_chain(
+            dataset_index=self._dataset_index(),
+            literature_seed=self._literature_seed(),
+            level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base={},
+            statistical_adapter_contract={},
+            source_paths=self._source_paths(),
+        )
+
+        self.assertEqual(chain["status"], "blocked_missing_acceptance_inputs")
+        self.assertIn("method_knowledge_base", chain["missing_inputs"])
+        self.assertIn("statistical_adapter_contract", chain["missing_inputs"])
+        task_ids = {item["task_id"] for item in chain["repair_queue"]}
+        self.assertIn("build_method_knowledge_base", task_ids)
+        self.assertIn("build_statistical_adapter_contract", task_ids)
+
+    def test_bdd_p7h_repairs_incomplete_statistical_contract(self) -> None:
+        chain = build_auto_mode_acceptance_chain(
+            dataset_index=self._dataset_index(),
+            literature_seed=self._literature_seed(),
+            level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(contract_ready_count=0),
+            source_paths=self._source_paths(),
+        )
+
+        self.assertEqual(chain["package_readiness"], "needs_auto_mode_repair")
+        task_ids = {item["task_id"] for item in chain["repair_queue"]}
+        self.assertIn("repair_statistical_adapter_contract", task_ids)
+        self.assertEqual(chain["statistical_readiness"]["contract_ready_result_count"], 0)
+
+    def test_bdd_p7h_exposes_method_and_statistical_readiness_summaries(self) -> None:
+        chain = build_auto_mode_acceptance_chain(
+            dataset_index=self._dataset_index(),
+            literature_seed=self._literature_seed(),
+            level3_gate=self._level3_gate(gate_status="yellow", ready=True),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
+            source_paths=self._source_paths(),
+        )
+
+        self.assertEqual(chain["method_readiness"]["recommended_check_count"], 2)
+        self.assertFalse(chain["method_readiness"]["proposal_rules_can_block"])
+        self.assertEqual(chain["statistical_readiness"]["normalized_result_count"], 2)
+        self.assertEqual(chain["statistical_readiness"]["contract_ready_result_count"], 2)
+        self.assertEqual(chain["statistical_readiness"]["observed_methods"], ["ols", "ordered_logit"])
+
     def test_bdd_p7d_writes_json_and_markdown_review_outputs(self) -> None:
         chain = build_auto_mode_acceptance_chain(
             dataset_index=self._dataset_index(),
             literature_seed=self._literature_seed(),
             level3_gate=self._level3_gate(gate_status="red", ready=False),
+            method_knowledge_base=self._method_knowledge_base(),
+            statistical_adapter_contract=self._statistical_adapter_contract(),
             source_paths=self._source_paths(),
         )
 
@@ -87,6 +153,8 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
             self.assertIn("Auto Mode Acceptance Chain", review_text)
             self.assertIn("正式论文写回：否", review_text)
             self.assertIn("needs_auto_mode_repair", review_text)
+            self.assertIn("Method Knowledge Base", review_text)
+            self.assertIn("Statistical Adapter Contract", review_text)
 
     def _dataset_index(self) -> dict:
         return {
@@ -117,11 +185,58 @@ class AutoModeAcceptanceChainTests(unittest.TestCase):
             },
         }
 
+    def _method_knowledge_base(self) -> dict:
+        return {
+            "schema_version": "p7.method_knowledge_base.v1",
+            "status": "needs_human_method_kb_review",
+            "source_summary": {
+                "proposal_source_count": 1,
+                "canonical_rule_count": 0,
+                "reviewed_canonical_blocking_rule_count": 0,
+            },
+            "formal_export_policy": {
+                "proposal_rules_can_block": False,
+                "reviewed_canonical_blocking_rule_count": 0,
+                "canonical_rules_can_block_after_human_review": False,
+            },
+            "recommended_checks": [
+                {"check_id": "ordered_outcome_model_fit", "requires_human_review": True},
+                {"check_id": "ols_association_boundary", "requires_human_review": True},
+            ],
+        }
+
+    def _statistical_adapter_contract(self, contract_ready_count: int = 2) -> dict:
+        normalized_results = [
+            {"result_id": "ols_baseline", "method_id": "ols", "status": "contract_ready"},
+            {"result_id": "ordered_logit", "method_id": "ordered_logit", "status": "contract_ready"},
+        ][:contract_ready_count]
+        return {
+            "schema_version": "p7.statistical_adapter_contract.v1",
+            "status": "needs_human_statistical_adapter_review",
+            "normalized_results": normalized_results,
+            "capability_matrix": {
+                "ols": {
+                    "method_id": "ols",
+                    "status": "contract_ready" if contract_ready_count else "incomplete",
+                    "result_count": 1 if contract_ready_count else 0,
+                    "contract_ready_count": 1 if contract_ready_count else 0,
+                },
+                "ordered_logit": {
+                    "method_id": "ordered_logit",
+                    "status": "contract_ready" if contract_ready_count > 1 else "not_observed",
+                    "result_count": 1 if contract_ready_count > 1 else 0,
+                    "contract_ready_count": 1 if contract_ready_count > 1 else 0,
+                },
+            },
+        }
+
     def _source_paths(self) -> dict:
         return {
             "dataset_index": "Results/json/dataset_motherlode_index.json",
             "literature_seed": "Results/json/literature_discovery_seed.json",
             "level3_gate": "Results/json/level3_manuscript_quality_gate.json",
+            "method_knowledge_base": "Results/json/method_knowledge_base.json",
+            "statistical_adapter_contract": "Results/json/statistical_adapter_contract.json",
         }
 
 

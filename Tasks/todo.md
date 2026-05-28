@@ -336,7 +336,21 @@
 - [x] 真实输出：`status=blocked_by_selected_route_execution_preflight`、`can_execute_selected_route_with_confirmation=false`、`selected_route_execute_manifest_recorded=false`、`selected_route_execute_operations=0`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；仓库已有旧 PDF/DOCX/manifest，本节点未修改它们，未写 `state/product/auto_mode_formal_package_selected_route_execute.json`。
 - [x] 正式层边界：本节点只写 selected route execute JSON/Markdown；只有 ready + confirmed execute 时才写 execute manifest；不渲染 PDF/DOCX，不生成正式 package manifest，不执行人工验收，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
 - [x] 验证：目标测试 9 OK；P7-A/.../AA 回归 174 OK；Python 编译通过。
-- [ ] 下一步 P7-AB：实现 route-specific artifact executor（按 execute manifest 分别执行 PDF/DOCX/package/manual 的真实动作）；默认因 P7-AA blocked 而 blocked。
+- [x] 下一步 P7-AB：已实现 route-specific artifact executor（按 execute manifest 分别执行 PDF/DOCX/package/manual 的真实动作）；默认因 P7-AA blocked 而 blocked。
+
+## 2026-05-28 P7-AB Auto Mode Formal Package Route-Specific Artifact Executor
+
+- [x] 组件效果：把 P7-AA execute manifest 接成 route-specific artifact executor；ready + confirmed execute 时按 route type 分发到现有 PDF、DOCX、package manifest 或 manual acceptance 命令。
+- [x] 当前真实效果：仓库里的 P7-AA 仍是 blocked 且没有 execute manifest，所以本节点输出 `blocked_by_selected_route_execute`，没有运行 delegated command，也没有写任何正式包产物。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_route_specific_artifact_executor.py`，覆盖 dry-run dispatch、当前 blocked、report/manifest 缺失或错误、operation 合约错误、execute 缺确认/元数据、PDF/DOCX 真实命令、package/manual 真实命令、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_route_specific_artifact_executor`。
+- [x] Agent Team：未调用；本节点是单一 selected-route dispatcher 小切片，主要风险由 manifest/contract/request/四类 delegated command 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_route_specific_artifact_executor.py` 和 `Program/auto_mode_formal_package_route_specific_artifact_executor.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-route-specific-artifact-executor.md`；新增审阅输出 `Reviews/auto_mode_formal_package_route_specific_artifact_executor.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_route_specific_artifact_executor.py --project-root . --selected-route-execute Results/json/auto_mode_formal_package_selected_route_execute.json --execute-manifest workspace/formal_package_selected_route_execute/auto_mode/selected_route_execute_manifest.json --mode dry-run --output-executor Results/json/auto_mode_formal_package_route_specific_artifact_executor.json --output-review Reviews/auto_mode_formal_package_route_specific_artifact_executor.md`。
+- [x] 真实输出：`status=blocked_by_selected_route_execute`、`route_specific_command_executed=false`、`route_specific_artifact_executed=false`、`delegated_status=`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；没有 execute manifest，未运行 delegated command，未写 `state/product/auto_mode_formal_package_route_specific_artifact_executor.json`。
+- [x] 正式层边界：当前真实 blocked 不写产物；ready + confirmed execute 时只调用所选路线对应的既有命令。PDF/DOCX/package 会写各自正式包产物或 manifest；manual acceptance 会写既有人工验收 report/state；不重跑模型，不修改 DesignSpec/RunPlan/统计产物。
+- [x] 验证：目标测试 8 OK；P7-A/.../AB 回归 182 OK；Python 编译通过。
+- [ ] 下一步 P7-AC：实现 route-specific artifact verification gate（读取 P7-AB 和 delegated report，核验所选产物是否真正存在且指纹/状态一致）；默认因 P7-AB blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

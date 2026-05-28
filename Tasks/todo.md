@@ -215,7 +215,20 @@
 - [x] 真实输出：状态为 `blocked_by_materialization_execute`；`candidate_targets_verified=false`、`target_verification_records=0`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 materialization manifest，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_verification.json`。
 - [x] 正式层边界：本节点只写 candidate verification JSON 和 Markdown；不创建/修复 candidate target，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R 回归 107 OK；Python 编译通过；P7-R scoped `git diff --check` 通过。
-- [ ] 下一步 P7-S：实现 verified candidate promotion preflight；默认因 P7-R blocked 而 blocked，不提升正式层。
+- [x] 下一步 P7-S：已实现 verified candidate promotion preflight；默认因 P7-R blocked 而 blocked，不提升正式层。
+
+## 2026-05-28 P7-S Auto Mode Formal Target Adapter Candidate Promotion Preflight
+
+- [x] 节点目标：消费 P7-R candidate verification report，把已验证 candidate targets 转成可审阅的 verified candidate promotion preflight；本节点只判断是否可请求后续提升审批/显式执行，不提升候选目标。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_candidate_promotion_preflight.py`，覆盖 verified candidates 生成 promotion preflight plan、当前 P7-R blocked 阻断、missing/invalid schema 阻断、逐项 verification record 必须 verified/auto_mode/SHA256、boundary violation 阻断、CLI 默认 blocked、只写 report/review 不提升 candidate。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_target_adapter_candidate_promotion_preflight -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_target_adapter_candidate_promotion_preflight`；扩展 CLI 行为后第二次 RED 为缺少 `Program/auto_mode_formal_target_adapter_candidate_promotion_preflight.py`。
+- [x] Agent Team：未调用；本节点是单一 preflight gate 小切片，主要风险由 P7-R ready/blocked/record/boundary 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_candidate_promotion_preflight.py` 和 `Program/auto_mode_formal_target_adapter_candidate_promotion_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-candidate-promotion-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_candidate_promotion_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_candidate_promotion_preflight.py --project-root . --candidate-verification Results/json/auto_mode_formal_target_adapter_candidate_verification.json --output-preflight Results/json/auto_mode_formal_target_adapter_candidate_promotion_preflight.json --output-review Reviews/auto_mode_formal_target_adapter_candidate_promotion_preflight.md`。
+- [x] 真实输出：状态为 `blocked_by_candidate_verification`；`can_request_verified_candidate_promotion_approval=false`、`promotion_plan=0`、`candidate_targets_promoted=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_promotion_preflight.json`。
+- [x] 正式层边界：本节点只写 candidate promotion preflight JSON 和 Markdown；不复制/覆盖/提升 candidate target，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S 回归 114 OK；Python 编译通过。
+- [ ] 下一步 P7-T：实现 verified candidate promotion approval gate；默认因 P7-S blocked 而 blocked，不提升正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

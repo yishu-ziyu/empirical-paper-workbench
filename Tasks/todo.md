@@ -202,7 +202,20 @@
 - [x] 真实输出：状态为 `blocked_by_materialization_preflight`；`materialization_operations=0`、`can_materialize_with_confirmation=false`、`materialization_manifest_recorded=false`、`candidate_targets_materialized=false`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 materialization manifest，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
 - [x] 正式层边界：本节点只在 confirmed materialize 且 preflight ready 时写 candidate targets 与 materialization manifest；不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q 回归 99 OK；Python 编译通过；P7-Q scoped `git diff --check` 通过。
-- [ ] 下一步 P7-R：实现 materialized candidate target verification gate；默认因 P7-Q blocked 而 blocked，不提升正式层。
+- [x] 下一步 P7-R：已实现 materialized candidate target verification gate；默认因 P7-Q blocked 而 blocked，不提升正式层。
+
+## 2026-05-28 P7-R Auto Mode Formal Target Adapter Candidate Verification Gate
+
+- [x] 节点目标：消费 P7-Q materialization execute report 和 materialization manifest，验证 materialized candidate targets 是否存在且与 manifest byte count 一致；本节点只验证，不创建、不修复、不提升正式层。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_candidate_verification.py`，覆盖 completed materialization 验证 candidate targets、当前 P7-Q blocked 阻断、missing/invalid manifest 阻断、execute report 未 completed/materialized 阻断、target 缺失或 bytes 不一致阻断、boundary violation 阻断、CLI 默认 blocked、只写 report/review 不写正式层。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_target_adapter_candidate_verification -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_target_adapter_candidate_verification`。
+- [x] Agent Team：未调用；本节点是单一 verification gate 小切片，主要风险由 target 存在性/bytes/边界单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_candidate_verification.py` 和 `Program/auto_mode_formal_target_adapter_candidate_verification.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-candidate-verification.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_candidate_verification.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_candidate_verification.py --project-root . --materialization-execute Results/json/auto_mode_formal_target_adapter_materialization_execute.json --materialization-manifest workspace/formal_target_adapter_materialization/auto_mode/formal_target_adapter_materialization_manifest.json --output-verification Results/json/auto_mode_formal_target_adapter_candidate_verification.json --output-review Reviews/auto_mode_formal_target_adapter_candidate_verification.md`。
+- [x] 真实输出：状态为 `blocked_by_materialization_execute`；`candidate_targets_verified=false`、`target_verification_records=0`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 materialization manifest，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_verification.json`。
+- [x] 正式层边界：本节点只写 candidate verification JSON 和 Markdown；不创建/修复 candidate target，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R 回归 107 OK；Python 编译通过；P7-R scoped `git diff --check` 通过。
+- [ ] 下一步 P7-S：实现 verified candidate promotion preflight；默认因 P7-R blocked 而 blocked，不提升正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

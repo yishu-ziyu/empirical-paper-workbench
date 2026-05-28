@@ -378,7 +378,21 @@
 - [x] 真实输出：`status=blocked_by_route_specific_artifact_verification`、`route_completion_ledger_recorded=false`、`can_enter_next_auto_mode_gate=false`、`route_completion_records=0`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_verified_route_completion_ledger.json`。
 - [x] 正式层边界：本节点只写 P7-AD ledger JSON 和 Markdown；不执行 delegated command，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不提升 candidate target，不写 `state/product/*`，不修改 DesignSpec/RunPlan/统计产物。
 - [x] 验证：目标测试 8 OK；P7-A/.../AD 回归 198 OK；Python 编译通过；P7-AD scoped `git diff --check` 通过。
-- [ ] 下一步 P7-AE：实现 verified route completion next gate router（只消费 P7-AD ledger，决定能否进入下一 Auto Mode gate）；默认因 P7-AD blocked 而 blocked。
+- [x] 下一步 P7-AE：已实现 verified route completion next gate router（只消费 P7-AD ledger，决定能否进入下一 Auto Mode gate）；默认因 P7-AD blocked 而 blocked。
+
+## 2026-05-28 P7-AE Auto Mode Formal Package Verified Route Next Gate Router
+
+- [x] 组件效果：把 P7-AD 的只读完成账本转成下一关路由记录；PDF/DOCX/package manifest 完成后回到导出/验收路由循环，manual acceptance 完成后进入正式包交付完成门。
+- [x] 当前真实效果：仓库里的 P7-AD 仍是 `blocked_by_route_specific_artifact_verification`，所以本节点输出 `blocked_by_verified_route_completion_ledger`，没有记录下一关路由，也不允许进入下一关。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_verified_route_next_gate_router.py`，覆盖 ready PDF 路由、当前 blocked、schema/status 缺失、completion record 合约、未知 route type、manual acceptance 终态路由、边界越界、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_verified_route_next_gate_router`。
+- [x] Agent Team：未调用；本节点是单一只读 router 小切片，主要风险由 P7-AD ready/blocked/contract/boundary 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_verified_route_next_gate_router.py` 和 `Program/auto_mode_formal_package_verified_route_next_gate_router.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-verified-route-next-gate-router.md`；新增审阅输出 `Reviews/auto_mode_formal_package_verified_route_next_gate_router.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_verified_route_next_gate_router.py --project-root . --verified-route-completion-ledger Results/json/auto_mode_formal_package_verified_route_completion_ledger.json --output-router Results/json/auto_mode_formal_package_verified_route_next_gate_router.json --output-review Reviews/auto_mode_formal_package_verified_route_next_gate_router.md`。
+- [x] 真实输出：`status=blocked_by_verified_route_completion_ledger`、`next_gate_route_recorded=false`、`can_enter_routed_next_gate=false`、`routed_next_gate=`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_verified_route_next_gate_router.json`。
+- [x] 正式层边界：本节点只写 P7-AE router JSON 和 Markdown；不进入下一关，不执行 delegated command，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不写 `state/product/*`，不修改 DesignSpec/RunPlan/统计产物。
+- [x] 验证：目标测试 8 OK；P7-A/.../AE 回归 206 OK；Python 编译通过；P7-AE scoped `git diff --check` 通过。
+- [ ] 下一步 P7-AF：实现 routed next gate entry preflight（只消费 P7-AE router，ready 时生成下一关进入计划）；默认因 P7-AE blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

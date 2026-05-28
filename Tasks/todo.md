@@ -104,7 +104,19 @@
 - [x] 真实输出：packet 状态为 `awaiting_human_final_review`，可请求人工终审决策；evidence summary 包含 5 个组件、6 个方法检查、6 个 contract-ready 统计结果和 9 个 package 文件；decision 状态为 `waiting_for_human_final_review_decision`，route 为 `wait_for_human_confirmation`。
 - [x] 正式层边界：本节点只写终审 packet/router JSON 和 Markdown；默认 `defer`，不批准、不写正式论文、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不重跑模型、不覆盖统计执行产物。
 - [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I 回归 46 OK；Python 编译通过；P7-I staged `git diff --cached --check` 通过。
-- [ ] 下一步 P7-J：在人工 `approve` 决策之后实现 formal promotion preflight，继续保持正式写回需要单独明确授权。
+- [x] 下一步 P7-J：已实现 formal promotion preflight；当前真实状态因 P7-I `decision=defer` 阻断，正式写回仍需单独明确授权。
+
+## 2026-05-28 P7-J Auto Mode Formal Promotion Preflight
+
+- [x] 节点目标：在 P7-I 人工终审 `approve` 之后，生成 formal promotion preflight ledger；本节点只判断是否可请求下一道正式写回审批，不直接写正式论文、bibliography、DesignSpec、RunPlan、`state/product/*`、PDF/DOCX 或统计产物。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_promotion_preflight.py`，覆盖终审 approve 后进入正式写回审批预检、当前 defer 阻断、approve 缺少 reviewer/note 阻断、package manifest 缺口阻断、只写 JSON/Markdown、CLI 默认读取当前 defer 决策并写 blocked preflight。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_promotion_preflight -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_promotion_preflight`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_promotion_preflight.py` 和 `Program/auto_mode_formal_promotion_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-promotion-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_promotion_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_promotion_preflight.py --project-root . --final-review-decision Results/json/auto_mode_final_review_decision.json --final-review-packet Results/json/auto_mode_final_review_packet.json --package-manifest workspace/paper_packages/cgss_social_capital_happiness/manifest.json --output-report Results/json/auto_mode_formal_promotion_preflight.json --output-review Reviews/auto_mode_formal_promotion_preflight.md`。
+- [x] 真实输出：状态为 `blocked_by_final_review_decision`；`can_request_formal_writeback_approval=false`、`formal_writeback_allowed=false`、`can_write_product_state=false`；阻断原因包括 `final_review_decision_not_approved_for_preflight`、`final_review_decision_not_approve`、`final_review_route_not_formal_promotion_preflight`、`final_review_decision_not_approved` 和 `final_review_promotion_not_allowed`。
+- [x] 正式层边界：本节点只写 formal promotion preflight JSON 和 Markdown；不把 `defer` 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J 回归 52 OK；Python 编译通过；P7-J scoped `git diff --check` 通过。
+- [ ] 下一步 P7-K：实现 auto-mode formal writeback approval ledger，但默认保持 blocked/defer；只有用户明确给出 final review `approve` 和后续 formal writeback approval 时，才允许进入实际写回预检或转正。
 
 ## 2026-05-27 Global Node Execution Contract
 

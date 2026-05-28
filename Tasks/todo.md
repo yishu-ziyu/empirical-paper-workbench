@@ -452,7 +452,22 @@
 - [x] 真实输出：`status=blocked_by_manifested_routed_next_gate_command_preflight`、`can_execute_manifested_next_gate_command_with_confirmation=false`、`delegated_command=0`、`next_gate_command_executed=false`、`this_command_ran_next_gate_command=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_manifested_routed_next_gate_command_execute.json`。
 - [x] 正式层边界：本节点只写 P7-AI execute JSON 和 Markdown；只有 ready+确认时才运行 delegated next-gate command；当前真实运行不运行下游命令、不进入下一关、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 8 OK；P7-A/.../AI 回归 238 OK；Python 编译通过。
-- [ ] 下一步 P7-AJ：实现 manifested next-gate command result review（只消费 P7-AI execute report，审阅 delegated next-gate 输出是否可继续）；默认因 P7-AI blocked 而 blocked。
+- [x] 下一步 P7-AJ：已实现 manifested next-gate command result review（只消费 P7-AI execute report，审阅 delegated next-gate 输出是否可继续）；默认因 P7-AI blocked 而 blocked。
+
+## 2026-05-28 P7-AJ Auto Mode Formal Package Manifested Next Gate Command Result Review
+
+- [x] 组件效果：把 P7-AI 的 execute report 和 delegated next-gate report 转成可审阅的结果判断；只有 delegated schema、status、path contract 都匹配时才允许继续。
+- [x] 当前真实效果：仓库里的 P7-AI 仍是 `blocked_by_manifested_routed_next_gate_command_preflight`，所以本节点输出 `blocked_by_manifested_next_gate_command_execute`，delegated result record 为 0，不能继续。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_manifested_next_gate_command_result_review.json`；只有 `can_continue_after_delegated_next_gate=true` 且 `delegated_next_gate_result_reviewed=true` 时，才允许继续后续 next-gate workflow。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_manifested_next_gate_command_result_review.py`，覆盖已执行 PDF delegated 输出 ready、当前 P7-AI blocked、execute report 缺失/未完成、route/report/status contract、delegated report schema/status/blocker、只写 result review、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_manifested_next_gate_command_result_review`。
+- [x] Agent Team：未调用；本节点是单一 result review 小切片，主要风险由 execute/contract/delegated report 单测和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_manifested_next_gate_command_result_review.py` 和 `Program/auto_mode_formal_package_manifested_next_gate_command_result_review.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-manifested-next-gate-command-result-review.md`；新增审阅输出 `Reviews/auto_mode_formal_package_manifested_next_gate_command_result_review.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_manifested_next_gate_command_result_review.py --project-root . --manifested-next-gate-command-execute Results/json/auto_mode_formal_package_manifested_routed_next_gate_command_execute.json --output-result-review Results/json/auto_mode_formal_package_manifested_next_gate_command_result_review.json --output-review Reviews/auto_mode_formal_package_manifested_next_gate_command_result_review.md`。
+- [x] 真实输出：`status=blocked_by_manifested_next_gate_command_execute`、`can_continue_after_delegated_next_gate=false`、`delegated_result_records=0`、`next_gate_command_executed=false`、`this_command_ran_next_gate_command=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_manifested_next_gate_command_result_review.json`。
+- [x] 正式层边界：本节点只写 P7-AJ result review JSON 和 Markdown；不运行 delegated command、不进入下一关、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；P7-A/.../AJ 回归 245 OK；Python 编译通过。
+- [ ] 下一步 P7-AK：实现 next-gate workflow continuation preflight（只消费 P7-AJ result review，ready 时生成后续工作流 continuation plan）；默认因 P7-AJ blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

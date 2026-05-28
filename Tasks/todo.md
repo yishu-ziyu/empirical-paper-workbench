@@ -308,7 +308,21 @@
 - [x] 真实输出：`status=blocked_by_export_acceptance_preflight`、`can_route_export_or_acceptance=false`、`route_recorded=false`、`routed_action=`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_export_acceptance_router.json`，仓库已有旧 PDF/DOCX，本节点未修改它们。
 - [x] 正式层边界：本节点只写 router JSON 和 Markdown；不渲染 PDF/DOCX，不生成最终包 manifest，不执行人工验收，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
 - [x] 验证：目标测试 8 OK；P7-A/.../Y 回归 156 OK；Python 编译通过。
-- [ ] 下一步 P7-Z：实现 selected route execution preflight（按 P7-Y routed_action 拆到 PDF/DOCX/package/acceptance 的具体执行预检）；默认因 P7-Y blocked 而 blocked。
+- [x] 下一步 P7-Z：已实现 selected route execution preflight（按 P7-Y routed_action 拆到 PDF/DOCX/package/acceptance 的具体执行预检）；默认因 P7-Y blocked 而 blocked。
+
+## 2026-05-28 P7-Z Auto Mode Formal Package Selected Route Execution Preflight
+
+- [x] 组件效果：把 P7-Y 已记录的人为路线拆成单条执行预检；PDF、DOCX、package manifest、manual acceptance 会分别映射到不同的后续显式执行命令。
+- [x] 当前真实效果：仓库里的 P7-Y 仍是 blocked，所以本节点输出 `blocked_by_export_acceptance_router`，没有生成 selected route execution plan。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_selected_route_execution_preflight.py`，覆盖 PDF 路由、DOCX/package/manual 路由分流、当前 blocked、router 缺失/错误/未记录、未知/错配路线、selected plan 合约错误、边界越界、CLI 默认 blocked、只写 report/review。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_selected_route_execution_preflight`。
+- [x] Agent Team：未调用；本节点是单一 selected-route preflight 小切片，主要风险由 ready/blocked/route-mapping/contract/boundary 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_selected_route_execution_preflight.py` 和 `Program/auto_mode_formal_package_selected_route_execution_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-selected-route-execution-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_package_selected_route_execution_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_selected_route_execution_preflight.py --project-root . --export-acceptance-router Results/json/auto_mode_formal_package_export_acceptance_router.json --output-preflight Results/json/auto_mode_formal_package_selected_route_execution_preflight.json --output-review Reviews/auto_mode_formal_package_selected_route_execution_preflight.md`。
+- [x] 真实输出：`status=blocked_by_export_acceptance_router`、`can_request_selected_route_execution=false`、`requires_explicit_route_execute_command=false`、`selected_route_execution_plan=0`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；仓库已有旧 PDF/DOCX/manifest，本节点未修改它们，未写 `state/product/auto_mode_formal_package_selected_route_execution_preflight.json`。
+- [x] 正式层边界：本节点只写 selected route preflight JSON 和 Markdown；不渲染 PDF/DOCX，不生成 package manifest，不执行人工验收，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
+- [x] 验证：目标测试 9 OK；P7-A/.../Z 回归 165 OK；Python 编译通过。
+- [ ] 下一步 P7-AA：实现 selected route explicit execute gate（按 P7-Z plan 提供 dry-run/execute 门）；默认因 P7-Z blocked 而 blocked，不导出、不验收。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -68,7 +68,19 @@
 - [x] 真实输出：状态为 `needs_human_method_kb_review`；当前项目有 1 个 AER-like proposal 来源、0 个 canonical 规则、0 个 reviewed canonical blocking 规则；返回 6 个 CGSS OLS + Ordered Logit 方法检查。
 - [x] 正式层边界：本节点不联网、不同步外部仓库、不提升 proposal 到 canonical，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan 或 `state/product/*`。
 - [x] 验证：目标测试 5 OK；P7-A/B/C/D/E/F 回归 31 OK；Python 编译通过；P7-F 相关文件 scoped `git diff --check` 通过。
-- [ ] 下一步 P7-G：实现 Statistical Adapter Contract，把 OLS/Ordered Logit/IV/DID 等执行结果标准化为 Auto Mode 可消费的统计适配器契约。
+- [x] 下一步 P7-G：已实现 Statistical Adapter Contract，把 OLS/Ordered Logit/IV/DID 等执行结果标准化为 Auto Mode 可消费的统计适配器契约。
+
+## 2026-05-28 P7-G Statistical Adapter Contract
+
+- [x] 节点目标：把已有统计执行产物统一成 Auto Mode 可消费的统计结果契约，避免论文包、方法门和写作代理分别猜测后端字段。
+- [x] BDD/TDD：新增 `tests/test_statistical_adapter_contract.py`，覆盖本地 OLS/IV 执行结果规范化、CGSS OLS + Ordered Logit 证据规范化、capability/missing-field matrix、JSON/Markdown 输出、缺少统计来源阻断。
+- [x] RED 记录：`python3 -m unittest tests.test_statistical_adapter_contract -v` 首次失败原因为缺少 `Program.workbench.statistical_adapter_contract`。
+- [x] 实现范围：新增 `Program/workbench/statistical_adapter_contract.py` 和 `Program/statistical_adapter_contract.py`；新增计划 `docs/superpowers/plans/2026-05-28-statistical-adapter-contract.md`。
+- [x] 真实运行：`python3 Program/statistical_adapter_contract.py --project-root . --method-execution Results/json/method_execution_result.json --cgss-results-evidence workspace/paper_packages/cgss_social_capital_happiness/results_evidence_package.json` 写出 `Results/json/statistical_adapter_contract.json` 与 `Reviews/statistical_adapter_contract.md`。
+- [x] 真实输出：状态为 `needs_human_statistical_adapter_review`；生成 6 个 normalized results，其中 OLS 2 个、Ordered Logit 1 个、IV 3 个，capability matrix 均为 `contract_ready`。
+- [x] 正式层边界：本节点只读取已有执行/证据 JSON，不重跑模型、不调用 StatsPAI/Stata/Python 后端、不覆盖执行产物，不写正式 manuscript、正式 bibliography、DesignSpec、RunPlan 或 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P7-A/B/C/D/E/F/G 回归 36 OK；Python 编译通过；P7-G 相关文件 scoped `git diff --check` 通过。
+- [ ] 下一步 P7-H：把 Method KB 和 Statistical Adapter Contract 接入 Auto Mode acceptance chain，使最终 package readiness 能同时读取方法规则和统计结果 contract。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -254,7 +254,20 @@
 - [x] 真实输出：`can_request_verified_candidate_promotion_execution=false`、`requires_explicit_promotion_execute_command=false`、`promotion_execution_plan=0`、`candidate_targets_promoted=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_promotion_execution_preflight.json`。
 - [x] 正式层边界：本节点只写 execution preflight JSON 和 Markdown；不复制/覆盖/提升 candidate target，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U 回归 127 OK；Python 编译通过。
-- [ ] 下一步 P7-V：实现显式 verified candidate promotion execute gate；默认因 P7-U blocked 而 blocked，不提升正式层。
+- [x] 下一步 P7-V：已实现显式 verified candidate promotion execute gate；默认因 P7-U blocked 而 blocked，不提升正式层。
+
+## 2026-05-28 P7-V Auto Mode Formal Target Adapter Candidate Promotion Execute Gate
+
+- [x] 组件效果：把 P7-U 的执行前检查清单接成显式 promote 命令；只有 ready + confirm + reviewer/note + 文件校验通过时，才把 candidate 文件复制到 formal package。
+- [x] 当前真实效果：仓库里的 P7-U 仍是 blocked，所以本节点输出 `blocked_by_candidate_promotion_execution_preflight`，没有写正式成果。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_candidate_promotion_execute.py`，覆盖 confirmed promote、dry-run、blocked preflight、缺确认/元数据、候选缺失/变更/目标已存在、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_target_adapter_candidate_promotion_execute`；新增 CLI 行为后失败为缺少 `Program/auto_mode_formal_target_adapter_candidate_promotion_execute.py`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_candidate_promotion_execute.py` 和 `Program/auto_mode_formal_target_adapter_candidate_promotion_execute.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-candidate-promotion-execute.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_candidate_promotion_execute.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_candidate_promotion_execute.py --project-root . --promotion-execution-preflight Results/json/auto_mode_formal_target_adapter_candidate_promotion_execution_preflight.json --mode dry-run --output-execute Results/json/auto_mode_formal_target_adapter_candidate_promotion_execute.json --output-review Reviews/auto_mode_formal_target_adapter_candidate_promotion_execute.md --promotion-manifest workspace/formal_target_adapter_candidate_promotion/auto_mode/formal_target_adapter_candidate_promotion_manifest.json`。
+- [x] 真实输出：`status=blocked_by_candidate_promotion_execution_preflight`、`can_promote_with_confirmation=false`、`promotion_operations=0`、`candidate_targets_promoted=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 promotion manifest，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_promotion_execute.json`。
+- [x] 正式层边界：confirmed promote 可写 formal package target 和 promotion manifest；默认/current blocked 不写；不写 `state/product/*`，不渲染 PDF/DOCX，不重跑模型。
+- [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V 回归 133 OK；Python 编译通过。
+- [ ] 下一步 P7-W：实现 promoted formal package verification gate；默认因 P7-V blocked 而 blocked，确认正式成果文件和 manifest 后再进入后续 package verification/export。
 
 ## 2026-05-27 Global Node Execution Contract
 

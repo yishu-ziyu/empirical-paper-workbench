@@ -294,7 +294,21 @@
 - [x] 真实输出：`status=blocked_by_promoted_package_verification`、`can_enter_formal_package_export_acceptance=false`、`requires_explicit_export_or_acceptance_command=false`、`export_acceptance_plan=0`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；仓库已有旧 `paper.pdf/paper.docx`，本节点未改动它们，未写 `state/product/auto_mode_formal_package_export_acceptance_preflight.json`。
 - [x] 正式层边界：本节点只写导出/验收预检 JSON 和 Markdown；不渲染 PDF/DOCX，不生成最终包 manifest，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
 - [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X 回归 148 OK；Python 编译通过。
-- [ ] 下一步 P7-Y：实现 explicit formal package export/acceptance command router；默认因 P7-X blocked 而 blocked，只有预检 ready 且显式确认后才允许进入具体导出或人工验收动作。
+- [x] 下一步 P7-Y：已实现 explicit formal package export/acceptance command router；默认因 P7-X blocked 而 blocked，只有预检 ready 且显式确认后才允许进入具体导出或人工验收动作。
+
+## 2026-05-28 P7-Y Auto Mode Formal Package Export / Acceptance Router
+
+- [x] 组件效果：把 P7-X 的导出/验收预检接成显式人为路由；只有预检 ready + confirm + reviewer/note + decision 命中 plan 时，才记录下一步路由。
+- [x] 当前真实效果：仓库里的 P7-X 仍是 blocked，所以本节点输出 `blocked_by_export_acceptance_preflight`，没有记录导出/验收路线。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_export_acceptance_router.py`，覆盖 defer、confirmed pdf route、当前 blocked、未知/缺失计划动作、缺确认/元数据、边界越界、CLI 默认 blocked、只写 report/review。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_export_acceptance_router`。
+- [x] Agent Team：未调用；本节点是单一 router 小切片，主要风险由 ready/blocked/decision/boundary 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_export_acceptance_router.py` 和 `Program/auto_mode_formal_package_export_acceptance_router.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-export-acceptance-router.md`；新增审阅输出 `Reviews/auto_mode_formal_package_export_acceptance_router.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_export_acceptance_router.py --project-root . --export-acceptance-preflight Results/json/auto_mode_formal_package_export_acceptance_preflight.json --decision defer --output-router Results/json/auto_mode_formal_package_export_acceptance_router.json --output-review Reviews/auto_mode_formal_package_export_acceptance_router.md`。
+- [x] 真实输出：`status=blocked_by_export_acceptance_preflight`、`can_route_export_or_acceptance=false`、`route_recorded=false`、`routed_action=`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_export_acceptance_router.json`，仓库已有旧 PDF/DOCX，本节点未修改它们。
+- [x] 正式层边界：本节点只写 router JSON 和 Markdown；不渲染 PDF/DOCX，不生成最终包 manifest，不执行人工验收，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
+- [x] 验证：目标测试 8 OK；P7-A/.../Y 回归 156 OK；Python 编译通过。
+- [ ] 下一步 P7-Z：实现 selected route execution preflight（按 P7-Y routed_action 拆到 PDF/DOCX/package/acceptance 的具体执行预检）；默认因 P7-Y blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

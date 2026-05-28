@@ -116,7 +116,19 @@
 - [x] 真实输出：状态为 `blocked_by_final_review_decision`；`can_request_formal_writeback_approval=false`、`formal_writeback_allowed=false`、`can_write_product_state=false`；阻断原因包括 `final_review_decision_not_approved_for_preflight`、`final_review_decision_not_approve`、`final_review_route_not_formal_promotion_preflight`、`final_review_decision_not_approved` 和 `final_review_promotion_not_allowed`。
 - [x] 正式层边界：本节点只写 formal promotion preflight JSON 和 Markdown；不把 `defer` 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J 回归 52 OK；Python 编译通过；P7-J scoped `git diff --check` 通过。
-- [ ] 下一步 P7-K：实现 auto-mode formal writeback approval ledger，但默认保持 blocked/defer；只有用户明确给出 final review `approve` 和后续 formal writeback approval 时，才允许进入实际写回预检或转正。
+- [x] 下一步 P7-K：已实现 auto-mode formal writeback approval ledger；当前真实状态因 P7-J preflight blocked 而继续阻断，未批准、未写正式层。
+
+## 2026-05-28 P7-K Auto Mode Formal Writeback Approval Ledger
+
+- [x] 节点目标：在 P7-J formal promotion preflight ready 之后，记录单独的人类 formal writeback approval；本节点只生成审批账本并授权下一道执行预检，不直接写正式论文、bibliography、DesignSpec、RunPlan、`state/product/*`、PDF/DOCX 或统计产物。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_writeback_approval.py`，覆盖 ready preflight + approve 记录可生效审批、defer 等待、P7-J blocked 不可绕过、approve 缺 reviewer/note 阻断、revise/reject 不启用写回、只写 JSON/Markdown、CLI 默认读取当前 blocked preflight 并禁止正式写回。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_writeback_approval -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_writeback_approval`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_writeback_approval.py` 和 `Program/auto_mode_formal_writeback_approval.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-writeback-approval.md`；新增审阅输出 `Reviews/auto_mode_formal_writeback_approval.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_writeback_approval.py --project-root . --formal-promotion-preflight Results/json/auto_mode_formal_promotion_preflight.json --decision defer --output-approval Results/json/auto_mode_formal_writeback_approval.json --output-review Reviews/auto_mode_formal_writeback_approval.md`。
+- [x] 真实输出：状态为 `blocked_by_formal_promotion_preflight`；`approved=false`、`formal_writeback_allowed=false`、`can_enter_formal_writeback_execution_preflight=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；阻断原因包括 `formal_promotion_preflight_not_ready`、`formal_promotion_preflight_cannot_request_approval` 和 `formal_promotion_scope_missing`。
+- [x] 正式层边界：本节点只写 formal writeback approval JSON 和 Markdown；不把 `defer` 或 blocked preflight 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K 回归 59 OK；Python 编译通过；P7-K scoped `git diff --check` 通过。
+- [ ] 下一步 P7-L：实现 formal writeback execution preflight，消费 P7-K approval ledger；默认因当前 approval 未生效而 blocked，不执行正式写回。
 
 ## 2026-05-27 Global Node Execution Contract
 

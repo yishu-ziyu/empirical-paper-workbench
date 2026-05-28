@@ -92,7 +92,19 @@
 - [x] 真实输出：状态为 `needs_human_final_review`；五个组件均纳入 `component_statuses`；Method KB summary 显示 6 个推荐检查、1 个 proposal 来源、0 个 reviewed canonical blocking rules；Statistical Adapter Contract summary 显示 6 个 normalized results、6 个 contract-ready results，观测方法为 IV、OLS、Ordered Logit；repair queue 为空。
 - [x] 正式层边界：本节点只写验收链路 JSON 和 Markdown，不重跑模型、不提升 proposal 到 canonical，不覆盖统计执行产物，不写正式论文、正式 bibliography、project bibliography、DesignSpec、RunPlan 或 `state/product/*`。
 - [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H 回归 39 OK；Python 编译通过；P7-H tracked scoped `git diff --check` 通过。
-- [ ] 下一步 P7-I：把 `needs_human_final_review` 转成一个可人工签收的 final review packet / promotion decision router，但仍默认不写正式层。
+- [x] 下一步 P7-I：已把 `needs_human_final_review` 转成一个可人工签收的 final review packet / promotion decision router，默认 `defer` 且不写正式层。
+
+## 2026-05-28 P7-I Auto Mode Final Review Packet
+
+- [x] 节点目标：把 P7-H 五组件 `needs_human_final_review` 验收链和 CGSS paper package manifest 汇总成可人工签收的 final review packet，并提供 `defer/approve/revise/reject` 决策路由。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_final_review_packet.py`，覆盖 ready chain + package manifest 生成终审 packet、上游 repair queue 阻断终审、默认 defer 不写正式层、approve 必须有 reviewer/note、approve 只进入 formal promotion preflight、revise/reject 不允许 promotion、CLI 默认写出 packet/router 审阅产物。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_final_review_packet -v` 首次失败原因为缺少 `Program.workbench.auto_mode_final_review_packet`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_final_review_packet.py` 和 `Program/auto_mode_final_review_packet.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-final-review-packet.md`；新增审阅输出 `Reviews/auto_mode_final_review_packet.md` 与 `Reviews/auto_mode_final_review_decision.md`。
+- [x] 真实运行：`python3 Program/auto_mode_final_review_packet.py --project-root . --acceptance-chain Results/json/auto_mode_acceptance_chain_method_stat_integrated.json --package-manifest workspace/paper_packages/cgss_social_capital_happiness/manifest.json --decision defer --output-packet Results/json/auto_mode_final_review_packet.json --output-packet-review Reviews/auto_mode_final_review_packet.md --output-decision Results/json/auto_mode_final_review_decision.json --output-decision-review Reviews/auto_mode_final_review_decision.md`。
+- [x] 真实输出：packet 状态为 `awaiting_human_final_review`，可请求人工终审决策；evidence summary 包含 5 个组件、6 个方法检查、6 个 contract-ready 统计结果和 9 个 package 文件；decision 状态为 `waiting_for_human_final_review_decision`，route 为 `wait_for_human_confirmation`。
+- [x] 正式层边界：本节点只写终审 packet/router JSON 和 Markdown；默认 `defer`，不批准、不写正式论文、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不重跑模型、不覆盖统计执行产物。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I 回归 46 OK；Python 编译通过；P7-I staged `git diff --cached --check` 通过。
+- [ ] 下一步 P7-J：在人工 `approve` 决策之后实现 formal promotion preflight，继续保持正式写回需要单独明确授权。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -280,7 +280,21 @@
 - [x] 真实输出：`status=blocked_by_candidate_promotion_execute`、`formal_package_verified=false`、`promoted_formal_targets_verified=false`、`formal_target_verification_records=0`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 promotion manifest，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_promoted_package_verification.json`。
 - [x] 正式层边界：本节点只验证 P7-V 已提升的 formal package target；不复制/修复/覆盖正式成果，不写 `state/product/*`，不渲染 PDF/DOCX，不重跑模型。
 - [x] 验证：目标测试 8 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W 回归 141 OK；Python 编译通过。
-- [ ] 下一步 P7-X：实现 verified formal package export/acceptance preflight；默认因 P7-W blocked 而 blocked，只有正式包复验通过后才进入导出或终态验收。
+- [x] 下一步 P7-X：已实现 verified formal package export/acceptance preflight；默认因 P7-W blocked 而 blocked，只有正式包复验通过后才进入导出或终态验收。
+
+## 2026-05-28 P7-X Auto Mode Formal Package Export / Acceptance Preflight
+
+- [x] 组件效果：把 P7-W 的正式包复验结果接成导出/终态验收预检；只有 `formal_package_verified=true` 且 formal target 记录完整时，才生成 PDF、DOCX、包 manifest、人工验收四类下一步计划。
+- [x] 当前真实效果：仓库里的 P7-W 仍是 blocked，所以本节点输出 `blocked_by_promoted_package_verification`，没有导出/验收计划。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_export_acceptance_preflight.py`，覆盖 verified package 生成计划、当前 blocked、报告缺失/错误/未 verified、target 记录缺失/未验证/越界、边界越界、CLI 默认 blocked、只写 report/review。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_export_acceptance_preflight`。
+- [x] Agent Team：未调用；本节点是单一只读 preflight 小切片，主要风险由 P7-W ready/blocked/target/boundary 单测和 P7 回归覆盖，拆 sidecar 不会明显提升质量或速度。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_export_acceptance_preflight.py` 和 `Program/auto_mode_formal_package_export_acceptance_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-export-acceptance-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_package_export_acceptance_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_export_acceptance_preflight.py --project-root . --promoted-package-verification Results/json/auto_mode_formal_target_adapter_promoted_package_verification.json --output-preflight Results/json/auto_mode_formal_package_export_acceptance_preflight.json --output-review Reviews/auto_mode_formal_package_export_acceptance_preflight.md`。
+- [x] 真实输出：`status=blocked_by_promoted_package_verification`、`can_enter_formal_package_export_acceptance=false`、`requires_explicit_export_or_acceptance_command=false`、`export_acceptance_plan=0`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；仓库已有旧 `paper.pdf/paper.docx`，本节点未改动它们，未写 `state/product/auto_mode_formal_package_export_acceptance_preflight.json`。
+- [x] 正式层边界：本节点只写导出/验收预检 JSON 和 Markdown；不渲染 PDF/DOCX，不生成最终包 manifest，不修复/覆盖正式成果，不写 `state/product/*`，不重跑模型。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S/T/U/V/W/X 回归 148 OK；Python 编译通过。
+- [ ] 下一步 P7-Y：实现 explicit formal package export/acceptance command router；默认因 P7-X blocked 而 blocked，只有预检 ready 且显式确认后才允许进入具体导出或人工验收动作。
 
 ## 2026-05-27 Global Node Execution Contract
 

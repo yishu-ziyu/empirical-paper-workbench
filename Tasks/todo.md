@@ -128,7 +128,19 @@
 - [x] 真实输出：状态为 `blocked_by_formal_promotion_preflight`；`approved=false`、`formal_writeback_allowed=false`、`can_enter_formal_writeback_execution_preflight=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；阻断原因包括 `formal_promotion_preflight_not_ready`、`formal_promotion_preflight_cannot_request_approval` 和 `formal_promotion_scope_missing`。
 - [x] 正式层边界：本节点只写 formal writeback approval JSON 和 Markdown；不把 `defer` 或 blocked preflight 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K 回归 59 OK；Python 编译通过；P7-K scoped `git diff --check` 通过。
-- [ ] 下一步 P7-L：实现 formal writeback execution preflight，消费 P7-K approval ledger；默认因当前 approval 未生效而 blocked，不执行正式写回。
+- [x] 下一步 P7-L：已实现 formal writeback execution preflight；当前真实状态因 P7-K approval 未生效而 blocked，不执行正式写回。
+
+## 2026-05-28 P7-L Auto Mode Formal Writeback Execution Preflight
+
+- [x] 节点目标：消费 P7-K formal writeback approval ledger，把生效审批转成可审阅的正式写回执行计划；本节点只做执行预检，不直接写正式论文、bibliography、DesignSpec、RunPlan、`state/product/*`、PDF/DOCX 或统计产物。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_writeback_execution_preflight.py`，覆盖生效 approval 生成 execution plan、当前 approval 未生效阻断、approved scope 缺失阻断、上游边界越界阻断、只写 JSON/Markdown、CLI 默认读取当前 blocked approval 并不执行写回。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_writeback_execution_preflight -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_writeback_execution_preflight`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_writeback_execution_preflight.py` 和 `Program/auto_mode_formal_writeback_execution_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-writeback-execution-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_writeback_execution_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_writeback_execution_preflight.py --project-root . --formal-writeback-approval Results/json/auto_mode_formal_writeback_approval.json --output-preflight Results/json/auto_mode_formal_writeback_execution_preflight.json --output-review Reviews/auto_mode_formal_writeback_execution_preflight.md`。
+- [x] 真实输出：状态为 `blocked_by_formal_writeback_approval`；`can_request_formal_writeback_execution=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；阻断原因包括 `formal_writeback_approval_not_effective`、`formal_writeback_approval_decision_not_approve`、`formal_writeback_approval_metadata_incomplete` 和 `approved_scope_missing`。
+- [x] 正式层边界：本节点只写 formal writeback execution preflight JSON 和 Markdown；不把 blocked approval 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L 回归 65 OK；Python 编译通过；P7-L scoped `git diff --check` 通过。
+- [ ] 下一步 P7-M：实现显式 formal writeback execute dry-run/apply 分离；默认 dry-run 且当前因 P7-L blocked 不能 apply，继续不写正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

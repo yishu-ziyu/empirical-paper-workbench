@@ -140,7 +140,19 @@
 - [x] 真实输出：状态为 `blocked_by_formal_writeback_approval`；`can_request_formal_writeback_execution=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；阻断原因包括 `formal_writeback_approval_not_effective`、`formal_writeback_approval_decision_not_approve`、`formal_writeback_approval_metadata_incomplete` 和 `approved_scope_missing`。
 - [x] 正式层边界：本节点只写 formal writeback execution preflight JSON 和 Markdown；不把 blocked approval 当作批准，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L 回归 65 OK；Python 编译通过；P7-L scoped `git diff --check` 通过。
-- [ ] 下一步 P7-M：实现显式 formal writeback execute dry-run/apply 分离；默认 dry-run 且当前因 P7-L blocked 不能 apply，继续不写正式层。
+- [x] 下一步 P7-M：已实现显式 formal writeback execute dry-run/apply 分离；当前真实状态因 P7-L blocked 而 blocked，未记录 apply manifest，未写正式层。
+
+## 2026-05-28 P7-M Auto Mode Formal Writeback Execute Dry-Run/Apply Gate
+
+- [x] 节点目标：消费 P7-L formal writeback execution preflight，提供显式 `dry-run/apply` 执行门；默认 dry-run 只生成计划审阅，确认 apply 也只记录 apply manifest，不直接写正式层。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_writeback_execute.py`，覆盖 ready preflight dry-run、当前 P7-L blocked 阻断、apply 必须显式确认、apply 必须有 reviewer/note、confirmed apply 只写 manifest、CLI 默认读取当前 blocked preflight。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_writeback_execute -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_writeback_execute`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_writeback_execute.py` 和 `Program/auto_mode_formal_writeback_execute.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-writeback-execute.md`；新增审阅输出 `Reviews/auto_mode_formal_writeback_execute.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_writeback_execute.py --project-root . --execution-preflight Results/json/auto_mode_formal_writeback_execution_preflight.json --mode dry-run --output-execute Results/json/auto_mode_formal_writeback_execute.json --output-review Reviews/auto_mode_formal_writeback_execute.md --apply-manifest workspace/formal_writeback_apply/auto_mode/formal_writeback_apply_manifest.json`。
+- [x] 真实输出：状态为 `blocked_by_execution_preflight`；`mode=dry-run`、`can_apply_with_confirmation=false`、`apply_manifest_recorded=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 apply manifest。
+- [x] 正式层边界：本节点只写 execute dry-run/apply gate JSON 和 Markdown；当前真实 dry-run 不写 apply manifest。即使 confirmed apply，也只记录 apply manifest，不执行 formal target adapters，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M 回归 71 OK；Python 编译通过；P7-M scoped `git diff --check` 通过。
+- [ ] 下一步 P7-N：实现 formal target adapter readiness/mapping，把 apply manifest 的 6 类 target group 映射到具体候选写回目标；默认因 apply manifest 未记录而 blocked，不写正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

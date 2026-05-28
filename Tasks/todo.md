@@ -152,7 +152,19 @@
 - [x] 真实输出：状态为 `blocked_by_execution_preflight`；`mode=dry-run`、`can_apply_with_confirmation=false`、`apply_manifest_recorded=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未生成 apply manifest。
 - [x] 正式层边界：本节点只写 execute dry-run/apply gate JSON 和 Markdown；当前真实 dry-run 不写 apply manifest。即使 confirmed apply，也只记录 apply manifest，不执行 formal target adapters，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
 - [x] 验证：目标测试 6 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M 回归 71 OK；Python 编译通过；P7-M scoped `git diff --check` 通过。
-- [ ] 下一步 P7-N：实现 formal target adapter readiness/mapping，把 apply manifest 的 6 类 target group 映射到具体候选写回目标；默认因 apply manifest 未记录而 blocked，不写正式层。
+- [x] 下一步 P7-N：已实现 formal target adapter readiness/mapping；当前真实状态因 apply manifest 未记录而 blocked，未生成 adapter mappings，未写正式层。
+
+## 2026-05-28 P7-N Auto Mode Formal Target Adapter Readiness Mapping
+
+- [x] 节点目标：消费 P7-M apply manifest 和 CGSS paper package manifest，把 6 类 `writeback_target_group` 映射到具体候选写回目标；本节点只做 readiness/mapping，不执行 target adapter。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_target_adapter_readiness.py`，覆盖 ready apply manifest 映射 6 类 target group、当前缺少 apply manifest 阻断、未知 target group 阻断、缺少 package artifact 阻断、apply manifest 边界越界阻断、只写 report/review 不创建 candidate target、CLI 默认 blocked。
+- [x] RED 记录：`python3 -m unittest tests.test_auto_mode_formal_target_adapter_readiness -v` 首次失败原因为缺少 `Program.workbench.auto_mode_formal_target_adapter_readiness`。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_target_adapter_readiness.py` 和 `Program/auto_mode_formal_target_adapter_readiness.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-target-adapter-readiness.md`；新增审阅输出 `Reviews/auto_mode_formal_target_adapter_readiness.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_readiness.py --project-root . --apply-manifest workspace/formal_writeback_apply/auto_mode/formal_writeback_apply_manifest.json --package-manifest workspace/paper_packages/cgss_social_capital_happiness/manifest.json --target-root Submissions/auto_mode --output-report Results/json/auto_mode_formal_target_adapter_readiness.json --output-review Reviews/auto_mode_formal_target_adapter_readiness.md`。
+- [x] 真实输出：状态为 `blocked_by_apply_manifest`；`adapter_mappings=0`、`can_request_target_adapter_execution=false`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
+- [x] 正式层边界：本节点只写 target adapter readiness JSON 和 Markdown；不执行 adapter，不复制 package artifact，不写正式 manuscript、正式 bibliography、project bibliography、DesignSpec、RunPlan、`state/product/*`，不渲染 PDF/DOCX，不重跑模型，不覆盖统计执行产物。
+- [x] 验证：目标测试 7 OK；P7-A/B/C/D/E/F/G/H/I/J/K/L/M/N 回归 78 OK；Python 编译通过；P7-N scoped `git diff --check` 通过。
+- [ ] 下一步 P7-O：实现 formal target adapter execution gate，消费 P7-N readiness；默认因 P7-N blocked 而 blocked，不执行 adapter、不写正式层。
 
 ## 2026-05-27 Global Node Execution Contract
 

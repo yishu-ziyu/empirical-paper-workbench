@@ -422,7 +422,22 @@
 - [x] 真实输出：`status=blocked_by_routed_next_gate_entry_preflight`、`can_enter_routed_next_gate_with_confirmation=false`、`routed_next_gate_entry_manifest_recorded=false`、`routed_next_gate_entry_operations=0`、`next_gate_entered=false`、`can_write_product_state=false`；未写 entry manifest，未写 `state/product/auto_mode_formal_package_routed_next_gate_entry_execute.json`。
 - [x] 正式层边界：本节点只写 P7-AG execute JSON 和 Markdown；只有 ready+确认时写 workspace entry manifest；不运行下一关命令，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不写 `state/product/*`，不修改 DesignSpec/RunPlan/统计产物。
 - [x] 验证：目标测试 8 OK；P7-A/.../AG 回归 222 OK；Python 编译通过。
-- [ ] 下一步 P7-AH：实现 manifested routed next gate command preflight（只消费 P7-AG entry manifest，生成下一关命令调用计划）；默认因 P7-AG blocked 而 blocked。
+- [x] 下一步 P7-AH：已实现 manifested routed next gate command preflight（只消费 P7-AG entry manifest，生成下一关命令调用计划）；默认因 P7-AG blocked 而 blocked。
+
+## 2026-05-28 P7-AH Auto Mode Formal Package Manifested Routed Next Gate Command Preflight
+
+- [x] 组件效果：把 P7-AG 的 entry manifest 转成“下一关命令调用计划”；如果输入 manifest 是 ready，就能明确下游该调用 export/acceptance router 还是 delivery completion gate。
+- [x] 当前真实效果：仓库里没有 `workspace/formal_package_routed_next_gate_entry/auto_mode/routed_next_gate_entry_manifest.json`，所以本节点输出 `blocked_by_routed_next_gate_entry_manifest`，命令计划数为 0，不允许运行下一关命令。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.json`；只有 `can_request_manifested_next_gate_command_execution=true` 且 `next_gate_command_call_plan` 非空时，后续 execute gate 才能运行计划中的命令。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_manifested_routed_next_gate_command_preflight.py`，覆盖 ready PDF 命令计划、当前 missing manifest 阻断、invalid/unmanifested 阻断、边界越界阻断、operation contract、manual acceptance 路由、只写 report/review、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_manifested_routed_next_gate_command_preflight`。
+- [x] Agent Team：未调用；本节点是单一 manifest-consumer preflight 小切片，主要风险由 ready/blocked/contract/boundary 单测和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.py` 和 `Program/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-manifested-routed-next-gate-command-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.py --project-root . --routed-next-gate-entry-manifest workspace/formal_package_routed_next_gate_entry/auto_mode/routed_next_gate_entry_manifest.json --output-preflight Results/json/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.json --output-review Reviews/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.md`。
+- [x] 真实输出：`status=blocked_by_routed_next_gate_entry_manifest`、`can_request_manifested_next_gate_command_execution=false`、`next_gate_command_call_plan=0`、`next_gate_command_executed=false`、`can_write_product_state=false`；未创建 `workspace/formal_package_routed_next_gate_command`，未写 `state/product/auto_mode_formal_package_manifested_routed_next_gate_command_preflight.json`。
+- [x] 正式层边界：本节点只写 P7-AH preflight JSON 和 Markdown；不运行下一关命令，不进入下一关，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不写 `state/product/*`，不修改 DesignSpec/RunPlan/统计产物。
+- [x] 验证：目标测试 8 OK；P7-A/.../AH 回归 230 OK；Python 编译通过。
+- [ ] 下一步 P7-AI：实现 manifested routed next gate command execute gate（只消费 P7-AH command preflight，ready 且显式确认后才运行下一关命令）；默认因 P7-AH blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -497,7 +497,22 @@
 - [x] 真实输出：`status=blocked_by_next_gate_workflow_continuation_preflight`、`continuation_command=0`、`workflow_continuation_executed=false`、`this_command_ran_continuation=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_workflow_continuation_execute.json`。
 - [x] 正式层边界：本节点只写 P7-AL execute JSON 和 Markdown；只有 ready+确认时才运行 selected route execution preflight；当前真实运行不运行 continuation、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 8 OK；P7-A/.../AL 回归 260 OK；Python 编译通过。
-- [ ] 下一步 P7-AM：实现 continuation result review（只消费 P7-AL execute report，审阅 selected route execution preflight 输出是否可继续）；默认因 P7-AL blocked 而 blocked。
+- [x] 下一步 P7-AM：已实现 continuation result review（只消费 P7-AL execute report，审阅 selected route execution preflight 输出是否可继续）；默认因 P7-AL blocked 而 blocked。
+
+## 2026-05-28 P7-AM Auto Mode Formal Package Next Gate Workflow Continuation Result Review
+
+- [x] 组件效果：把 P7-AL continuation execute report 和 selected route execution preflight 转成只读结果审阅；只有 continuation 已真实执行、preflight ready、路径/状态/计划合约都匹配时，才允许继续到 selected route execute。
+- [x] 当前真实效果：仓库里的 P7-AL 仍是 `blocked_by_next_gate_workflow_continuation_preflight`，所以本节点输出 `blocked_by_next_gate_workflow_continuation_execute`，selected route preflight records 为 0，不能继续执行路线。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_workflow_continuation_result_review.json`；只有 `status=next_gate_workflow_continuation_result_review_ready` 且 `can_continue_to_selected_route_execution=true` 时，才允许进入后续 explicit selected route execute。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_workflow_continuation_result_review.py`，覆盖 ready continuation result、当前 blocked、P7-AL 缺失/无效/未完成、continuation result contract、selected route preflight clean gate、只写 result review、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_workflow_continuation_result_review`。
+- [x] Agent Team：未调用；本节点是单一 continuation result review 小切片，主要风险由 execute/result/preflight contract 单测和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_workflow_continuation_result_review.py` 和 `Program/auto_mode_formal_package_next_gate_workflow_continuation_result_review.py`；新增计划 `docs/superpowers/plans/2026-05-28-auto-mode-formal-package-next-gate-workflow-continuation-result-review.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_workflow_continuation_result_review.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_workflow_continuation_result_review.py --project-root . --next-gate-workflow-continuation-execute Results/json/auto_mode_formal_package_next_gate_workflow_continuation_execute.json --output-result-review Results/json/auto_mode_formal_package_next_gate_workflow_continuation_result_review.json --output-review Reviews/auto_mode_formal_package_next_gate_workflow_continuation_result_review.md`。
+- [x] 真实输出：`status=blocked_by_next_gate_workflow_continuation_execute`、`workflow_continuation_result_reviewed=false`、`can_continue_to_selected_route_execution=false`、`selected_route_execution_preflight_records=0`、`workflow_continuation_executed=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_workflow_continuation_result_review.json`。
+- [x] 正式层边界：本节点只写 P7-AM result review JSON 和 Markdown；不运行 continuation、不执行 selected route、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；P7-A/.../AM 回归 267 OK；Python 编译通过。
+- [ ] 下一步 P7-AN：实现 selected route execute gate（只消费 P7-AM result review，ready 且显式确认后才执行 selected route command）；默认因 P7-AM blocked 而 blocked。
 
 ## 2026-05-27 Global Node Execution Contract
 

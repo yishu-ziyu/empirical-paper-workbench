@@ -588,7 +588,22 @@
 - [x] 真实输出：`status=blocked_by_route_specific_artifact_execution_result_review`、`can_execute_route_specific_artifact_with_confirmation=false`、`route_specific_artifact_execution_command=0`、`route_specific_artifact_execution_command_executed=false`、`this_command_ran_route_specific_artifact_executor=false`、`route_specific_artifact_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_route_specific_artifact_execution.json`。
 - [x] 正式层边界：本节点只写 P7-AR execution gate JSON 和 Markdown；当前真实运行不调用 artifact executor、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。ready+确认时才调用既有 artifact executor execute。
 - [x] 验证：目标测试 8 OK；P7-A/.../AR 回归 305 OK；Python 编译通过。
-- [ ] 下一步 P7-AS：实现 route-specific artifact execution result review（只消费 P7-AR execution report 和既有 artifact executor output，审阅路线产物是否可进入后续验证）；默认因 P7-AR blocked 而 blocked。
+- [x] 下一步 P7-AS：已实现 route-specific artifact execution result review（只消费 P7-AR execution report 和既有 artifact executor output，审阅路线产物是否可进入后续验证）；默认因 P7-AR blocked 而 blocked。
+
+## 2026-05-29 P7-AS Auto Mode Formal Package Next Gate Route-Specific Artifact Execution Result Review
+
+- [x] 组件效果：把 P7-AR route-specific artifact execution report 和既有 artifact executor output 转成 result review；只有两者都显示同一路线产物已执行完成，才生成 route-specific artifact verification input。
+- [x] 当前真实效果：仓库里的 P7-AR 仍是 `blocked_by_route_specific_artifact_execution_result_review`，所以本节点输出 `blocked_by_route_specific_artifact_execution`，verification input records 为 0，没有进入 artifact verification。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.json`；只有 `status=route_specific_artifact_execution_result_review_ready` 且 `can_continue_to_route_specific_artifact_verification=true` 时，才允许使用 `route_specific_artifact_verification_input_records` 进入既有 route-specific artifact verification。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.py`，覆盖已执行路线产物放行、当前 blocked、P7-AR 缺失/无效/未完成、execution/executor 契约错配、executor output 不干净、只写 result review、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review`。
+- [x] Agent Team：未调用；本节点是单一 result-review 小切片，主要风险由 execution/executor 契约测试、当前 blocked CLI 和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.py` 和 `Program/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.py`；新增计划 `docs/superpowers/plans/2026-05-29-auto-mode-formal-package-next-gate-route-specific-artifact-execution-result-review.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.py --project-root . --route-specific-artifact-execution Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_execution.json --route-specific-artifact-executor Results/json/auto_mode_formal_package_route_specific_artifact_executor.json --output-result-review Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.json --output-review Reviews/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.md`。
+- [x] 真实输出：`status=blocked_by_route_specific_artifact_execution`、`artifact_execution_result_reviewed=false`、`can_continue_to_route_specific_artifact_verification=false`、`route_specific_artifact_verification_input_records=0`、`route_specific_artifact_executed=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.json`。
+- [x] 正式层边界：本节点只写 P7-AS result review JSON 和 Markdown；不运行 artifact verification、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；P7-A/.../AS 回归 312 OK；Python 编译通过。
+- [ ] 下一步 P7-AT：实现 route-specific artifact verification entry（只消费 P7-AS result review，ready 时调用既有 route-specific artifact verification；默认因 P7-AS blocked 而 blocked）。
 
 ## 2026-05-27 Global Node Execution Contract
 

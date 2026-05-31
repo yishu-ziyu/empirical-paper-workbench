@@ -2636,3 +2636,19 @@
 - [x] 正式层边界：本节点不接受 package、不批准修订队列、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
 - [x] 验证：目标测试 5 OK；reviewer revision loop + paper package builder + PDF preflight + method gate + results evidence package + literature review draft packet 相邻回归 28 OK；Python 编译通过；真实 CLI 返回 `0`；manifest 无缺失；package PDF 确认为 PDF 1.7。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 package 人工 acceptance、正式层 promotion 或发布。
+
+## 2026-05-31 P7-I Auto Mode Final Review Packet Current Package Refresh
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；既有 P7-I 代码与测试已落地，本轮用当前 P6-M package manifest 重新运行 final review packet，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P6-M 的 9 文件 paper package 接入 Auto Mode 终审入口；用户现在看到的不只是 package 文件夹，而是一个可做 `defer/approve/revise/reject` 的最终人工决策包。
+- [x] 当前真实效果：真实 CLI 输出 `packet_status=awaiting_human_final_review`、`decision_status=waiting_for_human_final_review_decision`、`decision_route=wait_for_human_confirmation`；默认决策仍为 `defer`。
+- [x] 终审证据：packet 汇总 5 个核心组件、方法 KB、统计适配契约和 CGSS paper package；package 文件数 `9`，required review items 数 `12`。
+- [x] 决策边界：当前 `approved=false`、`promotion.allowed=false`、`formal_writeback_allowed=false`、`can_write_product_state=false`；继续任务不等于批准终审。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_final_review_packet.json`、`Reviews/auto_mode_final_review_packet.md`、`Results/json/auto_mode_final_review_decision.json` 和 `Reviews/auto_mode_final_review_decision.md`；只有显式 `approve` 且带 reviewer/note 后才可进入 formal promotion preflight。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_final_review_packet.py` 覆盖 ready chain + package manifest 生成终审 packet、有 repair queue 时阻断、默认 defer 不写正式层、approve 必须有 reviewer/note、approve 只路由到 formal promotion preflight、revise/reject 不 promotion；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-final-review-packet-current-package.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-I workbench、CLI、测试、真实 packet/decision；新增/更新任务记录、session log、BDD plan。真实 packet/decision 内容与仓库既有产物一致，本轮记录当前 package 已重新接入终审入口。
+- [x] 真实运行：`python3 Program/auto_mode_final_review_packet.py --project-root . --decision defer`
+- [x] 真实输出：写出/刷新 `Results/json/auto_mode_final_review_packet.json`、`Reviews/auto_mode_final_review_packet.md`、`Results/json/auto_mode_final_review_decision.json` 和 `Reviews/auto_mode_final_review_decision.md`。
+- [x] 正式层边界：本节点不批准 final packet、不进入 formal promotion、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；acceptance chain + final review packet + package builder + method KB + statistical adapter contract 相邻回归 30 OK；Python 编译通过；真实 CLI 返回 `0`；packet/decision JSON 核对通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 approve/revise/reject、formal promotion preflight 或正式写回。

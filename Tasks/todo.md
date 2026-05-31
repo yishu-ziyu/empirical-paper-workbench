@@ -2501,3 +2501,19 @@
 - [x] 正式层边界：本节点不写正式 RunPlan、不写正式 DesignSpec、不写正式变量角色、不运行模型、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
 - [x] 验证：目标测试 5 OK；CGSS design spec draft + run plan seed + run plan seed approval + run plan seed executor 相邻回归 18 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 RunPlan seed 产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 RunPlan seed approval、模型执行或正式 RunPlan promotion。
+
+## 2026-05-31 P6-J6a CGSS RunPlan Seed Approval
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `93e34c1 Record CGSS run plan approval before execution` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan，并用本轮用户继续指令刷新审阅记录。
+- [x] 组件效果：把 P6-J5 的 RunPlan seed 草案转成明确的人审决策；当前决策为批准进入草案层执行，让下游可以读取 approved seed，但仍不能写正式 RunPlan 或正式结论。
+- [x] 当前真实效果：真实 CLI 输出 `status=run_plan_seed_approved_for_draft_execution`、`decision=approve`、`approved=true`，并生成 `Results/json/cgss_social_capital_happiness_run_plan_seed_approved.json`。
+- [x] 人工干预记录：本轮把审阅人记录为 `mahaoxuan`；说明为用户在 `2026-05-31` 继续目标模式，只批准 P6-J6b 草案层执行 CGSS OLS 与 Ordered Logit。
+- [x] 执行边界：本节点只记录审批，不运行 OLS/Ordered Logit，不写正式 RunPlan，不写 `state/product/*`，不生成正式论文结论。
+- [x] 对接方式：下游执行器只应读取 `Results/json/cgss_social_capital_happiness_run_plan_seed_approved.json`；执行后结果仍必须进入人工审阅证据包。
+- [x] BDD/TDD：既有 `tests/test_cgss_run_plan_seed_approval.py` 覆盖 defer/approve/revise/reject、批准必须带 reviewer 和 note、批准只生成草案执行 sidecar、默认 CLI 不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-cgss-run-plan-seed-approval.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J6a workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 approval JSON 与 approved seed JSON 加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_run_plan_seed_approval.py --project-root . --decision approve --reviewer mahaoxuan --note "用户在 2026-05-31 继续目标模式；本批准仅允许 P6-J6b 草案层执行 CGSS OLS 与 Ordered Logit，并把结果送入人工审阅证据包；不写正式 RunPlan、不写 state/product、不生成正式论文结论。"`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_run_plan_seed_approval.json`、`Reviews/cgss_social_capital_happiness_run_plan_seed_approval.md` 与 `Results/json/cgss_social_capital_happiness_run_plan_seed_approved.json`。
+- [x] 正式层边界：本节点不写正式 RunPlan、不运行模型、不生成论文、不写 `state/product/*`；approved seed 只授权草案执行。
+- [x] 验证：目标测试 5 OK；CGSS run plan seed + approval + executor 相邻回归 13 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 approval/approved seed 产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-J6b 模型执行或正式 RunPlan promotion。

@@ -1,0 +1,109 @@
+{
+  "schema_version": "p6.cgss_ordered_robustness.v1",
+  "generated_at": "2026-05-31T08:49:02.676579+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "dataset": {
+    "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "year": "2023",
+    "source": "CGSS2023.dta"
+  },
+  "method_gate": {
+    "method": "ordered_logit",
+    "status": "passed",
+    "blocking_reasons": [],
+    "checks": {
+      "minimum_nobs": 30,
+      "minimum_outcome_levels": 3,
+      "observed_nobs": 5310,
+      "observed_outcome_levels": 5
+    }
+  },
+  "sample": {
+    "nobs": 5310,
+    "outcome_levels": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "models": {
+    "ordered_logit_index": {
+      "method": "ordered_logit",
+      "nobs": 5310,
+      "log_likelihood": -5914.877342006681,
+      "aic": 11881.754684013362,
+      "coefficients": {
+        "social_capital_index": {
+          "coef": 0.4049733043163175,
+          "std_error": 0.04239022727731643,
+          "p_value": 1.2543655302918154e-21
+        },
+        "female": {
+          "coef": 0.10041425615645806,
+          "std_error": 0.055321573750611766,
+          "p_value": 0.0695083553386711
+        },
+        "age": {
+          "coef": 0.0187883313604453,
+          "std_error": 0.002090007772068103,
+          "p_value": 2.4813454483047857e-19
+        },
+        "education_level": {
+          "coef": 0.0716871462211644,
+          "std_error": 0.011477362382148413,
+          "p_value": 4.2120499590479996e-10
+        },
+        "log_income": {
+          "coef": -0.00027234943109437224,
+          "std_error": 0.007343704329107294,
+          "p_value": 0.9704163465320673
+        },
+        "health": {
+          "coef": 0.4459547294919815,
+          "std_error": 0.027403575703258118,
+          "p_value": 1.5196425372413883e-59
+        },
+        "urban_hukou": {
+          "coef": -0.03746118163031547,
+          "std_error": 0.07012288502402893,
+          "p_value": 0.5931880115873555
+        }
+      },
+      "thresholds": {
+        "1/2": {
+          "coef": -1.3673042981290782,
+          "std_error": 0.2522841184697703
+        },
+        "2/3": {
+          "coef": 0.38809707917617364,
+          "std_error": 0.06414663728600678
+        },
+        "3/4": {
+          "coef": 0.38215924717941063,
+          "std_error": 0.03387516416418168
+        },
+        "4/5": {
+          "coef": 1.0102811230253215,
+          "std_error": 0.016138777891785853
+        }
+      }
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_package": false,
+    "modified_formal_variable_roles": false,
+    "promoted_to_canonical_claim": false
+  },
+  "status": "completed_needs_human_review",
+  "interpretation_seed": {
+    "social_capital_index_direction": "positive",
+    "writing_note": "有序 Logit 把幸福感按等级结果处理，用来检验 OLS 方向是否稳健。"
+  },
+  "next_tasks": [
+    "review_cgss_ordered_robustness",
+    "bind_cgss_variable_roles",
+    "draft_cgss_paper_from_ordered_robustness"
+  ]
+}

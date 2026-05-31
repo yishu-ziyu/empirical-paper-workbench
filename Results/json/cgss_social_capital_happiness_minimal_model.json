@@ -1,0 +1,192 @@
+{
+  "schema_version": "p6.cgss_minimal_model.v1",
+  "generated_at": "2026-05-31T08:49:02.665583+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "status": "completed_needs_human_review",
+  "dataset": {
+    "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "year": "2023",
+    "source": "CGSS2023.dta"
+  },
+  "sample": {
+    "nobs": 5310,
+    "mean_happiness": 3.905084745762712,
+    "mean_social_capital_index": -0.015341997363527952
+  },
+  "variables": {
+    "outcome": "happiness <- a36",
+    "social_capital_index": [
+      "a33 trust",
+      "a31a neighbor_social",
+      "a31b friend_social",
+      "a311 leisure_social"
+    ],
+    "controls": [
+      "female",
+      "age",
+      "education_level",
+      "log_income",
+      "health",
+      "urban_hukou",
+      "province fixed effects"
+    ]
+  },
+  "models": {
+    "baseline_index": {
+      "formula": "happiness ~ social_capital_index + female + age + education_level + log_income + health + urban_hukou + C(province)",
+      "nobs": 5310,
+      "r_squared": 0.09662307899171196,
+      "coefficients": {
+        "social_capital_index": {
+          "coef": 0.16575366465966088,
+          "std_error_hc1": 0.01870151531710479,
+          "p_value": 7.780985384938017e-19
+        },
+        "female": {
+          "coef": 0.04150489217547959,
+          "std_error_hc1": 0.023144812924198226,
+          "p_value": 0.07292980678248176
+        },
+        "age": {
+          "coef": 0.007034910439677075,
+          "std_error_hc1": 0.0008269824045097925,
+          "p_value": 1.7891793088741546e-17
+        },
+        "education_level": {
+          "coef": 0.0316569102100608,
+          "std_error_hc1": 0.0043665514100642965,
+          "p_value": 4.1718584965102827e-13
+        },
+        "log_income": {
+          "coef": 0.002205475082848296,
+          "std_error_hc1": 0.0031533746026013655,
+          "p_value": 0.48430111983428137
+        },
+        "health": {
+          "coef": 0.18324242396717105,
+          "std_error_hc1": 0.011989339971963052,
+          "p_value": 9.808391496692226e-53
+        },
+        "urban_hukou": {
+          "coef": -0.0047524251404401086,
+          "std_error_hc1": 0.02735803205497989,
+          "p_value": 0.8620916144868043
+        }
+      }
+    },
+    "trust_only": {
+      "formula": "happiness ~ trust + female + age + education_level + log_income + health + urban_hukou + C(province)",
+      "nobs": 5310,
+      "r_squared": 0.10490516424812413,
+      "coefficients": {
+        "trust": {
+          "coef": 0.12902756478670552,
+          "std_error_hc1": 0.012406703300596546,
+          "p_value": 2.483844018899242e-25
+        },
+        "female": {
+          "coef": 0.05105446494381336,
+          "std_error_hc1": 0.02298418368601061,
+          "p_value": 0.026331539059195785
+        },
+        "age": {
+          "coef": 0.005706311986921005,
+          "std_error_hc1": 0.0008320151528874497,
+          "p_value": 6.9624768341719146e-12
+        },
+        "education_level": {
+          "coef": 0.029859463479066935,
+          "std_error_hc1": 0.004373603916567149,
+          "p_value": 8.658865933255517e-12
+        },
+        "log_income": {
+          "coef": 0.0025713120385646862,
+          "std_error_hc1": 0.0031436958136752467,
+          "p_value": 0.413399171262851
+        },
+        "health": {
+          "coef": 0.18599452661600083,
+          "std_error_hc1": 0.011896600489648641,
+          "p_value": 4.253982426556873e-55
+        },
+        "urban_hukou": {
+          "coef": -0.000408054349583839,
+          "std_error_hc1": 0.027318824777217324,
+          "p_value": 0.9880826440355485
+        }
+      }
+    },
+    "social_dimensions": {
+      "formula": "happiness ~ trust + neighbor_social + friend_social + leisure_social + female + age + education_level + log_income + health + urban_hukou + C(province)",
+      "nobs": 5310,
+      "r_squared": 0.10949539531831753,
+      "coefficients": {
+        "trust": {
+          "coef": 0.12542096994860905,
+          "std_error_hc1": 0.012424956193248534,
+          "p_value": 5.856002640580224e-24
+        },
+        "neighbor_social": {
+          "coef": 0.005207740775165231,
+          "std_error_hc1": 0.0061389351959958574,
+          "p_value": 0.3962634762344017
+        },
+        "friend_social": {
+          "coef": 0.0051005982448551375,
+          "std_error_hc1": 0.007310662148396212,
+          "p_value": 0.4853691692432486
+        },
+        "leisure_social": {
+          "coef": 0.041475586170234974,
+          "std_error_hc1": 0.012140870107960012,
+          "p_value": 0.0006350263269963503
+        },
+        "female": {
+          "coef": 0.04380775973495339,
+          "std_error_hc1": 0.023025474852214366,
+          "p_value": 0.057095644322422194
+        },
+        "age": {
+          "coef": 0.005926027067000147,
+          "std_error_hc1": 0.0008438640836707773,
+          "p_value": 2.1794864866599355e-12
+        },
+        "education_level": {
+          "coef": 0.029036885770187,
+          "std_error_hc1": 0.0044469500484349495,
+          "p_value": 6.593757757715708e-11
+        },
+        "log_income": {
+          "coef": 0.002375498749372368,
+          "std_error_hc1": 0.003132026786246326,
+          "p_value": 0.4481791445590274
+        },
+        "health": {
+          "coef": 0.18209509761143566,
+          "std_error_hc1": 0.011864890521506624,
+          "p_value": 3.6872751773771957e-53
+        },
+        "urban_hukou": {
+          "coef": 0.002135686713095254,
+          "std_error_hc1": 0.027247974952491823,
+          "p_value": 0.9375260614570934
+        }
+      }
+    }
+  },
+  "interpretation_seed": {
+    "baseline_index_direction": "positive",
+    "trust_direction": "positive",
+    "writing_note": "这只是第一版实证结果种子；正式写作还要补文献、变量口径审阅、稳健性和机制解释。"
+  },
+  "next_tasks": [
+    "review_cgss_minimal_model",
+    "run_ordered_logit_robustness",
+    "draft_cgss_paper_from_results"
+  ],
+  "boundary_flags": {
+    "modified_formal_package": false,
+    "modified_formal_variable_roles": false,
+    "promoted_to_canonical_claim": false
+  }
+}

@@ -4,7 +4,7 @@
 - Markdown 来源：`Manuscripts/generated/cgss_social_capital_happiness_paper.md`
 - PDF：`Submissions/cgss_social_capital_happiness/paper.pdf`
 - PDF 存在：`true`
-- PDF 字节：187320
+- PDF 字节：187318
 - HTML：`Submissions/cgss_social_capital_happiness/paper.html`
 - HTML 存在：`false`
 - 正式层写回：`false`

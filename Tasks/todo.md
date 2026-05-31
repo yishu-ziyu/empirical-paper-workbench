@@ -2568,3 +2568,20 @@
 - [x] 正式层边界：本节点不写正式 manuscript，不写正式 bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
 - [x] 验证：目标测试 3 OK；CGSS results evidence package + literature review draft packet + manuscript section router + exploratory paper assembler 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0` 并写出完整探索稿。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进整稿人工审阅、PDF 预检、AER-like 方法门或审稿式修订队列。
+
+## 2026-05-31 P6-J9 CGSS Draft PDF Preflight
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `d5a6fed Preflight CGSS exploratory paper PDF` 落地，本轮只复核真实状态、重新运行 P6-J9、补任务账本、补 session log、补 BDD plan，并固化真实 PDF 预检 JSON、review 和草案 PDF。
+- [x] 组件效果：把 P6-J8 的完整探索性 Markdown 草稿渲染成可打开的草案 PDF，让用户可以从“读 Markdown”进入“读导出候选”。
+- [x] 当前真实效果：真实 CLI 输出 `status=pdf_preflight_ready`；生成 `Submissions/cgss_social_capital_happiness/paper.pdf`，大小 `187318` bytes；`file` 识别为 `PDF document, version 1.7`。
+- [x] 渲染方式：使用 `pandoc+xelatex`，returncode 为 `0`；HTML fallback 未触发。
+- [x] 证据对接：预检 JSON 读取 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`，输出 `Results/json/cgss_social_capital_happiness_pdf_preflight.json` 与 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`。
+- [x] 执行边界：本节点只做草案 PDF 预检；不写正式 manuscript、不写 verified bibliography、不写 formal package、不写 `state/product/*`，不把 PDF 标为最终交付。
+- [x] 对接方式：下游只应读取 `Submissions/cgss_social_capital_happiness/paper.pdf`、`Results/json/cgss_social_capital_happiness_pdf_preflight.json` 和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`；人工打开 PDF 后才能进入 `human_review_pdf_candidate`、AER-like 方法门或审稿式修订队列。
+- [x] BDD/TDD：既有 `tests/test_cgss_pdf_preflight.py` 覆盖完整探索稿渲染 PDF 预检、缺少探索稿时阻断、写出预检报告且不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-cgss-pdf-preflight.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J9 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 PDF、预检 JSON 和 review 加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_pdf_preflight.py --project-root .`
+- [x] 真实输出：写出 `Submissions/cgss_social_capital_happiness/paper.pdf`、`Results/json/cgss_social_capital_happiness_pdf_preflight.json` 和 `Reviews/cgss_social_capital_happiness_pdf_preflight.md`。
+- [x] 正式层边界：本节点不写正式 manuscript，不写正式 bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
+- [x] 验证：目标测试 3 OK；CGSS exploratory paper assembler + PDF preflight + manuscript section router 相邻回归 9 OK；Python 编译通过；真实 CLI 返回 `0`；`file` 确认为 PDF 1.7；P6-J9 scoped `git diff --check` 通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 PDF 人工审阅、AER-like 方法门或审稿式修订队列。

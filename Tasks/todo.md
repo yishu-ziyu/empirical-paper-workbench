@@ -2486,3 +2486,18 @@
 - [x] 正式层边界：本节点不写正式 DesignSpec、不写正式变量角色、不写 RunPlan、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
 - [x] 验证：目标测试 5 OK；CGSS data discovery + variable discovery + dataset-bound role draft + design spec draft + run plan seed 相邻回归 20 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 DesignSpec 草案产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 RunPlan seed、正式 DesignSpec promotion 或模型执行。
+
+## 2026-05-31 P6-J5 CGSS RunPlan Seed
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `701da83 Seed CGSS run plan before execution` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-J4 的 DesignSpec 草案转成 RunPlan seed 草案；它列出执行前字段预检、分析样本构造、OLS 基准模型、Ordered Logit 有序模型和预期产物。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_run_plan_seed_review`；计划任务包括 `cgss_data_preflight`、`build_cgss_analysis_frame`、`run_ols_baseline`、`run_ordered_logit_robustness`。
+- [x] 执行边界：本节点只生成可审阅计划；`boundary_flags.ran_models=false`，不运行 OLS/Ordered Logit，不写正式 RunPlan，不写 `state/product/*`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_run_plan_seed.json` 和 `Reviews/cgss_social_capital_happiness_run_plan_seed.md`；人工确认 seed 后，才允许进入 RunPlan seed approval 或草案模型执行器。
+- [x] BDD/TDD：既有 `tests/test_cgss_run_plan_seed.py` 覆盖生成草案层 RunPlan seed、不写正式层、说明原始字段到执行变量的构造、安排 OLS/Ordered Logit CLI 任务、输入未 ready 阻断和 JSON/Markdown 输出；本轮补 `docs/superpowers/plans/2026-05-31-cgss-run-plan-seed.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J5 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/run_cgss_run_plan_seed.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_run_plan_seed.json` 与 `Reviews/cgss_social_capital_happiness_run_plan_seed.md`；状态为 `needs_human_run_plan_seed_review`。
+- [x] 正式层边界：本节点不写正式 RunPlan、不写正式 DesignSpec、不写正式变量角色、不运行模型、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
+- [x] 验证：目标测试 5 OK；CGSS design spec draft + run plan seed + run plan seed approval + run plan seed executor 相邻回归 18 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 RunPlan seed 产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 RunPlan seed approval、模型执行或正式 RunPlan promotion。

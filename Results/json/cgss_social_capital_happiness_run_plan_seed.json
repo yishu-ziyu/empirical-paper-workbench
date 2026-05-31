@@ -1,0 +1,198 @@
+{
+  "schema_version": "p6.cgss_run_plan_seed.v1",
+  "generated_at": "2026-05-31T08:38:20.790286+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "source_artifacts": {
+    "design_spec_draft": {
+      "path": "Results/json/cgss_social_capital_happiness_design_spec_draft.json",
+      "schema_version": "p6.cgss_design_spec_draft.v1",
+      "status": "needs_human_design_spec_review"
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_run_plan": false,
+    "modified_formal_design_spec": false,
+    "modified_formal_variable_roles": false,
+    "generated_formal_paper": false,
+    "wrote_state_product": false,
+    "ran_models": false
+  },
+  "status": "needs_human_run_plan_seed_review",
+  "blocking_reasons": [],
+  "run_plan_seed": {
+    "id": "cgss_run_plan_seed",
+    "version": 0,
+    "status": "draft_needs_human_review",
+    "evidence_level": "local_file",
+    "design_spec_draft_id": "cgss_design_spec_draft",
+    "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "tasks": [
+      {
+        "id": "cgss_data_preflight",
+        "label": "CGSS 数据读取和字段预检",
+        "method_id": "data_preflight",
+        "status": "planned",
+        "required_source_columns": [
+          "a36",
+          "a33",
+          "a31a",
+          "a31b",
+          "a311",
+          "a2",
+          "a3a",
+          "a7a",
+          "a8a",
+          "a15",
+          "a18",
+          "s41"
+        ],
+        "evidence_level": "local_file"
+      },
+      {
+        "id": "build_cgss_analysis_frame",
+        "label": "构造 CGSS 分析样本和社会资本指数",
+        "method_id": "feature_engineering",
+        "status": "planned",
+        "adapter": "Program/workbench/cgss_minimal_model.py::build_analysis_frame",
+        "required_analysis_columns": [
+          "happiness",
+          "social_capital_index",
+          "female",
+          "age",
+          "education_level",
+          "log_income",
+          "health",
+          "urban_hukou",
+          "province"
+        ],
+        "evidence_level": "local_file"
+      },
+      {
+        "id": "run_ols_baseline",
+        "label": "OLS 基准模型",
+        "method_id": "ols",
+        "estimator": "ols",
+        "status": "planned",
+        "design_spec_id": "cgss_design_spec_draft",
+        "formula": "happiness ~ social_capital_index + female + age + education_level + log_income + health + urban_hukou + C(province)",
+        "cli": "python3 Program/cgss_minimal_model.py --project-root . --dataset '/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta' --topic '社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析'",
+        "expected_outputs": [
+          "Results/json/cgss_social_capital_happiness_minimal_model.json",
+          "Reviews/cgss_social_capital_happiness_minimal_model.md"
+        ],
+        "evidence_level": "local_file"
+      },
+      {
+        "id": "run_ordered_logit_robustness",
+        "label": "Ordered Logit 有序模型",
+        "method_id": "ordered_logit",
+        "estimator": "ordered_logit",
+        "status": "planned",
+        "design_spec_id": "cgss_design_spec_draft",
+        "formula": "happiness ~ social_capital_index + female + age + education_level + log_income + health + urban_hukou + C(province)",
+        "cli": "python3 Program/cgss_ordered_robustness.py --project-root . --dataset '/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta' --topic '社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析'",
+        "expected_outputs": [
+          "Results/json/cgss_social_capital_happiness_ordered_robustness.json",
+          "Reviews/cgss_social_capital_happiness_ordered_robustness.md"
+        ],
+        "evidence_level": "local_file"
+      }
+    ],
+    "outputs": [
+      "Results/json/cgss_social_capital_happiness_minimal_model.json",
+      "Reviews/cgss_social_capital_happiness_minimal_model.md",
+      "Results/json/cgss_social_capital_happiness_ordered_robustness.json",
+      "Reviews/cgss_social_capital_happiness_ordered_robustness.md",
+      "Results/json/cgss_social_capital_happiness_results_evidence_package.json"
+    ],
+    "decision_events": []
+  },
+  "execution_preflight": {
+    "status": "ready_for_human_review",
+    "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "required_source_columns": [
+      "a36",
+      "a33",
+      "a31a",
+      "a31b",
+      "a311",
+      "a2",
+      "a3a",
+      "a7a",
+      "a8a",
+      "a15",
+      "a18",
+      "s41"
+    ],
+    "required_analysis_columns": [
+      "happiness",
+      "social_capital_index",
+      "female",
+      "age",
+      "education_level",
+      "log_income",
+      "health",
+      "urban_hukou",
+      "province"
+    ],
+    "deferred_control_source_columns": [
+      "a7b",
+      "a21",
+      "a8b"
+    ],
+    "feature_engineering": {
+      "outcome": {
+        "target": "happiness",
+        "source": "a36",
+        "rule": "numeric ordered 1-5 happiness scale"
+      },
+      "social_capital_index": {
+        "target": "social_capital_index",
+        "source_items": [
+          "a33",
+          "a31a",
+          "a31b",
+          "a311"
+        ],
+        "rule": "z-score trust, reversed neighbor/friend frequency, leisure social participation, then average"
+      },
+      "controls": {
+        "female": "a2 == 2",
+        "age": "2023 - a3a",
+        "education_level": "a7a",
+        "log_income": "log1p(a8a)",
+        "health": "a15",
+        "urban_hukou": "a18 in [2, 4]",
+        "province": "s41 fixed effects"
+      },
+      "missingness_policy": [
+        "negative CGSS special codes are treated as missing",
+        "a8a >= 9999997 is treated as missing",
+        "drop rows missing outcome, treatment index, required controls, or province",
+        "keep analysis ages from 16 to 100"
+      ]
+    },
+    "failure_explanations": [
+      "dataset_missing_or_unreadable",
+      "required_source_columns_missing",
+      "too_few_complete_rows_after_missingness_filter",
+      "outcome_has_too_few_ordered_levels_for_ordered_logit",
+      "social_capital_index_has_no_variation"
+    ],
+    "adapter_entrypoints": {
+      "analysis_frame": "Program/workbench/cgss_minimal_model.py::build_analysis_frame",
+      "ols": "Program/cgss_minimal_model.py",
+      "ordered_logit": "Program/cgss_ordered_robustness.py"
+    }
+  },
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_approve_cgss_run_plan_seed",
+    "would_write_if_approved": "state/product/run_plan.json"
+  },
+  "next_tasks": [
+    "human_review_cgss_run_plan_seed",
+    "after_approval_execute_cgss_ols_and_ordered_logit",
+    "combine_cgss_results_evidence_package"
+  ]
+}

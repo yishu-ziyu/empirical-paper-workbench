@@ -2787,3 +2787,18 @@
 - [x] 正式层边界：本节点不创建/修复 candidate target、不执行 adapter、不提升 candidate、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 8 OK；formal target adapter materialization execute + candidate verification + candidate promotion preflight + candidate promotion approval 相邻回归 29 OK；Python 编译通过；真实 CLI 返回 `0`；verification JSON 核对通过；materialization manifest、candidate target、candidate verification product state 不存在检查通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-Q 必须完成 materialization 后，才能把 P7-R 作为 ready verification 输入推进 P7-S。
+
+## 2026-05-31 P7-S Auto Mode Formal Target Adapter Candidate Promotion Preflight Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-S 代码与测试已落地，本轮用当前 P7-R blocked candidate verification 重新运行 formal target adapter candidate promotion preflight，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-R 已验证的 candidate target records 转成可审阅 promotion preflight plan；当前产品效果是 P7-R 未 verified 时不生成 promotion plan，也不允许 P7-T 记录有效 promotion approval。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_candidate_verification`、`can_request_verified_candidate_promotion_approval=false`、`promotion_plan=0`、`candidate_targets_promoted=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`。
+- [x] 阻断原因：P7-R source verification 仍是 `blocked_by_materialization_execute`，且 `candidate_targets_verified=false`、`target_verification_records_count=0`；P7-S 记录 `candidate_verification_not_ready`、`candidate_targets_not_verified`、`candidate_verification_has_blocking_reasons`、`target_verification_records_missing`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_target_adapter_candidate_promotion_preflight.json` 和 `Reviews/auto_mode_formal_target_adapter_candidate_promotion_preflight.md` 作为 blocked promotion preflight signal；P7-T 不应把当前 preflight 当成可批准输入，因为没有 promotion plan。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_target_adapter_candidate_promotion_preflight.py` 覆盖 verified candidates 生成 promotion preflight plan、当前 P7-R blocked 阻断、missing/invalid verification schema 阻断、逐项 verification record 必须 verified/auto_mode/SHA256、boundary violation 阻断、CLI 默认 blocked、只写 report/review 不提升 candidate；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-target-adapter-candidate-promotion-preflight-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-S workbench、CLI、测试、真实 candidate promotion preflight；新增/更新任务记录、session log、BDD plan。真实 preflight JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_candidate_promotion_preflight.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_target_adapter_candidate_promotion_preflight.json` 和 `Reviews/auto_mode_formal_target_adapter_candidate_promotion_preflight.md` 仍表达当前 P7-R 阻断传递状态；未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未创建 `Submissions/formal_package/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_promotion_preflight.json`。
+- [x] 正式层边界：本节点不复制/覆盖/提升 candidate target、不执行 adapter、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 7 OK；candidate verification + candidate promotion preflight + candidate promotion approval + candidate promotion execution preflight 相邻回归 28 OK；Python 编译通过；真实 CLI 返回 `0`；preflight JSON 核对通过；auto-mode candidate paper、formal package paper、candidate promotion preflight product state 不存在检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-R 必须产生 verified candidate records 后，才能把 P7-S 作为 ready approval 输入推进 P7-T。

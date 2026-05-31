@@ -948,7 +948,22 @@
 - [x] 真实输出：`status=blocked_by_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry`、`can_execute_downstream_execute_result_continuation_result_review_continuation_with_confirmation=false`、`requires_explicit_continuation_command=false`、`continuation_execute_command=0`、`continuation_execute_command_executed=false`、`route_specific_artifact_execution_entered=false`、`product_review_packet_continuation_recorded=false`、`can_write_product_state=false`。
 - [x] 正式层边界：本节点只写 P7-BP execute gate JSON/Markdown；不执行 route-specific artifact、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 9 OK；`python3 -m unittest discover -s tests -p 'test_auto_mode_formal_package*.py' -v` 354 OK；Python 编译通过；P7-BP staged `git diff --cached --check` 通过；全仓 `git diff --check` 仍被既有 `tests/test_p3_task_brief_demo.py:57` trailing whitespace 阻断。
-- [ ] 下一步 P7-BQ：实现 downstream execute result continuation result review continuation gate entry execute gate result review（只消费 P7-BP execute gate；默认因 P7-BP blocked 而 blocked，ready export 分支审阅 route-specific artifact execution dry-run，ready manual 分支审阅 product-review packet continuation）。
+- [x] 下一步 P7-BQ：已实现 downstream execute result continuation result review continuation gate entry execute gate result review（只消费 P7-BP execute gate；默认因 P7-BP blocked 而 blocked，ready export 分支审阅 route-specific artifact execution dry-run，ready manual 分支审阅 product-review packet continuation）。
+
+## 2026-05-31 P7-BQ Auto Mode Formal Package Manifested Routed Downstream Execute Result Continuation Result Review Continuation Gate Entry Execute Gate Result Review
+
+- [x] 组件效果：把 P7-BP execute gate 的结果转成“可继续/不可继续”的审阅报告。export 分支只审阅 route-specific artifact execution dry-run 是否 clean；manual 分支只审阅 product-review packet continuation record 是否 clean。
+- [x] 当前真实效果：仓库里的 P7-BP 仍是 blocked，所以本节点输出 `blocked_by_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate`；没有 route-specific artifact execution record，没有 product-review packet input record，没有继续到导出或产品审阅包。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate_result_review.json`；只有 `status=manifested_routed_downstream_execute_result_continuation_result_review_route_specific_artifact_execution_result_review_ready` 才能进入 route-specific artifact execution，只有 `status=manifested_routed_downstream_execute_result_continuation_result_review_product_review_packet_continuation_result_review_ready` 才能进入 product-review packet。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate_result_review.py` 覆盖 export ready、manual ready、当前 blocked、source contract、export dry-run contract、manual continuation record contract、边界越权和 CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate_result_review`。
+- [x] Agent Team：未调用；本节点是单一 result review 小切片，主要风险由 ready/blocked/contract/boundary 单测和 Auto Mode 回归覆盖。
+- [x] 实现范围：新增 P7-BQ workbench、CLI、BDD plan、真实 review JSON/Markdown、session log。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate_result_review.py --project-root .`
+- [x] 真实输出：`status=blocked_by_manifested_routed_downstream_execute_result_continuation_result_review_continuation_gate_entry_execute_gate`、`downstream_execute_result_continuation_result_review_continuation_reviewed=false`、`can_continue_after_downstream_execute_result_continuation_result_review_continuation=false`、`route_specific_artifact_execution_records=0`、`product_review_packet_input_records=0`、`can_write_product_state=false`。
+- [x] 正式层边界：本节点只写 P7-BQ result review JSON/Markdown；不执行 route-specific artifact、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 8 OK；`python3 -m unittest discover -s tests -p 'test_auto_mode*.py' -v` 472 OK；Python 编译通过；P7-BQ staged `git diff --cached --check` 通过。
+- [ ] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进下一节点。
 
 ## 2026-05-27 Global Node Execution Contract
 

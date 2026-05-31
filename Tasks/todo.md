@@ -2652,3 +2652,18 @@
 - [x] 正式层边界：本节点不批准 final packet、不进入 formal promotion、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
 - [x] 验证：目标测试 7 OK；acceptance chain + final review packet + package builder + method KB + statistical adapter contract 相邻回归 30 OK；Python 编译通过；真实 CLI 返回 `0`；packet/decision JSON 核对通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 approve/revise/reject、formal promotion preflight 或正式写回。
+
+## 2026-05-31 P7-J Auto Mode Formal Promotion Preflight Current Defer
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-J 代码与测试已落地，本轮用当前 P7-I `defer` 决策重新运行 formal promotion preflight，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把“终审包已经生成”继续转成“能不能请求正式写回审批”的清晰闸口；当前产品效果是明确阻断，而不是把继续任务误判为批准。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_final_review_decision`、`can_request_formal_writeback_approval=false`、`formal_writeback_allowed=false`、`can_write_product_state=false`。
+- [x] 阻断原因：当前 final review decision 仍是 `defer`，route 为 `wait_for_human_confirmation`，`approved=false`，`promotion.allowed=false`；因此不能进入正式写回审批。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_promotion_preflight.json` 和 `Reviews/auto_mode_formal_promotion_preflight.md`；只有 P7-I 被显式 `approve` 且带 reviewer/note 后，本节点才可进入 `ready_for_formal_writeback_approval`。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_promotion_preflight.py` 覆盖终审 approve 后只进入下一道写回审批、defer 阻断、伪 approve 缺 reviewer/note 阻断、package manifest 缺口阻断、只写 JSON/Markdown 不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-promotion-preflight-current-defer.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-J workbench、CLI、测试、真实 preflight；新增/更新任务记录、session log、BDD plan。真实 preflight JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_promotion_preflight.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_promotion_preflight.json` 和 `Reviews/auto_mode_formal_promotion_preflight.md` 仍表达当前 defer 阻断状态。
+- [x] 正式层边界：本节点不批准 final packet、不请求正式写回审批、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 6 OK；final review packet + formal promotion preflight + package builder + formal writeback approval + formal writeback execution preflight 相邻回归 31 OK；Python 编译通过；真实 CLI 返回 `0`；preflight JSON 核对通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步必须由用户明确给出 final review decision，不能自动推进 approve、formal writeback approval 或正式写回。

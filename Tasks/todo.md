@@ -2517,3 +2517,20 @@
 - [x] 正式层边界：本节点不写正式 RunPlan、不运行模型、不生成论文、不写 `state/product/*`；approved seed 只授权草案执行。
 - [x] 验证：目标测试 5 OK；CGSS run plan seed + approval + executor 相邻回归 13 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 approval/approved seed 产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-J6b 模型执行或正式 RunPlan promotion。
+
+## 2026-05-31 P6-J6b CGSS RunPlan Seed Executor
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `c724c84 Execute approved CGSS run plan seed` 落地，本轮只复核真实状态、重新运行 P6-J6b、补任务账本、补 session log、补 BDD plan，并固化真实 JSON 产物。
+- [x] 组件效果：读取 P6-J6a approved seed 后执行草案层 OLS 与 Ordered Logit，把两个模型结果合并为结果证据包，交给后续人工审阅和论文草稿路由。
+- [x] 当前真实效果：真实 CLI 输出 `status=completed_needs_human_result_review`、`ran_models=true`、`evidence_status=ready_for_paper_draft_input`。
+- [x] 模型结果：CGSS2023 分析样本 `n=5310`；OLS 中 `social_capital_index` 系数约 `0.1658`；Ordered Logit 中 `social_capital_index` 系数约 `0.4050`；两个方向一致为正。
+- [x] 证据包效果：写作种子为“在 CGSS2023 样本中，社会资本指数与居民主观幸福感呈正向相关；OLS 系数约为 0.1658，Ordered Logit 系数约为 0.4050。”；目标章节为数据与变量、实证结果、稳健性检验。
+- [x] 执行边界：本节点运行模型，但只写草案证据；不写正式 RunPlan，不写 `state/product/*`，不把结果升级为正式论文结论。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_results_evidence_package.json` 和 `Reviews/cgss_social_capital_happiness_results_evidence_package.md`；人工审阅后才允许进入论文章节路由。
+- [x] BDD/TDD：既有 `tests/test_cgss_run_plan_seed_executor.py` 覆盖无 approved seed 阻断、批准后执行 OLS/Ordered Logit 并生成证据包、执行记录不写正式状态；本轮补 `docs/superpowers/plans/2026-05-31-cgss-run-plan-seed-executor.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J6b workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 execution/minimal/ordered/evidence JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_run_plan_seed_executor.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_run_plan_seed_execution.json`、`Results/json/cgss_social_capital_happiness_minimal_model.json`、`Results/json/cgss_social_capital_happiness_ordered_robustness.json`、`Results/json/cgss_social_capital_happiness_results_evidence_package.json` 及对应 review。
+- [x] 正式层边界：本节点不写正式 RunPlan、不写正式变量角色、不生成论文、不写 `state/product/*`；结果状态为 `completed_needs_human_result_review`。
+- [x] 验证：目标测试 3 OK；CGSS run plan seed + approval + executor + OLS + Ordered Logit + results evidence package 相邻回归 20 OK；Python 编译通过；真实 CLI 返回 `0` 并写出草案层模型证据。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进结果人工审阅、论文章节路由或正式结果 promotion。

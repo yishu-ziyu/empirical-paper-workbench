@@ -2415,3 +2415,17 @@
 - [x] 正式层边界：本节点不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
 - [x] 验证：目标测试 5 OK；P6-I1-I14 scoped 回归 54 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I15 approval router。
+
+## 2026-05-31 P6-I15 CGSS Revision Approval Router
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `cb1712b Route CGSS revision approvals to work orders` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I14 的人工决策记录转成下一步路由；`defer` 等待确认，`revise` 回到队列修改，`reject` 回到重建/停止，只有 `approve` 且存在 approved queue 时才展开草案层 Agent 工单。
+- [x] 当前真实效果：真实 CLI 读取当前 `decision=defer` 的 approval 记录，输出 `status=waiting_for_human_revision_queue_decision`、`route=wait_for_human_confirmation`、`work_orders=0`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_revision_approval_router.json`；它可以驱动流程导航和 Agent 工单生成入口，但当前路由表示继续等待人工确认，不能启动 Agent。
+- [x] BDD/TDD：既有 `tests/test_cgss_revision_approval_router.py` 覆盖 defer 等待且不写工单、revise/reject 路由、approve+approved queue 才写草案工单、CLI 默认读取真实 approval JSON；本轮补 `docs/superpowers/plans/2026-05-31-cgss-revision-approval-router.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I15 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_revision_approval_router.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_revision_approval_router.json` 与 `Reviews/cgss_social_capital_happiness_revision_approval_router.md`；当前 `written_work_orders=[]`。
+- [x] 正式层边界：当前真实路由不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
+- [x] 验证：目标测试 5 OK；P6-I1-I15 scoped 回归 59 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I16 或真正的人工 approve。

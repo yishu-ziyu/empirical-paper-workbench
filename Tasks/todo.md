@@ -2387,3 +2387,17 @@
 - [x] 正式层边界：本节点不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`，不创建 Agent 工单文件。
 - [x] 验证：目标测试 8 OK；P6-I1-I12 scoped 回归 45 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I13。
+
+## 2026-05-31 P6-I13 CGSS Revision Work Orders Gate
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `20957d9 Build CGSS revision work order gate` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I12 的修订任务队列变成“Agent 草案工单门禁”；只有人工批准队列后，才允许把队列任务转换成可分发给 LiteratureAgent、MethodAgent、WriterAgent、ReviewerAgent 的草案层工单。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_revision_queue_not_approved`、`work_orders=0`、`written_work_orders=0`；当前阻断为 `human_approve_cgss_revision_task_queue`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_revision_work_orders.json`；当前状态表示“等待人批准队列”，所以不能创建 `Reviews/agent_packets/...` 工单文件，也不能写 `state/product/agent_task_queue.json`。
+- [x] BDD/TDD：既有 `tests/test_cgss_revision_work_orders.py` 覆盖未审批队列阻断、审批后生成草案工单、审批后才写 agent packet 文件、CLI 默认读取真实 pending queue 并阻断；本轮补 `docs/superpowers/plans/2026-05-31-cgss-revision-work-orders-gate.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I13 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_revision_work_orders.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_revision_work_orders.json` 与 `Reviews/cgss_social_capital_happiness_revision_work_orders.md`；状态为 `blocked_revision_queue_not_approved`。
+- [x] 正式层边界：本节点在当前真实 pending queue 下不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
+- [x] 验证：目标测试 4 OK；P6-I1-I13 scoped 回归 49 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I14 或人工审批节点。

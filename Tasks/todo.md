@@ -873,7 +873,22 @@
 - [x] 真实输出：`status=blocked_by_manifested_routed_next_gate_downstream_execute_gate`、`downstream_execute_result_reviewed=false`、`can_continue_after_downstream_execute=false`、`selected_route_execute_manifest_recorded=false`、`route_specific_artifact_executor_input_records=0`、`product_review_preparation_result_records=0`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`。
 - [x] 正式层边界：本节点只写 P7-BK result review JSON/Markdown；不运行 downstream command、不执行 selected route、不进入 artifact executor、不导出/验收、不写 `state/product/*`。
 - [x] 验证：目标测试 8 OK；`python3 -m unittest discover -s tests -p 'test_auto_mode_formal_package*.py' -v` 312 OK；Python 编译通过；真实 CLI 当前 blocked。
-- [ ] 下一步 P7-BL：实现 downstream execute result continuation gate entry（只消费 P7-BK result review；默认因 P7-BK blocked 而 blocked，ready 时 export 分支转入 route-specific artifact executor continuation，manual terminal 分支转入 product review packet continuation）。
+- [x] 下一步 P7-BL：已实现 downstream execute result continuation gate entry（只消费 P7-BK result review；默认因 P7-BK blocked 而 blocked，ready 时 export 分支转入 route-specific artifact executor continuation，manual terminal 分支转入 product review packet continuation）。
+
+## 2026-05-31 P7-BL Auto Mode Formal Package Manifested Routed Downstream Execute Result Continuation Gate Entry
+
+- [x] 组件效果：把 P7-BK result review 转成下一段 continuation entry；export 分支生成 route-specific artifact executor continuation input，manual terminal 分支生成 product-review packet continuation input。
+- [x] 当前真实效果：仓库里的 P7-BK 仍是 `blocked_by_manifested_routed_next_gate_downstream_execute_gate`，所以本节点输出 `blocked_by_manifested_routed_next_gate_downstream_execute_result_review`，没有 continuation input record，没有进入 artifact executor，也没有进入 product-review packet。
+- [x] 对接方式：下游 P7-BM 只读取 `Results/json/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry.json`；只有 `status=ready_for_manifested_routed_downstream_execute_result_continuation_gate_entry` 且 `can_request_downstream_execute_result_continuation=true` 时，才允许继续。export 分支使用 `continuation_kind=route_specific_artifact_executor_continuation`，manual terminal 分支使用 `continuation_kind=product_review_packet_continuation`。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry.py` 覆盖 export 入口、manual 入口、当前 blocked、source contract、export record contract、manual record contract、边界越权、只写本节点 report/review。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry`。
+- [x] Agent Team：未调用；本节点是单一 continuation gate entry 小切片，串行实现和验证成本更低。
+- [x] 实现范围：新增 P7-BL workbench、CLI、BDD plan、真实 review JSON/Markdown、session log。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry.py --project-root . --manifested-routed-downstream-execute-result-review Results/json/auto_mode_formal_package_next_gate_manifested_routed_next_gate_command_result_continuation_execute_result_downstream_gate_entry_execute_gate_result_review.json --output-gate-entry Results/json/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry.json --output-review Reviews/auto_mode_formal_package_next_gate_manifested_routed_downstream_execute_result_continuation_gate_entry.md`。
+- [x] 真实输出：`status=blocked_by_manifested_routed_next_gate_downstream_execute_result_review`、`downstream_execute_result_continuation_gate_entry_recorded=false`、`can_request_downstream_execute_result_continuation=false`、`requires_explicit_continuation_command=false`、`continuation_input_records=0`、`this_command_ran_continuation_command=false`、`route_specific_artifact_executed=false`、`export_or_acceptance_executed=false`、`can_write_product_state=false`。
+- [x] 正式层边界：本节点只写 P7-BL gate entry JSON/Markdown；不运行 continuation command、不进入 artifact executor、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 8 OK；`python3 -m unittest discover -s tests -p 'test_auto_mode_formal_package*.py' -v` 320 OK；Python 编译通过；真实 CLI 当前 blocked。
+- [ ] 下一步 P7-BM：实现 downstream execute result continuation gate entry execute gate（只消费 P7-BL gate entry；默认因 P7-BL blocked 而 blocked，ready 时 export 分支显式进入 route-specific artifact executor entry，manual terminal 分支只记录 product-review packet preparation）。
 
 ## 2026-05-27 Global Node Execution Contract
 

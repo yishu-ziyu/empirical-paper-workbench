@@ -1,0 +1,672 @@
+{
+  "schema_version": "p6.cgss_data_discovery.v1",
+  "generated_at": "2026-05-31T08:22:50.456508+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "data_root": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查",
+  "status": "needs_human_dataset_binding_review",
+  "dataset_binding_draft": {
+    "status": "needs_human_dataset_binding_review",
+    "candidate_count": 3,
+    "recommended_dataset": {
+      "year": "2023",
+      "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+      "file_type": "dta",
+      "size_bytes": 47775782,
+      "row_count": 11326,
+      "variable_count": 439,
+      "readability_status": "readable",
+      "read_error": null,
+      "evidence_level": "local_file",
+      "supporting_documents": [
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023编码表.xlsx",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（入户调查）.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（电话调查）.pdf"
+      ]
+    },
+    "binding_rule": "先确认 CGSS 年份、数据文件、编码表和问卷，再进入变量角色草案。"
+  },
+  "dataset_candidates": [
+    {
+      "year": "2023",
+      "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+      "file_type": "dta",
+      "size_bytes": 47775782,
+      "row_count": 11326,
+      "variable_count": 439,
+      "readability_status": "readable",
+      "read_error": null,
+      "evidence_level": "local_file",
+      "supporting_documents": [
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023编码表.xlsx",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（入户调查）.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（电话调查）.pdf"
+      ]
+    },
+    {
+      "year": "2021",
+      "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+      "file_type": "dta",
+      "size_bytes": 8010706,
+      "row_count": 8148,
+      "variable_count": 700,
+      "readability_status": "readable",
+      "read_error": null,
+      "evidence_level": "local_file",
+      "supporting_documents": [
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2012/问卷 家庭a.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2012/问卷 家庭b.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2013/调查问卷 家庭a.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2013/调查问卷 家庭b.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2017/cgss2017编码表.xls",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023编码表.xlsx",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2018/2018年CGSS居民问卷.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2017/中国综合社会调查2017问卷.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（入户调查）.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023居民问卷（电话调查）.pdf",
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2015/cgss2015问卷/CGSS2015家户问卷.pdf"
+      ]
+    },
+    {
+      "year": "2018",
+      "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2018/2018-CGSS-stata/CGSS2018.dta",
+      "file_type": "dta",
+      "size_bytes": 72597904,
+      "row_count": 12787,
+      "variable_count": 1030,
+      "readability_status": "readable",
+      "read_error": null,
+      "evidence_level": "local_file",
+      "supporting_documents": [
+        "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2018/2018年CGSS居民问卷.pdf"
+      ]
+    }
+  ],
+  "field_profile": {
+    "outcome_candidates": 6,
+    "social_capital_candidates": 117,
+    "control_candidates": 541,
+    "examples": {
+      "outcome": [
+        {
+          "name": "a36",
+          "label": "总的来说，您觉得您的生活是否幸福",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a36",
+            "幸福"
+          ]
+        },
+        {
+          "name": "A36",
+          "label": "A36. 总的来说，您觉得您的生活是否幸福？",
+          "year": "2021",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+          "matched_terms": [
+            "A36",
+            "幸福"
+          ]
+        },
+        {
+          "name": "D1",
+          "label": "D1.总的来说，您觉得您的生活是否幸福？",
+          "year": "2021",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+          "matched_terms": [
+            "D1",
+            "幸福"
+          ]
+        },
+        {
+          "name": "D36",
+          "label": "D36.请给您目前的幸福感评分（最高10分，最低0分）",
+          "year": "2021",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+          "matched_terms": [
+            "D36",
+            "幸福"
+          ]
+        },
+        {
+          "name": "D37",
+          "label": "D37.在幸福感评分中您认为几分以上是幸福的（最高10分，最",
+          "year": "2021",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+          "matched_terms": [
+            "幸福"
+          ]
+        },
+        {
+          "name": "a36",
+          "label": "总的来说，您觉得您的生活是否幸福？",
+          "year": "2018",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2018/2018-CGSS-stata/CGSS2018.dta",
+          "matched_terms": [
+            "a36",
+            "幸福"
+          ]
+        }
+      ],
+      "social_capital": [
+        {
+          "name": "a3006",
+          "label": "过去一年，您是否常在空闲时间从事以下活动-与不住在一起的亲戚聚会",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "聚会"
+          ]
+        },
+        {
+          "name": "a3007",
+          "label": "过去一年，您是否常在空闲时间从事以下活动-与朋友聚会",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "朋友",
+            "聚会"
+          ]
+        },
+        {
+          "name": "a311",
+          "label": "在过去一年中，您是否经常在您的空闲时间做下面的事情--社交",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a311",
+            "社交"
+          ]
+        },
+        {
+          "name": "a31a",
+          "label": "您与邻居进行社交娱乐活动的频繁程度",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a31a",
+            "邻居",
+            "社交"
+          ]
+        },
+        {
+          "name": "a31b",
+          "label": "您与其他朋友进行社交娱乐活动的频繁程度",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a31b",
+            "朋友",
+            "社交"
+          ]
+        },
+        {
+          "name": "a33",
+          "label": "总的来说，您同不同意在这个社会上，绝大多数人都是可以信任的",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a33",
+            "信任"
+          ]
+        },
+        {
+          "name": "a45",
+          "label": "请问您是不是工会会员",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "工会"
+          ]
+        },
+        {
+          "name": "b5",
+          "label": "您和亲人,朋友之间的接触和联系的情况怎么样",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "朋友",
+            "联系"
+          ]
+        }
+      ],
+      "control": [
+        {
+          "name": "s41",
+          "label": "采访地点-省/自治区/直辖市编码",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "s41",
+            "省",
+            "市"
+          ]
+        },
+        {
+          "name": "s42",
+          "label": "采访地点-地级市编码",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "s42",
+            "市"
+          ]
+        },
+        {
+          "name": "a2",
+          "label": "性别",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "a2",
+            "性别"
+          ]
+        },
+        {
+          "name": "a3a",
+          "label": "您的出生日期-年",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "出生"
+          ]
+        },
+        {
+          "name": "a3b",
+          "label": "您的出生日期-月",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "出生"
+          ]
+        },
+        {
+          "name": "a3c",
+          "label": "您的出生日期-日",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "出生"
+          ]
+        },
+        {
+          "name": "a4",
+          "label": "您的民族",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "民族"
+          ]
+        },
+        {
+          "name": "a4a",
+          "label": "您的民族-其他，请注明",
+          "year": "2023",
+          "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+          "matched_terms": [
+            "民族"
+          ]
+        }
+      ]
+    }
+  },
+  "role_candidate_preview": {
+    "status": "needs_human_review",
+    "recommended_dataset_order": [
+      {
+        "year": "2023",
+        "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "variable_count": 439
+      },
+      {
+        "year": "2021",
+        "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+        "variable_count": 700
+      },
+      {
+        "year": "2018",
+        "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2018/2018-CGSS-stata/CGSS2018.dta",
+        "variable_count": 1030
+      }
+    ],
+    "top_outcome": [
+      {
+        "name": "a36",
+        "label": "总的来说，您觉得您的生活是否幸福",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a36",
+          "幸福"
+        ],
+        "priority": [
+          0,
+          0,
+          "a36,幸福"
+        ]
+      },
+      {
+        "name": "A36",
+        "label": "A36. 总的来说，您觉得您的生活是否幸福？",
+        "year": "2021",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+        "matched_terms": [
+          "A36",
+          "幸福"
+        ],
+        "priority": [
+          1,
+          0,
+          "A36,幸福"
+        ]
+      },
+      {
+        "name": "D1",
+        "label": "D1.总的来说，您觉得您的生活是否幸福？",
+        "year": "2021",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+        "matched_terms": [
+          "D1",
+          "幸福"
+        ],
+        "priority": [
+          1,
+          0,
+          "D1,幸福"
+        ]
+      },
+      {
+        "name": "D36",
+        "label": "D36.请给您目前的幸福感评分（最高10分，最低0分）",
+        "year": "2021",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+        "matched_terms": [
+          "D36",
+          "幸福"
+        ],
+        "priority": [
+          1,
+          0,
+          "D36,幸福"
+        ]
+      },
+      {
+        "name": "D37",
+        "label": "D37.在幸福感评分中您认为几分以上是幸福的（最高10分，最",
+        "year": "2021",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2021/CGSS2021.dta",
+        "matched_terms": [
+          "幸福"
+        ],
+        "priority": [
+          1,
+          1,
+          "幸福"
+        ]
+      }
+    ],
+    "top_social_capital": [
+      {
+        "name": "a311",
+        "label": "在过去一年中，您是否经常在您的空闲时间做下面的事情--社交",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a311",
+          "社交"
+        ],
+        "priority": [
+          0,
+          0,
+          "a311,社交"
+        ]
+      },
+      {
+        "name": "a31a",
+        "label": "您与邻居进行社交娱乐活动的频繁程度",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a31a",
+          "邻居",
+          "社交"
+        ],
+        "priority": [
+          0,
+          0,
+          "a31a,邻居,社交"
+        ]
+      },
+      {
+        "name": "a31b",
+        "label": "您与其他朋友进行社交娱乐活动的频繁程度",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a31b",
+          "朋友",
+          "社交"
+        ],
+        "priority": [
+          0,
+          0,
+          "a31b,朋友,社交"
+        ]
+      },
+      {
+        "name": "a33",
+        "label": "总的来说，您同不同意在这个社会上，绝大多数人都是可以信任的",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a33",
+          "信任"
+        ],
+        "priority": [
+          0,
+          0,
+          "a33,信任"
+        ]
+      },
+      {
+        "name": "c11a",
+        "label": "在最近一次处理下列问题时，您最先向谁寻求帮助-情绪及心理上的问题",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "c11a",
+          "帮助"
+        ],
+        "priority": [
+          0,
+          0,
+          "c11a,帮助"
+        ]
+      },
+      {
+        "name": "c11b",
+        "label": "在最近一次处理下列问题时，您最先向谁寻求帮助-健康问题",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "c11b",
+          "帮助"
+        ],
+        "priority": [
+          0,
+          0,
+          "c11b,帮助"
+        ]
+      },
+      {
+        "name": "c11c",
+        "label": "在最近一次处理下列问题时，您最先向谁寻求帮助-家务琐事",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "c11c",
+          "帮助"
+        ],
+        "priority": [
+          0,
+          0,
+          "c11c,帮助"
+        ]
+      },
+      {
+        "name": "c11d",
+        "label": "在最近一次处理下列问题时，您最先向谁寻求帮助-照顾家人（如小孩/长辈）",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "c11d",
+          "帮助"
+        ],
+        "priority": [
+          0,
+          0,
+          "c11d,帮助"
+        ]
+      }
+    ],
+    "top_controls": [
+      {
+        "name": "a15",
+        "label": "您觉得您目前的身体健康状况是",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a15",
+          "健康"
+        ],
+        "priority": [
+          0,
+          0,
+          "a15,健康"
+        ]
+      },
+      {
+        "name": "a16",
+        "label": "在过去的四周中，由于健康问题影响到您的工作或其他日常活动的频繁程度是",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a16",
+          "健康",
+          "工作"
+        ],
+        "priority": [
+          0,
+          0,
+          "a16,健康,工作"
+        ]
+      },
+      {
+        "name": "a18",
+        "label": "您目前的户口登记状况是",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a18",
+          "户口"
+        ],
+        "priority": [
+          0,
+          0,
+          "a18,户口"
+        ]
+      },
+      {
+        "name": "a2",
+        "label": "性别",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a2",
+          "性别"
+        ],
+        "priority": [
+          0,
+          0,
+          "a2,性别"
+        ]
+      },
+      {
+        "name": "a21",
+        "label": "您目前的户口登记地",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a21",
+          "户口"
+        ],
+        "priority": [
+          0,
+          0,
+          "a21,户口"
+        ]
+      },
+      {
+        "name": "a7a",
+        "label": "您目前的最高教育程度是（包括目前在读的）",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a7a",
+          "教育"
+        ],
+        "priority": [
+          0,
+          0,
+          "a7a,教育"
+        ]
+      },
+      {
+        "name": "a7b",
+        "label": "您目前的最高教育程度的状态是",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a7b",
+          "教育"
+        ],
+        "priority": [
+          0,
+          0,
+          "a7b,教育"
+        ]
+      },
+      {
+        "name": "a7c",
+        "label": "您已经完成的最高学历是哪一年获得",
+        "year": "2023",
+        "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+        "matched_terms": [
+          "a7c"
+        ],
+        "priority": [
+          0,
+          0,
+          "a7c"
+        ]
+      }
+    ]
+  },
+  "next_tasks": [
+    "review_cgss_dataset_binding",
+    "draft_cgss_variable_roles",
+    "build_cgss_literature_seed_package",
+    "run_cgss_method_gate"
+  ],
+  "boundary_flags": {
+    "modified_formal_research_question": false,
+    "modified_formal_variable_roles": false,
+    "modified_design_spec": false,
+    "modified_run_plan": false,
+    "generated_formal_paper": false
+  },
+  "agent_team_routing": {
+    "first_agent_to_call": "DataAgent",
+    "handoff_after_this_node": "VariableRoleAgent",
+    "recall_condition": "人工确认 DatasetBinding 后，再让 VariableRoleAgent 读取字段画像。"
+  }
+}

@@ -2330,4 +2330,18 @@
 - [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_literature_source_verification_preflight.json` 与 `Reviews/cgss_social_capital_happiness_literature_source_verification_preflight.md`；状态为 `needs_source_verification`。
 - [x] 正式层边界：本节点不写 verified bibliography、不写 contribution matrix、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
 - [x] 验证：目标测试 4 OK；P6-I1-I8 scoped 回归 22 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I9。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I9。
+
+## 2026-05-31 P6-I9 CGSS Verified Bibliography Candidates
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `7a67cf9 Build CGSS verified bibliography candidates` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I8 来源核验预检推进为“可人工批准的参考文献候选台”，列出已打开来源页面的候选文献、仍需人工/数据库核验的文献，以及每条候选文献应绑定到论文哪个章节和论点。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_bibliography_approval`、`verified_bibliography_candidates=7`、`manual_followup_queue=3`、`citation_bindings=7`；当前阻断为 `human_bibliography_approval_required` 和 `browser_or_database_verification_required`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_verified_bibliography_candidates.json`；它可以驱动人工批准界面、正式 bibliography 写入前检查、contribution matrix 写入前检查和文献综述草稿准备，但不能直接当作正式参考文献表。
+- [x] BDD/TDD：既有 `tests/test_cgss_verified_bibliography_candidates.py` 覆盖 source-checked candidate 生成、未核验来源留在 manual queue、章节/论点引用绑定、source preflight 未 ready 阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-verified-bibliography-candidates.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I9 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_verified_bibliography_candidates.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_verified_bibliography_candidates.json` 与 `Reviews/cgss_social_capital_happiness_verified_bibliography_candidates.md`；状态为 `needs_human_bibliography_approval`。
+- [x] 正式层边界：本节点不写 `Data/literature/processed/verified_bibliography.csv`、不写 contribution matrix、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P6-I1-I9 scoped 回归 27 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I10。

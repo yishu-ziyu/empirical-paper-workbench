@@ -2619,3 +2619,20 @@
 - [x] 正式层边界：本节点不批准修订队列、不分发 work orders、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
 - [x] 验证：目标测试 5 OK；method gate + reviewer revision loop + revision queue/approval/work orders/router 相邻回归 33 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 6 条修订任务。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进人工 queue approval、修订工单派发或正式写回。
+
+## 2026-05-31 P6-M CGSS Paper Package Builder
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交落地，本轮只复核真实状态、重新运行 P6-M、补任务账本、补 session log、补 BDD plan，并固化真实 paper package 文件夹。
+- [x] 组件效果：把 P6-L 的 Rev1 草稿、PDF、结果证据包、文献综述草稿包、方法门、审稿报告、修订队列、复现说明和 manifest 汇总成一个可人工验收的 paper package。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_paper_package_review`、`rendered_artifact=paper.pdf`、`files=9`；package 目录为 `workspace/paper_packages/cgss_social_capital_happiness/`。
+- [x] 包内容：包含 `paper.md`、`paper.pdf`、`results_evidence_package.json`、`literature_review_packet.json`、`method_gate.md`、`reviewer_report.md`、`revision_task_queue.md`、`reproducibility_readme.md`、`manifest.json`。
+- [x] Manifest 角色：真实运行产物为 `results_evidence_package.json` 和 `paper.pdf`；草稿层产物为 `paper.md` 和 `literature_review_packet.json`；需要人工审阅产物为 `method_gate.md`、`reviewer_report.md`、`revision_task_queue.md`。
+- [x] 文件证据：package 总大小 `229662` bytes；`paper.pdf` 识别为 `PDF document, version 1.7`；manifest `missing_targets=[]`。
+- [x] 对接方式：下游只应读取 `workspace/paper_packages/cgss_social_capital_happiness/manifest.json` 和同目录 8 个配套文件；人工打开 `paper.md`/`paper.pdf` 并审阅方法门、审稿报告、修订队列后，才能进入接受、修订或正式层 promotion 路由。
+- [x] BDD/TDD：既有 `tests/test_cgss_paper_package_builder.py` 覆盖 manifest 生成、workspace package 写入、PDF 缺失时 HTML fallback、关键审阅产物缺失时阻断、manifest 标记真实运行/草稿层/人工审阅角色；本轮补 `docs/superpowers/plans/2026-05-31-cgss-paper-package-builder.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-M workbench、CLI、测试、真实 package；新增/更新任务记录、session log、BDD plan，并将真实 package 文件更新加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_paper_package_builder.py --project-root .`
+- [x] 真实输出：写出 `workspace/paper_packages/cgss_social_capital_happiness/` 下 9 个文件。
+- [x] 正式层边界：本节点不接受 package、不批准修订队列、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；reviewer revision loop + paper package builder + PDF preflight + method gate + results evidence package + literature review draft packet 相邻回归 28 OK；Python 编译通过；真实 CLI 返回 `0`；manifest 无缺失；package PDF 确认为 PDF 1.7。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 package 人工 acceptance、正式层 promotion 或发布。

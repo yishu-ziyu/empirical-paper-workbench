@@ -2682,3 +2682,18 @@
 - [x] 正式层边界：本节点不批准正式写回、不进入正式写回执行预检、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 7 OK；formal promotion preflight + formal writeback approval + formal writeback execution preflight + final review packet 相邻回归 26 OK；Python 编译通过；真实 CLI 返回 `0`；approval JSON 核对通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进正式写回审批生效或执行预检。
+
+## 2026-05-31 P7-L Auto Mode Formal Writeback Execution Preflight Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-L 代码与测试已落地，本轮用当前 P7-K blocked ledger 重新运行 formal writeback execution preflight，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把“正式写回审批是否生效”继续传递到“能不能请求正式写回执行”的闸口；当前产品效果是 P7-K 未生效时不暴露执行计划，也不执行写回。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_formal_writeback_approval`、`can_request_formal_writeback_execution=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`。
+- [x] 阻断原因：P7-K source approval 仍是 `blocked_by_formal_promotion_preflight`，P7-L 记录 `formal_writeback_approval_not_effective`、`formal_writeback_approval_decision_not_approve`、`formal_writeback_approval_metadata_incomplete`、`approved_scope_missing`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_writeback_execution_preflight.json` 和 `Reviews/auto_mode_formal_writeback_execution_preflight.md`；P7-M execute 不应把当前 preflight 当成 ready 输入。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_writeback_execution_preflight.py` 覆盖生效审批只生成执行预检计划、未生效审批阻断、缺少 approved scope 阻断、边界违规阻断、只写 JSON/Markdown 不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-writeback-execution-preflight-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-L workbench、CLI、测试、真实 execution preflight；新增/更新任务记录、session log、BDD plan。真实 execution preflight JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_writeback_execution_preflight.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_writeback_execution_preflight.json` 和 `Reviews/auto_mode_formal_writeback_execution_preflight.md` 仍表达当前 P7-K 阻断传递状态。
+- [x] 正式层边界：本节点不执行正式写回、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 6 OK；final review packet + formal promotion preflight + formal writeback approval + formal writeback execution preflight + formal writeback execute 相邻回归 32 OK；Python 编译通过；真实 CLI 返回 `0`；execution preflight JSON 核对通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进正式写回执行。

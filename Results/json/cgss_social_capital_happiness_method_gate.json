@@ -1,0 +1,192 @@
+{
+  "schema_version": "p6.cgss_method_gate.v1",
+  "generated_at": "2026-05-31T09:35:43.739074+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "profile": "aer_like",
+  "method_family": "cross_section_ols_ordered_logit",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "source_artifacts": {
+    "results_evidence_package": {
+      "path": "Results/json/cgss_social_capital_happiness_results_evidence_package.json",
+      "schema_version": "p6.cgss_results_evidence_package.v1",
+      "status": "ready_for_paper_draft_input"
+    },
+    "literature_review_draft_packet": {
+      "path": "Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json",
+      "schema_version": "p6.cgss_literature_review_draft_packet.v1",
+      "status": "needs_human_literature_review_draft_approval"
+    },
+    "paper_assembly": {
+      "path": "Results/json/cgss_social_capital_happiness_paper_assembly.json",
+      "schema_version": "p6.cgss_exploratory_paper_assembler.v1",
+      "status": "needs_human_exploratory_paper_review"
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_manuscript": false,
+    "modified_verified_bibliography": false,
+    "modified_design_spec": false,
+    "modified_run_plan": false,
+    "modified_product_state": false
+  },
+  "status": "needs_human_method_gate_review",
+  "blocking_reasons": [],
+  "gate_status": "yellow",
+  "gate_enforcement": {
+    "required": true,
+    "mode": "required",
+    "profile": "aer_like",
+    "recommended_profiles": [
+      "aer_like"
+    ],
+    "requires_user_choice_for_enforcement": false
+  },
+  "checks": [
+    {
+      "id": "variable_definitions",
+      "label": "变量定义是否充分",
+      "status": "passed",
+      "evidence": [
+        "happiness <- a36",
+        "social_capital_items=['a33 trust', 'a31a neighbor_social', 'a31b friend_social', 'a311 leisure_social']"
+      ],
+      "review_note": "正式稿仍需把题项方向、量表含义和缺失处理写入变量表。"
+    },
+    {
+      "id": "ordered_outcome_model_fit",
+      "label": "主观幸福感因变量是否适合 OLS + Ordered Logit",
+      "status": "passed",
+      "evidence": [
+        "OLS baseline",
+        "Ordered Logit ordered outcome robustness"
+      ],
+      "review_note": "OLS 可作可解释基准，Ordered Logit 用于有序因变量稳健性。"
+    },
+    {
+      "id": "social_capital_theory_literature",
+      "label": "社会资本核心解释变量是否有理论和文献依据",
+      "status": "needs_human_verification",
+      "evidence": [
+        "bourdieu_1986",
+        "ferrer_i_carbonell_frijters_2004",
+        "manual_source_verification_required",
+        "oecd_2025",
+        "putnam_2000",
+        "world_bank_2004",
+        "xu_zhang_huang_2023",
+        "zhang_wan_2020"
+      ],
+      "review_note": "候选引用存在，但正式 bibliography 和中文文献仍需人工核验。"
+    },
+    {
+      "id": "baseline_controls",
+      "label": "控制变量是否覆盖基本人口学和经济变量",
+      "status": "passed",
+      "evidence": [
+        "female",
+        "age",
+        "education_level",
+        "log_income",
+        "health",
+        "urban_hukou",
+        "province fixed effects"
+      ],
+      "review_note": "已覆盖性别、年龄、教育、收入、健康和户籍；可继续补地区与家庭结构。"
+    },
+    {
+      "id": "robustness_heterogeneity_mechanism_plan",
+      "label": "是否需要进一步稳健性、异质性、机制检验",
+      "status": "needs_followup",
+      "evidence": [
+        "data_and_measurement",
+        "empirical_strategy",
+        "literature_and_contribution",
+        "main_results"
+      ],
+      "review_note": "当前完整稿已有计划段落，但尚未真实执行分项指数、异质性和机制检验。"
+    },
+    {
+      "id": "reverse_causality_and_omitted_variable_risk",
+      "label": "是否存在反向因果和遗漏变量风险",
+      "status": "risk_flagged",
+      "evidence": [
+        "cross_section_data",
+        "conditional_association_claim_boundary"
+      ],
+      "review_note": "横截面结果只能支持条件相关；幸福感也可能影响社会参与，遗漏人格、社区质量等变量。"
+    }
+  ],
+  "required_evidence": [
+    {
+      "id": "variable_codebook",
+      "status": "required_for_formal_promotion"
+    },
+    {
+      "id": "ols_ordered_logit_model_outputs",
+      "status": "present_in_results_evidence_package"
+    },
+    {
+      "id": "candidate_citation_verification",
+      "status": "required_for_formal_promotion"
+    },
+    {
+      "id": "robustness_plan_or_results",
+      "status": "required_for_next_revision"
+    },
+    {
+      "id": "endogeneity_risk_statement",
+      "status": "required_for_next_revision"
+    }
+  ],
+  "risk_register": [
+    "reverse_causality",
+    "omitted_variables"
+  ],
+  "result_number_bindings": {
+    "source": "cgss_results_evidence_package",
+    "ols": {
+      "coef": 0.1658,
+      "std_error": 0.0187,
+      "p_value": 7.780985384938017e-19,
+      "nobs": 5310
+    },
+    "ordered_logit": {
+      "coef": 0.405,
+      "std_error": 0.0424,
+      "p_value": 1.2543655302918154e-21,
+      "nobs": 5310
+    }
+  },
+  "evidence_rules": [
+    "do_not_invent_numbers",
+    "all_result_numbers_must_bind_to_results_evidence_package",
+    "candidate_citations_require_human_verification",
+    "draft_layer_only"
+  ],
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_approve_cgss_method_gate",
+    "would_write_if_approved": [
+      "Manuscripts/sections/empirical-strategy.md",
+      "Manuscripts/sections/robustness-mechanisms-heterogeneity.md"
+    ]
+  },
+  "agent_team_schedule": {
+    "call_when": "after_exploratory_paper_and_pdf_preflight",
+    "called_agents": [
+      "MethodAgent",
+      "ReviewerAgent",
+      "VerifierAgent"
+    ],
+    "recall_when": "after_method_gate_json_and_review_are_written",
+    "next_call_when": "before_reviewer_report_and_revision_queue",
+    "boundary": "方法门只产出审阅层缺口和风险，不提升正式论文层。"
+  },
+  "next_tasks": [
+    "human_review_cgss_method_gate",
+    "add_variable_definition_detail",
+    "plan_robustness_heterogeneity_mechanism_tests",
+    "address_endogeneity_risk_in_reviewer_loop"
+  ]
+}

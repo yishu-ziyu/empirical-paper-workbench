@@ -2345,3 +2345,17 @@
 - [x] 正式层边界：本节点不写 `Data/literature/processed/verified_bibliography.csv`、不写 contribution matrix、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
 - [x] 验证：目标测试 5 OK；P6-I1-I9 scoped 回归 27 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I10。
+
+## 2026-05-31 P6-I10 CGSS Literature Review Draft Packet
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `28a24df Build CGSS literature review draft packet` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I9 参考文献候选组织成“文献综述草稿包”，形成理论基础、变量测量、中国经验研究、方法衔接 4 个段落块，并为每个段落标出来源、citation key、核心论点和审阅重点。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_literature_review_draft_approval`、`paragraph_blocks=4`、`target_chinese_characters=1600`、`open_dependencies=3`；当前阻断为 `literature_review_draft_needs_human_approval` 和 `manual_or_database_verification_required`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json`；它可以驱动文献综述人工审阅、正文段落扩写和引用计划检查，但不能直接写入 `Manuscripts/sections/literature-and-contribution.md`。
+- [x] BDD/TDD：既有 `tests/test_cgss_literature_review_draft_packet.py` 覆盖草稿包生成、段落到候选来源/论点映射、未批准来源保留为 open dependencies、候选参考文献未 ready 阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-literature-review-draft-packet.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I10 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_literature_review_draft_packet.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json` 与 `Reviews/cgss_social_capital_happiness_literature_review_draft_packet.md`；状态为 `needs_human_literature_review_draft_approval`。
+- [x] 正式层边界：本节点不写 `Manuscripts/sections/literature-and-contribution.md`、不写 citation plan、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P6-I1-I10 scoped 回归 32 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I11。

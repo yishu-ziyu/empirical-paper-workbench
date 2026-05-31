@@ -1,0 +1,651 @@
+{
+  "schema_version": "p6.cgss_literature_source_verification_preflight.v1",
+  "generated_at": "2026-05-31T07:48:11.481197+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析",
+  "source_artifacts": {
+    "literature_seed_package": {
+      "path": "Results/json/cgss_social_capital_happiness_literature_seed_package.json",
+      "schema_version": "p6.cgss_literature_seed_package.v1",
+      "status": "needs_human_literature_review"
+    }
+  },
+  "boundary_flags": {
+    "modified_verified_bibliography": false,
+    "modified_contribution_matrix": false,
+    "modified_formal_bibliography": false,
+    "modified_formal_manuscript": false,
+    "wrote_state_product": false
+  },
+  "status": "needs_source_verification",
+  "blocking_reasons": [
+    "manual_source_review_required",
+    "manual_cnki_verification_required",
+    "zotero_or_scholar_metadata_required"
+  ],
+  "candidate_bibliography": [
+    {
+      "id": "S01",
+      "title": "CGSS 项目概况",
+      "authors": [
+        "中国人民大学中国调查与数据中心"
+      ],
+      "year": "",
+      "url": "https://cgss.ruc.edu.cn/xmjs/xmgk.htm",
+      "source_type": "official_data",
+      "evidence_role": [
+        "cgss_empirical_context",
+        "data_source_description"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "open_official_source",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "中国人民大学中国调查与数据中心_nd",
+      "use_in_paper": "说明 CGSS 的项目来源、全国综合社会调查定位和数据使用边界。",
+      "do_not_claim": "不能仅凭数据来源说明把本文结果写成严格因果效应。"
+    },
+    {
+      "id": "S02",
+      "title": "Social Capital in the Creation of Human Capital",
+      "authors": [
+        "James S. Coleman"
+      ],
+      "year": "1988",
+      "url": "https://www.journals.uchicago.edu/doi/10.1086/228943",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "mechanism"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "coleman_1988",
+      "use_in_paper": "支撑社会资本通过义务、期望、信息渠道和社会规范影响个体福利的理论机制。",
+      "do_not_claim": "不能直接证明 CGSS 中某个题项就是完整社会资本。"
+    },
+    {
+      "id": "S03",
+      "title": "Bowling Alone: The Collapse and Revival of American Community",
+      "authors": [
+        "Robert D. Putnam"
+      ],
+      "year": "2000",
+      "url": "https://www.simonandschuster.com/books/Bowling-Alone-Revised-and-Updated/Robert-D-Putnam/9781982130848",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "trust_norms_networks"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "putnam_2000",
+      "use_in_paper": "用于组织信任、规范和网络三类社会资本维度。",
+      "do_not_claim": "不能把美国社区衰退叙事直接套用到中国居民幸福感。"
+    },
+    {
+      "id": "S04",
+      "title": "The Forms of Capital",
+      "authors": [
+        "Pierre Bourdieu"
+      ],
+      "year": "1986",
+      "url": "https://web.stanford.edu/~eckert/PDF/Bourdieu1986.pdf",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "resource_network"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "bourdieu_1986",
+      "use_in_paper": "补充社会资本作为可动员关系资源的解释。",
+      "do_not_claim": "不能把阶层再生产理论直接写成本文实证结论。"
+    },
+    {
+      "id": "S05",
+      "title": "Subjective Well-Being",
+      "authors": [
+        "Ed Diener"
+      ],
+      "year": "1984",
+      "url": "https://doi.org/10.1037/0033-2909.95.3.542",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "subjective_wellbeing_measurement"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "diener_1984",
+      "use_in_paper": "界定主观幸福感和生活评价的概念边界。",
+      "do_not_claim": "CGSS 单题幸福感只是代理变量，不能覆盖多维 SWB。"
+    },
+    {
+      "id": "S06",
+      "title": "OECD Guidelines on Measuring Subjective Well-being",
+      "authors": [
+        "OECD"
+      ],
+      "year": "2025",
+      "url": "https://www.oecd.org/en/publications/oecd-guidelines-on-measuring-subjective-well-being-2025-update_9203632a-en/full-report/measuring-subjective-well-being_b4b53f27.html",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "subjective_wellbeing_measurement",
+        "measurement_limits"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "oecd_2025",
+      "use_in_paper": "说明主观幸福感测量应区分生活评价、情感体验和其他福利指标。",
+      "do_not_claim": "不能把幸福感自评当作客观福利水平。"
+    },
+    {
+      "id": "S07",
+      "title": "Measuring Social Capital: An Integrated Questionnaire",
+      "authors": [
+        "World Bank"
+      ],
+      "year": "2004",
+      "url": "https://openknowledge.worldbank.org/entities/publication/634c867c-cbc8-536a-8446-a2703177bc7c",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "social_capital_measurement",
+        "variable_operationalization"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "bank_2004",
+      "use_in_paper": "为信任、网络、集体行动、信息沟通等社会资本维度提供测量参照。",
+      "do_not_claim": "CGSS 不是完整 SC-IQ，不能声称完全复刻该量表。"
+    },
+    {
+      "id": "S08",
+      "title": "Social trust, social capital, and subjective well-being of rural residents",
+      "authors": [
+        "Xu",
+        "Zhang",
+        "Huang"
+      ],
+      "year": "2023",
+      "url": "https://www.nature.com/articles/s41599-023-01532-1",
+      "source_type": "cgss_empirical_study",
+      "evidence_role": [
+        "cgss_empirical_context",
+        "mechanism",
+        "variable_operationalization"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "open_journal_page",
+        "lookup_zotero_or_scholar_metadata",
+        "confirm_wave_and_sample"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "xu_2023",
+      "use_in_paper": "提供 CGSS 语境下社会信任、社会资本与主观幸福感的实证参照。",
+      "do_not_claim": "该文样本和波次不同，不能直接外推到本文 CGSS2023 全样本。"
+    },
+    {
+      "id": "S09",
+      "title": "机会不均等、社会资本与农民主观幸福感",
+      "authors": [
+        "张彤进",
+        "万广华"
+      ],
+      "year": "2020",
+      "url": "https://qks.shufe.edu.cn/J/ArticleQuery/f824063e-2826-4256-90f5-e5ff8aa79e7a/CN",
+      "source_type": "chinese_literature_seed",
+      "evidence_role": [
+        "cnki_manual_queue",
+        "chinese_empirical_context"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "cnki_or_journal_page_check",
+        "record_chinese_metadata",
+        "confirm_cssci_or_journal_level_if_needed"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "张彤进_2020",
+      "use_in_paper": "作为中文 CGSS 幸福感研究和社会资本机制的候选中文文献。",
+      "do_not_claim": "其农民样本和机会不均等框架不能直接替代本文居民样本框架。"
+    },
+    {
+      "id": "S10",
+      "title": "How Important is Methodology for the estimates of the determinants of Happiness?",
+      "authors": [
+        "Ferrer-i-Carbonell",
+        "Frijters"
+      ],
+      "year": "2004",
+      "url": "https://doi.org/10.1111/j.1468-0297.2004.00235.x",
+      "source_type": "method_reference",
+      "evidence_role": [
+        "ordinal_outcome_method",
+        "subjective_wellbeing_method"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "ferrer-i-carbonell_2004",
+      "use_in_paper": "支撑幸福感有序变量建模和 OLS/有序模型稳健性讨论。",
+      "do_not_claim": "方法选择仍需结合 CGSS 量表和本文诊断结果说明。"
+    }
+  ],
+  "manual_review_queue": [
+    {
+      "id": "S01",
+      "title": "CGSS 项目概况",
+      "authors": [
+        "中国人民大学中国调查与数据中心"
+      ],
+      "year": "",
+      "url": "https://cgss.ruc.edu.cn/xmjs/xmgk.htm",
+      "source_type": "official_data",
+      "evidence_role": [
+        "cgss_empirical_context",
+        "data_source_description"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "open_official_source",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "中国人民大学中国调查与数据中心_nd",
+      "use_in_paper": "说明 CGSS 的项目来源、全国综合社会调查定位和数据使用边界。",
+      "do_not_claim": "不能仅凭数据来源说明把本文结果写成严格因果效应。"
+    },
+    {
+      "id": "S02",
+      "title": "Social Capital in the Creation of Human Capital",
+      "authors": [
+        "James S. Coleman"
+      ],
+      "year": "1988",
+      "url": "https://www.journals.uchicago.edu/doi/10.1086/228943",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "mechanism"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "coleman_1988",
+      "use_in_paper": "支撑社会资本通过义务、期望、信息渠道和社会规范影响个体福利的理论机制。",
+      "do_not_claim": "不能直接证明 CGSS 中某个题项就是完整社会资本。"
+    },
+    {
+      "id": "S03",
+      "title": "Bowling Alone: The Collapse and Revival of American Community",
+      "authors": [
+        "Robert D. Putnam"
+      ],
+      "year": "2000",
+      "url": "https://www.simonandschuster.com/books/Bowling-Alone-Revised-and-Updated/Robert-D-Putnam/9781982130848",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "trust_norms_networks"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "putnam_2000",
+      "use_in_paper": "用于组织信任、规范和网络三类社会资本维度。",
+      "do_not_claim": "不能把美国社区衰退叙事直接套用到中国居民幸福感。"
+    },
+    {
+      "id": "S04",
+      "title": "The Forms of Capital",
+      "authors": [
+        "Pierre Bourdieu"
+      ],
+      "year": "1986",
+      "url": "https://web.stanford.edu/~eckert/PDF/Bourdieu1986.pdf",
+      "source_type": "classic_theory",
+      "evidence_role": [
+        "social_capital_theory",
+        "resource_network"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "bourdieu_1986",
+      "use_in_paper": "补充社会资本作为可动员关系资源的解释。",
+      "do_not_claim": "不能把阶层再生产理论直接写成本文实证结论。"
+    },
+    {
+      "id": "S05",
+      "title": "Subjective Well-Being",
+      "authors": [
+        "Ed Diener"
+      ],
+      "year": "1984",
+      "url": "https://doi.org/10.1037/0033-2909.95.3.542",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "subjective_wellbeing_measurement"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "diener_1984",
+      "use_in_paper": "界定主观幸福感和生活评价的概念边界。",
+      "do_not_claim": "CGSS 单题幸福感只是代理变量，不能覆盖多维 SWB。"
+    },
+    {
+      "id": "S06",
+      "title": "OECD Guidelines on Measuring Subjective Well-being",
+      "authors": [
+        "OECD"
+      ],
+      "year": "2025",
+      "url": "https://www.oecd.org/en/publications/oecd-guidelines-on-measuring-subjective-well-being-2025-update_9203632a-en/full-report/measuring-subjective-well-being_b4b53f27.html",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "subjective_wellbeing_measurement",
+        "measurement_limits"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "oecd_2025",
+      "use_in_paper": "说明主观幸福感测量应区分生活评价、情感体验和其他福利指标。",
+      "do_not_claim": "不能把幸福感自评当作客观福利水平。"
+    },
+    {
+      "id": "S07",
+      "title": "Measuring Social Capital: An Integrated Questionnaire",
+      "authors": [
+        "World Bank"
+      ],
+      "year": "2004",
+      "url": "https://openknowledge.worldbank.org/entities/publication/634c867c-cbc8-536a-8446-a2703177bc7c",
+      "source_type": "measurement_standard",
+      "evidence_role": [
+        "social_capital_measurement",
+        "variable_operationalization"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "bank_2004",
+      "use_in_paper": "为信任、网络、集体行动、信息沟通等社会资本维度提供测量参照。",
+      "do_not_claim": "CGSS 不是完整 SC-IQ，不能声称完全复刻该量表。"
+    },
+    {
+      "id": "S08",
+      "title": "Social trust, social capital, and subjective well-being of rural residents",
+      "authors": [
+        "Xu",
+        "Zhang",
+        "Huang"
+      ],
+      "year": "2023",
+      "url": "https://www.nature.com/articles/s41599-023-01532-1",
+      "source_type": "cgss_empirical_study",
+      "evidence_role": [
+        "cgss_empirical_context",
+        "mechanism",
+        "variable_operationalization"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "open_journal_page",
+        "lookup_zotero_or_scholar_metadata",
+        "confirm_wave_and_sample"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "xu_2023",
+      "use_in_paper": "提供 CGSS 语境下社会信任、社会资本与主观幸福感的实证参照。",
+      "do_not_claim": "该文样本和波次不同，不能直接外推到本文 CGSS2023 全样本。"
+    },
+    {
+      "id": "S09",
+      "title": "机会不均等、社会资本与农民主观幸福感",
+      "authors": [
+        "张彤进",
+        "万广华"
+      ],
+      "year": "2020",
+      "url": "https://qks.shufe.edu.cn/J/ArticleQuery/f824063e-2826-4256-90f5-e5ff8aa79e7a/CN",
+      "source_type": "chinese_literature_seed",
+      "evidence_role": [
+        "cnki_manual_queue",
+        "chinese_empirical_context"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "cnki_or_journal_page_check",
+        "record_chinese_metadata",
+        "confirm_cssci_or_journal_level_if_needed"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "张彤进_2020",
+      "use_in_paper": "作为中文 CGSS 幸福感研究和社会资本机制的候选中文文献。",
+      "do_not_claim": "其农民样本和机会不均等框架不能直接替代本文居民样本框架。"
+    },
+    {
+      "id": "S10",
+      "title": "How Important is Methodology for the estimates of the determinants of Happiness?",
+      "authors": [
+        "Ferrer-i-Carbonell",
+        "Frijters"
+      ],
+      "year": "2004",
+      "url": "https://doi.org/10.1111/j.1468-0297.2004.00235.x",
+      "source_type": "method_reference",
+      "evidence_role": [
+        "ordinal_outcome_method",
+        "subjective_wellbeing_method"
+      ],
+      "review_status": "candidate_needs_source_check",
+      "verification_actions": [
+        "verify_doi_or_publisher_page",
+        "lookup_zotero_or_scholar_metadata",
+        "record_access_date"
+      ],
+      "requires_manual_review": true,
+      "ready_for_verified_bibliography": false,
+      "citation_key_seed": "ferrer-i-carbonell_2004",
+      "use_in_paper": "支撑幸福感有序变量建模和 OLS/有序模型稳健性讨论。",
+      "do_not_claim": "方法选择仍需结合 CGSS 量表和本文诊断结果说明。"
+    }
+  ],
+  "cnki_queue": [
+    {
+      "query": "社会资本 主观幸福感 CGSS",
+      "purpose": "确认中文核心文献中社会资本与幸福感的变量定义和常用控制变量。",
+      "status": "manual_search_required",
+      "expected_output": "candidate_cnki_record_with_title_authors_year_journal_url_or_note"
+    },
+    {
+      "query": "社会信任 居民幸福感 CGSS 有序Logit",
+      "purpose": "核验 CGSS 幸福感题项、社会信任题项和有序 Logit 写法。",
+      "status": "manual_search_required",
+      "expected_output": "candidate_cnki_record_with_title_authors_year_journal_url_or_note"
+    },
+    {
+      "query": "社会参与 社会网络 主观幸福感 中国综合社会调查",
+      "purpose": "补充分维度社会资本机制，避免只使用社会信任解释所有结果。",
+      "status": "manual_search_required",
+      "expected_output": "candidate_cnki_record_with_title_authors_year_journal_url_or_note"
+    },
+    {
+      "query": "机会不均等、社会资本与农民主观幸福感 张彤进",
+      "purpose": "核验中文文献元数据、期刊来源和可引用页面。",
+      "status": "manual_search_required",
+      "expected_output": "verified_chinese_bibliography_candidate_or_reject_reason"
+    }
+  ],
+  "zotero_scholar_queue": [
+    {
+      "query": "Diener 1984 Subjective Well-Being",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "doi_or_stable_url_and_bibtex_candidate"
+    },
+    {
+      "query": "Coleman 1988 Social Capital in the Creation of Human Capital",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "doi_or_stable_url_and_bibtex_candidate"
+    },
+    {
+      "query": "Ferrer-i-Carbonell Frijters 2004 determinants of happiness methodology",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "doi_or_stable_url_and_bibtex_candidate"
+    },
+    {
+      "query": "Social Capital in the Creation of Human Capital 1988",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "Bowling Alone: The Collapse and Revival of American Community 2000",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "The Forms of Capital 1986",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "Subjective Well-Being 1984",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "OECD Guidelines on Measuring Subjective Well-being 2025",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "Measuring Social Capital: An Integrated Questionnaire 2004",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "Social trust, social capital, and subjective well-being of rural residents 2023",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    },
+    {
+      "query": "How Important is Methodology for the estimates of the determinants of Happiness? 2004",
+      "target": "zotero_or_scholar",
+      "status": "needs_lookup",
+      "expected_output": "metadata_match_or_reject_reason"
+    }
+  ],
+  "citation_binding_targets": {
+    "literature_review": "Manuscripts/sections/literature-and-contribution.md",
+    "data_and_measurement": "Manuscripts/sections/data-and-measurement.md",
+    "empirical_strategy": "Manuscripts/sections/empirical-strategy.md",
+    "references": "Manuscripts/sections/references.md"
+  },
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_verify_sources_and_approve_bibliography_candidates",
+    "would_write_if_approved": [
+      "Data/literature/processed/verified_bibliography.csv",
+      "Data/literature/processed/contribution_matrix.md",
+      "Results/json/cgss_social_capital_happiness_citation_bindings.json"
+    ]
+  },
+  "next_tasks": [
+    "open_official_sources_and_record_access_dates",
+    "run_cnki_manual_verification",
+    "lookup_zotero_or_scholar_metadata",
+    "build_verified_bibliography_candidates",
+    "bind_sources_to_literature_review_claims"
+  ]
+}

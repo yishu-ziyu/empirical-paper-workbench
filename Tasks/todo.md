@@ -603,7 +603,22 @@
 - [x] 真实输出：`status=blocked_by_route_specific_artifact_execution`、`artifact_execution_result_reviewed=false`、`can_continue_to_route_specific_artifact_verification=false`、`route_specific_artifact_verification_input_records=0`、`route_specific_artifact_executed=false`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.json`。
 - [x] 正式层边界：本节点只写 P7-AS result review JSON 和 Markdown；不运行 artifact verification、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
 - [x] 验证：目标测试 7 OK；P7-A/.../AS 回归 312 OK；Python 编译通过。
-- [ ] 下一步 P7-AT：实现 route-specific artifact verification entry（只消费 P7-AS result review，ready 时调用既有 route-specific artifact verification；默认因 P7-AS blocked 而 blocked）。
+- [x] 下一步 P7-AT：已实现 route-specific artifact verification entry（只消费 P7-AS result review，ready 时调用既有 route-specific artifact verification；默认因 P7-AS blocked 而 blocked）。
+
+## 2026-05-31 P7-AT Auto Mode Formal Package Next Gate Route-Specific Artifact Verification Entry
+
+- [x] 组件效果：把 P7-AS result review 转成显式 route-specific artifact verification entry；只有 P7-AS 已确认路线产物执行结果可继续时，才调用既有 `auto_mode_formal_package_route_specific_artifact_verification.py`。
+- [x] 当前真实效果：仓库里的 P7-AS 仍是 `blocked_by_route_specific_artifact_execution`，所以本节点输出 `blocked_by_route_specific_artifact_execution_result_review`，verification command 未执行，没有进入 artifact verification。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.json`；只有 `status=next_gate_route_specific_artifact_verification_entered` 且 `route_specific_artifact_verified=true` 时，才允许进入后续 verified route completion ledger。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.py`，覆盖 ready P7-AS 调用既有 verification、当前 blocked、P7-AS 缺失/无效/未 ready、verification input record 合约、verification command 缺失、既有 verification 失败记录、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry`。
+- [x] Agent Team：未调用；本节点是单一 verification entry 小切片，主要风险由 result-review/input-record 合约测试、当前 blocked CLI 和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.py` 和 `Program/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.py`；新增计划 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-next-gate-route-specific-artifact-verification-entry.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.py --project-root . --route-specific-artifact-execution-result-review Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_execution_result_review.json --output-entry Results/json/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.json --output-review Reviews/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.md`。
+- [x] 真实输出：`status=blocked_by_route_specific_artifact_execution_result_review`、`can_enter_route_specific_artifact_verification=false`、`route_specific_artifact_verification_entry_command_executed=false`、`this_command_ran_route_specific_artifact_verification=false`、`route_specific_artifact_verified=false`、`verification_artifact_record_count=0`、`selected_route_executed=false`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`package_manifest_generated=false`、`manual_acceptance_performed=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_route_specific_artifact_verification_entry.json`。
+- [x] 正式层边界：本节点只写 P7-AT entry JSON 和 Markdown；当前真实运行不调用 artifact verification、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；P7-A/.../AT 回归 319 OK；Python 编译通过。
+- [ ] 下一步 P7-AU：实现 route-specific artifact verification entry result review（只消费 P7-AT entry 和既有 route-specific artifact verification output，审阅验证结果是否可进入 verified route completion ledger；默认因 P7-AT blocked 而 blocked）。
 
 ## 2026-05-27 Global Node Execution Contract
 

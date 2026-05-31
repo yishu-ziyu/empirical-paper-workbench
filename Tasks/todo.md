@@ -2772,3 +2772,18 @@
 - [x] 正式层边界：本节点不 materialize candidate target、不执行 adapter、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 7 OK；formal target adapter materialization preflight + materialization execute + candidate verification + candidate promotion preflight 相邻回归 29 OK；Python 编译通过；真实 CLI 返回 `0`；execute JSON 核对通过；materialization manifest 和 candidate target 不存在检查通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 candidate verification、promotion preflight 或正式写回。
+
+## 2026-05-31 P7-R Auto Mode Formal Target Adapter Candidate Verification Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-R 代码与测试已落地，本轮用当前 P7-Q blocked materialization execute 重新运行 formal target adapter candidate verification，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-Q 物化出的 candidate targets 和 materialization manifest 转成可验证记录；当前产品效果是 P7-Q 没有完成物化时不生成 target verification records，也不允许 P7-S 进入 promotion preflight。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_materialization_execute`、`candidate_targets_verified=false`、`target_verification_records=0`、`formal_target_adapters_executed=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`。
+- [x] 阻断原因：P7-Q source execute 仍是 `blocked_by_materialization_preflight`，且 `materialization_manifest_recorded=false`、`candidate_targets_materialized=false`；P7-R 记录 `materialization_execute_not_completed`、`materialization_manifest_not_recorded`、`candidate_targets_not_materialized`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_target_adapter_candidate_verification.json` 和 `Reviews/auto_mode_formal_target_adapter_candidate_verification.md` 作为 blocked verification signal；P7-S 不应把当前 verification 当成已验证候选目标，因为没有 manifest、没有 candidate target、没有 verification records。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_target_adapter_candidate_verification.py` 覆盖 completed materialization 验证 candidate targets、当前 P7-Q blocked 阻断、missing/invalid manifest 阻断、execute report 未 completed/materialized 阻断、target 缺失或 bytes 不一致阻断、boundary violation 阻断、CLI 默认 blocked、只写 report/review 不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-target-adapter-candidate-verification-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-R workbench、CLI、测试、真实 candidate verification；新增/更新任务记录、session log、BDD plan。真实 verification JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_candidate_verification.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_target_adapter_candidate_verification.json` 和 `Reviews/auto_mode_formal_target_adapter_candidate_verification.md` 仍表达当前 P7-Q 阻断传递状态；未创建 `workspace/formal_target_adapter_materialization/auto_mode/formal_target_adapter_materialization_manifest.json`，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`，未写 `state/product/auto_mode_formal_target_adapter_candidate_verification.json`。
+- [x] 正式层边界：本节点不创建/修复 candidate target、不执行 adapter、不提升 candidate、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 8 OK；formal target adapter materialization execute + candidate verification + candidate promotion preflight + candidate promotion approval 相邻回归 29 OK；Python 编译通过；真实 CLI 返回 `0`；verification JSON 核对通过；materialization manifest、candidate target、candidate verification product state 不存在检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-Q 必须完成 materialization 后，才能把 P7-R 作为 ready verification 输入推进 P7-S。

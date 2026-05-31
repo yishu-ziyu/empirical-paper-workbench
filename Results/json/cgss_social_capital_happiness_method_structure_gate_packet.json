@@ -1,0 +1,207 @@
+{
+  "schema_version": "p6.cgss_method_structure_gate_packet.v1",
+  "generated_at": "2026-05-31T08:00:42.116075+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "source_artifacts": {
+    "results_evidence_package": {
+      "path": "Results/json/cgss_social_capital_happiness_results_evidence_package.json",
+      "schema_version": "p6.cgss_results_evidence_package.v1",
+      "status": "ready_for_paper_draft_input"
+    },
+    "literature_review_draft_packet": {
+      "path": "Results/json/cgss_social_capital_happiness_literature_review_draft_packet.json",
+      "schema_version": "p6.cgss_literature_review_draft_packet.v1",
+      "status": "needs_human_literature_review_draft_approval"
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_manuscript": false,
+    "modified_design_spec": false,
+    "modified_run_plan": false,
+    "wrote_state_product": false
+  },
+  "status": "needs_human_method_structure_approval",
+  "blocking_reasons": [
+    "method_structure_gate_needs_human_approval"
+  ],
+  "paper_length_standard": {
+    "profile": "chinese_empirical_paper_package",
+    "total_target_chinese_chars": 22000,
+    "total_minimum_chinese_chars": 16000,
+    "total_maximum_chinese_chars": 32000,
+    "required_sections": [
+      "Abstract",
+      "Introduction",
+      "Literature and Contribution",
+      "Institutional Background / Theory / Context",
+      "Data and Measurement",
+      "Empirical Strategy",
+      "Main Results",
+      "Robustness / Mechanisms / Heterogeneity",
+      "Conclusion",
+      "References"
+    ],
+    "writing_rule": "先按 section 写足证据、变量、方法和结果，再由审稿式修订循环压缩重复内容。"
+  },
+  "section_standards": {
+    "Abstract": {
+      "min_chinese_chars": 180,
+      "max_chinese_chars": 300,
+      "required_evidence": [
+        "section_specific_evidence"
+      ]
+    },
+    "Introduction": {
+      "min_chinese_chars": 2800,
+      "max_chinese_chars": 5000,
+      "required_evidence": [
+        "section_specific_evidence"
+      ]
+    },
+    "Literature and Contribution": {
+      "min_chinese_chars": 1500,
+      "max_chinese_chars": 3000,
+      "required_evidence": [
+        "verified_bibliography_candidates",
+        "citation_bindings",
+        "contribution_position"
+      ]
+    },
+    "Institutional Background / Theory / Context": {
+      "min_chinese_chars": 1200,
+      "max_chinese_chars": 2500,
+      "required_evidence": [
+        "section_specific_evidence"
+      ]
+    },
+    "Data and Measurement": {
+      "min_chinese_chars": 1200,
+      "max_chinese_chars": 2500,
+      "required_evidence": [
+        "CGSS2023_path",
+        "variable_role_review_draft",
+        "sample_construction"
+      ]
+    },
+    "Empirical Strategy": {
+      "min_chinese_chars": 1800,
+      "max_chinese_chars": 3500,
+      "required_evidence": [
+        "model_formula",
+        "claim_boundary",
+        "method_gate"
+      ]
+    },
+    "Main Results": {
+      "min_chinese_chars": 3000,
+      "max_chinese_chars": 6000,
+      "required_evidence": [
+        "OLS_result",
+        "Ordered_Logit_result",
+        "main_table"
+      ]
+    },
+    "Robustness / Mechanisms / Heterogeneity": {
+      "min_chinese_chars": 2200,
+      "max_chinese_chars": 5000,
+      "required_evidence": [
+        "ordered_outcome_robustness",
+        "future_robustness_matrix"
+      ]
+    },
+    "Conclusion": {
+      "min_chinese_chars": 800,
+      "max_chinese_chars": 1300,
+      "required_evidence": [
+        "section_specific_evidence"
+      ]
+    },
+    "References": {
+      "min_chinese_chars": null,
+      "max_chinese_chars": null,
+      "required_evidence": [
+        "human_approved_verified_bibliography"
+      ]
+    }
+  },
+  "method_claim_gates": {
+    "main_result_gate": {
+      "nobs": 5310,
+      "ols_coef": 0.1658,
+      "ols_se": 0.0187,
+      "ols_p_value": 7.780985384938017e-19,
+      "ordered_logit_coef": 0.405,
+      "ordered_logit_se": 0.0424,
+      "ordered_logit_p_value": 1.2543655302918154e-21,
+      "outcome_levels": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "claim_boundary": "positive_conditional_association"
+    },
+    "supported_claims": [
+      {
+        "claim_type": "conditional_association",
+        "allowed_wording": "社会资本指数与居民主观幸福感呈正向相关。",
+        "evidence": [
+          "OLS",
+          "controls",
+          "province_fixed_effects"
+        ]
+      },
+      {
+        "claim_type": "ordered_outcome_robustness",
+        "allowed_wording": "在有序响应模型下，正向关系保持稳定。",
+        "evidence": [
+          "Ordered Logit",
+          "five_ordered_happiness_levels"
+        ]
+      }
+    ],
+    "blocked_method_families": [
+      {
+        "method": "DID",
+        "reason": "当前没有政策冲击、处理组、对照组和处理时间。"
+      },
+      {
+        "method": "IV",
+        "reason": "当前没有通过相关性与排除性讨论的工具变量。"
+      },
+      {
+        "method": "RDD",
+        "reason": "当前没有明确断点、运行变量和带宽诊断。"
+      },
+      {
+        "method": "PSM",
+        "reason": "当前没有已定义处理状态和匹配前平衡诊断。"
+      },
+      {
+        "method": "DML",
+        "reason": "当前没有因果处理设定、交叉拟合计划和 nuisance 模型诊断。"
+      }
+    ],
+    "human_decisions": [
+      "OLS 作为主模型还是 Ordered Logit 作为主模型",
+      "是否把社会资本指数拆成信任、交往、参与三个分维度",
+      "是否补充跨年份 CGSS 或其他稳健性数据"
+    ]
+  },
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_approve_method_structure_gate",
+    "would_write_if_approved": [
+      "Results/json/cgss_social_capital_happiness_design_spec_review.json",
+      "Manuscripts/sections/empirical-strategy.md",
+      "Manuscripts/sections/main-results.md"
+    ]
+  },
+  "next_tasks": [
+    "human_review_method_structure_gate",
+    "decide_primary_model_ols_or_ordered_logit",
+    "draft_empirical_strategy_after_approval",
+    "draft_main_results_after_approval"
+  ]
+}

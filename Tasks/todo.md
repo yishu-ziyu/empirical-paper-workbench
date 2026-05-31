@@ -2302,4 +2302,18 @@
 - [x] 实现：新增 `Program/cgss_variable_role_review_draft.py` 与 `Program/workbench/cgss_variable_role_review_draft.py`，读取结果证据包和变量候选画像，写出 `Results/json/cgss_social_capital_happiness_variable_role_review_draft.json` 与 `Reviews/cgss_social_capital_happiness_variable_role_review_draft.md`。
 - [x] 真实结果：草案状态为 `needs_human_role_review`；因变量为 `happiness <- a36`，核心解释变量为 `social_capital_index`，来源题项为 `a33/a31a/a31b/a311`，控制变量包括性别、年龄、教育、收入、健康、户籍和省份固定效应；模型证据显示 OLS 和 Ordered Logit 样本量均为 5310、方向一致为正。
 - [x] 验证：目标测试 3 OK；P6-I scoped 回归 14 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 下一步 P6-I7：生成 CGSS 文献综述种子包。要求接入 Scholar/CNKI/Zotero 或本地文献来源，形成“社会资本—主观幸福感”的文献、机制和变量依据；仍不写正式论文正文。
+- [x] 下一步 P6-I7：已生成 CGSS 文献综述种子包。它接入变量角色草案和结果证据包，形成“社会资本—主观幸福感”的文献、机制、变量依据和 CNKI/Zotero/Scholar 核验队列；仍不写正式论文正文。
+
+## 2026-05-31 P6-I7 CGSS Literature Seed Package
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `6c22633 Build CGSS literature seed package` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 CGSS 变量角色草案和 OLS/Ordered Logit 结果证据包转成文献综述种子包，包含 10 条候选种子文献、5 类覆盖范围、变量支持、机制地图、方法支持和 3 条 CNKI 人工检索队列。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_literature_review`、`seed_sources=10`、`coverage=5`、`cnki_manual_queue=3`、`promotion.allowed=false`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_literature_seed_package.json`；它不是正式参考文献表，只是 LiteratureAgent/人工审阅用的 seed package。只有人工核验后，后续节点才能生成 verified bibliography candidates 或 literature review draft packet。
+- [x] BDD/TDD：既有 `tests/test_cgss_literature_seed_package.py` 覆盖 reviewable seed、变量角色未 ready 阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-literature-seed-package.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I7 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_literature_seed_package.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_literature_seed_package.json` 与 `Reviews/cgss_social_capital_happiness_literature_seed_package.md`；状态为 `needs_human_literature_review`，阻断原因为空。
+- [x] 正式层边界：本节点不写正式 bibliography、不写正式 manuscript、不写正式 variable roles、不改 DesignSpec/RunPlan、不写 `state/product/*`。
+- [x] 验证：目标测试 3 OK；P6-I1-I7 scoped 回归 18 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I8。

@@ -2316,4 +2316,18 @@
 - [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_literature_seed_package.json` 与 `Reviews/cgss_social_capital_happiness_literature_seed_package.md`；状态为 `needs_human_literature_review`，阻断原因为空。
 - [x] 正式层边界：本节点不写正式 bibliography、不写正式 manuscript、不写正式 variable roles、不改 DesignSpec/RunPlan、不写 `state/product/*`。
 - [x] 验证：目标测试 3 OK；P6-I1-I7 scoped 回归 18 OK；Python 编译通过；真实 CLI 运行通过。
-- [ ] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I8。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I8。
+
+## 2026-05-31 P6-I8 CGSS Literature Source Verification Preflight
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `08e0b57 Build CGSS literature source preflight` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I7 文献种子包转成来源核验预检，列出每条候选文献需要执行的核验动作，包括官方来源打开、访问日期记录、DOI/出版社页核验、CNKI/期刊页核验、Zotero/Scholar 元数据查找。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_source_verification`、`candidate_bibliography=10`、`manual_review_queue=10`、`cnki_queue=4`、`zotero_scholar_queue=11`；当前阻断为 `manual_source_review_required`、`manual_cnki_verification_required`、`zotero_or_scholar_metadata_required`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_literature_source_verification_preflight.json`；它不是 verified bibliography，只是告诉后续核验节点哪些来源要查、怎么查、查完应输出什么。
+- [x] BDD/TDD：既有 `tests/test_cgss_literature_source_verification_preflight.py` 覆盖 candidate bibliography 生成、按来源类型分类核验动作、seed 未 ready 阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-literature-source-verification-preflight.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I8 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_literature_source_verification_preflight.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_literature_source_verification_preflight.json` 与 `Reviews/cgss_social_capital_happiness_literature_source_verification_preflight.md`；状态为 `needs_source_verification`。
+- [x] 正式层边界：本节点不写 verified bibliography、不写 contribution matrix、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
+- [x] 验证：目标测试 4 OK；P6-I1-I8 scoped 回归 22 OK；Python 编译通过；真实 CLI 运行通过。
+- [ ] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I9。

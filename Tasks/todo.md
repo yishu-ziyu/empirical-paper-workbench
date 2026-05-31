@@ -2952,3 +2952,18 @@
 - [x] 正式层边界：当前 blocked verification 不验证任何路线产物、不登记 completion ledger、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不生成 package manifest、不执行人工验收、不重跑模型；只有 P7-AB 完成真实 delegated command 且 delegated report/产物指纹干净后，P7-AC 才能产生 artifact verification records。
 - [x] 验证：目标测试 8 OK；route-specific artifact executor + route-specific artifact verification + verified route completion ledger 相邻回归 24 OK；Python 编译通过；真实 CLI 返回 `0`；verification JSON 核对通过；P7-AC product state 不存在检查通过；P7-AC scoped artifacts 未产生本轮差异。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-AB 必须完成 route-specific artifact execution 后，P7-AC 才能作为 P7-AD verified route completion ledger 输入。
+
+## 2026-05-31 P7-AD Auto Mode Formal Package Verified Route Completion Ledger Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-AD 代码与测试已落地，本轮用当前 P7-AC blocked route-specific artifact verification 重新运行 verified route completion ledger，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-AC 已验证的一路产物登记成只读 route completion ledger；当前产品效果是 P7-AC 未 verified 时不登记完成账本，不允许进入 P7-AE next gate router。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_route_specific_artifact_verification`、`verified_route_type=`、`route_completion_ledger_recorded=false`、`can_enter_next_auto_mode_gate=false`、`route_completion_records=0`、`can_write_product_state=false`。
+- [x] 阻断原因：P7-AC source verification 仍是 `blocked_by_route_specific_artifact_executor`，且 `route_specific_artifact_verified=false`、`artifact_verification_records_count=0`；P7-AD 记录 `route_specific_artifact_verification_not_verified`、`source_verification_has_blocking_reasons`、`route_specific_artifact_verified_flag_false`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_package_verified_route_completion_ledger.json` 和 `Reviews/auto_mode_formal_package_verified_route_completion_ledger.md` 作为 blocked completion ledger signal；P7-AE 不应把当前 ledger 当成 next gate 输入，因为没有 verified route type、没有 route completion records、`can_enter_next_auto_mode_gate=false`。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_package_verified_route_completion_ledger.py` 覆盖 verified PDF route 登记只读完成账本、当前 P7-AC blocked 阻断、verification 缺失/schema/status 错误阻断、verified 报告内部矛盾阻断、路线 flags 匹配、package manifest 多 artifact 证据保留、边界越界阻断、CLI 默认 blocked；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-verified-route-completion-ledger-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-AD workbench、CLI、测试、真实 verified route completion ledger；新增/更新任务记录、session log、BDD plan。真实 ledger JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_verified_route_completion_ledger.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_package_verified_route_completion_ledger.json` 和 `Reviews/auto_mode_formal_package_verified_route_completion_ledger.md` 仍表达当前 P7-AC 阻断传递状态；未写 `state/product/auto_mode_formal_package_verified_route_completion_ledger.json`；本轮 scoped status/diff 确认没有修改 P7-AD ledger 产物。
+- [x] 正式层边界：当前 blocked ledger 不登记 route completion、不进入 next gate router、不执行 delegated command、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不重跑模型；只有 P7-AC verified 且 artifact records 完整时，P7-AD 才能记录 completion ledger。
+- [x] 验证：目标测试 8 OK；route-specific artifact verification + verified route completion ledger + verified route next gate router 相邻回归 24 OK；Python 编译通过；真实 CLI 返回 `0`；ledger JSON 核对通过；P7-AD product state 不存在检查通过；P7-AD scoped artifacts 未产生本轮差异。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-AC 必须产生 verified artifact records 后，P7-AD 才能作为 P7-AE next gate router 输入。

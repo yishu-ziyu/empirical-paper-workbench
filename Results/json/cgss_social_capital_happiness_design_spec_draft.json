@@ -1,0 +1,200 @@
+{
+  "schema_version": "p6.cgss_design_spec_draft.v1",
+  "generated_at": "2026-05-31T08:30:40.936116+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "source_artifacts": {
+    "dataset_bound_variable_role_draft": {
+      "path": "Results/json/cgss_social_capital_happiness_dataset_bound_variable_role_draft.json",
+      "schema_version": "p6.cgss_dataset_bound_variable_role_draft.v1",
+      "status": "needs_human_dataset_bound_role_review"
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_design_spec": false,
+    "modified_formal_variable_roles": false,
+    "modified_run_plan": false,
+    "generated_formal_paper": false,
+    "wrote_state_product": false
+  },
+  "status": "needs_human_design_spec_review",
+  "blocking_reasons": [],
+  "design_spec_draft": {
+    "id": "cgss_design_spec_draft",
+    "status": "draft_needs_human_review",
+    "research_question": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+    "dataset_year": "2023",
+    "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "dataset_evidence_level": "local_file",
+    "variables": {
+      "outcome": [
+        "happiness"
+      ],
+      "treatment": [
+        "social_capital_index_draft"
+      ],
+      "controls": [
+        "a2",
+        "a3a",
+        "a7a",
+        "a7b",
+        "a15",
+        "a18",
+        "a21",
+        "a8a",
+        "a8b",
+        "s41"
+      ],
+      "fixed_effects": [
+        "s41"
+      ],
+      "cluster_by": []
+    },
+    "source_variable_bindings": {
+      "outcome": [
+        "a36"
+      ],
+      "treatment_items": [
+        "a33",
+        "a31a",
+        "a31b",
+        "a311"
+      ],
+      "control_items": [
+        "a2",
+        "a3a",
+        "a7a",
+        "a7b",
+        "a15",
+        "a18",
+        "a21",
+        "a8a",
+        "a8b",
+        "s41"
+      ],
+      "role_mapping": {
+        "gender": [
+          "a2"
+        ],
+        "age": [
+          "a3a"
+        ],
+        "education": [
+          "a7a",
+          "a7b"
+        ],
+        "health": [
+          "a15"
+        ],
+        "hukou": [
+          "a18",
+          "a21"
+        ],
+        "income": [
+          "a8a",
+          "a8b"
+        ],
+        "province_fixed_effect": [
+          "s41"
+        ]
+      }
+    },
+    "identification_strategy": {
+      "name": "cross_section_conditional_association",
+      "summary": "当前 CGSS2023 是横截面数据，本阶段先估计社会资本与主观幸福感之间的条件相关关系。",
+      "assumptions": [
+        "控制人口学、教育、健康、收入、户籍和地区差异后，剩余相关关系可作为探索性证据。",
+        "社会资本指数构造方向、幸福感编码方向和缺失值处理需要人工确认。"
+      ],
+      "threats": [
+        "遗漏变量偏误",
+        "反向因果",
+        "共同方法偏差",
+        "社会资本指数构造偏差",
+        "横截面数据无法识别动态因果路径"
+      ]
+    },
+    "feature_engineering": {
+      "social_capital_index": {
+        "target_name": "social_capital_index_draft",
+        "source_items": [
+          "a33",
+          "a31a",
+          "a31b",
+          "a311"
+        ],
+        "construction_plan": "先按信任、邻里交往、朋友交往和休闲社交四个维度做标准化方向核对；人工确认后再决定均值指数或分维度模型。",
+        "requires_human_review": true
+      },
+      "happiness_scale": {
+        "source_item": "a36",
+        "construction_plan": "核对 a36 的编码方向、拒答/不知道缺失码和 1-5 有序等级含义。",
+        "requires_human_review": true
+      }
+    },
+    "model_candidates": [
+      {
+        "id": "ols_baseline",
+        "estimator": "ols",
+        "formula": "happiness ~ social_capital_index_draft + a2 + a3a + a7a + a7b + a15 + a18 + a21 + a8a + a8b + s41",
+        "purpose": "给出最直观的基准相关关系，便于解释方向、数量级和控制变量变化。",
+        "readiness": "ready_after_variable_construction_review"
+      },
+      {
+        "id": "ordered_logit",
+        "estimator": "ordered_logit",
+        "formula": "happiness ~ social_capital_index_draft + a2 + a3a + a7a + a7b + a15 + a18 + a21 + a8a + a8b + s41",
+        "purpose": "把幸福感作为有序结果处理，用于检验 OLS 方向是否稳定。",
+        "readiness": "ready_after_outcome_scale_review"
+      }
+    ],
+    "claim_boundary": {
+      "level": "conditional_association_not_strong_causality",
+      "plain_language": "可以写社会资本与幸福感存在正向或负向条件相关；暂不写社会资本严格导致幸福感变化。"
+    }
+  },
+  "method_family_gate": {
+    "recommended_now": [
+      "OLS baseline",
+      "Ordered Logit robustness"
+    ],
+    "blocked_method_families": [
+      {
+        "method": "DID",
+        "reason": "当前题目没有明确政策冲击、处理组/对照组、处理时间和处理前趋势。"
+      },
+      {
+        "method": "IV",
+        "reason": "当前没有经过文献和数据共同支持的工具变量，也没有排除性约束说明。"
+      },
+      {
+        "method": "RDD",
+        "reason": "当前没有断点、运行变量、阈值规则和带宽诊断条件。"
+      },
+      {
+        "method": "PSM",
+        "reason": "当前社会资本是连续/多维构造草案，还没有二元处理定义和平衡性诊断。"
+      },
+      {
+        "method": "DML",
+        "reason": "当前目标是建立可解释基准模型，还没有因果处理设定、交叉拟合方案和 nuisance 模型诊断。"
+      }
+    ]
+  },
+  "review_gates": [
+    "outcome_order_and_coding_review",
+    "social_capital_index_construction_review",
+    "control_set_and_missingness_review",
+    "cross_section_identification_boundary_review",
+    "literature_support_required"
+  ],
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_approve_cgss_design_spec_draft",
+    "would_write_if_approved": "state/product/design_spec.json"
+  },
+  "next_tasks": [
+    "human_review_cgss_design_spec_draft",
+    "after_approval_build_RunPlan_draft",
+    "prepare_cgss_minimal_model_execution"
+  ]
+}

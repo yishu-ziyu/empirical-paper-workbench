@@ -2534,3 +2534,20 @@
 - [x] 正式层边界：本节点不写正式 RunPlan、不写正式变量角色、不生成论文、不写 `state/product/*`；结果状态为 `completed_needs_human_result_review`。
 - [x] 验证：目标测试 3 OK；CGSS run plan seed + approval + executor + OLS + Ordered Logit + results evidence package 相邻回归 20 OK；Python 编译通过；真实 CLI 返回 `0` 并写出草案层模型证据。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进结果人工审阅、论文章节路由或正式结果 promotion。
+
+## 2026-05-31 P6-J7 CGSS Manuscript Section Router
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `73d4348 Route CGSS evidence into manuscript section drafts` 落地，本轮只复核真实状态、重新运行 P6-J7、补任务账本、补 session log、补 BDD plan，并固化真实 JSON 与章节草案产物。
+- [x] 组件效果：把 P6-J6b 的结果证据包和文献综述草稿包路由成 4 个可审阅论文章节，让 Writer/ManuscriptAgent 可以从“证据包”进入“章节草案”。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_manuscript_section_review`、`section_count=4`；4 个章节均为 `section_draft_ready_for_review`。
+- [x] 章节产物：生成 `文献综述与研究贡献`、`数据与变量`、`实证策略`、`主要实证结果`；中文字符合计 `2996`，章节文件合计 `6036` 字符。
+- [x] 证据对接：数据与变量、实证策略、主要实证结果绑定 `cgss_results_evidence_package`、`cgss_minimal_model`、`cgss_ordered_robustness`；文献综述绑定 `cgss_literature_review_draft_packet` 与候选引用。
+- [x] 执行边界：本节点只写草案章节和审阅包；不写正式论文，不写正式参考文献，不写 `state/product/*`，不把结果升级为正式论文结论。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_manuscript_sections.json`、`Reviews/cgss_social_capital_happiness_manuscript_sections.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_sections/*.md`；人工审阅后才允许进入探索性整稿或 PDF 预检。
+- [x] BDD/TDD：既有 `tests/test_cgss_manuscript_section_router.py` 覆盖 ready evidence 路由成可审阅章节、结果证据未 ready 时阻断、写出章节草案且不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-cgss-manuscript-section-router.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J7 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 manuscript sections JSON 与章节 Markdown 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_manuscript_section_router.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_manuscript_sections.json`、`Reviews/cgss_social_capital_happiness_manuscript_sections.md` 和 4 个 `Manuscripts/generated/cgss_social_capital_happiness_sections/*.md` 文件。
+- [x] 正式层边界：本节点不写正式 manuscript，不改 verified bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
+- [x] 验证：目标测试 3 OK；CGSS results evidence package + literature review draft packet + manuscript section router + paper package builder 相邻回归 17 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 4 个可审阅章节。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进章节人工审阅、探索性整稿或 PDF 预检。

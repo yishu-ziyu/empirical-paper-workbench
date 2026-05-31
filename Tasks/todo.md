@@ -2601,3 +2601,21 @@
 - [x] 正式层边界：本节点不批准方法门、不运行新的稳健性/异质性/机制检验、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
 - [x] 验证：目标测试 6 OK；CGSS exploratory paper assembler + PDF preflight + method gate + results evidence package + literature review draft packet 相邻回归 21 OK；Python 编译通过；真实 CLI 返回 `0` 并写出黄灯方法门。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进人工方法 approve、审稿式修订队列或正式写回。
+
+## 2026-05-31 P6-L CGSS Reviewer Revision Loop
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交落地，本轮只复核真实状态、重新运行 P6-L、补任务账本、补 session log、补 BDD plan，并固化真实 reviewer report、revision queue 和 Rev1 草稿。
+- [x] 组件效果：把 P6-K 的黄灯方法门转成审稿式修订闭环；用户现在看到的不只是“有方法风险”，而是 8 类审稿发现、6 条修订任务和一份草案层 Rev1。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_revision_review`、`tasks=6`；修订队列状态为 `needs_human_revision_queue_review`，仍需人工批准、修改或拒绝。
+- [x] 审稿覆盖：覆盖论文结构、文献综述、数据和变量、识别策略、结果解释、稳健性缺口、投稿规范缺口和需要人类判断的问题。
+- [x] 修订任务：队列分派给 WriterAgent、LiteratureAgent、DataAgent、MethodAgent 和 ReviewerAgent；任务包括扩写核心章节、核验候选引用、补变量表/样本流、处理反向因果和遗漏变量、扩写稳健性/机制计划、审计因果措辞边界。
+- [x] 结果数字绑定：Rev1 继续保留 P6-J6b 结果证据包中的 OLS `0.1658`、Ordered Logit `0.405` 和样本量 `5310`，并明确当前只能写条件相关。
+- [x] 输出合约：真实 CLI 刷新 `Reviews/cgss_social_capital_happiness_revision_task_queue.md`；该路径从早期 Agent 队列审批草案更新为当前基于 P6-K 方法门风险的审稿式修订队列。
+- [x] 对接方式：下游只应读取 `Reviews/cgss_social_capital_happiness_reviewer_report.md`、`Reviews/cgss_social_capital_happiness_revision_task_queue.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`；人工确认修订队列后才允许进入 work orders 或正式包链路。
+- [x] BDD/TDD：既有 `tests/test_cgss_reviewer_revision_loop.py` 覆盖审稿报告范围、方法门风险转修订队列、生成 Rev1 且不写正式层、只写 3 个输出、方法门未 ready 时阻断；本轮补 `docs/superpowers/plans/2026-05-31-cgss-reviewer-revision-loop.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-L workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 Rev1 草稿加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_reviewer_revision_loop.py --project-root .`
+- [x] 真实输出：写出 `Reviews/cgss_social_capital_happiness_reviewer_report.md`、`Reviews/cgss_social_capital_happiness_revision_task_queue.md` 和 `Manuscripts/generated/cgss_social_capital_happiness_paper_rev1.md`；文件大小分别为 `2171`、`2119`、`21650` bytes。
+- [x] 正式层边界：本节点不批准修订队列、不分发 work orders、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；method gate + reviewer revision loop + revision queue/approval/work orders/router 相邻回归 33 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 6 条修订任务。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进人工 queue approval、修订工单派发或正式写回。

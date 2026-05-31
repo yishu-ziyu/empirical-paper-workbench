@@ -2862,3 +2862,18 @@
 - [x] 正式层边界：当前 blocked verification 不复制/覆盖/修复 formal target、不提升 candidate target、不执行 adapter、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型；只有 P7-V completed 且 manifest/bytes/SHA256 匹配后，P7-W 才能给 P7-X ready 输入。
 - [x] 验证：目标测试 8 OK；candidate promotion execute + promoted package verification + downstream package/export preflight 相邻回归 21 OK；Python 编译通过；真实 CLI 返回 `0`；verification JSON 核对通过；promotion manifest、formal package paper、promoted package verification product state 不存在检查通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-V 必须 completed promotion 后，P7-W 才能作为 P7-X formal package export/acceptance preflight 输入。
+
+## 2026-05-31 P7-X Auto Mode Formal Package Export / Acceptance Preflight Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-X 代码与测试已落地，本轮用当前 P7-W blocked promoted package verification 重新运行 formal package export / acceptance preflight，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-W verified formal package records 转成 PDF/DOCX/export/acceptance 的显式下一步计划；当前产品效果是 P7-W 未 verified 时不生成 export acceptance plan，不渲染 PDF/DOCX，也不允许进入人工验收或产品状态写回。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_promoted_package_verification`、`can_enter_formal_package_export_acceptance=false`、`requires_explicit_export_or_acceptance_command=false`、`export_acceptance_plan=0`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`。
+- [x] 阻断原因：P7-W source verification 仍是 `blocked_by_candidate_promotion_execute`，且 `formal_package_verified=false`、`promoted_formal_targets_verified=false`、`target_record_count=0`；P7-X 记录 `promoted_formal_package_verification_not_ready`、`formal_package_not_verified`、`promoted_formal_targets_not_verified`、`candidate_targets_not_promoted`、`source_formal_writeback_not_executed`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_package_export_acceptance_preflight.json` 和 `Reviews/auto_mode_formal_package_export_acceptance_preflight.md` 作为 blocked export/acceptance preflight signal；后续导出、验收、state/product 写回不应把当前 preflight 当成 ready 输入，因为没有 formal target records 和 export acceptance plan。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_package_export_acceptance_preflight.py` 覆盖 verified package 生成导出/验收计划、当前 P7-W blocked 阻断、P7-W 报告缺失/schema 错误/未 verified 阻断、formal target records 缺失/未验证/越界阻断、边界越界阻断、CLI 默认 blocked、只写 report/review 不导出不写产品状态；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-export-acceptance-preflight-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-X workbench、CLI、测试、真实 export/acceptance preflight；新增/更新任务记录、session log、BDD plan。真实 preflight JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_export_acceptance_preflight.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_package_export_acceptance_preflight.json` 和 `Reviews/auto_mode_formal_package_export_acceptance_preflight.md` 仍表达当前 P7-W 阻断传递状态；未写 `state/product/auto_mode_formal_package_export_acceptance_preflight.json`；仓库已有旧 `Submissions/formal_package/paper.pdf` 和 `Submissions/formal_package/paper.docx`，本轮 `git status`/`git diff` 确认未修改它们。
+- [x] 正式层边界：当前 blocked preflight 不导出/验收正式包、不渲染 PDF/DOCX、不写 package manifest、不修复/覆盖正式成果、不写 `state/product/*`、不重跑模型；只有 P7-W verified 且 formal target records 完整时，P7-X 才能生成 4 项 export/acceptance plan。
+- [x] 验证：目标测试 7 OK；promoted package verification + export/acceptance preflight 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0`；preflight JSON 核对通过；P7-X product state 不存在检查通过；旧 PDF/DOCX 存在但本轮未修改检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-W 必须 verified 后，P7-X 才能作为正式导出、人工验收或产品状态写回的 ready 输入。

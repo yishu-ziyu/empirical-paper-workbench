@@ -1,0 +1,48 @@
+{
+  "schema_version": "p6.cgss_pdf_preflight.v1",
+  "generated_at": "2026-05-31T09:30:49.000792+00:00",
+  "draft_layer_only": true,
+  "formal_writeback_allowed": false,
+  "paper_source": "Manuscripts/generated/cgss_social_capital_happiness_paper.md",
+  "pdf": {
+    "path": "Submissions/cgss_social_capital_happiness/paper.pdf",
+    "exists": true,
+    "bytes": 187318
+  },
+  "html": {
+    "path": "Submissions/cgss_social_capital_happiness/paper.html",
+    "exists": false,
+    "bytes": 0
+  },
+  "boundary_flags": {
+    "modified_formal_manuscript": false,
+    "modified_verified_bibliography": false,
+    "modified_formal_package": false,
+    "modified_product_state": false
+  },
+  "status": "pdf_preflight_ready",
+  "blocking_reasons": [],
+  "renderer": {
+    "ok": true,
+    "engine": "pandoc+xelatex",
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "next_tasks": [
+    "human_review_pdf_candidate",
+    "build_aer_like_method_gate",
+    "generate_reviewer_report_and_revision_queue"
+  ],
+  "agent_team_schedule": {
+    "call_when": "after_pdf_or_html_preflight_artifact_is_created",
+    "called_agents": [
+      "VerifierAgent",
+      "ManuscriptAgent",
+      "ExportAgent"
+    ],
+    "recall_when": "after_human_opens_rendered_artifact",
+    "next_call_when": "before_formal_package_or_revision_round",
+    "boundary": "当前渲染状态为 pdf_preflight_ready；只做草案预检，不提升正式层。"
+  }
+}

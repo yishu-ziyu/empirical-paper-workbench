@@ -2585,3 +2585,19 @@
 - [x] 正式层边界：本节点不写正式 manuscript，不写正式 bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
 - [x] 验证：目标测试 3 OK；CGSS exploratory paper assembler + PDF preflight + manuscript section router 相邻回归 9 OK；Python 编译通过；真实 CLI 返回 `0`；`file` 确认为 PDF 1.7；P6-J9 scoped `git diff --check` 通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 PDF 人工审阅、AER-like 方法门或审稿式修订队列。
+
+## 2026-05-31 P6-K CGSS AER-like Method Gate
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `e0676e4 Gate CGSS method claims for AER-like review` 落地，本轮只复核真实状态、重新运行 P6-K、补任务账本、补 session log、补 BDD plan，并固化真实 method gate JSON 与 review。
+- [x] 组件效果：把 P6-J8/P6-J9 之后的 CGSS 探索性论文草稿送入 AER-like 方法关卡；它判断当前草稿能否继续向更强审稿链路推进，还是必须先停在人工方法审阅。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_method_gate_review`、`gate_status=yellow`、`gate_enforcement.required=true`、`promotion.allowed=false`；这表示草稿可继续作为探索稿存在，但不能被升级为强审稿或正式提交状态。
+- [x] 方法检查：变量定义、OLS + Ordered Logit 适配、基础控制变量通过；社会资本理论/文献依据需要人工核验；稳健性/异质性/机制检验需要后续执行；反向因果和遗漏变量风险被明确标记。
+- [x] 结果数字绑定：方法门只读取 `cgss_social_capital_happiness_results_evidence_package.json`；当前绑定 OLS `social_capital_index` 系数 `0.1658`、Ordered Logit 系数 `0.405`、样本量 `5310`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_method_gate.json` 和 `Reviews/cgss_social_capital_happiness_method_gate.md`；MethodAgent 处理黄灯，ReviewerAgent 把风险转成修订任务，WriterAgent 保持探索性措辞，VerifierAgent 核对论文/PDF/方法门的结论边界。
+- [x] BDD/TDD：既有 `tests/test_cgss_method_gate.py` 覆盖 AER-like 强制审阅、默认 working paper advisory、方法检查清单、证据包数字绑定、输出 JSON/review 且不写正式层、输入未 ready 阻断；本轮补 `docs/superpowers/plans/2026-05-31-cgss-method-gate.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-K workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 method gate JSON 加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_method_gate.py --project-root . --profile aer_like`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_method_gate.json` 和 `Reviews/cgss_social_capital_happiness_method_gate.md`；JSON `6336` bytes，review `1988` bytes。
+- [x] 正式层边界：本节点不批准方法门、不运行新的稳健性/异质性/机制检验、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`。
+- [x] 验证：目标测试 6 OK；CGSS exploratory paper assembler + PDF preflight + method gate + results evidence package + literature review draft packet 相邻回归 21 OK；Python 编译通过；真实 CLI 返回 `0` 并写出黄灯方法门。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进人工方法 approve、审稿式修订队列或正式写回。

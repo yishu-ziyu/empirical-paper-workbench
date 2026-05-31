@@ -2697,3 +2697,18 @@
 - [x] 正式层边界：本节点不执行正式写回、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 6 OK；final review packet + formal promotion preflight + formal writeback approval + formal writeback execution preflight + formal writeback execute 相邻回归 32 OK；Python 编译通过；真实 CLI 返回 `0`；execution preflight JSON 核对通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进正式写回执行。
+
+## 2026-05-31 P7-M Auto Mode Formal Writeback Execute Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-M 代码与测试已落地，本轮用当前 P7-L blocked execution preflight 重新运行 formal writeback execute dry-run，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把“能不能请求正式写回执行”继续传递到“execute 命令能不能产生 dry-run/apply manifest”的闸口；当前产品效果是 execute 也不能绕过 P7-L 阻断。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_execution_preflight`、`mode=dry-run`、`apply_manifest_recorded=false`、`formal_writeback_executed=false`、`this_command_wrote_formal_state=false`。
+- [x] 阻断原因：P7-L source preflight 仍是 `blocked_by_formal_writeback_approval`，P7-M 记录 `execution_preflight_not_ready`、`execution_preflight_cannot_request_execution`、`execution_plan_missing`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_writeback_execute.json` 和 `Reviews/auto_mode_formal_writeback_execute.md`；P7-N target adapter readiness 不应把当前 execute 当成 ready 输入，因为没有 apply manifest。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_writeback_execute.py` 覆盖 ready preflight dry-run 计划、blocked preflight 阻断、apply 必须显式确认、apply 必须带 reviewer/note、确认 apply 只写 manifest 不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-writeback-execute-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-M workbench、CLI、测试、真实 execute dry-run；新增/更新任务记录、session log、BDD plan。真实 execute JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_writeback_execute.py --project-root . --mode dry-run`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_writeback_execute.json` 和 `Reviews/auto_mode_formal_writeback_execute.md` 仍表达当前 P7-L 阻断传递状态；未生成 apply manifest。
+- [x] 正式层边界：本节点不执行正式写回、不记录 apply manifest、不执行 formal target adapters、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 6 OK；final review packet + formal promotion preflight + formal writeback approval + formal writeback execution preflight + formal writeback execute + formal target adapter readiness 相邻回归 39 OK；Python 编译通过；真实 CLI 返回 `0`；execute JSON 核对通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 apply manifest、target adapter 或正式写回。

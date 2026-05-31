@@ -2712,3 +2712,18 @@
 - [x] 正式层边界：本节点不执行正式写回、不记录 apply manifest、不执行 formal target adapters、不写正式 manuscript、不写正式 bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 6 OK；final review packet + formal promotion preflight + formal writeback approval + formal writeback execution preflight + formal writeback execute + formal target adapter readiness 相邻回归 39 OK；Python 编译通过；真实 CLI 返回 `0`；execute JSON 核对通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 apply manifest、target adapter 或正式写回。
+
+## 2026-05-31 P7-N Auto Mode Formal Target Adapter Readiness Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-N 代码与测试已落地，本轮用当前缺失 apply manifest 的状态重新运行 formal target adapter readiness，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-M 的 apply manifest 转成正式写回目标映射；当前产品效果是没有 apply manifest 时不生成任何 adapter mapping，也不让 P7-O 执行 adapter。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_apply_manifest`、`adapter_mappings=0`、`can_request_target_adapter_execution=false`、`formal_target_adapters_executed=false`、`this_command_wrote_formal_state=false`。
+- [x] 阻断原因：当前 `workspace/formal_writeback_apply/auto_mode/formal_writeback_apply_manifest.json` 不存在，P7-N 记录 `apply_manifest_missing_or_invalid_schema` 和 `apply_manifest_operations_missing`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_target_adapter_readiness.json` 和 `Reviews/auto_mode_formal_target_adapter_readiness.md`；P7-O 不应把当前 readiness 当成可执行输入，因为 adapter mappings 为空。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_target_adapter_readiness.py` 覆盖 ready apply manifest 映射 6 类 target group、缺失 apply manifest 阻断、未知 target group 阻断、缺失 package artifact 阻断、apply manifest 边界越界阻断、只写 report/review 不创建 candidate target；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-target-adapter-readiness-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-N workbench、CLI、测试、真实 readiness；新增/更新任务记录、session log、BDD plan。真实 readiness JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_readiness.py --project-root .`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_target_adapter_readiness.json` 和 `Reviews/auto_mode_formal_target_adapter_readiness.md` 仍表达当前 apply manifest 缺失状态；未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
+- [x] 正式层边界：本节点不执行 adapter、不复制 package artifact、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 7 OK；formal writeback execute + formal target adapter readiness + target adapter execution + materialization preflight 相邻回归 27 OK；Python 编译通过；真实 CLI 返回 `0`；readiness JSON 核对通过；candidate target 不存在检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 apply manifest、target adapter execution 或正式写回。

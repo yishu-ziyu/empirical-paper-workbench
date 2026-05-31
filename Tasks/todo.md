@@ -2471,3 +2471,18 @@
 - [x] 正式层边界：本节点不写 `state/product/variable_roles.json`，不改 DesignSpec/RunPlan，不生成论文，不写 `state/product/*`；`promotion.allowed=false`。
 - [x] 验证：目标测试 4 OK；CGSS data discovery + variable discovery + dataset-bound role draft + design spec draft 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0` 并写出变量角色草案产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 DesignSpec 草案或正式变量角色 promotion。
+
+## 2026-05-31 P6-J4 CGSS DesignSpec Draft
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `5b529f5 Draft CGSS design spec before execution` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-J3 的变量角色草案转成研究设计草案；它说明数据、变量、识别边界、模型候选和暂不进入的方法族，让后续 RunPlan seed 有可审阅依据。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_design_spec_review`；模型候选为 OLS 基准模型和 Ordered Logit 有序模型；结论边界为横截面条件相关，不写强因果。
+- [x] 方法边界：当前明确阻断 DID、IV、RDD、PSM、DML；原因分别是缺少处理时间、工具变量、断点、二元处理定义/平衡诊断、因果处理设定和 DML 诊断方案。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_design_spec_draft.json` 和 `Reviews/cgss_social_capital_happiness_design_spec_draft.md`；人工确认后才允许进入 RunPlan seed 草案或正式 DesignSpec promotion。
+- [x] BDD/TDD：既有 `tests/test_cgss_design_spec_draft.py` 覆盖生成研究设计草案、不写正式层、推荐横截面模型、说明结论边界、阻断不适用方法族、输入未 ready 阻断和 JSON/Markdown 输出；本轮补 `docs/superpowers/plans/2026-05-31-cgss-design-spec-draft.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J4 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/run_cgss_design_spec_draft.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_design_spec_draft.json` 与 `Reviews/cgss_social_capital_happiness_design_spec_draft.md`；状态为 `needs_human_design_spec_review`。
+- [x] 正式层边界：本节点不写正式 DesignSpec、不写正式变量角色、不写 RunPlan、不生成论文、不写 `state/product/*`；`promotion.allowed=false`。
+- [x] 验证：目标测试 5 OK；CGSS data discovery + variable discovery + dataset-bound role draft + design spec draft + run plan seed 相邻回归 20 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 DesignSpec 草案产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 RunPlan seed、正式 DesignSpec promotion 或模型执行。

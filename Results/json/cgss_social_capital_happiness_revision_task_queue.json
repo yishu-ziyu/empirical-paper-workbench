@@ -1,41 +1,3 @@
-# CGSS 审稿式修订任务队列
-
-- 题目：社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析
-- schema：`p6.cgss_revision_task_queue.v1`
-- 状态：`needs_human_revision_queue_approval`
-- 草案层：是
-- 写入正式论文：否
-- 写入 state/product/agent_task_queue.json：否
-- 写入 DesignSpec / RunPlan：否
-
-## 当前需要处理
-- `revision_queue_needs_human_approval`
-
-## Agent 队列
-
-### LiteratureAgent
-- `literature.verify_open_seed_sources`：核验未批准文献与 CGSS 官方来源 -> `Reviews/agent_packets/literatureagent/cgss_source_verification.md`
-- `literature.revise_review_blocks`：审阅文献综述段落块 -> `Reviews/agent_packets/literatureagent/cgss_literature_revision_brief.md`
-
-### MethodAgent
-- `method.decide_primary_ordered_outcome_model`：审阅 OLS 与 Ordered Logit 的主模型角色 -> `Reviews/agent_packets/methodagent/cgss_primary_model_decision.md`
-- `method.review_blocked_causal_methods`：复核暂不进入的因果方法族 -> `Reviews/agent_packets/methodagent/cgss_blocked_method_review.md`
-
-### WriterAgent
-- `writer.prepare_section_revision_briefs`：生成章节级修订简报 -> `Reviews/agent_packets/writeragent/cgss_section_revision_briefs.md`
-- `writer.prepare_claim_wording_guardrails`：生成论断措辞边界 -> `Reviews/agent_packets/writeragent/cgss_claim_wording_guardrails.md`
-
-### ReviewerAgent
-- `reviewer.audit_revision_queue`：审计四类 Agent 修订队列 -> `Reviews/agent_packets/revieweragent/cgss_revision_queue_audit.md`
-- `reviewer.prepare_human_approval_checklist`：生成人工批准检查清单 -> `Reviews/agent_packets/revieweragent/cgss_human_approval_checklist.md`
-
-## 人工批准后才可进入
-- `agent_draft_review_packets`
-- `human_reviewer_round`
-- `draft_section_revision_briefs`
-
-## 队列 JSON
-```json
 {
   "schema_version": "p6.cgss_revision_task_queue.v1",
   "generated_at": "2026-05-31T08:04:33.494924+00:00",
@@ -441,4 +403,3 @@
     ]
   }
 }
-```

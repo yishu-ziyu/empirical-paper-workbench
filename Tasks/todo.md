@@ -2457,3 +2457,17 @@
 - [x] 正式层边界：本节点不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`。
 - [x] 验证：目标测试 4 OK；topic audit + CGSS data discovery + variable discovery 相邻回归 9 OK；Python 编译通过；真实 CLI 返回 `0` 并写出数据发现产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进变量角色草案或人工 DatasetBinding approval。
+
+## 2026-05-31 P6-J3 CGSS Dataset-Bound Variable Role Draft
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `df2323b Bind CGSS dataset choice to variable roles` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-J2 推荐的 CGSS2023 数据绑定草案转成变量角色草案；它只在推荐数据集内选择因变量、社会资本题项和控制变量，避免把 2021/2018 的候选变量混进主模型。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_dataset_bound_role_review`；因变量草案为 `happiness <- a36`，社会资本草案为 `a33/a31a/a31b/a311`，控制变量草案为 `a2/a3a/a7a/a7b/a15/a18/a21/a8a/a8b/s41`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_dataset_bound_variable_role_draft.json` 和 `Reviews/cgss_social_capital_happiness_dataset_bound_variable_role_draft.md`；人工确认变量角色后，才允许进入正式变量写回或 DesignSpec 草案。
+- [x] BDD/TDD：既有 `tests/test_cgss_dataset_bound_variable_role_draft.py` 覆盖按推荐数据集过滤变量候选、解释变量选择理由、缺少可审阅数据绑定时阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-dataset-bound-variable-role-draft.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J3 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/run_cgss_dataset_bound_variable_role_draft.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_dataset_bound_variable_role_draft.json` 与 `Reviews/cgss_social_capital_happiness_dataset_bound_variable_role_draft.md`；状态为 `needs_human_dataset_bound_role_review`。
+- [x] 正式层边界：本节点不写 `state/product/variable_roles.json`，不改 DesignSpec/RunPlan，不生成论文，不写 `state/product/*`；`promotion.allowed=false`。
+- [x] 验证：目标测试 4 OK；CGSS data discovery + variable discovery + dataset-bound role draft + design spec draft 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0` 并写出变量角色草案产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 DesignSpec 草案或正式变量角色 promotion。

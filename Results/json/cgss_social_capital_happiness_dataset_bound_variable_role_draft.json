@@ -1,0 +1,159 @@
+{
+  "schema_version": "p6.cgss_dataset_bound_variable_role_draft.v1",
+  "generated_at": "2026-05-31T08:27:01.611846+00:00",
+  "topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "source_artifacts": {
+    "data_discovery": {
+      "path": "Results/json/cgss_social_capital_happiness_data_discovery.json",
+      "schema_version": "p6.cgss_data_discovery.v1",
+      "status": "needs_human_dataset_binding_review"
+    },
+    "variable_candidates": {
+      "path": "Results/json/cgss_social_capital_happiness_variable_candidates.json",
+      "schema_version": "p6.cgss_topic_variable_discovery.v1",
+      "status": "needs_human_review"
+    }
+  },
+  "boundary_flags": {
+    "modified_formal_variable_roles": false,
+    "modified_design_spec": false,
+    "modified_run_plan": false,
+    "generated_formal_paper": false,
+    "wrote_state_product": false
+  },
+  "status": "needs_human_dataset_bound_role_review",
+  "blocking_reasons": [],
+  "dataset_binding": {
+    "year": "2023",
+    "path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+    "row_count": 11326,
+    "variable_count": 439,
+    "evidence_level": "local_file"
+  },
+  "proposed_roles": {
+    "outcome": {
+      "canonical_name": "happiness",
+      "source_variable": "a36",
+      "source_label": "总的来说，您觉得您的生活是否幸福",
+      "measurement_level": "ordered_happiness_scale_needs_codebook_review",
+      "why_selected": "这个题项直接测量居民对自身生活是否幸福的判断，和题目里的主观幸福感概念最贴近；进入正式模型前还要核对编码方向、缺失值和有序等级。",
+      "why_not_final": "这是草案层变量选择，尚未经过人工确认、编码表复核和文献口径核验。"
+    },
+    "treatment": {
+      "canonical_name": "social_capital_index_draft",
+      "source_items": [
+        "a33",
+        "a31a",
+        "a31b",
+        "a311"
+      ],
+      "source_labels": {
+        "a33": "总的来说，您同不同意在这个社会上，绝大多数人都是可以信任的",
+        "a31a": "您与邻居进行社交娱乐活动的频繁程度",
+        "a31b": "您与其他朋友进行社交娱乐活动的频繁程度",
+        "a311": "在过去一年中，您是否经常在您的空闲时间做下面的事情--社交"
+      },
+      "dimensions": {
+        "general_trust": "a33",
+        "neighborhood_ties": "a31a",
+        "friend_ties": "a31b",
+        "leisure_social_participation": "a311"
+      },
+      "construction": "先保留多维题项，人工确认后再决定是否合成指数或分维度回归。",
+      "why_selected": "社会资本不是单一题项：信任、邻里社交、朋友社交和休闲社交分别覆盖信任与网络互动两个核心维度。先按多维结构进入草案，比直接合成黑箱指数更稳。",
+      "why_not_final": "指数构造、标准化方向、反向题处理和维度权重需要文献支持与人工确认。"
+    },
+    "controls": {
+      "source_items": [
+        "a2",
+        "a3a",
+        "a7a",
+        "a7b",
+        "a15",
+        "a18",
+        "a21",
+        "a8a",
+        "a8b",
+        "s41"
+      ],
+      "source_labels": {
+        "a2": "性别",
+        "a3a": "您的出生日期-年",
+        "a7a": "您目前的最高教育程度是（包括目前在读的）",
+        "a7b": "您目前的最高教育程度的状态是",
+        "a15": "您觉得您目前的身体健康状况是",
+        "a18": "您目前的户口登记状况是",
+        "a21": "您目前的户口登记地",
+        "a8a": "您个人去年（2022）全年的总收入是多少",
+        "a8b": "您个人去年（2022）全年的职业/劳动收入是多少",
+        "s41": "采访地点-省/自治区/直辖市编码"
+      },
+      "role_mapping": {
+        "gender": [
+          "a2"
+        ],
+        "age": [
+          "a3a"
+        ],
+        "education": [
+          "a7a",
+          "a7b"
+        ],
+        "health": [
+          "a15"
+        ],
+        "hukou": [
+          "a18",
+          "a21"
+        ],
+        "income": [
+          "a8a",
+          "a8b"
+        ],
+        "province_fixed_effect": [
+          "s41"
+        ]
+      },
+      "why_selected": "这些变量覆盖人口学、教育、人力资本、收入、健康、户籍和地区差异，是社会资本与幸福感关系中最容易造成混杂因素的一组基础控制。",
+      "why_not_final": "控制变量集合仍需结合文献、缺失率、变量编码和样本量损耗做人工确认。"
+    }
+  },
+  "selected_source_variables": [
+    "a36",
+    "a33",
+    "a31a",
+    "a31b",
+    "a311",
+    "a2",
+    "a3a",
+    "a7a",
+    "a7b",
+    "a15",
+    "a18",
+    "a21",
+    "a8a",
+    "a8b",
+    "s41"
+  ],
+  "excluded_candidate_counts_by_year": {
+    "2021": 4,
+    "2018": 1
+  },
+  "review_gates": [
+    "outcome_coding_and_scale_review",
+    "social_capital_index_construction",
+    "control_set_completeness",
+    "missingness_and_sample_loss_review",
+    "literature_support_required"
+  ],
+  "promotion": {
+    "allowed": false,
+    "required_decision": "human_approve_dataset_bound_variable_roles",
+    "would_write_if_approved": "state/product/variable_roles.json"
+  },
+  "next_tasks": [
+    "human_review_dataset_bound_variable_roles",
+    "promote_variable_roles_after_approval",
+    "build_cgss_design_spec_draft"
+  ]
+}

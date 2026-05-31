@@ -2429,3 +2429,17 @@
 - [x] 正式层边界：当前真实路由不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
 - [x] 验证：目标测试 5 OK；P6-I1-I15 scoped 回归 59 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I16 或真正的人工 approve。
+
+## 2026-05-31 P6-J1 Topic-To-Paper Capability Audit
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `b2e8845 Explain topic-to-paper gaps for CGSS onboarding` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把“一个新题目能不能直接生成论文包”转成可执行审计；它会判断当前正式包是否匹配新题目，并输出人话版验收目标、五类差距矩阵和 Agent Team 路由。
+- [x] 当前真实效果：真实 CLI 对 CGSS 社会资本与幸福感题目输出 `status=new_topic_requires_data_binding`、`current_topic_reproducibility=not_reproducible_until_topic_data_binding`、`first_agent_to_call=DataAgent`；命令返回码 `3` 是预期的“需要数据绑定”信号。
+- [x] 对接方式：下游只应读取 `Results/json/topic_to_paper_capability_audit.json`；它把下一步指向 `run_cgss_data_discovery`、`bind_topic_to_cgss_dataset`、变量角色草案、文献 seed 和方法门，而不是直接写论文。
+- [x] BDD/TDD：既有 `tests/test_topic_to_paper_capability_audit.py` 覆盖既有正式包复现审计、正式包未 ready 阻断、新 CGSS 题目输出差距矩阵与 Agent 路由；本轮补 `docs/superpowers/plans/2026-05-31-topic-to-paper-capability-audit.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J1 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/topic_to_paper_capability_audit.py --project-root . --topic "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析"`
+- [x] 真实输出：写出 `Results/json/topic_to_paper_capability_audit.json` 与 `Reviews/topic_to_paper_capability_audit.md`；五类差距为题目到数据绑定、变量角色选择、方法族门、文献综述闭环、审稿式修订和导出。
+- [x] 正式层边界：本节点不生成新论文、不改正式 package、不接受 package、不改正式研究状态、不写 `state/product/*`。
+- [x] 验证：目标测试 3 OK；topic audit + CGSS data discovery + variable discovery 相邻回归 9 OK；Python 编译通过；真实 CLI 按预期返回 `3` 并写出审计产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-J2 数据发现。

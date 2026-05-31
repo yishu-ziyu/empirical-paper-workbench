@@ -1,0 +1,209 @@
+{
+  "schema_version": "p6.topic_to_paper_capability_audit.v1",
+  "generated_at": "2026-05-31T08:18:52.277177+00:00",
+  "research_topic": "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析",
+  "status": "new_topic_requires_data_binding",
+  "current_topic_reproducibility": "not_reproducible_until_topic_data_binding",
+  "general_topic_automation": "not_yet_general_auto_paper_generation",
+  "plain_language_summary": "这不是不能写文章，而是要先把题目、数据、变量、方法、文献和修订链路接起来。",
+  "paper_package_acceptance_target": {
+    "level": "master_thesis_or_course_paper_first_draft_pdf_package",
+    "plain_language": "先追求：硕士课程论文/毕业论文初稿级完整 PDF 包。",
+    "minimum_package": [
+      "完整正文结构",
+      "可追溯数据与变量说明",
+      "基准模型和方法边界",
+      "文献综述与参考文献候选",
+      "审稿式修订记录",
+      "PDF 导出和复现说明"
+    ]
+  },
+  "gates": {
+    "topic_fit": {
+      "status": "new_topic_requires_data_binding",
+      "current_question": "工业机器人应用对劳动力市场匹配效率的影响",
+      "overlap_tokens": [],
+      "requested_dataset_hint": "CGSS",
+      "current_question_mentions_requested_dataset": false,
+      "reason": "topic differs from current formal package"
+    },
+    "formal_package": {
+      "status": "ready",
+      "source_status": "ready_for_manual_acceptance",
+      "blocking_reasons": []
+    },
+    "manual_acceptance": {
+      "status": "pending_human_review",
+      "decision": "defer",
+      "accepted": false,
+      "blocking_reasons": []
+    },
+    "paper_structure_length": {
+      "status": "needs_work",
+      "verdict": [
+        "too_thin",
+        "format_gate_required",
+        "missing_sections",
+        "section_length_gate_required",
+        "needs_review_loop"
+      ],
+      "word_count": {
+        "main_text_words": 162,
+        "main_text_chinese_chars": 18,
+        "approx_total_units": 180,
+        "thresholds": {
+          "english_min_words": 7000,
+          "english_target_words": "9000-14000",
+          "aer_like_target_pages": "30-38",
+          "aer_like_upper_pages": 40,
+          "chinese_min_chars": 10000,
+          "chinese_target_chars": "12000-18000"
+        }
+      }
+    },
+    "literature_review": {
+      "status": "needs_human_review",
+      "counts": {
+        "candidate_count": 9,
+        "verified_count": 9,
+        "closest_or_method_count": 6
+      },
+      "missing_evidence": [
+        {
+          "id": "cnki_china_context_not_verified",
+          "severity": "medium",
+          "next_step": "用 CNKI 人工辅助检索补齐中国本土核心文献和中文引用格式。"
+        },
+        {
+          "id": "zotero_keys_missing",
+          "severity": "medium",
+          "next_step": "将英文核心文献导入 Zotero，并把 zotero_key 写回 verified_bibliography.csv。"
+        },
+        {
+          "id": "full_text_pdf_hash_missing",
+          "severity": "low",
+          "next_step": "对本地 PDF 做 hash，形成可复查的 PDF 证据链。"
+        }
+      ]
+    },
+    "method_gate": {
+      "status": "needs_human_review",
+      "source_status": "needs_human_review",
+      "blocking_items": [],
+      "yellow_items": [
+        "missing_leave_one_out_or_alternative_shock",
+        "missing_shift_share_identification_diagnostics",
+        "missing_shift_share_rotemberg_weights",
+        "missing_weak_iv_robust_inference",
+        "missing_weak_iv_robust_inference_ar_or_clr",
+        "review_exclusion_restriction_argument",
+        "review_share_or_shock_exogeneity_position"
+      ],
+      "red_items": []
+    },
+    "reviewer_revision_loop": {
+      "status": "ready_for_human_review",
+      "revision_item_count": 1,
+      "next_action": {
+        "id": "review_revision_round",
+        "label": "人工审阅本轮修订任务",
+        "description": "确认每个 Agent packet 的输入、输出和验收证据后，再进入 P4-H/P5 的真实任务执行。"
+      }
+    },
+    "final_artifacts": {
+      "status": "ready",
+      "paper_pdf_exists": true,
+      "paper_docx_exists": true,
+      "paper_pdf_path": "Submissions/formal_package/paper.pdf",
+      "paper_docx_path": "Submissions/formal_package/paper.docx"
+    }
+  },
+  "capability_gap_matrix": [
+    {
+      "id": "topic_to_data_binding",
+      "label": "题目到数据绑定",
+      "status": "needs_work",
+      "owner_agent": "DataAgent",
+      "current_state": "题目指向 CGSS，但当前正式研究问题仍是：工业机器人应用对劳动力市场匹配效率的影响",
+      "why_it_matters": "没有先绑定数据、样本和时间范围，后面的变量选择和模型设定都会悬空。",
+      "next_action": "扫描本地数据资产，确认 CGSS 文件、年份、样本口径和可用字段。",
+      "done_when": "产出 DatasetBinding 和字段画像，明确该题目使用哪个 CGSS 文件、哪些变量和多少样本。"
+    },
+    {
+      "id": "expert_variable_role_selection",
+      "label": "专家级变量角色选择",
+      "status": "needs_work",
+      "owner_agent": "Supervisor+MethodAgent",
+      "current_state": "还需要把字段画像转成因变量、核心解释变量、控制变量和可能机制变量，并给出理由。",
+      "why_it_matters": "变量不是只靠字段名猜出来；必须能解释为什么这样设定符合社会资本与幸福感研究。",
+      "next_action": "生成 VariableRoleSet 草案，并绑定数据画像、文献依据和识别逻辑。",
+      "done_when": "每个核心变量都有来源字段、测量解释、缺失率、方向预期和人工审阅状态。"
+    },
+    {
+      "id": "method_family_gate",
+      "label": "方法族和前置条件",
+      "status": "waiting_for_data_binding",
+      "owner_agent": "MethodAgent",
+      "current_state": "需要根据 CGSS 数据结构判断适合 OLS/Ordered Logit/FE/IV/PSM/DID 等哪条路线。",
+      "why_it_matters": "方法不能先验硬套；横截面、面板、政策冲击、工具变量可得性会决定可走的方法。",
+      "next_action": "先做 baseline 方法门，再列出不能进入的方法和需要补的证据。",
+      "done_when": "方法门输出 green/yellow/red，并说明每种方法的进入条件、诊断和稳健性要求。"
+    },
+    {
+      "id": "literature_review_loop",
+      "label": "文献综述闭环",
+      "status": "needs_work",
+      "owner_agent": "LiteratureAgent",
+      "current_state": "需要围绕社会资本、主观幸福感、CGSS 应用和中国情境建立可核验文献包。",
+      "why_it_matters": "文献综述不是凑段落；它决定变量定义、理论机制、贡献位置和引用可信度。",
+      "next_action": "生成 seed literature、CNKI/Scholar/Zotero 检索队列、候选参考文献和引用绑定。",
+      "done_when": "文献条目能核验来源，综述段落能绑定引用，参考文献候选进入人工批准队列。"
+    },
+    {
+      "id": "review_revision_and_export_loop",
+      "label": "审稿式修订和导出",
+      "status": "waiting_for_upstream",
+      "owner_agent": "ReviewerAgent+ExportAgent",
+      "current_state": "新题目需要先完成前四层，才能进入成文、审稿修订和 PDF 预检。",
+      "why_it_matters": "完整文章靠多轮修订成形；PDF 只是交付物，前面必须有证据包和修订账本。",
+      "next_action": "等数据、变量、方法和文献包就绪后，生成章节草稿、审稿意见和导出预检。",
+      "done_when": "修订队列全部有证据回应，PDF 包含正文、表图、参考文献、复现说明和审计记录。"
+    }
+  ],
+  "agent_team_routing": {
+    "first_agent_to_call": "DataAgent",
+    "reason": "新题目第一步必须先找数据和字段，不应直接写文献综述或跑模型。",
+    "agent_order": [
+      "DataAgent",
+      "Supervisor+MethodAgent",
+      "LiteratureAgent",
+      "MethodAgent",
+      "ReviewerAgent+ExportAgent"
+    ],
+    "next_cli_nodes": [
+      "run_cgss_data_discovery",
+      "draft_cgss_variable_roles",
+      "build_cgss_literature_seed_package",
+      "run_cgss_method_gate"
+    ]
+  },
+  "blocking_reasons": [],
+  "review_targets": [
+    "Submissions/formal_package/paper.pdf",
+    "Submissions/formal_package/paper.docx"
+  ],
+  "next_tasks": [
+    "run_cgss_data_discovery",
+    "bind_topic_to_cgss_dataset",
+    "discover_cgss_social_capital_happiness_variables",
+    "draft_cgss_variable_roles",
+    "build_cgss_literature_seed_package",
+    "run_cgss_method_gate"
+  ],
+  "boundary_flags": {
+    "this_command_generated_new_paper": false,
+    "this_command_modified_formal_package": false,
+    "this_command_accepted_package": false,
+    "this_command_modified_formal_research_state": false
+  }
+}

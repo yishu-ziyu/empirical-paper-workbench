@@ -1,0 +1,101 @@
+{
+  "id": "cgss_run_plan_seed",
+  "version": 0,
+  "status": "approved_for_draft_execution",
+  "evidence_level": "local_file",
+  "design_spec_draft_id": "cgss_design_spec_draft",
+  "dataset_path": "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta",
+  "tasks": [
+    {
+      "id": "cgss_data_preflight",
+      "label": "CGSS 数据读取和字段预检",
+      "method_id": "data_preflight",
+      "status": "planned",
+      "required_source_columns": [
+        "a36",
+        "a33",
+        "a31a",
+        "a31b",
+        "a311",
+        "a2",
+        "a3a",
+        "a7a",
+        "a8a",
+        "a15",
+        "a18",
+        "s41"
+      ],
+      "evidence_level": "local_file"
+    },
+    {
+      "id": "build_cgss_analysis_frame",
+      "label": "构造 CGSS 分析样本和社会资本指数",
+      "method_id": "feature_engineering",
+      "status": "planned",
+      "adapter": "Program/workbench/cgss_minimal_model.py::build_analysis_frame",
+      "required_analysis_columns": [
+        "happiness",
+        "social_capital_index",
+        "female",
+        "age",
+        "education_level",
+        "log_income",
+        "health",
+        "urban_hukou",
+        "province"
+      ],
+      "evidence_level": "local_file"
+    },
+    {
+      "id": "run_ols_baseline",
+      "label": "OLS 基准模型",
+      "method_id": "ols",
+      "estimator": "ols",
+      "status": "planned",
+      "design_spec_id": "cgss_design_spec_draft",
+      "formula": "happiness ~ social_capital_index + female + age + education_level + log_income + health + urban_hukou + C(province)",
+      "cli": "python3 Program/cgss_minimal_model.py --project-root . --dataset '/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta' --topic '社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析'",
+      "expected_outputs": [
+        "Results/json/cgss_social_capital_happiness_minimal_model.json",
+        "Reviews/cgss_social_capital_happiness_minimal_model.md"
+      ],
+      "evidence_level": "local_file"
+    },
+    {
+      "id": "run_ordered_logit_robustness",
+      "label": "Ordered Logit 有序模型",
+      "method_id": "ordered_logit",
+      "estimator": "ordered_logit",
+      "status": "planned",
+      "design_spec_id": "cgss_design_spec_draft",
+      "formula": "happiness ~ social_capital_index + female + age + education_level + log_income + health + urban_hukou + C(province)",
+      "cli": "python3 Program/cgss_ordered_robustness.py --project-root . --dataset '/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A004CGSS中国综合社会调查/中国综合社会调查2023/CGSS2023.dta' --topic '社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析'",
+      "expected_outputs": [
+        "Results/json/cgss_social_capital_happiness_ordered_robustness.json",
+        "Reviews/cgss_social_capital_happiness_ordered_robustness.md"
+      ],
+      "evidence_level": "local_file"
+    }
+  ],
+  "outputs": [
+    "Results/json/cgss_social_capital_happiness_minimal_model.json",
+    "Reviews/cgss_social_capital_happiness_minimal_model.md",
+    "Results/json/cgss_social_capital_happiness_ordered_robustness.json",
+    "Reviews/cgss_social_capital_happiness_ordered_robustness.md",
+    "Results/json/cgss_social_capital_happiness_results_evidence_package.json"
+  ],
+  "decision_events": [],
+  "human_approval": {
+    "status": "approved",
+    "decision": "human_approve_cgss_run_plan_seed",
+    "approved_by": "mahaoxuan",
+    "note": "用户在 2026-05-31 继续目标模式；本批准仅允许 P6-J6b 草案层执行 CGSS OLS 与 Ordered Logit，并把结果送入人工审阅证据包；不写正式 RunPlan、不写 state/product、不生成正式论文结论。",
+    "approved_at": "2026-05-31T08:41:32.787010+00:00"
+  },
+  "promotion": {
+    "allowed": true,
+    "required_decision": "human_review_cgss_execution_results"
+  },
+  "formal_writeback_allowed": false,
+  "draft_layer_only": true
+}

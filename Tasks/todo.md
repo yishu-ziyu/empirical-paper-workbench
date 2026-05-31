@@ -2359,3 +2359,17 @@
 - [x] 正式层边界：本节点不写 `Manuscripts/sections/literature-and-contribution.md`、不写 citation plan、不写正式 bibliography、不写正式 manuscript、不写 `state/product/*`。
 - [x] 验证：目标测试 5 OK；P6-I1-I10 scoped 回归 32 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I11。
+
+## 2026-05-31 P6-I11 CGSS Method Structure Gate Packet
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `0fe6131 Build CGSS method structure gate packet` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把结果证据包和文献综述草稿包合成“方法与结构门禁”，明确这篇 CGSS 论文可以写哪些方法结论、不能写哪些因果识别方法，以及每个论文章节需要的长度和证据。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_method_structure_approval`；主结果样本量 `5310`，OLS 系数 `0.1658`，Ordered Logit 系数 `0.405`；当前只允许 `conditional_association` 和 `ordered_outcome_robustness`，阻断 DID、IV、RDD、PSM、DML。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_method_structure_gate_packet.json`；它可以驱动方法审阅、经验策略段落、主结果段落和章节质量门，但不能直接写 DesignSpec、RunPlan 或正式论文正文。
+- [x] BDD/TDD：既有 `tests/test_cgss_method_structure_gate_packet.py` 覆盖方法结构门生成、条件相关/因果方法分离、真实结果数值进入 main result gate、输入未 ready 阻断、JSON/Markdown 输出和正式层不写回；本轮补 `docs/superpowers/plans/2026-05-31-cgss-method-structure-gate-packet.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I11 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_method_structure_gate_packet.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_method_structure_gate_packet.json` 与 `Reviews/cgss_social_capital_happiness_method_structure_gate_packet.md`；状态为 `needs_human_method_structure_approval`。
+- [x] 正式层边界：本节点不写 DesignSpec、不写 RunPlan、不写正式 manuscript、不写正式 bibliography、不写 `state/product/*`。
+- [x] 验证：目标测试 5 OK；P6-I1-I11 scoped 回归 37 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I12。

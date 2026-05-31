@@ -1,6 +1,6 @@
 # CGSS 方法规范与论文结构门禁
 
-- 题目：社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析
+- 题目：社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析
 - 状态：`needs_human_method_structure_approval`
 - 写入正式论文：否
 - 写入 DesignSpec / RunPlan：否

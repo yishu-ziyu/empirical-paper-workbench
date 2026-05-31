@@ -2401,3 +2401,17 @@
 - [x] 正式层边界：本节点在当前真实 pending queue 下不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
 - [x] 验证：目标测试 4 OK；P6-I1-I13 scoped 回归 49 OK；Python 编译通过；真实 CLI 运行通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I14 或人工审批节点。
+
+## 2026-05-31 P6-I14 CGSS Revision Queue Approval Record
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `c3d36b8 Record CGSS revision queue approvals` 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把 P6-I12 的 8 条修订任务队列接成一个人工决策记录入口，支持 `defer/approve/revise/reject`；只有 `approve` 且提供 reviewer/note 时，才会生成 approved queue sidecar。
+- [x] 当前真实效果：真实 CLI 默认 `defer`，输出 `status=pending_human_revision_queue_decision`、`approved=false`、`approved_queue=none`；当前阻断为 `human_approve_cgss_revision_task_queue`。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_revision_queue_approval.json`；它可以驱动人工确认按钮和后续 approval router，但当前不能触发 P6-I13 写 Agent 工单。
+- [x] BDD/TDD：既有 `tests/test_cgss_revision_queue_approval.py` 覆盖 defer 不批准、approve 缺 reviewer/note 阻断、approve 生成 approved queue sidecar、revise/reject 不生成 approved queue、CLI 默认 defer 且不写 product state；本轮补 `docs/superpowers/plans/2026-05-31-cgss-revision-queue-approval.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-I14 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_revision_queue_approval.py --project-root .`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_revision_queue_approval.json` 与 `Reviews/cgss_social_capital_happiness_revision_queue_approval.md`；未生成 `Results/json/cgss_social_capital_happiness_revision_task_queue_approved.json`。
+- [x] 正式层边界：本节点不创建 Agent 工单文件、不写正式 manuscript、不写 verified bibliography、不写 DesignSpec/RunPlan、不写 `state/product/*`、不写 `state/product/agent_task_queue.json`。
+- [x] 验证：目标测试 5 OK；P6-I1-I14 scoped 回归 54 OK；Python 编译通过；真实 CLI 运行通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-I15 approval router。

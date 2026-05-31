@@ -1,19 +1,3 @@
-# CGSS 修订任务队列人工决策记录
-
-- 题目：社会资本对居民主观幸福感的影响研究--基于 CGSS 数据的实证分析
-- schema：`p6.cgss_revision_queue_approval.v1`
-- 状态：`pending_human_revision_queue_decision`
-- 决策：`defer`
-- 审阅人：未记录
-- 草案层：是
-- 写入正式论文：否
-- 写入 state/product：否
-
-## 当前阻断
-- `human_approve_cgss_revision_task_queue`
-
-## 决策 JSON
-```json
 {
   "schema_version": "p6.cgss_revision_queue_approval.v1",
   "generated_at": "2026-05-31T08:12:50.351852+00:00",
@@ -41,4 +25,3 @@
     "required_decision": "human_approve_cgss_revision_task_queue"
   }
 }
-```

@@ -2551,3 +2551,20 @@
 - [x] 正式层边界：本节点不写正式 manuscript，不改 verified bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
 - [x] 验证：目标测试 3 OK；CGSS results evidence package + literature review draft packet + manuscript section router + paper package builder 相邻回归 17 OK；Python 编译通过；真实 CLI 返回 `0` 并写出 4 个可审阅章节。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进章节人工审阅、探索性整稿或 PDF 预检。
+
+## 2026-05-31 P6-J8 CGSS Exploratory Paper Assembler
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史提交 `0c49ff8 Assemble CGSS evidence into exploratory paper draft` 落地，本轮只复核真实状态、重新运行 P6-J8、补任务账本、补 session log、补 BDD plan，并固化真实完整稿 Markdown 与 assembly JSON。
+- [x] 组件效果：把 P6-J7 的 4 个可审阅章节组装成一篇完整探索性论文草稿，让用户可以从“章节片段审阅”进入“整篇论文审阅”。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_exploratory_paper_review`、中文字符数 `5399`、最低门槛 `5000`、组装章节数 `4`；生成的完整稿文件为 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`。
+- [x] 论文结构：完整稿包含摘要、引言、文献综述与研究贡献、数据与变量、实证策略、主要实证结果、稳健性与进一步检验计划、结论、参考文献候选和人工审阅清单。
+- [x] 证据对接：assembly JSON 绑定 `cgss_results_evidence_package`、`cgss_literature_review_draft_packet`、`cgss_manuscript_section_package`、`cgss_minimal_model`、`cgss_ordered_robustness`、`verified_bibliography_candidates`、`citation_binding_placeholders` 和 `ordered_method_gate`。
+- [x] 执行边界：本节点只写草案层完整稿、assembly JSON 和审阅报告；不写正式 manuscript，不改 verified bibliography，不写 formal package，不写 `state/product/*`，不把探索性结论升级为正式论文结论。
+- [x] 对接方式：下游只应读取 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`、`Results/json/cgss_social_capital_happiness_paper_assembly.json` 和 `Reviews/cgss_social_capital_happiness_paper_assembly.md`；人工整稿审阅后才允许进入 PDF 预检、AER-like 方法门或审稿式修订队列。
+- [x] BDD/TDD：既有 `tests/test_cgss_exploratory_paper_assembler.py` 覆盖 ready section package 组装完整探索稿、输入未 ready 阻断、写出完整稿/JSON/review 且不写正式层；本轮补 `docs/superpowers/plans/2026-05-31-cgss-exploratory-paper-assembler.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J8 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实完整稿 Markdown 与 assembly JSON 加入本阶段提交。
+- [x] 真实运行：`python3 Program/cgss_exploratory_paper_assembler.py --project-root .`
+- [x] 真实输出：写出 `Manuscripts/generated/cgss_social_capital_happiness_paper.md`、`Results/json/cgss_social_capital_happiness_paper_assembly.json` 和 `Reviews/cgss_social_capital_happiness_paper_assembly.md`。
+- [x] 正式层边界：本节点不写正式 manuscript，不写正式 bibliography，不写 formal package，不写 product state；`formal_writeback_allowed=false`。
+- [x] 验证：目标测试 3 OK；CGSS results evidence package + literature review draft packet + manuscript section router + exploratory paper assembler 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0` 并写出完整探索稿。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进整稿人工审阅、PDF 预检、AER-like 方法门或审稿式修订队列。

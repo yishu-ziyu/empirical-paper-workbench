@@ -2727,3 +2727,18 @@
 - [x] 正式层边界：本节点不执行 adapter、不复制 package artifact、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
 - [x] 验证：目标测试 7 OK；formal writeback execute + formal target adapter readiness + target adapter execution + materialization preflight 相邻回归 27 OK；Python 编译通过；真实 CLI 返回 `0`；readiness JSON 核对通过；candidate target 不存在检查通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 apply manifest、target adapter execution 或正式写回。
+
+## 2026-05-31 P7-O Auto Mode Formal Target Adapter Execution Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-O 代码与测试已落地，本轮用当前 P7-N blocked readiness 重新运行 formal target adapter execution dry-run，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-N 的 target adapter mappings 转成可审阅的 adapter execution plan 或 execution manifest；当前产品效果是 P7-N 不 ready 时不生成执行计划，也不允许 materialization。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_target_adapter_readiness`、`mode=dry-run`、`adapter_execution_plan=0`、`execution_manifest_recorded=false`、`formal_target_adapters_executed=false`、`this_command_wrote_formal_state=false`。
+- [x] 阻断原因：P7-N source readiness 仍是 `blocked_by_apply_manifest` 且 `adapter_mappings_count=0`，P7-O 记录 `target_adapter_readiness_not_ready`、`target_adapter_readiness_cannot_request_execution`、`adapter_mappings_missing`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_target_adapter_execution.json` 和 `Reviews/auto_mode_formal_target_adapter_execution.md`；P7-P 不应把当前 execution gate 当成可 materialize 输入，因为没有 execution manifest。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_target_adapter_execution.py` 覆盖 ready readiness dry-run 计划、blocked readiness 阻断、execute 必须显式确认、execute 必须带 reviewer/note、确认 execute 只写 manifest 不创建 candidate target、坏 mapping 阻断、CLI 默认 blocked；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-target-adapter-execution-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-O workbench、CLI、测试、真实 execution gate；新增/更新任务记录、session log、BDD plan。真实 execution JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_target_adapter_execution.py --project-root . --mode dry-run`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_target_adapter_execution.json` 和 `Reviews/auto_mode_formal_target_adapter_execution.md` 仍表达当前 P7-N 阻断传递状态；未创建 `workspace/formal_target_adapter_execution/auto_mode/formal_target_adapter_execution_manifest.json`，未创建 `Submissions/auto_mode/cgss_social_capital_happiness/manuscript/paper.md`。
+- [x] 正式层边界：本节点不执行 adapter、不创建 candidate target、不写正式 manuscript、不写正式 bibliography、不改 project bibliography、不改 DesignSpec/RunPlan、不写 `state/product/*`、不渲染 PDF/DOCX、不重跑模型。
+- [x] 验证：目标测试 7 OK；formal target adapter readiness + execution + materialization preflight + materialization execute 相邻回归 28 OK；Python 编译通过；真实 CLI 返回 `0`；execution JSON 核对通过；execution manifest 和 candidate target 不存在检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，不能自动推进 execution manifest、materialization 或正式写回。

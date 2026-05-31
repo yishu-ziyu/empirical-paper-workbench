@@ -2443,3 +2443,17 @@
 - [x] 正式层边界：本节点不生成新论文、不改正式 package、不接受 package、不改正式研究状态、不写 `state/product/*`。
 - [x] 验证：目标测试 3 OK；topic audit + CGSS data discovery + variable discovery 相邻回归 9 OK；Python 编译通过；真实 CLI 按预期返回 `3` 并写出审计产物。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进 P6-J2 数据发现。
+
+## 2026-05-31 P6-J2 CGSS Data Discovery
+
+- [x] 节点时间盒：本节点作为记录补齐和复验节点；代码与测试已由历史 P6-J2 落地，本轮只复核真实状态、补任务账本、补 session log、补 BDD plan 并固化真实 JSON 产物。
+- [x] 组件效果：把“这个 CGSS 题目应该接哪份本地数据”变成可审阅 DatasetBinding 草案；它扫描本机 CGSS `.dta`，列出候选数据、推荐数据、配套编码表/问卷和字段画像预览。
+- [x] 当前真实效果：真实 CLI 输出 `status=needs_human_dataset_binding_review`，推荐 `CGSS2023.dta`；样本量 11326，字段数 439，候选数据包含 2023、2021、2018 三份可读本地文件。
+- [x] 对接方式：下游只应读取 `Results/json/cgss_social_capital_happiness_data_discovery.json` 和 `Reviews/cgss_social_capital_happiness_data_discovery.md`；人工确认 DatasetBinding 后，才能进入变量角色草案和方法门。
+- [x] BDD/TDD：既有 `tests/test_cgss_data_discovery.py` 覆盖有数据时生成 DatasetBinding 草案、无数据时干净阻断、审阅文本提示人工检查、机器 JSON 与 Markdown 写出；本轮补 `docs/superpowers/plans/2026-05-31-cgss-data-discovery.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P6-J2 workbench、CLI、测试、真实 review；新增/更新任务记录、session log、BDD plan，并将真实 JSON 产物加入本阶段提交。
+- [x] 真实运行：`python3 Program/run_cgss_data_discovery.py --project-root . --topic "社会资本对居民主观幸福感的影响研究--基于CGSS数据的实证分析"`
+- [x] 真实输出：写出 `Results/json/cgss_social_capital_happiness_data_discovery.json` 与 `Reviews/cgss_social_capital_happiness_data_discovery.md`；状态为 `needs_human_dataset_binding_review`，推荐数据为 2023 年 CGSS。
+- [x] 正式层边界：本节点不写正式变量角色、不改 DesignSpec/RunPlan、不生成论文、不写 `state/product/*`。
+- [x] 验证：目标测试 4 OK；topic audit + CGSS data discovery + variable discovery 相邻回归 9 OK；Python 编译通过；真实 CLI 返回 `0` 并写出数据发现产物。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停，不自动推进变量角色草案或人工 DatasetBinding approval。

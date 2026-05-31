@@ -738,7 +738,22 @@
 - [x] 真实输出：`status=blocked_by_routed_next_gate_entry_preflight_entry_result_review`、`can_execute_explicit_routed_next_gate_entry=false`、`explicit_routed_next_gate_entry_gate_executed=false`、`explicit_routed_next_gate_entry_execute_status=`、`routed_next_gate_entry_manifest_recorded=false`、`explicit_routed_next_gate_entry_operations=0`、`next_gate_entered=false`、`next_gate_command_executed=false`、`export_or_acceptance_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`；未写 `workspace/formal_package_routed_next_gate_entry/auto_mode/routed_next_gate_entry_manifest.json`。
 - [x] 正式层边界：本节点当前真实运行只写 P7-BB gate JSON 和 Markdown；不调用 execute、不进入下一关、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。ready 且显式确认时也只委托 existing execute 记录 entry manifest，不运行下一关命令。
 - [x] 验证：目标测试 8 OK；`test_auto_mode_formal_package*.py` 回归 238 OK；Python 编译通过。
-- [ ] 下一步 P7-BC：实现 manifested routed next gate run preflight（只消费 P7-BB gate result 和 entry manifest；默认因 P7-BB blocked 而 blocked，ready 时只预检将要运行的 routed next gate command，不真正运行下一关）。
+- [x] 下一步 P7-BC：已实现 manifested routed next gate run preflight（只消费 P7-BB gate result 和 entry manifest；默认因 P7-BB blocked 而 blocked，ready 时只预检将要运行的 routed next gate command，不真正运行下一关）。
+
+## 2026-05-31 P7-BC Auto Mode Formal Package Next Gate Manifested Routed Next Gate Run Preflight
+
+- [x] 组件效果：把 P7-BB explicit routed next gate entry gate result 和 entry manifest 转成 manifested routed next gate run preflight；只有 P7-BB 已真实记录 manifest，且 manifest 与 gate result 完全匹配时，才生成下一关命令计划和一条下游 run input record。
+- [x] 当前真实效果：仓库里的 P7-BB 仍是 `blocked_by_routed_next_gate_entry_preflight_entry_result_review`，且未记录 entry manifest，所以本节点输出 `blocked_by_explicit_routed_next_gate_entry_gate`，没有命令计划，没有 run input record，没有运行下一关。
+- [x] 对接方式：下游 P7-BD 只读取 `Results/json/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.json`；只有 `status=ready_for_manifested_routed_next_gate_run_preflight`、`can_request_manifested_next_gate_command_execution=true` 且存在 `manifested_routed_next_gate_run_input_records` 时，才允许进入显式 command execute gate。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.py`，覆盖 ready gate + manifest、当前 blocked、P7-BB 缺失/无效/未记录、gate/manifest 不匹配、manifest 缺失/无效、manifest 边界越权、manifest operation 合约、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight`。
+- [x] Agent Team：未调用；本节点是单一 wrapper/preflight 小切片，主要风险由 P7-BB gate 合约、既有 manifested command preflight 复用、gate/manifest 交叉校验和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.py` 和 `Program/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.py`；新增计划 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-next-gate-manifested-routed-next-gate-run-preflight.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.md`；新增阶段记录 `notes/session-logs/2026-05-31-p7-bc-manifested-routed-next-gate-run-preflight.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.py --project-root . --explicit-routed-next-gate-entry-gate Results/json/auto_mode_formal_package_next_gate_explicit_routed_next_gate_entry_gate.json --routed-next-gate-entry-manifest workspace/formal_package_routed_next_gate_entry/auto_mode/routed_next_gate_entry_manifest.json --output-preflight Results/json/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.json --output-review Reviews/auto_mode_formal_package_next_gate_manifested_routed_next_gate_run_preflight.md`。
+- [x] 真实输出：`status=blocked_by_explicit_routed_next_gate_entry_gate`、`can_request_manifested_next_gate_command_execution=false`、`next_gate_command_call_plan=0`、`manifested_routed_next_gate_run_input_records=0`、`next_gate_command_executed=false`、`this_command_ran_next_gate_command=false`、`next_gate_entered=false`、`export_or_acceptance_executed=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`。
+- [x] 正式层边界：本节点只写 P7-BC preflight JSON 和 Markdown；不运行 manifested routed next gate command、不进入下一关、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 8 OK；`test_auto_mode_formal_package*.py` 回归 246 OK；Python 编译通过；真实 CLI 输出为当前 blocked。
+- [ ] 下一步 P7-BD：实现 manifested routed next gate command execute gate entry（只消费 P7-BC run preflight；ready 且显式确认后才调用既有 manifested command execute，默认因 P7-BC blocked 而 blocked）。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -663,7 +663,22 @@
 - [x] 真实输出：`status=blocked_by_verified_route_completion_ledger_entry`、`verified_route_completion_ledger_entry_result_reviewed=false`、`can_continue_to_verified_route_next_gate_router=false`、`route_completion_ledger_recorded=false`、`can_enter_next_auto_mode_gate=false`、`route_completion_records=0`、`verified_route_next_gate_router_input_records=0`、`verified_route_next_gate_router_executed=false`、`this_command_ran_verified_route_next_gate_router=false`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_verified_route_completion_ledger_entry_result_review.json`。
 - [x] 正式层边界：本节点只写 P7-AW result review JSON 和 Markdown；不重新运行 ledger，不运行 verified route next-gate router，不导出 PDF/DOCX，不生成 package manifest，不执行人工验收，不写 `state/product/*`。
 - [x] 验证：目标测试 8 OK；`test_auto_mode_formal_package*.py` 回归 200 OK；Python 编译通过。
-- [ ] 下一步 P7-AX：实现 verified route next-gate router entry（只消费 P7-AW result review，ready 时调用既有 `auto_mode_formal_package_verified_route_next_gate_router.py`；默认因 P7-AW blocked 而 blocked）。
+- [x] 下一步 P7-AX：已实现 verified route next-gate router entry（只消费 P7-AW result review，ready 时调用既有 `auto_mode_formal_package_verified_route_next_gate_router.py`；默认因 P7-AW blocked 而 blocked）。
+
+## 2026-05-31 P7-AX Auto Mode Formal Package Next Gate Verified Route Next-Gate Router Entry
+
+- [x] 组件效果：把 P7-AW result review 转成显式 verified route next-gate router entry；只有 P7-AW 已确认 ledger 可继续到 router 时，才调用既有 `auto_mode_formal_package_verified_route_next_gate_router.py`。
+- [x] 当前真实效果：仓库里的 P7-AW 仍是 `blocked_by_verified_route_completion_ledger_entry`，所以本节点输出 `blocked_by_verified_route_completion_ledger_entry_result_review`，router command 未执行，没有记录 routed next gate。
+- [x] 对接方式：下游只读取 `Results/json/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.json`；只有 `status=next_gate_verified_route_next_gate_router_entered` 且 `next_gate_route_recorded=true` 时，才允许进入后续 routed next gate entry/result review。
+- [x] BDD/TDD：新增 `tests/test_auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.py`，覆盖 ready P7-AW 调用既有 router、当前 blocked、P7-AW 缺失/无效/未 ready、router input record 合约、router command 缺失、既有 router 失败记录、CLI 默认 blocked。
+- [x] RED 记录：首次目标测试失败为缺少 `Program.workbench.auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry`。
+- [x] Agent Team：未调用；本节点是单一 router entry 小切片，主要风险由 result-review/input-record 合约测试、当前 blocked CLI 和 P7 主链路回归覆盖。
+- [x] 实现范围：新增 `Program/workbench/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.py` 和 `Program/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.py`；新增计划 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-next-gate-verified-route-next-gate-router-entry.md`；新增审阅输出 `Reviews/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.md`。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.py --project-root . --verified-route-completion-ledger-entry-result-review Results/json/auto_mode_formal_package_next_gate_verified_route_completion_ledger_entry_result_review.json --output-entry Results/json/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.json --output-review Reviews/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.md`。
+- [x] 真实输出：`status=blocked_by_verified_route_completion_ledger_entry_result_review`、`can_enter_verified_route_next_gate_router=false`、`verified_route_next_gate_router_entry_command_executed=false`、`this_command_ran_verified_route_next_gate_router=false`、`next_gate_route_recorded=false`、`can_enter_routed_next_gate=false`、`routed_next_gate=`、`route_completion_records=0`、`can_write_product_state=false`；未写 `state/product/auto_mode_formal_package_next_gate_verified_route_next_gate_router_entry.json`。
+- [x] 正式层边界：本节点只写 P7-AX entry JSON 和 Markdown；当前真实运行不调用 verified route next-gate router、不进入 routed next gate、不导出 PDF/DOCX、不生成 package manifest、不执行人工验收、不写 `state/product/*`。
+- [x] 验证：目标测试 7 OK；`test_auto_mode_formal_package*.py` 回归 207 OK；Python 编译通过。
+- [ ] 下一步 P7-AY：实现 verified route next-gate router entry result review（只消费 P7-AX entry 和既有 verified route next-gate router output，审阅 routed next gate 是否可进入后续 manifested command/preflight；默认因 P7-AX blocked 而 blocked）。
 
 ## 2026-05-27 Global Node Execution Contract
 

@@ -2877,3 +2877,18 @@
 - [x] 正式层边界：当前 blocked preflight 不导出/验收正式包、不渲染 PDF/DOCX、不写 package manifest、不修复/覆盖正式成果、不写 `state/product/*`、不重跑模型；只有 P7-W verified 且 formal target records 完整时，P7-X 才能生成 4 项 export/acceptance plan。
 - [x] 验证：目标测试 7 OK；promoted package verification + export/acceptance preflight 相邻回归 15 OK；Python 编译通过；真实 CLI 返回 `0`；preflight JSON 核对通过；P7-X product state 不存在检查通过；旧 PDF/DOCX 存在但本轮未修改检查通过。
 - [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-W 必须 verified 后，P7-X 才能作为正式导出、人工验收或产品状态写回的 ready 输入。
+
+## 2026-05-31 P7-Y Auto Mode Formal Package Export / Acceptance Router Current Blocked
+
+- [x] 节点时间盒：本节点作为复验和记录节点；既有 P7-Y 代码与测试已落地，本轮用当前 P7-X blocked export/acceptance preflight 重新运行 formal package export / acceptance router，并补任务账本、session log、BDD plan。
+- [x] 组件效果：把 P7-X ready export/acceptance plan 接成人类显式路线选择；当前产品效果是 P7-X 未 ready 时不记录 PDF/DOCX/package/manual acceptance 路线，也不允许 P7-Z 生成单路线执行预检。
+- [x] 当前真实效果：真实 CLI 输出 `status=blocked_by_export_acceptance_preflight`、`decision=defer`、`can_route_export_or_acceptance=false`、`route_recorded=false`、`routed_action=`、`export_or_acceptance_executed=false`、`rendered_pdf=false`、`rendered_docx=false`、`this_command_wrote_formal_state=false`、`can_write_product_state=false`。
+- [x] 阻断原因：P7-X source preflight 仍是 `blocked_by_promoted_package_verification`，且 `can_enter_formal_package_export_acceptance=false`、`export_acceptance_plan_count=0`；P7-Y 记录 `export_acceptance_preflight_not_ready`、`export_acceptance_preflight_cannot_enter`、`export_acceptance_preflight_missing_explicit_command_requirement`。
+- [x] 对接方式：下游只应读取 `Results/json/auto_mode_formal_package_export_acceptance_router.json` 和 `Reviews/auto_mode_formal_package_export_acceptance_router.md` 作为 blocked route signal；P7-Z 不应把当前 router 当成 selected route 输入，因为没有 route_recorded、没有 routed_action、没有 selected_plan_item。
+- [x] BDD/TDD：既有 `tests/test_auto_mode_formal_package_export_acceptance_router.py` 覆盖 ready defer 等待、confirmed PDF route 只记录路线不导出、当前 P7-X blocked 阻断、未知 decision/缺计划动作阻断、非 defer 必须确认/reviewer/note、边界越界阻断、CLI 默认 blocked、只写 report/review 不导出不验收不写产品状态；本轮补 `docs/superpowers/plans/2026-05-31-auto-mode-formal-package-export-acceptance-router-current-blocked.md` 作为可审阅行为记录。
+- [x] 实现范围：复验既有 P7-Y workbench、CLI、测试、真实 export/acceptance router；新增/更新任务记录、session log、BDD plan。真实 router JSON/Markdown 与仓库既有产物一致，本轮不制造假产物更新。
+- [x] 真实运行：`python3 Program/auto_mode_formal_package_export_acceptance_router.py --project-root . --decision defer`
+- [x] 真实输出：确认 `Results/json/auto_mode_formal_package_export_acceptance_router.json` 和 `Reviews/auto_mode_formal_package_export_acceptance_router.md` 仍表达当前 P7-X 阻断传递状态；未写 `state/product/auto_mode_formal_package_export_acceptance_router.json`；仓库已有旧 `Submissions/formal_package/paper.pdf`、`Submissions/formal_package/paper.docx`、`Submissions/formal_package/manifest.json`，本轮 `git status`/`git diff` 确认未修改它们。
+- [x] 正式层边界：当前 blocked router 不导出/验收正式包、不渲染 PDF/DOCX、不写 package manifest、不修复/覆盖正式成果、不写 `state/product/*`、不重跑模型；只有 P7-X ready 且显式 confirm/reviewer/note/decision 命中 plan 时，P7-Y 才能给 P7-Z ready selected route 输入。
+- [x] 验证：目标测试 8 OK；export/acceptance preflight + router + selected route execution preflight 相邻回归 24 OK；Python 编译通过；真实 CLI 返回 `0`；router JSON 核对通过；P7-Y product state 不存在检查通过；旧 PDF/DOCX/manifest 存在但本轮未修改检查通过。
+- [x] 暂停点：按用户要求，本小阶段完成后先暂停；下一步仍必须由用户明确给出 final review approval，并且 P7-X 必须 ready 后，P7-Y 才能作为 P7-Z selected route execution preflight 输入。

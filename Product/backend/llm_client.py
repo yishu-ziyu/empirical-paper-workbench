@@ -98,13 +98,22 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
         id="minimax",
         name="MiniMax Token Plan",
         api_type="anthropic-compatible",
-        base_url="https://api.minimaxi.com/anthropic",
+        # base_url 真相：用户现有 sk-cp-* key 实测在 api.minimaxi.com 上 200，在
+        # api.minimax.io 上 401。官方文档说后者是 current host，但 key 平台是旧的。
+        # 用 env MINIMAX_BASE_URL 可以 override（推荐在 .env.local 里设）。
+        # base_url 必须含 /v1 段（项目 _call_anthropic_compatible 拼 /messages）
+        base_url="https://api.minimaxi.com/anthropic/v1",
         default_model="MiniMax-M3",
         models=("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5"),
-        api_key_env="MINIMAX_TOKEN_PLAN_KEY",
+        api_key_env="MINIMAX_API_KEY",
+        # 兼容旧名 MINIMAX_TOKEN_PLAN_KEY：见 chat_completion() 中的 fallback 逻辑
         doc=(
             "MiniMax Token Plan via Anthropic-compatible protocol. "
-            "Reference: ~/Desktop/AI组件工作流库/components/minimax-token-plan-real-service/WORKFLOW.md"
+            "Env var: MINIMAX_API_KEY (Token Plan keys use sk-cp-* prefix). "
+            "Falls back to MINIMAX_TOKEN_PLAN_KEY for backward compat. "
+            "Default base_url=https://api.minimaxi.com/anthropic/v1 (verified with this key). "
+            "Override via env MINIMAX_BASE_URL if you have a key bound to api.minimax.io. "
+            "Official docs: https://platform.minimax.io/docs/api-reference/text-anthropic-api"
         ),
     ),
 }
@@ -347,10 +356,13 @@ def chat_completion(
     """
     preset = resolve_provider(provider_id)
 
-    # Resolve API key: explicit > env var > empty
+    # Resolve API key: explicit > primary env var > alias env vars > empty
     resolved_key = (api_key or "").strip()
     if not resolved_key and preset.api_key_env:
         resolved_key = os.getenv(preset.api_key_env, "").strip()
+    # Backward-compat alias: MINIMAX_TOKEN_PLAN_KEY (old name) → MINIMAX_API_KEY (new)
+    if not resolved_key and preset.id == "minimax":
+        resolved_key = os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip()
 
     if preset.requires_api_key and not resolved_key:
         raise LLMError("missing_api_key", f"{preset.name} requires API key. Set env var {preset.api_key_env} or pass api_key.")
@@ -360,10 +372,15 @@ def chat_completion(
     if not selected_model:
         raise LLMError("missing_model", f"{preset.name} model is required.")
 
+    # Resolve base URL: explicit > per-provider env var > preset default
+    effective_base_url = base_url
+    if not effective_base_url and preset.id == "minimax":
+        effective_base_url = os.getenv("MINIMAX_BASE_URL", "").strip() or None
+
     # Resolve base URL
     if preset.api_type == "openai-compatible":
         normalized_base = normalize_base_url(
-            base_url, api_type=preset.api_type, fallback=preset.base_url
+            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
         )
         return _call_openai_compatible(
             api_key=resolved_key,
@@ -376,7 +393,7 @@ def chat_completion(
 
     if preset.api_type == "anthropic-compatible":
         normalized_base = normalize_base_url(
-            base_url, api_type=preset.api_type, fallback=preset.base_url
+            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
         )
         return _call_anthropic_compatible(
             api_key=resolved_key,

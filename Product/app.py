@@ -185,6 +185,7 @@ from Product.backend.cost_service import (
     get_project_costs,
     start_cost_event,
 )
+from Product.api.brief import router as brief_router
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -198,6 +199,9 @@ app = FastAPI(title="Econ Workbench Product Shell", version="0.1.0")
 app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
+
+# Register 5-tab vertical slice routers (L1: brief)
+app.include_router(brief_router)
 
 
 def error_response(status_code: int, code: str, message: str, details: dict | None = None) -> JSONResponse:

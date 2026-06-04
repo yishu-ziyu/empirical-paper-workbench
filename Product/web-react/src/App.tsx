@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { DottedSurface } from "./components/DottedSurface";
 import { ResearchCommandInput } from "./components/ResearchCommandInput";
-import { SemanticGlowCards, type SemanticDraft } from "./components/SemanticGlowCards";
-import { SlideTabs } from "./components/SlideTabs";
-import { TaskBriefDemo } from "./components/TaskBriefDemo";
-import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
-import { AgentActivityPanel } from "./components/AgentActivityPanel";
+import { SlideTabs, type StageTab } from "./components/SlideTabs";
+import { BriefPanel, type BriefResult } from "./components/BriefPanel";
+import { SearchPanel, type Paper } from "./components/SearchPanel";
+import { VariablesPanel, type Variable } from "./components/VariablesPanel";
+import { DesignPanel } from "./components/DesignPanel";
+import { ExecutionPanel } from "./components/ExecutionPanel";
 
 interface SubmittedResearchTask {
   message: string;
@@ -14,21 +15,135 @@ interface SubmittedResearchTask {
   pastedCount: number;
 }
 
+/** Five end-to-end stages (BDD ref: spec §6.1 + §6.2). */
+type Stage = "brief" | "search" | "variables" | "design" | "execution";
+
+interface LiteratureResult {
+  papers: Paper[];
+  literaturePath: string;
+}
+
+interface VariablesResult {
+  variables: Variable[];
+  variablesPath: string;
+}
+
+interface DesignResult {
+  recommended: string;
+  designPath: string;
+}
+
+interface ExecutionResult {
+  paperPath: string;
+  resultsPath: string;
+}
+
+const STAGE_ORDER: Stage[] = [
+  "brief",
+  "search",
+  "variables",
+  "design",
+  "execution",
+];
+
+const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
+  brief: { label: "任务书", hint: "生成 4 段式研究简报（研究问题 / 边际贡献 / 研究边界 / 成功标准）" },
+  search: { label: "递归搜索", hint: "arxiv 召回 + LLM 重排，提炼 8-12 篇相关文献" },
+  variables: { label: "数据变量", hint: "基于数据集 schema + 简报识别 X / Y / control 候选变量" },
+  design: { label: "方法设计", hint: "StatsPAI 估算候选识别策略，LLM 解释并推荐" },
+  execution: { label: "执行实验", hint: "流式生成 9 节论文 + paper.pdf + results.json" },
+};
+
+/**
+ * Convert a free-form research topic into a filesystem-safe slug.
+ * Falls back to "untitled" when the input contains no ASCII alphanumerics
+ * (e.g. pure Chinese topics will slugify to "untitled" — acceptable for
+ * Phase 1; downstream code can read the raw topic from brief.md).
+ */
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 50) || "untitled"
+  );
+}
+
 export function App() {
   const [task, setTask] = useState<SubmittedResearchTask | null>(null);
-  const [draft, setDraft] = useState<SemanticDraft>({
-    message: "",
-    mode: "codex-supervisor",
-    fileCount: 0,
-    pastedCount: 0,
-    hasMaterial: false,
-  });
-  const [analysisSeed, setAnalysisSeed] = useState<SemanticDraft | null>(null);
-  const [activeStage, setActiveStage] = useState("brief");
-  const [briefConfirmed, setBriefConfirmed] = useState(false);
-  const [planApproved, setPlanApproved] = useState(false);
-  const [executionStarted, setExecutionStarted] = useState(false);
+  const [topicSlug, setTopicSlug] = useState<string>("");
+  const [activeStage, setActiveStage] = useState<Stage>("brief");
 
+  // Results from each stage. Preserved across navigation so the user can
+  // jump back to an earlier tab without losing state.
+  const [briefResult, setBriefResult] = useState<BriefResult | null>(null);
+  const [literatureResult, setLiteratureResult] = useState<LiteratureResult | null>(null);
+  const [variablesResult, setVariablesResult] = useState<VariablesResult | null>(null);
+  const [designResult, setDesignResult] = useState<DesignResult | null>(null);
+  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  /**
+   * Tab is unlocked iff every stage strictly before it has completed.
+   * brief is always unlocked; execution is unlocked only when design done.
+   */
+  const canEnter = useCallback(
+    (stage: Stage): boolean => {
+      switch (stage) {
+        case "brief":
+          return true;
+        case "search":
+          return briefResult !== null;
+        case "variables":
+          return briefResult !== null && literatureResult !== null;
+        case "design":
+          return (
+            briefResult !== null &&
+            literatureResult !== null &&
+            variablesResult !== null
+          );
+        case "execution":
+          return (
+            briefResult !== null &&
+            variablesResult !== null &&
+            designResult !== null
+          );
+        default:
+          return false;
+      }
+    },
+    [briefResult, literatureResult, variablesResult, designResult],
+  );
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    window.setTimeout(() => setToastMessage(null), 3000);
+  }, []);
+
+  const handleStageChange = (newId: string) => {
+    if (!STAGE_ORDER.includes(newId as Stage)) return;
+    const target = newId as Stage;
+    if (!canEnter(target)) {
+      showToast("请按顺序完成前一阶段后再进入。");
+      return;
+    }
+    setActiveStage(target);
+  };
+
+  const resetAll = () => {
+    setTask(null);
+    setTopicSlug("");
+    setActiveStage("brief");
+    setBriefResult(null);
+    setLiteratureResult(null);
+    setVariablesResult(null);
+    setDesignResult(null);
+    setExecutionResult(null);
+  };
+
+  // ── Intake screen ──
   if (task === null) {
     return (
       <main className="app-shell app-shell--intake">
@@ -39,27 +154,32 @@ export function App() {
             <h1>今天要推进什么研究？</h1>
           </div>
           <ResearchCommandInput
-            onDraftChange={setDraft}
             onSubmit={({ message, files, pastedContent, mode }) => {
-              setAnalysisSeed({
-                message,
-                mode,
-                fileCount: files.length,
-                pastedCount: pastedContent.length,
-                hasMaterial: true,
-              });
               setTask({
                 message,
                 mode,
                 fileCount: files.length,
                 pastedCount: pastedContent.length,
               });
+              setTopicSlug(slugify(message));
+              setActiveStage("brief");
             }}
           />
         </section>
       </main>
     );
   }
+
+  // ── Build 5-tab configuration with stage-locking hints ──
+  const tabs: StageTab[] = STAGE_ORDER.map((stage) => {
+    const info = STAGE_LABELS[stage];
+    const unlocked = canEnter(stage);
+    return {
+      id: stage,
+      label: unlocked ? info.label : `${info.label} (待解锁)`,
+      hint: unlocked ? info.hint : "请按顺序完成前一阶段后再进入。",
+    };
+  });
 
   return (
     <main className="app-shell analysis-workspace">
@@ -68,14 +188,7 @@ export function App() {
         <button
           className="analysis-workspace__back"
           type="button"
-          onClick={() => {
-            setTask(null);
-            setAnalysisSeed(null);
-            setActiveStage("brief");
-            setBriefConfirmed(false);
-            setPlanApproved(false);
-            setExecutionStarted(false);
-          }}
+          onClick={resetAll}
         >
           新任务
         </button>
@@ -83,63 +196,111 @@ export function App() {
           <span className="eyebrow">分析工作台</span>
           <h1>{task.message || "附件驱动任务"}</h1>
           <p>
-            模式：{task.mode} · 文件 {task.fileCount} · 长文本 {task.pastedCount}
+            模式：
+            {task.mode === "codex-supervisor"
+              ? "智能规划模式"
+              : task.mode === "auto-research"
+                ? "自动探索模式"
+                : "人工审阅模式"}
+            {" · "}文件 {task.fileCount} · 长文本 {task.pastedCount} · slug:{" "}
+            <code data-testid="topic-slug">{topicSlug}</code>
           </p>
         </div>
       </section>
 
       <section className="stage-panel" aria-label="研究路径">
-        <SlideTabs value={activeStage} onChange={setActiveStage} />
-        {activeStage === "brief" ? (
-          !briefConfirmed ? (
-            <TaskBriefDemo
-              draft={analysisSeed ?? draft}
-              onApprove={() => setBriefConfirmed(true)}
-            />
-          ) : !planApproved ? (
-            <SupervisorPlanReview
-              onApprove={() => {
-                setPlanApproved(true);
-              }}
-              onReject={() => {
-                setBriefConfirmed(false);
-              }}
-            />
-          ) : (
-            <AgentActivityPanel
-              executionStarted={executionStarted}
-              onStartExecution={() => {
-                setExecutionStarted(true);
-              }}
-              onBack={() => {
-                setPlanApproved(false);
-              }}
-            />
-          )
+        {toastMessage ? (
+          <div className="inline-toast" role="alert" data-testid="stage-locked-toast">
+            <span className="toast-icon">🔒</span>
+            <span>{toastMessage}</span>
+          </div>
         ) : null}
-        {activeStage !== "brief" ? <SemanticGlowCards draft={analysisSeed ?? draft} /> : null}
+
+        <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
+
+        {activeStage === "brief" ? (
+          <BriefPanel
+            topic={task.message}
+            onComplete={(b) => {
+              setBriefResult(b);
+              setActiveStage("search");
+            }}
+          />
+        ) : null}
+
+        {activeStage === "search" && briefResult ? (
+          <SearchPanel
+            briefPath={briefResult.path}
+            topicSlug={topicSlug}
+            onComplete={(papers, literaturePath) => {
+              setLiteratureResult({ papers, literaturePath });
+              setActiveStage("variables");
+            }}
+          />
+        ) : null}
+
+        {activeStage === "variables" && briefResult ? (
+          <VariablesPanel
+            briefPath={briefResult.path}
+            topicSlug={topicSlug}
+            onComplete={(variables, variablesPath) => {
+              setVariablesResult({ variables, variablesPath });
+              setActiveStage("design");
+            }}
+          />
+        ) : null}
+
+        {activeStage === "design" && briefResult && variablesResult ? (
+          <DesignPanel
+            topicSlug={topicSlug}
+            briefPath={briefResult.path}
+            variablesPath={variablesResult.variablesPath}
+            onComplete={(recommended, designPath) => {
+              setDesignResult({ recommended, designPath });
+              setActiveStage("execution");
+            }}
+          />
+        ) : null}
+
+        {activeStage === "execution" && briefResult && variablesResult && designResult ? (
+          <ExecutionPanel
+            briefPath={briefResult.path}
+            variablesPath={variablesResult.variablesPath}
+            topicSlug={topicSlug}
+            designPath={designResult.designPath}
+            onComplete={(paperPath, resultsPath) => {
+              setExecutionResult({ paperPath, resultsPath });
+            }}
+          />
+        ) : null}
+
+        {executionResult ? (
+          <div
+            className="stage-panel__completion"
+            data-testid="final-complete"
+            role="status"
+          >
+            <h2>研究链路完成</h2>
+            <p>
+              paper.pdf:{" "}
+              <code data-testid="final-paper-path">{executionResult.paperPath}</code>
+            </p>
+            <p>
+              results.json:{" "}
+              <code data-testid="final-results-path">
+                {executionResult.resultsPath}
+              </code>
+            </p>
+            <p className="stage-panel__completion-hint">
+              5 tab 走通完成，产物已落盘到项目目录，可以入库。
+            </p>
+          </div>
+        ) : null}
+
         <div className="stage-panel__summary">
           <span>当前阶段</span>
-          <strong>
-            {activeStage === "brief"
-              ? !briefConfirmed
-                ? "确认研究问题和边界"
-                : !planApproved
-                ? "审阅 Supervisor 规划路线"
-                : "Agent 任务排队与真实执行阻断"
-              : "拆解草案信号"}
-          </strong>
-          <p>
-            {activeStage === "brief"
-              ? !briefConfirmed
-                ? "先确认任务书，再决定是否进入递归搜索、数据变量和方法设计。"
-                : !planApproved
-                ? "批准 Supervisor 规划路线后，将自动派发任务队列并阻断在执行前。"
-                : executionStarted
-                ? "真实执行授权已记录，后续由执行器把日志、产物和审计链写回队列。"
-                : "确认真实执行范围后，再进入本地安全沙盒进行统计模型回归。"
-              : "把输入信号拆为变量、方法和证据线索，供后续分析页接收。"}
-          </p>
+          <strong>{STAGE_LABELS[activeStage].label}</strong>
+          <p>{STAGE_LABELS[activeStage].hint}</p>
         </div>
       </section>
     </main>

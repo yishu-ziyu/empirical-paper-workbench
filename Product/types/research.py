@@ -116,10 +116,19 @@ class ExecuteRequest(BaseModel):
 
 
 class ExecuteEvent(BaseModel):
-    """SSE 流式事件。event 类型见 spec §4.5。"""
+    """SSE 流式事件。event 类型见 spec §4.5。
+
+    推理链可视化字段（D2 / Kimi 蜂群IDE 启发）：
+    - prompt: 喂给 LLM 的完整 prompt
+    - raw_output: LLM 返回的原始文本
+    - parsed_output: 落盘后 / 经过 schema 解析的最终 markdown 段
+    """
     event: Literal["start", "progress", "section_done", "paper_ready", "done", "error"]
     stage: str
     message: str
     section_index: Optional[int] = None
     paper_pdf_path: Optional[str] = None
     results_json_path: Optional[str] = None
+    prompt: Optional[str] = None
+    raw_output: Optional[str] = None
+    parsed_output: Optional[str] = None

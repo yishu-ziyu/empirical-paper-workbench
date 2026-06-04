@@ -292,7 +292,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
     // 中止上一次未完成的请求 (防 zombie stream)
     abortRef.current?.abort();
     try {
-      await consumeSse("/api/brief", { topic });
+      await consumeSse("/api/brief/stream", { topic });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         return; // 主动中止, 不算错误
@@ -312,7 +312,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       // 中止上一次未完成的请求 (防 zombie stream)
       abortRef.current?.abort();
       try {
-        const events = await consumeSse("/api/brief/resume", {
+        const events = await consumeSse("/api/brief/stream/resume", {
           topic,
           action,
           user_input: userInput,

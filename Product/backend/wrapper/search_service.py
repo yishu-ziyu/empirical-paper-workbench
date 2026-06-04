@@ -91,7 +91,7 @@ def build_queries(
     Returns:
         list of {"query": str, "rationale": str}
     """
-    from Program.prompts.search.v1 import load_prompt_v1 as _default_loader
+    from Program.prompts.search.v2 import load_prompt_v2 as _default_loader
 
     chat = chat_completion_fn or chat_completion
     loader = prompt_loader or _default_loader

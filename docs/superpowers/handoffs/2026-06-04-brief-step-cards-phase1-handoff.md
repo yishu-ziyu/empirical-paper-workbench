@@ -326,3 +326,73 @@ grep -r "api.minimaxi.com\|api.openai.com" Product/ Program/
 2. 收到后验收 + 派 Subagent 3 (e2e)
 3. e2e green 后派 Subagent 4 (merge + cleanup)
 4. 所有 commit 合并后通知用户验收
+
+---
+
+## 11. Subagent 3 验证报告 (2026-06-05 早, mock LLM 模式)
+
+### 11.1 验收结果: 3/3 GREEN (mock LLM, 1.4-1.5s/次)
+
+| Run | 结果 | 时长 | 触发动作 |
+|-----|------|------|----------|
+| 1 | FAIL | 30s | `BASE_URL` 缺 `/react/` 尾 slash → 404 |
+| 2 | FAIL | 90s | URL 修了, 但 spec 在 step-3-continue 后查 step-card-3 done 错位 (onComplete 卸载 BriefPanel) |
+| 3 | FAIL | 90s | 改去查 brief-result, 但它在 BriefPanel 内, search tab 不渲染 |
+| 4-6 | **PASS** | 1.4-1.5s | 把 brief-result 改在 view-saved-brief 切回 brief tab 之后查 step-card-3 可见性 |
+
+### 11.2 CORS + 绝对 URL fix 验证
+
+uvicorn log 显示 14 次 OPTIONS `/api/brief/stream` + `/api/brief/stream/resume` 全部 **200 OK**, 证明 CORSMiddleware + VITE_API_BASE_URL 修复工作。
+
+### 11.3 关键发现: 真实 MiniMax key 不支持 streaming (硬阻塞)
+
+Subagent 3 直接 curl `https://api.minimaxi.com/anthropic/v1/messages` 验证:
+- `stream=False` + sk-cp-08_... key → **200 OK**
+- `stream=True` + 同一个 key → **401** `"login fail: Please carry the API secret key"`
+
+ANTHROPIC_AUTH_TOKEN 和 .env.local 的 MINIMAX_API_KEY 是同一个 key (125 字符), 都不支持 streaming. brief_stream_service 强依赖 streaming, 因此 e2e 跑真 LLM 在当前 key 下**永远 401**.
+
+**Subagent 4 派活前需要新 streaming 兼容 key, 或者前端降级到轮询**.
+
+### 11.4 mock LLM 跑法 (供后续真 LLM key 拿到前的 e2e 验证)
+
+```bash
+# 1. 启动 mock uvicorn (monkey-patch chat_completion_stream)
+cd /Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板/.claude/worktrees/brief-step-cards
+PYTHONPATH=. python /tmp/uvicorn_with_mock.py
+
+# 2. 启动 vite dev server
+cd Product/web-react && npm run dev -- --port 5173
+
+# 3. 跑 e2e
+cd Product/web-react
+E2E_BASE_URL=http://127.0.0.1:5173/react/ npx playwright test e2e/brief-step-cards.spec.ts
+```
+
+**注意**: `/tmp/uvicorn_with_mock.py` **不要提交到 worktree** (它不是产品代码).
+
+### 11.5 已知 Bug (留给 Phase 1 后续, **不要在 Subagent 4 merge 阶段修**)
+
+- **BriefPanel state restoration bug**: view-saved-brief 切回 brief tab 时, step 3 仍显示 "等你决策" 而不是 "完成". `finalBrief` 没从 snapshot 还原. 已在 e2e 注释里标注.
+
+### 11.6 Subagent 3 commit (HEAD: 5052997)
+
+- `5052997 test(e2e): fix brief-step-cards spec for new vite /react/ base + tab-onComplete flow` (3 spec bugs fixed)
+
+完整 13 commits:
+```
+5052997 test(e2e): fix brief-step-cards spec
+3da9237 fix(sse-proxy): backend CORS + frontend absolute URL
+701a36e refactor(api+wrapper): Phase A decoupling cleanup
+e9596fe fix(web): BriefPanel SSE endpoint path alignment
+e3a5cd6 fix(prompts): restore v4.md academic-prose style
+d16df12 feat(api): add /api/brief/stream + /api/brief/stream/resume SSE endpoints
+088e83b docs(handoff): append Subagent 2 final report
+72e5484 feat(wrapper): restore brief_stream_service.py from pyc disassembly
+29540fe feat(llm_client): add chat_completion_stream as single LLM streaming entry point
+be873c6 fix(web): persist brief step snapshot across tab navigation
+2be69c2 fix(web): step_done always wins over awaiting
+8344134 fix(web): render step body via react-markdown + strip LLM template markers
+11c783e docs(handoff): update with skill inventory findings
+eb1852b docs(handoff): brief-step-cards phase 1 + skill integration handoff
+```

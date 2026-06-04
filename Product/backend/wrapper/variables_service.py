@@ -8,7 +8,9 @@
 5. run_variables — 端到端入口（API 层调用）
 
 约定：
-- LLM 调用走 `Product.backend.llm_client.chat_completion`（真实 MiniMax-M3）
+- LLM 调用走 `Product.backend.llm_client.chat_completion`
+  → provider_id="minimax", model="MiniMax-M3" (Anthropic-compatible)
+  参考: ~/Desktop/AI组件工作流库/components/minimax-token-plan-real-service/WORKFLOW.md
 - test 时用 `unittest.mock.patch("Product.backend.wrapper.variables_service.chat_completion", ...)`
 - 产物路径: Tasks/{topic_slug}/variables.yaml
 """
@@ -121,7 +123,7 @@ def build_mapping(
     prompt_loader: Callable[[], str],
     *,
     model: str = "MiniMax-M3",
-    provider_id: str = "openrouter",
+    provider_id: str = "minimax",
     temperature: float = 0.3,
 ) -> list[Variable]:
     """调 LLM 解析 schema + brief → list[Variable]。
@@ -234,7 +236,7 @@ def write_variables(
         {
             "topic": topic,
             "topic_slug": topic_slug,
-            "generated_by": "variables-llm-m3",
+            "generated_by": "variables-llm-minimax",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "model": model,
             "prompt_version": prompt_version,

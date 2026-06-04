@@ -94,6 +94,19 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
         requires_api_key=False,
         doc="Custom endpoint",
     ),
+    "minimax": ProviderPreset(
+        id="minimax",
+        name="MiniMax Token Plan",
+        api_type="anthropic-compatible",
+        base_url="https://api.minimaxi.com/anthropic",
+        default_model="MiniMax-M3",
+        models=("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5"),
+        api_key_env="MINIMAX_TOKEN_PLAN_KEY",
+        doc=(
+            "MiniMax Token Plan via Anthropic-compatible protocol. "
+            "Reference: ~/Desktop/AI组件工作流库/components/minimax-token-plan-real-service/WORKFLOW.md"
+        ),
+    ),
 }
 
 

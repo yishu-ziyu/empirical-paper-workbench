@@ -215,6 +215,12 @@ from Product.api.execute import router as execute_router  # noqa: E402
 app.include_router(execute_router)
 
 
+# ── 5-tab routers (L1-L5 各自 register 自己的) ─────────────────────────────
+# L2-search owns /api/search
+from Product.api.search import router as search_router  # noqa: E402
+app.include_router(search_router)
+
+
 def error_response(status_code: int, code: str, message: str, details: dict | None = None) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,

@@ -1,6 +1,6 @@
 """Wrapper services for 5-tab vertical slice.
 
-Each tab (brief / search / variables / design / execution) has its own
-`*_service.py` module exposing build/write/verify functions that wrap the
-existing 40+ backend services and `llm_client.chat_completion`.
+每个 tab (brief / search / variables / design / execute) 一个 service:
+`*_service.py` 暴露 build/write/verify 函数，包装现有 40+ backend services
+和 `llm_client.chat_completion`。
 """

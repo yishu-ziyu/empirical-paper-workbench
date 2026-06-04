@@ -6,30 +6,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-# Re-export event / request types from the wrapper so callers can
-# `from Product.api.brief_stream import BriefEvent, BriefResumeRequest`.
+from Product.api._paths import TASKS_ROOT
 from Product.backend.wrapper.brief_stream_service import (
     BriefEvent,
     BriefResumeRequest,
     resume_brief_stream,
     run_brief_stream,
 )
-
-# `BriefRequest` is the wire-format request model for the initial POST.
-# It already exists in Product.types.research and matches the simple
-# {"topic": str, "topic_slug"?: str} payload the stream endpoint needs.
 from Product.types.research import BriefRequest
 
 router = APIRouter()
-
-# 落盘到 repo 根的 Tasks/ 目录 (与 /api/brief 保持一致)
-_TASKS_ROOT = Path(__file__).resolve().parents[2] / "Tasks"
 
 
 def _sse_format(event_dict: dict) -> str:
@@ -48,7 +39,7 @@ async def _stream_resume(req: BriefResumeRequest) -> AsyncIterator[str]:
         action=req.action,
         prior_steps=req.prior_steps,
         user_input=req.user_input,
-        tasks_root=_TASKS_ROOT,
+        tasks_root=TASKS_ROOT,
     ):
         yield _sse_format(event.model_dump())
 

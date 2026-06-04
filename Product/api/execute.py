@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -24,10 +23,8 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 # 仓库根目录：Manuscripts / Results / Tasks 直接放在 repo 根
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-MANUSCRIPTS_ROOT = _REPO_ROOT / "Manuscripts"
-RESULTS_ROOT = _REPO_ROOT / "Results"
-TASKS_ROOT = _REPO_ROOT / "Tasks"
+# 统一从 Product.api._paths 导入 (后端解耦审计 Phase A M2)
+from Product.api._paths import MANUSCRIPTS_ROOT, RESULTS_ROOT, TASKS_ROOT  # noqa: E402
 
 
 @router.post("/api/execute")

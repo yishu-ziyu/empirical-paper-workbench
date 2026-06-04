@@ -1,8 +1,11 @@
 import { useState, useRef } from "react";
 import { Play, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { ReasoningChainView } from "./ReasoningChainView";
 
-/** ExecuteEvent 6 种类型 + 必要字段（与 Product/types/research.py 一致） */
+/** ExecuteEvent 6 种类型 + 必要字段（与 Product/types/research.py 一致）
+ *  推理链字段（D2）：prompt/raw_output/parsed_output —— 由 section_done 事件携带
+ */
 export type ExecuteEventType =
   | "start"
   | "progress"
@@ -18,6 +21,9 @@ export interface ExecuteEvent {
   section_index?: number | null;
   paper_pdf_path?: string | null;
   results_json_path?: string | null;
+  prompt?: string | null;
+  raw_output?: string | null;
+  parsed_output?: string | null;
 }
 
 export interface ExecutionPanelProps {
@@ -92,6 +98,10 @@ export function ExecutionPanel({
   const [statusStage, setStatusStage] = useState<string>("idle");
   const [paperPath, setPaperPath] = useState<string | null>(null);
   const [resultsPath, setResultsPath] = useState<string | null>(null);
+  /** 推理链数据：每节 section_done 事件注入 prompt/raw_output/parsed_output。 */
+  const [reasoningChains, setReasoningChains] = useState<
+    Record<number, { prompt: string; rawOutput: string; parsedOutput: string }>
+  >({});
   const completedRef = useRef(false);
   // Mirror paperPath in a ref so the SSE callback (closed over handleStart's
   // initial scope) can read the latest value when the `done` event fires.
@@ -102,6 +112,7 @@ export function ExecutionPanel({
     setRunning(true);
     setError(null);
     setSections({});
+    setReasoningChains({});
     setPaperPath(null);
     setResultsPath(null);
     completedRef.current = false;
@@ -127,6 +138,17 @@ export function ExecutionPanel({
         setStatusStage(evt.stage);
         if (evt.event === "section_done" && evt.section_index != null) {
           setSections((prev) => ({ ...prev, [evt.section_index as number]: evt }));
+          // 推理链捕获（D2）：prompt/raw_output/parsed_output 三件套
+          if (evt.prompt || evt.raw_output || evt.parsed_output) {
+            setReasoningChains((prev) => ({
+              ...prev,
+              [evt.section_index as number]: {
+                prompt: evt.prompt ?? "",
+                rawOutput: evt.raw_output ?? "",
+                parsedOutput: evt.parsed_output ?? "",
+              },
+            }));
+          }
         } else if (evt.event === "paper_ready" && evt.paper_pdf_path) {
           setPaperPath(evt.paper_pdf_path);
           paperPathRef.current = evt.paper_pdf_path;
@@ -231,6 +253,35 @@ export function ExecutionPanel({
         })}
       </ol>
 
+      {/* D2 推理链可视化：每节一次，section_done 事件注入三件套。默认折叠。 */}
+      {Object.keys(reasoningChains).length > 0 ? (
+        <div className="execution-panel__chains" data-testid="execute-reasoning-chains">
+          {Object.entries(reasoningChains)
+            .sort(([a], [b]) => Number(a) - Number(b))
+            .map(([idxStr, chain]) => {
+              const idx = Number(idxStr);
+              const title = SECTION_TITLES[idx] ?? `Section ${idx}`;
+              return (
+                <details
+                  key={idx}
+                  className="execution-panel__chain-block"
+                  data-testid={`execute-chain-block-${idx}`}
+                >
+                  <summary className="execution-panel__chain-summary">
+                    {title} · 推理链
+                  </summary>
+                  <ReasoningChainView
+                    sectionIndex={idx}
+                    prompt={chain.prompt}
+                    rawOutput={chain.rawOutput}
+                    parsedOutput={chain.parsedOutput}
+                  />
+                </details>
+              );
+            })}
+        </div>
+      ) : null}
+
       {allSectionsDone && paperPath && (
         <div
           className="execution-panel__result"
@@ -258,6 +309,26 @@ export function ExecutionPanel({
           display: flex;
           flex-direction: column;
           gap: 1rem;
+        }
+        .execution-panel__chains {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .execution-panel__chain-block {
+          background: #f3f4f6;
+          border-radius: 6px;
+          padding: 0.4rem 0.6rem;
+        }
+        .execution-panel__chain-summary {
+          cursor: pointer;
+          font-size: 0.85rem;
+          color: #1f2937;
+          font-weight: 500;
+          list-style: none;
+        }
+        .execution-panel__chain-summary::-webkit-details-marker {
+          display: none;
         }
         .execution-panel__header h2 {
           margin: 0;

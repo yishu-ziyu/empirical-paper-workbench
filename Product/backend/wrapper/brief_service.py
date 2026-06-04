@@ -115,9 +115,9 @@ def run_brief(req: BriefRequest, tasks_root: Path) -> BriefResponse:
     Returns:
         BriefResponse (含 brief_markdown, brief_path, verdict_passed)
     """
-    from Program.prompts.brief.v1 import load_prompt_v1
+    from Program.prompts.brief.v2 import load_prompt_v2
 
-    content = build_brief(req.topic, load_prompt_v1)
+    content = build_brief(req.topic, load_prompt_v2)
     slug = req.topic_slug or _slugify(req.topic)
     path = write_brief(content, req.topic, slug, tasks_root)
     return BriefResponse(

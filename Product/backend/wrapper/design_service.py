@@ -138,7 +138,7 @@ def build_candidates(
     - prompt_loader: 加载 design prompt 模板
     """
     if prompt_loader is None:
-        from Program.prompts.design.v1 import load_prompt_v1 as _loader
+        from Program.prompts.design.v2 import load_prompt_v2 as _loader
         prompt_loader = _loader
 
     variables_yaml = yaml.safe_dump(

@@ -91,6 +91,7 @@ FastAPI (Product/app.py, :8765)
 - 已有 91K pipeline 跑通的部分（执行实验）**不动核心逻辑**，只包 endpoint
 - 长任务用 SSE 流式返回进度
 - 5 tab 状态串接：每个 tab 写一个文件，下一个 tab 读它当输入
+- **LLM 唯一真实模型：MiniMax M3**（不是 Claude/OpenAI/Kimi）。`Product/backend/llm_client.py` 里列的 9 个 model label（`claude-opus-4-6` / `claude-sonnet-4-6` / `claude-haiku-4-5` / `gpt-4o` / `kimi-for-coding` 等）**都是 M3 的 alias**。spec 中所有 LLM 调用统一走 `llm_client.py` 的 `MiniMax-M3` 入口。不存在"轻 tab 走轻模型 / 重 tab 走重模型"的 tier 策略
 
 ### 3.3 5 tab 的工作流串接
 ```
@@ -159,7 +160,13 @@ FastAPI (Product/app.py, :8765)
 | 方法设计 | 3 轮 | DID/IV/RD 解释深度、代码 stub 可执行性 |
 | 论文 9 节写作 | **4 轮** | 每节 prompt 各 1 轮 + 整体连贯性 1 轮（最关键）|
 
-**总成本预算**：~15 轮 prompt 迭代 × 5 USD/轮 ≈ **75 USD 上限**（实际可能 30-50 USD）。每次迭代结束打印 token 计数。
+**总成本预算**：~15 轮 prompt 迭代 × ~1.5 USD/轮 ≈ **25 USD 上限**（实际可能 8-15 USD）。M3 单档定价（待 Day 1 探明精确值，placeholder 按 Sonnet 4.6 档估算）。每次迭代结束打印 token 计数。
+
+**verdict 红了怎么办**（重要 — 没有 tier 切换退路）：
+- 唯一手段是**继续调 M3 prompt**（M3 一档，没有"换模型"这条路）
+- 4 轮内未达标 → 标黄但**仍交付**（让用户 PM 视角判断"模板感"是否可接受）
+- 9 节论文若整篇 M3 4 轮仍红 → 接受"模板感"上限，不强求 Opus 级（如果未来用户接入真 Opus，可重跑历史 topic）
+- 计入 DoD：每 LLM tab 的"未达标节"清单 + 用户决策记录入 `Tasks/{topic}/quality_decisions.md`
 
 **Prompt 版本管理**：
 - 每个 prompt 模板存 `Program/prompts/{tab}/{tab}_v{N}.md`（带 commit）
@@ -205,7 +212,7 @@ topic: 工业机器人对城市制造业就业结构的影响——基于 CFPS 2
 topic_slug: industrial-robots-cfps-2010-2022
 generated_by: brief+arxiv+llm-rerank
 timestamp: 2026-06-04T05:30:00Z
-model: claude-opus-4-6
+model: MiniMax-M3            # 唯一真实模型; llm_client.py 中其他 label 都是 alias
 prompt_version: v1.2
 seed_query: brief.md
 upstream:
@@ -321,7 +328,7 @@ Day 7: 修 + 文档 + DoD 验收
 - [ ] 5 个 tab 产物都入库到 `Tasks/{topic}/` + `Manuscripts/{topic}/` + `Results/{topic}/`
 - [ ] 第二天能 re-run 拿到等价结果（不是逐字相同，但 9 节结构、关键发现、变量选择一致）
 - [ ] 每个 LLM tab 的 prompt 已按 §4.6 预算迭代到对应轮数（任务书 2 / 搜索 2 / 变量 3 / 设计 3 / 写作 4）
-- [ ] Token 成本打印出来给用户看，且 ≤ §4.6 预算上限
+- [ ] Token 成本打印出来给用户看，且 ≤ 25 USD（§4.6 M3 单档预算）
 - [ ] 用户 PM 视角验收过
 
 ---
@@ -333,6 +340,8 @@ Day 7: 修 + 文档 + DoD 验收
 3. 之前 91K pipeline 跑出的 paper.pdf 在 `Manuscripts/industrial-robots-cfps-2010-2022/` 吗？要拿来做模板还是覆盖？
 4. `Product/backend/` 40 个 service 哪些可以 import，哪些是 stub？
 5. 后端 SSE 基础设施（如果有）能复用吗？
+6. **MiniMax M3 真实定价**（input/output 每 MTok 各多少）？当前 §4.6 预算 25 USD 是按 Sonnet 4.6 档 placeholder 估的，差 3-5 倍就可能需要重新定预算
+7. **M3 调用入口**：在 `llm_client.py` 里应该用哪个具体的 model 字符串？是 `MiniMax-M3` 还是某个 label 才会路由到 M3？需 Day 1 跑一个最小测试确认
 
 ---
 

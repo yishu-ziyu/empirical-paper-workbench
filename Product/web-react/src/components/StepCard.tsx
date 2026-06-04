@@ -19,6 +19,7 @@ export interface StepCardProps {
   onContinue?: () => void;
   onModify?: (userInput: string) => void;
   onReselect?: () => void;
+  disabled?: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export function StepCard({
   onContinue,
   onModify,
   onReselect,
+  disabled = false,
 }: StepCardProps) {
   const [showModifyInput, setShowModifyInput] = useState(false);
   const [userInput, setUserInput] = useState("");
@@ -101,6 +103,7 @@ export function StepCard({
                 type="button"
                 className="btn btn--primary"
                 onClick={onContinue}
+                disabled={disabled}
                 data-testid="step-3-continue"
               >
                 <Check size={14} /> 继续
@@ -108,7 +111,8 @@ export function StepCard({
               <button
                 type="button"
                 className="btn"
-                onClick={() => setShowModifyInput(true)}
+                onClick={() => !disabled && setShowModifyInput(true)}
+                disabled={disabled}
                 data-testid="step-3-modify"
               >
                 <Edit3 size={14} /> 修改
@@ -117,6 +121,7 @@ export function StepCard({
                 type="button"
                 className="btn btn--ghost"
                 onClick={onReselect}
+                disabled={disabled}
                 data-testid="step-3-reselect"
               >
                 <RotateCcw size={14} /> 重选
@@ -130,6 +135,7 @@ export function StepCard({
                 onChange={(e) => setUserInput(e.target.value)}
                 placeholder="告诉 LLM 怎么调整这 3 个贡献点…"
                 rows={3}
+                disabled={disabled}
                 data-testid="step-3-modify-input"
                 className="step-card__textarea"
               />
@@ -137,8 +143,8 @@ export function StepCard({
                 <button
                   type="button"
                   className="btn btn--primary"
-                  disabled={!userInput.trim()}
-                  onClick={() => onModify?.(userInput.trim())}
+                  disabled={disabled || !userInput.trim()}
+                  onClick={() => !disabled && onModify?.(userInput.trim())}
                   data-testid="step-3-modify-submit"
                 >
                   提交修改
@@ -147,9 +153,11 @@ export function StepCard({
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => {
+                    if (disabled) return;
                     setShowModifyInput(false);
                     setUserInput("");
                   }}
+                  disabled={disabled}
                 >
                   取消
                 </button>

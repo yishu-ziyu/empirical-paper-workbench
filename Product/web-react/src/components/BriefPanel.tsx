@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StepCard, type StepStatus } from "./StepCard";
 
 export interface BriefResult {
@@ -34,6 +34,10 @@ const INITIAL_STEPS: Record<1 | 2 | 3 | 4, StepState> = {
   4: { status: "pending", title: STEP_TITLES[4], liveText: "", summary: "" },
 };
 
+function isStepIndex(n: unknown): n is 1 | 2 | 3 | 4 {
+  return n === 1 || n === 2 || n === 3 || n === 4;
+}
+
 interface BriefSseEvent {
   event: string;
   step_index?: number;
@@ -67,6 +71,15 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
   // 保存 step 1-3 输出, 供 /resume 用
   const priorStepsRef = useRef<Record<string, string>>({});
   const abortRef = useRef<AbortController | null>(null);
+  // 防止 step 3 按钮被双击 → 多次 POST /api/brief/resume
+  const [resumeInFlight, setResumeInFlight] = useState(false);
+
+  // 组件卸载时中止未完成的 SSE 请求, 避免在已卸载组件上 setState
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const updateStep = useCallback(
     (idx: 1 | 2 | 3 | 4, patch: Partial<StepState>) => {
@@ -78,6 +91,8 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
   const consumeSse = useCallback(
     async (url: string, body: object): Promise<BriefSseEvent[]> => {
       const collected: BriefSseEvent[] = [];
+      // 中止上一次未完成的请求, 避免 zombie stream 污染新 state
+      abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       const res = await fetch(url, {
@@ -95,19 +110,42 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          // 刷新 decoder 里残留的 UTF-8 字节
+          buffer += decoder.decode();
+          break;
+        }
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split("\n\n");
         buffer = parts.pop() || "";
         for (const part of parts) {
-          const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
-          if (!dataLine) continue;
+          // SSE spec: 同一事件可有多个 data: 行, 用 \n 拼接
+          const dataLines = part.split("\n").filter((l) => l.startsWith("data: "));
+          if (dataLines.length === 0) continue;
+          const payload = dataLines.map((l) => l.slice(6)).join("\n");
           try {
-            const evt: BriefSseEvent = JSON.parse(dataLine.slice(6));
+            const evt: BriefSseEvent = JSON.parse(payload);
             collected.push(evt);
             applyEvent(evt);
           } catch {
             // ignore malformed
+          }
+        }
+      }
+      // Flush remaining buffered partial event (no trailing \n\n)
+      const finalTail = buffer.trim();
+      if (finalTail) {
+        const dataLines = finalTail
+          .split("\n")
+          .filter((l) => l.startsWith("data: "));
+        if (dataLines.length > 0) {
+          const payload = dataLines.map((l) => l.slice(6)).join("\n");
+          try {
+            const evt: BriefSseEvent = JSON.parse(payload);
+            collected.push(evt);
+            applyEvent(evt);
+          } catch {
+            // ignore malformed tail
           }
         }
       }
@@ -121,7 +159,8 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
     (evt: BriefSseEvent) => {
       switch (evt.event) {
         case "step_start": {
-          const idx = evt.step_index as 1 | 2 | 3 | 4;
+          const idx = evt.step_index;
+          if (!isStepIndex(idx)) return;
           updateStep(idx, {
             status: "running",
             title: evt.title || STEP_TITLES[idx],
@@ -130,7 +169,8 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
         }
         case "step_delta": {
-          const idx = evt.step_index as 1 | 2 | 3 | 4;
+          const idx = evt.step_index;
+          if (!isStepIndex(idx)) return;
           setSteps((prev) => ({
             ...prev,
             [idx]: {
@@ -141,16 +181,17 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
         }
         case "step_done": {
-          const idx = evt.step_index as 1 | 2 | 3 | 4;
+          const idx = evt.step_index;
+          if (!isStepIndex(idx)) return;
+          // 在 setState 之前捕获 liveText (reducer 应当是纯的)
+          const captured = steps[idx].liveText;
+          priorStepsRef.current[String(idx)] = captured;
           updateStep(idx, { status: "done", summary: evt.summary || "" });
-          setSteps((prev) => {
-            priorStepsRef.current[String(idx)] = prev[idx].liveText;
-            return prev;
-          });
           break;
         }
         case "await_user": {
-          const idx = evt.step_index as 1 | 2 | 3 | 4;
+          const idx = evt.step_index;
+          if (!isStepIndex(idx)) return;
           updateStep(idx, { status: "awaiting" });
           setPhase("awaiting");
           break;
@@ -165,18 +206,20 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         }
         case "done": {
           setPhase("completed");
+          setResumeInFlight(false);
           break;
         }
         case "error": {
           setError(evt.message || "未知错误");
           setPhase("error");
+          setResumeInFlight(false);
           break;
         }
         default:
           break;
       }
     },
-    [updateStep]
+    [updateStep, steps]
   );
 
   const handleStart = useCallback(async () => {
@@ -185,17 +228,29 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
     setSteps(INITIAL_STEPS);
     setFinalBrief(null);
     priorStepsRef.current = {};
+    setResumeInFlight(false);
+    // 中止上一次未完成的请求 (防 zombie stream)
+    abortRef.current?.abort();
     try {
       await consumeSse("/api/brief", { topic });
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return; // 主动中止, 不算错误
+      }
       setError(err instanceof Error ? err.message : String(err));
       setPhase("error");
+      setResumeInFlight(false);
     }
   }, [topic, consumeSse]);
 
   const handleResume = useCallback(
     async (action: "continue" | "modify" | "reselect", userInput?: string) => {
+      // 防止双击 → 多个 POST /resume 竞态
+      if (resumeInFlight) return;
+      setResumeInFlight(true);
       setPhase("running");
+      // 中止上一次未完成的请求 (防 zombie stream)
+      abortRef.current?.abort();
       try {
         const events = await consumeSse("/api/brief/resume", {
           topic,
@@ -208,11 +263,16 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           onComplete({ markdown: final.markdown || "", path: final.brief_path || "" });
         }
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return; // 主动中止, 不算错误
+        }
         setError(err instanceof Error ? err.message : String(err));
         setPhase("error");
+      } finally {
+        setResumeInFlight(false);
       }
     },
-    [topic, consumeSse, onComplete]
+    [topic, consumeSse, onComplete, resumeInFlight]
   );
 
   return (
@@ -261,6 +321,7 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
               onContinue={() => handleResume("continue")}
               onModify={(userInput) => handleResume("modify", userInput)}
               onReselect={() => handleResume("reselect")}
+              disabled={resumeInFlight}
             />
           ))}
         </div>

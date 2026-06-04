@@ -199,6 +199,18 @@ app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
 
+# 5-tab vertical slice routers (L1-L5)
+from Product.api.design import router as design_router  # noqa: E402
+app.include_router(design_router)
+
+# L3-variables: 数据变量 (Variables) tab
+from Product.api.variables import router as variables_router  # noqa: E402
+app.include_router(variables_router)
+
+# L5-execution: 执行实验 (Execution) tab - SSE endpoint
+from Product.api.execute import router as execute_router  # noqa: E402
+app.include_router(execute_router)
+
 
 def error_response(status_code: int, code: str, message: str, details: dict | None = None) -> JSONResponse:
     return JSONResponse(
@@ -1864,14 +1876,22 @@ def api_orchestrate_project(slug: str, mode: str = "dry-run") -> dict:
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(WEB_ROOT / "index.html")
-
-
 @app.get("/react")
 @app.get("/react/")
-def react_index() -> FileResponse:
+def index() -> FileResponse:
+    # `/` now serves the React build (topic-first intake screen).
+    # `/react` and `/react/` are kept as backward-compatible aliases.
     index_path = WEB_DIST_ROOT / "index.html"
     if not index_path.exists():
-        raise HTTPException(status_code=404, detail="React preview has not been built. Run npm run build in Product/web-react.")
+        raise HTTPException(
+            status_code=404,
+            detail="React build is missing. Run `npm run build` in Product/web-react.",
+        )
     return FileResponse(index_path)
+
+
+@app.get("/legacy")
+@app.get("/legacy/")
+def legacy_index() -> FileResponse:
+    # Old multi-nav workbench kept reachable in case anything depends on it.
+    return FileResponse(WEB_ROOT / "index.html")

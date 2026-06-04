@@ -518,10 +518,16 @@ class M3ModelPathTests(unittest.TestCase):
         self.assertIn("missing", result.detail.lower())
 
     def test_bdd_check_m3_model_path_handles_single_quote_provider_id(self) -> None:
-        """行为 8b-e: provider_id='minimax' (单引号) 也算 PASS."""
+        """行为 8b-e: provider_id='minimax' (单引号) 也算 PASS.
+
+        AST-based check (2026-06-04) 接受两种引号, 因为 ast.Constant.value 不分引号。
+        """
         path = self.tmp_path / "brief_service.py"
+        # 用合法 Python 写一个调用, 单引号字符串, AST 能解析
         path.write_text(
-            "provider_id='minimax'\n"
+            '"""Mock wrapper."""\n'
+            "_PROVIDER_ID = 'minimax'\n"
+            "chat_completion(provider_id='minimax', model='MiniMax-M3')\n"
         )
         for name in ("search", "variables", "design", "execute"):
             self._write_wrapper(name)

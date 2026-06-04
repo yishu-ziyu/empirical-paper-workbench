@@ -40,5 +40,16 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
 - section_lit v2 (2026-06-04): 4 段（背景/分组/缺口/衔接），强制"衔接到 §1"。
 - section_institution v2 (2026-06-04): 3 段（制度/采集/时间线），简化为聚焦数据集背景。
 - section_conclusion v2 (2026-06-04): 4 段（发现/政策/局限/未来），加"与 §1 引言一一对应"硬约束。
+- v3 (2026-06-04): 关键 4 节 (intro/results/robust/strategy) 加 evidence binding 硬约束。
+  每节 prompt 末尾追加「必须显式引用 results_evidence_package.json 里的 evidence_id (≥1 处)」，
+  避免模型用 placeholder 数字 (Phase 7 P3 痛点：回归系数凭空写)。
+  旧 v1/v2 仍可访问 (向后兼容未升级的节)。
+- v4 (2026-06-04): 关键 4 节 (intro/results/robust/strategy) 加 identification-audit 联动 (D3 6th tab)。
+  - intro: 末尾"研究设计"段必须点名 identification strategy (DID/IV/RDD/PSM) + 写明一句话
+    识别假设 (e.g. "平行趋势假设", "排他性约束")
+  - results: 异质性段后追加一段"对识别假设的回应证据" (e.g. "pre-trend p 值 0.42 > 0.1，支持平行趋势")
+  - robust: 第 1 段后追加"identification falsification list" — 至少 2 个直接针对识别假设的反事实检验
+    (e.g. placebo / leave-one-out / 弱 IV 的 Anderson-Rubin CI)
+  - strategy: 第 4 段"稳健性安排"后追加"识别假设的 refutability" — 一句话讲该假设可被哪种证据推翻
 - section_refs: 暂不升级 (v1 输出格式已稳定，再调 ROI 低)。
-- execute_service: 优先 v2 loader，fallback v1（向后兼容未升级的节）。
+- execute_service: loader 链: v4 → v3 → v2 → v1 (向后兼容未升级的节)。

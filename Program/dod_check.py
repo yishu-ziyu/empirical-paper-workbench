@@ -358,10 +358,16 @@ def check_m3_model_path(wrapper_dir: Path) -> DoDItem:
 
     行为:
     - 检查 Product/backend/wrapper/ 下 5 个 *_service.py 文件
-    - 每个文件必须显式使用 provider_id="minimax" (M3 Token Plan 唯一真实 provider)
+    - 每个文件的 provider_id 必须解析为 "minimax" (M3 Token Plan 唯一真实 provider)
+    - 接受两种写法: (a) 字面量 provider_id="minimax"  (b) 常量 provider_id=_PROVIDER 且
+      文件内 _PROVIDER = "minimax"
     - 任何 wrapper 还在用 openrouter / openai / anthropic / kimi 等 → FAIL
     - 缺文件 → FAIL
+
+    设计: 用 ast 解析, 避免 grep 误判 (注释/docstring 里的字符串 / 老代码残留)。
     """
+    import ast
+
     wrapper_files = {
         tab: wrapper_dir / f"{tab}_service.py"
         for tab in TAB_NAMES
@@ -377,16 +383,79 @@ def check_m3_model_path(wrapper_dir: Path) -> DoDItem:
             detail=f"missing wrapper services: {missing}",
         )
 
-    # grep 每个 wrapper: 必须有 provider_id="minimax" 且不能有 openrouter/openai/anthropic
+    bad_providers = ("openrouter", "openai", "anthropic", "kimi", "claude", "gpt-")
+
+    def _providers_used(tree: ast.AST) -> set[str]:
+        """从 AST 里提取所有 provider_id 关键字参数实际取值.
+        支持字面量 ("minimax") / 模块顶层常量 / 函数参数默认值 三种来源.
+        """
+        # 1. 收 module-level 字符串赋值: _PROVIDER = "minimax" → {"_PROVIDER": "minimax"}
+        consts: dict[str, str] = {}
+        for node in getattr(tree, "body", []):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                tgt = node.targets[0]
+                if isinstance(tgt, ast.Name) and isinstance(node.value, ast.Constant):
+                    if isinstance(node.value.value, str):
+                        consts[tgt.id] = node.value.value
+
+        # 2. 收 function 参数默认值: def f(*, provider_id="minimax") → {"provider_id": "minimax"}
+        # 也支持: def f(*, provider_id=DEFAULT_PROVIDER) (Name 引用模块常量)
+        param_defaults: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            args = node.args
+            all_args = list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)
+            all_defaults = list(args.defaults) + [None] * (len(args.posonlyargs) + len(args.args) - len(args.defaults)) + list(args.kw_defaults)
+            for a, d in zip(all_args, all_defaults):
+                if a.arg in ("provider_id",) and d is not None:
+                    if isinstance(d, ast.Constant) and isinstance(d.value, str):
+                        param_defaults[a.arg] = d.value
+                    elif isinstance(d, ast.Name) and d.id in consts:
+                        param_defaults[a.arg] = consts[d.id]
+
+        # 3. 找 chat_completion(..., provider_id=...) 调用, 取字面量/常量/参数默认值
+        found: set[str] = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            for kw in node.keywords:
+                if kw.arg != "provider_id":
+                    continue
+                v = kw.value
+                if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                    found.add(v.value)
+                elif isinstance(v, ast.Name):
+                    if v.id in consts:
+                        found.add(consts[v.id])
+                    elif v.id in param_defaults:
+                        found.add(param_defaults[v.id])
+        return found
+
     wrong_provider: list[str] = []
     for tab, path in wrapper_files.items():
         text = path.read_text(encoding="utf-8")
-        if 'provider_id="minimax"' not in text and "provider_id='minimax'" not in text:
-            wrong_provider.append(f"{tab}:no-minimax")
-        # 防御性: 如果还有 openrouter/openai/anthropic 标记 → 标红
-        for bad in ("openrouter", "openai", "anthropic"):
-            if bad in text.lower() and 'provider_id="minimax"' not in text:
-                wrong_provider.append(f"{tab}:contains-{bad}")
+        try:
+            tree = ast.parse(text)
+        except SyntaxError as exc:
+            wrong_provider.append(f"{tab}:syntax-error")
+            continue
+        used = _providers_used(tree)
+        # Fallback: AST 找不到 call 但文本里有字面量 provider_id="minimax" — 仍算 PASS
+        # (覆盖测试 fixture 形式, 也允许"显式声明但尚未调 LLM"的早期 wrapper 草稿)
+        if not used:
+            if 'provider_id="minimax"' in text or "provider_id='minimax'" in text:
+                used = {"minimax"}
+            else:
+                wrong_provider.append(f"{tab}:no-provider_id-call")
+                continue
+        if "minimax" not in used:
+            wrong_provider.append(f"{tab}:providers={sorted(used)}")
+            continue
+        # 防御性: 还有别的 provider 混用 → 标红
+        for bad in bad_providers:
+            if any(bad in p for p in used):
+                wrong_provider.append(f"{tab}:mixes-{bad}-with-minimax")
                 break
 
     if wrong_provider:

@@ -1,6 +1,23 @@
 import { Check, Edit3, Loader2, X, RotateCcw } from "lucide-react";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "../lib/cn";
+
+/**
+ * Strip LLM-leaked template markers from streaming/final text:
+ *  - `### 步骤 N: title`  (v4 prompt header the model sometimes echoes)
+ *  - `---`               (markdown horizontal rules)
+ *  - leading/trailing whitespace
+ *
+ * 渲染前调用, 保证 ReactMarkdown 不会把 `### 步骤 3` 当成 H3 显示.
+ */
+export function stripTemplateMarkers(s: string): string {
+  return s
+    .replace(/^###\s*步骤\s*\d+[^\n]*$/gm, "")
+    .replace(/^---\s*$/gm, "")
+    .replace(/^\s+|\s+$/g, "");
+}
 
 export type StepStatus =
   | "pending"
@@ -86,11 +103,22 @@ export function StepCard({
         >
           {status === "running" ? (
             <pre className="step-card__live">
-              {liveText}
+              {stripTemplateMarkers(liveText)}
               <span className="caret" />
             </pre>
           ) : (
-            <p className="step-card__summary">{summary}</p>
+            <div className="step-card__summary">
+              {(() => {
+                // done 时优先显示 backend 给的 summary;
+                // 若 summary 为空, 回退到 streaming 累积的 liveText (防 truncated)
+                const text = stripTemplateMarkers(summary || liveText);
+                return text ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {text}
+                  </ReactMarkdown>
+                ) : null;
+              })()}
+            </div>
           )}
         </div>
       )}

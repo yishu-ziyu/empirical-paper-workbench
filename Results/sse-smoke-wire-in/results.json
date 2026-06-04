@@ -1,0 +1,12 @@
+{
+  "topic": "smoke test",
+  "topic_slug": "sse-smoke-wire-in",
+  "method": "IV",
+  "n_variables": 2,
+  "n_sections": 9,
+  "provenance": {
+    "model": "MiniMax-M3",
+    "prompt_version": "v1"
+  },
+  "generated_at": "2026-06-04T08:47:19.345956+00:00"
+}

@@ -1,0 +1,38 @@
+---
+topic: '## 研究问题'
+topic_slug: smoke-vars
+generated_by: variables-llm-m3
+timestamp: '2026-06-04T08:42:43.295709+00:00'
+model: MiniMax-M3
+prompt_version: v1
+n_variables: 3
+roles:
+- X
+- Y
+- control
+upstream:
+- brief.md
+downstream_consumers:
+- design.json
+- execution
+---
+
+variables:
+- role: X
+  dataset_column: robot_density
+  semantic_label: 工业机器人渗透率
+  description: Bartik IV 来源
+  reference_papers:
+  - Acemoglu 2020
+- role: Y
+  dataset_column: ln_wage
+  semantic_label: 对数工资
+  description: 被解释变量
+  reference_papers:
+  - Acemoglu 2020
+- role: control
+  dataset_column: age
+  semantic_label: 年龄
+  description: 控制
+  reference_papers: []
+

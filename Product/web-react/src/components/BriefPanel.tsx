@@ -183,10 +183,25 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         case "step_done": {
           const idx = evt.step_index;
           if (!isStepIndex(idx)) return;
-          // 在 setState 之前捕获 liveText (reducer 应当是纯的)
-          const captured = steps[idx].liveText;
-          priorStepsRef.current[String(idx)] = captured;
-          updateStep(idx, { status: "done", summary: evt.summary || "" });
+          // 在 setState 之前用 ref 捕获 liveText —
+          // 修复 stale closure: applyEvent 之前依赖 [updateStep, steps],
+          // 但 consumeSse 是 useCallback([], ...) 冻结了 *初始* 引用,
+          // 读到的是 INITIAL_STEPS (全空), 导致 prior_steps 被存成空串,
+          // resume 时 step 3 永远不能从 awaiting → done.
+          setSteps((prev) => {
+            const captured = prev[idx].liveText;
+            priorStepsRef.current[String(idx)] = captured;
+            return {
+              ...prev,
+              [idx]: {
+                ...prev[idx],
+                // 强制覆盖 awaiting / running, step_done 一定胜出
+                status: "done",
+                // summary 缺失时回退到 liveText (防 truncated)
+                summary: evt.summary || captured,
+              },
+            };
+          });
           break;
         }
         case "await_user": {
@@ -205,6 +220,26 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
         }
         case "done": {
+          // 流结束: 兜底 — 把所有仍卡在 awaiting 的 step 强制标记为 done
+          // (后端 resume 可能不重发 step_done for awaiting steps)
+          setSteps((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            (Object.keys(next) as unknown as Array<keyof typeof next>).forEach(
+              (k) => {
+                const step = next[k as 1 | 2 | 3 | 4];
+                if (step.status === "awaiting" || step.status === "running") {
+                  next[k as 1 | 2 | 3 | 4] = {
+                    ...step,
+                    status: "done",
+                    summary: step.summary || step.liveText,
+                  };
+                  changed = true;
+                }
+              }
+            );
+            return changed ? next : prev;
+          });
           setPhase("completed");
           setResumeInFlight(false);
           break;
@@ -219,7 +254,7 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
       }
     },
-    [updateStep, steps]
+    [updateStep]
   );
 
   const handleStart = useCallback(async () => {

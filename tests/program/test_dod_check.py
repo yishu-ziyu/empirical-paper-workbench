@@ -378,11 +378,11 @@ class PromptIterationTests(unittest.TestCase):
         self.assertEqual(result.status, "PASS")
 
 
-# ── 行为 8: Token 成本 ───────────────────────────────────────────────────────
+# ── 行为 8: Token 成本 (NO CAP per L8 spec) ─────────────────────────────────
 
 
 class TokenCostTests(unittest.TestCase):
-    """行为 8: item 7 + 9 - token 成本 ≤ 25 USD (placeholder 0)."""
+    """行为 8: item 7 - token 成本 NO CAP, 仅 report (M3 via Token Plan)."""
 
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -391,15 +391,16 @@ class TokenCostTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def test_bdd_check_token_cost_returns_pass_with_placeholder(self) -> None:
-        """行为 8a: 无 LLM log file → 报告 0 USD (远 ≤ 25) → PASS (placeholder)."""
+    def test_bdd_check_token_cost_returns_pass_with_n_a_placeholder(self) -> None:
+        """行为 8a: 无 LLM log file → 报告 'N/A' → PASS (M3 Token Plan 模式)."""
         result = dod_check.check_token_cost(repo_root=self.tmp_path)
         self.assertEqual(result.status, "PASS")
-        self.assertIn("0", result.detail)
-        self.assertIn("25", result.detail)
+        self.assertIn("N/A", result.detail)
+        self.assertIn("M3", result.detail)
+        self.assertIn("Token Plan", result.detail)
 
-    def test_bdd_check_token_cost_fails_when_over_budget(self) -> None:
-        """行为 8b: log file 含 cost_usd=30 > 25 → FAIL."""
+    def test_bdd_check_token_cost_reports_spend_no_cap(self) -> None:
+        """行为 8b: log file 含 cost_usd=30 → 报告 spend (NOT cap, 永远 PASS)."""
         log_dir = self.tmp_path / "logs" / "llm"
         log_dir.mkdir(parents=True)
         (log_dir / "session_001.jsonl").write_text(
@@ -407,11 +408,13 @@ class TokenCostTests(unittest.TestCase):
         )
 
         result = dod_check.check_token_cost(repo_root=self.tmp_path)
-        self.assertEqual(result.status, "FAIL")
-        self.assertIn("30", result.detail)
+        # NO CAP → 即使 30 USD > 25 (旧上限), 仍 PASS
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("30.00", result.detail)
+        self.assertIn("NO CAP", result.detail)
 
-    def test_bdd_check_token_cost_passes_when_under_budget(self) -> None:
-        """行为 8c: log file 含 cost_usd=15 < 25 → PASS."""
+    def test_bdd_check_token_cost_reports_small_spend(self) -> None:
+        """行为 8c: log file 含 cost_usd=15 → 报告 15 USD → PASS."""
         log_dir = self.tmp_path / "logs" / "llm"
         log_dir.mkdir(parents=True)
         (log_dir / "session_001.jsonl").write_text(
@@ -420,7 +423,7 @@ class TokenCostTests(unittest.TestCase):
 
         result = dod_check.check_token_cost(repo_root=self.tmp_path)
         self.assertEqual(result.status, "PASS")
-        self.assertIn("15", result.detail)
+        self.assertIn("15.00", result.detail)
 
     def test_bdd_check_token_cost_sums_multiple_files(self) -> None:
         """行为 8d: 多个 log file cost_usd 求和."""
@@ -432,9 +435,9 @@ class TokenCostTests(unittest.TestCase):
         (log_dir / "s2.jsonl").write_text(json.dumps({"cost_usd": 3.0}) + "\n")
 
         result = dod_check.check_token_cost(repo_root=self.tmp_path)
-        # 10 + 5 + 3 = 18 ≤ 25 → PASS
+        # 10 + 5 + 3 = 18 USD, 求和后报告
         self.assertEqual(result.status, "PASS")
-        self.assertIn("18", result.detail)
+        self.assertIn("18.00", result.detail)
 
     def test_bdd_check_token_cost_skips_malformed_lines(self) -> None:
         """行为 8e: 损坏的 JSON 行跳过."""
@@ -448,7 +451,82 @@ class TokenCostTests(unittest.TestCase):
 
         result = dod_check.check_token_cost(repo_root=self.tmp_path)
         self.assertEqual(result.status, "PASS")
-        self.assertIn("5", result.detail)
+        self.assertIn("5.00", result.detail)
+
+
+# ── 行为 8b: M3 model path (item 9) ──────────────────────────────────────────
+
+
+class M3ModelPathTests(unittest.TestCase):
+    """行为 8b: item 9 - 5 个 wrapper service 全部用 provider_id="minimax"."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.tmp.name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _write_wrapper(self, name: str, provider: str = "minimax") -> None:
+        """构造一个 wrapper service 文件, 注入指定 provider_id (literal string)."""
+        path = self.tmp_path / f"{name}_service.py"
+        # 必须写 literal provider_id="..." 才能被 check_m3_model_path 命中
+        path.write_text(
+            f'"""Mock wrapper."""\n'
+            f'_PROVIDER_ID = "{provider}"\n'
+            f'chat_completion(provider_id="{provider}", model="MiniMax-M3")\n'
+        )
+
+    def test_bdd_check_m3_model_path_passes_when_all_5_use_minimax(self) -> None:
+        """行为 8b-a: 5 个 wrapper 全用 minimax → PASS."""
+        for name in ("brief", "search", "variables", "design", "execute"):
+            self._write_wrapper(name, provider="minimax")
+
+        result = dod_check.check_m3_model_path(wrapper_dir=self.tmp_path)
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("5 wrapper services", result.detail)
+        self.assertIn("minimax", result.detail)
+
+    def test_bdd_check_m3_model_path_fails_when_one_uses_openrouter(self) -> None:
+        """行为 8b-b: 任一 wrapper 还在 openrouter → FAIL."""
+        for name in ("brief", "search", "variables", "design"):
+            self._write_wrapper(name, provider="minimax")
+        # execute 还在 openrouter
+        self._write_wrapper("execute", provider="openrouter")
+
+        result = dod_check.check_m3_model_path(wrapper_dir=self.tmp_path)
+        self.assertEqual(result.status, "FAIL")
+        self.assertIn("execute", result.detail)
+
+    def test_bdd_check_m3_model_path_fails_when_one_uses_anthropic(self) -> None:
+        """行为 8b-c: 任一 wrapper 还在 anthropic → FAIL."""
+        for name in ("brief", "search", "variables", "design"):
+            self._write_wrapper(name, provider="minimax")
+        self._write_wrapper("execute", provider="anthropic")
+
+        result = dod_check.check_m3_model_path(wrapper_dir=self.tmp_path)
+        self.assertEqual(result.status, "FAIL")
+
+    def test_bdd_check_m3_model_path_fails_when_wrapper_missing(self) -> None:
+        """行为 8b-d: 缺某个 wrapper service → FAIL."""
+        for name in ("brief", "search", "variables", "design"):
+            self._write_wrapper(name)
+        # 缺 execute_service.py
+
+        result = dod_check.check_m3_model_path(wrapper_dir=self.tmp_path)
+        self.assertEqual(result.status, "FAIL")
+        self.assertIn("missing", result.detail.lower())
+
+    def test_bdd_check_m3_model_path_handles_single_quote_provider_id(self) -> None:
+        """行为 8b-e: provider_id='minimax' (单引号) 也算 PASS."""
+        path = self.tmp_path / "brief_service.py"
+        path.write_text(
+            "provider_id='minimax'\n"
+        )
+        for name in ("search", "variables", "design", "execute"):
+            self._write_wrapper(name)
+        result = dod_check.check_m3_model_path(wrapper_dir=self.tmp_path)
+        self.assertEqual(result.status, "PASS")
 
 
 # ── 行为 9: PM 验收 (manual) ─────────────────────────────────────────────────
@@ -521,6 +599,13 @@ class CheckDodIntegrationTests(unittest.TestCase):
                 f"@router.post('/api/{name}')\n"
                 "def p():\n    try:\n        return {}\n"
                 "    except Exception as e:\n        raise HTTPException(500, str(e))\n"
+            )
+        # 5 wrapper services (M3 path) — Item 9
+        (self.tmp_path / "Product" / "backend" / "wrapper").mkdir(parents=True)
+        for name in ("brief", "search", "variables", "design", "execute"):
+            (self.tmp_path / "Product" / "backend" / "wrapper" / f"{name}_service.py").write_text(
+                '_PROVIDER_ID = "minimax"\n'
+                'chat_completion(provider_id="minimax", model="MiniMax-M3")\n'
             )
         # artifacts
         for d in ("Tasks", "Manuscripts", "Results"):

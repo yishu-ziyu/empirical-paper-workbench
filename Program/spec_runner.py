@@ -19,11 +19,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from typing import Any, Iterator, Optional
 
 import requests
+
+
+# spec §3.2 + 任务约束: 跑 spec_runner 必须配 MiniMax Token Plan key.
+# 主键 = MINIMAX_API_KEY (2026-06-04 L7 迁移); 兼容旧名 MINIMAX_TOKEN_PLAN_KEY.
+# 测试在 conftest.py 里 setdefault 一个 dummy key 满足此 assert。
+assert (
+    "MINIMAX_API_KEY" in os.environ or "MINIMAX_TOKEN_PLAN_KEY" in os.environ
+), (
+    "Set MINIMAX_API_KEY (preferred) or MINIMAX_TOKEN_PLAN_KEY (legacy) "
+    "before running spec_runner.py (see docs/SETUP_MINIMAX.md)."
+)
 
 
 API_BASE = "http://127.0.0.1:8765"

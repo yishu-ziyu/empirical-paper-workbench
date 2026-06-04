@@ -101,32 +101,66 @@
 
 ---
 
-## 4. Skill 集成 (Task B, 进行中)
+## 4. Skill 集成 (Task B, 已盘点)
 
-### 4.1 盘点 (Skill inventory subagent 运行中)
+### 4.1 盘点结果 ✅
 - 源: `https://github.com/brycewang-stanford/Awesome-Agent-Skills-for-Empirical-Research`
 - 本地: `/Users/mahaoxuan/Desktop/经济学论文/Awesome-Agent-Skills-for-Empirical-Research/skills/`
-- 数量: 49 skills
-- 报告输出: `docs/superpowers/handoffs/2026-06-05-skill-inventory-report.md` (待生成)
+- 数量: **49 skills**
+- 完整报告: `docs/superpowers/handoffs/2026-06-05-skill-inventory-report.md` (主路径, 307 行)
 
-### 4.2 暂定 5-tab OS 映射 (待 inventory 验证)
-| 5-tab stage | 候选 skill | 来源 |
-|------------|-----------|------|
-| brief | chinese-de-aigc (48) | 降 AIGC skill |
-| brief | claude-scholar (33) | 学术写作 |
-| search | paper-search-mcp, arxiv-mcp | 学术搜索 |
-| variables | (待盘点) | 数据集 schema mapping |
-| design | StatsPAI (00), pyfixest (40), marginaleffects (39) | 因果推断工具 |
-| execution | Stata skill (32) | Stata 执行 |
-| identification-audit | causal-inference-mixtape (10), MixtapeTools (13) | 识别策略审计 |
+**仓库最有价值的 3 个 skill**:
+1. **StatsPAI** (P=3.4) — execution/design 核心工具
+2. **MixtapeTools Referee 2** (P=3.4) — identification-audit 协议
+3. **chinese-de-aigc** (P=3.9) — 写作后处理 (中文学术降 AIGC)
 
-### 4.3 Phase 1 集成 (本周可做 3 个)
-- 候选优先级: 0.5×相关性 + 0.3×质量 - 0.2×难度
-- 解耦集成架构: `Program/integrations/{skill_name}/`
-  - `wrapper.py`: 暴露 Pydantic interface
-  - `prompts/v1.md`: 适配本项目 prompt 格式
-  - `tests/`: 单测 + 集成测试
-- 严禁: 跨 integration 互相 import；绕过 chat_completion_stream
+**关键发现**:
+- 大集合型 skill (07/17/24/26/33) 评分偏低 — 文档好但解耦差, **不推荐直接照搬**
+- pyfixest 与 StatsPAI 功能重叠 — StatsPAI 优先, pyfixest 作 fallback / 交叉验证
+- MixtapeTools "不修改作者代码" 原则与项目"重写优先"工作流冲突 — 需 wrapper 显式约束
+
+### 4.2 Phase 1 集成 (锁定 3 个, 3.5 人天)
+
+| 优先级 | Skill | 工作量 | 落地方式 | 路径 |
+|:---:|---|:-:|---|---|
+| P0 | **chinese-de-aigc** | 0.5d | 纯 prompt 模板 | `Program/prompts/writing_de_aigc/v1.md` |
+| P1 | **AI-research-feedback** | 1d | 6-agent prompt | `Program/prompts/audit_claesbackman/v1.md` |
+| P2 | **pyfixest** | 2d | 新 wrapper service | `Program/api/execution_pyfixest.py` |
+
+### 4.3 Phase 2 (06-13 ~ 07-12, 6.5 人天)
+- StatsPAI (3d) + causal-inference-mixtape (1.5d) + stata-accounting-research (1d) + claude-skills Song (1d)
+
+### 4.4 Phase 3 (07-13+, 9 人天)
+- MixtapeTools Referee 2 + stata-skill + marginaleffects + research-companion + awesome-econ-ai-stuff
+
+### 4.5 解耦集成架构 (锁死)
+```
+Program/
+├── integrations/                  # 新增根目录
+│   ├── stats_pai/                 # Phase 2
+│   ├── pyfixest/                  # Phase 1
+│   ├── referee2/                  # Phase 3
+│   └── ...
+├── prompts/                       # 现有 + 新增
+│   ├── writing_de_aigc/v1.md      # Phase 1 (chinese-de-aigc)
+│   ├── audit_claesbackman/v1.md   # Phase 1 (AI-research-feedback)
+│   ├── ...
+├── knowledge/                     # 新增 (静态知识)
+│   ├── mixtape/
+│   ├── jar_patterns/
+│   └── ...
+└── llm/chat_completion_stream.py  # 单一 LLM 入口
+```
+
+**8 铁律** (来自 inventory 报告第 4.2 节):
+1. 每个 skill 一个独立目录
+2. wrapper 暴露纯 Pydantic model, 不向上层泄露 prompt 字符串
+3. LLM 调用统一过 `Program/llm/chat_completion_stream.py`
+4. 严禁跨 integration 互相 import
+5. 集成层不写业务逻辑
+6. 每个 integration 必须有 `tests/test_smoke.py`
+7. 所有 prompt 模板按版本号管理 (v{N}.md)
+8. LLM 字符串禁止外泄到上层 (Pydantic model 输出是结构化数据)
 
 ---
 

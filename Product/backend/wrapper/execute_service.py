@@ -292,6 +292,10 @@ def run_execute_stream(
                 stage=f"section_{idx}",
                 message=f"section {idx}/9 done: {sec_name}",
                 section_index=idx,
+                # 推理链可视化（D2）：注入 prompt + 原始 LLM 输出 + 落盘后的最终内容
+                prompt=prompt,
+                raw_output=text,
+                parsed_output=text,
             )
 
         # 4. 渲染 paper.pdf

@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 from urllib import error, request
 from urllib.parse import urlparse
 
@@ -326,6 +327,127 @@ def _call_anthropic_compatible(
     }
 
 
+# ── Streaming helpers (SSE parsers) ──────────────────────────────────────────
+
+
+def _build_anthropic_stream_request(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+) -> request.Request:
+    system_msg = ""
+    user_messages: list[dict[str, str]] = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            system_msg = msg.get("content", "")
+        else:
+            user_messages.append(msg)
+
+    payload: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": user_messages or [{"role": "user", "content": "Hello"}],
+        "temperature": temperature,
+        "stream": True,
+    }
+    if system_msg:
+        payload["system"] = system_msg
+
+    headers = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+    }
+    if api_key:
+        headers["x-api-key"] = api_key
+
+    return request.Request(
+        f"{base_url.rstrip('/')}/messages",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+
+def _build_openai_stream_request(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+) -> request.Request:
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "EmpiricalPaperWorkbench/1.0",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    return request.Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+
+def _iter_sse_lines(req: request.Request, *, timeout: int = DEFAULT_TIMEOUT) -> Iterator[str]:
+    """Yield decoded SSE `data: ...` payload strings from a streaming response.
+
+    Skips event-name / comment / blank lines. Stops at `[DONE]`.
+    """
+    with request.urlopen(req, timeout=timeout) as resp:
+        for raw in resp:
+            line = raw.decode("utf-8", errors="replace").rstrip("\n").rstrip("\r")
+            if not line.startswith("data: "):
+                continue
+            payload = line[len("data: "):]
+            if payload.strip() == "[DONE]":
+                break
+            yield payload
+
+
+def _stream_anthropic_compatible(req: request.Request) -> Iterator[str]:
+    """Parse Anthropic SSE: `content_block_delta` → `text_delta.text`."""
+    for payload in _iter_sse_lines(req):
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") == "content_block_delta":
+            delta = event.get("delta") or {}
+            if delta.get("type") == "text_delta":
+                text = delta.get("text", "")
+                if text:
+                    yield text
+
+
+def _stream_openai_compatible(req: request.Request) -> Iterator[str]:
+    """Parse OpenAI SSE: `choices[].delta.content`."""
+    for payload in _iter_sse_lines(req):
+        try:
+            event = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        for choice in event.get("choices", []) or []:
+            delta = choice.get("delta") or {}
+            content = delta.get("content", "")
+            if content:
+                yield content
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 
@@ -470,6 +592,107 @@ def chat_completion_with_fallback(
             continue
 
     raise LLMError("all_attempts_failed", f"All providers failed. Last: {last_error}")
+
+
+def chat_completion_stream(
+    messages: list[dict[str, str]],
+    *,
+    provider_id: str | None = None,
+    model: str | None = None,
+    temperature: float = 0.4,
+    max_tokens: int = 4096,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> Iterator[str]:
+    """Stream text chunks from LLM. Yields incremental text (str).
+
+    LLM 单一入口 (用户要求). 内部走 _stream_anthropic_compatible /
+    _stream_openai_compatible 分支, 自动重试 3 次 (指数退避, 与 chat_completion 一致).
+
+    Args:
+        messages: List of {"role": "system"|"user"|"assistant", "content": str}
+        provider_id: Provider preset ID (默认 openrouter). 当前主要用 "minimax" (Anthropic-compatible).
+        model: Model name override.
+        temperature: Sampling temperature.
+        max_tokens: Max tokens for response.
+        api_key: API key override (falls back to env var).
+        base_url: Base URL override.
+
+    Yields:
+        Incremental text chunks (str) from the streaming response.
+
+    Raises:
+        LLMError: On provider error, auth failure, or network issue after retries.
+    """
+    preset = resolve_provider(provider_id)
+
+    # Resolve API key (mirrors chat_completion logic)
+    resolved_key = (api_key or "").strip()
+    if not resolved_key and preset.api_key_env:
+        resolved_key = os.getenv(preset.api_key_env, "").strip()
+    if not resolved_key and preset.id == "minimax":
+        resolved_key = os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip()
+
+    if preset.requires_api_key and not resolved_key:
+        raise LLMError(
+            "missing_api_key",
+            f"{preset.name} requires API key. Set env var {preset.api_key_env} or pass api_key.",
+        )
+
+    selected_model = (model or preset.default_model).strip()
+    if not selected_model:
+        raise LLMError("missing_model", f"{preset.name} model is required.")
+
+    effective_base_url = base_url
+    if not effective_base_url and preset.id == "minimax":
+        effective_base_url = os.getenv("MINIMAX_BASE_URL", "").strip() or None
+
+    if preset.api_type == "anthropic-compatible":
+        normalized_base = normalize_base_url(
+            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
+        )
+        req = _build_anthropic_stream_request(
+            api_key=resolved_key,
+            base_url=normalized_base,
+            model=selected_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        stream_fn = _stream_anthropic_compatible
+    else:
+        normalized_base = normalize_base_url(
+            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
+        )
+        req = _build_openai_stream_request(
+            api_key=resolved_key,
+            base_url=normalized_base,
+            model=selected_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        stream_fn = _stream_openai_compatible
+
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            yield from stream_fn(req)
+            return
+        except error.HTTPError as exc:
+            last_error = LLMError(
+                "provider_error",
+                f"{preset.name} HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')[:300]}",
+            )
+        except error.URLError as exc:
+            last_error = LLMError("network_error", f"Cannot reach model provider: {exc}")
+        if attempt < 2:
+            time.sleep(0.5 * (2 ** attempt))
+
+    # All retries exhausted
+    if isinstance(last_error, LLMError):
+        raise last_error
+    raise LLMError("stream_failed", f"stream failed after 3 attempts: {last_error}")
 
 
 def get_available_providers() -> dict[str, Any]:

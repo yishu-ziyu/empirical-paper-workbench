@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { DottedSurface } from "./components/DottedSurface";
 import { ResearchCommandInput } from "./components/ResearchCommandInput";
 import { SlideTabs, type StageTab } from "./components/SlideTabs";
-import { BriefPanel, type BriefResult } from "./components/BriefPanel";
+import { BriefPanel, type BriefResult, type BriefStepsSnapshot } from "./components/BriefPanel";
 import { SearchPanel, type Paper } from "./components/SearchPanel";
 import { VariablesPanel, type Variable } from "./components/VariablesPanel";
 import { DesignPanel } from "./components/DesignPanel";
@@ -81,6 +81,9 @@ export function App() {
   // Results from each stage. Preserved across navigation so the user can
   // jump back to an earlier tab without losing state.
   const [briefResult, setBriefResult] = useState<BriefResult | null>(null);
+  // 4 个 research-journal step 的累积文本 + 落盘的 final brief —
+  // 用户切走后再切回 brief tab, BriefPanel 据此 hydrate, 不重新跑 streaming
+  const [briefSnapshot, setBriefSnapshot] = useState<BriefStepsSnapshot | null>(null);
   const [literatureResult, setLiteratureResult] = useState<LiteratureResult | null>(null);
   const [variablesResult, setVariablesResult] = useState<VariablesResult | null>(null);
   const [designResult, setDesignResult] = useState<DesignResult | null>(null);
@@ -143,6 +146,7 @@ export function App() {
     setTopicSlug("");
     setActiveStage("brief");
     setBriefResult(null);
+    setBriefSnapshot(null);
     setLiteratureResult(null);
     setVariablesResult(null);
     setDesignResult(null);
@@ -227,8 +231,10 @@ export function App() {
         {activeStage === "brief" ? (
           <BriefPanel
             topic={task.message}
-            onComplete={(b) => {
+            initialSnapshot={briefSnapshot}
+            onComplete={(b, snapshot) => {
               setBriefResult(b);
+              setBriefSnapshot(snapshot);
               setActiveStage("search");
             }}
           />
@@ -282,6 +288,24 @@ export function App() {
 
         {activeStage === "identification-audit" && executionResult ? (
           <IdentificationAuditPanel />
+        ) : null}
+
+        {briefResult && activeStage !== "brief" ? (
+          <div className="stage-panel__saved-link" data-testid="saved-brief-link">
+            <span className="eyebrow">已落盘</span>
+            <p>
+              研究简报已生成（路径：
+              <code data-testid="saved-brief-path">{briefResult.path}</code>）
+            </p>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setActiveStage("brief")}
+              data-testid="view-saved-brief"
+            >
+              查看已保存的简报
+            </button>
+          </div>
         ) : null}
 
         {executionResult ? (

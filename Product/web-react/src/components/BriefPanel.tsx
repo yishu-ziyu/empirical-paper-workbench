@@ -4,11 +4,22 @@ import { StepCard, type StepStatus } from "./StepCard";
 export interface BriefResult {
   markdown: string;
   path: string;
+  verdict?: boolean;
+}
+
+/** Persisted snapshot of the 4 research-journal steps, used to rehydrate
+ *  BriefPanel when the user navigates away from the brief tab and back. */
+export interface BriefStepsSnapshot {
+  steps: Record<1 | 2 | 3 | 4, StepState>;
+  finalBrief: BriefResult | null;
 }
 
 export interface BriefPanelProps {
   topic: string;
-  onComplete?: (brief: BriefResult) => void;
+  /** 从 App 传下来的"上次完成"快照 — 若存在, 跳过 streaming 直接显示。 */
+  initialSnapshot?: BriefStepsSnapshot | null;
+  /** 完成时回调, 把当前 4 step state + final brief 一并交给 App 持久化。 */
+  onComplete?: (brief: BriefResult, snapshot: BriefStepsSnapshot) => void;
 }
 
 interface StepState {
@@ -59,15 +70,29 @@ interface BriefSseEvent {
  * - 用户决策 → POST /api/brief/resume SSE → 步骤 4 → final_brief → onComplete
  * - 任何 SSE 错误显示重试按钮
  */
-export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
-  const [phase, setPhase] = useState<Phase>("idle");
+export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelProps) {
+  // 若 App 传了 initialSnapshot (用户切走后又切回), 直接 hydrate —
+  // 跳过 streaming, 进入 "查看已保存的简报" 模式
+  const [phase, setPhase] = useState<Phase>(
+    initialSnapshot ? "completed" : "idle"
+  );
   const [error, setError] = useState<string | null>(null);
-  const [steps, setSteps] = useState(INITIAL_STEPS);
-  const [finalBrief, setFinalBrief] = useState<{
-    markdown: string;
-    path: string;
-    verdict: boolean;
-  } | null>(null);
+  const [steps, setSteps] = useState<Record<1 | 2 | 3 | 4, StepState>>(
+    initialSnapshot?.steps ?? INITIAL_STEPS
+  );
+  const [finalBrief, setFinalBrief] = useState<BriefResult | null>(
+    initialSnapshot?.finalBrief ?? null
+  );
+  // 镜像 steps / finalBrief 到 ref, 让 handleResume 能在不重新订阅
+  // SSE 的前提下读到最新 state (用于构造 onComplete 的 snapshot)
+  const stepsRef = useRef<Record<1 | 2 | 3 | 4, StepState>>(steps);
+  const finalBriefRef = useRef<BriefResult | null>(finalBrief);
+  useEffect(() => {
+    stepsRef.current = steps;
+  }, [steps]);
+  useEffect(() => {
+    finalBriefRef.current = finalBrief;
+  }, [finalBrief]);
   // 保存 step 1-3 输出, 供 /resume 用
   const priorStepsRef = useRef<Record<string, string>>({});
   const abortRef = useRef<AbortController | null>(null);
@@ -295,7 +320,18 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         });
         const final = events.find((e) => e.event === "final_brief");
         if (final && final.verdict_passed && onComplete) {
-          onComplete({ markdown: final.markdown || "", path: final.brief_path || "" });
+          onComplete(
+            {
+              markdown: final.markdown || "",
+              path: final.brief_path || "",
+              verdict: final.verdict_passed,
+            },
+            {
+              // 用 ref 拿最新 state, 避免 handleResume 闭包陷阱
+              steps: stepsRef.current,
+              finalBrief: finalBriefRef.current,
+            },
+          );
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
@@ -320,19 +356,30 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         </div>
 
         <div className="task-brief__confirm-actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleStart}
-            disabled={phase === "running" || phase === "awaiting" || !topic.trim()}
-            data-testid="brief-start"
-          >
-            {phase === "running"
-              ? "研究中…"
-              : phase === "awaiting"
-                ? "等你的决策"
-                : "开始研究"}
-          </button>
+          {phase === "completed" ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={handleStart}
+              data-testid="brief-restart"
+            >
+              重新研究
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={handleStart}
+              disabled={phase === "running" || phase === "awaiting" || !topic.trim()}
+              data-testid="brief-start"
+            >
+              {phase === "running"
+                ? "研究中…"
+                : phase === "awaiting"
+                  ? "等你的决策"
+                  : "开始研究"}
+            </button>
+          )}
         </div>
 
         {phase === "error" && error && (

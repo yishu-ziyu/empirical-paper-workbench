@@ -37,4 +37,8 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
 - section_robust v2 (2026-06-04): 4 段（设计/5 个具体检验/弱 IV 诊断/综合判断），加弱 IV 诊断。
 - section_data v2 (2026-06-04): 4 段（来源/构造/描述统计/平衡性），加缺失变量 fallback 句。
 - section_strategy v2 (2026-06-04): 4 段（设定/假设/构造细节/稳健性安排），加"假设不满足会怎样"。
+- section_lit v2 (2026-06-04): 4 段（背景/分组/缺口/衔接），强制"衔接到 §1"。
+- section_institution v2 (2026-06-04): 3 段（制度/采集/时间线），简化为聚焦数据集背景。
+- section_conclusion v2 (2026-06-04): 4 段（发现/政策/局限/未来），加"与 §1 引言一一对应"硬约束。
+- section_refs: 暂不升级 (v1 输出格式已稳定，再调 ROI 低)。
 - execute_service: 优先 v2 loader，fallback v1（向后兼容未升级的节）。

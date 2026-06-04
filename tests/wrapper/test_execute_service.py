@@ -7,6 +7,7 @@
 - 行为 4: write_results 落盘 Results/{topic}/results.json 含 provenance
 - 行为 5: run_execute_stream 生成器，按顺序 yield start / progress×N / section_done×9 / paper_ready / done
 - 行为 6: run_execute_stream 在异常时 yield error 事件后停止
+- 行为 7（D2 推理链）：section_done 事件携带 prompt/raw_output/parsed_output 三件套
 """
 from __future__ import annotations
 
@@ -338,6 +339,93 @@ class ExecuteServiceTests(unittest.TestCase):
         self.assertEqual(error_idx, len(event_types) - 1, "error should be the last event")
         error_event = next(e for e in events if e.event == "error")
         self.assertIn("message", error_event.model_dump())
+
+    # ============== 行为 7: D2 推理链字段 (Kimi 蜂群IDE 启发) ==============
+
+    def test_bdd_execute_section_done_carries_reasoning_chain(self) -> None:
+        """行为 7 (D2): section_done 事件携带 prompt / raw_output / parsed_output 三件套。
+
+        这是 Kimi 蜂群IDE 推理链可视化的数据基础：
+        - prompt:        喂给 LLM 的完整 prompt（含 brief[:500] 上下文）
+        - raw_output:    LLM 返回的原始文本
+        - parsed_output: 落盘后 / schema 解析后的最终 markdown 段
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manuscripts_root = tmp_path / "Manuscripts"
+            results_root = tmp_path / "Results"
+            tasks_root = tmp_path / "Tasks"
+            for d in (manuscripts_root, results_root, tasks_root):
+                d.mkdir()
+
+            brief_path = tasks_root / "industrial-robots-employment" / "brief.md"
+            variables_path = tasks_root / "industrial-robots-employment" / "variables.yaml"
+            design_path = tasks_root / "industrial-robots-employment" / "design.json"
+            brief_path.parent.mkdir(parents=True, exist_ok=True)
+            brief_path.write_text(SAMPLE_BRIEF_MD, encoding="utf-8")
+            variables_path.write_text(SAMPLE_VARIABLES_YAML, encoding="utf-8")
+            design_path.write_text(SAMPLE_DESIGN_JSON, encoding="utf-8")
+
+            req = ExecuteRequest(
+                topic_slug="industrial-robots-employment",
+                design_path=str(design_path),
+                variables_path=str(variables_path),
+                brief_path=str(brief_path),
+            )
+
+            with patch(
+                "Product.backend.wrapper.execute_service.chat_completion",
+                side_effect=_fake_chat_completion,
+            ):
+                events = _collect_events(
+                    run_execute_stream(
+                        req,
+                        manuscripts_root=manuscripts_root,
+                        results_root=results_root,
+                        tasks_root=tasks_root,
+                        prompt_loader=_fake_prompt_loader,
+                    )
+                )
+
+            section_done_events = [e for e in events if e.event == "section_done"]
+            self.assertEqual(len(section_done_events), 9, "应有 9 个 section_done 事件")
+
+            # 验证每个 section_done 事件都带三件套
+            for evt in section_done_events:
+                self.assertIsNotNone(evt.prompt, f"section {evt.section_index} 缺 prompt")
+                self.assertIsNotNone(evt.raw_output, f"section {evt.section_index} 缺 raw_output")
+                self.assertIsNotNone(evt.parsed_output, f"section {evt.section_index} 缺 parsed_output")
+                # prompt 应含 section 名（来自 mock loader）
+                self.assertIn(
+                    f"section={SECTION_NAMES_LOOKUP[evt.section_index]}",
+                    evt.prompt or "",
+                    f"section {evt.section_index} prompt 不含 section 标识",
+                )
+                # parsed_output 与 raw_output 在简单 mock 下应一致
+                self.assertEqual(evt.parsed_output, evt.raw_output)
+
+            # 验证非 section_done 事件不带三件套（避免 UI 误渲染）
+            non_section_done = [e for e in events if e.event != "section_done"]
+            for evt in non_section_done:
+                # 允许为 None（Pydantic default），但不应回填 prompt
+                self.assertIsNone(
+                    evt.prompt,
+                    f"{evt.event} 事件不应携带 prompt 字段",
+                )
+
+
+# 测试用 SECTION_NAMES 顺序（与 execute_service.SECTION_NAMES 保持一致）
+SECTION_NAMES_LOOKUP = {
+    1: "section_intro",
+    2: "section_lit",
+    3: "section_institution",
+    4: "section_data",
+    5: "section_strategy",
+    6: "section_results",
+    7: "section_robust",
+    8: "section_conclusion",
+    9: "section_refs",
+}
 
 
 if __name__ == "__main__":

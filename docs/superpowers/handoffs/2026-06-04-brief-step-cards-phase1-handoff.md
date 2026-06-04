@@ -79,15 +79,30 @@
 
 ## 3. 待完成 (Phase 1 前端收尾)
 
-### 3.1 UX 3 bug 修复 (Subagent 2 运行中)
-- [ ] **Bug 1**: Steps 1-3 body 显示原始 markdown (### 步骤 N, ---, 截断)
-  - 修法: ReactMarkdown 渲染 + strip 模板标记
-  - 依赖: `react-markdown` + `remark-gfm` (新加 package.json)
-- [ ] **Bug 2**: Step 3 status 卡在 "awaiting"，点 继续 后 step_done 没正确转 "done"
-  - 修法: applyEvent step_done 分支无条件覆盖 status
-- [ ] **Bug 3**: 切回 brief tab 看到 reset 状态
-  - 修法: App.tsx 新加 `briefSteps` state + BriefPanel mount 时 hydrate
-  - 新 UI: "查看已保存的简报" 按钮
+### 3.1 UX 3 bug 修复 (Subagent 2 完成 ✅)
+
+**3 个 commit** (提交顺序 = Bug 1 → Bug 2 → Bug 3):
+- `8344134` fix(web): render step body via react-markdown + strip LLM template markers
+- `2be69c2` fix(web): step_done always wins over awaiting (kill stale closure)
+- `be873c6` fix(web): persist brief step snapshot across tab navigation
+
+**实际修复方案**:
+- Bug 1: `stripTemplateMarkers()` 用 `replace(/^###\s*步骤\s*\d+[^\n]*$/gm, "")` + `/^---$/gm` 清理, 然后喂给 `<ReactMarkdown remarkPlugins={[remarkGfm]}>`
+- Bug 2: 根因是 `consumeSse = useCallback(..., [])` 冻结了 `applyEvent` 闭包。修复: `step_done` 改在 `setSteps((prev) => ...)` reducer 内捕获 `liveText`, status 强制 `"done"` 覆盖 awaiting
+- Bug 3: App 新增 `briefSnapshot` state (与 `briefResult` 同级保留), BriefPanel 接 `initialSnapshot` prop → mount 时 hydrate
+
+**新加 testid** (Subagent 3 可用):
+- `view-saved-brief` — "查看已保存的简报" 按钮
+
+**Bundle 体积警告**: `react-markdown@9` + `remark-gfm@4` + `micromark` 带来 ~50KB gzip, vite build warning chunk > 500KB。后续可 manualChunks 拆 `markdown-vendor`。
+
+**Subagent 2 已知遗留** (Subagent 3/4 关注):
+- e2e test 未加 "step 3 awaiting → done" 的 2s 断言 (Subagent 3 补)
+- step 3 "修改" 后 summary 覆盖用户输入版本 (产品取舍, 暂不改)
+- 刷新页面 `briefSnapshot` 丢 (无 localStorage 持久化, 后续可加)
+- 严格模式 `priorStepsRef` 写两次同值, 无害
+
+**Subagent 2 用的 worktree 操作**: `git reset --hard main` (从 194c677 拉回 00ac88b 取 BriefPanel/StepCard 实现) — worktree 内安全, 不影响 main。
 
 ### 3.2 e2e 测试 (Subagent 3 待派)
 - [ ] 跑 `Product/web-react/e2e/brief-step-cards.spec.ts` against real backend

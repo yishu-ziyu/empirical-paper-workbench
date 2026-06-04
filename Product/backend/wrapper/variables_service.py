@@ -288,7 +288,7 @@ def run_variables(
     model: str = "MiniMax-M3",
 ) -> VariablesResponse:
     """端到端：load_schema → build_mapping → write_variables → verify。"""
-    from Program.prompts.variables.v2 import load_prompt_v2 as _default_loader
+    from Program.prompts.variables.v3 import load_prompt_v3 as _default_loader
 
     loader = prompt_loader or _default_loader
 

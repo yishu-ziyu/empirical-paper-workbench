@@ -93,6 +93,9 @@ export function ExecutionPanel({
   const [paperPath, setPaperPath] = useState<string | null>(null);
   const [resultsPath, setResultsPath] = useState<string | null>(null);
   const completedRef = useRef(false);
+  // Mirror paperPath in a ref so the SSE callback (closed over handleStart's
+  // initial scope) can read the latest value when the `done` event fires.
+  const paperPathRef = useRef<string | null>(null);
 
   async function handleStart() {
     if (running) return;
@@ -126,15 +129,16 @@ export function ExecutionPanel({
           setSections((prev) => ({ ...prev, [evt.section_index as number]: evt }));
         } else if (evt.event === "paper_ready" && evt.paper_pdf_path) {
           setPaperPath(evt.paper_pdf_path);
+          paperPathRef.current = evt.paper_pdf_path;
         } else if (evt.event === "done" && evt.results_json_path) {
           setResultsPath(evt.results_json_path);
           if (
             !completedRef.current &&
-            paperPath &&
+            paperPathRef.current &&
             evt.results_json_path
           ) {
             completedRef.current = true;
-            onComplete?.(paperPath, evt.results_json_path);
+            onComplete?.(paperPathRef.current, evt.results_json_path);
           }
         } else if (evt.event === "error") {
           setError(evt.message);

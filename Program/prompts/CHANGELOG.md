@@ -19,6 +19,7 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
 ## design
 - v1 (2026-06-04): 初版，3 个候选方法 + 推荐
 - v2 (2026-06-04): 加 4 项评估标准（内生性/假设/数据/计算成本），"30 分钟内能跑"作为硬门槛。
+- v3 (2026-06-04): 加 JSON schema 硬约束（candidates.length=3, method 大写, recommended.method ∈ candidates），减少 LLM 输出解析失败导致重跑。
 
 ## execution (9 节)
 - v1 (2026-06-04): 初版，每节独立 prompt

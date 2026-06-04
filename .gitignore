@@ -2,6 +2,11 @@
 .DS_Store
 .vscode/
 
+# Local env (real API keys — never commit)
+.env
+.env.local
+.env.*.local
+
 # Python caches
 __pycache__/
 *.py[cod]

@@ -11,9 +11,15 @@
 from __future__ import annotations
 
 import importlib
+import os
 from unittest.mock import patch
 
 import pytest
+
+
+# 为 spec_runner.py 顶部的 assert 提供 dummy key（避免 import 时崩）。
+# 生产环境要求真实 key 配在 .env.local (主键 MINIMAX_API_KEY, 兼容旧名 MINIMAX_TOKEN_PLAN_KEY)。
+os.environ.setdefault("MINIMAX_API_KEY", "test-minimax-api-key")
 
 
 # ── 1. Autouse: 拦截所有 wrapper service 的 LLM 调用 ────────────────────────

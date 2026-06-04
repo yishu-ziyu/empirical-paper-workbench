@@ -7,6 +7,7 @@ import { SearchPanel, type Paper } from "./components/SearchPanel";
 import { VariablesPanel, type Variable } from "./components/VariablesPanel";
 import { DesignPanel } from "./components/DesignPanel";
 import { ExecutionPanel } from "./components/ExecutionPanel";
+import { IdentificationAuditPanel } from "./components/IdentificationAuditPanel";
 
 interface SubmittedResearchTask {
   message: string;
@@ -15,8 +16,8 @@ interface SubmittedResearchTask {
   pastedCount: number;
 }
 
-/** Five end-to-end stages (BDD ref: spec §6.1 + §6.2). */
-type Stage = "brief" | "search" | "variables" | "design" | "execution";
+/** Six end-to-end stages (BDD ref: spec §6.1 + §6.2 + D3 6th tab stub). */
+type Stage = "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
 
 interface LiteratureResult {
   papers: Paper[];
@@ -44,6 +45,7 @@ const STAGE_ORDER: Stage[] = [
   "variables",
   "design",
   "execution",
+  "identification-audit",
 ];
 
 const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
@@ -52,6 +54,7 @@ const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
   variables: { label: "数据变量", hint: "基于数据集 schema + 简报识别 X / Y / control 候选变量" },
   design: { label: "方法设计", hint: "StatsPAI 估算候选识别策略，LLM 解释并推荐" },
   execution: { label: "执行实验", hint: "流式生成 9 节论文 + paper.pdf + results.json" },
+  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（pre-registration 占位）" },
 };
 
 /**
@@ -88,6 +91,7 @@ export function App() {
   /**
    * Tab is unlocked iff every stage strictly before it has completed.
    * brief is always unlocked; execution is unlocked only when design done.
+   * 6th tab (identification-audit) unlocked only when executionResult is set.
    */
   const canEnter = useCallback(
     (stage: Stage): boolean => {
@@ -110,11 +114,13 @@ export function App() {
             variablesResult !== null &&
             designResult !== null
           );
+        case "identification-audit":
+          return executionResult !== null;
         default:
           return false;
       }
     },
-    [briefResult, literatureResult, variablesResult, designResult],
+    [briefResult, literatureResult, variablesResult, designResult, executionResult],
   );
 
   const showToast = useCallback((msg: string) => {
@@ -272,6 +278,10 @@ export function App() {
               setExecutionResult({ paperPath, resultsPath });
             }}
           />
+        ) : null}
+
+        {activeStage === "identification-audit" && executionResult ? (
+          <IdentificationAuditPanel />
         ) : null}
 
         {executionResult ? (

@@ -35,4 +35,6 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
 - section_intro v2 (2026-06-04): 显式分 4 段（背景/缺口/贡献/数据+方法+结果摘要），让 LLM 输出与摘要表一一对应。
 - section_results v2 (2026-06-04): 4 段（系数/经济显著性/异质/文献对比），强制经济显著性讨论。
 - section_robust v2 (2026-06-04): 4 段（设计/5 个具体检验/弱 IV 诊断/综合判断），加弱 IV 诊断。
+- section_data v2 (2026-06-04): 4 段（来源/构造/描述统计/平衡性），加缺失变量 fallback 句。
+- section_strategy v2 (2026-06-04): 4 段（设定/假设/构造细节/稳健性安排），加"假设不满足会怎样"。
 - execute_service: 优先 v2 loader，fallback v1（向后兼容未升级的节）。

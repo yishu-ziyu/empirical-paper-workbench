@@ -185,6 +185,7 @@ from Product.backend.cost_service import (
     get_project_costs,
     start_cost_event,
 )
+from Product.api.brief import router as brief_router
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -199,7 +200,9 @@ app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
 
-# 5-tab vertical slice routers (L1-L5)
+# 5-tab vertical slice routers (L1: brief, L2: search, L3: variables, L4: design, L5: execute)
+app.include_router(brief_router)
+
 from Product.api.design import router as design_router  # noqa: E402
 app.include_router(design_router)
 

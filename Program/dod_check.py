@@ -1,16 +1,16 @@
 """DoD checklist: 验证 spec §9 的 9 项 Definition of Done.
 
 行为契约 (Phase 8 Task 8.2):
-- 9 个 DoD 项 (spec §9 + 用户列出的 9 项):
-  1. 5 tab BDD 全绿
-  2. 60-min 端到端跑通 (e2e test 存在)
-  3. 失败模式 5 种被 endpoint 兜底处理 (try/except + HTTPException)
-  4. 产物入库 Tasks/ Manuscripts/ Results/
+- 9 个 DoD 项 (用户列出的 9 项, 含 spec §9 隐含 + M3 验证):
+  1. 5 tab BDD 全绿 (pytest tests/wrapper/)
+  2. 60-min 端到端 (e2e/end-to-end.spec.ts 存在)
+  3. 失败模式 5 种处理 (grep endpoint try/except)
+  4. 产物入库 (Tasks/ Manuscripts/ Results/ 都含 topic)
   5. Re-run 等价 (Program/spec_runner.py 存在)
-  6. Prompt 迭代轮数达标 (CHANGELOG.md 解析)
-  7. Token 成本 ≤ 25 USD (placeholder 0)
-  8. PM 验收 (manual flag — Program/dod_pm_accepted.txt)
-  9. Token ≤ 25 USD (covered by 7 — 重复验证 placeholder 一致性)
+  6. Prompt 迭代轮数 (CHANGELOG.md 解析, brief≥2/search≥2/variables≥3/design≥3/execution≥4)
+  7. Token 成本 — NO CAP, 仅 report (M3 via Token Plan, 无 per-call 计费)
+  8. PM 验收 (Program/dod_pm_accepted.txt 手动标记, 默认 MANUAL)
+  9. M3 model path 验证 (5 个 wrapper service 全部用 provider_id="minimax")
 
 - 每项返回 DoDItem (item, name, status, detail)
 - check_dod() 返回 {"items": [...], "summary": {pass, fail, manual, total}}
@@ -39,8 +39,9 @@ PROMPT_MIN_VERSIONS: dict[str, int] = {
 # 5 个 tab 名字 (用于 endpoint/wrapper 验证)
 TAB_NAMES: tuple[str, ...] = ("brief", "search", "variables", "design", "execute")
 
-# Token 预算上限 (spec §4.6: ≤ 25 USD)
-TOKEN_BUDGET_USD: float = 25.0
+# Token 成本 — NO CAP per user task description
+# (M3 via Token Plan: no per-call cost tracking, just report total spend if logs available)
+TOKEN_BUDGET_USD: float = 25.0  # kept for backward compat (item 7 now reports, not caps)
 
 
 # ── 数据结构 ──────────────────────────────────────────────────────────────────
@@ -283,20 +284,29 @@ def check_prompt_iterations(changelog_path: Path) -> DoDItem:
 
 
 def check_token_cost(repo_root: Path) -> DoDItem:
-    """DoD #7: Token 成本 ≤ 25 USD.
+    """DoD #7: Token 成本 — NO CAP, 仅 report.
 
-    简化: 读 logs/llm/*.jsonl 里 cost_usd 字段求和。无 log → 0 USD (placeholder)。
+    per user task description (2026-06-04 L8 spec):
+    "NO CAP, just report total spend if logs available. Print
+    'Token cost tracking: N/A (M3 via Token Plan, no per-call cost tracking) —
+    see Program/runs/ for usage'"
+
+    简化: 读 logs/llm/*.jsonl 里 cost_usd 字段求和。无 log → 报 N/A。永远 PASS。
     """
     log_dir = repo_root / "logs" / "llm"
     if not log_dir.exists():
         return DoDItem(
             item=7,
-            name="Token 成本 ≤ 25 USD",
+            name="Token 成本 (NO CAP, M3 Token Plan)",
             status="PASS",
-            detail=f"无 LLM log, placeholder 0 USD ≤ {TOKEN_BUDGET_USD} (需运行 LLM 后才会真记)",
+            detail=(
+                "Token cost tracking: N/A (M3 via Token Plan, no per-call cost tracking) "
+                "— see Program/runs/ for usage"
+            ),
         )
 
     total = 0.0
+    n_records = 0
     for log_file in log_dir.glob("*.jsonl"):
         for line in log_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -306,21 +316,18 @@ def check_token_cost(repo_root: Path) -> DoDItem:
                 rec = json.loads(line)
                 if "cost_usd" in rec:
                     total += float(rec["cost_usd"])
+                    n_records += 1
             except (json.JSONDecodeError, ValueError, TypeError):
                 continue
 
-    if total <= TOKEN_BUDGET_USD:
-        return DoDItem(
-            item=7,
-            name="Token 成本 ≤ 25 USD",
-            status="PASS",
-            detail=f"{total:.2f} USD ≤ {TOKEN_BUDGET_USD} USD",
-        )
     return DoDItem(
         item=7,
-        name="Token 成本 ≤ 25 USD",
-        status="FAIL",
-        detail=f"{total:.2f} USD > {TOKEN_BUDGET_USD} USD (超预算)",
+        name="Token 成本 (NO CAP, M3 Token Plan)",
+        status="PASS",
+        detail=(
+            f"Total reported spend: {total:.2f} USD across {n_records} log records "
+            f"(NO CAP — M3 via Token Plan, no per-call cost tracking)"
+        ),
     )
 
 
@@ -342,21 +349,67 @@ def check_pm_acceptance(repo_root: Path) -> DoDItem:
     )
 
 
-def check_token_cost_duplicate(repo_root: Path) -> DoDItem:
-    """DoD #9: Token ≤ 25 USD (covered by #7) — 重复验证 placeholder 一致性.
+def check_m3_model_path(wrapper_dir: Path) -> DoDItem:
+    """DoD #9: M3 model path 验证.
 
-    spec §9 提到 token ≤ 25 在两处 (一处是预算一处是 DoD), 这里复用 #7 的检查作为双保险。
+    per user task description (2026-06-04 L8 spec):
+    "M3 model path verified — grep for provider_id="minimax" in all 5 wrapper
+    services, fail if any is on OpenRouter or other provider"
+
+    行为:
+    - 检查 Product/backend/wrapper/ 下 5 个 *_service.py 文件
+    - 每个文件必须显式使用 provider_id="minimax" (M3 Token Plan 唯一真实 provider)
+    - 任何 wrapper 还在用 openrouter / openai / anthropic / kimi 等 → FAIL
+    - 缺文件 → FAIL
     """
-    # 复用 #7 的实现
-    return check_token_cost(repo_root).__class__(
+    wrapper_files = {
+        tab: wrapper_dir / f"{tab}_service.py"
+        for tab in TAB_NAMES
+    }
+
+    # 缺文件 → FAIL
+    missing = [tab for tab, p in wrapper_files.items() if not p.exists()]
+    if missing:
+        return DoDItem(
+            item=9,
+            name="M3 model path (provider_id=minimax)",
+            status="FAIL",
+            detail=f"missing wrapper services: {missing}",
+        )
+
+    # grep 每个 wrapper: 必须有 provider_id="minimax" 且不能有 openrouter/openai/anthropic
+    wrong_provider: list[str] = []
+    for tab, path in wrapper_files.items():
+        text = path.read_text(encoding="utf-8")
+        if 'provider_id="minimax"' not in text and "provider_id='minimax'" not in text:
+            wrong_provider.append(f"{tab}:no-minimax")
+        # 防御性: 如果还有 openrouter/openai/anthropic 标记 → 标红
+        for bad in ("openrouter", "openai", "anthropic"):
+            if bad in text.lower() and 'provider_id="minimax"' not in text:
+                wrong_provider.append(f"{tab}:contains-{bad}")
+                break
+
+    if wrong_provider:
+        return DoDItem(
+            item=9,
+            name="M3 model path (provider_id=minimax)",
+            status="FAIL",
+            detail=(
+                "5 wrappers 未全部走 minimax: "
+                + ", ".join(wrong_provider)
+                + " (spec §3.2: minimax 是项目唯一真实 provider)"
+            ),
+        )
+
+    return DoDItem(
         item=9,
-        name="Token 成本 ≤ 25 USD (covered by #7)",
-        status=_alias_status(check_token_cost(repo_root).status),
-        detail=check_token_cost(repo_root).detail + " [covered by #7]",
+        name="M3 model path (provider_id=minimax)",
+        status="PASS",
+        detail=f"5 wrapper services 全用 provider_id=\"minimax\": {list(wrapper_files.keys())}",
     )
 
 
-def _alias_status(s: str) -> str:
+def _alias_status(s: str) -> str:  # kept for backward compat (not used in check_dod)
     return s  # DoDItem.status 已经是 PASS/FAIL/MANUAL, 直接复用
 
 
@@ -368,6 +421,7 @@ def check_dod(
     changelog_path: Path | None = None,
     tests_dir: Path | None = None,
     api_dir: Path | None = None,
+    wrapper_dir: Path | None = None,
 ) -> dict:
     """跑 9 项 DoD 检查, 返回结构化报告.
 
@@ -376,6 +430,7 @@ def check_dod(
         changelog_path: Program/prompts/CHANGELOG.md (默认从 repo_root 推断)
         tests_dir: tests/wrapper/ (默认从 repo_root 推断)
         api_dir: Product/api/ (默认从 repo_root 推断)
+        wrapper_dir: Product/backend/wrapper/ (默认从 repo_root 推断, 给 item 9)
 
     Returns:
         {
@@ -391,6 +446,8 @@ def check_dod(
         tests_dir = repo_root / "tests" / "wrapper"
     if api_dir is None:
         api_dir = repo_root / "Product" / "api"
+    if wrapper_dir is None:
+        wrapper_dir = repo_root / "Product" / "backend" / "wrapper"
 
     items: list[DoDItem] = [
         check_5_tab_bdd(tests_dir),
@@ -401,7 +458,7 @@ def check_dod(
         check_prompt_iterations(changelog_path),
         check_token_cost(repo_root),
         check_pm_acceptance(repo_root),
-        check_token_cost_duplicate(repo_root),
+        check_m3_model_path(wrapper_dir),
     ]
 
     summary = {

@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from io import StringIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -54,6 +56,34 @@ class CliArgumentTests(unittest.TestCase):
         self.assertIn("2024", slug)
         self.assertNotIn(" ", slug)
         self.assertNotIn("!", slug)
+
+    def test_bdd_module_requires_minimax_token_plan_key_env(self) -> None:
+        """行为 1e: 模块 import 时 assert MINIMAX_API_KEY 在 os.environ 里.
+
+        验证 spec_runner.py 顶部的 assertion 真的在跑; 测试用 subprocess 重启
+        Python 解释器清空 os.environ 来模拟 "用户没设 env var" 的场景。
+        """
+        import subprocess
+        import sys as _sys
+
+        repo_root = Path(__file__).resolve().parents[2]
+        # 用 env={} 强制 MINIMAX_API_KEY 和 MINIMAX_TOKEN_PLAN_KEY 都不在 os.environ
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("MINIMAX_API_KEY", "MINIMAX_TOKEN_PLAN_KEY")
+        }
+        result = subprocess.run(
+            [_sys.executable, "-c", "from Program import spec_runner"],
+            cwd=str(repo_root),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # 应该崩 (non-zero exit) + stderr 提到 MINIMAX_API_KEY
+        self.assertNotEqual(result.returncode, 0, "expected import to fail without env var")
+        self.assertIn("MINIMAX_API_KEY", result.stderr)
 
 
 # ── 行为 2: SSE 解析器 ────────────────────────────────────────────────────────

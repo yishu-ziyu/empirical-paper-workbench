@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Empirical Research OS API
+  version: 1.0.0
+  description: 5 个 tab 的后端 endpoint（任务书 / 递归搜索 / 数据变量 / 方法设计 / 执行实验）
+servers:
+  - url: http://127.0.0.1:8765
+paths:
+  /api/brief:
+    post:
+      summary: 任务书 LLM 扩写
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BriefRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BriefResponse'
+        '500':
+          description: LLM 错误
+  /api/search:
+    post:
+      summary: 递归搜索 arxiv + LLM 重排
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '500':
+          description: arxiv/LLM 错误
+  /api/variables:
+    post:
+      summary: 数据变量识别（数据集 schema + LLM 映射）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariablesRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariablesResponse'
+        '500':
+          description: dataset/LLM 错误
+  /api/design:
+    post:
+      summary: 方法设计（StatsPAI + LLM 解释）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DesignRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DesignResponse'
+        '500':
+          description: StatsPAI/LLM 错误
+  /api/execute:
+    post:
+      summary: 执行实验（SSE 流式）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteRequest'
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ExecuteEvent'
+        '500':
+          description: 执行错误
+components:
+  schemas:
+    BriefRequest:
+      type: object
+      required: [topic]
+      properties:
+        topic: { type: string, description: "用户输入的研究课题" }
+        topic_slug: { type: string, nullable: true, description: "URL-safe slug，不传则自动生成" }
+    BriefResponse:
+      type: object
+      required: [brief_markdown, brief_path, verdict_passed]
+      properties:
+        brief_markdown: { type: string }
+        brief_path: { type: string }
+        verdict_passed: { type: boolean, description: "verdict gate 是否通过（4 段齐全）" }
+    SearchRequest:
+      type: object
+      required: [topic_slug, brief_path]
+      properties:
+        topic_slug: { type: string }
+        brief_path: { type: string }
+    SearchResponse:
+      type: object
+      required: [literature_markdown, literature_path, papers, verdict_passed]
+      properties:
+        literature_markdown: { type: string }
+        literature_path: { type: string }
+        papers:
+          type: array
+          items: { $ref: '#/components/schemas/Paper' }
+        verdict_passed: { type: boolean }
+    Paper:
+      type: object
+      required: [title, authors, year, abstract, arxiv_id, relevance_score, accepted]
+      properties:
+        title: { type: string }
+        authors: { type: array, items: { type: string } }
+        year: { type: integer }
+        abstract: { type: string }
+        arxiv_id: { type: string }
+        relevance_score: { type: number, format: float, minimum: 0.0, maximum: 1.0 }
+        accepted: { type: boolean, default: true }
+    VariablesRequest:
+      type: object
+      required: [topic_slug, brief_path, dataset_name]
+      properties:
+        topic_slug: { type: string }
+        brief_path: { type: string }
+        dataset_name: { type: string, enum: [CFPS, CHIP, CHARLS, custom] }
+        custom_dataset_path: { type: string, nullable: true }
+    VariablesResponse:
+      type: object
+      required: [variables_yaml, variables_path, variables, verdict_passed]
+      properties:
+        variables_yaml: { type: string }
+        variables_path: { type: string }
+        variables:
+          type: array
+          items: { $ref: '#/components/schemas/Variable' }
+        verdict_passed: { type: boolean }
+    Variable:
+      type: object
+      required: [role, dataset_column, semantic_label, description, reference_papers]
+      properties:
+        role: { type: string, enum: [X, Y, control, mediator, moderator] }
+        dataset_column: { type: string }
+        semantic_label: { type: string }
+        description: { type: string }
+        reference_papers: { type: array, items: { type: string } }
+    DesignRequest:
+      type: object
+      required: [topic_slug, variables_path, brief_path]
+      properties:
+        topic_slug: { type: string }
+        variables_path: { type: string }
+        brief_path: { type: string }
+    DesignResponse:
+      type: object
+      required: [design_json, design_path, candidates, recommended, code_stub, verdict_passed]
+      properties:
+        design_json: { type: string }
+        design_path: { type: string }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/DesignCandidate' }
+        recommended: { type: string, enum: [DID, IV, RDD, PSM, DML] }
+        code_stub: { type: string }
+        verdict_passed: { type: boolean }
+    DesignCandidate:
+      type: object
+      required: [method, rationale, fits_data, sp_output]
+      properties:
+        method: { type: string, enum: [DID, IV, RDD, PSM, DML] }
+        rationale: { type: string }
+        fits_data: { type: boolean }
+        sp_output: { type: object, additionalProperties: true }
+    ExecuteRequest:
+      type: object
+      required: [topic_slug, design_path, variables_path, brief_path]
+      properties:
+        topic_slug: { type: string }
+        design_path: { type: string }
+        variables_path: { type: string }
+        brief_path: { type: string }
+    ExecuteEvent:
+      type: object
+      required: [event, stage, message]
+      properties:
+        event: { type: string, enum: [start, progress, section_done, paper_ready, done, error] }
+        stage: { type: string, description: "执行阶段名" }
+        message: { type: string }
+        section_index: { type: integer, nullable: true }
+        paper_pdf_path: { type: string, nullable: true }
+        results_json_path: { type: string, nullable: true }

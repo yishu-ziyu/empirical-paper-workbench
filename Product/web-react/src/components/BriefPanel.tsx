@@ -120,7 +120,10 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const res = await fetch(url, {
+      // Vite 内置 proxy 不转 SSE, 改用绝对 URL + 后端 CORS 跨域 (Subagent 3 验证)
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
+      const res = await fetch(fullUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

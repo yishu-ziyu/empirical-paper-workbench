@@ -197,6 +197,24 @@ WEB_DIST_ROOT = PRODUCT_ROOT / "web-dist"
 ensure_registry(PRODUCT_ROOT, REPO_ROOT)
 
 app = FastAPI(title="Econ Workbench Product Shell", version="0.1.0")
+
+# CORS for vite dev server (5173) → uvicorn (8765) split
+# SSE 流式响应在 vite 内置 http-proxy 下不工作 (Subagent 3 验证),
+# 改为前端直接用 absolute URL + CORS 跨域是更稳的方案.
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")

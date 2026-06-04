@@ -32,3 +32,5 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
   - section_robust: 3-5 个稳健性检验，~1500 字
   - section_conclusion: 结论 + 政策含义，~1000 字
   - section_refs: 参考文献格式化，≥8 篇
+- section_intro v2 (2026-06-04): 显式分 4 段（背景/缺口/贡献/数据+方法+结果摘要），让 LLM 输出与摘要表一一对应。
+- execute_service: 优先 v2 loader，fallback v1（向后兼容未升级的节）。

@@ -33,4 +33,6 @@ verdict gate 红色 + 用户反馈驱动调优（spec §4.6）。
   - section_conclusion: 结论 + 政策含义，~1000 字
   - section_refs: 参考文献格式化，≥8 篇
 - section_intro v2 (2026-06-04): 显式分 4 段（背景/缺口/贡献/数据+方法+结果摘要），让 LLM 输出与摘要表一一对应。
+- section_results v2 (2026-06-04): 4 段（系数/经济显著性/异质/文献对比），强制经济显著性讨论。
+- section_robust v2 (2026-06-04): 4 段（设计/5 个具体检验/弱 IV 诊断/综合判断），加弱 IV 诊断。
 - execute_service: 优先 v2 loader，fallback v1（向后兼容未升级的节）。

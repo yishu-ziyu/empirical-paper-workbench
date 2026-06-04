@@ -208,22 +208,22 @@ def write_results(
 # ============== 行为 5: run_execute_stream ==============
 
 
-# 默认 prompt loader 工厂：直接 import 已有的 v2 loaders
-# 优先 v2，fallback v1
+# 默认 prompt loader 工厂：直接 import 已有的 loaders
+# 优先 v4 → v3 → v2 → v1 (向后兼容未升级的节, 2026-06-04 L7 调优)
 def _default_prompt_loader(section_name: str) -> Callable[[], str]:
-    """根据 section_name 返回对应的 v2 prompt loader（fallback v1）。"""
-    try:
-        module = __import__(
-            f"Program.prompts.execution.{section_name}.v2",
-            fromlist=["load_prompt_v2"],
-        )
-        return module.load_prompt_v2
-    except ModuleNotFoundError:
-        module = __import__(
-            f"Program.prompts.execution.{section_name}.v1",
-            fromlist=["load_prompt_v1"],
-        )
-        return module.load_prompt_v1
+    """根据 section_name 返回最新的 prompt loader（v4 → v3 → v2 → v1 fallback）。"""
+    for ver in ("v4", "v3", "v2", "v1"):
+        try:
+            module = __import__(
+                f"Program.prompts.execution.{section_name}.{ver}",
+                fromlist=[f"load_prompt_{ver}"],
+            )
+            return getattr(module, f"load_prompt_{ver}")
+        except ModuleNotFoundError:
+            continue
+    raise ModuleNotFoundError(
+        f"No prompt loader found for section {section_name} (tried v1-v4)"
+    )
 
 
 def run_execute_stream(

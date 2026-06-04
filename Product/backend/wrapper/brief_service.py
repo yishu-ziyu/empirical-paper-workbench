@@ -8,7 +8,9 @@
 
 设计要点:
 - LLM 入口使用 `Product.backend.llm_client.chat_completion` (与 spec §3.2 一致)
-- model 字段为 `MiniMax-M3` 唯一真实模型 (spec §3.2)
+- 真实底层模型走 minimax provider preset (`MiniMax-M3`，Anthropic-compatible)
+  参考: ~/Desktop/AI组件工作流库/components/minimax-token-plan-real-service/WORKFLOW.md
+- model 字段为 `MiniMax-M3` (而非旧的 MiniMax-M3 — 那是 spec 早期笔误)
 - 真实 provider/model 通过 chat_completion 的 provider_id/model 参数注入
 - 测试通过 conftest.py 在 `Product.backend.wrapper.brief_service` 命名空间上
   mock `chat_completion` —— 不需要真实 API key
@@ -27,10 +29,9 @@ from Product.types.research import BriefRequest, BriefResponse
 
 REQUIRED_SECTIONS = ["研究问题", "边际贡献", "研究边界", "成功标准"]
 
-# 真实底层模型 (spec §3.2: MiniMax-M3 是项目唯一真实模型)
+# 真实底层模型：MiniMax Token Plan (Anthropic-compatible)
 _MODEL = "MiniMax-M3"
-# openrouter 是 llm_client 的默认 provider
-_PROVIDER_ID = "openrouter"
+_PROVIDER_ID = "minimax"
 
 
 def build_brief(topic: str, prompt_loader: Callable[[], str]) -> str:
@@ -48,7 +49,7 @@ def build_brief(topic: str, prompt_loader: Callable[[], str]) -> str:
     text, _usage = chat_completion(
         messages=[{"role": "user", "content": prompt}],
         provider_id=_PROVIDER_ID,
-        model="anthropic/claude-sonnet-4-6",  # 实际 alias → MiniMax-M3 (见 llm_client.py)
+        model=_MODEL,
         temperature=0.3,
     )
     return text
@@ -82,7 +83,7 @@ def write_brief(
         {
             "topic": topic,
             "topic_slug": topic_slug,
-            "generated_by": "brief-llm-m3",
+            "generated_by": "brief-llm-minimax",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "model": model,
             "prompt_version": prompt_version,

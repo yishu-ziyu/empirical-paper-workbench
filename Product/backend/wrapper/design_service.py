@@ -33,8 +33,8 @@ from Product.types.research import (
 ALLOWED_METHODS = {"DID", "IV", "RDD", "PSM", "DML"}
 
 DEFAULT_MODEL = "MiniMax-M3"
-DEFAULT_PROVIDER = "openrouter"
-DEFAULT_LLM_MODEL = "anthropic/claude-sonnet-4-6"
+DEFAULT_PROVIDER = "minimax"
+DEFAULT_LLM_MODEL = "MiniMax-M3"
 
 
 # ============== 1. load_variables ==============
@@ -359,7 +359,7 @@ def write_design(
     payload = {
         "topic": topic,
         "topic_slug": topic_slug,
-        "generated_by": "design-llm-m3",
+        "generated_by": "design-llm-minimax",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": model,
         "prompt_version": prompt_version,

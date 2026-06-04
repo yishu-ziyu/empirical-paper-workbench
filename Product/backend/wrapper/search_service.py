@@ -23,9 +23,10 @@ from Product.backend.llm_client import chat_completion
 from Product.types.research import Paper, SearchRequest, SearchResponse
 
 
-# 默认 provider / model (M3 alias 落到 openrouter 的 sonnet-4-6)
-_DEFAULT_PROVIDER = "openrouter"
-_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
+# 默认 provider / model (MiniMax Token Plan, Anthropic-compatible)
+# 参考: ~/Desktop/AI组件工作流库/components/minimax-token-plan-real-service/WORKFLOW.md
+_DEFAULT_PROVIDER = "minimax"
+_DEFAULT_MODEL = "MiniMax-M3"
 _DEFAULT_TEMPERATURE = 0.3
 
 # verdict gate

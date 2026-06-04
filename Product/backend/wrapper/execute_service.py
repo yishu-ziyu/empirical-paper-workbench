@@ -269,8 +269,8 @@ def run_execute_stream(
             prompt = loader() + "\n\n" + brief_text[:500]
             text, _usage = chat_completion_fn(
                 messages=[{"role": "user", "content": prompt}],
-                provider_id="openrouter",
-                model="anthropic/claude-sonnet-4-6",
+                provider_id="minimax",
+                model="MiniMax-M3",
                 temperature=0.3,
             )
             write_section(

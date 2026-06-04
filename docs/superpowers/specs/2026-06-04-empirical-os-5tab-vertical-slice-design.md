@@ -39,18 +39,18 @@
 ### 2.1 Goals（必须做）
 1. **5 tab 全部接真后端**：每个 tab 背后调 1 个真实 FastAPI endpoint，对应真实 service 调用
 2. **可复现使用**：每个 tab 的产物落盘到 `Tasks/{topic}/` + `Manuscripts/{topic}/` + `Results/{topic}/`，第二天能 re-run 拿到等价结果
-3. **LLM 选择性增强**：在 4 个"语义判断"点用 LLM（任务书扩写、搜索重排、变量映射、方法解释、论文写作）
+3. **LLM 选择性增强**：在 5 个"语义判断"点用 LLM（任务书扩写、搜索重排、变量映射、方法解释、9 节论文写作）
 4. **保持可复现**：LLM 调用的 prompt / model / seed / 数据快照全部入库
 5. **verdict gate 复用**：之前 91K 用的 9 节判分标准直接搬过来作为质量门
+6. **LLM prompt 调优**：每个 LLM tab 的 prompt **至少迭代 2 轮**，由 verdict gate 红色 + 用户反馈驱动。详细机制见 §4.6
 
 ### 2.2 Non-Goals（明确不做）
 - ❌ 多用户协作 / 权限管理
 - ❌ 主题切换的清理
 - ❌ 论文 LaTeX 高端排版
-- ❌ LLM prompt 深度调优
 - ❌ 移动端 / 触屏适配
 - ❌ 实时协同编辑
-- ❌ 把 91K pipeline 重写成"非模板"（先贯通，调优是下个 spec）
+- ❌ 把 91K pipeline 重写成"非模板"（本次贯通，调优包含 prompt 而非重写 ManuscriptAgent 本身）
 
 ---
 
@@ -141,6 +141,35 @@ FastAPI (Product/app.py, :8765)
 - **系统行为**：SSE 流式返回进度 → StatsPAI 跑数据 → ManuscriptAgent LLM 写 **9 节论文**（沿用 `Program/workbench/manuscript_section_draft_expansion.py` 的节结构：引言/文献综述/制度背景/数据/实证策略/主结果/稳健性/结论/参考文献）→ 出 PDF → 写 `Manuscripts/{topic}/paper.pdf` + `Results/{topic}/results.json`
 - **UI 反馈**：实时进度条 + 9 节逐节状态 + 最终 PDF 预览 + 下载
 - **失败模式**：跑超 60 分钟 → 客户端 SSE 断线重连，后端继续跑
+
+### 4.6 Prompt 调优机制（核心质量保障）
+
+**为什么是 first-class goal**：91K pipeline 当时"自动版是结构化模板"—— 这次不重写 ManuscriptAgent，但**通过迭代 prompt 弥补"模板感"**。4 个 LLM tab 任何一个 prompt 没调过，质量就会回退到模板感。
+
+**迭代驱动器**（双源信号）：
+- **自动**：verdict gate 红色（任务书 4 段缺、文献评分缺失、变量映射不完整、9 节判分 < 8/9）
+- **人工**：用户在 UI 上点"这段不对"或"这节写得太浅" → 反馈进 `Tasks/{topic}/feedback.jsonl`
+
+**每个 LLM tab 的迭代预算**：
+| Tab | 至少迭代轮数 | 典型调优点 |
+|---|---|---|
+| 任务书 | 2 轮 | 4 段结构、边界划定粒度 |
+| 递归搜索 | 2 轮 | 相关性评分标准、剔除条件 |
+| 数据变量 | 3 轮 | 列名→研究变量的语义桥、引用文献匹配 |
+| 方法设计 | 3 轮 | DID/IV/RD 解释深度、代码 stub 可执行性 |
+| 论文 9 节写作 | **4 轮** | 每节 prompt 各 1 轮 + 整体连贯性 1 轮（最关键）|
+
+**总成本预算**：~15 轮 prompt 迭代 × 5 USD/轮 ≈ **75 USD 上限**（实际可能 30-50 USD）。每次迭代结束打印 token 计数。
+
+**Prompt 版本管理**：
+- 每个 prompt 模板存 `Program/prompts/{tab}/{tab}_v{N}.md`（带 commit）
+- 每次调优记录到 `Program/prompts/{tab}/CHANGELOG.md`（写"为什么改 + 改了什么"）
+- LLM 调用的 prompt_version 进 provenance 元数据（接 §5.2）
+- "可复现"的定义升级为"**指定 prompt_version 可重跑**"
+
+**Re-tune 触发**（不锁死调优结束）：
+- 用户随时可要求"这节再调一版"（不受 2-4 轮上限约束）
+- 但超出预算的调优需要单独 token 预算审批
 
 ---
 
@@ -262,15 +291,23 @@ Day 2-3: 5 agent 并行
   ├─ Agent 4: 方法设计 (StatsPAI + LLM 解释)
   └─ Agent 5: 执行实验 (SSE + ManuscriptAgent)
 
-Day 4: 集成 + verdict gate
+Day 4: 集成 + 第一跑 + 识别弱 prompt
   ├─ 5 个 endpoint 串起来
-  ├─ 端到端跑一次（用 session 里的工业机器人题目）
-  └─ 用户验收，不通过则补
+  ├─ 端到端跑一次（用 session 里的工业机器人题目），v1 prompt
+  ├─ 收集 verdict gate 红色信号 + 用户反馈
+  └─ 输出"prompt 调优清单"（哪个 tab 的哪一节需要改）
 
-Day 5: 修 + 文档
-  ├─ 修 Day 4 验收问题
+Day 5-6: Prompt 调优（核心质量阶段）
+  ├─ Day 5 上午：调优 任务书 + 递归搜索（2 轮）→ 跑 → 验收
+  ├─ Day 5 下午：调优 数据变量 + 方法设计（3 轮）→ 跑 → 验收
+  ├─ Day 6 上午：调优 9 节论文写作（4 轮）→ 跑 → 验收
+  └─ Day 6 下午：用户 PM 视角验收 paper.pdf，对照 verdict 评分
+
+Day 7: 修 + 文档 + DoD 验收
+  ├─ 修 Day 5-6 验收遗留问题
   ├─ 写 spec runner（明天能 re-run 同一 topic）
-  └─ 出 60 分钟贯通 demo
+  ├─ 打印最终 token 成本
+  └─ 出 60 分钟贯通 demo（用调优后的 prompt）
 ```
 
 ---
@@ -283,7 +320,8 @@ Day 5: 修 + 文档
 - [ ] 失败模式 5 种都被正面处理
 - [ ] 5 个 tab 产物都入库到 `Tasks/{topic}/` + `Manuscripts/{topic}/` + `Results/{topic}/`
 - [ ] 第二天能 re-run 拿到等价结果（不是逐字相同，但 9 节结构、关键发现、变量选择一致）
-- [ ] Token 成本打印出来给用户看
+- [ ] 每个 LLM tab 的 prompt 已按 §4.6 预算迭代到对应轮数（任务书 2 / 搜索 2 / 变量 3 / 设计 3 / 写作 4）
+- [ ] Token 成本打印出来给用户看，且 ≤ §4.6 预算上限
 - [ ] 用户 PM 视角验收过
 
 ---

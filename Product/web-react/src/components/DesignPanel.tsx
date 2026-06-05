@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Sparkles, CheckCircle2, AlertCircle, Loader2, Code2, FlaskConical } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle, Loader2, Code2, FlaskConical, Library } from "lucide-react";
 import { cn } from "../lib/cn";
+import { MethodsDrawer } from "./MethodsDrawer";
 
 /** 与 Product/types/research.py DesignCandidate 一致 */
 export interface DesignCandidateFE {
@@ -39,6 +40,7 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<DesignResponseFE | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   async function handleDesign() {
     if (loading) return;
@@ -124,6 +126,15 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
                 <span>verdict gate 未通过</span>
               </>
             )}
+            <button
+              type="button"
+              className="design-panel__browse-all"
+              onClick={() => setDrawerOpen(true)}
+              data-testid="design-browse-all"
+            >
+              <Library size={14} />
+              查看全部可用方法
+            </button>
           </div>
 
           <ul className="design-panel__candidates">
@@ -178,6 +189,31 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
           </footer>
         </div>
       )}
+
+      <MethodsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        initialCategory={response?.recommended?.toLowerCase()}
+      />
+      <style>{`
+.design-panel__verdict { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.design-panel__browse-all {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--color-panel-soft);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.design-panel__browse-all:hover {
+  background: var(--color-strong);
+  color: var(--color-inverse);
+  border-color: var(--color-strong);
+}
+      `}</style>
     </section>
   );
 }

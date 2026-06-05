@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
-import { Play, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Play, FileText, CheckCircle2, AlertCircle, Loader2, Activity } from "lucide-react";
 import { cn } from "../lib/cn";
 import { ReasoningChainView } from "./ReasoningChainView";
+import { FormalPackageAcceptancePanel } from "./FormalPackageAcceptancePanel";
 
 /** ExecuteEvent 6 种类型 + 必要字段（与 Product/types/research.py 一致）
  *  推理链字段（D2）：prompt/raw_output/parsed_output —— 由 section_done 事件携带
@@ -219,6 +220,67 @@ export function ExecutionPanel({
         </div>
       )}
 
+      {/* Agent 实时活动: 由 section_done 事件驱动, 显示 1-9 节的实时状态条。 */}
+      {(running || sectionIndices.length > 0) && (
+        <section
+          className="execution-panel__activities"
+          data-testid="execute-agent-activities"
+        >
+          <header className="execution-panel__activities-header">
+            <Activity size={14} />
+            <span>Agent 实时活动</span>
+            <code data-testid="execute-agent-activities-count">
+              {sectionIndices.length} / 9 done
+            </code>
+          </header>
+          <ul className="execution-panel__activity-list">
+            {Array.from({ length: 9 }, (_, i) => i + 1).map((idx) => {
+              const done = sections[idx];
+              // 推断当前正在写的节：最后一个 done + 1，仅在 running 时显示
+              const maxDone = sectionIndices.length > 0
+                ? sectionIndices[sectionIndices.length - 1]
+                : 0;
+              const isWriting = running && idx === maxDone + 1;
+              const status = done
+                ? "done"
+                : isWriting
+                ? "writing"
+                : "pending";
+              return (
+                <li
+                  key={idx}
+                  className={cn(
+                    "execution-panel__activity-row",
+                    `is-${status}`
+                  )}
+                  data-testid={`execute-agent-activity-${idx}`}
+                >
+                  <span className="execution-panel__activity-icon">
+                    {status === "done" ? (
+                      <CheckCircle2 size={14} />
+                    ) : status === "writing" ? (
+                      <Loader2 size={14} className="spin" />
+                    ) : (
+                      <span className="execution-panel__activity-dot" />
+                    )}
+                  </span>
+                  <span className="execution-panel__activity-name">
+                    Section {idx} ({SECTION_TITLES[idx] ?? `Section ${idx}`})
+                  </span>
+                  <span className="execution-panel__activity-status">
+                    {status === "done"
+                      ? "已完成"
+                      : status === "writing"
+                      ? "写入中..."
+                      : "等待"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <ol className="execution-panel__sections" data-testid="execute-sections">
         {Array.from({ length: 9 }, (_, i) => i + 1).map((idx) => {
           const done = sections[idx];
@@ -301,6 +363,22 @@ export function ExecutionPanel({
         </div>
       )}
 
+      {/* 形式化产物验收: 9 节跑完且 paper.pdf + results.json 都已落盘时出现。
+          projectId 复用 ExecutionPanel 的 topicSlug, 避免硬编码。
+       */}
+      {allSectionsDone && paperPath && resultsPath && (
+        <section
+          className="execution-panel__acceptance"
+          data-testid="execute-formal-acceptance"
+        >
+          <header className="execution-panel__acceptance-header">
+            <h3>形式化产物验收</h3>
+            <p>人工核验 paper / results / 可复现性 3 张卡, 默认未验收。</p>
+          </header>
+          <FormalPackageAcceptancePanel projectId={topicSlug} />
+        </section>
+      )}
+
       <style>{`
         .execution-panel {
           padding: 1.25rem 1.5rem;
@@ -314,6 +392,93 @@ export function ExecutionPanel({
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
+        }
+        .execution-panel__activities {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          background: #eef2ff;
+          border: 1px solid #c7d2fe;
+          border-radius: 8px;
+          padding: 0.5rem 0.75rem;
+        }
+        .execution-panel__activities-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #1e3a8a;
+        }
+        .execution-panel__activities-header code {
+          margin-left: auto;
+          background: #c7d2fe;
+          color: #1e1b4b;
+          padding: 0 0.4rem;
+          border-radius: 4px;
+          font-size: 0.75rem;
+        }
+        .execution-panel__activity-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        .execution-panel__activity-row {
+          display: grid;
+          grid-template-columns: 18px 1fr auto;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.8rem;
+          padding: 0.2rem 0.4rem;
+          border-radius: 4px;
+        }
+        .execution-panel__activity-row.is-done {
+          color: #047857;
+        }
+        .execution-panel__activity-row.is-writing {
+          background: #fef3c7;
+          color: #92400e;
+        }
+        .execution-panel__activity-row.is-pending {
+          color: #6b7280;
+        }
+        .execution-panel__activity-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .execution-panel__activity-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #d1d5db;
+          display: inline-block;
+        }
+        .execution-panel__activity-status {
+          font-size: 0.75rem;
+          color: inherit;
+          opacity: 0.85;
+        }
+        .execution-panel__acceptance {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          background: #ecfdf5;
+          border: 1px solid #6ee7b7;
+          border-radius: 8px;
+          padding: 0.75rem 1rem;
+        }
+        .execution-panel__acceptance-header h3 {
+          margin: 0;
+          font-size: 1rem;
+        }
+        .execution-panel__acceptance-header p {
+          margin: 0.2rem 0 0;
+          font-size: 0.8rem;
+          color: #065f46;
         }
         .execution-panel__chain-block {
           background: #f3f4f6;

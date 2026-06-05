@@ -84,7 +84,10 @@ export function VariablesPanel({
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch("/api/variables", {
+      // 绝对 URL + VITE_API_BASE_URL: vite 7 http-proxy 不转 SSE/JSON, 同时
+      // /react/ base 会拒掉裸 /api/ 路径, 改打后端 8765
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const resp = await fetch(`${base}/api/variables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

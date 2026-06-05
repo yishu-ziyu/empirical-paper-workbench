@@ -89,7 +89,9 @@ export function MethodsDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch("/api/capabilities/methods")
+    // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
+    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    fetch(`${base}/api/capabilities/methods`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

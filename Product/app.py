@@ -186,6 +186,7 @@ from Product.backend.cost_service import (
     start_cost_event,
 )
 from Product.api.brief import router as brief_router
+from Product.api.brief_stream import router as brief_stream_router
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -196,12 +197,32 @@ WEB_DIST_ROOT = PRODUCT_ROOT / "web-dist"
 ensure_registry(PRODUCT_ROOT, REPO_ROOT)
 
 app = FastAPI(title="Econ Workbench Product Shell", version="0.1.0")
+
+# CORS for vite dev server (5173) → uvicorn (8765) split
+# SSE 流式响应在 vite 内置 http-proxy 下不工作 (Subagent 3 验证),
+# 改为前端直接用 absolute URL + CORS 跨域是更稳的方案.
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
 
 # 5-tab vertical slice routers (L1: brief, L2: search, L3: variables, L4: design, L5: execute)
 app.include_router(brief_router)
+# Phase 1 brief-step-cards: SSE stream + resume endpoints (additive, does not replace /api/brief)
+app.include_router(brief_stream_router)
 
 from Product.api.design import router as design_router  # noqa: E402
 app.include_router(design_router)

@@ -1934,3 +1934,383 @@ button {
   color: var(--color-strong);
   font-weight: 600;
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Step cards (BriefPanel 4-step LLM 扩写) — v2 visual upgrade
+ * 2026-06-05: 用户反馈"可视化还是不够清楚".
+ * 修复: 整套 .step-card / .caret / .step-card__spinner / skeleton 都是缺失的,
+ * 浏览器默认样式让所有 status 看不出区别. 现在每步都有卡片视觉 + 状态 pill +
+ * spinner + 用时/字符数实时显示 + skeleton 占位.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.step-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.step-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 14px 20px;
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+  transition:
+    border-color 220ms ease,
+    background 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.step-card--pending {
+  border-left-color: var(--color-line);
+  opacity: 0.7;
+}
+
+.step-card--running {
+  border-left-color: #6ea8ff;
+  background: linear-gradient(
+    180deg,
+    rgba(110, 168, 255, 0.06) 0%,
+    rgba(110, 168, 255, 0.02) 100%
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(110, 168, 255, 0.14),
+    0 6px 18px rgba(110, 168, 255, 0.06);
+  animation: card-pulse 2.4s ease-in-out infinite;
+}
+
+.step-card--done {
+  border-left-color: #57c47a;
+  background: rgba(87, 196, 122, 0.04);
+}
+
+.step-card--awaiting {
+  border-left-color: #f5a623;
+  background: rgba(245, 166, 35, 0.05);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 166, 35, 0.18),
+    0 6px 18px rgba(245, 166, 35, 0.07);
+}
+
+.step-card--error {
+  border-left-color: #e0625e;
+  background: rgba(224, 98, 94, 0.05);
+}
+
+@keyframes card-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(110, 168, 255, 0.14),
+      0 6px 18px rgba(110, 168, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(110, 168, 255, 0.24),
+      0 8px 24px rgba(110, 168, 255, 0.11);
+  }
+}
+
+.step-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.step-card__index {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-muted);
+  font-family: "sfmono-regular", consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.step-card--running .step-card__index {
+  border-color: rgba(110, 168, 255, 0.45);
+  color: #6ea8ff;
+  background: rgba(110, 168, 255, 0.08);
+}
+.step-card--done .step-card__index {
+  border-color: rgba(87, 196, 122, 0.45);
+  color: #57c47a;
+  background: rgba(87, 196, 122, 0.08);
+}
+.step-card--awaiting .step-card__index {
+  border-color: rgba(245, 166, 35, 0.45);
+  color: #f5a623;
+  background: rgba(245, 166, 35, 0.08);
+}
+.step-card--error .step-card__index {
+  border-color: rgba(224, 98, 94, 0.45);
+  color: #e0625e;
+  background: rgba(224, 98, 94, 0.08);
+}
+
+.step-card__title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-strong);
+  font-family: ui-serif, georgia, "times new roman", serif;
+  font-size: 15.5px;
+  font-weight: 480;
+  line-height: 1.3;
+}
+
+.step-card--pending .step-card__title {
+  color: var(--color-muted);
+}
+
+.step-card__phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: #8db4f4;
+  font-size: 12px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step-card__phase-icon {
+  flex-shrink: 0;
+  animation: sparkles-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sparkles-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+.step-card__status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.step-card__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 540;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.step-card__pill--pending  { color: var(--color-muted); }
+.step-card__pill--running  { color: #6ea8ff; border-color: rgba(110, 168, 255, 0.4); background: rgba(110, 168, 255, 0.08); }
+.step-card__pill--done     { color: #57c47a; border-color: rgba(87, 196, 122, 0.4); background: rgba(87, 196, 122, 0.08); }
+.step-card__pill--awaiting { color: #f5a623; border-color: rgba(245, 166, 35, 0.4); background: rgba(245, 166, 35, 0.08); }
+.step-card__pill--error    { color: #e0625e; border-color: rgba(224, 98, 94, 0.4); background: rgba(224, 98, 94, 0.08); }
+
+.step-card__spinner {
+  animation: spin 900ms linear infinite;
+  color: currentColor;
+}
+
+.step-card__metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-family: "sfmono-regular", consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-card__body {
+  min-height: 8px;
+  margin-left: 0;
+}
+
+.step-card__live {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-ink);
+  font-family: "sfmono-regular", "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(110, 168, 255, 0.12);
+  border-radius: 8px;
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 1px;
+  background: #6ea8ff;
+  vertical-align: text-bottom;
+  animation: caret-blink 1s steps(2, end) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+.step-card__skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.step-card__skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(110, 168, 255, 0.05) 0%,
+    rgba(110, 168, 255, 0.18) 50%,
+    rgba(110, 168, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.step-card__skeleton-line:nth-child(2) { animation-delay: 0.15s; }
+.step-card__skeleton-line:nth-child(3) { animation-delay: 0.3s; }
+.step-card__skeleton-line:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 0; opacity: 0.65; }
+  50%  { opacity: 1; }
+  100% { background-position: -100% 0; opacity: 0.65; }
+}
+
+.step-card__summary {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--color-ink);
+}
+
+.step-card__summary p:first-child { margin-top: 0; }
+.step-card__summary p:last-child  { margin-bottom: 0; }
+.step-card__summary h1, .step-card__summary h2, .step-card__summary h3 {
+  margin: 0.7em 0 0.35em;
+  color: var(--color-strong);
+  font-family: ui-serif, georgia, "times new roman", serif;
+  font-weight: 540;
+  line-height: 1.3;
+}
+.step-card__summary h3 { font-size: 14.5px; }
+.step-card__summary h2 { font-size: 16px; }
+.step-card__summary h1 { font-size: 18px; }
+.step-card__summary ul, .step-card__summary ol { padding-left: 1.4em; margin: 0.4em 0; }
+.step-card__summary li { margin: 0.18em 0; }
+.step-card__summary code {
+  font-family: "sfmono-regular", consolas, monospace;
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1c987;
+}
+.step-card__summary pre {
+  margin: 0.4em 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.step-card__summary blockquote {
+  margin: 0.4em 0;
+  padding: 4px 12px;
+  border-left: 3px solid #57c47a;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.step-card__actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(245, 166, 35, 0.25);
+}
+
+.step-card__buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.step-card__modify {
+  display: grid;
+  gap: 8px;
+}
+
+.step-card__textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 70px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--color-line);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--color-strong);
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.step-card__textarea:focus {
+  border-color: rgba(245, 166, 35, 0.5);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.12);
+}
+
+.step-card__textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.step-card__modify-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-card--running,
+  .step-card__phase-icon,
+  .step-card__skeleton-line,
+  .caret,
+  .step-card__spinner {
+    animation: none;
+  }
+}

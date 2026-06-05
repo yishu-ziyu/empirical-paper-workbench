@@ -27,6 +27,10 @@ interface StepState {
   title: string;
   liveText: string;
   summary: string;
+  /** step_start event 时的 epoch ms — StepCard 用来算用时. */
+  startedAt: number | null;
+  /** step_done event 时的 epoch ms — StepCard 用来冻结用时显示. */
+  endedAt: number | null;
 }
 
 type Phase = "idle" | "running" | "awaiting" | "completed" | "error";
@@ -39,10 +43,10 @@ const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
 };
 
 const INITIAL_STEPS: Record<1 | 2 | 3 | 4, StepState> = {
-  1: { status: "pending", title: STEP_TITLES[1], liveText: "", summary: "" },
-  2: { status: "pending", title: STEP_TITLES[2], liveText: "", summary: "" },
-  3: { status: "pending", title: STEP_TITLES[3], liveText: "", summary: "" },
-  4: { status: "pending", title: STEP_TITLES[4], liveText: "", summary: "" },
+  1: { status: "pending", title: STEP_TITLES[1], liveText: "", summary: "", startedAt: null, endedAt: null },
+  2: { status: "pending", title: STEP_TITLES[2], liveText: "", summary: "", startedAt: null, endedAt: null },
+  3: { status: "pending", title: STEP_TITLES[3], liveText: "", summary: "", startedAt: null, endedAt: null },
+  4: { status: "pending", title: STEP_TITLES[4], liveText: "", summary: "", startedAt: null, endedAt: null },
 };
 
 function isStepIndex(n: unknown): n is 1 | 2 | 3 | 4 {
@@ -193,6 +197,8 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
             status: "running",
             title: evt.title || STEP_TITLES[idx],
             liveText: "",
+            startedAt: Date.now(),
+            endedAt: null,
           });
           break;
         }
@@ -227,6 +233,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
                 status: "done",
                 // summary 缺失时回退到 liveText (防 truncated)
                 summary: evt.summary || captured,
+                endedAt: Date.now(),
               },
             };
           });
@@ -261,6 +268,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
                     ...step,
                     status: "done",
                     summary: step.summary || step.liveText,
+                    endedAt: step.endedAt ?? Date.now(),
                   };
                   changed = true;
                 }
@@ -403,6 +411,8 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
               status={steps[idx].status}
               liveText={steps[idx].liveText}
               summary={steps[idx].summary}
+              startedAt={steps[idx].startedAt}
+              endedAt={steps[idx].endedAt}
               onContinue={() => handleResume("continue")}
               onModify={(userInput) => handleResume("modify", userInput)}
               onReselect={() => handleResume("reselect")}

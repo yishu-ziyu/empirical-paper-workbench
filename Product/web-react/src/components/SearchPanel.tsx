@@ -53,7 +53,12 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
   const triggerSearch = async () => {
     setState({ loading: true, error: null, response: null, excluded: new Set() });
     try {
-      const resp = await fetch("/api/search", {
+      // vite 7 http-proxy 不转 SSE, 同时 vite 的 public base URL (/react/)
+      // 会拒绝 "/api/..." 这种绝对路径, 返回 404 "did you mean to visit /react/api/..."
+      // 改用绝对 URL + 后端 CORS, 与 BriefPanel 一致 (SSE plumbing 必走绝对 URL)
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const url = `${base}/api/search`;
+      const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic_slug: topicSlug, brief_path: briefPath }),

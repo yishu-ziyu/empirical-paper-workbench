@@ -121,7 +121,9 @@ export function ExecutionPanel({
     setStatusStage("connecting");
 
     try {
-      const response = await fetch("/api/execute", {
+      // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const response = await fetch(`${base}/api/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

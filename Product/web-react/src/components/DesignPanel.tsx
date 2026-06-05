@@ -49,7 +49,9 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
     setResponse(null);
 
     try {
-      const r = await fetch("/api/design", {
+      // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const r = await fetch(`${base}/api/design`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

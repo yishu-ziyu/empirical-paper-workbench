@@ -60,20 +60,20 @@ interface ResearchCommandInputProps {
 
 const DEFAULT_MODES: ModelOption[] = [
   {
+    id: "human-review",
+    name: "半自动审阅",
+    description: "每一步等待人工确认后再继续",
+    badge: "默认",
+  },
+  {
     id: "codex-supervisor",
     name: "本地 Codex Supervisor",
     description: "先生成研究计划、风险和证据要求",
-    badge: "默认",
   },
   {
     id: "auto-research",
     name: "Auto Research",
     description: "自动推进到导出预检，结果保持草案层",
-  },
-  {
-    id: "human-review",
-    name: "半自动审阅",
-    description: "每一步等待人工确认后再继续",
   },
 ];
 

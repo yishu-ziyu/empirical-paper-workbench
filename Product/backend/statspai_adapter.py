@@ -79,7 +79,13 @@ def index_statspai_capabilities(statspai_path: Path | None = None) -> list[dict[
             spec = sp.describe_function(fn_name)
         except Exception:
             continue
-        category = getattr(spec, "category", "unknown")
+        # `spec` is a dict (returned by `sp.describe_function()`), not a dataclass.
+        # `getattr(spec, "category", "unknown")` silently returns "unknown" for ALL
+        # functions — see Task 43 BDD spec for the bug it caused in the methods drawer.
+        if isinstance(spec, dict):
+            category = spec.get("category", "unknown")
+        else:
+            category = getattr(spec, "category", "unknown")
         capabilities.append({
             "id": f"cap_statspai_{fn_name}",
             "namespace": "statspai",

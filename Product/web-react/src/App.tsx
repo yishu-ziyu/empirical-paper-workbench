@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DottedSurface } from "./components/DottedSurface";
 import { ResearchCommandInput } from "./components/ResearchCommandInput";
 import { SlideTabs, type StageTab } from "./components/SlideTabs";
@@ -8,6 +8,19 @@ import { VariablesPanel, type Variable } from "./components/VariablesPanel";
 import { DesignPanel } from "./components/DesignPanel";
 import { ExecutionPanel } from "./components/ExecutionPanel";
 import { IdentificationAuditPanel } from "./components/IdentificationAuditPanel";
+import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
+import { AutoResearchStream } from "./components/AutoResearchStream";
+import { SystemStatusBar } from "./components/SystemStatusBar";
+
+interface SupervisorPlanStage {
+  id: string;
+  title: string;
+  owner: string;
+  status: "empty" | "draft" | "ready" | "running" | "completed" | "failed";
+  reason: string;
+  inputs: string[];
+  outputs: string[];
+}
 
 interface SubmittedResearchTask {
   message: string;
@@ -54,7 +67,7 @@ const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
   variables: { label: "数据变量", hint: "基于数据集 schema + 简报识别 X / Y / control 候选变量" },
   design: { label: "方法设计", hint: "StatsPAI 估算候选识别策略，LLM 解释并推荐" },
   execution: { label: "执行实验", hint: "流式生成 9 节论文 + paper.pdf + results.json" },
-  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（pre-registration 占位）" },
+  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（statspai 真实输出）" },
 };
 
 /**
@@ -77,6 +90,10 @@ export function App() {
   const [task, setTask] = useState<SubmittedResearchTask | null>(null);
   const [topicSlug, setTopicSlug] = useState<string>("");
   const [activeStage, setActiveStage] = useState<Stage>("brief");
+  // codex-supervisor mode: 计划审核通过前, BriefPanel 不渲染
+  const [planApproved, setPlanApproved] = useState<boolean>(false);
+  const [planStages, setPlanStages] = useState<SupervisorPlanStage[] | null>(null);
+  const [planFetchError, setPlanFetchError] = useState<string | null>(null);
 
   // Results from each stage. Preserved across navigation so the user can
   // jump back to an earlier tab without losing state.
@@ -151,7 +168,50 @@ export function App() {
     setVariablesResult(null);
     setDesignResult(null);
     setExecutionResult(null);
+    setPlanApproved(false);
+    setPlanStages(null);
+    setPlanFetchError(null);
   };
+
+  // codex-supervisor mode: 进入 brief tab 时拉计划草案.
+  // 仅在 mode 切换 / 任务首次进入时拉一次 (topic 变化时重拉).
+  useEffect(() => {
+    if (!task) return;
+    if (task.mode !== "codex-supervisor") return;
+    if (planStages !== null) return;
+    const ctrl = new AbortController();
+    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    fetch(`${base}/api/supervisor/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: task.message }),
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: { stages?: SupervisorPlanStage[] }) => {
+        setPlanStages(data.stages ?? []);
+        setPlanFetchError(null);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setPlanFetchError(err instanceof Error ? err.message : String(err));
+        // 兜底: 即使拉取失败也给一个空 stages, 让 SupervisorPlanReview 仍可渲染
+        setPlanStages([]);
+      });
+    return () => ctrl.abort();
+  }, [task, planStages]);
+
+  // task 重置时清掉 plan
+  useEffect(() => {
+    if (task === null) {
+      setPlanStages(null);
+      setPlanApproved(false);
+      setPlanFetchError(null);
+    }
+  }, [task]);
 
   // ── Intake screen ──
   if (task === null) {
@@ -215,6 +275,10 @@ export function App() {
             {" · "}文件 {task.fileCount} · 长文本 {task.pastedCount} · slug:{" "}
             <code data-testid="topic-slug">{topicSlug}</code>
           </p>
+          <SystemStatusBar
+            projectId={`proj_${topicSlug}`}
+            topicSlug={topicSlug}
+          />
         </div>
       </section>
 
@@ -229,15 +293,55 @@ export function App() {
         <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
 
         {activeStage === "brief" ? (
-          <BriefPanel
-            topic={task.message}
-            initialSnapshot={briefSnapshot}
-            onComplete={(b, snapshot) => {
-              setBriefResult(b);
-              setBriefSnapshot(snapshot);
-              setActiveStage("search");
-            }}
-          />
+          task.mode === "codex-supervisor" ? (
+            <>
+              <SupervisorPlanReview
+                onApprove={() => {
+                  setPlanApproved(true);
+                }}
+                onReject={() => {
+                  showToast("已否决计划，回到新任务选择。");
+                  resetAll();
+                }}
+              />
+              {planApproved ? (
+                <BriefPanel
+                  topic={task.message}
+                  initialSnapshot={briefSnapshot}
+                  onComplete={(b, snapshot) => {
+                    setBriefResult(b);
+                    setBriefSnapshot(snapshot);
+                    setActiveStage("search");
+                  }}
+                />
+              ) : planFetchError ? (
+                <div className="task-brief__error" role="alert" data-testid="plan-fetch-error">
+                  <strong>计划加载失败：</strong> {planFetchError}
+                </div>
+              ) : null}
+            </>
+          ) : task.mode === "auto-research" ? (
+            <AutoResearchStream
+              topic={task.message}
+              topicSlug={topicSlug}
+              onComplete={(b, snapshot) => {
+                setBriefResult(b);
+                setBriefSnapshot(snapshot);
+                setActiveStage("search");
+              }}
+            />
+          ) : (
+            // human-review (default) and any unrecognized mode → BriefPanel as today
+            <BriefPanel
+              topic={task.message}
+              initialSnapshot={briefSnapshot}
+              onComplete={(b, snapshot) => {
+                setBriefResult(b);
+                setBriefSnapshot(snapshot);
+                setActiveStage("search");
+              }}
+            />
+          )
         ) : null}
 
         {activeStage === "search" && briefResult ? (
@@ -286,8 +390,11 @@ export function App() {
           />
         ) : null}
 
-        {activeStage === "identification-audit" && executionResult ? (
-          <IdentificationAuditPanel />
+        {activeStage === "identification-audit" && executionResult && designResult ? (
+          <IdentificationAuditPanel
+            resultsPath={executionResult.resultsPath}
+            designPath={designResult.designPath}
+          />
         ) : null}
 
         {briefResult && activeStage !== "brief" ? (

@@ -402,3 +402,100 @@ def normalize_list(value: Any) -> list[Any]:
     if value is None:
         return []
     return [value]
+
+
+# ── Default plan draft (intake-time preview) ─────────────────────────────────
+# Mirrors Product/web-react/src/components/SupervisorPlanReview.tsx::DEFAULT_STAGES.
+# This is the static 8-stage plan shown in the brief tab when the user has
+# selected codex-supervisor mode. Backend is the single source of truth for
+# the structure; the frontend re-uses the same shape when receiving JSON.
+# When the user approves, the per-project generate_project_supervisor_plan()
+# produces a live Codex-driven plan (see /api/v1/projects/{id}/supervisor-plan).
+
+DEFAULT_PLAN_DRAFT_STAGES: list[dict[str, Any]] = [
+    {
+        "id": "literature-search",
+        "title": "1. 文献检索与理论构建",
+        "owner": "LiteratureAgent",
+        "status": "ready",
+        "reason": "识别核心机制、经典文献中对该效应的理论建模，抽取关键机制假说。",
+        "inputs": ["研究题目", "文献数据库 API"],
+        "outputs": ["理论假说", "机制框架图"],
+    },
+    {
+        "id": "data-variables",
+        "title": "2. 数据检索与变量画像",
+        "owner": "DataAgent",
+        "status": "running",
+        "reason": "【推荐首选分支】已附带本地数据文件，优先对数据文件开展字段解析、缺失值评估与类型画像。",
+        "inputs": ["本地附件 (csv/dta)", "变量定义字典"],
+        "outputs": ["VariableRoleSet", "字段缺失值报告"],
+    },
+    {
+        "id": "method-design",
+        "title": "3. 因果识别与方法设计",
+        "owner": "MethodAgent",
+        "status": "draft",
+        "reason": "基于自变量与因变量的数据分布，设计双重差分 (DID) 或工具变量 (IV) 识别方程。",
+        "inputs": ["VariableRoleSet", "时点分布"],
+        "outputs": ["DesignSpec (方程设定)", "平行趋势前置条件"],
+    },
+    {
+        "id": "preflight-check",
+        "title": "4. 执行预检与沙盒模拟",
+        "owner": "Supervisor",
+        "status": "empty",
+        "reason": "静态解析 Stata/Python 代码块，开展因果依赖冲突、循环共线性等预检。",
+        "inputs": ["DesignSpec", "本地环境配置"],
+        "outputs": ["PreflightReport", "环境依赖树"],
+    },
+    {
+        "id": "experiment-run",
+        "title": "5. 实证跑码与实验运行",
+        "owner": "ExecutionAgent",
+        "status": "empty",
+        "reason": "启动本地 Stata/Python 进程，执行回归计算、稳健性检验并捕获完整输出。",
+        "inputs": ["approved RunPlan", "本地计算沙盒"],
+        "outputs": ["回归系数表", "异质性分析结果"],
+    },
+    {
+        "id": "findings-review",
+        "title": "6. 结果解释与证据审核",
+        "owner": "ReviewerAgent",
+        "status": "empty",
+        "reason": "审核回归结果是否显性、控制变量是否稳定，以及机制分析是否符合逻辑路径。",
+        "inputs": ["回归系数表", "机制分析结论"],
+        "outputs": ["approved Finding", "可复现证据包"],
+    },
+    {
+        "id": "manuscript-draft",
+        "title": "7. 论文草稿与学术表述",
+        "owner": "ManuscriptAgent",
+        "status": "empty",
+        "reason": "自动根据因果系数及机制审核包，起草实证部分的 LaTeX/Docx 段落及表格。",
+        "inputs": ["approved Finding", "LaTeX 模板"],
+        "outputs": ["Manuscript 草稿段落", "Word 数据附表"],
+    },
+    {
+        "id": "export-reproducibility",
+        "title": "8. 导出审计与可复现包",
+        "owner": "Supervisor",
+        "status": "empty",
+        "reason": "对最终论文段落、Stata dofile、原始数据画像及人工审核链进行完整打包，生成可复现指纹。",
+        "inputs": ["Manuscript", "完整执行 Trace"],
+        "outputs": ["可复现压缩包 (zip)", "数据指纹签名"],
+    },
+]
+
+
+def get_default_plan_draft() -> list[dict[str, Any]]:
+    """Return the static 8-stage plan draft used by the brief tab's
+    SupervisorPlanReview component when the user picks `codex-supervisor` mode.
+
+    This is NOT the same as `generate_project_supervisor_plan()` — the latter
+    requires a registered project, a confirmed ResearchQuestion, and an
+    approved DesignSpec + RunPlan. The intake-time preview only needs the
+    shape of what a plan would look like.
+    """
+    # Return a deep-ish copy so callers can't mutate the module constant.
+    return [dict(stage) for stage in DEFAULT_PLAN_DRAFT_STAGES]

@@ -187,6 +187,8 @@ from Product.backend.cost_service import (
 )
 from Product.api.brief import router as brief_router
 from Product.api.brief_stream import router as brief_stream_router
+from Product.api.supervisor import router as supervisor_router
+from Product.api.auto_research import router as auto_research_router
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -223,6 +225,9 @@ if (WEB_DIST_ROOT / "assets").exists():
 app.include_router(brief_router)
 # Phase 1 brief-step-cards: SSE stream + resume endpoints (additive, does not replace /api/brief)
 app.include_router(brief_stream_router)
+# Task 42 (ui-gap-fill): intake-time mode-dispatch endpoints (no project_id)
+app.include_router(supervisor_router)
+app.include_router(auto_research_router)
 
 from Product.api.design import router as design_router  # noqa: E402
 app.include_router(design_router)
@@ -234,6 +239,18 @@ app.include_router(variables_router)
 # L5-execution: 执行实验 (Execution) tab - SSE endpoint
 from Product.api.execute import router as execute_router  # noqa: E402
 app.include_router(execute_router)
+
+# Task 41: 后端 11 service 状态聚合 (状态条 single source of truth)
+from Product.api.system import router as system_router  # noqa: E402
+app.include_router(system_router)
+
+# Task 43: DesignPanel 抽屉 — 浏览全部 StatsPAI 方法
+from Product.api.capabilities import router as capabilities_router  # noqa: E402
+app.include_router(capabilities_router)
+
+# Task 44: 6th tab (identification-audit) real statspai diagnostics
+from Product.api.identification import router as identification_router  # noqa: E402
+app.include_router(identification_router)
 
 
 # ── 5-tab routers (L1-L5 各自 register 自己的) ─────────────────────────────

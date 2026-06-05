@@ -37,6 +37,7 @@ from Product.types.research import (
 _VALID_ROLES = {"X", "Y", "control", "mediator", "moderator"}
 
 # 已知数据集的 stub 列名（按工业机器人/就业/工资研究最常见变量排序）
+# 注意: 这是只读配置 (只用作 fallback 查表, 任何代码都不得 .update() / .pop() / .clear())
 _DATASET_STUBS: dict[str, list[dict[str, str]]] = {
     "CFPS": [
         {"name": "pid", "type": "int", "desc": "个体 id"},

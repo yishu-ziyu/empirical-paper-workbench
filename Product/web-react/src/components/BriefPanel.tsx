@@ -4,11 +4,22 @@ import { StepCard, type StepStatus } from "./StepCard";
 export interface BriefResult {
   markdown: string;
   path: string;
+  verdict?: boolean;
+}
+
+/** Persisted snapshot of the 4 research-journal steps, used to rehydrate
+ *  BriefPanel when the user navigates away from the brief tab and back. */
+export interface BriefStepsSnapshot {
+  steps: Record<1 | 2 | 3 | 4, StepState>;
+  finalBrief: BriefResult | null;
 }
 
 export interface BriefPanelProps {
   topic: string;
-  onComplete?: (brief: BriefResult) => void;
+  /** 从 App 传下来的"上次完成"快照 — 若存在, 跳过 streaming 直接显示。 */
+  initialSnapshot?: BriefStepsSnapshot | null;
+  /** 完成时回调, 把当前 4 step state + final brief 一并交给 App 持久化。 */
+  onComplete?: (brief: BriefResult, snapshot: BriefStepsSnapshot) => void;
 }
 
 interface StepState {
@@ -59,15 +70,29 @@ interface BriefSseEvent {
  * - 用户决策 → POST /api/brief/resume SSE → 步骤 4 → final_brief → onComplete
  * - 任何 SSE 错误显示重试按钮
  */
-export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
-  const [phase, setPhase] = useState<Phase>("idle");
+export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelProps) {
+  // 若 App 传了 initialSnapshot (用户切走后又切回), 直接 hydrate —
+  // 跳过 streaming, 进入 "查看已保存的简报" 模式
+  const [phase, setPhase] = useState<Phase>(
+    initialSnapshot ? "completed" : "idle"
+  );
   const [error, setError] = useState<string | null>(null);
-  const [steps, setSteps] = useState(INITIAL_STEPS);
-  const [finalBrief, setFinalBrief] = useState<{
-    markdown: string;
-    path: string;
-    verdict: boolean;
-  } | null>(null);
+  const [steps, setSteps] = useState<Record<1 | 2 | 3 | 4, StepState>>(
+    initialSnapshot?.steps ?? INITIAL_STEPS
+  );
+  const [finalBrief, setFinalBrief] = useState<BriefResult | null>(
+    initialSnapshot?.finalBrief ?? null
+  );
+  // 镜像 steps / finalBrief 到 ref, 让 handleResume 能在不重新订阅
+  // SSE 的前提下读到最新 state (用于构造 onComplete 的 snapshot)
+  const stepsRef = useRef<Record<1 | 2 | 3 | 4, StepState>>(steps);
+  const finalBriefRef = useRef<BriefResult | null>(finalBrief);
+  useEffect(() => {
+    stepsRef.current = steps;
+  }, [steps]);
+  useEffect(() => {
+    finalBriefRef.current = finalBrief;
+  }, [finalBrief]);
   // 保存 step 1-3 输出, 供 /resume 用
   const priorStepsRef = useRef<Record<string, string>>({});
   const abortRef = useRef<AbortController | null>(null);
@@ -95,7 +120,10 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const res = await fetch(url, {
+      // Vite 内置 proxy 不转 SSE, 改用绝对 URL + 后端 CORS 跨域 (Subagent 3 验证)
+      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
+      const res = await fetch(fullUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -183,10 +211,25 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         case "step_done": {
           const idx = evt.step_index;
           if (!isStepIndex(idx)) return;
-          // 在 setState 之前捕获 liveText (reducer 应当是纯的)
-          const captured = steps[idx].liveText;
-          priorStepsRef.current[String(idx)] = captured;
-          updateStep(idx, { status: "done", summary: evt.summary || "" });
+          // 在 setState 之前用 ref 捕获 liveText —
+          // 修复 stale closure: applyEvent 之前依赖 [updateStep, steps],
+          // 但 consumeSse 是 useCallback([], ...) 冻结了 *初始* 引用,
+          // 读到的是 INITIAL_STEPS (全空), 导致 prior_steps 被存成空串,
+          // resume 时 step 3 永远不能从 awaiting → done.
+          setSteps((prev) => {
+            const captured = prev[idx].liveText;
+            priorStepsRef.current[String(idx)] = captured;
+            return {
+              ...prev,
+              [idx]: {
+                ...prev[idx],
+                // 强制覆盖 awaiting / running, step_done 一定胜出
+                status: "done",
+                // summary 缺失时回退到 liveText (防 truncated)
+                summary: evt.summary || captured,
+              },
+            };
+          });
           break;
         }
         case "await_user": {
@@ -205,6 +248,26 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
         }
         case "done": {
+          // 流结束: 兜底 — 把所有仍卡在 awaiting 的 step 强制标记为 done
+          // (后端 resume 可能不重发 step_done for awaiting steps)
+          setSteps((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            (Object.keys(next) as unknown as Array<keyof typeof next>).forEach(
+              (k) => {
+                const step = next[k as 1 | 2 | 3 | 4];
+                if (step.status === "awaiting" || step.status === "running") {
+                  next[k as 1 | 2 | 3 | 4] = {
+                    ...step,
+                    status: "done",
+                    summary: step.summary || step.liveText,
+                  };
+                  changed = true;
+                }
+              }
+            );
+            return changed ? next : prev;
+          });
           setPhase("completed");
           setResumeInFlight(false);
           break;
@@ -219,7 +282,7 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
           break;
       }
     },
-    [updateStep, steps]
+    [updateStep]
   );
 
   const handleStart = useCallback(async () => {
@@ -232,7 +295,7 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
     // 中止上一次未完成的请求 (防 zombie stream)
     abortRef.current?.abort();
     try {
-      await consumeSse("/api/brief", { topic });
+      await consumeSse("/api/brief/stream", { topic });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         return; // 主动中止, 不算错误
@@ -252,7 +315,7 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
       // 中止上一次未完成的请求 (防 zombie stream)
       abortRef.current?.abort();
       try {
-        const events = await consumeSse("/api/brief/resume", {
+        const events = await consumeSse("/api/brief/stream/resume", {
           topic,
           action,
           user_input: userInput,
@@ -260,7 +323,18 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         });
         const final = events.find((e) => e.event === "final_brief");
         if (final && final.verdict_passed && onComplete) {
-          onComplete({ markdown: final.markdown || "", path: final.brief_path || "" });
+          onComplete(
+            {
+              markdown: final.markdown || "",
+              path: final.brief_path || "",
+              verdict: final.verdict_passed,
+            },
+            {
+              // 用 ref 拿最新 state, 避免 handleResume 闭包陷阱
+              steps: stepsRef.current,
+              finalBrief: finalBriefRef.current,
+            },
+          );
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
@@ -285,19 +359,30 @@ export function BriefPanel({ topic, onComplete }: BriefPanelProps) {
         </div>
 
         <div className="task-brief__confirm-actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={handleStart}
-            disabled={phase === "running" || phase === "awaiting" || !topic.trim()}
-            data-testid="brief-start"
-          >
-            {phase === "running"
-              ? "研究中…"
-              : phase === "awaiting"
-                ? "等你的决策"
-                : "开始研究"}
-          </button>
+          {phase === "completed" ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={handleStart}
+              data-testid="brief-restart"
+            >
+              重新研究
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={handleStart}
+              disabled={phase === "running" || phase === "awaiting" || !topic.trim()}
+              data-testid="brief-start"
+            >
+              {phase === "running"
+                ? "研究中…"
+                : phase === "awaiting"
+                  ? "等你的决策"
+                  : "开始研究"}
+            </button>
+          )}
         </div>
 
         {phase === "error" && error && (

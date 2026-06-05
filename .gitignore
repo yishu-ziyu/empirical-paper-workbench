@@ -13,6 +13,9 @@ __pycache__/
 
 # Frontend dependencies
 Product/web-react/node_modules/
+Product/web-react/dist/
+Product/web-react/test-results/
+Product/web-dist/
 
 # Product runtime state
 Product/state/*.json

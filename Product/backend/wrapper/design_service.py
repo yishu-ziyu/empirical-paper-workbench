@@ -81,9 +81,11 @@ def _default_sp_fn(method: str, variables: list) -> dict[str, Any]:
         "source": "placeholder",
     }
     try:
+        import os
         import sys
-        stats_pai_path = "/Users/mahaoxuan/Desktop/经济学论文/StatsPAI/src"
-        if stats_pai_path not in sys.path:
+        # StatsPAI path 通过 env var 配置 (避免 hardcoded 绝对路径导致环境不可移植)
+        stats_pai_path = os.getenv("STATSPAI_PATH", "")
+        if stats_pai_path and stats_pai_path not in sys.path:
             sys.path.insert(0, stats_pai_path)
         import statspai  # type: ignore[import-untyped]
         spec = statspai.describe_function(method.lower())

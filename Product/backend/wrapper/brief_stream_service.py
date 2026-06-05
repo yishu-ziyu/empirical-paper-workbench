@@ -9,6 +9,7 @@ hygiene task; route module re-exports them).
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -62,7 +63,7 @@ class BriefResumeRequest(BaseModel):
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-_MODEL = "MiniMax-M3"
+_MODEL = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
 _PROVIDER_ID = "minimax"
 _STEP_MARKER_RE = re.compile(r"### STEP_(\d+)_DONE ###")
 STEP_TITLES = (

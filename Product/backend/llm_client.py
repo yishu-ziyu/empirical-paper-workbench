@@ -104,8 +104,10 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
         # 用 env MINIMAX_BASE_URL 可以 override（推荐在 .env.local 里设）。
         # base_url 必须含 /v1 段（项目 _call_anthropic_compatible 拼 /messages）
         base_url="https://api.minimaxi.com/anthropic/v1",
-        default_model="MiniMax-M3",
-        models=("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5"),
+        # 模型默认 MiniMax-M2.7 (用户 ai组件工作流 验证: 同一个 sk-cp-* key, M2.7
+        # 支持 streaming 200 OK, M3 stream=True 返 401). 用 env MINIMAX_MODEL 可 override.
+        default_model=os.getenv("MINIMAX_MODEL", "MiniMax-M2.7"),
+        models=("MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M3"),
         api_key_env="MINIMAX_API_KEY",
         # 兼容旧名 MINIMAX_TOKEN_PLAN_KEY：见 chat_completion() 中的 fallback 逻辑
         doc=(
@@ -114,6 +116,8 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
             "Falls back to MINIMAX_TOKEN_PLAN_KEY for backward compat. "
             "Default base_url=https://api.minimaxi.com/anthropic/v1 (verified with this key). "
             "Override via env MINIMAX_BASE_URL if you have a key bound to api.minimax.io. "
+            "Default model=MiniMax-M2.7 (MiniMax-M3 doesn't support streaming with Token Plan keys, "
+            "see ai组件工作流/.env.local for pattern). Override via env MINIMAX_MODEL. "
             "Official docs: https://platform.minimax.io/docs/api-reference/text-anthropic-api"
         ),
     ),

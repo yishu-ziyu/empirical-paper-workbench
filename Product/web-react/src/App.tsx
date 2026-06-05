@@ -67,7 +67,7 @@ const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
   variables: { label: "数据变量", hint: "基于数据集 schema + 简报识别 X / Y / control 候选变量" },
   design: { label: "方法设计", hint: "StatsPAI 估算候选识别策略，LLM 解释并推荐" },
   execution: { label: "执行实验", hint: "流式生成 9 节论文 + paper.pdf + results.json" },
-  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（pre-registration 占位）" },
+  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（statspai 真实输出）" },
 };
 
 /**
@@ -390,8 +390,11 @@ export function App() {
           />
         ) : null}
 
-        {activeStage === "identification-audit" && executionResult ? (
-          <IdentificationAuditPanel />
+        {activeStage === "identification-audit" && executionResult && designResult ? (
+          <IdentificationAuditPanel
+            resultsPath={executionResult.resultsPath}
+            designPath={designResult.designPath}
+          />
         ) : null}
 
         {briefResult && activeStage !== "brief" ? (

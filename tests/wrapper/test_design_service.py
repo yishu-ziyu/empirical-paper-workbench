@@ -109,6 +109,25 @@ class DesignServiceTests(unittest.TestCase):
         self.assertIn("Y", roles)
         self.assertTrue(all(isinstance(v, Variable) for v in variables))
 
+    def test_bdd_design_load_variables_accepts_frontmatter(self) -> None:
+        """行为 1b: 变量文件带 provenance frontmatter 时，设计阶段只解析 YAML body。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            var_path = Path(tmp) / "variables.yaml"
+            var_path.write_text(
+                "---\n"
+                "topic: \"父母教育水平---对子女工资的影响\"\n"
+                "generated_by: variables_service\n"
+                "---\n\n"
+                + SAMPLE_VARIABLES_YAML,
+                encoding="utf-8",
+            )
+
+            variables = load_variables(var_path)
+
+        self.assertEqual(len(variables), 3)
+        self.assertIn("X", {v.role for v in variables})
+        self.assertIn("Y", {v.role for v in variables})
+
     # ============== 行为 2: build_candidates ==============
 
     def test_bdd_design_build_candidates_uses_llm_and_statspai(self) -> None:

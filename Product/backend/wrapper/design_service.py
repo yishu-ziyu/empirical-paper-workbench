@@ -45,7 +45,12 @@ def load_variables(variables_path: Path | str) -> list[Variable]:
     容错：YAML 结构必须含 `variables` 列表，每项至少有 role/dataset_column。
     """
     path = Path(variables_path)
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    # 兼容带 frontmatter 的 variables.yaml: 切掉首段 `--- ... ---` 只解析 body.
+    # 不直接 yaml.safe_load_all 是为了避免 topic='---' 这类字段值触发多文档歧义.
+    parts = re.split(r"^---\s*\n", text, maxsplit=2, flags=re.MULTILINE)
+    body = parts[-1] if len(parts) >= 3 else text
+    raw = yaml.safe_load(body)
     if not isinstance(raw, dict) or "variables" not in raw:
         raise ValueError(f"variables.yaml missing 'variables' key: {path}")
     items = raw["variables"]

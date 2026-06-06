@@ -132,6 +132,33 @@ class ExecuteServiceTests(unittest.TestCase):
         self.assertEqual(design_dict["method"], "IV")
         self.assertIn("code_stub", design_dict)
 
+    def test_bdd_execute_load_inputs_accepts_variables_frontmatter(self) -> None:
+        """行为 1b: 执行阶段读取带 provenance frontmatter 的 variables.yaml。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            brief_path = tmp_path / "brief.md"
+            variables_path = tmp_path / "variables.yaml"
+            design_path = tmp_path / "design.json"
+            brief_path.write_text(SAMPLE_BRIEF_MD, encoding="utf-8")
+            variables_path.write_text(
+                "---\n"
+                "topic: \"父母教育水平---对子女工资的影响\"\n"
+                "generated_by: variables_service\n"
+                "---\n\n"
+                + SAMPLE_VARIABLES_YAML,
+                encoding="utf-8",
+            )
+            design_path.write_text(SAMPLE_DESIGN_JSON, encoding="utf-8")
+
+            _, variables, design_dict = load_inputs(
+                brief_path, variables_path, design_path
+            )
+
+        self.assertEqual(len(variables), 3)
+        self.assertIn("X", {v.role for v in variables})
+        self.assertIn("Y", {v.role for v in variables})
+        self.assertEqual(design_dict["recommended"], "IV")
+
     # ============== 行为 2: write_section ==============
 
     def test_bdd_execute_write_section_returns_path(self) -> None:

@@ -9,6 +9,7 @@ from Product.backend.registry import get_project_by_id_or_transient
 from Product.backend.auto_empirical_research_skills import (
     get_aers_source_info,
     index_aers_capabilities,
+    index_aers_quality_gates,
 )
 from Product.backend.reproducibility_skill_contract import build_reproducibility_product_capability
 from Product.backend.statspai_adapter import get_statspai_info, index_statspai_capabilities
@@ -75,6 +76,7 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
     statspai_caps = index_statspai_capabilities()
     aers_info = get_aers_source_info()
     aers_caps = index_aers_capabilities()
+    aers_quality_gates = index_aers_quality_gates()
 
     # Built-in capabilities (product actions)
     builtin_caps: list[dict[str, Any]] = [
@@ -109,7 +111,7 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
         build_reproducibility_product_capability(),
     ]
 
-    all_capabilities = builtin_caps + statspai_caps + aers_caps
+    all_capabilities = builtin_caps + statspai_caps + aers_caps + aers_quality_gates
     classification = _classify_capabilities(all_capabilities)
 
     registry = {
@@ -133,6 +135,7 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
                 "indexed_at": timestamp,
                 "available": aers_info.get("available", False),
                 "function_count": len(aers_caps),
+                "quality_gate_count": len(aers_quality_gates),
                 "summary": aers_info.get("summary", {}),
                 "canonical_policy": aers_info.get("canonical_policy", {}),
             },

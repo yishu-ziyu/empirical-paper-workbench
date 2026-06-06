@@ -29,19 +29,35 @@ def _sse_format(event_dict: dict) -> str:
 
 
 async def _stream_initial(req: BriefRequest) -> AsyncIterator[str]:
-    for event in run_brief_stream(req.topic):
-        yield _sse_format(event.model_dump())
+    try:
+        for event in run_brief_stream(req.topic):
+            yield _sse_format(event.model_dump())
+    except Exception as exc:
+        yield _sse_format(
+            BriefEvent(
+                event="error",
+                message=f"模型执行没有完成：{exc}",
+            ).model_dump()
+        )
 
 
 async def _stream_resume(req: BriefResumeRequest) -> AsyncIterator[str]:
-    for event in resume_brief_stream(
-        topic=req.topic,
-        action=req.action,
-        prior_steps=req.prior_steps,
-        user_input=req.user_input,
-        tasks_root=TASKS_ROOT,
-    ):
-        yield _sse_format(event.model_dump())
+    try:
+        for event in resume_brief_stream(
+            topic=req.topic,
+            action=req.action,
+            prior_steps=req.prior_steps,
+            user_input=req.user_input,
+            tasks_root=TASKS_ROOT,
+        ):
+            yield _sse_format(event.model_dump())
+    except Exception as exc:
+        yield _sse_format(
+            BriefEvent(
+                event="error",
+                message=f"模型执行没有完成：{exc}",
+            ).model_dump()
+        )
 
 
 @router.post("/api/brief/stream")

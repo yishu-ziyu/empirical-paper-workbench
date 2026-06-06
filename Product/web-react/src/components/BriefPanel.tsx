@@ -40,7 +40,7 @@ interface StepState {
 type Phase = "idle" | "running" | "awaiting" | "completed" | "error";
 
 const SERVICE_ERROR_MESSAGE =
-  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
+  "这一步没有跑通。请检查后端服务或模型配置后重试，已保存的研究材料不会丢。";
 
 const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
   1: "分析研究问题",
@@ -142,7 +142,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
-        throw new Error("brief_service_unavailable");
+        throw new Error(SERVICE_ERROR_MESSAGE);
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -318,7 +318,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       if (err instanceof Error && err.name === "AbortError") {
         return; // 主动中止, 不算错误
       }
-      setError(SERVICE_ERROR_MESSAGE);
+      setError(err instanceof Error ? err.message : SERVICE_ERROR_MESSAGE);
       setPhase("error");
       setResumeInFlight(false);
     }
@@ -358,7 +358,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
         if (err instanceof Error && err.name === "AbortError") {
           return; // 主动中止, 不算错误
         }
-        setError(SERVICE_ERROR_MESSAGE);
+        setError(err instanceof Error ? err.message : SERVICE_ERROR_MESSAGE);
         setPhase("error");
       } finally {
         setResumeInFlight(false);
@@ -406,9 +406,9 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
 
         {phase === "error" && error && (
           <div className="task-brief__error" role="alert" data-testid="brief-error">
-            <strong>服务暂时没连上：</strong> {error}
+            <strong>这一步没有跑通：</strong> {error}
             <button type="button" className="btn btn--ghost" onClick={handleStart}>
-              稍后重试
+              重新尝试
             </button>
           </div>
         )}

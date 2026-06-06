@@ -102,13 +102,14 @@ export function ReasoningChainView({
         .reasoning-chain {
           margin-top: 0.5rem;
           padding: 0.5rem 0.75rem;
-          background: #f9fafb;
+          background: var(--color-panel-soft);
+          border: 1px solid var(--color-line);
           border-radius: 6px;
           font-size: 0.8rem;
         }
         .reasoning-chain__header {
           font-weight: 600;
-          color: #4b5563;
+          color: var(--color-muted);
           margin-bottom: 0.4rem;
           font-size: 0.7rem;
           text-transform: uppercase;
@@ -123,7 +124,7 @@ export function ReasoningChainView({
           gap: 0.4rem;
           cursor: pointer;
           list-style: none;
-          color: #1f2937;
+          color: var(--color-ink);
           padding: 0.2rem 0;
         }
         .reasoning-chain__summary::-webkit-details-marker {
@@ -131,14 +132,14 @@ export function ReasoningChainView({
         }
         .reasoning-chain__truncated-tag {
           font-size: 0.7rem;
-          color: #9ca3af;
+          color: var(--color-muted);
           margin-left: 0.3rem;
         }
         .reasoning-chain__body {
           margin: 0.3rem 0 0.3rem 1.4rem;
           padding: 0.5rem;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
+          background: rgba(230, 230, 230, 0.04);
+          border: 1px solid var(--color-line);
           border-radius: 4px;
           white-space: pre-wrap;
           word-break: break-word;
@@ -146,10 +147,10 @@ export function ReasoningChainView({
           font-size: 0.75rem;
           max-height: 320px;
           overflow-y: auto;
-          color: #1f2937;
+          color: var(--color-ink);
         }
         .reasoning-chain__body--prompt {
-          color: #4b5563;
+          color: var(--color-muted);
         }
       `}</style>
     </div>

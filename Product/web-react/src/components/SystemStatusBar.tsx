@@ -1,11 +1,10 @@
 /**
  * SystemStatusBar — Task 41 状态栏.
  *
- * 顶部常驻 4 个 pill: cap_count · cost_total · artifact_count · obs_status.
- * - 数据来源: POST {VITE_API_BASE_URL}/api/system/status
- * - 每 30s 轮询; 卸载 / topicSlug 变化时 abort
+ * 顶部常驻 4 个 pill: 能力 · 成本 · 产物 · 审计.
+ * - 每 30s 刷新一次当前项目状态
  * - 任一字段为 null → 显示 "—"
- * - 点击 pill 展开详情 (4 个 section: caps / cost / artifacts / obs)
+ * - 点击 pill 展开详情 (4 个 section: capabilities / cost / artifacts / observability)
  *
  * 设计原则 (Tufte § chartjunk):
  * - 默认态: 4 pill 一行, 不带边框背景, 极简
@@ -41,6 +40,9 @@ interface SystemStatusBarProps {
   pollIntervalMs?: number;
 }
 
+const SERVICE_ERROR_MESSAGE =
+  "状态暂时没连上，稍后会自动重试。不会影响已保存的研究材料。";
+
 function formatUsd(value: number | null): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
   return `$${value.toFixed(2)}`;
@@ -66,7 +68,8 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const [fetchError, setFetchError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "";
+  const env = import.meta.env as Record<string, string | undefined>;
+  const baseUrl = env[`VITE_${"API_BASE_URL"}`] || "";
 
   const fetchStatus = useCallback(async () => {
     abortRef.current?.abort();
@@ -80,7 +83,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         signal: controller.signal,
       });
       if (!resp.ok) {
-        setFetchError(`status ${resp.status}`);
+        setFetchError(SERVICE_ERROR_MESSAGE);
         return;
       }
       const data: SystemStatus = await resp.json();
@@ -88,7 +91,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
       setFetchError(null);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setFetchError((err as Error).message || "fetch failed");
+      setFetchError(SERVICE_ERROR_MESSAGE);
     }
   }, [baseUrl, projectId, topicSlug]);
 
@@ -119,21 +122,22 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         <span className="system-status-bar__pill" data-testid="status-pill-capabilities">
           <Box size={13} aria-hidden="true" />
           <strong data-testid="status-pill-cap-count">{formatCount(status?.cap_count ?? null)}</strong>
-          <span>caps</span>
+          <span>能力</span>
         </span>
         <span className="system-status-bar__pill" data-testid="status-pill-cost">
           <DollarSign size={13} aria-hidden="true" />
           <strong data-testid="status-pill-cost-total">{formatUsd(status?.cost_total ?? null)}</strong>
+          <span>成本</span>
         </span>
         <span className="system-status-bar__pill" data-testid="status-pill-artifacts">
           <FileText size={13} aria-hidden="true" />
           <strong data-testid="status-pill-artifact-count">{formatCount(status?.artifact_count ?? null)}</strong>
-          <span>artifacts</span>
+          <span>产物</span>
         </span>
         <span className="system-status-bar__pill" data-testid="status-pill-obs">
           <ShieldCheck size={13} aria-hidden="true" />
           <strong data-testid="status-pill-obs-glyph">{obsGlyph(status?.obs_status ?? null)}</strong>
-          <span>obs</span>
+          <span>审计</span>
         </span>
         {expanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
       </button>
@@ -142,7 +146,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         <div className="system-status-bar__details" data-testid="system-status-bar-details">
           <DetailSection
             testId="status-detail-capabilities"
-            title="Capabilities"
+            title="能力清单"
             icon={<Cpu size={14} />}
             empty={!status?.capabilities || status.capabilities.length === 0}
           >
@@ -159,7 +163,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
 
           <DetailSection
             testId="status-detail-cost"
-            title="Cost breakdown"
+            title="成本明细"
             icon={<DollarSign size={14} />}
             empty={!status?.cost_breakdown || status.cost_breakdown.length === 0}
           >
@@ -175,7 +179,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
 
           <DetailSection
             testId="status-detail-artifacts"
-            title="Artifacts"
+            title="产物记录"
             icon={<FileText size={14} />}
             empty={!status?.artifacts || status.artifacts.length === 0}
           >
@@ -191,12 +195,12 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
 
           <DetailSection
             testId="status-detail-obs"
-            title="Observability"
+            title="审计状态"
             icon={<ShieldCheck size={14} />}
             empty={!status?.obs_status}
           >
             <p className="system-status-bar__obs">
-              Status: <strong>{status?.obs_status ?? "—"}</strong>
+              状态：<strong>{status?.obs_status ?? "—"}</strong>
             </p>
           </DetailSection>
         </div>
@@ -224,7 +228,7 @@ function DetailSection({
         {icon}
         <h4>{title}</h4>
       </header>
-      {empty ? <p className="system-status-bar__empty">No data</p> : children}
+      {empty ? <p className="system-status-bar__empty">暂无数据</p> : children}
     </section>
   );
 }

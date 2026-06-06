@@ -18,6 +18,10 @@ interface StepState {
   title: string;
   liveText: string;
   summary: string;
+  /** step_start event 时的 epoch ms — StepCard 用来算用时. */
+  startedAt: number | null;
+  /** step_done event 时的 epoch ms — StepCard 用来冻结用时显示. */
+  endedAt: number | null;
 }
 
 const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
@@ -28,10 +32,10 @@ const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
 };
 
 const INITIAL_STEPS: Record<1 | 2 | 3 | 4, StepState> = {
-  1: { status: "pending", title: STEP_TITLES[1], liveText: "", summary: "" },
-  2: { status: "pending", title: STEP_TITLES[2], liveText: "", summary: "" },
-  3: { status: "pending", title: STEP_TITLES[3], liveText: "", summary: "" },
-  4: { status: "pending", title: STEP_TITLES[4], liveText: "", summary: "" },
+  1: { status: "pending", title: STEP_TITLES[1], liveText: "", summary: "", startedAt: null, endedAt: null },
+  2: { status: "pending", title: STEP_TITLES[2], liveText: "", summary: "", startedAt: null, endedAt: null },
+  3: { status: "pending", title: STEP_TITLES[3], liveText: "", summary: "", startedAt: null, endedAt: null },
+  4: { status: "pending", title: STEP_TITLES[4], liveText: "", summary: "", startedAt: null, endedAt: null },
 };
 
 function isStepIndex(n: unknown): n is 1 | 2 | 3 | 4 {
@@ -55,6 +59,9 @@ export interface AutoResearchStreamProps {
   topicSlug?: string;
   onComplete?: (brief: BriefResult, snapshot: BriefStepsSnapshot) => void;
 }
+
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearchStreamProps) {
   const [phase, setPhase] = useState<"idle" | "running" | "completed" | "error">("idle");
@@ -92,6 +99,8 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
             status: "running",
             title: evt.title || STEP_TITLES[idx],
             liveText: "",
+            startedAt: Date.now(),
+            endedAt: null,
           });
           break;
         }
@@ -116,6 +125,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
               ...prev[idx],
               status: "done",
               summary: evt.summary || prev[idx].liveText,
+              endedAt: Date.now(),
             },
           }));
           break;
@@ -139,6 +149,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
                   ...step,
                   status: "done",
                   summary: step.summary || step.liveText,
+                  endedAt: step.endedAt ?? Date.now(),
                 };
                 changed = true;
               }
@@ -146,18 +157,28 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
             return changed ? next : prev;
           });
           setPhase("completed");
+          // 关键: 用 setFinalBrief 的 functional updater 拿到 latest state,
+          // 避免 final_brief setState 还没 commit 时 ref 仍是 null 的 race.
           if (onComplete) {
-            onComplete(
-              {
-                markdown: finalBriefRef.current?.markdown || "",
-                path: finalBriefRef.current?.path || "",
-                verdict: finalBriefRef.current?.verdict ?? false,
-              },
-              {
-                steps: stepsRef.current,
-                finalBrief: finalBriefRef.current,
-              },
-            );
+            setFinalBrief((latest) => {
+              const safe: BriefResult = latest ?? {
+                markdown: "",
+                path: "",
+                verdict: false,
+              };
+              onComplete(
+                {
+                  markdown: safe.markdown,
+                  path: safe.path,
+                  verdict: safe.verdict,
+                },
+                {
+                  steps: stepsRef.current,
+                  finalBrief: latest,
+                },
+              );
+              return latest;
+            });
           }
           break;
         }
@@ -179,7 +200,8 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
       const res = await fetch(fullUrl, {
         method: "POST",
@@ -188,7 +210,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        throw new Error("auto_research_service_unavailable");
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -230,7 +252,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
       await consumeSse("/api/auto-research/start", { topic, topic_slug: topicSlug });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : String(err));
+      setError(SERVICE_ERROR_MESSAGE);
       setPhase("error");
     }
   }, [topic, topicSlug, consumeSse]);
@@ -248,16 +270,18 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
       <div className="task-brief__main">
         <div className="task-brief__lead">
           <span className="eyebrow">自动探索模式</span>
-          <h2>正在自动推进研究链路</h2>
+          <h2>自动整理研究简报</h2>
           <p>研究题目：{topic || "（未填）"}</p>
-          <p data-testid="auto-mode-hint">无需人工介入，4 步跑完自动进入 search tab。</p>
+          <p data-testid="auto-mode-hint">
+            系统会先整理研究问题、边界和贡献点；完成后进入文献检索。
+          </p>
         </div>
 
         {phase === "error" && error && (
           <div className="task-brief__error" role="alert" data-testid="auto-research-error">
-            <strong>错误：</strong> {error}
+            <strong>服务暂时没连上：</strong> {error}
             <button type="button" className="btn btn--ghost" onClick={handleStart}>
-              重试
+              稍后重试
             </button>
           </div>
         )}
@@ -271,6 +295,8 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
               status={steps[idx].status}
               liveText={steps[idx].liveText}
               summary={steps[idx].summary}
+              startedAt={steps[idx].startedAt}
+              endedAt={steps[idx].endedAt}
             />
           ))}
         </div>
@@ -286,7 +312,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
                 }
                 data-testid="auto-brief-verdict"
               >
-                {finalBrief.verdict ? "verdict passed" : "verdict failed"}
+                {finalBrief.verdict ? "简报可继续" : "简报需补充"}
               </span>
               <span className="task-brief__path">文件：{finalBrief.path}</span>
             </div>

@@ -48,9 +48,15 @@ const SECTION_TITLES: Record<number, string> = {
   9: "9. 参考文献",
 };
 
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
+
 /**
  * 把 fetch 的 ReadableStream 当作 SSE 消费，逐行解析 "data: {...}" 事件。
  * EventSource 不支持 POST，因此手动消费。
+ *
+ * 关键: 流结束时把 buffer 剩余内容(可能没有 trailing \n\n 的最后一条事件)flush 出去,
+ * 否则后端 `data: {...done...}\n` 这类最后一行事件会被丢掉.
  */
 async function consumeSSE(
   response: Response,
@@ -64,19 +70,35 @@ async function consumeSSE(
   let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      // Flush 残留 UTF-8 bytes
+      buffer += decoder.decode();
+      break;
+    }
     buffer += decoder.decode(value, { stream: true });
     const parts = buffer.split("\n\n");
     buffer = parts.pop() || "";
     for (const part of parts) {
-      const line = part.trim();
-      if (line.startsWith("data: ")) {
-        const json = line.slice(6);
-        try {
-          onEvent(JSON.parse(json) as ExecuteEvent);
-        } catch {
-          // 跳过无法解析的行
-        }
+      const dataLines = part.split("\n").filter((l) => l.startsWith("data: "));
+      if (dataLines.length === 0) continue;
+      const json = dataLines.map((l) => l.slice(6)).join("\n");
+      try {
+        onEvent(JSON.parse(json) as ExecuteEvent);
+      } catch {
+        // 跳过无法解析的行
+      }
+    }
+  }
+  // Tail flush: 处理流结束时 buffer 里残留的最后一条事件(无 \n\n 分隔)
+  const tail = buffer.trim();
+  if (tail) {
+    const dataLines = tail.split("\n").filter((l) => l.startsWith("data: "));
+    if (dataLines.length > 0) {
+      const json = dataLines.map((l) => l.slice(6)).join("\n");
+      try {
+        onEvent(JSON.parse(json) as ExecuteEvent);
+      } catch {
+        // ignore malformed tail
       }
     }
   }
@@ -94,7 +116,7 @@ export function ExecutionPanel({
   /** section_index -> 最后一个 section_done 事件（用于列表展示） */
   const [sections, setSections] = useState<Record<number, ExecuteEvent>>({});
   const [statusMessage, setStatusMessage] = useState<string>(
-    "点击「开始跑」以流式生成 9 节论文 + paper.pdf + results.json"
+    "点击「生成论文与结果包」后，系统会按论文结构生成草稿、PDF 和结果记录。"
   );
   const [statusStage, setStatusStage] = useState<string>("idle");
   const [paperPath, setPaperPath] = useState<string | null>(null);
@@ -117,12 +139,12 @@ export function ExecutionPanel({
     setPaperPath(null);
     setResultsPath(null);
     completedRef.current = false;
-    setStatusMessage("正在打开 SSE 流...");
+    setStatusMessage("正在准备生成论文与结果包...");
     setStatusStage("connecting");
 
     try {
-      // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const response = await fetch(`${base}/api/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +156,7 @@ export function ExecutionPanel({
         }),
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error("execution_service_unavailable");
       }
       await consumeSSE(response, (evt) => {
         setStatusMessage(evt.message);
@@ -166,12 +188,11 @@ export function ExecutionPanel({
             onComplete?.(paperPathRef.current, evt.results_json_path);
           }
         } else if (evt.event === "error") {
-          setError(evt.message);
+          setError(SERVICE_ERROR_MESSAGE);
         }
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      setError(SERVICE_ERROR_MESSAGE);
     } finally {
       setRunning(false);
     }
@@ -185,9 +206,9 @@ export function ExecutionPanel({
   return (
     <div className="execution-panel">
       <header className="execution-panel__header">
-        <h2>执行实验</h2>
+        <h2>论文生成</h2>
         <p className="execution-panel__subtitle">
-          按 9 节顺序写作、引言 → 参考文献，最终拼成 paper.pdf 并落盘 results.json
+          按论文结构生成正文、PDF 和结果记录；完成后进入识别审计。
         </p>
       </header>
 
@@ -201,11 +222,11 @@ export function ExecutionPanel({
         >
           {running ? (
             <>
-              <Loader2 size={16} className="spin" /> 正在跑...
+              <Loader2 size={16} className="spin" /> 生成中...
             </>
           ) : (
             <>
-              <Play size={16} /> 开始跑
+              <Play size={16} /> 生成论文与结果包
             </>
           )}
         </button>
@@ -230,9 +251,9 @@ export function ExecutionPanel({
         >
           <header className="execution-panel__activities-header">
             <Activity size={14} />
-            <span>Agent 实时活动</span>
+            <span>生成进度</span>
             <code data-testid="execute-agent-activities-count">
-              {sectionIndices.length} / 9 done
+              {sectionIndices.length} / 9 已完成
             </code>
           </header>
           <ul className="execution-panel__activity-list">
@@ -267,7 +288,7 @@ export function ExecutionPanel({
                     )}
                   </span>
                   <span className="execution-panel__activity-name">
-                    Section {idx} ({SECTION_TITLES[idx] ?? `Section ${idx}`})
+                    第 {idx} 节（{SECTION_TITLES[idx] ?? `第 ${idx} 节`}）
                   </span>
                   <span className="execution-panel__activity-status">
                     {status === "done"
@@ -302,11 +323,11 @@ export function ExecutionPanel({
               <span className="execution-panel__section-state">
                 {done ? (
                   <>
-                    <CheckCircle2 size={14} /> done
+                    <CheckCircle2 size={14} /> 已完成
                   </>
                 ) : running ? (
                   <>
-                    <Loader2 size={14} className="spin" /> writing
+                    <Loader2 size={14} className="spin" /> 生成中
                   </>
                 ) : (
                   "—"
@@ -352,7 +373,7 @@ export function ExecutionPanel({
           data-testid="execute-paper-ready"
         >
           <FileText size={16} />
-          <span>Paper ready:&nbsp;</span>
+          <span>论文文件：&nbsp;</span>
           <code>{paperPath}</code>
         </div>
       )}
@@ -360,7 +381,7 @@ export function ExecutionPanel({
       {resultsPath && (
         <div className="execution-panel__result" data-testid="execute-done">
           <CheckCircle2 size={16} />
-          <span>Results:&nbsp;</span>
+          <span>结果记录：&nbsp;</span>
           <code>{resultsPath}</code>
         </div>
       )}
@@ -375,7 +396,7 @@ export function ExecutionPanel({
         >
           <header className="execution-panel__acceptance-header">
             <h3>形式化产物验收</h3>
-            <p>人工核验 paper / results / 可复现性 3 张卡, 默认未验收。</p>
+            <p>人工核验论文、结果和可复现性 3 张卡，确认后进入正式产物。</p>
           </header>
           <FormalPackageAcceptancePanel projectId={topicSlug} />
         </section>
@@ -384,7 +405,8 @@ export function ExecutionPanel({
       <style>{`
         .execution-panel {
           padding: 1.25rem 1.5rem;
-          background: #fafafa;
+          background: rgba(230, 230, 230, 0.025);
+          border: 1px solid var(--color-line);
           border-radius: 12px;
           display: flex;
           flex-direction: column;
@@ -399,8 +421,8 @@ export function ExecutionPanel({
           display: flex;
           flex-direction: column;
           gap: 0.4rem;
-          background: #eef2ff;
-          border: 1px solid #c7d2fe;
+          background: rgba(230, 230, 230, 0.045);
+          border: 1px solid var(--color-line);
           border-radius: 8px;
           padding: 0.5rem 0.75rem;
         }
@@ -410,12 +432,12 @@ export function ExecutionPanel({
           gap: 0.5rem;
           font-size: 0.85rem;
           font-weight: 600;
-          color: #1e3a8a;
+          color: var(--color-strong);
         }
         .execution-panel__activities-header code {
           margin-left: auto;
-          background: #c7d2fe;
-          color: #1e1b4b;
+          background: rgba(230, 230, 230, 0.08);
+          color: var(--color-ink);
           padding: 0 0.4rem;
           border-radius: 4px;
           font-size: 0.75rem;
@@ -438,14 +460,14 @@ export function ExecutionPanel({
           border-radius: 4px;
         }
         .execution-panel__activity-row.is-done {
-          color: #047857;
+          color: var(--color-strong);
         }
         .execution-panel__activity-row.is-writing {
-          background: #fef3c7;
-          color: #92400e;
+          background: rgba(230, 230, 230, 0.075);
+          color: var(--color-strong);
         }
         .execution-panel__activity-row.is-pending {
-          color: #6b7280;
+          color: var(--color-muted);
         }
         .execution-panel__activity-icon {
           display: inline-flex;
@@ -456,7 +478,7 @@ export function ExecutionPanel({
           width: 8px;
           height: 8px;
           border-radius: 50%;
-          background: #d1d5db;
+          background: var(--color-muted);
           display: inline-block;
         }
         .execution-panel__activity-status {
@@ -468,8 +490,8 @@ export function ExecutionPanel({
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
-          background: #ecfdf5;
-          border: 1px solid #6ee7b7;
+          background: rgba(230, 230, 230, 0.045);
+          border: 1px solid var(--color-line);
           border-radius: 8px;
           padding: 0.75rem 1rem;
         }
@@ -480,17 +502,18 @@ export function ExecutionPanel({
         .execution-panel__acceptance-header p {
           margin: 0.2rem 0 0;
           font-size: 0.8rem;
-          color: #065f46;
+          color: var(--color-muted);
         }
         .execution-panel__chain-block {
-          background: #f3f4f6;
+          background: rgba(230, 230, 230, 0.04);
+          border: 1px solid var(--color-line);
           border-radius: 6px;
           padding: 0.4rem 0.6rem;
         }
         .execution-panel__chain-summary {
           cursor: pointer;
           font-size: 0.85rem;
-          color: #1f2937;
+          color: var(--color-ink);
           font-weight: 500;
           list-style: none;
         }
@@ -504,7 +527,7 @@ export function ExecutionPanel({
         .execution-panel__subtitle {
           margin: 0.25rem 0 0;
           font-size: 0.85rem;
-          color: #666;
+          color: var(--color-muted);
         }
         .execution-panel__controls {
           display: flex;
@@ -516,43 +539,48 @@ export function ExecutionPanel({
           display: inline-flex;
           align-items: center;
           gap: 0.4rem;
-          background: #1f2937;
-          color: white;
-          border: none;
+          background: #dedede;
+          color: #101010;
+          border: 1px solid #dedede;
           border-radius: 6px;
           padding: 0.5rem 0.9rem;
           cursor: pointer;
           font-size: 0.9rem;
         }
         .execution-panel__button:disabled {
-          opacity: 0.6;
+          background: rgba(230, 230, 230, 0.08);
+          color: #9a9a9a;
+          border-color: rgba(230, 230, 230, 0.16);
+          opacity: 1;
           cursor: not-allowed;
         }
         .execution-panel__button.is-running {
-          background: #374151;
+          background: rgba(230, 230, 230, 0.18);
+          color: var(--color-strong);
         }
         .execution-panel__status {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
           font-size: 0.85rem;
-          color: #555;
+          color: var(--color-muted);
         }
         .execution-panel__status code {
-          background: #e5e7eb;
+          background: rgba(230, 230, 230, 0.08);
           padding: 0 0.3rem;
           border-radius: 4px;
           font-size: 0.8rem;
         }
         .execution-panel__status-message {
-          color: #444;
+          color: var(--color-ink);
         }
         .execution-panel__error {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          color: #b91c1c;
-          background: #fee2e2;
+          color: var(--color-danger);
+          background: rgba(190, 80, 80, 0.06);
+          border: 1px solid rgba(190, 80, 80, 0.22);
           padding: 0.5rem 0.75rem;
           border-radius: 6px;
           font-size: 0.9rem;
@@ -572,15 +600,16 @@ export function ExecutionPanel({
           gap: 0.5rem;
           padding: 0.5rem 0.75rem;
           border-radius: 6px;
-          background: #f3f4f6;
+          background: rgba(230, 230, 230, 0.04);
+          border: 1px solid var(--color-line);
           font-size: 0.85rem;
         }
         .execution-panel__section.is-done {
-          background: #ecfdf5;
-          color: #047857;
+          background: rgba(230, 230, 230, 0.07);
+          color: var(--color-strong);
         }
         .execution-panel__section.is-pending {
-          background: #fef3c7;
+          background: rgba(230, 230, 230, 0.055);
         }
         .execution-panel__section-state {
           display: inline-flex;
@@ -592,8 +621,8 @@ export function ExecutionPanel({
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          background: #ecfdf5;
-          color: #065f46;
+          background: rgba(230, 230, 230, 0.055);
+          color: var(--color-ink);
           padding: 0.5rem 0.75rem;
           border-radius: 6px;
           font-size: 0.85rem;

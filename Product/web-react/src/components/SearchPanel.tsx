@@ -32,9 +32,12 @@ interface RunState {
   loading: boolean;
   error: string | null;
   response: SearchResponse | null;
-  /** 用户手动排除的 arxiv_id 集合 */
+  /** 用户手动排除的文献 id 集合 */
   excluded: Set<string>;
 }
+
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 const SCORE_BADGE_CLASS = (s: number): string => {
   if (s >= 0.8) return "search-score search-score--high";
@@ -53,10 +56,8 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
   const triggerSearch = async () => {
     setState({ loading: true, error: null, response: null, excluded: new Set() });
     try {
-      // vite 7 http-proxy 不转 SSE, 同时 vite 的 public base URL (/react/)
-      // 会拒绝 "/api/..." 这种绝对路径, 返回 404 "did you mean to visit /react/api/..."
-      // 改用绝对 URL + 后端 CORS, 与 BriefPanel 一致 (SSE plumbing 必走绝对 URL)
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const url = `${base}/api/search`;
       const resp = await fetch(url, {
         method: "POST",
@@ -64,8 +65,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
         body: JSON.stringify({ topic_slug: topicSlug, brief_path: briefPath }),
       });
       if (!resp.ok) {
-        const detail = await resp.text();
-        throw new Error(`HTTP ${resp.status}: ${detail}`);
+        throw new Error("search_service_unavailable");
       }
       const data = (await resp.json()) as SearchResponse;
       setState((prev) => ({ ...prev, loading: false, response: data }));
@@ -76,7 +76,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: e instanceof Error ? e.message : String(e),
+        error: SERVICE_ERROR_MESSAGE,
       }));
     }
   };
@@ -94,10 +94,10 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
   };
 
   return (
-    <section aria-label="递归搜索" className="search-panel" data-testid="search-panel">
+    <section aria-label="文献检索" className="search-panel" data-testid="search-panel">
       <header className="search-panel__header">
-        <span className="eyebrow">第 2 阶段：递归搜索 arxiv + LLM 重排</span>
-        <h2>从 arxiv 召回 8-12 篇相关论文</h2>
+        <span className="eyebrow">第 2 阶段：文献检索</span>
+        <h2>补齐论文依据</h2>
         <p>
           任务书已确认：<code data-testid="search-brief-path">{briefPath}</code>
         </p>
@@ -106,7 +106,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
       {!state.response && !state.loading && !state.error && (
         <div className="search-panel__cta">
           <p className="search-panel__hint">
-            LLM 将基于研究简报生成 3-5 个英文 arxiv 检索词，命中 arxiv 后再由 LLM 重排打分。
+            系统会基于研究简报提炼检索线索，筛选 8-12 篇相关文献；采纳后进入变量审阅。
           </p>
           <button
             className="btn btn--primary btn--large"
@@ -124,16 +124,16 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
       {state.loading && (
         <div className="search-panel__loading" data-testid="search-loading">
           <Loader2 size={20} className="spin" />
-          <span>arxiv 检索 + LLM 重排中...</span>
+          <span>正在检索并筛选相关文献...</span>
         </div>
       )}
 
       {state.error && (
         <div className="search-panel__error" data-testid="search-error" role="alert">
           <AlertCircle size={16} />
-          <span>搜索失败：{state.error}</span>
+          <span>{state.error}</span>
           <button className="btn btn--ghost" type="button" onClick={triggerSearch}>
-            重试
+            稍后重试
           </button>
         </div>
       )}
@@ -150,7 +150,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
               )}
               data-testid="search-verdict"
             >
-              {state.response.verdict_passed ? "verdict pass" : "verdict fail"}
+              {state.response.verdict_passed ? "文献依据可继续" : "文献依据需补充"}
             </span>
             <span className="search-panel__count">
               {state.response.papers.length} 篇候选 / 已排除 {state.excluded.size} 篇

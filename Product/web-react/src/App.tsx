@@ -62,12 +62,12 @@ const STAGE_ORDER: Stage[] = [
 ];
 
 const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
-  brief: { label: "任务书", hint: "生成 4 段式研究简报（研究问题 / 边际贡献 / 研究边界 / 成功标准）" },
-  search: { label: "递归搜索", hint: "arxiv 召回 + LLM 重排，提炼 8-12 篇相关文献" },
-  variables: { label: "数据变量", hint: "基于数据集 schema + 简报识别 X / Y / control 候选变量" },
-  design: { label: "方法设计", hint: "StatsPAI 估算候选识别策略，LLM 解释并推荐" },
-  execution: { label: "执行实验", hint: "流式生成 9 节论文 + paper.pdf + results.json" },
-  "identification-audit": { label: "识别审计", hint: "Pre-trend + 弱 IV 诊断 + DAG（statspai 真实输出）" },
+  brief: { label: "研究简报", hint: "确认研究问题、边界、贡献和成功标准" },
+  search: { label: "文献检索", hint: "从中文和英文来源筛选相关文献，形成综述素材" },
+  variables: { label: "变量审阅", hint: "确认因变量、解释变量和控制变量是否能被数据支持" },
+  design: { label: "方法选择", hint: "比较可行识别策略，查看假设、风险和所需检验" },
+  execution: { label: "论文生成", hint: "生成论文草稿、PDF、结果记录和可复现产物" },
+  "identification-audit": { label: "识别审计", hint: "检查趋势、工具变量强度和因果路径是否支撑结论" },
 };
 
 /**
@@ -180,7 +180,8 @@ export function App() {
     if (task.mode !== "codex-supervisor") return;
     if (planStages !== null) return;
     const ctrl = new AbortController();
-    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    const env = import.meta.env as Record<string, string | undefined>;
+    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
     fetch(`${base}/api/supervisor/plan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -188,7 +189,7 @@ export function App() {
       signal: ctrl.signal,
     })
       .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw new Error("plan_service_unavailable");
         return r.json();
       })
       .then((data: { stages?: SupervisorPlanStage[] }) => {
@@ -197,7 +198,7 @@ export function App() {
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
-        setPlanFetchError(err instanceof Error ? err.message : String(err));
+        setPlanFetchError("服务暂时没连上，稍后重试。不会影响已保存的研究材料。");
         // 兜底: 即使拉取失败也给一个空 stages, 让 SupervisorPlanReview 仍可渲染
         setPlanStages([]);
       });
@@ -272,7 +273,7 @@ export function App() {
               : task.mode === "auto-research"
                 ? "自动探索模式"
                 : "人工审阅模式"}
-            {" · "}文件 {task.fileCount} · 长文本 {task.pastedCount} · slug:{" "}
+            {" · "}文件 {task.fileCount} · 长文本 {task.pastedCount} · 任务编号：{" "}
             <code data-testid="topic-slug">{topicSlug}</code>
           </p>
           <SystemStatusBar
@@ -406,7 +407,7 @@ export function App() {
             </p>
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--ghost workbench-saved-brief"
               onClick={() => setActiveStage("brief")}
               data-testid="view-saved-brief"
             >
@@ -423,17 +424,17 @@ export function App() {
           >
             <h2>研究链路完成</h2>
             <p>
-              paper.pdf:{" "}
+              论文文件：{" "}
               <code data-testid="final-paper-path">{executionResult.paperPath}</code>
             </p>
             <p>
-              results.json:{" "}
+              结果记录：{" "}
               <code data-testid="final-results-path">
                 {executionResult.resultsPath}
               </code>
             </p>
             <p className="stage-panel__completion-hint">
-              5 tab 走通完成，产物已落盘到项目目录，可以入库。
+              全流程已完成。下一步可以打开识别审计，确认哪些结论可以进入正式稿。
             </p>
           </div>
         ) : null}

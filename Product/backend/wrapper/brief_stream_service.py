@@ -49,6 +49,7 @@ class BriefEvent(BaseModel):
     brief_path: Optional[str] = None
     verdict_passed: Optional[bool] = None
     message: Optional[str] = None
+    critique: Optional[list[str]] = None  # step 3 only: LLM 自我疑虑 (≤3 短句)
 
 
 class BriefResumeRequest(BaseModel):
@@ -66,6 +67,31 @@ class BriefResumeRequest(BaseModel):
 _MODEL = os.getenv("MINIMAX_MODEL", "MiniMax-M2.7")
 _PROVIDER_ID = "minimax"
 _STEP_MARKER_RE = re.compile(r"### STEP_(\d+)_DONE ###")
+# Critique 段 header (中英文, 启发式, 不命中 → [])
+_CRITIQUE_HEADER_RE = re.compile(
+    r"(?im)^#{1,3}\s*(?:自(?:我)?(?:评|审视|评估|批评)|我(?:最)?不放心(?:的\s*\d+\s*点)?|最不放心(?:的\s*\d+\s*点)?|我不确定(?:的点?|的)?|不确定(?:性|的点?)?|Self[- ]?Critique(?:s|ism)?|Limitations?|Caveats?|Risks?)\s*$"
+)
+_SECTION_END_RE = re.compile(r"(?m)^#{1,3}\s+")
+_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+\.)\s+")
+_CONCERN_HINTS = (
+    "不放心",
+    "不确定",
+    "可能",
+    "是否",
+    "需要",
+    "风险",
+    "偏误",
+    "遗漏",
+    "限制",
+    "缺",
+    "口径",
+    "测量",
+    "识别",
+    "因果",
+    "样本",
+    "变量",
+    "数据",
+)
 STEP_TITLES = (
     None,  # index 0 占位, step 1-4 直接用索引
     "分析研究问题",
@@ -102,6 +128,43 @@ def _first_sentence(text: str, max_len: int = 80) -> str:
         if idx >= 0:
             return text[: idx + len(sep)].strip()
     return text[:max_len].strip()
+
+
+def _extract_critique(text: str, max_items: int = 3) -> list[str]:
+    """启发式: 从 LLM 文本抓 self-critique 段, 返 ≤ N 短句. 无 → []."""
+    if not text:
+        return []
+    m = _CRITIQUE_HEADER_RE.search(text)
+    if not m:
+        return []
+    nxt = _SECTION_END_RE.search(text, m.end())
+    section = text[m.end() : nxt.start() if nxt else len(text)].strip()
+    if not section:
+        return []
+    items: list[str] = [
+        re.sub(r"\s+", " ", _BULLET_RE.sub("", l).strip())[:160]
+        for l in section.splitlines() if l.strip()
+    ]
+    if not items:  # 没 bullet → 按中英句号切
+        for sent in re.split(r"(?<=[。!?;；\n])\s*", section):
+            s = re.sub(r"\s+", " ", sent.strip().lstrip("-*·• ").strip())[:160]
+            if len(s) > 4:
+                items.append(s)
+            if len(items) >= max_items:
+                break
+    concerns = [it for it in items if any(hint in it for hint in _CONCERN_HINTS)]
+    if concerns:
+        items = concerns
+    seen: set[str] = set()
+    out: list[str] = []
+    for it in items:
+        if it in seen:
+            continue
+        seen.add(it)
+        out.append(it)
+        if len(out) >= max_items:
+            break
+    return out
 
 
 def _slugify(topic: str) -> str:
@@ -184,6 +247,7 @@ def run_brief_stream(topic: str) -> Iterator[BriefEvent]:
             event="step_done",
             step_index=step_index,
             summary=_first_sentence(live_text),
+            critique=_extract_critique(live_text) if step_index == 3 else None,
         )
 
     yield BriefEvent(event="await_user", step_index=3)
@@ -256,6 +320,7 @@ def resume_brief_stream(
             event="step_done",
             step_index=3,
             summary=_first_sentence(live_text),
+            critique=_extract_critique(live_text),
         )
 
     # Step 4

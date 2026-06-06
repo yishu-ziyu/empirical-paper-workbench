@@ -6,6 +6,7 @@ from typing import Any
 
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id_or_transient
+from Product.backend.reproducibility_skill_contract import build_reproducibility_product_capability
 from Product.backend.statspai_adapter import get_statspai_info, index_statspai_capabilities
 
 
@@ -99,6 +100,7 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
             "output_schema": {"type": "object", "properties": {}},
             "status": "executable",
         },
+        build_reproducibility_product_capability(),
     ]
 
     all_capabilities = builtin_caps + statspai_caps

@@ -7,11 +7,6 @@
  *  3. 搜索: real-time substring filter on name + description; match highlight
  *  4. 不阻塞: position:fixed right slide-in (z-index 1000), backdrop click closes
  *
- * Performance:
- *  - Fetches all 1018 methods ONCE on first open (cached in `useRef`)
- *  - Subsequent category clicks and typing filter the cached array in memory
- *  - No re-fetch on every interaction
- *
  * CSS: follows the `.design-panel__*` BEM convention used by DesignPanel.tsx.
  * Scoped inline `<style>` block at the end so we don't touch styles.css.
  */
@@ -58,6 +53,8 @@ export interface MethodsDrawerProps {
 }
 
 const ALL_CATEGORIES_LABEL = "全部";
+const SERVICE_ERROR_MESSAGE =
+  "方法库暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 export function MethodsDrawer({
   open,
@@ -89,11 +86,11 @@ export function MethodsDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
-    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    const env = import.meta.env as Record<string, string | undefined>;
+    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
     fetch(`${base}/api/capabilities/methods`)
       .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw new Error("methods_service_unavailable");
         return r.json();
       })
       .then((data) => {
@@ -105,7 +102,7 @@ export function MethodsDrawer({
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
+        setError(SERVICE_ERROR_MESSAGE);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -223,7 +220,7 @@ export function MethodsDrawer({
           )}
           {error && (
             <div className="design-panel__drawer-empty" role="alert">
-              加载失败：{error}
+              {error}
             </div>
           )}
           {!loading && !error && filtered.length === 0 && (
@@ -383,9 +380,9 @@ export function MethodsDrawer({
             background: var(--color-inverse);
             color: var(--color-muted);
           }
-          .design-panel__risk--high { background: #5c1f1f; color: #ffb4b4; }
-          .design-panel__risk--medium { background: #4a3a14; color: #ffd07a; }
-          .design-panel__risk--low { background: #1f3a1f; color: #a8e6a8; }
+          .design-panel__risk--high { background: rgba(230, 230, 230, 0.12); color: var(--color-strong); }
+          .design-panel__risk--medium { background: rgba(230, 230, 230, 0.09); color: var(--color-ink); }
+          .design-panel__risk--low { background: rgba(230, 230, 230, 0.06); color: var(--color-muted); }
           .design-panel__drawer-item-meta {
             display: flex; align-items: center; gap: 8px;
             margin-bottom: 4px;
@@ -415,8 +412,8 @@ export function MethodsDrawer({
             font-size: 11px;
           }
           .methods-drawer-mark {
-            background: rgba(214, 174, 100, 0.32);
-            color: #f5e4b8;
+            background: rgba(230, 230, 230, 0.16);
+            color: var(--color-strong);
             border-radius: 2px;
             padding: 0 1px;
           }

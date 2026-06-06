@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 
 /**
- * 6th tab — Identification Audit (real statspai diagnostics).
+ * 6th tab — Identification Audit.
  *
- * Task 44 (ui-gap-fill) — 把占位的 3 张卡换成真实 statspai 输出.
+ * Task 44 (ui-gap-fill) — 把占位的 3 张卡换成真实审计输出.
  *
  * 数据流: resultsPath + designPath (来自 App.tsx executionResult / designResult)
  *   → POST /api/identification/audit
@@ -12,13 +12,13 @@ import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
  *   → 返回 { pretrend, weak_iv, dag, method }
  *
  * 失败兜底 (BDD 行为 3):
- *   - 后端不可达 / statspai 没装 / results.json 缺字段
+ *   - 后端不可达 / 审计依赖缺失 / results.json 缺字段
  *   - service 返回 { error, reason } + 各 card source=unavailable
  *   - 前端展示明确错误 + 各 card 显示 N/A, 不崩
  *
  * 业务背景: 用户 3 月草稿把 reduced-form 当 IV-2SLS 报告, 导致
  *   ISEI/兼职假显著. 此 tab 现在强提示 weak-IV + AR p-value,
- *   让用户必须先看 statspai 真实诊断, 再下结论.
+ *   让用户必须先看真实诊断, 再下结论.
  */
 
 export interface IdentificationAuditPanelProps {
@@ -70,6 +70,8 @@ type FetchState =
   | { kind: "error"; message: string };
 
 const API_PATH = "/api/identification/audit";
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 export function IdentificationAuditPanel({
   resultsPath,
@@ -79,7 +81,8 @@ export function IdentificationAuditPanel({
 
   useEffect(() => {
     const ctrl = new AbortController();
-    const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+    const env = import.meta.env as Record<string, string | undefined>;
+    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
     const url = `${base}${API_PATH}`;
 
     setState({ kind: "loading" });
@@ -91,7 +94,7 @@ export function IdentificationAuditPanel({
     })
       .then(async (res) => {
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+          throw new Error("audit_service_unavailable");
         }
         return res.json() as Promise<IdentificationAuditPayload>;
       })
@@ -102,8 +105,7 @@ export function IdentificationAuditPanel({
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
-        const message = err instanceof Error ? err.message : String(err);
-        setState({ kind: "error", message });
+        setState({ kind: "error", message: SERVICE_ERROR_MESSAGE });
       });
 
     return () => ctrl.abort();
@@ -113,9 +115,9 @@ export function IdentificationAuditPanel({
     <div className="identification-audit" data-testid="identification-audit-panel">
       <header className="identification-audit__header">
         <CheckCircle2 size={16} />
-        <h2>识别策略审计</h2>
+        <h2>核验识别可信度</h2>
         <p className="identification-audit__subtitle">
-          Pre-trend + 弱 IV 诊断 + DAG · 来自 statspai 真实输出
+          趋势检验、工具变量强度、因果路径；审计结果会决定哪些结论可以写进正式稿。
         </p>
       </header>
 
@@ -128,7 +130,8 @@ export function IdentificationAuditPanel({
       <style>{`
         .identification-audit {
           padding: 1.25rem 1.5rem;
-          background: #fafafa;
+          background: rgba(230, 230, 230, 0.025);
+          border: 1px solid var(--color-line);
           border-radius: 12px;
           display: flex;
           flex-direction: column;
@@ -142,12 +145,12 @@ export function IdentificationAuditPanel({
         .identification-audit__header h2 {
           margin: 0;
           font-size: 1.1rem;
-          color: #1f2937;
+          color: var(--color-strong);
         }
         .identification-audit__subtitle {
           margin: 0 0 0 auto;
           font-size: 0.8rem;
-          color: #6b7280;
+          color: var(--color-muted);
         }
         .identification-audit__cards {
           display: grid;
@@ -155,8 +158,8 @@ export function IdentificationAuditPanel({
           gap: 1rem;
         }
         .identification-audit__card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
+          background: rgba(230, 230, 230, 0.04);
+          border: 1px solid var(--color-line);
           border-radius: 8px;
           padding: 0.9rem 1rem;
           display: flex;
@@ -166,7 +169,7 @@ export function IdentificationAuditPanel({
         .identification-audit__card h3 {
           margin: 0;
           font-size: 0.95rem;
-          color: #1f2937;
+          color: var(--color-strong);
           display: flex;
           align-items: center;
           gap: 0.4rem;
@@ -174,24 +177,24 @@ export function IdentificationAuditPanel({
         .identification-audit__hint {
           margin: 0;
           font-size: 0.78rem;
-          color: #6b7280;
+          color: var(--color-muted);
         }
         .identification-audit__source-tag {
           font-size: 0.7rem;
           padding: 0.15rem 0.45rem;
           border-radius: 999px;
-          background: #e0e7ff;
-          color: #3730a3;
+          background: rgba(230, 230, 230, 0.08);
+          color: var(--color-ink);
           font-family: ui-monospace, "SF Mono", Menlo, monospace;
           margin-left: auto;
         }
         .identification-audit__source-tag--unavailable {
-          background: #fee2e2;
-          color: #991b1b;
+          background: rgba(190, 80, 80, 0.08);
+          color: var(--color-danger);
         }
         .identification-audit__source-tag--default {
-          background: #fef3c7;
-          color: #92400e;
+          background: rgba(230, 230, 230, 0.12);
+          color: var(--color-strong);
         }
         .identification-audit__kv {
           display: grid;
@@ -200,11 +203,11 @@ export function IdentificationAuditPanel({
           font-size: 0.82rem;
         }
         .identification-audit__kv dt {
-          color: #4b5563;
+          color: var(--color-muted);
         }
         .identification-audit__kv dd {
           margin: 0;
-          color: #111827;
+          color: var(--color-ink);
           font-family: ui-monospace, "SF Mono", Menlo, monospace;
         }
         .identification-audit__coefs {
@@ -216,11 +219,11 @@ export function IdentificationAuditPanel({
         .identification-audit__coefs td {
           padding: 0.25rem 0.5rem;
           text-align: right;
-          border-bottom: 1px solid #f3f4f6;
+          border-bottom: 1px solid var(--color-line);
         }
         .identification-audit__coefs th {
-          background: #f9fafb;
-          color: #4b5563;
+          background: rgba(230, 230, 230, 0.055);
+          color: var(--color-muted);
           font-weight: 500;
         }
         .identification-audit__coefs td:first-child,
@@ -229,27 +232,27 @@ export function IdentificationAuditPanel({
           font-family: ui-monospace, "SF Mono", Menlo, monospace;
         }
         .identification-audit__coefs tr.is-pre td {
-          color: #4b5563;
+          color: var(--color-muted);
         }
         .identification-audit__coefs tr.is-post td {
-          color: #111827;
+          color: var(--color-strong);
           font-weight: 500;
         }
         .identification-audit__dag {
-          background: #f9fafb;
-          border: 1px solid #e5e7eb;
+          background: rgba(230, 230, 230, 0.04);
+          border: 1px solid var(--color-line);
           border-radius: 4px;
           padding: 0.7rem;
           font-family: ui-monospace, "SF Mono", Menlo, monospace;
           font-size: 0.75rem;
-          color: #1f2937;
+          color: var(--color-ink);
           margin: 0;
           white-space: pre-wrap;
           overflow-x: auto;
           max-height: 220px;
         }
         .identification-audit__skeleton {
-          background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+          background: linear-gradient(90deg, rgba(230, 230, 230, 0.045) 0%, rgba(230, 230, 230, 0.09) 50%, rgba(230, 230, 230, 0.045) 100%);
           background-size: 200% 100%;
           animation: ident-shimmer 1.2s ease-in-out infinite;
           border-radius: 6px;
@@ -264,13 +267,13 @@ export function IdentificationAuditPanel({
           gap: 0.5rem;
           margin-bottom: 0.5rem;
           align-items: center;
-          color: #6b7280;
+          color: var(--color-muted);
           font-size: 0.82rem;
         }
         .identification-audit__error {
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          color: #991b1b;
+          background: rgba(190, 80, 80, 0.06);
+          border: 1px solid rgba(190, 80, 80, 0.22);
+          color: var(--color-danger);
           padding: 0.7rem 0.9rem;
           border-radius: 6px;
           display: flex;
@@ -279,15 +282,15 @@ export function IdentificationAuditPanel({
           font-size: 0.85rem;
         }
         .identification-audit__error code {
-          background: #fee2e2;
+          background: rgba(190, 80, 80, 0.08);
           padding: 0.1rem 0.3rem;
           border-radius: 3px;
           font-size: 0.78rem;
         }
         .identification-audit__warnings {
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          color: #78350f;
+          background: rgba(230, 230, 230, 0.045);
+          border: 1px solid var(--color-line);
+          color: var(--color-ink);
           padding: 0.6rem 0.85rem;
           border-radius: 6px;
           font-size: 0.8rem;
@@ -297,13 +300,13 @@ export function IdentificationAuditPanel({
           padding-left: 1.2rem;
         }
         .identification-audit__na {
-          color: #9ca3af;
+          color: var(--color-muted);
           font-style: italic;
           font-size: 0.82rem;
         }
         .identification-audit__paths {
           font-size: 0.72rem;
-          color: #6b7280;
+          color: var(--color-muted);
           font-family: ui-monospace, "SF Mono", Menlo, monospace;
         }
       `}</style>
@@ -328,13 +331,12 @@ function ErrorCard({ message }: { message: string }) {
     <div className="identification-audit__error" data-testid="audit-error">
       <XCircle size={16} />
       <div>
-        <strong>审计 API 调用失败。</strong>
+        <strong>审计服务暂时未连接。</strong>
         <div style={{ marginTop: "0.2rem" }}>
           <code>{message}</code>
         </div>
         <div style={{ marginTop: "0.3rem", fontSize: "0.78rem" }}>
-          6th tab 3 张卡将显示 N/A. 检查后端 <code>uvicorn Product.app:app</code> 是否运行, 以及
-          <code> VITE_API_BASE_URL</code> 环境变量.
+          当前无法读取识别审计结果。请刷新页面，或重新启动本地服务后再试。
         </div>
       </div>
     </div>
@@ -390,7 +392,7 @@ function TopError({ error, reason }: { error: string; reason?: string }) {
     <div className="identification-audit__error" data-testid="audit-top-error">
       <XCircle size={16} />
       <div>
-        <strong>审计数据不完整: {error}</strong>
+        <strong>审计数据不完整：{error}</strong>
         {reason ? (
           <div style={{ marginTop: "0.2rem", fontSize: "0.8rem" }}>{reason}</div>
         ) : null}
@@ -428,7 +430,7 @@ function PretrendCard({
       data-testid="audit-card-pretrend"
     >
       <h3>
-        Pre-trend test
+        趋势检验
         <SourceTag source={pretrend.source} />
       </h3>
       <p className="identification-audit__hint">
@@ -501,15 +503,15 @@ function WeakIvCard({
   return (
     <section className="identification-audit__card" data-testid="audit-card-weakiv">
       <h3>
-        Weak-IV diagnostics
+        工具变量强度
         <SourceTag source={weakIv.source} />
       </h3>
       <p className="identification-audit__hint">
-        第一阶段 F + Partial R² + Anderson-Rubin p (AR size-correct under weak IV)
+        第一阶段强度、解释力和弱工具变量下的稳健检验
       </p>
       {isUnavail ? (
         <p className="identification-audit__na">
-          N/A — results.json 缺 first_stage 字段. 跑 statspai iv_diag 时填充.
+          N/A — 结果记录缺少第一阶段字段，需要补充工具变量诊断。
         </p>
       ) : (
         <dl className="identification-audit__kv">
@@ -521,7 +523,7 @@ function WeakIvCard({
             {fFlag ? (
               <span
                 style={{
-                  color: fFlag === "ok" ? "#15803d" : "#b91c1c",
+                  color: fFlag === "ok" ? "var(--color-strong)" : "var(--color-danger)",
                   fontSize: "0.72rem",
                   marginLeft: "0.3rem",
                 }}
@@ -538,7 +540,7 @@ function WeakIvCard({
             {arFlag ? (
               <span
                 style={{
-                  color: arFlag === "ok" ? "#15803d" : "#b91c1c",
+                  color: arFlag === "ok" ? "var(--color-strong)" : "var(--color-danger)",
                   fontSize: "0.72rem",
                   marginLeft: "0.3rem",
                 }}
@@ -563,18 +565,18 @@ function DagCard({ dag }: { dag: IdentificationAuditPayload["dag"] }) {
   return (
     <section className="identification-audit__card" data-testid="audit-card-dag">
       <h3>
-        DAG visualization
+        因果路径
         <SourceTag source={dag.source} />
       </h3>
       <p className="identification-audit__hint">
-        因果图: X → Y + 控制变量 + 工具变量 (mermaid text)
+        因果图：解释变量、结果变量、控制变量和工具变量之间的路径
       </p>
       {isUnavail ? (
         <p className="identification-audit__na">N/A — design.json 缺 causal_graph 字段</p>
       ) : (
         <>
           {dag.spec ? (
-            <div style={{ fontSize: "0.72rem", color: "#6b7280" }}>
+            <div style={{ fontSize: "0.72rem", color: "var(--color-muted)" }}>
               spec: <code>{dag.spec}</code>
             </div>
           ) : null}
@@ -585,8 +587,8 @@ function DagCard({ dag }: { dag: IdentificationAuditPayload["dag"] }) {
             {mermaid}
           </pre>
           {dag.adjustment_sets && dag.adjustment_sets.length > 0 ? (
-            <div style={{ fontSize: "0.75rem", color: "#4b5563" }}>
-              <strong>Adjustment sets:</strong>{" "}
+            <div style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
+              <strong>调整集合：</strong>{" "}
               {dag.adjustment_sets.map((s, i) => (
                 <code key={i} style={{ marginRight: "0.4rem" }}>
                   {`{${s.join(", ")}}`}

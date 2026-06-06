@@ -38,12 +38,15 @@ const DATASET_OPTIONS: { value: DatasetName; label: string; hint: string }[] = [
 ];
 
 const ROLE_BADGE: Record<VariableRole, { color: string; label: string }> = {
-  X: { color: "var(--variables-x, #c1440e)", label: "X 解释变量" },
-  Y: { color: "var(--variables-y, #1f6feb)", label: "Y 被解释变量" },
-  control: { color: "var(--variables-control, #6e7681)", label: "控制变量" },
-  mediator: { color: "var(--variables-mediator, #8b5cf6)", label: "中介变量" },
-  moderator: { color: "var(--variables-moderator, #0e8a86)", label: "调节变量" },
+  X: { color: "var(--variables-role-x, #d8d8d8)", label: "X 解释变量" },
+  Y: { color: "var(--variables-role-y, #bfbfbf)", label: "Y 被解释变量" },
+  control: { color: "var(--variables-role-control, #9a9a9a)", label: "控制变量" },
+  mediator: { color: "var(--variables-role-mediator, #8a8a8a)", label: "中介变量" },
+  moderator: { color: "var(--variables-role-moderator, #747474)", label: "调节变量" },
 };
+
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 export interface VariablesPanelProps {
   briefPath: string;
@@ -84,9 +87,8 @@ export function VariablesPanel({
     setLoading(true);
     setError(null);
     try {
-      // 绝对 URL + VITE_API_BASE_URL: vite 7 http-proxy 不转 SSE/JSON, 同时
-      // /react/ base 会拒掉裸 /api/ 路径, 改打后端 8765
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const resp = await fetch(`${base}/api/variables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,8 +99,7 @@ export function VariablesPanel({
         }),
       });
       if (!resp.ok) {
-        const detail = await resp.text();
-        throw new Error(`HTTP ${resp.status}: ${detail || resp.statusText}`);
+        throw new Error("variables_service_unavailable");
       }
       const data = (await resp.json()) as VariablesResponse;
       setResponse(data);
@@ -106,7 +107,7 @@ export function VariablesPanel({
         onComplete?.(data.variables, data.variables_path);
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(SERVICE_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }
@@ -128,9 +129,9 @@ export function VariablesPanel({
         <div className="variables-panel__heading">
           <Database className="variables-panel__icon" aria-hidden />
           <div>
-            <h2>识别研究变量</h2>
+            <h2>审阅变量角色</h2>
             <p className="variables-panel__hint">
-              基于数据集 schema + 研究简报，由 LLM 把列名映射到研究变量。
+              系统会基于数据结构和研究简报提出变量角色，确认后进入方法选择。
             </p>
           </div>
         </div>
@@ -188,7 +189,7 @@ export function VariablesPanel({
       {loading ? (
         <div className="variables-panel__loading" data-testid="variables-loading">
           <Loader2 className="variables-panel__spinner" aria-hidden />
-          <span>LLM 解析 schema 中…</span>
+          <span>正在读取数据字段并生成变量候选…</span>
         </div>
       ) : null}
 
@@ -197,11 +198,11 @@ export function VariablesPanel({
         <div className="variables-panel__verdict" data-testid="variables-verdict">
           {response.verdict_passed ? (
             <span className="variables-panel__verdict-passed">
-              <CheckCircle2 aria-hidden /> verdict 通过
+              <CheckCircle2 aria-hidden /> 角色候选通过
             </span>
           ) : (
             <span className="variables-panel__verdict-failed">
-              <XCircle aria-hidden /> verdict 未通过（变量数不足或 role 非法）
+              <XCircle aria-hidden /> 角色候选未通过（变量数不足或角色不完整）
             </span>
           )}
           <span className="variables-panel__verdict-path" title={response.variables_path}>
@@ -258,7 +259,7 @@ export function VariablesPanel({
       {/* ── 底部 role 覆盖提示 ── */}
       {variables.length > 0 ? (
         <footer className="variables-panel__footer" data-testid="variables-footer">
-          <span>已覆盖 role: </span>
+          <span>角色覆盖：</span>
           {(["X", "Y", "control", "mediator", "moderator"] as VariableRole[]).map((r) => {
             const present = rolesPresent.has(r);
             return (

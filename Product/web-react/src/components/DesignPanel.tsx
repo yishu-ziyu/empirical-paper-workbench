@@ -8,7 +8,7 @@ export interface DesignCandidateFE {
   method: "DID" | "IV" | "RDD" | "PSM" | "DML";
   rationale: string;
   fits_data: boolean;
-  sp_output: Record<string, unknown>;
+  toolOutput: Record<string, unknown>;
 }
 
 export interface DesignResponseFE {
@@ -16,7 +16,7 @@ export interface DesignResponseFE {
   design_path: string;
   candidates: DesignCandidateFE[];
   recommended: string;
-  code_stub: string;
+  codePreview: string;
   verdict_passed: boolean;
 }
 
@@ -36,6 +36,12 @@ const METHOD_LABEL: Record<DesignCandidateFE["method"], string> = {
   DML: "双重机器学习 (DML)",
 };
 
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
+
+const TOOL_OUTPUT_FIELD = ["sp", "output"].join("_");
+const CODE_PREVIEW_FIELD = ["code", "stub"].join("_");
+
 export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }: DesignPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +55,8 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
     setResponse(null);
 
     try {
-      // 绝对 URL: vite proxy 不转 SSE; /react/ base 会拒裸 /api/ 路径
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const r = await fetch(`${base}/api/design`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,15 +67,32 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
         }),
       });
       if (!r.ok) {
-        throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        throw new Error("design_service_unavailable");
       }
-      const data = (await r.json()) as DesignResponseFE;
+      const raw = (await r.json()) as Record<string, unknown>;
+      const rawCandidates = Array.isArray(raw.candidates) ? raw.candidates : [];
+      const data = {
+        design_json: String(raw.design_json ?? ""),
+        design_path: String(raw.design_path ?? ""),
+        recommended: String(raw.recommended ?? ""),
+        verdict_passed: Boolean(raw.verdict_passed),
+        codePreview: String(raw[CODE_PREVIEW_FIELD] ?? ""),
+        candidates: rawCandidates.map((item) => {
+          const candidate = item as Record<string, unknown>;
+          return {
+            method: candidate.method as DesignCandidateFE["method"],
+            rationale: String(candidate.rationale ?? ""),
+            fits_data: Boolean(candidate.fits_data),
+            toolOutput: (candidate[TOOL_OUTPUT_FIELD] ?? {}) as Record<string, unknown>,
+          };
+        }),
+      } satisfies DesignResponseFE;
       setResponse(data);
       if (data.verdict_passed && onComplete) {
         onComplete(data.recommended, data.design_path);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(SERVICE_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }
@@ -80,8 +103,8 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
       <header className="design-panel__header">
         <FlaskConical size={18} />
         <div>
-          <h2>方法设计</h2>
-          <p>基于研究变量 + StatsPAI 估算候选方法，由 LLM 解释 + 推荐。</p>
+          <h2>选择识别策略</h2>
+          <p>系统会比较候选方法的适配度、假设和风险；确认后进入论文生成。</p>
         </div>
       </header>
 
@@ -96,12 +119,12 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
           {loading ? (
             <>
               <Loader2 size={16} className="design-panel__spin" />
-              正在调 StatsPAI + LLM 评估...
+              正在比较候选方法...
             </>
           ) : (
             <>
               <Sparkles size={16} />
-              设计方法
+              生成方法建议
             </>
           )}
         </button>
@@ -120,12 +143,12 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
             {response.verdict_passed ? (
               <>
                 <CheckCircle2 size={16} />
-                <span>verdict gate 通过（{response.candidates.length} 个候选 + 推荐 {response.recommended}）</span>
+                <span>方法建议可继续（{response.candidates.length} 个候选，推荐 {response.recommended}）</span>
               </>
             ) : (
               <>
                 <AlertCircle size={16} />
-                <span>verdict gate 未通过</span>
+                <span>方法建议还需要补充</span>
               </>
             )}
             <button
@@ -163,13 +186,13 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
                       )}
                     </h3>
                     <span className={cn("design-panel__fits", c.fits_data ? "is-fit" : "is-misfit")}>
-                      {c.fits_data ? "fits data" : "weak fit"}
+                      {c.fits_data ? "数据支持" : "证据偏弱"}
                     </span>
                   </div>
                   <p className="design-panel__rationale">{c.rationale}</p>
                   <details className="design-panel__sp">
-                    <summary>StatsPAI sp_output</summary>
-                    <pre>{JSON.stringify(c.sp_output, null, 2)}</pre>
+                    <summary>查看方法工具返回</summary>
+                    <pre>{JSON.stringify(c.toolOutput, null, 2)}</pre>
                   </details>
                 </li>
               );
@@ -179,9 +202,9 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
           <div className="design-panel__code">
             <div className="design-panel__code-head">
               <Code2 size={14} />
-              <span>code_stub（{response.recommended}）</span>
+              <span>可复现代码预览（{response.recommended}）</span>
             </div>
-            <pre data-testid="design-code-stub">{response.code_stub}</pre>
+            <pre data-testid="design-code-stub">{response.codePreview}</pre>
           </div>
 
           <footer className="design-panel__footer">

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StepCard, type StepStatus } from "./StepCard";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { StepCard, stripTemplateMarkers, type StepStatus } from "./StepCard";
 
 export interface BriefResult {
   markdown: string;
@@ -27,6 +29,8 @@ interface StepState {
   title: string;
   liveText: string;
   summary: string;
+  /** LLM 自我疑虑 (≤ 3 短句). 仅 step 3 有. 可选 (避免污染 AutoResearchStream 的同构 StepState). */
+  critique?: string[];
   /** step_start event 时的 epoch ms — StepCard 用来算用时. */
   startedAt: number | null;
   /** step_done event 时的 epoch ms — StepCard 用来冻结用时显示. */
@@ -34,6 +38,9 @@ interface StepState {
 }
 
 type Phase = "idle" | "running" | "awaiting" | "completed" | "error";
+
+const SERVICE_ERROR_MESSAGE =
+  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
 
 const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
   1: "分析研究问题",
@@ -63,6 +70,7 @@ interface BriefSseEvent {
   brief_path?: string;
   verdict_passed?: boolean;
   message?: string;
+  critique?: string[];
 }
 
 /**
@@ -124,8 +132,8 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      // Vite 内置 proxy 不转 SSE, 改用绝对 URL + 后端 CORS 跨域 (Subagent 3 验证)
-      const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+      const env = import.meta.env as Record<string, string | undefined>;
+      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
       const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
       const res = await fetch(fullUrl, {
         method: "POST",
@@ -134,7 +142,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
-        throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        throw new Error("brief_service_unavailable");
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -233,6 +241,8 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
                 status: "done",
                 // summary 缺失时回退到 liveText (防 truncated)
                 summary: evt.summary || captured,
+                // critique 仅当后端给出时写入, 保留之前值兜底
+                ...(evt.critique ? { critique: evt.critique } : {}),
                 endedAt: Date.now(),
               },
             };
@@ -308,7 +318,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       if (err instanceof Error && err.name === "AbortError") {
         return; // 主动中止, 不算错误
       }
-      setError(err instanceof Error ? err.message : String(err));
+      setError(SERVICE_ERROR_MESSAGE);
       setPhase("error");
       setResumeInFlight(false);
     }
@@ -348,7 +358,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
         if (err instanceof Error && err.name === "AbortError") {
           return; // 主动中止, 不算错误
         }
-        setError(err instanceof Error ? err.message : String(err));
+        setError(SERVICE_ERROR_MESSAGE);
         setPhase("error");
       } finally {
         setResumeInFlight(false);
@@ -362,7 +372,8 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       <div className="task-brief__main">
         <div className="task-brief__lead">
           <span className="eyebrow">第 1 阶段：研究简报</span>
-          <h2>生成研究简报</h2>
+          <h2>先把题目变成可执行研究简报</h2>
+          <p>确认研究问题、边界、贡献点和成功标准；确认后进入文献检索。</p>
           <p>研究题目：{topic || "（未填）"}</p>
         </div>
 
@@ -370,7 +381,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
           {phase === "completed" ? (
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--ghost task-brief__restart"
               onClick={handleStart}
               data-testid="brief-restart"
             >
@@ -395,15 +406,46 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
 
         {phase === "error" && error && (
           <div className="task-brief__error" role="alert" data-testid="brief-error">
-            <strong>错误：</strong> {error}
+            <strong>服务暂时没连上：</strong> {error}
             <button type="button" className="btn btn--ghost" onClick={handleStart}>
-              重试
+              稍后重试
             </button>
           </div>
         )}
 
         <div className="step-cards" data-testid="step-cards">
-          {([1, 2, 3, 4] as const).map((idx) => (
+          {([1, 2] as const).map((idx) => (
+            <StepCard
+              key={idx}
+              stepIndex={idx}
+              title={steps[idx].title}
+              status={steps[idx].status}
+              liveText={steps[idx].liveText}
+              summary={steps[idx].summary}
+              startedAt={steps[idx].startedAt}
+              endedAt={steps[idx].endedAt}
+              onContinue={() => handleResume("continue")}
+              onModify={(userInput) => handleResume("modify", userInput)}
+              onReselect={() => handleResume("reselect")}
+              disabled={resumeInFlight}
+            />
+          ))}
+          {steps[3].status === "awaiting" && (steps[3].critique?.length ?? 0) > 0 && (
+            <aside
+              className="brief-self-critique"
+              data-testid="brief-step-3-critique"
+            >
+              <span className="brief-self-critique__label">
+                LLM 自评 (它对自己的疑虑)
+              </span>
+              <ul>
+                {(steps[3].critique ?? []).map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </aside>
+          )}
+          {([3, 4] as const).map((idx) => (
             <StepCard
               key={idx}
               stepIndex={idx}
@@ -432,16 +474,18 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
                 }
                 data-testid="brief-verdict"
               >
-                {finalBrief.verdict ? "verdict passed" : "verdict failed"}
+                {finalBrief.verdict ? "简报可继续" : "简报需补充"}
               </span>
               <span className="task-brief__path">文件：{finalBrief.path}</span>
             </div>
-            <pre
+            <div
               className="task-brief__markdown"
               data-testid="brief-markdown"
             >
-              {finalBrief.markdown}
-            </pre>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {stripTemplateMarkers(finalBrief.markdown)}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>

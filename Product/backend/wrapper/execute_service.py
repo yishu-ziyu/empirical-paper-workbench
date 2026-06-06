@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -64,7 +65,12 @@ def load_inputs(
     """
     brief_text = Path(brief_path).read_text(encoding="utf-8")
 
-    variables_payload = yaml.safe_load(Path(variables_path).read_text(encoding="utf-8"))
+    # 兼容带 frontmatter 的 variables.yaml: 切掉首段 `--- ... ---` 只解析 body.
+    # 不直接 yaml.safe_load_all 是为了避免 topic='---' 这类字段值触发多文档歧义.
+    _var_text = Path(variables_path).read_text(encoding="utf-8")
+    _var_parts = re.split(r"^---\s*\n", _var_text, maxsplit=2, flags=re.MULTILINE)
+    _var_body = _var_parts[-1] if len(_var_parts) >= 3 else _var_text
+    variables_payload = yaml.safe_load(_var_body)
     if not isinstance(variables_payload, dict) or "variables" not in variables_payload:
         raise ValueError(f"variables file must contain 'variables' key: {variables_path}")
     raw_vars = variables_payload["variables"]

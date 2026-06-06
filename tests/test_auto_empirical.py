@@ -53,9 +53,11 @@ class AutoEmpiricalWorkbenchTests(unittest.TestCase):
         by_name = {source.name: source for source in sources}
 
         self.assertIn("empirical_skills", by_name)
+        self.assertIn("auto_empirical_research_skills", by_name)
         self.assertIn("statspai", by_name)
         self.assertTrue(by_name["empirical_skills"].exists)
         self.assertTrue(by_name["statspai"].exists)
+        self.assertFalse(by_name["auto_empirical_research_skills"].required)
         self.assertEqual(missing_required_capabilities(sources), [])
 
     def test_source_registry_accepts_registered_paths_only(self) -> None:

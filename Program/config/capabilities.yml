@@ -3,6 +3,10 @@ capability_sources:
     path: /Users/mahaoxuan/Desktop/经济学论文/Awesome-Agent-Skills-for-Empirical-Research
     role: 方法模板、agent skills、实证流程知识库
     required: true
+  auto_empirical_research_skills:
+    path: /Users/mahaoxuan/Desktop/经济学论文/Auto-Empirical-Research-Skills
+    role: CoPaper/AERS 实证研究 agent skills、方法模板、质量门与评测目录
+    required: false
   statspai:
     path: /Users/mahaoxuan/Desktop/经济学论文/StatsPAI
     role: Python 计量、因果推断、诊断、稳健性执行引擎

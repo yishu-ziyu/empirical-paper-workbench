@@ -12,6 +12,71 @@ INTERNAL_AGENT_SKILL_REGISTRY_PATH = (
 INTERNAL_AGENT_SKILL_PROPOSAL_PATH = "Program/methodology/proposals/internal-agent-skills/"
 
 
+SKILL_TRIGGER_KEYWORDS: dict[str, list[str]] = {
+    "recursive_research_search": [
+        "递归",
+        "文献",
+        "检索",
+        "引用",
+        "citation",
+        "cnki",
+        "zotero",
+        "literature",
+        "search",
+        "数据线索",
+        "变量证据",
+    ],
+    "did_staggered_identification_gate": [
+        "did",
+        "双重差分",
+        "diff-in-diff",
+        "事件研究",
+        "event study",
+        "staggered",
+        "交错",
+        "政策冲击",
+        "treatment timing",
+        "平行趋势",
+    ],
+    "weak_iv_diagnostic_gate": [
+        "iv",
+        "工具变量",
+        "instrument",
+        "2sls",
+        "weak iv",
+        "弱工具",
+        "first stage",
+        "第一阶段",
+        "内生",
+    ],
+    "aer_abstract_submission_preflight": [
+        "aer",
+        "aej",
+        "投稿",
+        "submission",
+        "abstract",
+        "摘要",
+        "table",
+        "figure",
+        "预检",
+        "期刊",
+    ],
+    "replication_package_gate": [
+        "复现",
+        "可复现",
+        "repro",
+        "replication",
+        "package",
+        "export",
+        "导出",
+        "artifact",
+        "产物",
+        "readme",
+        "一键",
+    ],
+}
+
+
 def _load_registry(registry_path: Path) -> tuple[dict[str, Any] | None, str | None]:
     if not registry_path.exists():
         return None, "registry_not_found"
@@ -27,6 +92,10 @@ def _load_registry(registry_path: Path) -> tuple[dict[str, Any] | None, str | No
 def _slug(value: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9]+", "_", value).strip("_").lower()
     return normalized or "unknown"
+
+
+def normalize_agent_role_name(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
 def _default_registry_path(registry_path: Path | None = None) -> Path:
@@ -193,6 +262,86 @@ def index_internal_agent_skill_capabilities(registry_path: Path | None = None) -
     return capabilities
 
 
+def recommend_internal_agent_skills_for_plan_context(
+    context: dict[str, Any],
+    registry_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    capabilities = index_internal_agent_skill_capabilities(registry_path)
+    if not capabilities:
+        return []
+
+    dispatch_items = [
+        item for item in _as_list(context.get("subagent_dispatch")) if isinstance(item, dict)
+    ]
+    full_text = _context_text(context)
+    recommendations: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for capability in capabilities:
+        skill = capability.get("internal_skill") if isinstance(capability.get("internal_skill"), dict) else {}
+        skill_id = str(skill.get("id") or capability.get("id") or "")
+        matched_keywords = [
+            keyword
+            for keyword in SKILL_TRIGGER_KEYWORDS.get(skill_id, [])
+            if keyword.lower() in full_text
+        ]
+        dispatch_targets = _matching_dispatch_targets(skill, dispatch_items)
+        if not matched_keywords and not dispatch_targets:
+            continue
+        if skill_id in seen:
+            continue
+        seen.add(skill_id)
+        recommendations.append(
+            {
+                "id": capability.get("id"),
+                "skill_id": skill_id,
+                "name": capability.get("name"),
+                "owner_agent": skill.get("owner_agent"),
+                "allowed_agents": list(skill.get("allowed_agents") or []),
+                "stage": skill.get("stage", ""),
+                "risk_level": capability.get("risk_level", "medium"),
+                "status": capability.get("status", "checklist"),
+                "adapter_path": capability.get("adapter_path", ""),
+                "matched_keywords": matched_keywords,
+                "matched_reason": _matched_reason(skill, matched_keywords, dispatch_targets),
+                "dispatch_targets": dispatch_targets,
+                "required_state": list(skill.get("required_state") or []),
+                "blockers": list(skill.get("blockers") or []),
+                "quality_gates": skill.get("quality_gates") or {},
+                "human_confirmation": skill.get("human_confirmation") or {},
+                "benchmark": skill.get("benchmark") or {},
+                "formal_write_targets": list(skill.get("formal_write_targets") or []),
+                "source_policy": skill.get("source_policy", ""),
+                "canonical_policy": capability.get("canonical_policy") or build_internal_agent_skill_policy(),
+            }
+        )
+    return recommendations
+
+
+def compact_internal_agent_skills_for_prompt() -> dict[str, Any]:
+    return {
+        "policy": build_internal_agent_skill_policy(),
+        "skills": [
+            {
+                "id": cap.get("id"),
+                "skill_id": (cap.get("internal_skill") or {}).get("id")
+                if isinstance(cap.get("internal_skill"), dict)
+                else "",
+                "name": cap.get("name"),
+                "owner_agent": (cap.get("internal_skill") or {}).get("owner_agent")
+                if isinstance(cap.get("internal_skill"), dict)
+                else "",
+                "allowed_agents": cap.get("allowed_roles", []),
+                "stage": (cap.get("internal_skill") or {}).get("stage")
+                if isinstance(cap.get("internal_skill"), dict)
+                else "",
+                "risk_level": cap.get("risk_level"),
+                "status": cap.get("status"),
+            }
+            for cap in index_internal_agent_skill_capabilities()
+        ],
+    }
+
+
 def _describe_skill(
     skill: dict[str, Any],
     metadata: dict[str, Any],
@@ -204,3 +353,49 @@ def _describe_skill(
     stage = str(applies_when.get("stage") or "unknown_stage")
     owner = str(metadata.get("owner_agent") or "Supervisor")
     return f"{name}: {owner} 在 {stage} 阶段调用的 {domain} 内部 Agent Skill。"
+
+
+def _matching_dispatch_targets(
+    skill: dict[str, Any],
+    dispatch_items: list[dict[str, Any]],
+) -> list[str]:
+    owner_agent = normalize_agent_role_name(skill.get("owner_agent"))
+    targets: list[str] = []
+    for item in dispatch_items:
+        role = normalize_agent_role_name(item.get("role") or item.get("owner_agent"))
+        owner = normalize_agent_role_name(item.get("agent_id"))
+        if owner_agent and (role == owner_agent or owner == owner_agent):
+            targets.append(str(item.get("agent_id") or item.get("role") or ""))
+    return [target for target in targets if target]
+
+
+def _matched_reason(
+    skill: dict[str, Any],
+    matched_keywords: list[str],
+    dispatch_targets: list[str],
+) -> str:
+    if matched_keywords and dispatch_targets:
+        return f"命中关键词 {', '.join(matched_keywords[:5])}，且可绑定 {skill.get('owner_agent')} 分工。"
+    if matched_keywords:
+        return f"命中关键词 {', '.join(matched_keywords[:5])}。"
+    return f"存在可绑定 {skill.get('owner_agent')} 分工。"
+
+
+def _context_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.lower()
+    if isinstance(value, dict):
+        return " ".join(_context_text(item) for item in value.values())
+    if isinstance(value, list):
+        return " ".join(_context_text(item) for item in value)
+    if value is None:
+        return ""
+    return str(value).lower()
+
+
+def _as_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if value is None:
+        return []
+    return [value]

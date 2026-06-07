@@ -242,6 +242,76 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "review_internal_skill_before_execution",
         )
 
+    def test_bdd_10_queue_preserves_llm_semantic_skill_reason_for_dispatch_review(self) -> None:
+        """行为 10：派工队列必须保留 LLM Supervisor 解释过的 skill 绑定理由。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_reviewer",
+                    "role": "ReviewerAgent",
+                    "task": "审阅写作出口和投稿预检",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_aer_abstract_submission_preflight",
+                    "skill_id": "aer_abstract_submission_preflight",
+                    "name": "AER-like 投稿预检",
+                    "owner_agent": "ReviewerAgent",
+                    "allowed_agents": ["Supervisor", "ReviewerAgent", "ManuscriptAgent", "ExportAgent"],
+                    "stage": "review_export",
+                    "risk_level": "medium",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_reviewer"],
+                    "matched_reason": "",
+                    "selection_source": "llm_semantic_judgment",
+                    "semantic_selection_reason": "用户选择顶刊标准，需要先检查摘要、表格说明和披露边界。",
+                    "llm_semantic_judgment": {
+                        "reason": "用户选择顶刊标准，需要先检查摘要、表格说明和披露边界。",
+                        "evidence_fit": "写作出口前缺少投稿格式和 disclosure 核验。",
+                        "agent_fit": "ReviewerAgent 负责审阅出口质量。",
+                        "risk_note": "不能静默导出正式投稿包。",
+                        "human_review_note": "正式导出前必须由研究者确认。",
+                        "confidence": "medium",
+                    },
+                    "quality_gates": {
+                        "machine_checkable": ["aers:eval:aer-abstract-100words"],
+                        "manual_review": ["contribution_claim_review"],
+                    },
+                    "human_confirmation": {
+                        "required_before": ["formal_submission_package_export"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        binding = response.json()["agent_task_queue"]["tasks"][0]["internal_skill_bindings"][0]
+        self.assertEqual(binding["skill_id"], "aer_abstract_submission_preflight")
+        self.assertEqual(binding["selection_source"], "llm_semantic_judgment")
+        self.assertEqual(
+            binding["semantic_selection_reason"],
+            "用户选择顶刊标准，需要先检查摘要、表格说明和披露边界。",
+        )
+        self.assertEqual(
+            binding["llm_semantic_judgment"]["risk_note"],
+            "不能静默导出正式投稿包。",
+        )
+        self.assertFalse(binding["canonical_policy"]["auto_mode"]["can_write_canonical"])
+
     def _write_supervisor_plan(
         self,
         status: str,

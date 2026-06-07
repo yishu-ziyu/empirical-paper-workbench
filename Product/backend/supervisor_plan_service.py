@@ -7,8 +7,8 @@ from typing import Any
 from Product.backend.codex_provider import local_codex_status, run_local_codex_prompt
 from Product.backend.design_spec_service import load_saved_design_spec, load_saved_run_plan
 from Product.backend.internal_agent_skill_registry import (
+    build_internal_agent_skill_recommendation_bundle,
     compact_internal_agent_skills_for_prompt,
-    recommend_internal_agent_skills_for_plan_context,
 )
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
@@ -293,7 +293,11 @@ def build_supervisor_plan_prompt(
     return (
         "你是本地 Codex Supervisor，负责为实证论文工作台生成下一轮可审阅研究执行计划。\n"
         "只输出 JSON，不要输出 Markdown。JSON 必须包含：stage_plan、subagent_dispatch、"
-        "evidence_requirements、risks、human_gates、next_action。\n"
+        "evidence_requirements、risks、human_gates、internal_skill_judgments、next_action。\n"
+        "internal_skill_judgments 用来解释你为什么选择某个内部 Agent Skill；"
+        "每项必须只使用 internal_skill_registry.skills 中存在的 skill_id，并包含 reason、"
+        "evidence_fit、agent_fit、risk_note、human_review_note、confidence。"
+        "如果没有合适 skill，输出空数组，不要编造 registry 外 skill。\n"
         "所有建议必须基于输入状态，不得声称已执行分析，不得改写任何已批准状态。\n\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
@@ -362,7 +366,12 @@ def normalize_supervisor_plan(
     evidence_requirements = normalize_list(generated.get("evidence_requirements"))
     risks = normalize_list(generated.get("risks"))
     human_gates = normalize_list(generated.get("human_gates"))
-    recommended_internal_skills = recommend_internal_agent_skills_for_plan_context(
+    llm_internal_skill_judgments = normalize_list(
+        generated.get("internal_skill_judgments")
+        or generated.get("skill_judgments")
+        or generated.get("recommended_internal_skills")
+    )
+    internal_skill_recommendations = build_internal_agent_skill_recommendation_bundle(
         {
             "project": project,
             "objective": objective,
@@ -375,8 +384,10 @@ def normalize_supervisor_plan(
             "evidence_requirements": evidence_requirements,
             "risks": risks,
             "human_gates": human_gates,
+            "internal_skill_judgments": llm_internal_skill_judgments,
         }
     )
+    recommended_internal_skills = internal_skill_recommendations["recommended_internal_skills"]
     return {
         "id": "supervisor_plan",
         "version": version,
@@ -391,7 +402,11 @@ def normalize_supervisor_plan(
         "evidence_requirements": evidence_requirements,
         "risks": risks,
         "human_gates": human_gates,
+        "llm_internal_skill_judgments": llm_internal_skill_judgments,
         "recommended_internal_skills": recommended_internal_skills,
+        "unmatched_internal_skill_judgments": internal_skill_recommendations[
+            "unmatched_internal_skill_judgments"
+        ],
         "next_action": generated.get("next_action") or {
             "id": "review_supervisor_plan",
             "label": "审阅 SupervisorPlan",

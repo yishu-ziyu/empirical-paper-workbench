@@ -496,6 +496,77 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
             by_skill_id["did_staggered_identification_gate"]["human_confirmation"]["required_before"],
         )
 
+    def test_bdd_16_supervisor_plan_keeps_llm_semantic_skill_judgment(self) -> None:
+        """行为 16：LLM Supervisor 选择 internal skill 时，必须保存可审阅的语义理由。"""
+        generated = {
+            "stage_plan": [
+                {"stage": "质量检查", "goal": "判断是否需要更高标准的写作出口核验", "status": "planned"}
+            ],
+            "subagent_dispatch": [
+                {
+                    "agent_id": "pipeline_quality",
+                    "role": "QualityAgent",
+                    "task": "整理下一步质量检查任务",
+                }
+            ],
+            "evidence_requirements": [],
+            "risks": [],
+            "human_gates": [],
+            "internal_skill_judgments": [
+                {
+                    "skill_id": "aer_abstract_submission_preflight",
+                    "reason": "用户选择顶刊标准，需要先检查摘要、表格说明和披露边界。",
+                    "evidence_fit": "当前计划进入写作出口前，缺少摘要长度、图表说明和 disclosure 的核验项。",
+                    "agent_fit": "ReviewerAgent/ManuscriptAgent 更适合做投稿前预检。",
+                    "risk_note": "只生成预检和修订工单，不能静默导出正式投稿包。",
+                    "human_review_note": "正式导出前必须由研究者确认。",
+                    "confidence": "medium",
+                },
+                {
+                    "skill_id": "unknown_external_skill",
+                    "reason": "LLM 认为可能有用，但它不在本项目内部 registry 中。",
+                },
+            ],
+        }
+
+        plan = normalize_supervisor_plan(
+            generated=generated,
+            project={"id": "p1", "title": "Project", "question": "父母教育是否影响工资？"},
+            objective="规划下一步质量检查",
+            note="让 LLM 解释为什么选择 skill",
+            provider={"provider": "local_codex"},
+            research_question={
+                "question": "父母教育是否影响工资？",
+                "topic_session_id": "topic_session_v1",
+                "version": 1,
+                "status": "confirmed",
+            },
+            variable_roles={"version": 1, "status": "approved"},
+            design_spec={"version": 1, "status": "approved"},
+            run_plan={"version": 1, "status": "approved"},
+            version=2,
+            timestamp="2026-06-08T00:00:00Z",
+        )
+
+        by_skill_id = {
+            skill["skill_id"]: skill for skill in plan["recommended_internal_skills"]
+        }
+
+        self.assertIn("aer_abstract_submission_preflight", by_skill_id)
+        self.assertNotIn("unknown_external_skill", by_skill_id)
+        aer_preflight = by_skill_id["aer_abstract_submission_preflight"]
+        self.assertEqual(aer_preflight["selection_source"], "llm_semantic_judgment")
+        self.assertEqual(
+            aer_preflight["semantic_selection_reason"],
+            "用户选择顶刊标准，需要先检查摘要、表格说明和披露边界。",
+        )
+        self.assertEqual(
+            aer_preflight["llm_semantic_judgment"]["evidence_fit"],
+            "当前计划进入写作出口前，缺少摘要长度、图表说明和 disclosure 的核验项。",
+        )
+        self.assertFalse(aer_preflight["canonical_policy"]["auto_mode"]["can_write_canonical"])
+        self.assertEqual(plan["unmatched_internal_skill_judgments"][0]["skill_id"], "unknown_external_skill")
+
 
 if __name__ == "__main__":
     unittest.main()

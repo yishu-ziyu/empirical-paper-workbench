@@ -11,6 +11,10 @@ from Product.backend.auto_empirical_research_skills import (
     index_aers_capabilities,
     index_aers_quality_gates,
 )
+from Product.backend.internal_agent_skill_registry import (
+    get_internal_agent_skill_source_info,
+    index_internal_agent_skill_capabilities,
+)
 from Product.backend.reproducibility_skill_contract import build_reproducibility_product_capability
 from Product.backend.statspai_adapter import get_statspai_info, index_statspai_capabilities
 
@@ -77,6 +81,8 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
     aers_info = get_aers_source_info()
     aers_caps = index_aers_capabilities()
     aers_quality_gates = index_aers_quality_gates()
+    internal_skill_info = get_internal_agent_skill_source_info()
+    internal_skill_caps = index_internal_agent_skill_capabilities()
 
     # Built-in capabilities (product actions)
     builtin_caps: list[dict[str, Any]] = [
@@ -111,7 +117,13 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
         build_reproducibility_product_capability(),
     ]
 
-    all_capabilities = builtin_caps + statspai_caps + aers_caps + aers_quality_gates
+    all_capabilities = (
+        builtin_caps
+        + statspai_caps
+        + aers_caps
+        + aers_quality_gates
+        + internal_skill_caps
+    )
     classification = _classify_capabilities(all_capabilities)
 
     registry = {
@@ -144,6 +156,17 @@ def reindex_capabilities(product_root: Path, repo_root: Path, project_id: str) -
                 "indexed_at": timestamp,
                 "available": True,
                 "function_count": len(builtin_caps),
+            },
+            "internal_agent_skill_registry": {
+                "path": str(internal_skill_info.get("path", "")),
+                "schema_version": str(internal_skill_info.get("schema_version", "unknown")),
+                "indexed_at": timestamp,
+                "available": internal_skill_info.get("available", False),
+                "function_count": len(internal_skill_caps),
+                "skill_count": internal_skill_info.get("skill_count", 0),
+                "lifecycle_counts": internal_skill_info.get("lifecycle_counts", {}),
+                "domain_counts": internal_skill_info.get("domain_counts", {}),
+                "canonical_policy": internal_skill_info.get("canonical_policy", {}),
             },
         },
         "capabilities": all_capabilities,

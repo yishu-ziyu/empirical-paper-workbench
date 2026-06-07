@@ -6,6 +6,10 @@ from typing import Any
 
 from Product.backend.codex_provider import local_codex_status, run_local_codex_prompt
 from Product.backend.design_spec_service import load_saved_design_spec, load_saved_run_plan
+from Product.backend.internal_agent_skill_registry import (
+    compact_internal_agent_skills_for_prompt,
+    recommend_internal_agent_skills_for_plan_context,
+)
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
 from Product.backend.research_question_service import load_saved_research_question
@@ -283,6 +287,7 @@ def build_supervisor_plan_prompt(
         "approved_variable_roles": compact_state(variable_roles),
         "approved_design_spec": compact_state(design_spec),
         "approved_run_plan": compact_state(run_plan),
+        "internal_skill_registry": compact_internal_agent_skills_for_prompt(),
         "write_boundary": "You must not modify VariableRoleSet, DesignSpec, or RunPlan. Propose a reviewable plan only.",
     }
     return (
@@ -352,6 +357,26 @@ def normalize_supervisor_plan(
     version: int,
     timestamp: str,
 ) -> dict[str, Any]:
+    stage_plan = normalize_list(generated.get("stage_plan"))
+    subagent_dispatch = normalize_list(generated.get("subagent_dispatch"))
+    evidence_requirements = normalize_list(generated.get("evidence_requirements"))
+    risks = normalize_list(generated.get("risks"))
+    human_gates = normalize_list(generated.get("human_gates"))
+    recommended_internal_skills = recommend_internal_agent_skills_for_plan_context(
+        {
+            "project": project,
+            "objective": objective,
+            "research_question": research_question,
+            "variable_roles": variable_roles,
+            "design_spec": design_spec,
+            "run_plan": run_plan,
+            "stage_plan": stage_plan,
+            "subagent_dispatch": subagent_dispatch,
+            "evidence_requirements": evidence_requirements,
+            "risks": risks,
+            "human_gates": human_gates,
+        }
+    )
     return {
         "id": "supervisor_plan",
         "version": version,
@@ -361,11 +386,12 @@ def normalize_supervisor_plan(
         "provider": provider,
         "objective": objective,
         "input_research_question": compact_research_question(research_question),
-        "stage_plan": normalize_list(generated.get("stage_plan")),
-        "subagent_dispatch": normalize_list(generated.get("subagent_dispatch")),
-        "evidence_requirements": normalize_list(generated.get("evidence_requirements")),
-        "risks": normalize_list(generated.get("risks")),
-        "human_gates": normalize_list(generated.get("human_gates")),
+        "stage_plan": stage_plan,
+        "subagent_dispatch": subagent_dispatch,
+        "evidence_requirements": evidence_requirements,
+        "risks": risks,
+        "human_gates": human_gates,
+        "recommended_internal_skills": recommended_internal_skills,
         "next_action": generated.get("next_action") or {
             "id": "review_supervisor_plan",
             "label": "审阅 SupervisorPlan",

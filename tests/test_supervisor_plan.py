@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import Product.app as product_app
 from Product.backend.registry import ensure_registry
+from Product.backend.supervisor_plan_service import normalize_supervisor_plan
 
 
 class SupervisorPlanApiTests(unittest.TestCase):
@@ -418,6 +419,82 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn("supervisorHumanReviewLabel", self.app_js)
         self.assertIn('plan.status === "approved"', self.app_js)
         self.assertIn("已批准", self.app_js)
+
+    def test_bdd_15_supervisor_plan_recommends_internal_skills_from_plan_context(self) -> None:
+        """行为 15：SupervisorPlan 必须把相关 internal skills 作为待审能力推荐，而不是自由发挥。"""
+        generated = {
+            "stage_plan": [
+                {"stage": "递归搜索", "goal": "检索文献、数据和方法缺口", "status": "planned"},
+                {"stage": "方法设计", "goal": "检查 DID 和 IV 识别门", "status": "planned"},
+            ],
+            "subagent_dispatch": [
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索与变量证据",
+                },
+                {
+                    "agent_id": "pipeline_method",
+                    "role": "MethodAgent",
+                    "task": "检查 DID 与 IV 识别前置条件",
+                },
+            ],
+            "evidence_requirements": [],
+            "risks": [],
+            "human_gates": [],
+        }
+
+        plan = normalize_supervisor_plan(
+            generated=generated,
+            project={"id": "p1", "title": "Project", "question": "政策冲击是否影响工资？"},
+            objective="用 DID / IV 路线规划下一轮实证任务",
+            note="绑定 internal skill registry",
+            provider={"provider": "local_codex"},
+            research_question={
+                "question": "政策冲击是否影响工资？",
+                "topic_session_id": "topic_session_v1",
+                "version": 1,
+                "status": "confirmed",
+            },
+            variable_roles={"version": 1, "status": "approved"},
+            design_spec={
+                "version": 1,
+                "status": "approved",
+                "identification_strategy": {"name": "did_iv_candidate"},
+                "model": {"estimator": "did_iv"},
+            },
+            run_plan={"version": 1, "status": "approved"},
+            version=2,
+            timestamp="2026-06-08T00:00:00Z",
+        )
+
+        by_skill_id = {
+            skill["skill_id"]: skill for skill in plan["recommended_internal_skills"]
+        }
+
+        self.assertIn("recursive_research_search", by_skill_id)
+        self.assertIn("did_staggered_identification_gate", by_skill_id)
+        self.assertIn("weak_iv_diagnostic_gate", by_skill_id)
+        self.assertEqual(
+            by_skill_id["recursive_research_search"]["dispatch_targets"],
+            ["pipeline_literature"],
+        )
+        self.assertEqual(
+            by_skill_id["did_staggered_identification_gate"]["dispatch_targets"],
+            ["pipeline_method"],
+        )
+        self.assertEqual(by_skill_id["did_staggered_identification_gate"]["formal_write_targets"], [])
+        self.assertFalse(
+            by_skill_id["did_staggered_identification_gate"]["canonical_policy"]["auto_mode"]["can_write_canonical"]
+        )
+        self.assertIn(
+            "aers:eval:did-staggered-recovery",
+            by_skill_id["did_staggered_identification_gate"]["quality_gates"]["machine_checkable"],
+        )
+        self.assertIn(
+            "default_run_plan_inclusion",
+            by_skill_id["did_staggered_identification_gate"]["human_confirmation"]["required_before"],
+        )
 
 
 if __name__ == "__main__":

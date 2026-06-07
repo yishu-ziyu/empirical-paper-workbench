@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from Product.backend.internal_agent_skill_registry import normalize_agent_role_name
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
 from Product.backend.supervisor_plan_service import load_saved_supervisor_plan
@@ -75,6 +76,8 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
             "queued_count": 0,
             "blocked_count": len(blockers),
             "owner_agents": [],
+            "internal_skill_count": 0,
+            "high_risk_internal_skill_count": 0,
         },
         "tasks": [],
         "blockers": blockers,
@@ -159,6 +162,7 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
     owner_agent = str(dispatch_item.get("agent_id") or dispatch_item.get("role") or f"agent_{index:02d}")
     role = str(dispatch_item.get("role") or owner_agent)
     title = str(dispatch_item.get("task") or dispatch_item.get("title") or dispatch_item.get("goal") or f"Agent task {index}")
+    internal_skill_bindings = build_task_internal_skill_bindings(plan, dispatch_item, owner_agent, role)
     return {
         "id": f"agent_task_{index:02d}",
         "source_dispatch_id": dispatch_item.get("agent_id") or "",
@@ -179,6 +183,7 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
         },
         "input_evidence": build_task_input_evidence(plan),
         "output_requirements": build_output_requirements(plan, dispatch_item),
+        "internal_skill_bindings": internal_skill_bindings,
         "blockers": [],
         "risk_flags": normalize_list(plan.get("risks")),
         "audit_log": [
@@ -189,6 +194,57 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
                 "source_supervisor_plan_version": plan.get("version", 0),
             }
         ],
+    }
+
+
+def build_task_internal_skill_bindings(
+    plan: dict[str, Any],
+    dispatch_item: dict[str, Any],
+    owner_agent: str,
+    role: str,
+) -> list[dict[str, Any]]:
+    dispatch_id = str(dispatch_item.get("agent_id") or owner_agent)
+    normalized_candidates = {
+        normalize_agent_role_name(dispatch_id),
+        normalize_agent_role_name(owner_agent),
+        normalize_agent_role_name(role),
+    }
+    bindings: list[dict[str, Any]] = []
+    for skill in normalize_list(plan.get("recommended_internal_skills")):
+        if not isinstance(skill, dict):
+            continue
+        targets = [str(target) for target in normalize_list(skill.get("dispatch_targets"))]
+        if targets and dispatch_id not in targets and owner_agent not in targets and role not in targets:
+            continue
+        if not targets:
+            owner = normalize_agent_role_name(skill.get("owner_agent"))
+            allowed = {
+                normalize_agent_role_name(agent)
+                for agent in normalize_list(skill.get("allowed_agents"))
+            }
+            if owner not in normalized_candidates and not allowed.intersection(normalized_candidates):
+                continue
+        bindings.append(compact_task_internal_skill_binding(skill))
+    return bindings
+
+
+def compact_task_internal_skill_binding(skill: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": skill.get("id"),
+        "skill_id": skill.get("skill_id"),
+        "name": skill.get("name"),
+        "owner_agent": skill.get("owner_agent"),
+        "stage": skill.get("stage"),
+        "risk_level": skill.get("risk_level", "medium"),
+        "status": skill.get("status", "checklist"),
+        "matched_reason": skill.get("matched_reason", ""),
+        "quality_gates": skill.get("quality_gates") or {},
+        "human_confirmation": skill.get("human_confirmation") or {},
+        "benchmark": skill.get("benchmark") or {},
+        "formal_write_targets": normalize_list(skill.get("formal_write_targets")),
+        "source_policy": skill.get("source_policy", ""),
+        "canonical_policy": skill.get("canonical_policy") or {},
+        "next_action": "review_internal_skill_before_execution",
     }
 
 
@@ -242,6 +298,7 @@ def build_queue_ui_contract() -> dict[str, Any]:
         "hidden_by_default": [
             "input_evidence",
             "output_requirements",
+            "internal_skill_bindings",
             "risk_flags",
             "audit_log",
         ],
@@ -310,6 +367,12 @@ def ensure_task_dispatch_audit_fields(task: dict[str, Any]) -> None:
 
 def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:
     task_dicts = [task for task in tasks if isinstance(task, dict)]
+    skill_bindings = [
+        binding
+        for task in task_dicts
+        for binding in normalize_list(task.get("internal_skill_bindings"))
+        if isinstance(binding, dict)
+    ]
     return {
         "total_tasks": len(task_dicts),
         "queued_count": len([task for task in task_dicts if task.get("status") == "queued"]),
@@ -319,6 +382,10 @@ def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:
         ),
         "needs_revision_count": len([task for task in task_dicts if task.get("status") == "needs_revision"]),
         "owner_agents": unique_preserve_order([str(task.get("owner_agent", "")) for task in task_dicts]),
+        "internal_skill_count": len(skill_bindings),
+        "high_risk_internal_skill_count": len(
+            [binding for binding in skill_bindings if binding.get("risk_level") == "high"]
+        ),
     }
 
 

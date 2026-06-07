@@ -143,11 +143,111 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "subagent_dispatch_required")
         self.assertFalse((self.project_root / "state" / "product" / "agent_task_queue.json").exists())
 
+    def test_bdd_9_queue_tasks_inherit_internal_skill_bindings_from_supervisor_plan(self) -> None:
+        """行为 9：任务队列必须把 SupervisorPlan 推荐的 internal skills 绑定到对应 Agent 任务。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+                {
+                    "agent_id": "pipeline_method",
+                    "role": "MethodAgent",
+                    "task": "检查 DID 识别门",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "allowed_agents": ["Supervisor", "LiteratureAgent", "ReviewerAgent"],
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "quality_gates": {
+                        "machine_checkable": ["aers:eval:citation-hygiene-no-fake-refs"],
+                        "manual_review": ["source_relevance_review"],
+                    },
+                    "human_confirmation": {
+                        "required_before": ["formal_literature_review_writeback"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+                {
+                    "id": "cap_internal_skill_did_staggered_identification_gate",
+                    "skill_id": "did_staggered_identification_gate",
+                    "name": "交错 DID 识别门",
+                    "owner_agent": "MethodAgent",
+                    "allowed_agents": ["Supervisor", "MethodAgent", "ExecutionAgent", "ReviewerAgent"],
+                    "stage": "method_design",
+                    "risk_level": "high",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_method"],
+                    "quality_gates": {
+                        "machine_checkable": ["aers:eval:did-staggered-recovery"],
+                        "manual_review": ["parallel_trends_substantive_review"],
+                    },
+                    "human_confirmation": {
+                        "required_before": ["default_run_plan_inclusion", "formal_method_writeback"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        queue = response.json()["agent_task_queue"]
+        self.assertEqual(queue["summary"]["internal_skill_count"], 2)
+        self.assertEqual(queue["summary"]["high_risk_internal_skill_count"], 1)
+
+        literature_task = queue["tasks"][0]
+        method_task = queue["tasks"][1]
+        self.assertEqual(literature_task["internal_skill_bindings"][0]["skill_id"], "recursive_research_search")
+        self.assertEqual(method_task["internal_skill_bindings"][0]["skill_id"], "did_staggered_identification_gate")
+        self.assertEqual(method_task["internal_skill_bindings"][0]["formal_write_targets"], [])
+        self.assertFalse(method_task["internal_skill_bindings"][0]["canonical_policy"]["auto_mode"]["can_write_canonical"])
+        self.assertEqual(method_task["next_action"], "dispatch_review_required")
+        self.assertFalse(method_task["can_execute"])
+        self.assertIn(
+            "aers:eval:did-staggered-recovery",
+            method_task["internal_skill_bindings"][0]["quality_gates"]["machine_checkable"],
+        )
+        self.assertEqual(
+            method_task["internal_skill_bindings"][0]["next_action"],
+            "review_internal_skill_before_execution",
+        )
+
     def _write_supervisor_plan(
         self,
         status: str,
         can_dispatch: bool,
         subagent_dispatch: list[dict] | None = None,
+        recommended_internal_skills: list[dict] | None = None,
     ) -> None:
         path = self.project_root / "state" / "product" / "supervisor_plan.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,6 +290,7 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "human_gates": [
                 {"id": "review_supervisor_plan", "label": "人工确认 SupervisorPlan", "required": True}
             ],
+            "recommended_internal_skills": recommended_internal_skills or [],
         }
         path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 

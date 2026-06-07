@@ -266,14 +266,58 @@ def recommend_internal_agent_skills_for_plan_context(
     context: dict[str, Any],
     registry_path: Path | None = None,
 ) -> list[dict[str, Any]]:
+    return build_internal_agent_skill_recommendation_bundle(
+        context,
+        registry_path,
+    )["recommended_internal_skills"]
+
+
+def build_internal_agent_skill_recommendation_bundle(
+    context: dict[str, Any],
+    registry_path: Path | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     capabilities = index_internal_agent_skill_capabilities(registry_path)
     if not capabilities:
-        return []
+        return {
+            "recommended_internal_skills": [],
+            "unmatched_internal_skill_judgments": normalize_llm_internal_skill_judgments(context),
+        }
 
     dispatch_items = [
         item for item in _as_list(context.get("subagent_dispatch")) if isinstance(item, dict)
     ]
-    full_text = _context_text(context)
+    capability_skill_ids = {
+        str((capability.get("internal_skill") or {}).get("id") or "")
+        for capability in capabilities
+        if isinstance(capability.get("internal_skill"), dict)
+    }
+    llm_judgments: dict[str, dict[str, Any]] = {}
+    unmatched_llm_judgments: list[dict[str, Any]] = []
+    for judgment in normalize_llm_internal_skill_judgments(context):
+        skill_id = str(judgment.get("skill_id") or "")
+        if skill_id in capability_skill_ids:
+            llm_judgments[skill_id] = judgment
+        else:
+            unmatched_llm_judgments.append(
+                {
+                    **judgment,
+                    "status": "ignored_unknown_skill",
+                    "reason_code": "skill_not_in_internal_registry",
+                }
+            )
+
+    context_for_rule_match = {
+        key: value
+        for key, value in context.items()
+        if key
+        not in {
+            "internal_skill_judgments",
+            "skill_judgments",
+            "recommended_internal_skills",
+            "llm_internal_skill_judgments",
+        }
+    }
+    full_text = _context_text(context_for_rule_match)
     recommendations: list[dict[str, Any]] = []
     seen: set[str] = set()
     for capability in capabilities:
@@ -285,11 +329,14 @@ def recommend_internal_agent_skills_for_plan_context(
             if keyword.lower() in full_text
         ]
         dispatch_targets = _matching_dispatch_targets(skill, dispatch_items)
-        if not matched_keywords and not dispatch_targets:
+        llm_judgment = llm_judgments.get(skill_id)
+        if not matched_keywords and not dispatch_targets and not llm_judgment:
             continue
         if skill_id in seen:
             continue
         seen.add(skill_id)
+        matched_reason = _matched_reason(skill, matched_keywords, dispatch_targets)
+        selection_source = _selection_source(matched_keywords, dispatch_targets, llm_judgment)
         recommendations.append(
             {
                 "id": capability.get("id"),
@@ -302,7 +349,10 @@ def recommend_internal_agent_skills_for_plan_context(
                 "status": capability.get("status", "checklist"),
                 "adapter_path": capability.get("adapter_path", ""),
                 "matched_keywords": matched_keywords,
-                "matched_reason": _matched_reason(skill, matched_keywords, dispatch_targets),
+                "matched_reason": matched_reason,
+                "selection_source": selection_source,
+                "semantic_selection_reason": (llm_judgment or {}).get("reason") or matched_reason,
+                "llm_semantic_judgment": llm_judgment or {},
                 "dispatch_targets": dispatch_targets,
                 "required_state": list(skill.get("required_state") or []),
                 "blockers": list(skill.get("blockers") or []),
@@ -314,7 +364,49 @@ def recommend_internal_agent_skills_for_plan_context(
                 "canonical_policy": capability.get("canonical_policy") or build_internal_agent_skill_policy(),
             }
         )
-    return recommendations
+    return {
+        "recommended_internal_skills": recommendations,
+        "unmatched_internal_skill_judgments": unmatched_llm_judgments,
+    }
+
+
+def normalize_llm_internal_skill_judgments(context: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_items: list[Any] = []
+    for key in (
+        "internal_skill_judgments",
+        "skill_judgments",
+        "recommended_internal_skills",
+        "llm_internal_skill_judgments",
+    ):
+        raw_items.extend(_as_list(context.get(key)))
+
+    judgments: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        skill_id = _normalize_skill_id(item.get("skill_id") or item.get("internal_skill_id") or item.get("id"))
+        if not skill_id or skill_id in seen:
+            continue
+        seen.add(skill_id)
+        judgment = {
+            "skill_id": skill_id,
+            "reason": str(
+                item.get("reason")
+                or item.get("why_this_skill")
+                or item.get("rationale")
+                or item.get("semantic_selection_reason")
+                or item.get("matched_reason")
+                or ""
+            ),
+            "evidence_fit": str(item.get("evidence_fit") or ""),
+            "agent_fit": str(item.get("agent_fit") or ""),
+            "risk_note": str(item.get("risk_note") or ""),
+            "human_review_note": str(item.get("human_review_note") or ""),
+            "confidence": item.get("confidence") or "",
+        }
+        judgments.append({key: value for key, value in judgment.items() if value != ""})
+    return judgments
 
 
 def compact_internal_agent_skills_for_prompt() -> dict[str, Any]:
@@ -379,6 +471,25 @@ def _matched_reason(
     if matched_keywords:
         return f"命中关键词 {', '.join(matched_keywords[:5])}。"
     return f"存在可绑定 {skill.get('owner_agent')} 分工。"
+
+
+def _selection_source(
+    matched_keywords: list[str],
+    dispatch_targets: list[str],
+    llm_judgment: dict[str, Any] | None,
+) -> str:
+    if llm_judgment and (matched_keywords or dispatch_targets):
+        return "registry_and_llm_semantic_judgment"
+    if llm_judgment:
+        return "llm_semantic_judgment"
+    return "registry_rule_match"
+
+
+def _normalize_skill_id(value: Any) -> str:
+    skill_id = str(value or "").strip()
+    if skill_id.startswith("cap_internal_skill_"):
+        return skill_id.removeprefix("cap_internal_skill_")
+    return skill_id
 
 
 def _context_text(value: Any) -> str:

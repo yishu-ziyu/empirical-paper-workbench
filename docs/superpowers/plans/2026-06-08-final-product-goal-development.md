@@ -1335,3 +1335,49 @@ git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py P
 ```
 
 Next node: **P1-Q review draft section plan before drafting section text**.
+
+## P1-Q Draft Section Plan Review Gate
+
+Boundary: a draft section plan only says which sections and citation bindings should become writing tasks. It must pass a human review gate before the system creates section-level draft task packages, and it still cannot write formal manuscript prose.
+
+BDD:
+
+```text
+Behavior 38: approve a draft section plan for section task generation
+Given Results/json/draft_section_plan.json exists
+And the Agent task is waiting for draft section plan review
+When the user approves the plan for section task generation
+Then the system records a human review gate,
+sets section_task_generation_allowed=true,
+keeps formal_write_allowed=false,
+and exposes generate_draft_section_tasks as the next action.
+
+Behavior 39: block draft section plan review before the plan exists
+Given the manuscript citation plan has been approved
+But Results/json/draft_section_plan.json has not been generated
+When the user tries to approve a draft section plan review
+Then the system returns draft_section_plan_required
+and does not open section task generation.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-section-plan-review`.
+- The service accepts `approve_for_section_tasks`, `needs_revision`, and `reject`.
+- Approval records `review_gate=review_draft_section_plan`, `reviewer=human`, `section_task_generation_allowed=true`, and `formal_write_allowed=false`.
+- The parent Agent task moves to `draft_section_plan_approved` and exposes `generate_draft_section_tasks`.
+- The frontend renders the review gate with `批准生成章节任务`, `要求修订`, and `拒绝计划` actions.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_38_review_draft_section_plan_opens_section_task_generation tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_39_draft_section_plan_review_requires_plan tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_26_frontend_exposes_draft_section_plan_review_gate -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+Next node: **P1-R generate draft section task packages after draft section plan approval**.

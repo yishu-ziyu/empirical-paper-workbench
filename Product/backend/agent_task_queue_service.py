@@ -31,6 +31,11 @@ VALID_MANUSCRIPT_CITATION_PLAN_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_DRAFT_SECTION_PLAN_REVIEW_ACTIONS = {
+    "approve_for_section_tasks",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -429,6 +434,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "draft_section_plan_review",
+        }
+    if status == "draft_section_plan_approved":
+        return {
+            "id": "generate_draft_section_tasks",
+            "label": "生成章节草稿任务包",
+            "reason": "章节草稿计划已通过审阅，下一步把章节边界和引用绑定拆成可执行草稿任务。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "draft_section_tasks",
         }
     if status == "rejected":
         return {
@@ -1926,6 +1940,99 @@ def generate_project_draft_section_plan(
     return response
 
 
+def review_project_draft_section_plan(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_DRAFT_SECTION_PLAN_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_draft_section_plan_review_action",
+            f"Unsupported draft section plan review action: {action}.",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    plan_summary = task.get("draft_section_plan") if isinstance(task.get("draft_section_plan"), dict) else {}
+    plan_artifact_path = str(plan_summary.get("artifact_path") or "")
+    plan_artifact = project_root / plan_artifact_path
+    if task.get("status") != "draft_section_plan_ready" or not plan_artifact_path or not plan_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "draft_section_plan_required",
+            "Draft section plan is required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_draft_section_plan_review(action, note, timestamp)
+    task["draft_section_plan_review"] = review
+    plan_summary["review_status"] = review["status"]
+    plan_summary["review_gate"] = review["review_gate"]
+    plan_summary["section_task_generation_allowed"] = review["section_task_generation_allowed"]
+    plan_summary["formal_write_allowed"] = False
+    task["draft_section_plan"] = plan_summary
+
+    plan = json.loads(plan_artifact.read_text(encoding="utf-8"))
+    plan["review"] = review
+    plan["formal_write_allowed"] = False
+    plan["section_task_generation_allowed"] = review["section_task_generation_allowed"]
+    plan_artifact.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if action == "approve_for_section_tasks":
+        task["status"] = "draft_section_plan_approved"
+        task["next_action"] = "generate_draft_section_tasks"
+        task["can_execute"] = False
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "draft_section_plan_needs_revision"
+        task["next_action"] = "revise_draft_section_plan"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "draft_section_plan_needs_revision",
+                "label": "章节草稿计划需要修订",
+                "description": note or "按审阅意见调整章节边界、引用绑定或写作任务。",
+            }
+        ]
+    else:
+        task["status"] = "draft_section_plan_rejected"
+        task["next_action"] = "replace_draft_section_plan"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "draft_section_plan_rejected",
+                "label": "章节草稿计划已拒绝",
+                "description": note or "需要重新生成或替换章节草稿计划。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "draft_section_plan_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "status": review["status"],
+            "artifact_path": plan_artifact_path,
+            "section_task_generation_allowed": review["section_task_generation_allowed"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["draft_section_plan_review"] = review
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -2017,6 +2124,39 @@ def build_manuscript_citation_plan_review(action: str, note: str, timestamp: str
         "reviewed_at": timestamp,
         "citation_state": "section_binding_plan",
         "draft_section_plan_allowed": draft_section_plan_allowed,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_draft_section_plan_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_section_tasks":
+        status = "approved_for_section_tasks"
+        next_action = "generate_draft_section_tasks"
+        next_action_label = "生成章节草稿任务包"
+        section_task_generation_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_draft_section_plan"
+        next_action_label = "要求修订章节计划"
+        section_task_generation_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_draft_section_plan"
+        next_action_label = "拒绝章节计划"
+        section_task_generation_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_draft_section_plan",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "draft_state": "section_task_plan",
+        "section_task_generation_allowed": section_task_generation_allowed,
         "formal_write_allowed": False,
         "writes_formal_layer": False,
         "next_action": next_action,

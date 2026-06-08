@@ -1204,6 +1204,45 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.json()["error"]["code"], "manuscript_citation_plan_review_required")
         self.assertFalse((self.project_root / "Results" / "json" / "draft_section_plan.json").exists())
 
+    def test_bdd_38_review_draft_section_plan_opens_section_task_generation(self) -> None:
+        """行为 38：章节草稿计划通过人工审阅后，才开放章节草稿任务包。"""
+        self._generate_draft_section_plan()
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-plan-review",
+            json={"action": "approve_for_section_tasks", "note": "章节边界和引用绑定可以进入草稿任务包。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        review = task["draft_section_plan_review"]
+        self.assertEqual(review["status"], "approved_for_section_tasks")
+        self.assertEqual(review["review_gate"], "review_draft_section_plan")
+        self.assertTrue(review["section_task_generation_allowed"])
+        self.assertFalse(review["formal_write_allowed"])
+        self.assertEqual(task["status"], "draft_section_plan_approved")
+        self.assertEqual(task["next_action"], "generate_draft_section_tasks")
+        self.assertEqual(task["primary_action"]["id"], "generate_draft_section_tasks")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "draft_section_plan_reviewed")
+
+        artifact = json.loads((self.project_root / "Results" / "json" / "draft_section_plan.json").read_text(encoding="utf-8"))
+        self.assertEqual(artifact["review"]["status"], "approved_for_section_tasks")
+        self.assertTrue(artifact["section_task_generation_allowed"])
+        self.assertFalse(artifact["formal_write_allowed"])
+
+    def test_bdd_39_draft_section_plan_review_requires_plan(self) -> None:
+        """行为 39：没有章节草稿计划时，不能伪造章节计划审阅。"""
+        self._approve_manuscript_citation_plan()
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-plan-review",
+            json={"action": "approve_for_section_tasks", "note": "还没有章节草稿计划。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "draft_section_plan_required")
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1292,6 +1331,14 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
         return reviewed
+
+    def _generate_draft_section_plan(self):
+        self._approve_manuscript_citation_plan()
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-plan"
+        )
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        return generated
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1679,6 +1726,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("生成章节草稿计划", self.app_js)
         self.assertIn("draft_section_plan", self.app_js)
         self.assertIn(".agent-task-draft-section-plan", self.styles_css)
+
+    def test_bdd_26_frontend_exposes_draft_section_plan_review_gate(self) -> None:
+        """行为 26：前端必须能审阅章节草稿计划，再开放章节草稿任务包。"""
+        self.assertIn("reviewDraftSectionPlan", self.app_js)
+        self.assertIn("handleDraftSectionPlanReview", self.app_js)
+        self.assertIn("data-draft-section-plan-review-action", self.app_js)
+        self.assertIn("批准生成章节任务", self.app_js)
+        self.assertIn("draft_section_plan_review", self.app_js)
+        self.assertIn(".agent-task-draft-section-plan__review", self.styles_css)
 
 
 if __name__ == "__main__":

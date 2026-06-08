@@ -969,3 +969,53 @@ P1-H implementation:
 - Added frontend API binding and review buttons in the candidate source package result block.
 
 Next node: **P1-I draft-layer literature review generation from approved_for_draft seed packages**.
+
+20-minute boundary for P1-I:
+
+- Do not implement CNKI / Scholar / Zotero connector crawling.
+- Do not claim citations are verified.
+- Do not write to Manuscripts formal sections.
+- Only generate a draft-layer markdown literature review from an already approved candidate source seed package.
+
+P1-I BDD:
+
+```text
+Given a LiteratureAgent task has produced a reference_chain_seed_package
+And the user has approved that seed package for draft use
+When the user asks the system to generate a literature review draft
+Then the system writes draft_literature_review.md,
+records draft_literature_review.status=draft_ready,
+sets next_action=review_draft_literature_review,
+and keeps formal_write_allowed=false.
+
+Given a reference_chain_seed_package exists but has not been approved
+When the user calls the draft literature review endpoint
+Then the system rejects the request with reference_seed_review_required.
+
+Given the frontend receives a draft_ready literature review record
+When the agent task queue renders the task
+Then the user can see the draft artifact path, source artifact path,
+review action, and formal-layer boundary.
+```
+
+P1-I verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_21_approved_seed_package_generates_draft_layer_literature_review tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_22_draft_literature_review_requires_approved_seed_package tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_18_frontend_exposes_draft_literature_review_generation -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+P1-I implementation:
+
+- Added `POST /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-literature-review`.
+- The endpoint requires `reference_seed_review.status=approved_for_draft`.
+- It reads the persisted `reference_chain_seed_package.json` and writes `draft_literature_review.md` next to it.
+- The task moves to `draft_literature_review_ready` with primary action `review_draft_literature_review`.
+- The draft record explicitly keeps `formal_write_allowed=false`, `writes_formal_layer=false`, and `claims_verified_citations=false`.
+- The frontend now exposes `生成草稿层文献综述` after approval and renders the resulting draft artifact, source artifact, next action, and formal-layer boundary.
+
+Next node: **P1-J review draft_literature_review and open citation-verification tasks**.

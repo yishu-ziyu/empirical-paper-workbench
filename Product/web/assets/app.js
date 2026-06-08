@@ -77,6 +77,7 @@ const state = {
   creatingAgentTaskQueue: false,
   reviewingAgentTaskId: null,
   reviewingAgentTaskAction: null,
+  draftingLiteratureReviewTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -482,6 +483,13 @@ const v2api = {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      });
+    },
+    async draftLiteratureReview(projectId, taskId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/draft-literature-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
     },
     async selectBackend(projectId, taskId, payload) {
@@ -1495,6 +1503,8 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
     ? Number(review.candidate_query_count)
     : 0;
   const isReviewing = state.reviewingAgentTaskId === task.id;
+  const isApprovedForDraft = seedReview.status === "approved_for_draft";
+  const isDrafting = state.draftingLiteratureReviewTaskId === task.id;
   return `
     <div class="agent-task-reference-seed-result">
       <div class="agent-task-reference-seed-result__head">
@@ -1534,6 +1544,11 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
           <p class="muted">${seedReview.status ? `已记录：${escapeHtml(productTermLabel(seedReview.status))}` : "批准后只进入草稿综述；不会写入正式层。"}</p>
         </div>
         <div class="agent-task-reference-seed-result__buttons">
+          ${isApprovedForDraft ? `
+            <button class="primary-button" data-draft-literature-review-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isDrafting ? "disabled" : ""}>
+              ${isDrafting ? "生成中..." : "生成草稿层文献综述"}
+            </button>
+          ` : ""}
           <button class="secondary-button" data-reference-seed-review-action="approve_for_draft" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
             ${isReviewing && state.reviewingAgentTaskAction === "approve_for_draft" ? "处理中..." : "进入草稿综述"}
           </button>
@@ -1543,6 +1558,38 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
           <button class="secondary-button" data-reference-seed-review-action="reject" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
             拒绝种子包
           </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDraftLiteratureReview(task = {}) {
+  const draft = task.draft_literature_review || {};
+  if (draft.status !== "draft_ready") return "";
+  return `
+    <div class="agent-task-literature-draft">
+      <div>
+        <span class="meta-label">草稿层文献综述</span>
+        <strong>${escapeHtml(draft.next_action_label || "审阅草稿综述")}</strong>
+        <p class="muted">来自候选来源种子包 · ${escapeHtml(draft.citation_state || "candidate")} · 不写入正式层</p>
+      </div>
+      <div class="agent-task-literature-draft__grid">
+        <div>
+          <span class="meta-label">草稿文件</span>
+          <code>${escapeHtml(draft.artifact_path || "等待生成 draft_literature_review.md")}</code>
+        </div>
+        <div>
+          <span class="meta-label">来源文件</span>
+          <code>${escapeHtml(draft.source_artifact_path || "-")}</code>
+        </div>
+        <div>
+          <span class="meta-label">下一步</span>
+          <p>${escapeHtml(productTermLabel(draft.next_action || "review_draft_literature_review"))}</p>
+        </div>
+        <div>
+          <span class="meta-label">正式层边界</span>
+          <p>${escapeHtml(draft.limitations || "引用仍需核验，不能写入正式层。")}</p>
         </div>
       </div>
     </div>
@@ -1572,6 +1619,7 @@ function renderAgentTaskExecutionHandoff(task) {
 
   return `
     ${renderReferenceSeedPackageResultReview(executionResult, task)}
+    ${renderDraftLiteratureReview(task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -2243,6 +2291,25 @@ async function handleReferenceSeedPackageReview(taskId, action) {
   } finally {
     state.reviewingAgentTaskId = null;
     state.reviewingAgentTaskAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleDraftLiteratureReview(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.draftingLiteratureReviewTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.draftLiteratureReview(
+      state.selectedProjectId,
+      taskId,
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成草稿层文献综述失败：${error.message}`);
+  } finally {
+    state.draftingLiteratureReviewTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -7254,6 +7321,11 @@ async function boot() {
         referenceSeedReviewButton.dataset.agentTaskId,
         referenceSeedReviewButton.dataset.referenceSeedReviewAction,
       );
+      return;
+    }
+    const draftLiteratureReviewButton = target.closest("[data-draft-literature-review-action]");
+    if (draftLiteratureReviewButton) {
+      void handleDraftLiteratureReview(draftLiteratureReviewButton.dataset.agentTaskId || "");
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

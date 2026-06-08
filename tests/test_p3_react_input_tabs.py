@@ -57,6 +57,29 @@ class ReactInputTabsContractTest(unittest.TestCase):
         self.assertIn("onKeyDown", source)
         self.assertIn("aria-selected", source)
 
+    def test_locked_stage_tabs_do_not_become_visually_selected(self) -> None:
+        """行为 21：未解锁阶段可提示用户，但不能被滑块或 active 样式选中。"""
+        component_path = WEB_REACT_ROOT / "src" / "components" / "SlideTabs.tsx"
+        app_path = WEB_REACT_ROOT / "src" / "App.tsx"
+
+        source = component_path.read_text(encoding="utf-8")
+        app_source = app_path.read_text(encoding="utf-8")
+
+        self.assertIn("disabled?: boolean", source)
+        self.assertIn("DEFAULT_CURSOR_POSITION", source)
+        self.assertIn("aria-disabled={tab.disabled ? \"true\" : undefined}", source)
+        self.assertIn("slide-tabs__tab--locked", source)
+        self.assertIn("useLayoutEffect", source)
+        self.assertIn("requestAnimationFrame", source)
+        self.assertIn("initial={false}", source)
+        self.assertIn("setCursorTo(activeId)", source)
+        self.assertIn("if (target?.disabled)", source)
+        self.assertIn("returnActiveCursor", source)
+        self.assertIn("if (tab.disabled) return;", source)
+        self.assertIn("disabled: !unlocked", app_source)
+        self.assertIn('label: info.label', app_source)
+        self.assertNotIn('label: unlocked ? info.label : `${info.label} (待解锁)`', app_source)
+
     def test_dotted_surface_background_uses_three_without_adding_page_copy(self) -> None:
         component_path = WEB_REACT_ROOT / "src" / "components" / "DottedSurface.tsx"
         self.assertTrue(component_path.exists(), "DottedSurface component is missing.")

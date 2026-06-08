@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "../lib/cn";
 
@@ -6,6 +6,7 @@ export interface StageTab {
   id: string;
   label: string;
   hint: string;
+  disabled?: boolean;
 }
 
 const DEFAULT_TABS: StageTab[] = [
@@ -16,6 +17,8 @@ const DEFAULT_TABS: StageTab[] = [
   { id: "execution", label: "执行实验", hint: "运行、诊断、预检和草案" },
 ];
 
+const DEFAULT_CURSOR_POSITION = { left: 5, width: 88, opacity: 1 };
+
 interface SlideTabsProps {
   tabs?: StageTab[];
   value?: string;
@@ -24,7 +27,7 @@ interface SlideTabsProps {
 
 export function SlideTabs({ tabs = DEFAULT_TABS, value, onChange }: SlideTabsProps) {
   const [activeId, setActiveId] = useState(value || tabs[0]?.id || "");
-  const [position, setPosition] = useState({ left: 0, width: 0, opacity: 0 });
+  const [position, setPosition] = useState(DEFAULT_CURSOR_POSITION);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const active = tabs.find((tab) => tab.id === activeId) || tabs[0];
 
@@ -32,13 +35,33 @@ export function SlideTabs({ tabs = DEFAULT_TABS, value, onChange }: SlideTabsPro
     if (value) setActiveId(value);
   }, [value]);
 
+  function setCursorTo(id: string) {
+    const node = tabRefs.current[id];
+    if (!node) return;
+    setPosition({ left: node.offsetLeft, width: node.offsetWidth, opacity: 1 });
+  }
+
+  useLayoutEffect(() => {
+    setCursorTo(activeId);
+    const frame = window.requestAnimationFrame(() => setCursorTo(activeId));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeId, tabs]);
+
+  function returnActiveCursor() {
+    setCursorTo(activeId);
+  }
+
   function selectTab(id: string) {
+    const target = tabs.find((tab) => tab.id === id);
+    if (target?.disabled) {
+      onChange?.(id);
+      returnActiveCursor();
+      return;
+    }
+
     setActiveId(id);
     onChange?.(id);
-    const node = tabRefs.current[id];
-    if (node) {
-      setPosition({ left: node.offsetLeft, width: node.offsetWidth, opacity: 1 });
-    }
+    setCursorTo(id);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -47,6 +70,11 @@ export function SlideTabs({ tabs = DEFAULT_TABS, value, onChange }: SlideTabsPro
     const offset = event.key === "ArrowRight" ? 1 : -1;
     const nextIndex = (index + offset + tabs.length) % tabs.length;
     const next = tabs[nextIndex];
+    if (next.disabled) {
+      onChange?.(next.id);
+      returnActiveCursor();
+      return;
+    }
     selectTab(next.id);
     tabRefs.current[next.id]?.focus();
   }
@@ -56,20 +84,25 @@ export function SlideTabs({ tabs = DEFAULT_TABS, value, onChange }: SlideTabsPro
       <div
         className="slide-tabs"
         onMouseLeave={() => {
-          const node = tabRefs.current[activeId];
-          setPosition(node ? { left: node.offsetLeft, width: node.offsetWidth, opacity: 1 } : position);
+          returnActiveCursor();
         }}
         role="tablist"
       >
         {tabs.map((tab, index) => (
           <button
+            aria-disabled={tab.disabled ? "true" : undefined}
             aria-selected={tab.id === activeId}
-            className={cn("slide-tabs__tab", tab.id === activeId && "slide-tabs__tab--active")}
+            className={cn(
+              "slide-tabs__tab",
+              tab.id === activeId && "slide-tabs__tab--active",
+              tab.disabled && "slide-tabs__tab--locked",
+            )}
             key={tab.id}
             onClick={() => selectTab(tab.id)}
             onFocus={() => selectTab(tab.id)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             onMouseEnter={(event) => {
+              if (tab.disabled) return;
               setPosition({
                 left: event.currentTarget.offsetLeft,
                 width: event.currentTarget.offsetWidth,
@@ -88,6 +121,7 @@ export function SlideTabs({ tabs = DEFAULT_TABS, value, onChange }: SlideTabsPro
         <motion.span
           animate={position}
           className="slide-tabs__cursor"
+          initial={false}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
         />
       </div>

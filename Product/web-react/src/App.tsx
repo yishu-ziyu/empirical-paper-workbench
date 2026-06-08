@@ -280,8 +280,9 @@ export function App() {
     const unlocked = canEnter(stage);
     return {
       id: stage,
-      label: unlocked ? info.label : `${info.label} (待解锁)`,
+      label: info.label,
       hint: unlocked ? info.hint : "请按顺序完成前一阶段后再进入。",
+      disabled: !unlocked,
     };
   });
   const currentStageMeta = STAGE_LABELS[activeStage];

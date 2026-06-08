@@ -797,7 +797,7 @@ button {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #c9c9c9;
+  color: var(--color-ink);
   cursor: pointer;
   padding: 0 16px;
   font-size: 14px;
@@ -811,7 +811,13 @@ button {
 
 .slide-tabs__tab--active,
 .slide-tabs__tab:hover {
-  color: #202020;
+  color: var(--color-bg);
+}
+
+.slide-tabs__tab--locked,
+.slide-tabs__tab--locked:hover {
+  color: var(--color-subtle);
+  cursor: not-allowed;
 }
 
 .slide-tabs__cursor {

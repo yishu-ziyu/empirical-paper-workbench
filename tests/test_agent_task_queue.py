@@ -383,6 +383,69 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(binding["skill_sources"][0]["name"], "Auto-Empirical-Research-Skills")
         self.assertFalse(binding["can_execute_without_human_review"])
 
+    def test_bdd_12_execute_endpoint_requires_selected_backend_without_mutating_task(self) -> None:
+        """行为 12：执行 API 必须先要求后端选择，不能把未选后端任务写成失败。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/dispatch-review",
+            json={"action": "approve", "note": "可以进入后端选择"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "execution_backend_required")
+        queue = self.client.get(f"/api/v1/projects/{self.project_id}/agent-task-queue").json()[
+            "agent_task_queue"
+        ]
+        task = queue["tasks"][1]
+        self.assertEqual(task["status"], "reviewed_for_dispatch")
+        self.assertEqual(task["next_action"], "select_execution_backend")
+        self.assertNotIn("execution_result", task)
+
+    def test_bdd_13_reviewed_task_can_select_codex_backend_and_execute_through_api(self) -> None:
+        """行为 13：已审阅任务可以通过 API 选择 Codex 后端并生成可审阅脚本。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/dispatch-review",
+            json={"action": "approve", "note": "先生成脚本草案"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/select-backend",
+            json={"backend_id": "codex"},
+        )
+
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+        selected_task = selected.json()["agent_task_queue"]["tasks"][1]
+        self.assertEqual(selected_task["status"], "backend_selected")
+        self.assertEqual(selected_task["selected_backend"]["id"], "codex")
+        self.assertEqual(
+            selected_task["selected_backend"]["execution_boundary"]["kind"],
+            "draft_code_generation",
+        )
+
+        executed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+        )
+
+        self.assertEqual(executed.status_code, 200, msg=executed.text)
+        body = executed.json()
+        self.assertEqual(body["execution_result"]["engine"], "codex")
+        self.assertEqual(body["execution_result"]["evidence_level"], "local_file")
+        artifact_path = self.project_root / body["execution_result"]["artifact_path"]
+        self.assertTrue(artifact_path.exists())
+        task = body["agent_task_queue"]["tasks"][1]
+        self.assertEqual(task["status"], "succeeded")
+        self.assertEqual(task["execution_result"]["engine"], "codex")
+
     def _write_supervisor_plan(
         self,
         status: str,

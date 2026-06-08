@@ -484,6 +484,12 @@ def execute_project_agent_task(
     project_root = Path(project.get("project_root") or project["root"]).resolve()
     queue = normalize_agent_task_queue(_load_required_queue(project_root))
     task = _find_agent_task(queue, task_id)
+    selected_backend = task.get("selected_backend") if isinstance(task.get("selected_backend"), dict) else {}
+    if not selected_backend.get("id"):
+        raise AgentTaskQueueBlockedError(
+            "execution_backend_required",
+            "Select an execution backend before executing this agent task.",
+        )
     result = execute_agent_task_with_backend(task, project_root)
     queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
     queue["updated_at"] = utc_now()

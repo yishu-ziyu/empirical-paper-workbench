@@ -1026,6 +1026,9 @@ def api_v1_review_project_agent_task_dispatch(
         if exc.code == "agent_task_not_found":
             status_code = 404
         return error_response(status_code, exc.code, str(exc))
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
@@ -1052,6 +1055,9 @@ def api_v1_select_project_agent_task_backend(
         if exc.code == "agent_task_not_found":
             status_code = 404
         return error_response(status_code, exc.code, str(exc))
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
@@ -1072,6 +1078,9 @@ def api_v1_execute_project_agent_task(
         status_code = 400 if exc.code == "invalid_dispatch_review_action" else 409
         if exc.code == "agent_task_not_found":
             status_code = 404
+        return error_response(status_code, exc.code, str(exc))
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
         return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

@@ -14,9 +14,9 @@ Event types match BriefEvent so the same consumer shape works:
   - error       {message}
 
 In a real LLM environment this would call chat_completion_stream. For
-intake-time preview we emit synthetic step events derived from the topic
-(plus the 4 brief sections), so the SSE plumbing is exercised end-to-end
-without waiting for variable roles / design specs to be confirmed.
+intake-time preview we emit topic-bound step events plus the 4 brief
+sections, so the SSE plumbing is exercised end-to-end without fixing
+variable roles or methods before the later review stages.
 """
 from __future__ import annotations
 
@@ -61,20 +61,20 @@ def _render_step_text(step_index: int, topic: str) -> str:
         return f"题目意图分析: 围绕『{topic}』抽取核心因变量、处理变量、识别假说与边界。\n"
     if step_index == 2:
         return (
-            "本地数据匹配: 扫描 Data/ 与 final/ 目录, 优先选取含 `ln_wage` / `robot` 字段的 CSV.\n"
-            "文献线索: 暂无本地文献, 计划在 search 阶段调 arxiv.\n"
+            f"本地数据匹配: 根据『{topic}』扫描 Data/、Tasks/ 与已登记数据候选, 先记录可用数据线索。\n"
+            "文献线索: 生成与题目直接相关的中英文检索词, 进入递归搜索后再召回和核验。\n"
         )
     if step_index == 3:
         return (
-            "方法候选: OLS baseline + DID/IV 上行升级, 视数据时点分布决定具体识别方程.\n"
-            "变量角色: outcome=ln_wage, treatment=robot_exposure, control=age/edu/gender/urban.\n"
+            "方法候选: 等数据结构、样本口径、时间维度和识别条件确认后再选择。\n"
+            "变量角色: 结果变量、解释变量、控制变量和工具变量暂记为待字段画像确认。\n"
         )
     if step_index == 4:
         return (
             f"## 研究问题\n\n本研究关注『{topic}』的核心因果识别问题。\n\n"
-            "## 边际贡献\n\n- 利用本地数据提供新证据\n- 提供可复现的代码 + 流程\n\n"
-            "## 研究边界\n\n- 仅使用本地可用数据, 暂不纳入全国样本\n- 识别策略在数据确认后决定\n\n"
-            "## 成功标准\n\n- 主要系数显著 (p<0.05) 且方向符合理论\n- 稳健性检验通过 ≥ 1 项\n"
+            "## 边际贡献\n\n- 基于可核验数据线索建立题目到变量的映射\n- 提供可复现的代码、日志和研究过程记录\n\n"
+            "## 研究边界\n\n- 数据来源、样本范围和时间跨度进入下一步确认\n- 变量角色待字段画像确认\n- 识别策略在数据结构和变量角色确认后决定\n\n"
+            "## 成功标准\n\n- 题目、数据、变量角色和方法条件均可被核验\n- 关键结果能绑定日志、表格和复现路径\n"
         )
     return ""
 

@@ -375,6 +375,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "verified_literature_package",
         }
+    if status == "verified_literature_package_ready":
+        return {
+            "id": "review_verified_literature_package",
+            "label": "审阅已核验文献包",
+            "reason": "文献来源已形成可追溯包，下一步由人工决定是否进入论文草稿引用层。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "verified_literature_package_review",
+        }
     if status == "rejected":
         return {
             "id": "replace_literature_search",
@@ -1442,6 +1451,91 @@ def record_project_citation_verification_evidence(
     return response
 
 
+def generate_project_verified_literature_package(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    if task.get("status") != "citation_verification_complete":
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_complete_required",
+            "Complete citation verification is required before generating a verified literature package.",
+        )
+
+    log_record = task.get("citation_verification_log") if isinstance(task.get("citation_verification_log"), dict) else {}
+    log_artifact_path = str(log_record.get("artifact_path") or "")
+    if not log_artifact_path:
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_log_required",
+            "Citation verification log is required before generating a verified literature package.",
+        )
+    log_artifact = project_root / log_artifact_path
+    if not log_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_log_required",
+            "Citation verification log file is missing.",
+        )
+
+    log = json.loads(log_artifact.read_text(encoding="utf-8"))
+    if not log.get("claims_verified_citations") or not normalize_list(log.get("records")):
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_log_required",
+            "Citation verification log does not contain verified citation records.",
+        )
+
+    timestamp = utc_now()
+    package_artifact_path = Path("Results/json/verified_literature_package.json")
+    package = build_verified_literature_package_record(task, log, log_artifact_path, timestamp)
+    absolute_package_artifact = project_root / package_artifact_path
+    absolute_package_artifact.parent.mkdir(parents=True, exist_ok=True)
+    absolute_package_artifact.write_text(json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    package_summary = {
+        "status": "verified_literature_package_ready",
+        "schema_version": package["schema_version"],
+        "artifact_path": str(package_artifact_path),
+        "source_log_artifact_path": log_artifact_path,
+        "verified_reference_count": package["verified_reference_count"],
+        "claims_verified_citations": True,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "review_verified_literature_package",
+        "next_action_label": "审阅已核验文献包",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+    task["verified_literature_package"] = package_summary
+    task["status"] = "verified_literature_package_ready"
+    task["next_action"] = "review_verified_literature_package"
+    task["can_execute"] = False
+    task["blockers"] = []
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "verified_literature_package_generated",
+            "actor": "system",
+            "timestamp": timestamp,
+            "source_log_artifact_path": log_artifact_path,
+            "artifact_path": str(package_artifact_path),
+            "verified_reference_count": package["verified_reference_count"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["verified_literature_package"] = package_summary
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1651,6 +1745,69 @@ def write_citation_verification_log(
         "formal_write_allowed": False,
         "created_at": timestamp,
     }
+
+
+def build_verified_literature_package_record(
+    task: dict[str, Any],
+    verification_log: dict[str, Any],
+    source_log_artifact_path: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    records = [item for item in normalize_list(verification_log.get("records")) if isinstance(item, dict)]
+    references = [
+        build_verified_reference_entry(index, record)
+        for index, record in enumerate(records, start=1)
+    ]
+    return {
+        "schema_version": "p1.verified_literature_package.v1",
+        "status": "verified_literature_package_ready",
+        "source_task_id": str(task.get("id") or verification_log.get("source_task_id") or ""),
+        "source_log_artifact_path": source_log_artifact_path,
+        "verified_reference_count": len(references),
+        "claims_verified_citations": True,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "evidence_level": "verified_source_record",
+        "verified_references": references,
+        "usage_boundary": "这份文献包只证明来源元数据已经核验，可供后续草稿和人工审阅使用；写入正式层仍需单独批准。",
+        "created_at": timestamp,
+    }
+
+
+def build_verified_reference_entry(index: int, record: dict[str, Any]) -> dict[str, Any]:
+    authors = [str(author).strip() for author in normalize_list(record.get("authors")) if str(author).strip()]
+    year = str(record.get("year") or "").strip()
+    title = str(record.get("title") or "").strip()
+    venue = str(record.get("venue") or "").strip()
+    citation_text = format_verified_citation_text(authors, year, title, venue)
+    return {
+        "id": f"verified_reference_{index:02d}",
+        "authors": authors,
+        "year": year,
+        "title": title,
+        "venue": venue,
+        "doi_or_stable_url": str(record.get("doi_or_stable_url") or "").strip(),
+        "relevance": str(record.get("relevance") or "").strip(),
+        "evidence_url": str(record.get("evidence_url") or "").strip(),
+        "connector": str(record.get("connector") or "").strip(),
+        "citation_text": citation_text,
+        "evidence_level": "verified_source_record",
+        "verified_at": str(record.get("verified_at") or "").strip(),
+        "formal_write_allowed": False,
+        "claims_verified_citations": True,
+    }
+
+
+def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:
+    author_text = ", ".join(authors) if authors else "Unknown author"
+    segments = [author_text]
+    if year:
+        segments.append(f"({year})")
+    if title:
+        segments.append(title)
+    if venue:
+        segments.append(venue)
+    return ". ".join(segment.strip(". ") for segment in segments if segment).strip() + "."
 
 
 def build_draft_literature_review_record(

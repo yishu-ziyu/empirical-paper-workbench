@@ -981,24 +981,11 @@ class AgentTaskQueueApiTests(unittest.TestCase):
 
     def test_bdd_27_all_verified_citations_write_verification_log(self) -> None:
         """行为 27：全部候选引用核验完成后，写出 citation_verification_log.json 并开放下一步。"""
-        self._open_citation_verification_tasks()
-        queue = json.loads((self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8"))
-        citation_tasks = queue["tasks"][0]["citation_verification_tasks"]
-
-        response = None
-        for index, citation_task in enumerate(citation_tasks, start=1):
-            payload = self._valid_citation_evidence_payload(
-                title=f"Verified citation {index}",
-                doi=f"https://doi.org/10.1257/aer.2020{index:04d}",
-            )
-            response = self.client.put(
-                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/citation-verification/{citation_task['id']}",
-                json=payload,
-            )
-            self.assertEqual(response.status_code, 200, msg=response.text)
+        response = self._complete_citation_verification()
 
         self.assertIsNotNone(response)
         task = response.json()["agent_task_queue"]["tasks"][0]
+        citation_tasks = task["citation_verification_tasks"]
         self.assertEqual(task["status"], "citation_verification_complete")
         self.assertEqual(task["next_action"], "generate_verified_literature_package")
         self.assertEqual(task["primary_action"]["id"], "generate_verified_literature_package")
@@ -1016,6 +1003,50 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(log["schema_version"], "citation_verification_log.v1")
         self.assertEqual(log["verified_count"], len(citation_tasks))
         self.assertTrue(log["claims_verified_citations"])
+
+    def test_bdd_28_verified_citation_log_generates_literature_package(self) -> None:
+        """行为 28：核验日志可以生成草稿层已核验文献包，供后续论文草稿使用。"""
+        self._complete_citation_verification()
+
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package"
+        )
+
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        task = generated.json()["agent_task_queue"]["tasks"][0]
+        package = task["verified_literature_package"]
+        self.assertEqual(task["status"], "verified_literature_package_ready")
+        self.assertEqual(task["next_action"], "review_verified_literature_package")
+        self.assertEqual(task["primary_action"]["id"], "review_verified_literature_package")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(package["status"], "verified_literature_package_ready")
+        self.assertTrue(package["claims_verified_citations"])
+        self.assertFalse(package["formal_write_allowed"])
+        self.assertEqual(package["source_log_artifact_path"], "Results/json/citation_verification_log.json")
+        self.assertGreaterEqual(package["verified_reference_count"], 5)
+
+        artifact_path = self.project_root / package["artifact_path"]
+        self.assertTrue(artifact_path.exists())
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        self.assertEqual(artifact["schema_version"], "p1.verified_literature_package.v1")
+        self.assertTrue(artifact["claims_verified_citations"])
+        self.assertFalse(artifact["formal_write_allowed"])
+        self.assertEqual(len(artifact["verified_references"]), package["verified_reference_count"])
+        self.assertEqual(artifact["verified_references"][0]["evidence_level"], "verified_source_record")
+        self.assertIn("citation_text", artifact["verified_references"][0])
+        self.assertEqual(task["audit_log"][-1]["event"], "verified_literature_package_generated")
+
+    def test_bdd_29_verified_literature_package_requires_complete_citation_log(self) -> None:
+        """行为 29：引用核验未完成时，不能跳过门禁生成已核验文献包。"""
+        self._open_citation_verification_tasks()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package"
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "citation_verification_complete_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "verified_literature_package.json").exists())
 
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
@@ -1054,6 +1085,23 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "evidence_url": doi,
             "note": "人工核对作者、年份、题名、来源和稳定链接。",
         }
+
+    def _complete_citation_verification(self):
+        self._open_citation_verification_tasks()
+        queue = json.loads((self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8"))
+        citation_tasks = queue["tasks"][0]["citation_verification_tasks"]
+        response = None
+        for index, citation_task in enumerate(citation_tasks, start=1):
+            payload = self._valid_citation_evidence_payload(
+                title=f"Verified citation {index}",
+                doi=f"https://doi.org/10.1257/aer.2020{index:04d}",
+            )
+            response = self.client.put(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/citation-verification/{citation_task['id']}",
+                json=payload,
+            )
+            self.assertEqual(response.status_code, 200, msg=response.text)
+        return response
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1396,6 +1444,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("已核验证据", self.app_js)
         self.assertIn("等待补证", self.app_js)
         self.assertIn(".agent-task-citation-evidence", self.styles_css)
+
+    def test_bdd_21_frontend_exposes_verified_literature_package_action(self) -> None:
+        """行为 21：前端必须能从引用核验完成态生成已核验文献包。"""
+        self.assertIn("generateVerifiedLiteraturePackage", self.app_js)
+        self.assertIn("handleVerifiedLiteraturePackage", self.app_js)
+        self.assertIn("data-verified-literature-package-action", self.app_js)
+        self.assertIn("生成已核验文献包", self.app_js)
+        self.assertIn("已核验文献包", self.app_js)
+        self.assertIn(".agent-task-verified-literature-package", self.styles_css)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from Product.backend.agent_task_queue_service import (
     create_project_agent_task_queue,
     execute_project_agent_task,
     generate_project_draft_literature_review,
+    generate_project_verified_literature_package,
     get_project_agent_task_queue,
     record_project_citation_verification_evidence,
     review_project_draft_literature_review,
@@ -1149,6 +1150,25 @@ def api_v1_record_project_citation_verification_evidence(
             status_code = 404
         else:
             status_code = 409
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/verified-literature-package")
+def api_v1_generate_project_verified_literature_package(
+    project_id: str,
+    task_id: str,
+) -> dict:
+    try:
+        return generate_project_verified_literature_package(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
         return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

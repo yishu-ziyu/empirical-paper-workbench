@@ -85,6 +85,7 @@ const state = {
   generatingVerifiedLiteraturePackageTaskId: null,
   reviewingVerifiedLiteraturePackageTaskId: null,
   reviewingVerifiedLiteraturePackageAction: null,
+  generatingManuscriptCitationPlanTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -527,6 +528,13 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async generateManuscriptCitationPlan(projectId, taskId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/manuscript-citation-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -956,8 +964,10 @@ function productTermLabel(value) {
     verified_literature_package_approved: "文献包已批准",
     verified_literature_package_needs_revision: "文献包需修订",
     verified_literature_package_rejected: "文献包已拒绝",
+    manuscript_citation_plan_ready: "引用计划待审阅",
     review_verified_literature_package: "审阅已核验文献包",
     generate_manuscript_citation_plan: "生成论文引用计划",
+    review_manuscript_citation_plan: "审阅论文引用计划",
     approved_for_manuscript_citations: "已批准进入引用计划",
     revise_verified_literature_package: "修订已核验文献包",
     replace_verified_literature_package: "替换已核验文献包",
@@ -1776,6 +1786,54 @@ function renderVerifiedLiteraturePackage(task = {}) {
   `;
 }
 
+function renderManuscriptCitationPlan(task = {}) {
+  const plan = task.manuscript_citation_plan || {};
+  const canGenerate = task.status === "verified_literature_package_approved";
+  const isGenerating = state.generatingManuscriptCitationPlanTaskId === task.id;
+  if (!plan.status && !canGenerate) return "";
+
+  return `
+    <div class="agent-task-manuscript-citation-plan">
+      <div class="agent-task-manuscript-citation-plan__head">
+        <div>
+          <span class="meta-label">论文引用计划</span>
+          <strong>${plan.status ? escapeHtml(productTermLabel(plan.status)) : "等待生成"}</strong>
+          <p class="muted">把已核验文献映射到引言、文献综述和方法设计等章节；生成后仍需人工审阅。</p>
+        </div>
+        ${canGenerate ? `
+          <button class="primary-button" data-manuscript-citation-plan-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isGenerating ? "disabled" : ""}>
+            ${isGenerating ? "生成中..." : "生成论文引用计划"}
+          </button>
+        ` : `<span class="pill">${escapeHtml(productTermLabel(task.next_action || plan.next_action || "review_manuscript_citation_plan"))}</span>`}
+      </div>
+      ${plan.status ? `
+        <div class="agent-task-manuscript-citation-plan__grid">
+          <div>
+            <span class="meta-label">引用计划</span>
+            <code>${escapeHtml(plan.artifact_path || "Results/json/manuscript_citation_plan.json")}</code>
+          </div>
+          <div>
+            <span class="meta-label">来源文献包</span>
+            <code>${escapeHtml(plan.source_artifact_path || "Results/json/verified_literature_package.json")}</code>
+          </div>
+          <div>
+            <span class="meta-label">绑定数量</span>
+            <p>${escapeHtml(String(plan.citation_binding_count || 0))} 条引用绑定</p>
+          </div>
+          <div>
+            <span class="meta-label">下一步</span>
+            <p>${escapeHtml(productTermLabel(plan.next_action || task.next_action || "review_manuscript_citation_plan"))}</p>
+          </div>
+          <div>
+            <span class="meta-label">正式层边界</span>
+            <p>${plan.formal_write_allowed ? "允许写入正式层" : "不写入正式层"}</p>
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderAgentTaskExecutionHandoff(task) {
   const executionResult = task.execution_result || {};
   const methodResult = firstMethodExecutionResult(executionResult);
@@ -1802,6 +1860,7 @@ function renderAgentTaskExecutionHandoff(task) {
     ${renderDraftLiteratureReview(task)}
     ${renderCitationVerificationTasks(task)}
     ${renderVerifiedLiteraturePackage(task)}
+    ${renderManuscriptCitationPlan(task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -2590,6 +2649,25 @@ async function handleVerifiedLiteraturePackageReview(taskId, action) {
   } finally {
     state.reviewingVerifiedLiteraturePackageTaskId = null;
     state.reviewingVerifiedLiteraturePackageAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleManuscriptCitationPlan(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.generatingManuscriptCitationPlanTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.generateManuscriptCitationPlan(
+      state.selectedProjectId,
+      taskId,
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成论文引用计划失败：${error.message}`);
+  } finally {
+    state.generatingManuscriptCitationPlanTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -7653,6 +7731,11 @@ async function boot() {
         verifiedLiteraturePackageReviewButton.dataset.agentTaskId || "",
         verifiedLiteraturePackageReviewButton.dataset.verifiedLiteraturePackageReviewAction || "",
       );
+      return;
+    }
+    const manuscriptCitationPlanButton = target.closest("[data-manuscript-citation-plan-action]");
+    if (manuscriptCitationPlanButton) {
+      void handleManuscriptCitationPlan(manuscriptCitationPlanButton.dataset.agentTaskId || "");
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

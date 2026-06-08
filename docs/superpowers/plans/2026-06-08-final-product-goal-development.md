@@ -868,3 +868,45 @@ P1-E implementation:
 - Existing non-literature Codex tasks still generate reviewable scripts, and the P2-AA execution backend tests remain green.
 
 Next node: **P1-F surface the seed package in task result review and connect it to the next human gate**.
+
+20-minute boundary for P1-F:
+
+- Do not implement real CNKI / Scholar / Zotero connectors.
+- Do not add a new review API yet.
+- Reuse the existing execution result and task result handoff surface.
+- Make the generated seed package visible as a candidate review object, not just a file path.
+
+P1-F BDD:
+
+```text
+Given a LiteratureAgent Codex task writes a reference_chain_seed_package
+When the task execution result is returned
+Then the result includes a result_review object with the artifact path,
+review_literature_seed_package gate, review focus, candidate reference state,
+and formal-layer boundary.
+
+Given the task queue frontend receives execution_kind=reference_chain_seed_package
+When the succeeded task is rendered
+Then it shows a candidate source package review block with the seed package path,
+candidate query count, review gate, and "not verified citation" boundary.
+```
+
+P1-F verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_18_literature_task_codex_execution_writes_candidate_reference_seed_package tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_16_frontend_exposes_reference_seed_package_result_review -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/reference_chain_seed_runner.py Product/backend/execution_backend_service.py
+node --check Product/web/assets/app.js
+```
+
+P1-F implementation:
+
+- Added `build_reference_chain_result_review` beside the seed package writer.
+- Codex LiteratureAgent execution now returns and persists `result_review`.
+- The result review includes title, artifact path, review gate, next action, candidate query count, review focus, reference state, and formal-layer boundary.
+- Added `renderReferenceSeedPackageResultReview` to the task queue result handoff.
+- Added a lightweight `.agent-task-reference-seed-result` style block so users can identify the review object before reading the generic run result.
+
+Next node: **P1-G commit scope and define the next product node: review_literature_seed_package action endpoint**.

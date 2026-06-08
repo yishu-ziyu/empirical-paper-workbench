@@ -1479,6 +1479,50 @@ function firstMethodExecutionResult(executionResult) {
   return methods.find((method) => method.task_id) || methods[0] || {};
 }
 
+function renderReferenceSeedPackageResultReview(executionResult) {
+  if (executionResult?.execution_kind !== "reference_chain_seed_package") return "";
+  const review = executionResult.result_review || {};
+  const reviewFocus = Array.isArray(review.review_focus) ? review.review_focus : [];
+  const candidateQueryCount = Number.isFinite(Number(review.candidate_query_count))
+    ? Number(review.candidate_query_count)
+    : 0;
+  return `
+    <div class="agent-task-reference-seed-result">
+      <div class="agent-task-reference-seed-result__head">
+        <div>
+          <span class="meta-label">结果审阅对象</span>
+          <strong>${escapeHtml(review.title || "候选来源种子包")}</strong>
+          <p class="muted">候选检索式 ${escapeHtml(String(candidateQueryCount))} 条 · ${escapeHtml(review.reference_state || "candidate")}</p>
+        </div>
+        <span class="pill">${escapeHtml(productTermLabel(review.review_gate || "review_literature_seed_package"))}</span>
+      </div>
+      <div class="agent-task-reference-seed-result__grid">
+        <div>
+          <span class="meta-label">种子包文件</span>
+          <code>${escapeHtml(review.artifact_path || executionResult.artifact_path || "等待生成 reference_chain_seed_package.json")}</code>
+        </div>
+        <div>
+          <span class="meta-label">下一步审阅门</span>
+          <p>${escapeHtml(productTermLabel(review.next_action || "review_literature_seed_package"))}</p>
+        </div>
+        <div>
+          <span class="meta-label">候选检索式</span>
+          ${reviewFocus.length ? `
+            <ul>
+              ${reviewFocus.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          ` : "<p class='muted'>检查候选来源、检索式和引用状态。</p>"}
+        </div>
+        <div>
+          <span class="meta-label">正式层边界</span>
+          <p>${escapeHtml(review.formal_layer_boundary || "不宣称已验证引用；人工审阅前不能写入正式层。")}</p>
+          <p class="muted">${review.claims_verified_citations ? "已声明验证引用" : "不宣称已验证引用"}</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderAgentTaskExecutionHandoff(task) {
   const executionResult = task.execution_result || {};
   const methodResult = firstMethodExecutionResult(executionResult);
@@ -1501,6 +1545,7 @@ function renderAgentTaskExecutionHandoff(task) {
   if (!resultPath && !manifestPath && !runId && !auditLog.length && !evaluatorStatus) return "";
 
   return `
+    ${renderReferenceSeedPackageResultReview(executionResult)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>

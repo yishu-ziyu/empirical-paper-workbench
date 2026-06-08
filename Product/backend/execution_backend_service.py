@@ -12,7 +12,10 @@ from .project_service import (
     execute_run_plan_method_tasks,
     utc_now,
 )
-from .reference_chain_seed_runner import write_reference_chain_seed_package
+from .reference_chain_seed_runner import (
+    build_reference_chain_result_review,
+    write_reference_chain_seed_package,
+)
 
 
 class ExecutionBackendSelectionError(RuntimeError):
@@ -475,6 +478,7 @@ def _execute_with_codex(
     if _is_reference_chain_task(task):
         seed_package = write_reference_chain_seed_package(task, project_root, run_id, timestamp)
         artifact_path = seed_package["artifact_path"]
+        result_review = build_reference_chain_result_review(seed_package["package"], artifact_path)
         task["status"] = "succeeded"
         task["next_action"] = "completed"
         task["can_execute"] = False
@@ -485,6 +489,7 @@ def _execute_with_codex(
             "evidence_level": "local_file",
             "artifact_path": artifact_path,
             "note": "Candidate source package generated. No citation is marked verified.",
+            "result_review": result_review,
             "formal_write_allowed": False,
             "writes_formal_layer": False,
             "execution_boundary": _build_execution_boundary("codex", "local_file"),
@@ -506,6 +511,7 @@ def _execute_with_codex(
             "evidence_level": "local_file",
             "artifact_path": artifact_path,
             "note": "Candidate source package generated. No citation is marked verified.",
+            "result_review": result_review,
             "formal_write_allowed": False,
             "writes_formal_layer": False,
             "execution_boundary": _build_execution_boundary("codex", "local_file"),

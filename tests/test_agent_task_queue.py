@@ -761,6 +761,15 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(result["evidence_level"], "local_file")
         self.assertFalse(result["formal_write_allowed"])
         self.assertFalse(result["writes_formal_layer"])
+        review = result["result_review"]
+        self.assertEqual(review["title"], "候选来源种子包")
+        self.assertEqual(review["artifact_path"], result["artifact_path"])
+        self.assertEqual(review["review_gate"], "review_literature_seed_package")
+        self.assertEqual(review["next_action"], "review_literature_seed_package")
+        self.assertEqual(review["reference_state"], "candidate")
+        self.assertFalse(review["claims_verified_citations"])
+        self.assertFalse(review["can_enter_formal_layer"])
+        self.assertIn("候选检索式是否覆盖研究题目", review["review_focus"])
         artifact_path = self.project_root / result["artifact_path"]
         self.assertTrue(artifact_path.exists())
 
@@ -1017,6 +1026,17 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("writes_formal_layer", self.app_js)
         self.assertIn("任务引用链路", self.app_js)
         self.assertIn(".reference-chain-policy", self.styles_css)
+
+    def test_bdd_16_frontend_exposes_reference_seed_package_result_review(self) -> None:
+        """行为 16：候选来源种子包执行完成后，前端必须展示审阅入口和候选引用边界。"""
+        self.assertIn("renderReferenceSeedPackageResultReview", self.app_js)
+        self.assertIn("result_review", self.app_js)
+        self.assertIn("reference_chain_seed_package", self.app_js)
+        self.assertIn("候选来源种子包", self.app_js)
+        self.assertIn("候选检索式", self.app_js)
+        self.assertIn("review_literature_seed_package", self.app_js)
+        self.assertIn("不宣称已验证引用", self.app_js)
+        self.assertIn(".agent-task-reference-seed-result", self.styles_css)
 
 
 if __name__ == "__main__":

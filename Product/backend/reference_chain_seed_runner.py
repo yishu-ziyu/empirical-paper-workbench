@@ -25,6 +25,32 @@ def write_reference_chain_seed_package(
     }
 
 
+def build_reference_chain_result_review(
+    package: dict[str, Any],
+    artifact_path: str,
+) -> dict[str, Any]:
+    """Build the human review handoff for a candidate literature package."""
+    formal_gate = str(package.get("formal_writeback_gate") or "review_literature_seed_package")
+    candidate_query_count = len(package.get("candidate_queries", [])) if isinstance(package.get("candidate_queries"), list) else 0
+    return {
+        "title": "候选来源种子包",
+        "artifact_path": artifact_path,
+        "review_gate": formal_gate,
+        "next_action": formal_gate,
+        "reference_state": "candidate",
+        "candidate_query_count": candidate_query_count,
+        "review_focus": [
+            "候选检索式是否覆盖研究题目",
+            "CNKI、Scholar、Zotero 和本地笔记是否需要人工补查",
+            "候选来源是否能支持变量、方法和边界判断",
+            "引用状态仍为 candidate，不能写入正式层",
+        ],
+        "formal_layer_boundary": "review_literature_seed_package 通过前只能进入草稿层",
+        "claims_verified_citations": False,
+        "can_enter_formal_layer": False,
+    }
+
+
 def build_reference_chain_seed_package(
     task: dict[str, Any],
     policy: dict[str, Any],

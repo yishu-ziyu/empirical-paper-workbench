@@ -83,7 +83,7 @@ UI 设计原则：
 - 内部方法库、统计结果契约、Level 3 manuscript gate、formal writeback gates 有一批 CLI-first 资产。
 - P0-F 已完成并提交 `4be3d7a`：intake 阶段的研究问题分析不再注入固定“机器人 / 工资 / DID / 工具变量”假设，LLM preview 必须绑定用户当前题目。
 - P2-AB 已完成并提交 `00f055f`：Agent Task Queue 执行 API 必须先选择执行后端；未选后端时返回 `execution_backend_required`，不会把任务污染成真实执行失败。
-- P0-D 已完成本节点实现：禁用按钮不再被基础按钮样式覆盖成白底白字，DottedSurface 背景粒子强度下调，当前浏览器验收截图已保存。
+- P0-D 已完成本节点实现：React 工作台禁用按钮不再显示成高亮白块，深色背景和 DottedSurface 粒子强度已整体降噪，当前浏览器验收截图已保存。
 
 仍缺的关键能力：
 
@@ -104,8 +104,12 @@ UI 设计原则：
 - `python3 -m py_compile Product/api/auto_research.py Product/api/supervisor.py Product/backend/agent_task_queue_service.py Product/app.py`
 - `git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py tests/test_agent_task_queue.py`
 - `npm run build` in `Product/web-react`
-- Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-ux-contrast`; observed `dottedOpacity=0.1`, disabled button background `rgba(230, 230, 230, 0.17)`, disabled text `rgb(208, 208, 208)`.
-- Screenshot: `artifacts/ui-checks/p0d-ux-contrast-20260608.png`
+- P0-D visual contract:
+  - `python3 -m unittest tests.test_react_workbench_visual_contract -v`
+  - `python3 -m unittest tests.test_react_workbench_visual_contract tests.test_agent_task_queue -v`
+  - `npm run build` in `Product/web-react`
+- Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-contrast`; observed `--color-bg=#242424`, `--color-panel=#2b2b2b`, `--color-ink=#c8c8c8`, `dottedOpacity=0.06`, disabled button background `rgba(230, 230, 230, 0.075)`, disabled text `rgb(143, 143, 143)`, disabled opacity `1`.
+- Screenshot: `artifacts/ui-checks/p0d-react-contrast-20260608.png`
 - P0-B1 已完成本节点实现：Agent Task Queue 的任务详情现在会展开显示绑定的内部 Skill、为什么选它、预期产物、执行边界和 Skill 来源；后端的 SupervisorPlan / Queue / Registry 契约与前端可见契约已一起通过。
 - P0-B2 已完成本节点实现：工作台首页现在会实际挂载 SupervisorPlan 审阅台和 Agent Task Queue，不再出现后端数据已返回但页面容器为空的情况。
 - Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0b-skill-visible-2`; observed `.supervisor-plan-skill-review = 1`, `.agent-task-skill-binding = 1`, and the page text includes “推荐 Skill / 选择理由 / 缺失证据 / 为什么选这个 Skill / 预期产物 / 执行边界 / Skill 来源”.
@@ -312,7 +316,7 @@ P0-C2 manual acceptance:
 
 ### Task P0-D: UX contrast and action clarity fix
 
-Status: implemented for the readability and contrast part of the acceptance. The remaining “one clear next action” work should be handled as a separate UX guidance node, because it changes stage interaction logic rather than the visual contrast contract.
+Status: completed for the readability and contrast part of the acceptance. The remaining “one clear next action” work is tracked as the next UX guidance node, because it changes stage interaction logic rather than the visual contrast contract.
 
 **Files:**
 - Inspect: `Product/web-react/src/styles.css`
@@ -340,8 +344,23 @@ Acceptance:
 
 - No white text on near-white buttons.
 - Background contrast is softened.
-- Current task page tells the user what to do next.
 - Browser screenshot saved under `artifacts/ui-checks/`.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_react_workbench_visual_contract -v
+python3 -m unittest tests.test_react_workbench_visual_contract tests.test_agent_task_queue -v
+npm run build
+```
+
+Manual acceptance:
+
+- Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-contrast`.
+- The page is the empirical React workbench, not the unrelated app on port `5173`.
+- CSS variables confirmed softer background, panel and text tokens.
+- Disabled buttons confirmed with low-noise grey background, readable grey text and opacity `1`.
+- Screenshot saved to `artifacts/ui-checks/p0d-react-contrast-20260608.png`.
 
 ## 8. P1：CoPaper-like 完整研究包
 
@@ -424,29 +443,28 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-P0-C3 completed.
+P0-D completed.
 
-Reason: 用户现在能看到后端为什么被选中，也能看到执行成功后应该检查哪个结果文件、哪个运行清单、评估器状态是什么，以及下一步动作是什么。
+Reason: 用户反馈的白色按钮不可读和背景对比度过高问题已先止血；React 工作台现在使用更柔和的暗色面、禁用按钮灰态和更低强度的背景粒子。
 
-P0-C3 verified:
+P0-D verified:
 
 ```bash
-python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_13_succeeded_task_exposes_result_handoff -v
-python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests -v
-node --check Product/web/assets/app.js
+python3 -m unittest tests.test_react_workbench_visual_contract -v
+python3 -m unittest tests.test_react_workbench_visual_contract tests.test_agent_task_queue -v
+npm run build
 ```
 
-P0-C3 manual acceptance:
+P0-D manual acceptance:
 
-- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0c3-result-handoff`.
-- DOM check confirmed 2 `.agent-task-execution-handoff` blocks.
-- Visible handoff text includes `Results/json/method_execution_result.json`, `state/runs/.../run_manifest.json`, evaluator status and next action.
-- Screenshot saved to `artifacts/ui-checks/p0c3-result-handoff-20260608.png`.
+- Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-contrast`.
+- DOM style check confirmed disabled button background `rgba(230, 230, 230, 0.075)`, text `rgb(143, 143, 143)`, opacity `1`, and dotted background opacity `0.06`.
+- Screenshot saved to `artifacts/ui-checks/p0d-react-contrast-20260608.png`.
 
-Next node: **P0-D UX contrast and action clarity fix**.
+Next node: **P0-E LLM intervention and skill selection rationale contract**.
 
-20-minute boundary for P0-D:
+20-minute boundary for P0-E:
 
-- Fix only the task queue / execution handoff contrast and unreadable button states reported by the user.
-- Add one frontend contract that disabled or secondary buttons still use readable text color.
-- Verify in browser on the same `/legacy` flow.
+- Define when LLM Supervisor intervenes and when deterministic executors take over.
+- Add one contract that Agent Task Queue exposes why a skill was selected.
+- Keep the node to plan / queue metadata; do not start another UI redesign inside P0-E.

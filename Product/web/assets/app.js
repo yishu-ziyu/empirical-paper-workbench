@@ -82,6 +82,7 @@ const state = {
   reviewingDraftLiteratureReviewAction: null,
   recordingCitationEvidenceTaskId: null,
   recordingCitationEvidenceCitationId: null,
+  generatingVerifiedLiteraturePackageTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -508,6 +509,13 @@ const v2api = {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      });
+    },
+    async generateVerifiedLiteraturePackage(projectId, taskId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/verified-literature-package`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
     },
     async selectBackend(projectId, taskId, payload) {
@@ -1636,6 +1644,8 @@ function renderCitationVerificationTasks(task = {}) {
   if (!citationTasks.length) return "";
   const pendingCount = citationTasks.filter((item) => item.status === "pending").length;
   const verifiedCount = citationTasks.filter((item) => item.status === "verified").length;
+  const canGeneratePackage = task.status === "citation_verification_complete";
+  const isGeneratingPackage = state.generatingVerifiedLiteraturePackageTaskId === task.id;
   return `
     <div class="agent-task-citation-verification">
       <div class="agent-task-citation-verification__head">
@@ -1668,6 +1678,17 @@ function renderCitationVerificationTasks(task = {}) {
           </article>
         `).join("")}
       </div>
+      ${canGeneratePackage ? `
+        <div class="agent-task-citation-verification__action">
+          <div>
+            <strong>引用核验已完成</strong>
+            <p class="muted">下一步生成可追溯的已核验文献包，供后续草稿和人工审阅使用。</p>
+          </div>
+          <button class="primary-button" data-verified-literature-package-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isGeneratingPackage ? "disabled" : ""}>
+            ${isGeneratingPackage ? "生成中..." : "生成已核验文献包"}
+          </button>
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -1684,6 +1705,38 @@ function citationEvidenceTemplate(item = {}) {
     evidence_url: "",
     note: `核验：${item.query || item.source_label || item.id || ""}`,
   }, null, 2);
+}
+
+function renderVerifiedLiteraturePackage(task = {}) {
+  const literaturePackage = task.verified_literature_package || {};
+  if (literaturePackage.status !== "verified_literature_package_ready") return "";
+  return `
+    <div class="agent-task-verified-literature-package">
+      <div>
+        <span class="meta-label">已核验文献包</span>
+        <strong>${escapeHtml(String(literaturePackage.verified_reference_count || 0))} 条来源已核验</strong>
+        <p class="muted">引用元数据已形成证据包；正式写入仍等待人工审阅。</p>
+      </div>
+      <div class="agent-task-verified-literature-package__grid">
+        <div>
+          <span class="meta-label">文献包</span>
+          <code>${escapeHtml(literaturePackage.artifact_path || "Results/json/verified_literature_package.json")}</code>
+        </div>
+        <div>
+          <span class="meta-label">来源日志</span>
+          <code>${escapeHtml(literaturePackage.source_log_artifact_path || "Results/json/citation_verification_log.json")}</code>
+        </div>
+        <div>
+          <span class="meta-label">下一步</span>
+          <p>${escapeHtml(productTermLabel(literaturePackage.next_action || "review_verified_literature_package"))}</p>
+        </div>
+        <div>
+          <span class="meta-label">正式层边界</span>
+          <p>${literaturePackage.formal_write_allowed ? "允许写入正式层" : "不写入正式层"}</p>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderAgentTaskExecutionHandoff(task) {
@@ -1711,6 +1764,7 @@ function renderAgentTaskExecutionHandoff(task) {
     ${renderReferenceSeedPackageResultReview(executionResult, task)}
     ${renderDraftLiteratureReview(task)}
     ${renderCitationVerificationTasks(task)}
+    ${renderVerifiedLiteraturePackage(task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -2455,6 +2509,25 @@ async function handleCitationVerificationEvidence(taskId, citationTaskId) {
   } finally {
     state.recordingCitationEvidenceTaskId = null;
     state.recordingCitationEvidenceCitationId = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleVerifiedLiteraturePackage(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.generatingVerifiedLiteraturePackageTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.generateVerifiedLiteraturePackage(
+      state.selectedProjectId,
+      taskId,
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成已核验文献包失败：${error.message}`);
+  } finally {
+    state.generatingVerifiedLiteraturePackageTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -7496,6 +7569,11 @@ async function boot() {
         citationEvidenceButton.dataset.agentTaskId || "",
         citationEvidenceButton.dataset.citationTaskId || "",
       );
+      return;
+    }
+    const verifiedLiteraturePackageButton = target.closest("[data-verified-literature-package-action]");
+    if (verifiedLiteraturePackageButton) {
+      void handleVerifiedLiteraturePackage(verifiedLiteraturePackageButton.dataset.agentTaskId || "");
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

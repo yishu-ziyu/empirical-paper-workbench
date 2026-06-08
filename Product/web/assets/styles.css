@@ -798,6 +798,40 @@ textarea {
   justify-self: start;
 }
 
+.agent-task-citation-verification__action,
+.agent-task-verified-literature-package {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(32, 32, 32, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.agent-task-citation-verification__action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-task-verified-literature-package {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-task-verified-literature-package__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.agent-task-verified-literature-package__grid > div {
+  padding: 10px;
+  border: 1px solid rgba(32, 32, 32, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .agent-task-item h5 {
   margin: 0 0 4px;
   font-size: 16px;

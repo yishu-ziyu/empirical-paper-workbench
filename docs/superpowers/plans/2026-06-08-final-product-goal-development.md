@@ -1122,3 +1122,44 @@ node --check Product/web/assets/app.js
 ```
 
 Next node: **P1-L generate verified literature package from citation verification log**.
+
+## P1-L Verified Literature Package
+
+Boundary: convert a completed citation verification log into a reusable verified literature package. This package is still a draft-layer product artifact: it proves citation metadata has been checked, but it does not silently write references into the formal manuscript.
+
+BDD:
+
+```text
+Behavior 28: generate a verified literature package from a complete citation log
+Given every citation verification task has verified source evidence
+And Results/json/citation_verification_log.json exists
+When the user generates the verified literature package
+Then the system writes Results/json/verified_literature_package.json,
+stores verified reference entries with citation text and source evidence,
+keeps formal_write_allowed=false,
+and exposes review_verified_literature_package as the next action.
+
+Behavior 29: block package generation before citation verification is complete
+Given citation verification is still pending
+When the user tries to generate the verified literature package
+Then the system returns citation_verification_complete_required
+and does not create Results/json/verified_literature_package.json.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `POST /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/verified-literature-package`.
+- The service requires `citation_verification_complete` and a real `Results/json/citation_verification_log.json`.
+- The generated package has schema `p1.verified_literature_package.v1`, `verified_references`, `citation_text`, evidence links, connector metadata, and a formal-layer boundary.
+- The parent Agent task moves to `verified_literature_package_ready` and exposes `review_verified_literature_package`.
+- The frontend now exposes a `生成已核验文献包` action after citation verification is complete and renders the resulting package path and source log.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_28_verified_citation_log_generates_literature_package tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_29_verified_literature_package_requires_complete_citation_log tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_21_frontend_exposes_verified_literature_package_action -v
+```
+
+Next node: **P1-M review verified literature package before manuscript citation use**.

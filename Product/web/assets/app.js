@@ -1216,6 +1216,29 @@ function renderSupervisorPlanColumn(title, items, detailKey) {
   `;
 }
 
+function renderAgentTaskPrimaryAction(action, options = {}) {
+  if (!action || !action.id) return "";
+  const title = options.title || "当前建议动作";
+  const reasonLabel = options.reasonLabel || "为什么现在做这一步";
+  const formalLayerNote = action.writes_formal_layer
+    ? "会触及正式层，必须人工确认"
+    : "只进入草案层或审阅层";
+  return `
+    <div class="agent-task-primary-action">
+      <div>
+        <span class="meta-label">${escapeHtml(title)}</span>
+        <strong>${escapeHtml(action.label || productTermLabel(action.id))}</strong>
+        <p class="muted"><span>${escapeHtml(reasonLabel)}：</span>${escapeHtml(action.reason || "系统正在根据任务状态判断下一步。")}</p>
+      </div>
+      <div class="agent-task-primary-action__meta">
+        ${action.task_title ? `<span class="pill">${escapeHtml(action.task_title)}</span>` : ""}
+        <span class="pill">${escapeHtml(action.enabled === false ? "暂不可执行" : "可继续")}</span>
+        <span class="pill">${escapeHtml(formalLayerNote)}</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderAgentTaskQueue() {
   const container = document.getElementById("agent-task-queue-body");
   if (!container) return;
@@ -1249,6 +1272,7 @@ function renderAgentTaskQueue() {
         <div><span class="meta-label">已审阅</span><strong>${escapeHtml(String(summary.dispatch_reviewed_count || 0))}</strong></div>
         <div><span class="meta-label">负责人 Agent</span><strong>${escapeHtml(ownerAgents.length ? ownerAgents.join("、") : "-")}</strong></div>
       </div>
+      ${renderAgentTaskPrimaryAction(queue.primary_action)}
       ${hasQueue ? `
         <div class="agent-task-list">
           ${(queue.tasks || []).map(renderAgentTaskQueueItem).join("")}
@@ -1270,7 +1294,7 @@ function renderAgentTaskQueue() {
       <div class="decision-signal-row">
         <span>来源：${escapeHtml(queue.source_supervisor_plan?.path || "state/product/supervisor_plan.json")}</span>
         <span>${escapeHtml(detailsPolicy)}</span>
-        <span>下一步：${escapeHtml(queue.next_action?.label || "等待人工检查")}</span>
+        <span>下一步：${escapeHtml(queue.primary_action?.label || queue.next_action?.label || "等待人工检查")}</span>
       </div>
     </article>
   `;
@@ -1603,11 +1627,12 @@ function renderAgentTaskQueueItem(task) {
         <div>
           <span class="meta-label">${escapeHtml(productTermLabel(task.role || task.owner_agent || "Agent"))}</span>
           <h5>${escapeHtml(task.title || task.id || "未命名任务")}</h5>
-          <p class="muted">负责人 Agent：${escapeHtml(task.owner_agent || "-")} · 状态：${escapeHtml(productTermLabel(task.status || "queued"))} · 下一步：${escapeHtml(productTermLabel(task.next_action || "dispatch_review_required"))}</p>
+          <p class="muted">负责人 Agent：${escapeHtml(task.owner_agent || "-")} · 状态：${escapeHtml(productTermLabel(task.status || "queued"))} · 下一步：${escapeHtml(task.primary_action?.label || productTermLabel(task.next_action || "dispatch_review_required"))}</p>
         </div>
         <span class="pill">${escapeHtml(productTermLabel(task.status || "queued"))}</span>
       </div>
       <p class="muted">${escapeHtml(task.summary || "")}</p>
+      ${renderAgentTaskPrimaryAction(task.primary_action, { title: "任务建议动作" })}
       <div class="agent-task-dispatch-review">
         <div>
           <span class="meta-label">派工审阅</span>

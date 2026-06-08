@@ -426,6 +426,36 @@ textarea {
   gap: 10px;
 }
 
+.agent-task-primary-action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(32, 32, 32, 0.12);
+  border-radius: 10px;
+  background: rgba(247, 246, 241, 0.84);
+}
+
+.agent-task-primary-action strong {
+  display: block;
+  margin: 3px 0 5px;
+  overflow-wrap: anywhere;
+}
+
+.agent-task-primary-action p {
+  margin: 0;
+}
+
+.agent-task-primary-action__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 42%;
+}
+
 .agent-task-queue-ledger > div,
 .agent-task-item,
 .agent-task-blocker {

@@ -786,6 +786,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("manifest_artifact_path", self.app_js)
         self.assertIn(".agent-task-execution-handoff", self.styles_css)
 
+    def test_bdd_14_frontend_renders_queue_primary_action_guidance(self) -> None:
+        """行为 14：任务队列必须直接显示后端给出的主动作和理由。"""
+        self.assertIn("renderAgentTaskPrimaryAction", self.app_js)
+        self.assertIn("primary_action", self.app_js)
+        self.assertIn("当前建议动作", self.app_js)
+        self.assertIn("为什么现在做这一步", self.app_js)
+        self.assertIn(".agent-task-primary-action", self.styles_css)
+        self.assertIn("20260608-p0h-primary-action", self.index_html)
+
 
 if __name__ == "__main__":
     unittest.main()

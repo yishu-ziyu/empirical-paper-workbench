@@ -20,6 +20,14 @@ class ExecutionBackendSelectionError(RuntimeError):
         self.code = code
 
 
+BACKEND_FALLBACKS: dict[str, list[str]] = {
+    "statspai": ["python_ols_adapter", "codex", "stata_mcp"],
+    "python_ols_adapter": ["statspai", "codex", "stata_mcp"],
+    "stata_mcp": ["statspai", "python_ols_adapter", "codex"],
+    "codex": ["python_ols_adapter", "statspai"],
+}
+
+
 def select_execution_backend(
     task: dict[str, Any],
     backend_id: str,
@@ -56,6 +64,8 @@ def select_execution_backend(
         )
 
     backend_info = available_backends[backend_id]
+    evidence_level = backend_info.get("evidence_level", "local_file")
+    timestamp = utc_now()
 
     # Check availability
     if _check_available is not None:
@@ -64,13 +74,20 @@ def select_execution_backend(
         is_available = backend_info.get("availability_status") in ("available", "ready")
 
     if not is_available:
+        _record_backend_unavailable(
+            task,
+            backend_id,
+            backend_info,
+            available_backends,
+            timestamp,
+        )
         raise ExecutionBackendSelectionError(
             "backend_not_available",
             f"Backend '{backend_id}' is not available ({backend_info.get('availability_status')}).",
         )
 
-    evidence_level = backend_info.get("evidence_level", "local_file")
-    timestamp = utc_now()
+    execution_boundary = _build_execution_boundary(backend_id, evidence_level)
+    fallback_backend_ids = _fallback_backend_ids(backend_id, available_backends)
 
     task["status"] = "backend_selected"
     task["next_action"] = "execute"
@@ -80,6 +97,10 @@ def select_execution_backend(
         "label": backend_info.get("label", backend_id),
         "evidence_level": evidence_level,
         "availability_status": backend_info.get("availability_status"),
+        "selection_reason": _backend_selection_reason(task, backend_id, backend_info),
+        "fallback_backend_ids": fallback_backend_ids,
+        "formal_write_allowed": False,
+        "execution_boundary": execution_boundary,
         "selected_at": timestamp,
     }
     task.setdefault("audit_log", []).append({
@@ -88,9 +109,104 @@ def select_execution_backend(
         "timestamp": timestamp,
         "backend_id": backend_id,
         "evidence_level": evidence_level,
+        "fallback_backend_ids": fallback_backend_ids,
+        "formal_write_allowed": False,
     })
 
     return task
+
+
+def _backend_selection_reason(
+    task: dict[str, Any],
+    backend_id: str,
+    backend_info: dict[str, Any],
+) -> str:
+    method_id = task.get("method_id") or _infer_method_from_task(task)
+    label = backend_info.get("label", backend_id)
+    purpose = backend_info.get("purpose", "")
+    if backend_id == "codex":
+        return (
+            f"选择 {backend_id} ({label})，因为当前任务适合先生成 method={method_id} 的可审阅脚本草案；"
+            "它只进入草案层，必须经过人工审阅和真实执行后，才可能进入正式论文层。"
+        )
+    if backend_id == "python_ols_adapter":
+        return (
+            f"选择 {backend_id} ({label})，因为它已在本地就绪，适合先运行或交叉校验 "
+            f"method={method_id} 的基准结果。{purpose}"
+        )
+    if backend_id == "stata_mcp":
+        return (
+            f"选择 {backend_id} ({label})，用于在 Stata 可用时生成可复现 do-file 和 log。{purpose}"
+        )
+    return (
+        f"选择 {backend_id} ({label})，因为它是 method={method_id} 当前优先的实证执行后端。{purpose}"
+    )
+
+
+def _fallback_backend_ids(
+    backend_id: str,
+    available_backends: dict[str, dict[str, Any]],
+) -> list[str]:
+    preferred = BACKEND_FALLBACKS.get(backend_id) or [
+        candidate for candidate in available_backends if candidate != backend_id
+    ]
+    fallback_ids: list[str] = []
+    for candidate_id in preferred:
+        candidate = available_backends.get(candidate_id)
+        if not candidate:
+            continue
+        if candidate.get("availability_status") not in ("available", "ready"):
+            continue
+        fallback_ids.append(candidate_id)
+    return fallback_ids
+
+
+def _build_execution_boundary(backend_id: str, evidence_level: str) -> dict[str, Any]:
+    if backend_id == "codex":
+        kind = "draft_code_generation"
+        output_boundary = "script_or_plan_only"
+    else:
+        kind = "statistical_execution"
+        output_boundary = "local_execution_artifacts"
+    return {
+        "kind": kind,
+        "output_boundary": output_boundary,
+        "evidence_level": evidence_level,
+        "formal_write_allowed": False,
+        "can_enter_formal_layer_automatically": False,
+        "requires_human_review_before_formal_layer": True,
+    }
+
+
+def _record_backend_unavailable(
+    task: dict[str, Any],
+    backend_id: str,
+    backend_info: dict[str, Any],
+    available_backends: dict[str, dict[str, Any]],
+    timestamp: str,
+) -> None:
+    fallback_backend_ids = _fallback_backend_ids(backend_id, available_backends)
+    task["status"] = "blocked_by_backend_unavailable"
+    task["next_action"] = "choose_fallback_backend"
+    task["can_execute"] = False
+    task["backend_blocker"] = {
+        "code": "blocked_by_backend_unavailable",
+        "backend_id": backend_id,
+        "label": backend_info.get("label", backend_id),
+        "availability_status": backend_info.get("availability_status"),
+        "fallback_backend_ids": fallback_backend_ids,
+        "retry_action": "retry_backend_selection",
+        "message": "所选执行后端当前不可用，请重试或选择 fallback 后端。",
+        "recorded_at": timestamp,
+    }
+    task.setdefault("audit_log", []).append({
+        "event": "backend_unavailable",
+        "actor": "system",
+        "timestamp": timestamp,
+        "backend_id": backend_id,
+        "availability_status": backend_info.get("availability_status"),
+        "fallback_backend_ids": fallback_backend_ids,
+    })
 
 
 def execute_agent_task_with_backend(
@@ -221,6 +337,8 @@ def _execute_with_statspai(
         "evidence_level": "local_execution",
         "artifact_path": method_execution.get("artifact_path"),
         "method_execution": method_execution,
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("statspai", "local_execution"),
     }
     task.setdefault("audit_log", []).append({
         "event": "execution_succeeded",
@@ -237,6 +355,8 @@ def _execute_with_statspai(
         "evidence_level": "local_execution",
         "artifact_path": method_execution.get("artifact_path"),
         "method_execution": method_execution,
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("statspai", "local_execution"),
         "audit_log": task.get("audit_log", []),
     }
 
@@ -293,6 +413,8 @@ def _execute_with_python_adapter(
         "engine": "python_ols_adapter",
         "evidence_level": "local_execution",
         "artifact_path": "Results/json/method_execution_result.json",
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("python_ols_adapter", "local_execution"),
     }
     task.setdefault("audit_log", []).append({
         "event": "execution_succeeded",
@@ -308,6 +430,8 @@ def _execute_with_python_adapter(
         "engine": "python_ols_adapter",
         "evidence_level": "local_execution",
         "artifact_path": "Results/json/method_execution_result.json",
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("python_ols_adapter", "local_execution"),
         "audit_log": task.get("audit_log", []),
     }
 
@@ -376,6 +500,8 @@ print("Generated script for {method_id}: {formula}")
         "evidence_level": "local_file",
         "artifact_path": script_path.relative_to(project_root).as_posix(),
         "note": "Code generated only. No statistical estimation executed.",
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("codex", "local_file"),
     }
     task.setdefault("audit_log", []).append({
         "event": "execution_succeeded",
@@ -393,6 +519,8 @@ print("Generated script for {method_id}: {formula}")
         "evidence_level": "local_file",
         "artifact_path": script_path.relative_to(project_root).as_posix(),
         "note": "Code generated only. No statistical estimation executed.",
+        "formal_write_allowed": False,
+        "execution_boundary": _build_execution_boundary("codex", "local_file"),
     }
 
 

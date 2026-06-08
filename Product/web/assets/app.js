@@ -477,6 +477,13 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async reviewReferenceSeedPackage(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/reference-seed-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -1479,13 +1486,15 @@ function firstMethodExecutionResult(executionResult) {
   return methods.find((method) => method.task_id) || methods[0] || {};
 }
 
-function renderReferenceSeedPackageResultReview(executionResult) {
+function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
   if (executionResult?.execution_kind !== "reference_chain_seed_package") return "";
   const review = executionResult.result_review || {};
+  const seedReview = task.reference_seed_review || {};
   const reviewFocus = Array.isArray(review.review_focus) ? review.review_focus : [];
   const candidateQueryCount = Number.isFinite(Number(review.candidate_query_count))
     ? Number(review.candidate_query_count)
     : 0;
+  const isReviewing = state.reviewingAgentTaskId === task.id;
   return `
     <div class="agent-task-reference-seed-result">
       <div class="agent-task-reference-seed-result__head">
@@ -1519,6 +1528,23 @@ function renderReferenceSeedPackageResultReview(executionResult) {
           <p class="muted">${review.claims_verified_citations ? "已声明验证引用" : "不宣称已验证引用"}</p>
         </div>
       </div>
+      <div class="agent-task-reference-seed-result__actions">
+        <div>
+          <strong>人工审阅</strong>
+          <p class="muted">${seedReview.status ? `已记录：${escapeHtml(productTermLabel(seedReview.status))}` : "批准后只进入草稿综述；不会写入正式层。"}</p>
+        </div>
+        <div class="agent-task-reference-seed-result__buttons">
+          <button class="secondary-button" data-reference-seed-review-action="approve_for_draft" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+            ${isReviewing && state.reviewingAgentTaskAction === "approve_for_draft" ? "处理中..." : "进入草稿综述"}
+          </button>
+          <button class="secondary-button" data-reference-seed-review-action="needs_revision" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+            要求修订
+          </button>
+          <button class="secondary-button" data-reference-seed-review-action="reject" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+            拒绝种子包
+          </button>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -1545,7 +1571,7 @@ function renderAgentTaskExecutionHandoff(task) {
   if (!resultPath && !manifestPath && !runId && !auditLog.length && !evaluatorStatus) return "";
 
   return `
-    ${renderReferenceSeedPackageResultReview(executionResult)}
+    ${renderReferenceSeedPackageResultReview(executionResult, task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -2198,6 +2224,36 @@ async function handleReviewAgentTaskDispatch(taskId, action) {
     state.reviewingAgentTaskAction = null;
     renderAgentTaskQueue();
   }
+}
+
+async function handleReferenceSeedPackageReview(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingAgentTaskId = taskId;
+  state.reviewingAgentTaskAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewReferenceSeedPackage(state.selectedProjectId, taskId, {
+      action,
+      note: `候选来源种子包审阅：${referenceSeedReviewActionLabel(action)}`,
+    });
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存候选来源审阅失败：${error.message}`);
+  } finally {
+    state.reviewingAgentTaskId = null;
+    state.reviewingAgentTaskAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+function referenceSeedReviewActionLabel(action) {
+  const labels = {
+    approve_for_draft: "进入草稿综述",
+    needs_revision: "要求修订",
+    reject: "拒绝种子包",
+  };
+  return labels[action] || action || "审阅";
 }
 
 async function handleSelectBackendAndExecute(taskId, backendId) {
@@ -7189,6 +7245,14 @@ async function boot() {
       void handleReviewAgentTaskDispatch(
         dispatchReviewButton.dataset.agentTaskId,
         dispatchReviewButton.dataset.dispatchReviewAction,
+      );
+      return;
+    }
+    const referenceSeedReviewButton = target.closest("[data-reference-seed-review-action]");
+    if (referenceSeedReviewButton) {
+      void handleReferenceSeedPackageReview(
+        referenceSeedReviewButton.dataset.agentTaskId,
+        referenceSeedReviewButton.dataset.referenceSeedReviewAction,
       );
       return;
     }

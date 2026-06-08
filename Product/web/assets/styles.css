@@ -832,6 +832,21 @@ textarea {
   background: rgba(255, 255, 255, 0.58);
 }
 
+.agent-task-verified-literature-package__review {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(32, 32, 32, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.agent-task-verified-literature-package__review .action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .agent-task-item h5 {
   margin: 0 0 4px;
   font-size: 16px;

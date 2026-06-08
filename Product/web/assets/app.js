@@ -83,6 +83,8 @@ const state = {
   recordingCitationEvidenceTaskId: null,
   recordingCitationEvidenceCitationId: null,
   generatingVerifiedLiteraturePackageTaskId: null,
+  reviewingVerifiedLiteraturePackageTaskId: null,
+  reviewingVerifiedLiteraturePackageAction: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -518,6 +520,13 @@ const v2api = {
         body: JSON.stringify({}),
       });
     },
+    async reviewVerifiedLiteraturePackage(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/verified-literature-package-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -943,6 +952,15 @@ function productTermLabel(value) {
     needs_revision: "需要修改",
     ready_to_create: "待创建",
     backend_selected: "已选择执行后端",
+    verified_literature_package_ready: "等待文献包审阅",
+    verified_literature_package_approved: "文献包已批准",
+    verified_literature_package_needs_revision: "文献包需修订",
+    verified_literature_package_rejected: "文献包已拒绝",
+    review_verified_literature_package: "审阅已核验文献包",
+    generate_manuscript_citation_plan: "生成论文引用计划",
+    approved_for_manuscript_citations: "已批准进入引用计划",
+    revise_verified_literature_package: "修订已核验文献包",
+    replace_verified_literature_package: "替换已核验文献包",
     blocked_by_backend_unavailable: "执行后端不可用",
     choose_fallback_backend: "选择后备执行后端",
     statistical_execution: "统计执行",
@@ -1709,7 +1727,10 @@ function citationEvidenceTemplate(item = {}) {
 
 function renderVerifiedLiteraturePackage(task = {}) {
   const literaturePackage = task.verified_literature_package || {};
-  if (literaturePackage.status !== "verified_literature_package_ready") return "";
+  if (!literaturePackage.status) return "";
+  const review = task.verified_literature_package_review || {};
+  const canReview = task.status === "verified_literature_package_ready";
+  const isReviewing = state.reviewingVerifiedLiteraturePackageTaskId === task.id;
   return `
     <div class="agent-task-verified-literature-package">
       <div>
@@ -1728,12 +1749,28 @@ function renderVerifiedLiteraturePackage(task = {}) {
         </div>
         <div>
           <span class="meta-label">下一步</span>
-          <p>${escapeHtml(productTermLabel(literaturePackage.next_action || "review_verified_literature_package"))}</p>
+          <p>${escapeHtml(productTermLabel(task.next_action || literaturePackage.next_action || "review_verified_literature_package"))}</p>
         </div>
         <div>
           <span class="meta-label">正式层边界</span>
           <p>${literaturePackage.formal_write_allowed ? "允许写入正式层" : "不写入正式层"}</p>
         </div>
+      </div>
+      <div class="agent-task-verified-literature-package__review">
+        <div>
+          <span class="meta-label">审阅门</span>
+          <strong>${escapeHtml(productTermLabel(review.status || "等待审阅"))}</strong>
+          <p class="muted">批准后只生成草稿层引用计划，不直接写入正式论文。</p>
+        </div>
+        ${canReview ? `
+          <div class="action-row">
+            ${["approve_for_manuscript_citations", "needs_revision", "reject"].map((action) => `
+              <button class="${action === "approve_for_manuscript_citations" ? "primary-button" : "secondary-button"}" data-verified-literature-package-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+                ${isReviewing && state.reviewingVerifiedLiteraturePackageAction === action ? "保存中..." : verifiedLiteraturePackageReviewActionLabel(action)}
+              </button>
+            `).join("")}
+          </div>
+        ` : ""}
       </div>
     </div>
   `;
@@ -2532,6 +2569,31 @@ async function handleVerifiedLiteraturePackage(taskId) {
   }
 }
 
+async function handleVerifiedLiteraturePackageReview(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingVerifiedLiteraturePackageTaskId = taskId;
+  state.reviewingVerifiedLiteraturePackageAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewVerifiedLiteraturePackage(
+      state.selectedProjectId,
+      taskId,
+      {
+        action,
+        note: `已核验文献包审阅：${verifiedLiteraturePackageReviewActionLabel(action)}`,
+      },
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存已核验文献包审阅失败：${error.message}`);
+  } finally {
+    state.reviewingVerifiedLiteraturePackageTaskId = null;
+    state.reviewingVerifiedLiteraturePackageAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
 function referenceSeedReviewActionLabel(action) {
   const labels = {
     approve_for_draft: "进入草稿综述",
@@ -2546,6 +2608,15 @@ function draftLiteratureReviewReviewActionLabel(action) {
     approve_for_citation_verification: "进入引用核验",
     needs_revision: "要求修订",
     reject: "拒绝草稿",
+  };
+  return labels[action] || action || "审阅";
+}
+
+function verifiedLiteraturePackageReviewActionLabel(action) {
+  const labels = {
+    approve_for_manuscript_citations: "批准进入引用计划",
+    needs_revision: "要求修订",
+    reject: "拒绝文献包",
   };
   return labels[action] || action || "审阅";
 }
@@ -7574,6 +7645,14 @@ async function boot() {
     const verifiedLiteraturePackageButton = target.closest("[data-verified-literature-package-action]");
     if (verifiedLiteraturePackageButton) {
       void handleVerifiedLiteraturePackage(verifiedLiteraturePackageButton.dataset.agentTaskId || "");
+      return;
+    }
+    const verifiedLiteraturePackageReviewButton = target.closest("[data-verified-literature-package-review-action]");
+    if (verifiedLiteraturePackageReviewButton) {
+      void handleVerifiedLiteraturePackageReview(
+        verifiedLiteraturePackageReviewButton.dataset.agentTaskId || "",
+        verifiedLiteraturePackageReviewButton.dataset.verifiedLiteraturePackageReviewAction || "",
+      );
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

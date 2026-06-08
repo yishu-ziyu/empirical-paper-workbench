@@ -800,7 +800,8 @@ textarea {
 
 .agent-task-citation-verification__action,
 .agent-task-verified-literature-package,
-.agent-task-manuscript-citation-plan {
+.agent-task-manuscript-citation-plan,
+.agent-task-draft-section-plan {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -825,7 +826,13 @@ textarea {
   gap: 12px;
 }
 
-.agent-task-manuscript-citation-plan__head {
+.agent-task-draft-section-plan {
+  display: grid;
+  gap: 12px;
+}
+
+.agent-task-manuscript-citation-plan__head,
+.agent-task-draft-section-plan__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -838,7 +845,8 @@ textarea {
   gap: 10px;
 }
 
-.agent-task-manuscript-citation-plan__grid {
+.agent-task-manuscript-citation-plan__grid,
+.agent-task-draft-section-plan__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
@@ -851,7 +859,8 @@ textarea {
   background: rgba(255, 255, 255, 0.58);
 }
 
-.agent-task-manuscript-citation-plan__grid > div {
+.agent-task-manuscript-citation-plan__grid > div,
+.agent-task-draft-section-plan__grid > div {
   padding: 10px;
   border: 1px solid rgba(32, 32, 32, 0.1);
   border-radius: 8px;

@@ -83,6 +83,7 @@ UI 设计原则：
 - 内部方法库、统计结果契约、Level 3 manuscript gate、formal writeback gates 有一批 CLI-first 资产。
 - P0-F 已完成并提交 `4be3d7a`：intake 阶段的研究问题分析不再注入固定“机器人 / 工资 / DID / 工具变量”假设，LLM preview 必须绑定用户当前题目。
 - P2-AB 已完成并提交 `00f055f`：Agent Task Queue 执行 API 必须先选择执行后端；未选后端时返回 `execution_backend_required`，不会把任务污染成真实执行失败。
+- P0-D 已完成本节点实现：禁用按钮不再被基础按钮样式覆盖成白底白字，DottedSurface 背景粒子强度下调，当前浏览器验收截图已保存。
 
 仍缺的关键能力：
 
@@ -91,7 +92,7 @@ UI 设计原则：
 - Agent Task Queue 到执行后端选择层还需要接实：StatsPAI / Python / StataMCP / Codex subagent 的边界要清楚。
 - 文献检索和 Journal Skill 审稿门还没有稳定进入主链路。
 - 论文草稿能生成，但距离 CoPaper-like “可直接审阅的完整论文包”还要补长度、结构、引用校验、方法规范和多轮修订。
-- 前端仍有体验问题：部分按钮不可读，背景对比度偏高，任务处理页缺少足够的下一步引导。
+- 前端仍有体验问题：任务处理页还需要更强的下一步引导；按钮可读性和背景粒子强度已在 P0-D 先做止血。
 
 今天已验证的测试：
 
@@ -99,8 +100,12 @@ UI 设计原则：
 - `python3 -m unittest tests.test_demo_server_real_llm_contract tests.test_agent_task_queue tests.test_agent_task_dispatch_audit -v`
 - `python3 -m unittest tests.test_agent_task_queue tests.test_agent_task_dispatch_audit -v`
 - `python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q`
+- `python3 -m unittest tests.test_workbench_visual_contrast_contract tests.test_brief_panel_self_critique_contract -v`
 - `python3 -m py_compile Product/api/auto_research.py Product/api/supervisor.py Product/backend/agent_task_queue_service.py Product/app.py`
 - `git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py tests/test_agent_task_queue.py`
+- `npm run build` in `Product/web-react`
+- Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-ux-contrast`; observed `dottedOpacity=0.1`, disabled button background `rgba(230, 230, 230, 0.17)`, disabled text `rgb(208, 208, 208)`.
+- Screenshot: `artifacts/ui-checks/p0d-ux-contrast-20260608.png`
 
 ## 5. LLM 介入编排
 
@@ -245,6 +250,8 @@ Acceptance:
 
 ### Task P0-D: UX contrast and action clarity fix
 
+Status: implemented for the readability and contrast part of the acceptance. The remaining “one clear next action” work should be handled as a separate UX guidance node, because it changes stage interaction logic rather than the visual contrast contract.
+
 **Files:**
 - Inspect: `Product/web-react/src/styles.css`
 - Inspect: `Product/web-react/src/App.tsx`
@@ -355,6 +362,13 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-D UX contrast and action clarity fix**, then return to the browser and test the visible path.
+Start with **P0-B1 Skill Registry explanation contract**.
 
-Reason: backend contracts for topic-bound planning and backend selection are now guarded by tests and commits. The user is currently validating through the app, so the next highest-value node is making the current task page readable, reducing contrast, and ensuring each stage tells the user the one next action. After that, wire the visible buttons to the backend selection / execution API and save browser screenshot evidence.
+Reason: backend contracts for topic-bound planning, backend selection and P0-D readability are now guarded by tests. The next highest-value product capability is making SupervisorPlan and Agent Task Queue explain which internal skill is selected, why it is selected, what evidence it requires, and where human review is still needed.
+
+20-minute boundary for P0-B1:
+
+- Write/confirm 2-3 BDD contract tests around skill explanation metadata.
+- Wire the smallest metadata path into SupervisorPlan / queue output.
+- Do not implement canonical skill ingestion or execution behavior in this node.
+- Verify with targeted tests first; browser wiring can be a follow-up node if backend metadata is not yet exposed on the current page.

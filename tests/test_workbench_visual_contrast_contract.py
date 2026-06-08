@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +50,20 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
             WEB_REACT_ROOT / "src" / "components" / "MethodsDrawer.tsx"
         ).read_text(encoding="utf-8")
 
+    def _css_block(self, selector: str) -> str:
+        pattern = re.compile(rf"{re.escape(selector)}\s*\{{(?P<body>.*?)\n\}}", re.S)
+        match = pattern.search(self.css)
+        self.assertIsNotNone(match, f"missing css selector: {selector}")
+        return match.group("body")
+
+    def _rgba_alpha_for_var(self, var_name: str) -> float:
+        pattern = re.compile(
+            rf"{re.escape(var_name)}:\s*rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*(?P<alpha>[0-9.]+)\s*\);"
+        )
+        match = pattern.search(self.css)
+        self.assertIsNotNone(match, f"missing rgba var: {var_name}")
+        return float(match.group("alpha"))
+
     def test_bdd_saved_brief_button_has_readable_monochrome_states(self) -> None:
         """行为 10：已落盘简报入口在深色背景上不能出现白块白字。"""
         self.assertIn("查看已保存的简报", self.app)
@@ -70,8 +85,37 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
             "background: radial-gradient(ellipse at top, #242424 0%, #1d1d1d 100%)",
             self.css,
         )
-        self.assertIn("opacity: 0.18", self.css)
-        self.assertIn("opacity: 0.12", self.surface)
+        self.assertIn("opacity: 0.1", self.css)
+        self.assertIn("opacity: 0.075", self.surface)
+
+    def test_bdd_disabled_actions_cannot_be_overridden_into_white_blocks(self) -> None:
+        """行为 21：禁用按钮必须强制继承暗色可读状态，不能被基础按钮白底覆盖。"""
+        alpha = self._rgba_alpha_for_var("--color-button-disabled-bg")
+        self.assertGreaterEqual(alpha, 0.14)
+        self.assertLessEqual(alpha, 0.24)
+
+        for selector in [
+            ".btn:disabled",
+            ".btn--primary:disabled",
+            ".task-brief__restart:disabled",
+            ".workbench-saved-brief:disabled",
+            ".step-card__buttons .btn:disabled",
+            ".step-card__buttons .btn:not(.btn--primary):disabled",
+        ]:
+            block = self._css_block(selector)
+            self.assertIn(
+                "background: var(--color-button-disabled-bg) !important",
+                block,
+            )
+            self.assertIn(
+                "color: var(--color-button-disabled-text) !important",
+                block,
+            )
+
+    def test_bdd_background_particles_stay_below_primary_content_contrast(self) -> None:
+        """行为 22：背景粒子只是质感，不能抢主内容的视觉层级。"""
+        self.assertIn("opacity: 0.1", self.css)
+        self.assertIn("opacity: 0.075", self.surface)
 
     def test_bdd_stage_navigation_uses_research_task_language(self) -> None:
         """行为 12：阶段导航要说用户任务，不裸露单一来源或后端术语。"""

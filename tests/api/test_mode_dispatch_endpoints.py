@@ -1,7 +1,7 @@
 """Mode-dispatch endpoint tests (Task 42, ui-gap-fill).
 
 Verifies:
-- POST /api/supervisor/plan returns the static 8-stage plan
+- POST /api/supervisor/plan returns a topic-bound 8-stage plan
 - POST /api/auto-research/start returns SSE events for all 4 steps + final_brief
 - get_default_plan_draft() returns a copy (not the module constant)
 """
@@ -45,6 +45,37 @@ class SupervisorPlanEndpointTests(unittest.TestCase):
         # 推荐首选分支 (data-variables) status=running
         recommended = next(s for s in stages if s["id"] == "data-variables")
         self.assertEqual(recommended["status"], "running")
+
+    def test_supervisor_plan_inspector_does_not_inject_unrelated_method_assumptions(self) -> None:
+        """BDD: Given a new topic, inspector guidance must stay topic-bound.
+
+        Given 用户输入的是“父母教育水平对子女工资水平的影响”
+        When 系统生成 intake-time SupervisorPlan
+        Then 右侧 Inspector 不得注入旧机器人案例或未确认的 DID/IV/R 环境假设
+        """
+        topic = "父母教育水平对子女工资水平的影响"
+        resp = self.client.post(
+            "/api/supervisor/plan",
+            json={"topic": topic, "note": "CGSS 数据"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body["topic"], topic)
+        combined = json.dumps(body["inspector"], ensure_ascii=False)
+        self.assertIn(topic, combined)
+        forbidden_terms = [
+            "工业机器人",
+            "机器人",
+            "Bartik",
+            "DID",
+            "多期DID",
+            "工具变量排他性",
+            "平行趋势",
+            "三级固定效应",
+            "R 语言环境",
+        ]
+        for term in forbidden_terms:
+            self.assertNotIn(term, combined, f"inspector leaked unrelated term: {term}")
 
     def test_post_supervisor_plan_rejects_empty_topic(self) -> None:
         resp = self.client.post("/api/supervisor/plan", json={"topic": ""})
@@ -144,6 +175,40 @@ class AutoResearchEndpointTests(unittest.TestCase):
             events = self._collect_sse_events(resp)
         deltas = [e for e in events if e["event"] == "step_delta"]
         self.assertGreater(len(deltas), 0, "expected at least 1 step_delta")
+
+    def test_auto_research_preview_stays_bound_to_user_topic(self) -> None:
+        """BDD: Given a non-robot topic, preview text cannot reuse robot-wage fixture logic.
+
+        Given 用户输入的是“父母教育水平对子女工资水平的影响”
+        When 自动研究入口生成四步预览和 brief
+        Then 文本必须围绕该题目，并把变量/方法留给后续画像确认
+        """
+        topic = "父母教育水平对子女工资水平的影响"
+        with self.client.stream(
+            "POST",
+            "/api/auto-research/start",
+            json={"topic": topic, "topic_slug": "parent-edu-wage"},
+        ) as resp:
+            self.assertEqual(resp.status_code, 200)
+            events = self._collect_sse_events(resp)
+
+        combined = "\n".join(
+            str(evt.get("text") or evt.get("summary") or evt.get("markdown") or "")
+            for evt in events
+        )
+        self.assertIn(topic, combined)
+        self.assertIn("待字段画像确认", combined)
+        forbidden_terms = [
+            "robot",
+            "robot_exposure",
+            "ln_wage",
+            "Acemoglu",
+            "Restrepo",
+            "工业机器人",
+            "机器人",
+        ]
+        for term in forbidden_terms:
+            self.assertNotIn(term, combined, f"auto-research leaked unrelated term: {term}")
 
 
 if __name__ == "__main__":

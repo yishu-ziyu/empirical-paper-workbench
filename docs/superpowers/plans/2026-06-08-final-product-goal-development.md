@@ -424,13 +424,29 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-C3 Execution result handoff clarity**.
+P0-C3 completed.
 
-Reason: 用户现在能看到后端为什么被选中。下一步要让执行完成后的结果路径、日志路径、evaluator 检查和下一步动作在队列里更清楚，避免用户看到“执行成功”但不知道应该点哪里、看哪个文件、能不能进入草稿。
+Reason: 用户现在能看到后端为什么被选中，也能看到执行成功后应该检查哪个结果文件、哪个运行清单、评估器状态是什么，以及下一步动作是什么。
 
-20-minute boundary for P0-C3:
+P0-C3 verified:
 
-- Inspect current `execution_result` fields and visible queue rendering.
-- Add one contract: succeeded task must show result file path, log/audit hint, evaluator status and next action.
-- Wire only existing metadata if possible; do not invent fake run outputs.
-- Verify with focused frontend test and browser DOM check.
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_13_succeeded_task_exposes_result_handoff -v
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests -v
+node --check Product/web/assets/app.js
+```
+
+P0-C3 manual acceptance:
+
+- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0c3-result-handoff`.
+- DOM check confirmed 2 `.agent-task-execution-handoff` blocks.
+- Visible handoff text includes `Results/json/method_execution_result.json`, `state/runs/.../run_manifest.json`, evaluator status and next action.
+- Screenshot saved to `artifacts/ui-checks/p0c3-result-handoff-20260608.png`.
+
+Next node: **P0-D UX contrast and action clarity fix**.
+
+20-minute boundary for P0-D:
+
+- Fix only the task queue / execution handoff contrast and unreadable button states reported by the user.
+- Add one frontend contract that disabled or secondary buttons still use readable text color.
+- Verify in browser on the same `/legacy` flow.

@@ -644,6 +644,17 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("python_ols_adapter", self.app_js)
         self.assertIn("can_enter_formal_layer_automatically: false", self.app_js)
 
+    def test_bdd_13_succeeded_task_exposes_result_handoff(self) -> None:
+        """行为 13：任务执行成功后，必须展示结果路径、日志线索、自检状态和下一步。"""
+        self.assertIn("renderAgentTaskExecutionHandoff", self.app_js)
+        self.assertIn("结果文件", self.app_js)
+        self.assertIn("运行清单", self.app_js)
+        self.assertIn("评估器状态", self.app_js)
+        self.assertIn("下一步动作", self.app_js)
+        self.assertIn("result_artifact_path", self.app_js)
+        self.assertIn("manifest_artifact_path", self.app_js)
+        self.assertIn(".agent-task-execution-handoff", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

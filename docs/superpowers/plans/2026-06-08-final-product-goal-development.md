@@ -461,10 +461,40 @@ P0-D manual acceptance:
 - DOM style check confirmed disabled button background `rgba(230, 230, 230, 0.075)`, text `rgb(143, 143, 143)`, opacity `1`, and dotted background opacity `0.06`.
 - Screenshot saved to `artifacts/ui-checks/p0d-react-contrast-20260608.png`.
 
-Next node: **P0-E LLM intervention and skill selection rationale contract**.
+P0-E completed.
 
-20-minute boundary for P0-E:
+Reason: Agent Task Queue 现在不只保存任务和 skill 绑定，还会保存一份 LLM 介入交接契约。用户以后点开任务时，可以看到 LLM Supervisor 在哪里做语义判断、确定性服务在哪里接手、人工确认卡在哪里。这个节点没有启动新的 UI 重构，保持在 plan / queue metadata 范围内。
 
-- Define when LLM Supervisor intervenes and when deterministic executors take over.
-- Add one contract that Agent Task Queue exposes why a skill was selected.
-- Keep the node to plan / queue metadata; do not start another UI redesign inside P0-E.
+P0-E behavior added:
+
+```gherkin
+Given an approved SupervisorPlan with an LLM intervention plan
+And the plan recommends an internal Skill for a sub Agent
+When the user creates an Agent Task Queue
+Then the queue exposes the LLM intervention contract
+And each task exposes which stage is LLM judgment, which service takes over, where human review happens, and why the Skill was selected.
+```
+
+P0-E verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_14_queue_exposes_llm_intervention_handoff_contract -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py
+```
+
+P0-E implementation:
+
+- `llm_intervention_contract` is stored at the Agent Task Queue top level.
+- `llm_intervention_handoff` is stored on each task.
+- Skill-bound tasks use the `skill_selection` handoff and preserve `selected_skill_reason`.
+- Non-skill tasks fall back to the `agent_task_queue` handoff.
+- Legacy queues are normalized with the default contract so old state files still load.
+
+Next node: **P0-G execution handoff and one-primary-action guidance**.
+
+20-minute boundary for P0-G:
+
+- Do not redesign the page.
+- Make the next executable action clearer from persisted task state.
+- Preserve human gate before real execution.

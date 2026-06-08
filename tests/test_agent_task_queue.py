@@ -446,12 +446,87 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["execution_result"]["engine"], "codex")
 
+    def test_bdd_14_queue_exposes_llm_intervention_handoff_contract(self) -> None:
+        """行为 14：队列必须说明 LLM 何时判断、何时交还确定性服务、何处人工确认。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                },
+            ],
+            llm_intervention_plan={
+                "contract_version": "llm_intervention.v1",
+                "default_policy": "llm_plans_deterministic_executes_human_promotes",
+                "stage_handoffs": [
+                    {
+                        "stage": "skill_selection",
+                        "llm_role": "解释为什么选择 Skill，并列出缺失证据。",
+                        "deterministic_owner": "internal_skill_registry",
+                        "handoff_condition": "Skill id、来源、适用理由和执行边界写入 SupervisorPlan。",
+                        "human_gate": "review_internal_skill_before_execution",
+                        "formal_boundary": "draft_only_until_human_review",
+                    },
+                    {
+                        "stage": "agent_task_queue",
+                        "llm_role": "把研究路线拆成子 Agent 任务摘要。",
+                        "deterministic_owner": "agent_task_queue_service",
+                        "handoff_condition": "任务队列持久化为 local_file，默认不可执行。",
+                        "human_gate": "dispatch_review_required",
+                        "formal_boundary": "draft_only_until_human_review",
+                    },
+                ],
+            },
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        queue = response.json()["agent_task_queue"]
+        self.assertEqual(queue["llm_intervention_contract"]["contract_version"], "llm_intervention.v1")
+        self.assertEqual(
+            queue["llm_intervention_contract"]["default_policy"],
+            "llm_plans_deterministic_executes_human_promotes",
+        )
+        self.assertIn("llm_intervention_contract", queue["ui_contract"]["hidden_by_default"])
+
+        handoff = queue["tasks"][0]["llm_intervention_handoff"]
+        self.assertEqual(handoff["stage"], "skill_selection")
+        self.assertEqual(handoff["llm_role"], "解释为什么选择 Skill，并列出缺失证据。")
+        self.assertEqual(handoff["deterministic_owner"], "internal_skill_registry")
+        self.assertEqual(handoff["human_gate"], "review_internal_skill_before_execution")
+        self.assertEqual(handoff["formal_boundary"], "draft_only_until_human_review")
+        self.assertEqual(
+            handoff["selected_skill_reason"],
+            "题目需要先从文献、数据和变量证据形成递归搜索图。",
+        )
+        self.assertFalse(queue["tasks"][0]["can_execute"])
+
     def _write_supervisor_plan(
         self,
         status: str,
         can_dispatch: bool,
         subagent_dispatch: list[dict] | None = None,
         recommended_internal_skills: list[dict] | None = None,
+        llm_intervention_plan: dict | None = None,
     ) -> None:
         path = self.project_root / "state" / "product" / "supervisor_plan.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -496,6 +571,8 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             ],
             "recommended_internal_skills": recommended_internal_skills or [],
         }
+        if llm_intervention_plan is not None:
+            plan["llm_intervention_plan"] = llm_intervention_plan
         path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _approve_research_states(self) -> None:

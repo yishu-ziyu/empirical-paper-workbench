@@ -63,6 +63,7 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
     plan = load_saved_supervisor_plan(project_root)
     blockers = agent_task_queue_blockers(plan)
     can_create = not blockers and bool(normalize_list(plan.get("subagent_dispatch") if plan else []))
+    llm_intervention_contract = build_llm_intervention_contract(plan)
     return {
         "id": "agent_task_queue",
         "version": 0,
@@ -81,6 +82,7 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
         },
         "tasks": [],
         "blockers": blockers,
+        "llm_intervention_contract": llm_intervention_contract,
         "ui_contract": build_queue_ui_contract(),
         "next_action": {
             "id": "create_agent_task_queue" if can_create else "approve_supervisor_plan",
@@ -132,8 +134,9 @@ def agent_task_queue_blockers(plan: dict[str, Any] | None) -> list[dict[str, str
 
 
 def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], timestamp: str) -> dict[str, Any]:
+    llm_intervention_contract = build_llm_intervention_contract(plan)
     tasks = [
-        build_agent_task(index, dispatch, plan, timestamp)
+        build_agent_task(index, dispatch, plan, timestamp, llm_intervention_contract)
         for index, dispatch in enumerate(dispatch_items, start=1)
     ]
     return {
@@ -147,6 +150,7 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         "summary": build_agent_task_queue_summary(tasks),
         "tasks": tasks,
         "blockers": [],
+        "llm_intervention_contract": llm_intervention_contract,
         "ui_contract": build_queue_ui_contract(),
         "next_action": {
             "id": "dispatch_agent_tasks",
@@ -157,7 +161,13 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
     }
 
 
-def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp: str) -> dict[str, Any]:
+def build_agent_task(
+    index: int,
+    dispatch: Any,
+    plan: dict[str, Any],
+    timestamp: str,
+    llm_intervention_contract: dict[str, Any],
+) -> dict[str, Any]:
     dispatch_item = dispatch if isinstance(dispatch, dict) else {"task": str(dispatch)}
     owner_agent = str(dispatch_item.get("agent_id") or dispatch_item.get("role") or f"agent_{index:02d}")
     role = str(dispatch_item.get("role") or owner_agent)
@@ -184,6 +194,10 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
         "input_evidence": build_task_input_evidence(plan),
         "output_requirements": build_output_requirements(plan, dispatch_item),
         "internal_skill_bindings": internal_skill_bindings,
+        "llm_intervention_handoff": build_task_llm_intervention_handoff(
+            llm_intervention_contract,
+            internal_skill_bindings,
+        ),
         "blockers": [],
         "risk_flags": normalize_list(plan.get("risks")),
         "audit_log": [
@@ -195,6 +209,104 @@ def build_agent_task(index: int, dispatch: Any, plan: dict[str, Any], timestamp:
             }
         ],
     }
+
+
+def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
+    return [
+        {
+            "stage": "supervisor_plan",
+            "llm_role": "生成研究路线、风险、证据要求和子 Agent 分工。",
+            "deterministic_owner": "supervisor_plan_service",
+            "handoff_condition": "写入 needs_review 或 approved SupervisorPlan；不改写正式研究状态。",
+            "human_gate": "review_supervisor_plan",
+            "formal_boundary": "draft_only_until_human_review",
+        },
+        {
+            "stage": "skill_selection",
+            "llm_role": "解释为什么选择 Skill，并列出缺失证据。",
+            "deterministic_owner": "internal_skill_registry",
+            "handoff_condition": "Skill id、来源、适用理由和执行边界写入 plan 和 queue。",
+            "human_gate": "review_internal_skill_before_execution",
+            "formal_boundary": "draft_only_until_human_review",
+        },
+        {
+            "stage": "agent_task_queue",
+            "llm_role": "把研究路线拆成子 Agent 任务摘要和阻塞项。",
+            "deterministic_owner": "agent_task_queue_service",
+            "handoff_condition": "任务队列持久化为 local_file，默认不可执行。",
+            "human_gate": "dispatch_review_required",
+            "formal_boundary": "draft_only_until_human_review",
+        },
+    ]
+
+
+def build_llm_intervention_contract(plan: dict[str, Any] | None) -> dict[str, Any]:
+    raw_contract = plan.get("llm_intervention_plan") if isinstance(plan, dict) else None
+    contract = raw_contract if isinstance(raw_contract, dict) else {}
+    stage_handoffs = [
+        normalize_llm_stage_handoff(item)
+        for item in normalize_list(contract.get("stage_handoffs"))
+        if isinstance(item, dict)
+    ]
+    if not stage_handoffs:
+        stage_handoffs = default_llm_intervention_stage_handoffs()
+    return {
+        "contract_version": str(contract.get("contract_version") or "llm_intervention.v1"),
+        "default_policy": str(
+            contract.get("default_policy") or "llm_plans_deterministic_executes_human_promotes"
+        ),
+        "stage_handoffs": stage_handoffs,
+    }
+
+
+def normalize_llm_stage_handoff(item: dict[str, Any]) -> dict[str, str]:
+    return {
+        "stage": str(item.get("stage") or "agent_task_queue"),
+        "llm_role": str(item.get("llm_role") or "生成可审阅判断，不直接改写正式层。"),
+        "deterministic_owner": str(item.get("deterministic_owner") or "agent_task_queue_service"),
+        "handoff_condition": str(item.get("handoff_condition") or "写入本地状态文件，等待人工确认。"),
+        "human_gate": str(item.get("human_gate") or "dispatch_review_required"),
+        "formal_boundary": str(item.get("formal_boundary") or "draft_only_until_human_review"),
+    }
+
+
+def build_task_llm_intervention_handoff(
+    llm_intervention_contract: dict[str, Any],
+    internal_skill_bindings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    first_skill = internal_skill_bindings[0] if internal_skill_bindings else {}
+    stage = "skill_selection" if first_skill else "agent_task_queue"
+    handoff = find_llm_stage_handoff(llm_intervention_contract, stage)
+    result: dict[str, Any] = {
+        "stage": handoff["stage"],
+        "llm_role": handoff["llm_role"],
+        "deterministic_owner": handoff["deterministic_owner"],
+        "handoff_condition": handoff["handoff_condition"],
+        "human_gate": handoff["human_gate"],
+        "formal_boundary": handoff["formal_boundary"],
+    }
+    if first_skill:
+        result.update(
+            {
+                "selected_skill_id": first_skill.get("skill_id") or first_skill.get("id"),
+                "selected_skill_name": first_skill.get("name"),
+                "selected_skill_reason": first_skill.get("why_this_skill")
+                or first_skill.get("semantic_selection_reason")
+                or first_skill.get("matched_reason", ""),
+                "selection_source": first_skill.get("selection_source", ""),
+            }
+        )
+    return result
+
+
+def find_llm_stage_handoff(contract: dict[str, Any], stage: str) -> dict[str, str]:
+    for handoff in normalize_list(contract.get("stage_handoffs")):
+        if isinstance(handoff, dict) and handoff.get("stage") == stage:
+            return normalize_llm_stage_handoff(handoff)
+    for handoff in default_llm_intervention_stage_handoffs():
+        if handoff.get("stage") == stage:
+            return handoff
+    return default_llm_intervention_stage_handoffs()[-1]
 
 
 def build_task_internal_skill_bindings(
@@ -310,6 +422,7 @@ def build_queue_ui_contract() -> dict[str, Any]:
             "input_evidence",
             "output_requirements",
             "internal_skill_bindings",
+            "llm_intervention_contract",
             "risk_flags",
             "audit_log",
         ],
@@ -334,18 +447,31 @@ def build_agent_task_queue_response(project: dict[str, Any], queue: dict[str, An
 
 
 def normalize_agent_task_queue(queue: dict[str, Any]) -> dict[str, Any]:
+    queue.setdefault("llm_intervention_contract", build_llm_intervention_contract(None))
+    queue.setdefault("ui_contract", build_queue_ui_contract())
     tasks = normalize_list(queue.get("tasks"))
     if tasks:
         for task in tasks:
             if isinstance(task, dict):
-                ensure_task_dispatch_audit_fields(task)
+                ensure_task_dispatch_audit_fields(task, queue["llm_intervention_contract"])
         queue["summary"] = build_agent_task_queue_summary(tasks)
     return queue
 
 
-def ensure_task_dispatch_audit_fields(task: dict[str, Any]) -> None:
+def ensure_task_dispatch_audit_fields(task: dict[str, Any], llm_intervention_contract: dict[str, Any]) -> None:
     status = str(task.get("status") or "queued")
     task.setdefault("can_execute", False)
+    task.setdefault(
+        "llm_intervention_handoff",
+        build_task_llm_intervention_handoff(
+            llm_intervention_contract,
+            [
+                binding
+                for binding in normalize_list(task.get("internal_skill_bindings"))
+                if isinstance(binding, dict)
+            ],
+        ),
+    )
     if status == "reviewed_for_dispatch":
         task.setdefault("next_action", "select_execution_backend")
         task.setdefault("dispatch_readiness", {"status": "reviewed_for_dispatch", "blockers": []})

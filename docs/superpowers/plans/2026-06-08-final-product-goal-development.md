@@ -909,4 +909,63 @@ P1-F implementation:
 - Added `renderReferenceSeedPackageResultReview` to the task queue result handoff.
 - Added a lightweight `.agent-task-reference-seed-result` style block so users can identify the review object before reading the generic run result.
 
-Next node: **P1-G commit scope and define the next product node: review_literature_seed_package action endpoint**.
+P1-G verified:
+
+```bash
+git diff --check -- Product/backend/reference_chain_seed_runner.py Product/backend/execution_backend_service.py Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+git status --short --branch
+```
+
+P1-G implementation:
+
+- Committed P1-F as `a421772 Surface literature seed packages for review`.
+- Left unrelated dirty/untracked workspace artifacts untouched.
+
+Next node: **P1-H add review_literature_seed_package action endpoint**.
+
+20-minute boundary for P1-H:
+
+- Do not add CNKI / Scholar / Zotero crawlers.
+- Do not verify citations automatically.
+- Do not promote candidate references to the formal manuscript layer.
+- Only add the human review action that decides whether the candidate source package can enter draft-layer literature writing.
+
+P1-H BDD:
+
+```text
+Given a LiteratureAgent task has produced a reference_chain_seed_package
+When the user approves it with approve_for_draft
+Then the task records reference_seed_review=approved_for_draft,
+sets next_action=draft_literature_review,
+and keeps formal_write_allowed=false.
+
+Given a task has not produced a reference_chain_seed_package
+When the user calls the reference seed review endpoint
+Then the system rejects the action with reference_seed_package_required
+instead of fabricating a review state.
+
+Given the task queue frontend receives a reference seed package result review
+When the result block is rendered
+Then it exposes actions for approve_for_draft, needs_revision, and reject,
+with copy that approval only enters the draft layer.
+```
+
+P1-H verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_19_reference_seed_package_review_only_promotes_to_draft_layer tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_20_reference_seed_package_review_requires_seed_package_result tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_17_frontend_exposes_reference_seed_package_review_actions -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+```
+
+P1-H implementation:
+
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/reference-seed-review`.
+- Added review actions: `approve_for_draft`, `needs_revision`, `reject`.
+- `approve_for_draft` changes the task to `reviewed_for_draft` and makes the primary action `draft_literature_review`.
+- All review outcomes keep `formal_write_allowed=false`, `writes_formal_layer=false`, and `claims_verified_citations=false`.
+- Added frontend API binding and review buttons in the candidate source package result block.
+
+Next node: **P1-I draft-layer literature review generation from approved_for_draft seed packages**.

@@ -11,6 +11,11 @@ from Product.backend.supervisor_plan_service import load_saved_supervisor_plan
 
 
 AGENT_TASK_QUEUE_PATH = Path("state/product/agent_task_queue.json")
+VALID_REFERENCE_SEED_REVIEW_ACTIONS = {
+    "approve_for_draft",
+    "needs_revision",
+    "reject",
+}
 
 
 class AgentTaskQueueBlockedError(RuntimeError):
@@ -310,6 +315,24 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "execution_result_review",
+        }
+    if status == "reviewed_for_draft":
+        return {
+            "id": "draft_literature_review",
+            "label": "进入草稿综述",
+            "reason": "候选来源种子包已通过人工审阅，可以进入草稿综述；引用仍保持候选状态，不能写入正式层。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "draft_literature_review",
+        }
+    if status == "rejected":
+        return {
+            "id": "replace_literature_search",
+            "label": "更换检索方案",
+            "reason": "候选来源种子包已被拒绝，需要重新生成检索式或更换来源。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "reference_seed_revision",
         }
     if status == "blocked_by_backend_unavailable":
         return {
@@ -1044,3 +1067,124 @@ def execute_project_agent_task(
     response = build_agent_task_queue_response(project, queue)
     response["execution_result"] = result
     return response
+
+
+def review_project_reference_seed_package(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_REFERENCE_SEED_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_reference_seed_review_action",
+            f"Unsupported reference seed review action: {action}.",
+        )
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    execution_result = task.get("execution_result") if isinstance(task.get("execution_result"), dict) else {}
+    if execution_result.get("execution_kind") != "reference_chain_seed_package":
+        raise AgentTaskQueueBlockedError(
+            "reference_seed_package_required",
+            "Reference seed package execution result is required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_reference_seed_package_review(action, note, timestamp)
+    task["reference_seed_review"] = review
+    task["can_execute"] = False
+    result_review = (
+        execution_result.get("result_review")
+        if isinstance(execution_result.get("result_review"), dict)
+        else {}
+    )
+    result_review["last_review_action"] = action
+    result_review["can_enter_formal_layer"] = False
+    result_review["claims_verified_citations"] = False
+    execution_result["result_review"] = result_review
+    execution_result["formal_write_allowed"] = False
+    execution_result["writes_formal_layer"] = False
+    task["execution_result"] = execution_result
+
+    if action == "approve_for_draft":
+        task["status"] = "reviewed_for_draft"
+        task["next_action"] = "draft_literature_review"
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "needs_revision"
+        task["next_action"] = "revise_literature_search"
+        task["blockers"] = [
+            {
+                "code": "reference_seed_needs_revision",
+                "label": "候选来源需要修改",
+                "description": note or "人工要求修改候选来源种子包。",
+            }
+        ]
+    else:
+        task["status"] = "rejected"
+        task["next_action"] = "replace_literature_search"
+        task["blockers"] = [
+            {
+                "code": "reference_seed_rejected",
+                "label": "候选来源已拒绝",
+                "description": note or "人工拒绝了候选来源种子包。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "reference_seed_package_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "note": note,
+            "review_gate": "review_literature_seed_package",
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["reference_seed_review"] = review
+    return response
+
+
+def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_draft":
+        status = "approved_for_draft"
+        next_action = "draft_literature_review"
+        next_action_label = "进入草稿综述"
+        draft_layer_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_literature_search"
+        next_action_label = "要求修订候选来源"
+        draft_layer_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_literature_search"
+        next_action_label = "拒绝种子包并重新检索"
+        draft_layer_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_literature_seed_package",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "reference_state": "candidate",
+        "draft_layer_allowed": draft_layer_allowed,
+        "formal_write_allowed": False,
+        "claims_verified_citations": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "local_file",
+    }

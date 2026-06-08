@@ -792,6 +792,105 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertIn("verified_requires", package["citation_verification_policy"])
         self.assertFalse(package["claims_verified_citations"])
 
+    def test_bdd_19_reference_seed_package_review_only_promotes_to_draft_layer(self) -> None:
+        """行为 19：候选来源种子包通过人工审阅后，只能进入草稿综述，不能写入正式层。"""
+        self._execute_reference_seed_package_task()
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/reference-seed-review",
+            json={"action": "approve_for_draft", "note": "可以进入草稿综述，但引用仍需补查。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        review = task["reference_seed_review"]
+        self.assertEqual(review["status"], "approved_for_draft")
+        self.assertEqual(review["review_gate"], "review_literature_seed_package")
+        self.assertTrue(review["draft_layer_allowed"])
+        self.assertFalse(review["formal_write_allowed"])
+        self.assertEqual(review["reference_state"], "candidate")
+        self.assertIn("草稿综述", review["next_action_label"])
+        self.assertEqual(task["status"], "reviewed_for_draft")
+        self.assertEqual(task["next_action"], "draft_literature_review")
+        self.assertEqual(task["primary_action"]["id"], "draft_literature_review")
+        self.assertEqual(task["primary_action"]["label"], "进入草稿综述")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertFalse(task["execution_result"]["result_review"]["can_enter_formal_layer"])
+        self.assertEqual(task["execution_result"]["result_review"]["last_review_action"], "approve_for_draft")
+        self.assertEqual(task["audit_log"][-1]["event"], "reference_seed_package_reviewed")
+
+        saved = json.loads(
+            (self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(saved["tasks"][0]["reference_seed_review"]["status"], "approved_for_draft")
+
+    def test_bdd_20_reference_seed_package_review_requires_seed_package_result(self) -> None:
+        """行为 20：没有候选来源种子包执行结果时，不能伪造文献种子包审阅。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/reference-seed-review",
+            json={"action": "approve_for_draft", "note": "还没有真实种子包。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "reference_seed_package_required")
+
+    def _execute_reference_seed_package_task(self) -> None:
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "citation_verification_queue"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                },
+            ],
+            reference_chain_policy={
+                "contract_version": "reference_chain.v1",
+                "status": "needs_review",
+                "source_priority": ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+                "max_depth": 2,
+                "max_iterations": 5,
+                "formal_writeback_gate": "review_literature_seed_package",
+                "writes_formal_layer": True,
+            },
+        )
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
+            json={"action": "approve", "note": "先生成候选来源种子包"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/select-backend",
+            json={"backend_id": "codex"},
+        )
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+        executed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/execute"
+        )
+        self.assertEqual(executed.status_code, 200, msg=executed.text)
+
     def _write_supervisor_plan(
         self,
         status: str,
@@ -1037,6 +1136,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("review_literature_seed_package", self.app_js)
         self.assertIn("不宣称已验证引用", self.app_js)
         self.assertIn(".agent-task-reference-seed-result", self.styles_css)
+
+    def test_bdd_17_frontend_exposes_reference_seed_package_review_actions(self) -> None:
+        """行为 17：前端必须提供候选来源种子包审阅动作，并明确只进入草稿层。"""
+        self.assertIn("reviewReferenceSeedPackage", self.app_js)
+        self.assertIn("handleReferenceSeedPackageReview", self.app_js)
+        self.assertIn("data-reference-seed-review-action", self.app_js)
+        self.assertIn("approve_for_draft", self.app_js)
+        self.assertIn("进入草稿综述", self.app_js)
+        self.assertIn("要求修订", self.app_js)
+        self.assertIn("拒绝种子包", self.app_js)
+        self.assertIn("不会写入正式层", self.app_js)
+        self.assertIn(".agent-task-reference-seed-result__actions", self.styles_css)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from Product.backend.agent_task_queue_service import (
     create_project_agent_task_queue,
     execute_project_agent_task,
     get_project_agent_task_queue,
+    review_project_reference_seed_package,
     select_project_agent_task_backend,
 )
 from Product.backend.agent_registry_service import get_agent_details, list_agents
@@ -406,6 +407,11 @@ class AgentTaskQueuePayload(BaseModel):
 
 
 class AgentTaskDispatchReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class AgentTaskReferenceSeedReviewPayload(BaseModel):
     action: str
     note: str = ""
 
@@ -1028,6 +1034,30 @@ def api_v1_review_project_agent_task_dispatch(
         return error_response(status_code, exc.code, str(exc))
     except AgentTaskQueueBlockedError as exc:
         status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/reference-seed-review")
+def api_v1_review_project_reference_seed_package(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskReferenceSeedReviewPayload,
+) -> dict:
+    try:
+        return review_project_reference_seed_package(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.action,
+            payload.note,
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 400 if exc.code == "invalid_reference_seed_review_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
         return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

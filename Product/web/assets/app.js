@@ -89,6 +89,8 @@ const state = {
   reviewingManuscriptCitationPlanTaskId: null,
   reviewingManuscriptCitationPlanAction: null,
   generatingDraftSectionPlanTaskId: null,
+  reviewingDraftSectionPlanTaskId: null,
+  reviewingDraftSectionPlanAction: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -552,6 +554,13 @@ const v2api = {
         body: JSON.stringify({}),
       });
     },
+    async reviewDraftSectionPlan(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/draft-section-plan-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -986,15 +995,22 @@ function productTermLabel(value) {
     manuscript_citation_plan_needs_revision: "引用计划需修订",
     manuscript_citation_plan_rejected: "引用计划已拒绝",
     draft_section_plan_ready: "章节计划待审阅",
+    draft_section_plan_approved: "章节计划已批准",
+    draft_section_plan_needs_revision: "章节计划需修订",
+    draft_section_plan_rejected: "章节计划已拒绝",
     review_verified_literature_package: "审阅已核验文献包",
     generate_manuscript_citation_plan: "生成论文引用计划",
     review_manuscript_citation_plan: "审阅论文引用计划",
     review_draft_section_plan: "审阅章节草稿计划",
     approved_for_manuscript_citations: "已批准进入引用计划",
     approved_for_draft_sections: "已批准进入章节草稿",
+    approved_for_section_tasks: "已批准生成章节任务",
     generate_draft_section_plan: "生成章节草稿计划",
+    generate_draft_section_tasks: "生成章节草稿任务包",
     revise_manuscript_citation_plan: "修订论文引用计划",
     replace_manuscript_citation_plan: "替换论文引用计划",
+    revise_draft_section_plan: "修订章节草稿计划",
+    replace_draft_section_plan: "替换章节草稿计划",
     revise_verified_literature_package: "修订已核验文献包",
     replace_verified_literature_package: "替换已核验文献包",
     blocked_by_backend_unavailable: "执行后端不可用",
@@ -1881,8 +1897,11 @@ function renderManuscriptCitationPlan(task = {}) {
 
 function renderDraftSectionPlan(task = {}) {
   const plan = task.draft_section_plan || {};
+  const review = task.draft_section_plan_review || {};
   const canGenerate = task.status === "manuscript_citation_plan_approved";
   const isGenerating = state.generatingDraftSectionPlanTaskId === task.id;
+  const canReview = task.status === "draft_section_plan_ready";
+  const isReviewing = state.reviewingDraftSectionPlanTaskId === task.id;
   if (!plan.status && !canGenerate) return "";
 
   return `
@@ -1925,6 +1944,22 @@ function renderDraftSectionPlan(task = {}) {
             <span class="meta-label">正式层边界</span>
             <p>${plan.formal_write_allowed ? "允许写入正式层" : "不写入正式层"}</p>
           </div>
+        </div>
+        <div class="agent-task-draft-section-plan__review">
+          <div>
+            <span class="meta-label">审阅门</span>
+            <strong>${escapeHtml(productTermLabel(review.status || "等待审阅"))}</strong>
+            <p class="muted">批准后只生成章节草稿任务包，不写入正式正文。</p>
+          </div>
+          ${canReview ? `
+            <div class="action-row">
+              ${["approve_for_section_tasks", "needs_revision", "reject"].map((action) => `
+                <button class="${action === "approve_for_section_tasks" ? "primary-button" : "secondary-button"}" data-draft-section-plan-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+                  ${isReviewing && state.reviewingDraftSectionPlanAction === action ? "保存中..." : draftSectionPlanReviewActionLabel(action)}
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
         </div>
       ` : ""}
     </div>
@@ -2814,6 +2849,31 @@ async function handleDraftSectionPlan(taskId) {
   }
 }
 
+async function handleDraftSectionPlanReview(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingDraftSectionPlanTaskId = taskId;
+  state.reviewingDraftSectionPlanAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewDraftSectionPlan(
+      state.selectedProjectId,
+      taskId,
+      {
+        action,
+        note: `章节草稿计划审阅：${draftSectionPlanReviewActionLabel(action)}`,
+      },
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存章节草稿计划审阅失败：${error.message}`);
+  } finally {
+    state.reviewingDraftSectionPlanTaskId = null;
+    state.reviewingDraftSectionPlanAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
 function referenceSeedReviewActionLabel(action) {
   const labels = {
     approve_for_draft: "进入草稿综述",
@@ -2846,6 +2906,15 @@ function manuscriptCitationPlanReviewActionLabel(action) {
     approve_for_draft_sections: "批准进入章节草稿",
     needs_revision: "要求修订",
     reject: "拒绝引用计划",
+  };
+  return labels[action] || action || "审阅";
+}
+
+function draftSectionPlanReviewActionLabel(action) {
+  const labels = {
+    approve_for_section_tasks: "批准生成章节任务",
+    needs_revision: "要求修订",
+    reject: "拒绝计划",
   };
   return labels[action] || action || "审阅";
 }
@@ -7900,6 +7969,14 @@ async function boot() {
     const draftSectionPlanButton = target.closest("[data-draft-section-plan-action]");
     if (draftSectionPlanButton) {
       void handleDraftSectionPlan(draftSectionPlanButton.dataset.agentTaskId || "");
+      return;
+    }
+    const draftSectionPlanReviewButton = target.closest("[data-draft-section-plan-review-action]");
+    if (draftSectionPlanReviewButton) {
+      void handleDraftSectionPlanReview(
+        draftSectionPlanReviewButton.dataset.agentTaskId || "",
+        draftSectionPlanReviewButton.dataset.draftSectionPlanReviewAction || "",
+      );
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

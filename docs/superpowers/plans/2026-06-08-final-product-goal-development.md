@@ -538,3 +538,111 @@ Next node: **P0-H frontend consumes queue primary_action**.
 - Do not redesign visual language.
 - Show the backend-provided `primary_action` label and reason in the Agent Task Queue panel.
 - Keep the action gated by existing buttons/endpoints; do not add new execution authority.
+
+P0-H completed.
+
+Reason: P0-G 已经让后端推导 `primary_action`，但旧工作台仍主要显示 `next_action` 和状态，用户需要自己猜下一步。P0-H 把后端的主动作直接显示在队列顶部和任务卡中，并解释“为什么现在做这一步”。
+
+P0-H behavior added:
+
+```gherkin
+Given an Agent Task Queue with a backend-provided primary_action
+When the user opens the queue panel
+Then the panel shows the current recommended action and the reason.
+
+Given a task carries its own primary_action
+When the task card is rendered
+Then the task summary shows the task-specific recommended action and reason before the folded details.
+```
+
+P0-H verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_14_frontend_renders_queue_primary_action_guidance -v
+python3 -m unittest tests.test_agent_task_queue -v
+node --check Product/web/assets/app.js
+git diff --check -- Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+P0-H implementation:
+
+- Added `renderAgentTaskPrimaryAction`.
+- Queue-level panel now renders `queue.primary_action` as “当前建议动作”.
+- Task cards now render `task.primary_action` as “任务建议动作”.
+- The existing decision row falls back to `queue.primary_action.label` before legacy `next_action`.
+- Updated legacy asset version to `20260608-p0h-primary-action` so browser acceptance loads the new JS/CSS instead of a cached workbench script.
+- No new execution endpoint or formal-layer authority was added.
+
+Next node: **P0-I Browser verify primary_action guidance in legacy workbench**.
+
+20-minute boundary for P0-I:
+
+- Open the local legacy workbench in the Codex browser.
+- Confirm the queue panel visibly contains “当前建议动作” and “为什么现在做这一步”.
+- Capture screenshot evidence if the server is available.
+
+P0-I completed.
+
+Reason: P0-H 的代码测试只能说明前端具备渲染能力，用户真正需要的是页面打开后能看到“现在做什么”和“为什么”。本节点用当前后端服务和真实页面验证队列状态已经穿透到 UI。
+
+P0-I verified:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+url = 'http://127.0.0.1:8782/legacy?v=20260608-p0h-primary-action-3'
+out = Path('artifacts/ui-checks/p0h-primary-action-20260608.png').resolve()
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+    page = browser.new_page(viewport={'width': 1440, 'height': 1200}, device_scale_factor=1)
+    page.goto(url, wait_until='networkidle')
+    page.wait_for_selector('.agent-task-queue-card', timeout=10000)
+    result = page.evaluate("""() => ({
+      primaryActionCount: document.querySelectorAll('.agent-task-primary-action').length,
+      hasCurrentAction: document.body.innerText.includes('当前建议动作'),
+      hasReason: document.body.innerText.includes('为什么现在做这一步'),
+      hasTaskAction: document.body.innerText.includes('任务建议动作')
+    })""")
+    page.screenshot(path=str(out), full_page=False)
+    browser.close()
+print(result)
+print('screenshot', out)
+PY
+```
+
+Browser evidence:
+
+- URL: `http://127.0.0.1:8782/legacy?v=20260608-p0h-primary-action-3`
+- `primaryActionCount`: 4
+- `hasCurrentAction`: true
+- `hasReason`: true
+- `hasTaskAction`: true
+- Screenshot: `artifacts/ui-checks/p0h-primary-action-20260608.png`
+
+Implementation note:
+
+- The running backend had to be restarted because it was still serving the pre-P0-G in-memory module. After restart, the API normalized the saved legacy queue and returned `primary_action`.
+- No persisted research state was rewritten.
+
+Next node: **P0-J commit P0-H/P0-I scoped changes**.
+
+20-minute boundary for P0-J:
+
+- Stage only P0-H/P0-I files.
+- Do not stage unrelated dirty research artifacts.
+- Commit with decision-record format.
+
+P0-J completed.
+
+Commit:
+
+- Included in the scoped commit `Show primary action guidance in agent queue`.
+
+Next node: **P1-A design LLM intervention points for final product chain**.
+
+20-minute boundary for P1-A:
+
+- Do not implement new LLM calls yet.
+- Write the explicit product map for when LLM Supervisor intervenes, what deterministic service owns, when Agent Team is dispatched, and when control returns to the user.
+- Convert that map into the next BDD/API contract target.

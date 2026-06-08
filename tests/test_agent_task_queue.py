@@ -1243,6 +1243,52 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "draft_section_plan_required")
 
+    def test_bdd_40_approved_draft_section_plan_generates_section_task_package(self) -> None:
+        """行为 40：通过审阅的章节计划可以生成章节草稿任务包，但仍不写正式正文。"""
+        self._approve_draft_section_plan()
+
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-tasks"
+        )
+
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        task = generated.json()["agent_task_queue"]["tasks"][0]
+        package = task["draft_section_tasks"]
+        self.assertEqual(package["status"], "draft_section_tasks_ready")
+        self.assertEqual(package["schema_version"], "p1.draft_section_tasks.v1")
+        self.assertEqual(package["source_review_gate"], "review_draft_section_plan")
+        self.assertEqual(package["generated_from_review_status"], "approved_for_section_tasks")
+        self.assertGreaterEqual(package["task_count"], 4)
+        self.assertFalse(package["formal_write_allowed"])
+        self.assertFalse(package["writes_formal_layer"])
+        self.assertEqual(package["next_action"], "review_draft_section_tasks")
+        self.assertEqual(task["status"], "draft_section_tasks_ready")
+        self.assertEqual(task["next_action"], "review_draft_section_tasks")
+        self.assertEqual(task["primary_action"]["id"], "review_draft_section_tasks")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "draft_section_tasks_generated")
+
+        artifact = self.project_root / package["artifact_path"]
+        self.assertTrue(artifact.exists())
+        artifact_data = json.loads(artifact.read_text(encoding="utf-8"))
+        self.assertEqual(artifact_data["schema_version"], "p1.draft_section_tasks.v1")
+        self.assertEqual(artifact_data["review"]["status"], "pending")
+        self.assertTrue(all(item["requires_human_review"] for item in artifact_data["tasks"]))
+        self.assertTrue(all(not item["formal_write_allowed"] for item in artifact_data["tasks"]))
+        self.assertIn("citation_binding_ids", artifact_data["tasks"][0])
+
+    def test_bdd_41_draft_section_tasks_require_approved_section_plan(self) -> None:
+        """行为 41：章节计划未通过人工审阅时，不能跳过门禁生成章节任务包。"""
+        self._generate_draft_section_plan()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-tasks"
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "draft_section_plan_review_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "draft_section_tasks.json").exists())
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1339,6 +1385,15 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(generated.status_code, 200, msg=generated.text)
         return generated
+
+    def _approve_draft_section_plan(self):
+        self._generate_draft_section_plan()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-plan-review",
+            json={"action": "approve_for_section_tasks", "note": "章节计划可以进入任务包。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        return reviewed
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(

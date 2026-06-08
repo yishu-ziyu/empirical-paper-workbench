@@ -388,6 +388,13 @@ def normalize_supervisor_plan(
         }
     )
     recommended_internal_skills = internal_skill_recommendations["recommended_internal_skills"]
+    unmatched_internal_skill_judgments = internal_skill_recommendations[
+        "unmatched_internal_skill_judgments"
+    ]
+    skill_review_contract = build_skill_review_contract(
+        recommended_internal_skills,
+        unmatched_internal_skill_judgments,
+    )
     return {
         "id": "supervisor_plan",
         "version": version,
@@ -404,9 +411,13 @@ def normalize_supervisor_plan(
         "human_gates": human_gates,
         "llm_internal_skill_judgments": llm_internal_skill_judgments,
         "recommended_internal_skills": recommended_internal_skills,
-        "unmatched_internal_skill_judgments": internal_skill_recommendations[
-            "unmatched_internal_skill_judgments"
-        ],
+        "unmatched_internal_skill_judgments": unmatched_internal_skill_judgments,
+        "skill_review_contract": skill_review_contract,
+        "skill_review_status": skill_review_contract["status"],
+        "selected_skill_ids": skill_review_contract["selected_skill_ids"],
+        "skill_sources": skill_review_contract["skill_sources"],
+        "applicability_reason": skill_review_contract["applicability_reason"],
+        "missing_evidence": skill_review_contract["missing_evidence"],
         "next_action": generated.get("next_action") or {
             "id": "review_supervisor_plan",
             "label": "审阅 SupervisorPlan",
@@ -434,6 +445,84 @@ def normalize_supervisor_plan(
                 "note": note,
             }
         ],
+    }
+
+
+def build_skill_review_contract(
+    recommended_internal_skills: list[Any],
+    unmatched_internal_skill_judgments: list[Any],
+) -> dict[str, Any]:
+    selected_skills = [skill for skill in recommended_internal_skills if isinstance(skill, dict)]
+    unmatched = [item for item in unmatched_internal_skill_judgments if isinstance(item, dict)]
+    selected_skill_ids = [str(skill.get("skill_id") or skill.get("id") or "") for skill in selected_skills]
+    selected_skill_ids = [skill_id for skill_id in selected_skill_ids if skill_id]
+    status = "no_internal_skill_selected"
+    if selected_skills:
+        status = "ready_for_human_skill_review"
+    if unmatched:
+        status = "needs_human_skill_review"
+
+    return {
+        "status": status,
+        "human_review_required": bool(selected_skills or unmatched),
+        "selected_skill_ids": selected_skill_ids,
+        "skill_sources": [compact_skill_source_for_review(skill) for skill in selected_skills],
+        "applicability_reason": {
+            str(skill.get("skill_id") or skill.get("id")): (
+                skill.get("semantic_selection_reason")
+                or skill.get("matched_reason")
+                or ""
+            )
+            for skill in selected_skills
+            if skill.get("skill_id") or skill.get("id")
+        },
+        "missing_evidence": [
+            *[compact_skill_missing_evidence(skill) for skill in selected_skills],
+            *[compact_unmatched_skill_judgment(item) for item in unmatched],
+        ],
+        "execution_boundary": {
+            "queue_dispatch_requires_human_review": True,
+            "canonical_method_write_allowed": False,
+            "formal_state_write_allowed": False,
+        },
+    }
+
+
+def compact_skill_source_for_review(skill: dict[str, Any]) -> dict[str, Any]:
+    skill_sources = [source for source in normalize_list(skill.get("skill_sources")) if isinstance(source, dict)]
+    return {
+        "skill_id": skill.get("skill_id") or skill.get("id"),
+        "name": skill.get("name", ""),
+        "owner_agent": skill.get("owner_agent", ""),
+        "risk_level": skill.get("risk_level", "medium"),
+        "selection_source": skill.get("selection_source", "registry_rule_match"),
+        "source_policy": skill.get("source_policy", ""),
+        "external_source_names": [
+            str(source.get("name"))
+            for source in skill_sources
+            if source.get("name")
+        ],
+        "skill_sources": skill_sources,
+    }
+
+
+def compact_skill_missing_evidence(skill: dict[str, Any]) -> dict[str, Any]:
+    human_confirmation = skill.get("human_confirmation") if isinstance(skill.get("human_confirmation"), dict) else {}
+    return {
+        "skill_id": skill.get("skill_id") or skill.get("id"),
+        "required_state": normalize_list(skill.get("required_state")),
+        "blockers": normalize_list(skill.get("blockers")),
+        "required_before": normalize_list(human_confirmation.get("required_before")),
+        "quality_gates": skill.get("quality_gates") if isinstance(skill.get("quality_gates"), dict) else {},
+    }
+
+
+def compact_unmatched_skill_judgment(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "skill_id": item.get("skill_id") or item.get("id"),
+        "status": item.get("status", "ignored_unknown_skill"),
+        "reason_code": item.get("reason_code", "skill_not_in_internal_registry"),
+        "reason": item.get("reason", ""),
     }
 
 

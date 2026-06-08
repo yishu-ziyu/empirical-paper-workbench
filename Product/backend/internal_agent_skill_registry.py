@@ -359,6 +359,10 @@ def build_internal_agent_skill_recommendation_bundle(
                 "quality_gates": skill.get("quality_gates") or {},
                 "human_confirmation": skill.get("human_confirmation") or {},
                 "benchmark": skill.get("benchmark") or {},
+                "expected_artifacts": _capability_expected_artifacts(capability),
+                "execution_boundary": _skill_execution_boundary(skill, capability),
+                "skill_sources": _skill_sources(skill),
+                "can_execute_without_human_review": False,
                 "formal_write_targets": list(skill.get("formal_write_targets") or []),
                 "source_policy": skill.get("source_policy", ""),
                 "canonical_policy": capability.get("canonical_policy") or build_internal_agent_skill_policy(),
@@ -483,6 +487,32 @@ def _selection_source(
     if llm_judgment:
         return "llm_semantic_judgment"
     return "registry_rule_match"
+
+
+def _capability_expected_artifacts(capability: dict[str, Any]) -> list[Any]:
+    output_schema = capability.get("output_schema")
+    if not isinstance(output_schema, dict):
+        return []
+    properties = output_schema.get("properties")
+    if not isinstance(properties, dict):
+        return []
+    artifacts = properties.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return []
+    return _as_list(artifacts.get("items"))
+
+
+def _skill_sources(skill: dict[str, Any]) -> list[dict[str, Any]]:
+    return [source for source in _as_list(skill.get("external_sources")) if isinstance(source, dict)]
+
+
+def _skill_execution_boundary(skill: dict[str, Any], capability: dict[str, Any]) -> str:
+    canonical_policy = capability.get("canonical_policy") if isinstance(capability.get("canonical_policy"), dict) else {}
+    auto_mode = canonical_policy.get("auto_mode") if isinstance(canonical_policy.get("auto_mode"), dict) else {}
+    human_confirmation = skill.get("human_confirmation") if isinstance(skill.get("human_confirmation"), dict) else {}
+    if auto_mode.get("can_write_canonical") is False or human_confirmation.get("required_before"):
+        return "review_only_until_dispatch_approved"
+    return "review_before_execution"
 
 
 def _normalize_skill_id(value: Any) -> str:

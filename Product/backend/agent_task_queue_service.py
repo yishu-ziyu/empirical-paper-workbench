@@ -579,6 +579,12 @@ def find_llm_stage_handoff(contract: dict[str, Any], stage: str) -> dict[str, st
 def build_reference_chain_policy(plan: dict[str, Any] | None) -> dict[str, Any]:
     raw_policy = plan.get("reference_chain_policy") if isinstance(plan, dict) else None
     policy = raw_policy if isinstance(raw_policy, dict) else {}
+    sources = build_reference_chain_sources(policy.get("sources"))
+    source_priority = [
+        str(source_id)
+        for source_id in normalize_list(policy.get("source_priority"))
+        if str(source_id).strip()
+    ] or [source["id"] for source in sources]
     return {
         "contract_version": str(policy.get("contract_version") or "reference_chain.v1"),
         "status": str(policy.get("status") or "needs_review"),
@@ -588,7 +594,8 @@ def build_reference_chain_policy(plan: dict[str, Any] | None) -> dict[str, Any]:
         ),
         "max_depth": int(policy.get("max_depth") or 2),
         "max_iterations": int(policy.get("max_iterations") or 5),
-        "sources": build_reference_chain_sources(policy.get("sources")),
+        "source_priority": source_priority,
+        "sources": sources,
         "required_artifacts": normalize_list(policy.get("required_artifacts"))
         or [
             "LiteratureSeedPackage",
@@ -603,7 +610,7 @@ def build_reference_chain_policy(plan: dict[str, Any] | None) -> dict[str, Any]:
             or "candidate_references_may_enter_draft_with_visible_review_state"
         ),
         "formal_writeback_gate": str(policy.get("formal_writeback_gate") or "review_literature_seed_package"),
-        "writes_formal_layer": bool(policy.get("writes_formal_layer") is True),
+        "writes_formal_layer": False,
     }
 
 

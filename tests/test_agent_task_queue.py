@@ -646,6 +646,20 @@ class AgentTaskQueueApiTests(unittest.TestCase):
                     "execution_boundary": "review_only_until_dispatch_approved",
                 },
             ],
+            reference_chain_policy={
+                "contract_version": "reference_chain.v1",
+                "status": "needs_review",
+                "source_priority": ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+                "sources": [
+                    {
+                        "id": "cnki",
+                        "label": "CNKI",
+                        "trigger": "中文制度背景、本土文献和中文关键词扩展。",
+                        "mode": "manual_assisted_or_browser_assisted_search",
+                    }
+                ],
+                "writes_formal_layer": True,
+            },
         )
 
         response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
@@ -659,6 +673,7 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(policy["status"], "needs_review")
         self.assertEqual(policy["max_depth"], 2)
         self.assertEqual(policy["max_iterations"], 5)
+        self.assertEqual(policy["source_priority"], ["cnki", "scholar", "zotero", "local_notes", "arxiv"])
         self.assertEqual(
             source_ids,
             ["arxiv", "scholar", "cnki", "zotero", "local_notes"],
@@ -677,6 +692,10 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         literature_task = queue["tasks"][0]
         method_task = queue["tasks"][1]
         self.assertEqual(literature_task["reference_chain_policy"]["status"], "needs_review")
+        self.assertEqual(
+            literature_task["reference_chain_policy"]["source_priority"],
+            ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+        )
         self.assertEqual(literature_task["reference_chain_policy"]["formal_writeback_gate"], "review_literature_seed_package")
         self.assertFalse(literature_task["reference_chain_policy"]["writes_formal_layer"])
         self.assertNotIn("reference_chain_policy", method_task)
@@ -688,6 +707,7 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         subagent_dispatch: list[dict] | None = None,
         recommended_internal_skills: list[dict] | None = None,
         llm_intervention_plan: dict | None = None,
+        reference_chain_policy: dict | None = None,
     ) -> None:
         path = self.project_root / "state" / "product" / "supervisor_plan.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -734,6 +754,8 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         }
         if llm_intervention_plan is not None:
             plan["llm_intervention_plan"] = llm_intervention_plan
+        if reference_chain_policy is not None:
+            plan["reference_chain_policy"] = reference_chain_policy
         path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _approve_research_states(self) -> None:

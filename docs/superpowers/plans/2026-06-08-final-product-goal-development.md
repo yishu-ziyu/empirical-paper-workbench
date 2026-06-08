@@ -745,3 +745,51 @@ Next node: **P1-C connect reference chain policy into SupervisorPlan generation 
 - Do not build real web search yet.
 - Make the SupervisorPlan contract able to request or override `reference_chain_policy`.
 - Test that LLM-generated plans can carry custom source priorities and still keep draft/formal boundaries.
+
+P1-C completed.
+
+BDD behavior added:
+
+```text
+Given the local Codex Supervisor is asked to generate a plan
+When it receives the prompt
+Then the prompt explicitly requires reference_chain_policy with source_priority,
+CNKI / Scholar / Zotero / local notes / arXiv sources, max_depth, max_iterations,
+draft citation policy, formal writeback gate, and writes_formal_layer=false.
+
+Given the LLM returns a reference_chain_policy
+When SupervisorPlan is normalized and persisted
+Then the plan keeps the source priority and search bounds, but forces formal
+writeback to remain disabled until review_literature_seed_package.
+
+Given an approved SupervisorPlan contains source priorities
+When Agent Task Queue is created
+Then the queue and LiteratureAgent task inherit the priority without letting
+candidate citations write into the formal layer.
+```
+
+P1-C verified:
+
+```bash
+python3 -m unittest tests.test_supervisor_plan.SupervisorPlanApiTests.test_bdd_19_supervisor_plan_prompt_requests_reference_chain_policy tests.test_supervisor_plan.SupervisorPlanFrontendTests.test_bdd_20_supervisor_plan_keeps_reference_chain_policy_for_queue_contract -v
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_17_reference_chain_policy_enters_queue_and_literature_task -v
+python3 -m unittest tests.test_supervisor_plan tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/supervisor_plan_service.py Product/backend/agent_task_queue_service.py
+git diff --check -- Product/backend/supervisor_plan_service.py Product/backend/agent_task_queue_service.py tests/test_supervisor_plan.py tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+P1-C implementation:
+
+- Added `reference_chain_policy_template` to SupervisorPlan prompt context.
+- Required the LLM output schema to include `reference_chain_policy`.
+- Added SupervisorPlan normalization for source priority, source list, bounds, draft policy, and formal gate.
+- Forced `writes_formal_layer=false` even if raw LLM output or a hand-written plan tries to set it to true.
+- Propagated `source_priority` from SupervisorPlan into Agent Task Queue and LiteratureAgent tasks.
+
+Next node: **P1-D make reference policy visible to product users without adding a crawler yet**.
+
+20-minute boundary for P1-D:
+
+- Do not implement real CNKI / Scholar / Zotero connectors yet.
+- Expose the reference policy in a user-facing API/UI contract section as collapsed-by-default evidence requirements.
+- Make the user see why CNKI/Scholar/Zotero/local notes/arXiv were selected and what still needs review.

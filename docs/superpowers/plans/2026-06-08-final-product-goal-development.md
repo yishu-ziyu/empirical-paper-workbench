@@ -245,6 +245,8 @@ Manual acceptance:
 
 ### Task P0-C: Execution backend selection layer
 
+Status: P0-C1 implemented for frontend-visible backend selection rationale. The queue already persisted selected backend metadata; this node exposes why the backend was selected, fallback backend choices, execution output boundary and formal-layer boundary in the task detail UI.
+
 **Files:**
 - Inspect: `Product/backend/agent_task_queue_service.py`
 - Inspect: `Product/backend/orchestrator.py`
@@ -271,6 +273,26 @@ Acceptance:
 
 - Frontend can show “本任务将由哪个后端执行”.
 - Logs and output paths are visible before final manuscript writing.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_11_frontend_exposes_backend_selection_reason_fallback_and_boundary -v
+python3 -m unittest tests.test_agent_task_queue tests.test_supervisor_plan tests.test_internal_agent_skill_registry_contract -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+node --check Product/web/assets/app.js
+```
+
+Manual acceptance:
+
+- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0c-backend-visible`.
+- DOM check confirmed `.agent-task-backend-details = 1`, with visible “为什么选这个后端 / 失败后备选 / 执行产物范围 / 正式层边界”.
+- Browser cache needed a hard refresh before the latest `app.js` rendered; this is a dev-server cache issue, not product state.
+- Screenshot saved to `artifacts/ui-checks/p0c-backend-visible-20260608.png`.
+
+Compatibility note:
+
+- Older queue state may contain `selected_backend.id` without `selection_reason`, `fallback_backend_ids` or `execution_boundary`. The next node should add a compatibility fallback or migration so old tasks still explain backend choice instead of showing empty detail text.
 
 ### Task P0-D: UX contrast and action clarity fix
 
@@ -386,13 +408,13 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-C1 Execution backend selection visibility**.
+Start with **P0-C2 Legacy backend metadata compatibility**.
 
-Reason: P0-B1 已经让任务队列解释 Skill 选择。下一步要让用户同样看清楚“这个任务准备用哪个后端执行、为什么、不可用时怎么办”，把 StatsPAI / Python / StataMCP / CodexSubagent 从候选词推进到可审阅的执行选择层。
+Reason: P0-C1 已经让新任务显示“这个任务准备用哪个后端执行、为什么、不可用时怎么办”。浏览器验收发现旧的 `selected_backend` 状态可能缺少解释字段，所以要先补兼容层，避免用户打开旧任务时又看到空解释。
 
-20-minute boundary for P0-C1:
+20-minute boundary for P0-C2:
 
-- Inspect current backend selection fields and frontend rendering.
-- Add/confirm one failing contract for visible backend selection reason and fallback.
-- Wire only the smallest user-visible metadata path.
-- Do not implement StatsPAI/StataMCP execution in this node.
+- Add one contract: legacy `selected_backend.id` can still render a human-readable reason, fallback and boundary.
+- Implement a frontend compatibility fallback or backend migration, choosing the smaller path after inspection.
+- Verify with unit contract and browser DOM check.
+- Do not change real backend execution semantics in this node.

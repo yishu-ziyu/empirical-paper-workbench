@@ -612,6 +612,75 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(handoffs["execution_experiment"]["deterministic_owner"], "execution_backend_router")
         self.assertEqual(handoffs["review_export"]["human_gate"], "export_preflight_review")
 
+    def test_bdd_17_reference_chain_policy_enters_queue_and_literature_task(self) -> None:
+        """行为 17：文献/引用链路策略必须进入队列，并被文献任务继承。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+                {
+                    "agent_id": "pipeline_method",
+                    "role": "MethodAgent",
+                    "task": "检查识别策略和方法门",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "allowed_agents": ["Supervisor", "LiteratureAgent", "ReviewerAgent"],
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "citation_verification_queue"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        queue = response.json()["agent_task_queue"]
+        policy = queue["reference_chain_policy"]
+        source_ids = [source["id"] for source in policy["sources"]]
+
+        self.assertEqual(policy["contract_version"], "reference_chain.v1")
+        self.assertEqual(policy["status"], "needs_review")
+        self.assertEqual(policy["max_depth"], 2)
+        self.assertEqual(policy["max_iterations"], 5)
+        self.assertEqual(
+            source_ids,
+            ["arxiv", "scholar", "cnki", "zotero", "local_notes"],
+        )
+        self.assertEqual(policy["sources"][2]["mode"], "manual_assisted_or_browser_assisted_search")
+        self.assertIn("citation_verification_queue", policy["required_artifacts"])
+        self.assertEqual(policy["candidate_reference_states"], ["candidate", "verified", "rejected"])
+        self.assertEqual(
+            policy["draft_citation_policy"],
+            "candidate_references_may_enter_draft_with_visible_review_state",
+        )
+        self.assertEqual(policy["formal_writeback_gate"], "review_literature_seed_package")
+        self.assertFalse(policy["writes_formal_layer"])
+        self.assertIn("reference_chain_policy", queue["ui_contract"]["hidden_by_default"])
+
+        literature_task = queue["tasks"][0]
+        method_task = queue["tasks"][1]
+        self.assertEqual(literature_task["reference_chain_policy"]["status"], "needs_review")
+        self.assertEqual(literature_task["reference_chain_policy"]["formal_writeback_gate"], "review_literature_seed_package")
+        self.assertFalse(literature_task["reference_chain_policy"]["writes_formal_layer"])
+        self.assertNotIn("reference_chain_policy", method_task)
+
     def _write_supervisor_plan(
         self,
         status: str,

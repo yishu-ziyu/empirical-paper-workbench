@@ -398,6 +398,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "manuscript_citation_plan",
         }
+    if status == "manuscript_citation_plan_ready":
+        return {
+            "id": "review_manuscript_citation_plan",
+            "label": "审阅论文引用计划",
+            "reason": "引用计划已生成，下一步审阅每条来源将进入哪个论文章节和论证位置。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "manuscript_citation_plan_review",
+        }
     if status == "rejected":
         return {
             "id": "replace_literature_search",
@@ -1641,6 +1650,82 @@ def review_project_verified_literature_package(
     return response
 
 
+def generate_project_manuscript_citation_plan(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    review = task.get("verified_literature_package_review") if isinstance(task.get("verified_literature_package_review"), dict) else {}
+    package_summary = task.get("verified_literature_package") if isinstance(task.get("verified_literature_package"), dict) else {}
+    package_artifact_path = str(package_summary.get("artifact_path") or "")
+    package_artifact = project_root / package_artifact_path
+    if (
+        task.get("status") != "verified_literature_package_approved"
+        or review.get("status") != "approved_for_manuscript_citations"
+        or not review.get("manuscript_citation_plan_allowed")
+        or not package_artifact_path
+        or not package_artifact.exists()
+    ):
+        raise AgentTaskQueueBlockedError(
+            "verified_literature_package_review_required",
+            "Approved verified literature package review is required before generating a manuscript citation plan.",
+        )
+
+    package = json.loads(package_artifact.read_text(encoding="utf-8"))
+    timestamp = utc_now()
+    plan_artifact_path = Path("Results/json/manuscript_citation_plan.json")
+    plan = build_manuscript_citation_plan_record(task, package, package_artifact_path, review, timestamp)
+    absolute_plan_artifact = project_root / plan_artifact_path
+    absolute_plan_artifact.parent.mkdir(parents=True, exist_ok=True)
+    absolute_plan_artifact.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    plan_summary = {
+        "status": "manuscript_citation_plan_ready",
+        "schema_version": plan["schema_version"],
+        "artifact_path": str(plan_artifact_path),
+        "source_artifact_path": package_artifact_path,
+        "source_review_gate": plan["source_review_gate"],
+        "generated_from_review_status": plan["generated_from_review_status"],
+        "citation_binding_count": plan["citation_binding_count"],
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "review_manuscript_citation_plan",
+        "next_action_label": "审阅论文引用计划",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+    task["manuscript_citation_plan"] = plan_summary
+    task["status"] = "manuscript_citation_plan_ready"
+    task["next_action"] = "review_manuscript_citation_plan"
+    task["can_execute"] = False
+    task["blockers"] = []
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "manuscript_citation_plan_generated",
+            "actor": "system",
+            "timestamp": timestamp,
+            "source_artifact_path": package_artifact_path,
+            "artifact_path": str(plan_artifact_path),
+            "citation_binding_count": plan["citation_binding_count"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["manuscript_citation_plan"] = plan_summary
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1934,6 +2019,80 @@ def build_verified_reference_entry(index: int, record: dict[str, Any]) -> dict[s
         "formal_write_allowed": False,
         "claims_verified_citations": True,
     }
+
+
+def build_manuscript_citation_plan_record(
+    task: dict[str, Any],
+    package: dict[str, Any],
+    source_artifact_path: str,
+    review: dict[str, Any],
+    timestamp: str,
+) -> dict[str, Any]:
+    references = [item for item in normalize_list(package.get("verified_references")) if isinstance(item, dict)]
+    bindings = [
+        build_manuscript_citation_binding(index, reference)
+        for index, reference in enumerate(references, start=1)
+    ]
+    return {
+        "schema_version": "p1.manuscript_citation_plan.v1",
+        "status": "manuscript_citation_plan_ready",
+        "source_task_id": str(task.get("id") or package.get("source_task_id") or ""),
+        "source_artifact_path": source_artifact_path,
+        "source_review_gate": "review_verified_literature_package",
+        "generated_from_review_status": str(review.get("status") or ""),
+        "citation_binding_count": len(bindings),
+        "citation_bindings": bindings,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "draft_layer": "manuscript_citation_plan",
+        "next_action": "review_manuscript_citation_plan",
+        "next_action_label": "审阅论文引用计划",
+        "usage_boundary": "这份计划只说明已核验来源如何进入草稿层论文写作；正式正文、正式参考文献和导出包仍需后续人工审批。",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_manuscript_citation_binding(index: int, reference: dict[str, Any]) -> dict[str, Any]:
+    target_sections = infer_citation_target_sections(index, reference)
+    return {
+        "id": f"citation_binding_{index:02d}",
+        "reference_id": str(reference.get("id") or f"verified_reference_{index:02d}"),
+        "citation_text": str(reference.get("citation_text") or ""),
+        "title": str(reference.get("title") or ""),
+        "authors": normalize_list(reference.get("authors")),
+        "year": str(reference.get("year") or ""),
+        "venue": str(reference.get("venue") or ""),
+        "doi_or_stable_url": str(reference.get("doi_or_stable_url") or ""),
+        "connector": str(reference.get("connector") or ""),
+        "evidence_url": str(reference.get("evidence_url") or ""),
+        "evidence_level": "verified_source_record",
+        "target_sections": target_sections,
+        "citation_purpose": citation_purpose_for_sections(target_sections),
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "requires_human_review": True,
+    }
+
+
+def infer_citation_target_sections(index: int, reference: dict[str, Any]) -> list[str]:
+    relevance = str(reference.get("relevance") or "").lower()
+    title = str(reference.get("title") or "").lower()
+    if index == 1:
+        return ["introduction", "literature_review"]
+    if "method" in title or "identification" in title or "estimate" in title:
+        return ["empirical_strategy"]
+    if relevance in {"method", "identification", "design"}:
+        return ["empirical_strategy"]
+    return ["literature_review", "theory_and_hypotheses"]
+
+
+def citation_purpose_for_sections(sections: list[str]) -> str:
+    if "empirical_strategy" in sections:
+        return "支持方法选择、识别设定或稳健性要求。"
+    if "introduction" in sections:
+        return "支持研究动机、贡献定位和问题重要性。"
+    return "支持文献脉络、理论机制或已有经验证据。"
 
 
 def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:

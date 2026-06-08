@@ -1205,3 +1205,45 @@ python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_
 ```
 
 Next node: **P1-N generate manuscript citation plan from approved verified literature package**.
+
+## P1-N Manuscript Citation Plan
+
+Boundary: use an approved verified literature package to create a draft-layer manuscript citation plan. This plan maps checked sources to paper sections and argument roles, but it still does not write manuscript text or mutate the formal layer.
+
+BDD:
+
+```text
+Behavior 32: generate a manuscript citation plan from an approved literature package
+Given Results/json/verified_literature_package.json exists
+And the human review gate approved it for manuscript citation planning
+When the user generates the manuscript citation plan
+Then the system writes Results/json/manuscript_citation_plan.json,
+stores section-level citation bindings,
+keeps formal_write_allowed=false,
+and exposes review_manuscript_citation_plan as the next action.
+
+Behavior 33: block manuscript citation planning before literature package approval
+Given a verified literature package exists
+But the package has not been approved for manuscript citation planning
+When the user tries to generate the manuscript citation plan
+Then the system returns verified_literature_package_review_required
+and does not create Results/json/manuscript_citation_plan.json.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `POST /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/manuscript-citation-plan`.
+- The service requires `verified_literature_package_approved`, a human review status of `approved_for_manuscript_citations`, and a real `Results/json/verified_literature_package.json`.
+- The generated plan has schema `p1.manuscript_citation_plan.v1`, `citation_bindings`, `target_sections`, citation purpose, source evidence links, and a formal-layer boundary.
+- The parent Agent task moves to `manuscript_citation_plan_ready` and exposes `review_manuscript_citation_plan`.
+- The frontend now exposes `生成论文引用计划` after package approval and renders the plan path, source package path, binding count, next action, and formal-layer boundary.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_32_approved_literature_package_generates_manuscript_citation_plan tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_33_manuscript_citation_plan_requires_approved_literature_package tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_23_frontend_exposes_manuscript_citation_plan_generation -v
+```
+
+Next node: **P1-O review manuscript citation plan before draft section use**.

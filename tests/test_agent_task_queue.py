@@ -1082,6 +1082,49 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "verified_literature_package_required")
 
+    def test_bdd_32_approved_literature_package_generates_manuscript_citation_plan(self) -> None:
+        """行为 32：通过审阅的已核验文献包可以生成草稿层论文引用计划。"""
+        self._approve_verified_literature_package()
+
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/manuscript-citation-plan"
+        )
+
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        task = generated.json()["agent_task_queue"]["tasks"][0]
+        plan_summary = task["manuscript_citation_plan"]
+        self.assertEqual(task["status"], "manuscript_citation_plan_ready")
+        self.assertEqual(task["next_action"], "review_manuscript_citation_plan")
+        self.assertEqual(task["primary_action"]["id"], "review_manuscript_citation_plan")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertFalse(plan_summary["formal_write_allowed"])
+        self.assertEqual(plan_summary["source_artifact_path"], "Results/json/verified_literature_package.json")
+        self.assertGreaterEqual(plan_summary["citation_binding_count"], 5)
+
+        artifact_path = self.project_root / plan_summary["artifact_path"]
+        self.assertTrue(artifact_path.exists())
+        artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        self.assertEqual(artifact["schema_version"], "p1.manuscript_citation_plan.v1")
+        self.assertEqual(artifact["source_review_gate"], "review_verified_literature_package")
+        self.assertEqual(artifact["generated_from_review_status"], "approved_for_manuscript_citations")
+        self.assertFalse(artifact["formal_write_allowed"])
+        self.assertEqual(len(artifact["citation_bindings"]), plan_summary["citation_binding_count"])
+        self.assertIn("citation_text", artifact["citation_bindings"][0])
+        self.assertIn("target_sections", artifact["citation_bindings"][0])
+        self.assertEqual(task["audit_log"][-1]["event"], "manuscript_citation_plan_generated")
+
+    def test_bdd_33_manuscript_citation_plan_requires_approved_literature_package(self) -> None:
+        """行为 33：文献包未通过审阅时，不能跳过门禁生成论文引用计划。"""
+        self._generate_verified_literature_package()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/manuscript-citation-plan"
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "verified_literature_package_review_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "manuscript_citation_plan.json").exists())
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1144,6 +1187,15 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(generated.status_code, 200, msg=generated.text)
         return generated
+
+    def _approve_verified_literature_package(self):
+        self._generate_verified_literature_package()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package-review",
+            json={"action": "approve_for_manuscript_citations", "note": "可进入引用计划。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        return reviewed
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1504,6 +1556,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("批准进入引用计划", self.app_js)
         self.assertIn("verified_literature_package_review", self.app_js)
         self.assertIn(".agent-task-verified-literature-package__review", self.styles_css)
+
+    def test_bdd_23_frontend_exposes_manuscript_citation_plan_generation(self) -> None:
+        """行为 23：前端必须能从已批准文献包生成论文引用计划。"""
+        self.assertIn("generateManuscriptCitationPlan", self.app_js)
+        self.assertIn("handleManuscriptCitationPlan", self.app_js)
+        self.assertIn("data-manuscript-citation-plan-action", self.app_js)
+        self.assertIn("生成论文引用计划", self.app_js)
+        self.assertIn("manuscript_citation_plan", self.app_js)
+        self.assertIn(".agent-task-manuscript-citation-plan", self.styles_css)
 
 
 if __name__ == "__main__":

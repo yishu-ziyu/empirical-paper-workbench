@@ -64,6 +64,7 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
     blockers = agent_task_queue_blockers(plan)
     can_create = not blockers and bool(normalize_list(plan.get("subagent_dispatch") if plan else []))
     llm_intervention_contract = build_llm_intervention_contract(plan)
+    reference_chain_policy = build_reference_chain_policy(plan)
     return {
         "id": "agent_task_queue",
         "version": 0,
@@ -83,6 +84,7 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
         "tasks": [],
         "blockers": blockers,
         "llm_intervention_contract": llm_intervention_contract,
+        "reference_chain_policy": reference_chain_policy,
         "ui_contract": build_queue_ui_contract(),
         "primary_action": build_empty_queue_primary_action(can_create),
         "next_action": {
@@ -136,8 +138,9 @@ def agent_task_queue_blockers(plan: dict[str, Any] | None) -> list[dict[str, str
 
 def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], timestamp: str) -> dict[str, Any]:
     llm_intervention_contract = build_llm_intervention_contract(plan)
+    reference_chain_policy = build_reference_chain_policy(plan)
     tasks = [
-        build_agent_task(index, dispatch, plan, timestamp, llm_intervention_contract)
+        build_agent_task(index, dispatch, plan, timestamp, llm_intervention_contract, reference_chain_policy)
         for index, dispatch in enumerate(dispatch_items, start=1)
     ]
     return {
@@ -152,6 +155,7 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         "tasks": tasks,
         "blockers": [],
         "llm_intervention_contract": llm_intervention_contract,
+        "reference_chain_policy": reference_chain_policy,
         "ui_contract": build_queue_ui_contract(),
         "primary_action": build_queue_primary_action(tasks),
         "next_action": {
@@ -169,12 +173,20 @@ def build_agent_task(
     plan: dict[str, Any],
     timestamp: str,
     llm_intervention_contract: dict[str, Any],
+    reference_chain_policy: dict[str, Any],
 ) -> dict[str, Any]:
     dispatch_item = dispatch if isinstance(dispatch, dict) else {"task": str(dispatch)}
     owner_agent = str(dispatch_item.get("agent_id") or dispatch_item.get("role") or f"agent_{index:02d}")
     role = str(dispatch_item.get("role") or owner_agent)
     title = str(dispatch_item.get("task") or dispatch_item.get("title") or dispatch_item.get("goal") or f"Agent task {index}")
     internal_skill_bindings = build_task_internal_skill_bindings(plan, dispatch_item, owner_agent, role)
+    task_reference_chain_policy = build_task_reference_chain_policy(
+        reference_chain_policy,
+        internal_skill_bindings,
+        owner_agent,
+        role,
+        title,
+    )
     task = {
         "id": f"agent_task_{index:02d}",
         "source_dispatch_id": dispatch_item.get("agent_id") or "",
@@ -211,6 +223,8 @@ def build_agent_task(
             }
         ],
     }
+    if task_reference_chain_policy:
+        task["reference_chain_policy"] = task_reference_chain_policy
     task["primary_action"] = build_task_primary_action(task)
     return task
 
@@ -562,6 +576,128 @@ def find_llm_stage_handoff(contract: dict[str, Any], stage: str) -> dict[str, st
     return default_llm_intervention_stage_handoffs()[-1]
 
 
+def build_reference_chain_policy(plan: dict[str, Any] | None) -> dict[str, Any]:
+    raw_policy = plan.get("reference_chain_policy") if isinstance(plan, dict) else None
+    policy = raw_policy if isinstance(raw_policy, dict) else {}
+    return {
+        "contract_version": str(policy.get("contract_version") or "reference_chain.v1"),
+        "status": str(policy.get("status") or "needs_review"),
+        "default_policy": str(
+            policy.get("default_policy")
+            or "recursive_search_requires_verified_citations_before_formal_writeback"
+        ),
+        "max_depth": int(policy.get("max_depth") or 2),
+        "max_iterations": int(policy.get("max_iterations") or 5),
+        "sources": build_reference_chain_sources(policy.get("sources")),
+        "required_artifacts": normalize_list(policy.get("required_artifacts"))
+        or [
+            "LiteratureSeedPackage",
+            "search_query_graph",
+            "citation_verification_queue",
+            "source_relevance_review",
+        ],
+        "candidate_reference_states": normalize_list(policy.get("candidate_reference_states"))
+        or ["candidate", "verified", "rejected"],
+        "draft_citation_policy": str(
+            policy.get("draft_citation_policy")
+            or "candidate_references_may_enter_draft_with_visible_review_state"
+        ),
+        "formal_writeback_gate": str(policy.get("formal_writeback_gate") or "review_literature_seed_package"),
+        "writes_formal_layer": bool(policy.get("writes_formal_layer") is True),
+    }
+
+
+def build_reference_chain_sources(raw_sources: Any) -> list[dict[str, str]]:
+    default_sources = [
+        {
+            "id": "arxiv",
+            "label": "arXiv",
+            "trigger": "需要英文工作论文、方法线索或最新开放论文。",
+            "mode": "automated_search",
+        },
+        {
+            "id": "scholar",
+            "label": "Google Scholar",
+            "trigger": "需要追踪引用网络、核心文献和英文发表版本。",
+            "mode": "browser_or_manual_assisted_search",
+        },
+        {
+            "id": "cnki",
+            "label": "CNKI",
+            "trigger": "需要中文制度背景、本土文献和中文关键词扩展。",
+            "mode": "manual_assisted_or_browser_assisted_search",
+        },
+        {
+            "id": "zotero",
+            "label": "Zotero",
+            "trigger": "需要读取用户已有文献库或已整理 reference bank。",
+            "mode": "local_connector_or_export_import",
+        },
+        {
+            "id": "local_notes",
+            "label": "Local notes",
+            "trigger": "需要读取项目笔记、历史研究材料或本地证据包。",
+            "mode": "local_file_search",
+        },
+    ]
+    overrides = {
+        str(source.get("id")): source
+        for source in normalize_list(raw_sources)
+        if isinstance(source, dict) and source.get("id")
+    }
+    result: list[dict[str, str]] = []
+    for source in default_sources:
+        merged = {**source, **overrides.get(source["id"], {})}
+        result.append(
+            {
+                "id": str(merged.get("id") or source["id"]),
+                "label": str(merged.get("label") or source["label"]),
+                "trigger": str(merged.get("trigger") or source["trigger"]),
+                "mode": str(merged.get("mode") or source["mode"]),
+                "review_state": str(merged.get("review_state") or "candidate"),
+            }
+        )
+    return result
+
+
+def build_task_reference_chain_policy(
+    reference_chain_policy: dict[str, Any],
+    internal_skill_bindings: list[dict[str, Any]],
+    owner_agent: str,
+    role: str,
+    title: str,
+) -> dict[str, Any]:
+    if not is_reference_chain_task(internal_skill_bindings, owner_agent, role, title):
+        return {}
+    task_policy = dict(reference_chain_policy)
+    task_policy["status"] = str(task_policy.get("status") or "needs_review")
+    task_policy["scope"] = "task_literature_reference_chain"
+    task_policy["control_returns_to_user_when"] = "种子文献、引用可信度或正式综述写回需要确认。"
+    return task_policy
+
+
+def is_reference_chain_task(
+    internal_skill_bindings: list[dict[str, Any]],
+    owner_agent: str,
+    role: str,
+    title: str,
+) -> bool:
+    task_text = " ".join([owner_agent, role, title]).lower()
+    if "literature" in task_text or "文献" in task_text or "引用" in task_text:
+        return True
+    for binding in internal_skill_bindings:
+        skill_text = " ".join(
+            [
+                str(binding.get("skill_id") or ""),
+                str(binding.get("stage") or ""),
+                str(binding.get("name") or ""),
+            ]
+        ).lower()
+        if "recursive_research_search" in skill_text or "literature" in skill_text or "citation" in skill_text:
+            return True
+    return False
+
+
 def build_task_internal_skill_bindings(
     plan: dict[str, Any],
     dispatch_item: dict[str, Any],
@@ -619,6 +755,7 @@ def compact_task_internal_skill_binding(skill: dict[str, Any]) -> dict[str, Any]
         "benchmark": skill.get("benchmark") or {},
         "formal_write_targets": normalize_list(skill.get("formal_write_targets")),
         "source_policy": skill.get("source_policy", ""),
+        "reference_chain_policy": skill.get("reference_chain_policy") or {},
         "canonical_policy": skill.get("canonical_policy") or {},
         "next_action": "review_internal_skill_before_execution",
     }
@@ -676,6 +813,7 @@ def build_queue_ui_contract() -> dict[str, Any]:
             "output_requirements",
             "internal_skill_bindings",
             "llm_intervention_contract",
+            "reference_chain_policy",
             "risk_flags",
             "audit_log",
         ],
@@ -701,31 +839,50 @@ def build_agent_task_queue_response(project: dict[str, Any], queue: dict[str, An
 
 def normalize_agent_task_queue(queue: dict[str, Any]) -> dict[str, Any]:
     queue.setdefault("llm_intervention_contract", build_llm_intervention_contract(None))
+    queue.setdefault("reference_chain_policy", build_reference_chain_policy(None))
     queue.setdefault("ui_contract", build_queue_ui_contract())
     tasks = normalize_list(queue.get("tasks"))
     if tasks:
         for task in tasks:
             if isinstance(task, dict):
-                ensure_task_dispatch_audit_fields(task, queue["llm_intervention_contract"])
+                ensure_task_dispatch_audit_fields(
+                    task,
+                    queue["llm_intervention_contract"],
+                    queue["reference_chain_policy"],
+                )
         queue["summary"] = build_agent_task_queue_summary(tasks)
         queue["primary_action"] = build_queue_primary_action(tasks)
     return queue
 
 
-def ensure_task_dispatch_audit_fields(task: dict[str, Any], llm_intervention_contract: dict[str, Any]) -> None:
+def ensure_task_dispatch_audit_fields(
+    task: dict[str, Any],
+    llm_intervention_contract: dict[str, Any],
+    reference_chain_policy: dict[str, Any],
+) -> None:
     status = str(task.get("status") or "queued")
     task.setdefault("can_execute", False)
+    internal_skill_bindings = [
+        binding
+        for binding in normalize_list(task.get("internal_skill_bindings"))
+        if isinstance(binding, dict)
+    ]
     task.setdefault(
         "llm_intervention_handoff",
         build_task_llm_intervention_handoff(
             llm_intervention_contract,
-            [
-                binding
-                for binding in normalize_list(task.get("internal_skill_bindings"))
-                if isinstance(binding, dict)
-            ],
+            internal_skill_bindings,
         ),
     )
+    task_reference_chain_policy = build_task_reference_chain_policy(
+        reference_chain_policy,
+        internal_skill_bindings,
+        str(task.get("owner_agent") or ""),
+        str(task.get("role") or ""),
+        str(task.get("title") or ""),
+    )
+    if task_reference_chain_policy:
+        task.setdefault("reference_chain_policy", task_reference_chain_policy)
     if status == "reviewed_for_dispatch":
         task.setdefault("next_action", "select_execution_backend")
         task.setdefault("dispatch_readiness", {"status": "reviewed_for_dispatch", "blockers": []})

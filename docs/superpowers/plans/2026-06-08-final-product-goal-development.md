@@ -698,3 +698,50 @@ Next node: **P1-B reference and literature chain policy enters queue contract**.
 - Do not build a full literature crawler.
 - Add the policy fields that say when arXiv / Scholar / CNKI / Zotero / local notes are requested.
 - Keep the output as a queue-readable contract and test it before any UI work.
+
+P1-B completed.
+
+Reason: 文献综述和引用不能再只是“后面搜索一下”。现在 Agent Task Queue 顶层暴露 `reference_chain_policy`，把 arXiv / Scholar / CNKI / Zotero / local notes 的触发条件、使用方式、递归深度、最大迭代次数、候选引用状态、引用核验队列和正式写回 gate 都写进同一个可读契约。文献类任务会继承这份策略，方法类任务不会被误挂文献链路。
+
+P1-B behavior added:
+
+```gherkin
+Given an approved SupervisorPlan creates an Agent Task Queue
+When the queue is inspected
+Then it exposes the default reference chain policy with arXiv, Scholar, CNKI, Zotero and local notes.
+
+Given a LiteratureAgent task exists
+When it is created from the queue
+Then it inherits the reference chain policy and remains in needs_review state.
+
+Given candidate references are produced
+When they are used before review
+Then they can only enter draft citation state
+And formal literature writeback still waits for review_literature_seed_package.
+```
+
+P1-B verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_17_reference_chain_policy_enters_queue_and_literature_task -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py
+python3 -m unittest tests.test_agent_task_queue -v
+```
+
+P1-B implementation:
+
+- Added default `reference_chain_policy` to empty and created Agent Task Queue responses.
+- Added default sources: `arxiv`, `scholar`, `cnki`, `zotero`, `local_notes`.
+- Added `max_depth=2` and `max_iterations=5` as the first recursive-search MVP guardrail.
+- Added candidate reference states: `candidate`, `verified`, `rejected`.
+- Added `citation_verification_queue` and `review_literature_seed_package` as the formal writeback gate.
+- Literature/reference tasks inherit `reference_chain_policy`; unrelated method tasks stay clean.
+- Legacy saved queues are normalized with the default policy when read.
+
+Next node: **P1-C connect reference chain policy into SupervisorPlan generation prompt/schema**.
+
+20-minute boundary for P1-C:
+
+- Do not build real web search yet.
+- Make the SupervisorPlan contract able to request or override `reference_chain_policy`.
+- Test that LLM-generated plans can carry custom source priorities and still keep draft/formal boundaries.

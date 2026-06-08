@@ -1289,3 +1289,49 @@ python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_
 ```
 
 Next node: **P1-P generate draft section plan from approved manuscript citation plan**.
+
+## P1-P Draft Section Plan From Approved Citation Plan
+
+Boundary: chapter planning is still a draft-layer artifact. It converts an approved citation plan into section-level writing tasks and citation bindings, but it does not write formal manuscript prose.
+
+BDD:
+
+```text
+Behavior 36: generate a draft section plan from an approved manuscript citation plan
+Given Results/json/manuscript_citation_plan.json exists
+And the manuscript citation plan review approved draft section planning
+When the user generates the draft section plan
+Then the system writes Results/json/draft_section_plan.json,
+stores section-level draft tasks and citation binding ids,
+keeps formal_write_allowed=false,
+and exposes review_draft_section_plan as the next action.
+
+Behavior 37: block draft section planning before citation plan approval
+Given a manuscript citation plan exists
+But the citation plan has not been approved for draft section planning
+When the user tries to generate the draft section plan
+Then the system returns manuscript_citation_plan_review_required
+and does not create Results/json/draft_section_plan.json.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `POST /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-section-plan`.
+- The service requires `manuscript_citation_plan_approved`, human review status `approved_for_draft_sections`, `draft_section_plan_allowed=true`, and a real `Results/json/manuscript_citation_plan.json`.
+- The generated artifact has schema `p1.draft_section_plan.v1`, section tasks, section citation binding ids, source review gate, and formal-layer boundary.
+- The parent Agent task moves to `draft_section_plan_ready` and exposes `review_draft_section_plan`.
+- The frontend now exposes `生成章节草稿计划` after citation plan approval and renders the plan path, source citation plan, section count, citation binding count, next action, and formal-layer boundary.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_36_approved_manuscript_citation_plan_generates_draft_section_plan tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_37_draft_section_plan_requires_approved_citation_plan tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_25_frontend_exposes_draft_section_plan_generation -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+Next node: **P1-Q review draft section plan before drafting section text**.

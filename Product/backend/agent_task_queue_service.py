@@ -421,6 +421,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "draft_section_plan",
         }
+    if status == "draft_section_plan_ready":
+        return {
+            "id": "review_draft_section_plan",
+            "label": "审阅章节草稿计划",
+            "reason": "章节草稿计划已生成，下一步审阅章节边界、引用绑定和写作任务。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "draft_section_plan_review",
+        }
     if status == "rejected":
         return {
             "id": "replace_literature_search",
@@ -1833,6 +1842,90 @@ def review_project_manuscript_citation_plan(
     return response
 
 
+def generate_project_draft_section_plan(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    review = task.get("manuscript_citation_plan_review") if isinstance(task.get("manuscript_citation_plan_review"), dict) else {}
+    citation_plan_summary = task.get("manuscript_citation_plan") if isinstance(task.get("manuscript_citation_plan"), dict) else {}
+    citation_plan_artifact_path = str(citation_plan_summary.get("artifact_path") or "")
+    citation_plan_artifact = project_root / citation_plan_artifact_path
+    if (
+        task.get("status") != "manuscript_citation_plan_approved"
+        or review.get("status") != "approved_for_draft_sections"
+        or not review.get("draft_section_plan_allowed")
+        or not citation_plan_artifact_path
+        or not citation_plan_artifact.exists()
+    ):
+        raise AgentTaskQueueBlockedError(
+            "manuscript_citation_plan_review_required",
+            "Approved manuscript citation plan review is required before generating a draft section plan.",
+        )
+
+    citation_plan = json.loads(citation_plan_artifact.read_text(encoding="utf-8"))
+    timestamp = utc_now()
+    draft_section_plan_artifact_path = Path("Results/json/draft_section_plan.json")
+    draft_section_plan = build_draft_section_plan_record(
+        task,
+        citation_plan,
+        citation_plan_artifact_path,
+        review,
+        timestamp,
+    )
+    absolute_artifact_path = project_root / draft_section_plan_artifact_path
+    absolute_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_artifact_path.write_text(json.dumps(draft_section_plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    plan_summary = {
+        "status": "draft_section_plan_ready",
+        "schema_version": draft_section_plan["schema_version"],
+        "artifact_path": str(draft_section_plan_artifact_path),
+        "source_artifact_path": citation_plan_artifact_path,
+        "source_review_gate": draft_section_plan["source_review_gate"],
+        "generated_from_review_status": draft_section_plan["generated_from_review_status"],
+        "section_count": len(draft_section_plan["sections"]),
+        "citation_binding_count": draft_section_plan["citation_binding_count"],
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "review_draft_section_plan",
+        "next_action_label": "审阅章节草稿计划",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+    task["draft_section_plan"] = plan_summary
+    task["status"] = "draft_section_plan_ready"
+    task["next_action"] = "review_draft_section_plan"
+    task["can_execute"] = False
+    task["blockers"] = []
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "draft_section_plan_generated",
+            "actor": "system",
+            "timestamp": timestamp,
+            "source_artifact_path": citation_plan_artifact_path,
+            "artifact_path": str(draft_section_plan_artifact_path),
+            "section_count": len(draft_section_plan["sections"]),
+            "citation_binding_count": draft_section_plan["citation_binding_count"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["draft_section_plan"] = plan_summary
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -2233,6 +2326,77 @@ def citation_purpose_for_sections(sections: list[str]) -> str:
     if "introduction" in sections:
         return "支持研究动机、贡献定位和问题重要性。"
     return "支持文献脉络、理论机制或已有经验证据。"
+
+
+def build_draft_section_plan_record(
+    task: dict[str, Any],
+    manuscript_plan: dict[str, Any],
+    source_artifact_path: str,
+    review: dict[str, Any],
+    timestamp: str,
+) -> dict[str, Any]:
+    bindings = [item for item in normalize_list(manuscript_plan.get("citation_bindings")) if isinstance(item, dict)]
+    sections = build_draft_section_entries(bindings)
+    return {
+        "schema_version": "p1.draft_section_plan.v1",
+        "status": "draft_section_plan_ready",
+        "source_task_id": str(task.get("id") or manuscript_plan.get("source_task_id") or ""),
+        "source_artifact_path": source_artifact_path,
+        "source_review_gate": "review_manuscript_citation_plan",
+        "generated_from_review_status": str(review.get("status") or ""),
+        "draft_layer": "draft_section_plan",
+        "section_count": len(sections),
+        "citation_binding_count": len(bindings),
+        "sections": sections,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "review_draft_section_plan",
+        "next_action_label": "审阅章节草稿计划",
+        "usage_boundary": "这份计划只拆分章节草稿任务和引用绑定；正式正文、正式参考文献和导出包仍需后续人工审批。",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_draft_section_entries(bindings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    section_order = [
+        ("introduction", "引言", "交代问题重要性、研究贡献和核心结论走向。"),
+        ("literature_review", "文献综述", "整理相关文献、研究缺口和本文定位。"),
+        ("theory_and_hypotheses", "理论机制与假设", "组织理论机制、作用路径和可检验假设。"),
+        ("empirical_strategy", "研究设计与识别策略", "说明变量、模型、识别假设和稳健性要求。"),
+    ]
+    section_bindings: dict[str, list[dict[str, Any]]] = {section_id: [] for section_id, _, _ in section_order}
+    for binding in bindings:
+        for section_id in normalize_list(binding.get("target_sections")):
+            if section_id in section_bindings:
+                section_bindings[section_id].append(binding)
+
+    sections = []
+    for section_id, title, purpose in section_order:
+        bound = section_bindings[section_id]
+        sections.append(
+            {
+                "section_id": section_id,
+                "section_title": title,
+                "purpose": purpose,
+                "citation_binding_ids": [str(binding.get("id") or "") for binding in bound if binding.get("id")],
+                "citation_count": len(bound),
+                "draft_task": draft_section_task_for(section_id),
+                "requires_human_review": True,
+                "formal_write_allowed": False,
+            }
+        )
+    return sections
+
+
+def draft_section_task_for(section_id: str) -> str:
+    tasks = {
+        "introduction": "先写研究问题、贡献定位和核心结论草稿，并标注每条引用的论证用途。",
+        "literature_review": "按研究脉络组织已核验来源，写出文献缺口和本文边际贡献草稿。",
+        "theory_and_hypotheses": "把文献证据转成理论机制和可检验假设草稿。",
+        "empirical_strategy": "把方法类引用绑定到模型设定、识别假设和稳健性检查草稿。",
+    }
+    return tasks.get(section_id, "生成章节草稿任务，并保留人工审阅门。")
 
 
 def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:

@@ -325,8 +325,34 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
+def default_llm_intervention_product_chain() -> list[str]:
     return [
+        "topic_intake",
+        "supervisor_plan",
+        "skill_selection",
+        "agent_task_queue",
+        "literature_search",
+        "data_variables",
+        "method_design",
+        "execution_experiment",
+        "writing",
+        "review_export",
+    ]
+
+
+def default_llm_intervention_stage_handoffs() -> list[dict[str, Any]]:
+    return [
+        {
+            "stage": "topic_intake",
+            "llm_role": "解析研究题目、数据线索、方法倾向和成功标准。",
+            "deterministic_owner": "research_question_service",
+            "handoff_condition": "写入 ResearchQuestion / TopicSession 草案。",
+            "human_gate": "confirm_research_question",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "no_subagent_before_topic_confirmed",
+            "control_returns_to_user_when": "题目、数据线索和研究边界需要确认。",
+            "writes_formal_layer": False,
+        },
         {
             "stage": "supervisor_plan",
             "llm_role": "生成研究路线、风险、证据要求和子 Agent 分工。",
@@ -334,6 +360,9 @@ def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
             "handoff_condition": "写入 needs_review 或 approved SupervisorPlan；不改写正式研究状态。",
             "human_gate": "review_supervisor_plan",
             "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "spawn_sidecar_agents_after_plan_review",
+            "control_returns_to_user_when": "SupervisorPlan 需要 approve、revise 或 reject。",
+            "writes_formal_layer": False,
         },
         {
             "stage": "skill_selection",
@@ -342,6 +371,9 @@ def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
             "handoff_condition": "Skill id、来源、适用理由和执行边界写入 plan 和 queue。",
             "human_gate": "review_internal_skill_before_execution",
             "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "method_or_literature_agents_can_recommend_but_not_merge_canonical_rules",
+            "control_returns_to_user_when": "高风险 Skill 或正式层写回前需要确认。",
+            "writes_formal_layer": False,
         },
         {
             "stage": "agent_task_queue",
@@ -350,6 +382,75 @@ def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
             "handoff_condition": "任务队列持久化为 local_file，默认不可执行。",
             "human_gate": "dispatch_review_required",
             "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "dispatch_agents_only_after_global_review_button",
+            "control_returns_to_user_when": "队列生成后等待派工审阅。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "literature_search",
+            "llm_role": "生成检索式、重排文献、提炼文献缺口和引用候选。",
+            "deterministic_owner": "literature_search_service",
+            "handoff_condition": "写入 LiteratureSeedPackage、query graph 和 citation verification queue。",
+            "human_gate": "review_literature_seed_package",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "literature_agents_can_search_in_parallel_with_citation_verifier",
+            "control_returns_to_user_when": "种子文献和引用可信度需要确认。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "data_variables",
+            "llm_role": "解释变量角色候选、样本口径和字段含义。",
+            "deterministic_owner": "data_profile_and_variable_role_service",
+            "handoff_condition": "字段画像、变量候选和缺失证据写入草案层。",
+            "human_gate": "review_variable_role_set",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "data_agent_profiles_first_method_agent_waits_for_roles",
+            "control_returns_to_user_when": "因变量、处理变量、控制变量或样本口径需要确认。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "method_design",
+            "llm_role": "解释识别策略、方法门、前置条件和稳健性路线。",
+            "deterministic_owner": "method_workflow_service",
+            "handoff_condition": "写入 DesignSpec / RunPlan 草案和 method gate checklist。",
+            "human_gate": "review_design_spec_and_run_plan",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "method_agent_may_request_stats_backend_schema_before_execution",
+            "control_returns_to_user_when": "识别假设、方法选择或运行计划需要确认。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "execution_experiment",
+            "llm_role": "解释执行失败、诊断日志、下一轮修复和 evaluator 结果。",
+            "deterministic_owner": "execution_backend_router",
+            "handoff_condition": "StatsPAI / Python / StataMCP / Codex 后端产生日志、结果和证据文件。",
+            "human_gate": "review_execution_result",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "execution_agent_runs_after_backend_selection_reviewer_checks_outputs",
+            "control_returns_to_user_when": "运行产物、失败原因或 evaluator 结论需要确认。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "writing",
+            "llm_role": "生成研究报告、exploratory 论文草案和修订建议。",
+            "deterministic_owner": "manuscript_draft_service",
+            "handoff_condition": "只写草案层 manuscript 和 evidence binding。",
+            "human_gate": "review_manuscript_draft",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "writer_agent_works_after_results_reviewer_can_request_revision",
+            "control_returns_to_user_when": "草案段落、论断强度和证据绑定需要确认。",
+            "writes_formal_layer": False,
+        },
+        {
+            "stage": "review_export",
+            "llm_role": "按 Journal Skill 做审稿门、格式门和导出预检。",
+            "deterministic_owner": "review_export_service",
+            "handoff_condition": "写入 ReviewExport gates、PDF/DOCX 预检和复现包清单。",
+            "human_gate": "export_preflight_review",
+            "formal_boundary": "draft_only_until_human_review",
+            "agent_team_policy": "reviewer_and_export_agents_check_package_before_formal_promotion",
+            "control_returns_to_user_when": "导出预检和正式层晋升需要确认。",
+            "writes_formal_layer": False,
         },
     ]
 
@@ -357,30 +458,68 @@ def default_llm_intervention_stage_handoffs() -> list[dict[str, str]]:
 def build_llm_intervention_contract(plan: dict[str, Any] | None) -> dict[str, Any]:
     raw_contract = plan.get("llm_intervention_plan") if isinstance(plan, dict) else None
     contract = raw_contract if isinstance(raw_contract, dict) else {}
-    stage_handoffs = [
-        normalize_llm_stage_handoff(item)
-        for item in normalize_list(contract.get("stage_handoffs"))
-        if isinstance(item, dict)
-    ]
-    if not stage_handoffs:
-        stage_handoffs = default_llm_intervention_stage_handoffs()
+    product_chain = [
+        str(stage)
+        for stage in normalize_list(contract.get("product_chain"))
+        if str(stage)
+    ] or default_llm_intervention_product_chain()
+    default_handoffs = {item["stage"]: item for item in default_llm_intervention_stage_handoffs()}
+    stage_handoffs = merge_llm_stage_handoffs(
+        product_chain,
+        default_handoffs,
+        [
+            item
+            for item in normalize_list(contract.get("stage_handoffs"))
+            if isinstance(item, dict)
+        ],
+    )
     return {
         "contract_version": str(contract.get("contract_version") or "llm_intervention.v1"),
         "default_policy": str(
             contract.get("default_policy") or "llm_plans_deterministic_executes_human_promotes"
         ),
+        "product_chain": product_chain,
         "stage_handoffs": stage_handoffs,
     }
 
 
-def normalize_llm_stage_handoff(item: dict[str, Any]) -> dict[str, str]:
+def merge_llm_stage_handoffs(
+    product_chain: list[str],
+    default_handoffs: dict[str, dict[str, Any]],
+    custom_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged = dict(default_handoffs)
+    custom_order: list[str] = []
+    for item in custom_items:
+        stage = str(item.get("stage") or "agent_task_queue")
+        base = default_handoffs.get(stage, {})
+        merged[stage] = {**base, **item}
+        if stage not in product_chain and stage not in custom_order:
+            custom_order.append(stage)
+    return [
+        normalize_llm_stage_handoff(merged[stage])
+        for stage in [*product_chain, *custom_order]
+        if stage in merged
+    ]
+
+
+def normalize_llm_stage_handoff(item: dict[str, Any]) -> dict[str, Any]:
+    stage = str(item.get("stage") or "agent_task_queue")
+    base = {
+        handoff["stage"]: handoff
+        for handoff in default_llm_intervention_stage_handoffs()
+    }.get(stage, {})
+    merged = {**base, **item}
     return {
-        "stage": str(item.get("stage") or "agent_task_queue"),
-        "llm_role": str(item.get("llm_role") or "生成可审阅判断，不直接改写正式层。"),
-        "deterministic_owner": str(item.get("deterministic_owner") or "agent_task_queue_service"),
-        "handoff_condition": str(item.get("handoff_condition") or "写入本地状态文件，等待人工确认。"),
-        "human_gate": str(item.get("human_gate") or "dispatch_review_required"),
-        "formal_boundary": str(item.get("formal_boundary") or "draft_only_until_human_review"),
+        "stage": str(merged.get("stage") or "agent_task_queue"),
+        "llm_role": str(merged.get("llm_role") or "生成可审阅判断，不直接改写正式层。"),
+        "deterministic_owner": str(merged.get("deterministic_owner") or "agent_task_queue_service"),
+        "handoff_condition": str(merged.get("handoff_condition") or "写入本地状态文件，等待人工确认。"),
+        "human_gate": str(merged.get("human_gate") or "dispatch_review_required"),
+        "formal_boundary": str(merged.get("formal_boundary") or "draft_only_until_human_review"),
+        "agent_team_policy": str(merged.get("agent_team_policy") or "single_agent_until_human_gate"),
+        "control_returns_to_user_when": str(merged.get("control_returns_to_user_when") or "需要人工确认下一步。"),
+        "writes_formal_layer": bool(merged.get("writes_formal_layer") is True),
     }
 
 

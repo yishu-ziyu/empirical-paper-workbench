@@ -88,7 +88,7 @@ UI 设计原则：
 仍缺的关键能力：
 
 - SupervisorPlan 和 Agent Task Queue 对 Skill Registry 的选择解释还没有形成用户可见主链路。
-- LLM Supervisor 什么时候介入、产出什么、何时交还给确定性执行器，还需要写成状态机。
+- LLM Supervisor 什么时候介入、产出什么、何时交还给确定性执行器，已经在 P1-A 写入队列契约；下一步还要把它驱动到真实 LLM 调用和前端审计视图。
 - Agent Task Queue 到执行后端选择层还需要接实：StatsPAI / Python / StataMCP / Codex subagent 的边界要清楚。
 - 文献检索和 Journal Skill 审稿门还没有稳定进入主链路。
 - 论文草稿能生成，但距离 CoPaper-like “可直接审阅的完整论文包”还要补长度、结构、引用校验、方法规范和多轮修订。
@@ -646,3 +646,55 @@ Next node: **P1-A design LLM intervention points for final product chain**.
 - Do not implement new LLM calls yet.
 - Write the explicit product map for when LLM Supervisor intervenes, what deterministic service owns, when Agent Team is dispatched, and when control returns to the user.
 - Convert that map into the next BDD/API contract target.
+
+P1-A completed.
+
+Reason: Goal 模式需要一条稳定的产品主链路，不然 LLM Supervisor 会变成零散功能。现在 Agent Task Queue 顶层暴露 `llm_intervention_contract`，把“输入题目 -> SupervisorPlan -> Skill 选择 -> Agent Task Queue -> 文献 -> 数据变量 -> 方法 -> 执行 -> 写作 -> 导出预检”列成明确 `product_chain`，每一站都说明 LLM 做什么、确定性服务谁接手、Agent Team 什么时候参与、人什么时候拿回控制权，以及是否能写正式层。
+
+P1-A behavior added:
+
+```gherkin
+Given no custom LLM intervention plan exists
+When the user reads the Agent Task Queue contract
+Then the default contract maps the full product chain from topic intake to export preflight.
+
+Given a stage handoff is exposed
+When the frontend or another agent inspects it
+Then it includes the LLM role, deterministic owner, Agent Team policy, human gate, control-return condition and formal-layer boundary.
+
+Given the queue reaches execution and export stages
+When the contract is inspected
+Then execution is owned by the execution backend router
+And export still waits for human preflight review.
+```
+
+P1-A verified:
+
+```bash
+python3 -m py_compile Product/backend/agent_task_queue_service.py
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_16_default_llm_intervention_contract_maps_full_product_chain -v
+python3 -m unittest tests.test_agent_task_queue -v
+```
+
+P1-A implementation:
+
+- Added `product_chain` to the default LLM intervention contract.
+- Added default stage handoffs for `topic_intake`, `supervisor_plan`, `skill_selection`, `agent_task_queue`, `literature_search`, `data_variables`, `method_design`, `execution_experiment`, `writing` and `review_export`.
+- Each handoff now exposes `agent_team_policy`, `control_returns_to_user_when` and `writes_formal_layer`.
+- Custom `plan.llm_intervention_plan.stage_handoffs` still override defaults without losing the product-chain order.
+- No new LLM call was introduced in this node; this is the orchestration contract the later LLM calls must obey.
+
+Subagent read-only result:
+
+- Epicurus confirmed the safest integration point is the existing `SupervisorPlan -> AgentTaskQueue` contract path.
+- Existing SupervisorPlan already has provider, stage plan, subagent dispatch, skill judgments and write-boundary fields.
+- Queue creation already requires an approved SupervisorPlan and `can_dispatch=true`.
+- Next implementation should extend this contract into reference/literature chain policy or UI visibility, not create a separate LLM orchestration service.
+
+Next node: **P1-B reference and literature chain policy enters queue contract**.
+
+20-minute boundary for P1-B:
+
+- Do not build a full literature crawler.
+- Add the policy fields that say when arXiv / Scholar / CNKI / Zotero / local notes are requested.
+- Keep the output as a queue-readable contract and test it before any UI work.

@@ -574,6 +574,44 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(executed_queue["tasks"][0]["primary_action"]["label"], "查看运行结果")
         self.assertFalse(executed_queue["tasks"][0]["primary_action"]["writes_formal_layer"])
 
+    def test_bdd_16_default_llm_intervention_contract_maps_full_product_chain(self) -> None:
+        """行为 16：默认 LLM 介入契约必须覆盖从选题到导出预检的主链路。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        contract = response.json()["agent_task_queue"]["llm_intervention_contract"]
+        handoffs = {item["stage"]: item for item in contract["stage_handoffs"]}
+        expected_stages = [
+            "topic_intake",
+            "supervisor_plan",
+            "skill_selection",
+            "agent_task_queue",
+            "literature_search",
+            "data_variables",
+            "method_design",
+            "execution_experiment",
+            "writing",
+            "review_export",
+        ]
+
+        self.assertEqual(contract["contract_version"], "llm_intervention.v1")
+        self.assertEqual(contract["product_chain"], expected_stages)
+        for stage in expected_stages:
+            self.assertIn(stage, handoffs)
+            self.assertIn("llm_role", handoffs[stage])
+            self.assertIn("deterministic_owner", handoffs[stage])
+            self.assertIn("agent_team_policy", handoffs[stage])
+            self.assertIn("control_returns_to_user_when", handoffs[stage])
+            self.assertFalse(handoffs[stage]["writes_formal_layer"])
+
+        self.assertEqual(handoffs["topic_intake"]["deterministic_owner"], "research_question_service")
+        self.assertEqual(handoffs["supervisor_plan"]["human_gate"], "review_supervisor_plan")
+        self.assertEqual(handoffs["agent_task_queue"]["human_gate"], "dispatch_review_required")
+        self.assertEqual(handoffs["execution_experiment"]["deterministic_owner"], "execution_backend_router")
+        self.assertEqual(handoffs["review_export"]["human_gate"], "export_preflight_review")
+
     def _write_supervisor_plan(
         self,
         status: str,

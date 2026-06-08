@@ -292,7 +292,23 @@ Manual acceptance:
 
 Compatibility note:
 
-- Older queue state may contain `selected_backend.id` without `selection_reason`, `fallback_backend_ids` or `execution_boundary`. The next node should add a compatibility fallback or migration so old tasks still explain backend choice instead of showing empty detail text.
+- P0-C2 completed this compatibility fallback. Older queue state with only `selected_backend.id` now gets a human-readable default reason, default fallback backends and a conservative formal-layer boundary.
+
+P0-C2 verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_12_legacy_backend_selection_still_has_human_explanation -v
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests -v
+node --check Product/web/assets/app.js
+git diff --check -- Product/web/assets/app.js tests/test_agent_task_queue.py
+```
+
+P0-C2 manual acceptance:
+
+- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0c2-legacy-backend-compat`.
+- DOM check confirmed 2 `.agent-task-backend-details` blocks.
+- Visible legacy fallback text includes “选择 StatsPAI，因为它适合本地统计执行、结构化结果和可追溯产物”, “Python OLS / StataMCP / Codex” and “不会自动进入正式层”.
+- Screenshot saved to `artifacts/ui-checks/p0c2-legacy-backend-compat-20260608.png`.
 
 ### Task P0-D: UX contrast and action clarity fix
 
@@ -408,13 +424,13 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-C2 Legacy backend metadata compatibility**.
+Start with **P0-C3 Execution result handoff clarity**.
 
-Reason: P0-C1 已经让新任务显示“这个任务准备用哪个后端执行、为什么、不可用时怎么办”。浏览器验收发现旧的 `selected_backend` 状态可能缺少解释字段，所以要先补兼容层，避免用户打开旧任务时又看到空解释。
+Reason: 用户现在能看到后端为什么被选中。下一步要让执行完成后的结果路径、日志路径、evaluator 检查和下一步动作在队列里更清楚，避免用户看到“执行成功”但不知道应该点哪里、看哪个文件、能不能进入草稿。
 
-20-minute boundary for P0-C2:
+20-minute boundary for P0-C3:
 
-- Add one contract: legacy `selected_backend.id` can still render a human-readable reason, fallback and boundary.
-- Implement a frontend compatibility fallback or backend migration, choosing the smaller path after inspection.
-- Verify with unit contract and browser DOM check.
-- Do not change real backend execution semantics in this node.
+- Inspect current `execution_result` fields and visible queue rendering.
+- Add one contract: succeeded task must show result file path, log/audit hint, evaluator status and next action.
+- Wire only existing metadata if possible; do not invent fake run outputs.
+- Verify with focused frontend test and browser DOM check.

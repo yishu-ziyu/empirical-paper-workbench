@@ -78,6 +78,8 @@ const state = {
   reviewingAgentTaskId: null,
   reviewingAgentTaskAction: null,
   draftingLiteratureReviewTaskId: null,
+  reviewingDraftLiteratureReviewTaskId: null,
+  reviewingDraftLiteratureReviewAction: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -490,6 +492,13 @@ const v2api = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
+      });
+    },
+    async reviewDraftLiteratureReview(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/draft-literature-review-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
     },
     async selectBackend(projectId, taskId, payload) {
@@ -1567,6 +1576,8 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
 function renderDraftLiteratureReview(task = {}) {
   const draft = task.draft_literature_review || {};
   if (draft.status !== "draft_ready") return "";
+  const review = task.draft_literature_review_review || {};
+  const isReviewingDraft = state.reviewingDraftLiteratureReviewTaskId === task.id;
   return `
     <div class="agent-task-literature-draft">
       <div>
@@ -1591,6 +1602,49 @@ function renderDraftLiteratureReview(task = {}) {
           <span class="meta-label">正式层边界</span>
           <p>${escapeHtml(draft.limitations || "引用仍需核验，不能写入正式层。")}</p>
         </div>
+      </div>
+      <div class="agent-task-literature-draft__actions">
+        <div>
+          <strong>草稿审阅</strong>
+          <p class="muted">${review.status ? `已记录：${escapeHtml(productTermLabel(review.status))}` : "批准后只打开引用核验任务；不宣称引用已验证。"}</p>
+        </div>
+        <div class="agent-task-literature-draft__buttons">
+          ${["approve_for_citation_verification", "needs_revision", "reject"].map((action) => `
+            <button class="${action === "approve_for_citation_verification" ? "primary-button" : "secondary-button"}" data-draft-literature-review-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewingDraft ? "disabled" : ""}>
+              ${isReviewingDraft && state.reviewingDraftLiteratureReviewAction === action ? "写回中..." : escapeHtml(draftLiteratureReviewReviewActionLabel(action))}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCitationVerificationTasks(task = {}) {
+  const citationTasks = Array.isArray(task.citation_verification_tasks)
+    ? task.citation_verification_tasks
+    : [];
+  if (!citationTasks.length) return "";
+  const pendingCount = citationTasks.filter((item) => item.status === "pending").length;
+  return `
+    <div class="agent-task-citation-verification">
+      <div class="agent-task-citation-verification__head">
+        <div>
+          <span class="meta-label">引用核验任务</span>
+          <strong>${escapeHtml(String(citationTasks.length))} 条候选来源待核验</strong>
+          <p class="muted">待处理 ${escapeHtml(String(pendingCount))} 条 · 不宣称引用已验证 · 不写入正式层</p>
+        </div>
+        <span class="pill">${escapeHtml(productTermLabel(task.next_action || "verify_citations"))}</span>
+      </div>
+      <div class="agent-task-citation-verification__list">
+        ${citationTasks.slice(0, 6).map((item) => `
+          <article>
+            <span class="meta-label">${escapeHtml(item.source_label || item.source_id || "候选来源")}</span>
+            <strong>${escapeHtml(productTermLabel(item.status || "pending"))}</strong>
+            <p>${escapeHtml(item.query || "等待补充检索式")}</p>
+            <p class="muted">需要核验：${escapeHtml((item.required_checks || []).join(" / "))}</p>
+          </article>
+        `).join("")}
       </div>
     </div>
   `;
@@ -1620,6 +1674,7 @@ function renderAgentTaskExecutionHandoff(task) {
   return `
     ${renderReferenceSeedPackageResultReview(executionResult, task)}
     ${renderDraftLiteratureReview(task)}
+    ${renderCitationVerificationTasks(task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -2314,11 +2369,41 @@ async function handleDraftLiteratureReview(taskId) {
   }
 }
 
+async function handleDraftLiteratureReviewReview(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingDraftLiteratureReviewTaskId = taskId;
+  state.reviewingDraftLiteratureReviewAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewDraftLiteratureReview(state.selectedProjectId, taskId, {
+      action,
+      note: `草稿综述审阅：${draftLiteratureReviewReviewActionLabel(action)}`,
+    });
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存草稿综述审阅失败：${error.message}`);
+  } finally {
+    state.reviewingDraftLiteratureReviewTaskId = null;
+    state.reviewingDraftLiteratureReviewAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
 function referenceSeedReviewActionLabel(action) {
   const labels = {
     approve_for_draft: "进入草稿综述",
     needs_revision: "要求修订",
     reject: "拒绝种子包",
+  };
+  return labels[action] || action || "审阅";
+}
+
+function draftLiteratureReviewReviewActionLabel(action) {
+  const labels = {
+    approve_for_citation_verification: "进入引用核验",
+    needs_revision: "要求修订",
+    reject: "拒绝草稿",
   };
   return labels[action] || action || "审阅";
 }
@@ -7326,6 +7411,14 @@ async function boot() {
     const draftLiteratureReviewButton = target.closest("[data-draft-literature-review-action]");
     if (draftLiteratureReviewButton) {
       void handleDraftLiteratureReview(draftLiteratureReviewButton.dataset.agentTaskId || "");
+      return;
+    }
+    const draftLiteratureReviewReviewButton = target.closest("[data-draft-literature-review-review-action]");
+    if (draftLiteratureReviewReviewButton) {
+      void handleDraftLiteratureReviewReview(
+        draftLiteratureReviewReviewButton.dataset.agentTaskId || "",
+        draftLiteratureReviewReviewButton.dataset.draftLiteratureReviewReviewAction || "",
+      );
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

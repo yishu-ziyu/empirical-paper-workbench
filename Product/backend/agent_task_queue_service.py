@@ -16,6 +16,19 @@ VALID_REFERENCE_SEED_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_DRAFT_LITERATURE_REVIEW_REVIEW_ACTIONS = {
+    "approve_for_citation_verification",
+    "needs_revision",
+    "reject",
+}
+CITATION_VERIFICATION_REQUIRED_CHECKS = [
+    "authors",
+    "year",
+    "title",
+    "venue",
+    "doi_or_stable_url",
+    "relevance",
+]
 
 
 class AgentTaskQueueBlockedError(RuntimeError):
@@ -333,6 +346,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "draft_literature_review_review",
+        }
+    if status == "citation_verification_ready":
+        return {
+            "id": "verify_citations",
+            "label": "进入引用核验",
+            "reason": "草稿综述已通过人工审阅，下一步逐条核对作者、年份、题名、期刊和 DOI 或稳定链接。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "citation_verification_tasks",
         }
     if status == "rejected":
         return {
@@ -1229,6 +1251,89 @@ def generate_project_draft_literature_review(
     return response
 
 
+def review_project_draft_literature_review(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_DRAFT_LITERATURE_REVIEW_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_draft_literature_review_review_action",
+            f"Unsupported draft literature review action: {action}.",
+        )
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    draft = task.get("draft_literature_review") if isinstance(task.get("draft_literature_review"), dict) else {}
+    if draft.get("status") != "draft_ready":
+        raise AgentTaskQueueBlockedError(
+            "draft_literature_review_required",
+            "Draft literature review is required before opening citation verification tasks.",
+        )
+
+    timestamp = utc_now()
+    review = build_draft_literature_review_review(action, note, timestamp)
+    task["draft_literature_review_review"] = review
+    draft["last_review_action"] = action
+    draft["formal_write_allowed"] = False
+    draft["claims_verified_citations"] = False
+    task["draft_literature_review"] = draft
+    task["can_execute"] = False
+
+    if action == "approve_for_citation_verification":
+        package = load_draft_literature_review_source_package(project_root, draft)
+        task["citation_verification_tasks"] = build_citation_verification_tasks(package, draft, timestamp)
+        task["status"] = "citation_verification_ready"
+        task["next_action"] = "verify_citations"
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "draft_literature_review_needs_revision"
+        task["next_action"] = "revise_draft_literature_review"
+        task["blockers"] = [
+            {
+                "code": "draft_literature_review_needs_revision",
+                "label": "草稿综述需要修订",
+                "description": note or "人工要求修改草稿综述结构或文献方向。",
+            }
+        ]
+    else:
+        task["status"] = "draft_literature_review_rejected"
+        task["next_action"] = "replace_literature_review_draft"
+        task["blockers"] = [
+            {
+                "code": "draft_literature_review_rejected",
+                "label": "草稿综述已拒绝",
+                "description": note or "人工拒绝了草稿综述，需要回到文献种子包或重写草稿。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "draft_literature_review_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "note": note,
+            "review_gate": "review_draft_literature_review",
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["draft_literature_review_review"] = review
+    response["citation_verification_tasks"] = task.get("citation_verification_tasks", [])
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1260,6 +1365,96 @@ def build_reference_seed_package_review(action: str, note: str, timestamp: str) 
         "next_action_label": next_action_label,
         "evidence_level": "local_file",
     }
+
+
+def build_draft_literature_review_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_citation_verification":
+        status = "approved_for_citation_verification"
+        next_action = "verify_citations"
+        next_action_label = "进入引用核验"
+        citation_verification_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_draft_literature_review"
+        next_action_label = "要求修订草稿综述"
+        citation_verification_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_literature_review_draft"
+        next_action_label = "拒绝草稿综述"
+        citation_verification_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_draft_literature_review",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "citation_state": "candidate",
+        "citation_verification_allowed": citation_verification_allowed,
+        "formal_write_allowed": False,
+        "claims_verified_citations": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "local_file",
+    }
+
+
+def load_draft_literature_review_source_package(project_root: Path, draft: dict[str, Any]) -> dict[str, Any]:
+    source_artifact_path = str(draft.get("source_artifact_path") or "")
+    source_artifact = project_root / source_artifact_path
+    if not source_artifact_path or not source_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "reference_seed_package_missing",
+            "Reference seed package file is missing for citation verification.",
+        )
+    return json.loads(source_artifact.read_text(encoding="utf-8"))
+
+
+def build_citation_verification_tasks(
+    package: dict[str, Any],
+    draft: dict[str, Any],
+    timestamp: str,
+) -> list[dict[str, Any]]:
+    candidate_queries = [item for item in normalize_list(package.get("candidate_queries")) if isinstance(item, dict)]
+    if not candidate_queries:
+        candidate_queries = [
+            {
+                "source_id": "draft_literature_review",
+                "source_label": "草稿综述",
+                "query": str(package.get("research_question") or draft.get("research_question") or ""),
+                "mode": "fallback",
+                "review_state": "candidate",
+            }
+        ]
+
+    tasks: list[dict[str, Any]] = []
+    for index, query in enumerate(candidate_queries, start=1):
+        source_id = str(query.get("source_id") or f"candidate_source_{index:02d}")
+        source_label = str(query.get("source_label") or source_id)
+        tasks.append(
+            {
+                "id": f"citation_verification_{index:02d}",
+                "status": "pending",
+                "source_id": source_id,
+                "source_label": source_label,
+                "query": str(query.get("query") or ""),
+                "mode": str(query.get("mode") or "candidate"),
+                "review_state": str(query.get("review_state") or "candidate"),
+                "citation_state": "candidate",
+                "required_checks": CITATION_VERIFICATION_REQUIRED_CHECKS,
+                "required_connectors": ["cnki", "scholar", "zotero", "local_notes"],
+                "source_artifact_path": str(draft.get("source_artifact_path") or ""),
+                "draft_artifact_path": str(draft.get("artifact_path") or ""),
+                "formal_write_allowed": False,
+                "writes_formal_layer": False,
+                "claims_verified_citations": False,
+                "can_enter_formal_layer": False,
+                "evidence_level": "candidate",
+                "created_at": timestamp,
+            }
+        )
+    return tasks
 
 
 def build_draft_literature_review_record(

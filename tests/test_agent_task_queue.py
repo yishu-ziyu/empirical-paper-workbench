@@ -624,6 +624,17 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("renderSupervisorPlan();", journey_body)
         self.assertIn("renderAgentTaskQueue();", journey_body)
 
+    def test_bdd_11_frontend_exposes_backend_selection_reason_fallback_and_boundary(self) -> None:
+        """行为 11：后端选择不能只显示名字，必须解释选择理由、失败后备选和执行边界。"""
+        self.assertIn("renderAgentTaskBackendDetails", self.app_js)
+        self.assertIn("selection_reason", self.app_js)
+        self.assertIn("fallback_backend_ids", self.app_js)
+        self.assertIn("execution_boundary", self.app_js)
+        self.assertIn("为什么选这个后端", self.app_js)
+        self.assertIn("失败后备选", self.app_js)
+        self.assertIn("正式层边界", self.app_js)
+        self.assertIn(".agent-task-backend-details", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

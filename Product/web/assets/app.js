@@ -901,6 +901,15 @@ function productTermLabel(value) {
     blocked: "已阻断",
     needs_revision: "需要修改",
     ready_to_create: "待创建",
+    backend_selected: "已选择执行后端",
+    blocked_by_backend_unavailable: "执行后端不可用",
+    choose_fallback_backend: "选择后备执行后端",
+    statistical_execution: "统计执行",
+    draft_code_generation: "脚本草案生成",
+    local_execution_artifacts: "本地执行产物",
+    script_or_plan_only: "脚本或计划草案",
+    local_execution: "本地执行证据",
+    local_file: "本地文件证据",
     "Data Agent": "数据智能体",
     "Execution Agent": "执行智能体",
   };
@@ -1272,9 +1281,69 @@ function renderAgentTaskQueue() {
   }
 }
 
+function backendOptionLabel(backendId) {
+  const map = {
+    statspai: "StatsPAI",
+    python_ols_adapter: "Python OLS",
+    stata_mcp: "StataMCP",
+    codex: "Codex",
+  };
+  return map[backendId] || backendId || "-";
+}
+
+function renderAgentTaskBackendDetails(task) {
+  const selectedBackend = task.selected_backend || {};
+  const blocker = task.backend_blocker || {};
+  const executionBoundary = selectedBackend.execution_boundary || {};
+  const fallbackBackendIds = Array.isArray(selectedBackend.fallback_backend_ids)
+    ? selectedBackend.fallback_backend_ids
+    : (Array.isArray(blocker.fallback_backend_ids) ? blocker.fallback_backend_ids : []);
+  const hasDetails = Boolean(
+    selectedBackend.selection_reason
+    || fallbackBackendIds.length
+    || Object.keys(executionBoundary).length
+    || blocker.message
+  );
+  if (!hasDetails) return "";
+
+  const formalBoundary = executionBoundary.can_enter_formal_layer_automatically
+    ? "允许进入正式层"
+    : "不会自动进入正式层，正式写回前需要人工审阅。";
+  const outputBoundary = [
+    productTermLabel(executionBoundary.kind || ""),
+    productTermLabel(executionBoundary.output_boundary || ""),
+  ].filter(Boolean).join(" · ");
+
+  return `
+    <div class="agent-task-backend-details">
+      <div>
+        <span class="meta-label">为什么选这个后端</span>
+        <p>${escapeHtml(selectedBackend.selection_reason || blocker.message || "等待后端选择后显示。")}</p>
+      </div>
+      <div>
+        <span class="meta-label">失败后备选</span>
+        ${fallbackBackendIds.length ? `
+          <ul>
+            ${fallbackBackendIds.map((backendId) => `<li>${escapeHtml(backendOptionLabel(backendId))}</li>`).join("")}
+          </ul>
+        ` : "<p class='muted'>暂无可用后备后端。</p>"}
+      </div>
+      <div>
+        <span class="meta-label">执行产物范围</span>
+        <p>${escapeHtml(outputBoundary || productTermLabel(selectedBackend.evidence_level || blocker.availability_status || "等待执行边界"))}</p>
+      </div>
+      <div>
+        <span class="meta-label">正式层边界</span>
+        <p>${escapeHtml(formalBoundary)}</p>
+      </div>
+    </div>
+  `;
+}
+
 function renderAgentTaskBackendSelection(task) {
   const status = task.status || "";
   const selectedBackend = task.selected_backend || {};
+  const backendBlocker = task.backend_blocker || {};
   const isExecuting = state.executingAgentTaskId === task.id;
   const backendOptions = [
     { id: "statspai", label: "StatsPAI" },
@@ -1317,6 +1386,29 @@ function renderAgentTaskBackendSelection(task) {
           </button>
         </div>
       </div>
+      ${renderAgentTaskBackendDetails(task)}
+    `;
+  }
+
+  if (status === "blocked_by_backend_unavailable") {
+    return `
+      <div class="agent-task-backend-selection is-blocked">
+        <div>
+          <span class="meta-label">后端不可用</span>
+          <p class="muted">${escapeHtml(backendBlocker.message || "所选执行后端暂时不可用，请选择后备执行后端。")}</p>
+        </div>
+        <div class="agent-task-backend-actions">
+          <select data-backend-select data-agent-task-id="${escapeHtml(task.id || "")}" ${isExecuting ? "disabled" : ""}>
+            ${backendOptions.map((opt) => `
+              <option value="${escapeHtml(opt.id)}">${escapeHtml(opt.label)}</option>
+            `).join("")}
+          </select>
+          <button class="primary-button" data-select-backend-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isExecuting ? "disabled" : ""}>
+            ${isExecuting ? "执行中..." : "选择后备并执行"}
+          </button>
+        </div>
+      </div>
+      ${renderAgentTaskBackendDetails(task)}
     `;
   }
 
@@ -1332,6 +1424,7 @@ function renderAgentTaskBackendSelection(task) {
           <p class="muted">${resultLabel}</p>
         </div>
       </div>
+      ${renderAgentTaskBackendDetails(task)}
     `;
   }
 

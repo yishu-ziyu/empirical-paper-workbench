@@ -486,6 +486,11 @@ textarea {
   margin: 2px 0 4px;
 }
 
+.agent-task-backend-selection.is-blocked {
+  border-color: rgba(126, 94, 42, 0.24);
+  background: rgba(252, 248, 240, 0.86);
+}
+
 .agent-task-backend-actions {
   display: flex;
   flex-wrap: wrap;
@@ -507,6 +512,38 @@ textarea {
 .agent-task-backend-actions select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.agent-task-backend-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(30, 111, 98, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.agent-task-backend-details > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(30, 111, 98, 0.1);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.74);
+}
+
+.agent-task-backend-details p {
+  margin: 6px 0 0;
+}
+
+.agent-task-backend-details ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.agent-task-backend-details li {
+  margin: 3px 0;
 }
 
 .agent-task-item h5 {

@@ -420,6 +420,19 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn('plan.status === "approved"', self.app_js)
         self.assertIn("已批准", self.app_js)
 
+    def test_bdd_18_frontend_exposes_internal_skill_review_contract(self) -> None:
+        """行为 18：SupervisorPlan 审阅台必须显示推荐 Skill、选择理由、缺失证据和人工审阅状态。"""
+        self.assertIn("renderSupervisorPlanSkillReview", self.app_js)
+        self.assertIn("recommended_internal_skills", self.app_js)
+        self.assertIn("skill_review_contract", self.app_js)
+        self.assertIn("applicability_reason", self.app_js)
+        self.assertIn("missing_evidence", self.app_js)
+        self.assertIn("推荐 Skill", self.app_js)
+        self.assertIn("选择理由", self.app_js)
+        self.assertIn("缺失证据", self.app_js)
+        self.assertIn("人工审阅状态", self.app_js)
+        self.assertIn(".supervisor-plan-skill-review", self.styles_css)
+
     def test_bdd_15_supervisor_plan_recommends_internal_skills_from_plan_context(self) -> None:
         """行为 15：SupervisorPlan 必须把相关 internal skills 作为待审能力推荐，而不是自由发挥。"""
         generated = {

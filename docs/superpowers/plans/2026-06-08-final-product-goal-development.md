@@ -106,6 +106,10 @@ UI 设计原则：
 - `npm run build` in `Product/web-react`
 - Browser opened `http://127.0.0.1:8771/react/react?v=20260608-p0d-ux-contrast`; observed `dottedOpacity=0.1`, disabled button background `rgba(230, 230, 230, 0.17)`, disabled text `rgb(208, 208, 208)`.
 - Screenshot: `artifacts/ui-checks/p0d-ux-contrast-20260608.png`
+- P0-B1 已完成本节点实现：Agent Task Queue 的任务详情现在会展开显示绑定的内部 Skill、为什么选它、预期产物、执行边界和 Skill 来源；后端的 SupervisorPlan / Queue / Registry 契约与前端可见契约已一起通过。
+- P0-B2 已完成本节点实现：工作台首页现在会实际挂载 SupervisorPlan 审阅台和 Agent Task Queue，不再出现后端数据已返回但页面容器为空的情况。
+- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0b-skill-visible-2`; observed `.supervisor-plan-skill-review = 1`, `.agent-task-skill-binding = 1`, and the page text includes “推荐 Skill / 选择理由 / 缺失证据 / 为什么选这个 Skill / 预期产物 / 执行边界 / Skill 来源”.
+- Screenshot: `artifacts/ui-checks/p0b-skill-visible-20260608.png`
 
 ## 5. LLM 介入编排
 
@@ -190,11 +194,15 @@ Expected: only this plan file is committed.
 
 ### Task P0-B: Skill Registry explanation contract
 
+Status: implemented for the P0-B visible explanation contract. Backend already carries the registry recommendation and LLM semantic judgment; this node added the missing frontend task-detail visibility and the missing Journey-page render hook so the user can inspect “为什么选这个 Skill” from the workbench.
+
 **Files:**
 - Inspect: `Product/backend/supervisor_plan_service.py`
 - Inspect: `Product/backend/agent_task_queue_service.py`
 - Inspect: `Product/backend/internal_skill_registry.py` or nearest existing registry module
-- Test: `tests/test_supervisor_plan_skill_registry.py`
+- Test: `tests/test_supervisor_plan.py`
+- Test: `tests/test_agent_task_queue.py`
+- Test: `tests/test_internal_agent_skill_registry_contract.py`
 
 Behavior cases:
 
@@ -218,6 +226,22 @@ Acceptance:
 - Browser shows each task’s chosen Skill and “为什么选它”.
 - Queue still does not execute until user approves dispatch.
 - No canonical method rule is promoted automatically.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_10_journey_view_renders_supervisor_plan_and_task_queue -v
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests -v
+node --check Product/web/assets/app.js
+python3 -m unittest tests.test_supervisor_plan tests.test_agent_task_queue tests.test_internal_agent_skill_registry_contract -v
+git diff --check -- Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py tests/test_supervisor_plan.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+Manual acceptance:
+
+- Browser opened `http://127.0.0.1:8782/legacy?v=20260608-p0b-skill-visible-2`.
+- DOM check confirmed `supervisorSkillReviewCount=1`, `agentTaskSkillBindingCount=1`, `planBodyLength=935`, `queueBodyLength=3428`.
+- Screenshot saved to `artifacts/ui-checks/p0b-skill-visible-20260608.png`.
 
 ### Task P0-C: Execution backend selection layer
 
@@ -362,13 +386,13 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-B1 Skill Registry explanation contract**.
+Start with **P0-C1 Execution backend selection visibility**.
 
-Reason: backend contracts for topic-bound planning, backend selection and P0-D readability are now guarded by tests. The next highest-value product capability is making SupervisorPlan and Agent Task Queue explain which internal skill is selected, why it is selected, what evidence it requires, and where human review is still needed.
+Reason: P0-B1 已经让任务队列解释 Skill 选择。下一步要让用户同样看清楚“这个任务准备用哪个后端执行、为什么、不可用时怎么办”，把 StatsPAI / Python / StataMCP / CodexSubagent 从候选词推进到可审阅的执行选择层。
 
-20-minute boundary for P0-B1:
+20-minute boundary for P0-C1:
 
-- Write/confirm 2-3 BDD contract tests around skill explanation metadata.
-- Wire the smallest metadata path into SupervisorPlan / queue output.
-- Do not implement canonical skill ingestion or execution behavior in this node.
-- Verify with targeted tests first; browser wiring can be a follow-up node if backend metadata is not yet exposed on the current page.
+- Inspect current backend selection fields and frontend rendering.
+- Add/confirm one failing contract for visible backend selection reason and fallback.
+- Wire only the smallest user-visible metadata path.
+- Do not implement StatsPAI/StataMCP execution in this node.

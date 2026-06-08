@@ -531,6 +531,133 @@ textarea {
   background: rgba(245, 245, 242, 0.9);
 }
 
+.agent-task-skill-bindings {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+}
+
+.agent-task-skill-bindings.is-empty {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-task-skill-binding {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(30, 111, 98, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.agent-task-skill-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.agent-task-skill-head strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.agent-task-skill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-task-skill-grid > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(30, 111, 98, 0.1);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.74);
+}
+
+.agent-task-skill-grid p {
+  margin: 6px 0 0;
+}
+
+.agent-task-skill-grid ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.agent-task-skill-grid li {
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.supervisor-plan-skill-review {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(30, 111, 98, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.supervisor-plan-skill-review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.supervisor-plan-skill-review-head h4 {
+  margin: 4px 0;
+}
+
+.supervisor-plan-skill-list {
+  display: grid;
+  gap: 10px;
+}
+
+.supervisor-plan-skill-item {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(120px, 0.8fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.74);
+}
+
+.supervisor-plan-skill-item strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.supervisor-plan-skill-item p,
+.supervisor-plan-skill-contract p {
+  margin: 6px 0 0;
+}
+
+.supervisor-plan-skill-item ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.supervisor-plan-skill-item li {
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.supervisor-plan-skill-contract {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
 .supervisor-plan-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

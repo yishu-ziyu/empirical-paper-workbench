@@ -604,6 +604,26 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("审计日志", self.app_js)
         self.assertIn("details_collapsed_by_default", self.app_js)
 
+    def test_bdd_9_frontend_exposes_internal_skill_explanation_in_task_details(self) -> None:
+        """行为 9：任务详情必须解释绑定了哪个 Skill、为什么选它、产物和执行边界。"""
+        self.assertIn("renderAgentTaskSkillBindings", self.app_js)
+        self.assertIn("internal_skill_bindings", self.app_js)
+        self.assertIn("why_this_skill", self.app_js)
+        self.assertIn("为什么选这个 Skill", self.app_js)
+        self.assertIn("预期产物", self.app_js)
+        self.assertIn("执行边界", self.app_js)
+        self.assertIn("Skill 来源", self.app_js)
+        self.assertIn(".agent-task-skill-binding", self.styles_css)
+
+    def test_bdd_10_journey_view_renders_supervisor_plan_and_task_queue(self) -> None:
+        """行为 10：进入工作台首页后，SupervisorPlan 与 Agent Task Queue 不能停留在空容器。"""
+        journey_start = self.app_js.index("function renderJourney()")
+        journey_end = self.app_js.index("// --- Data & Variables Page ---", journey_start)
+        journey_body = self.app_js[journey_start:journey_end]
+
+        self.assertIn("renderSupervisorPlan();", journey_body)
+        self.assertIn("renderAgentTaskQueue();", journey_body)
+
 
 if __name__ == "__main__":
     unittest.main()

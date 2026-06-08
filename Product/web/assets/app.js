@@ -1024,6 +1024,72 @@ function renderIntelligenceLayer(intelligence_layer) {
   `;
 }
 
+function renderSupervisorPlanSkillReview(plan) {
+  const recommendedSkills = Array.isArray(plan.recommended_internal_skills) ? plan.recommended_internal_skills : [];
+  const reviewContract = plan.skill_review_contract || {};
+  const applicabilityReason = plan.applicability_reason || {};
+  const missingEvidence = Array.isArray(plan.missing_evidence) ? plan.missing_evidence : [];
+
+  if (!recommendedSkills.length && !Object.keys(reviewContract).length && !missingEvidence.length) {
+    return "";
+  }
+
+  const humanReviewStatus = plan.skill_review_status || (reviewContract.human_review_required ? "needs_human_skill_review" : "not_required");
+  return `
+    <section class="supervisor-plan-skill-review">
+      <div class="supervisor-plan-skill-review-head">
+        <div>
+          <span class="meta-label">人工审阅状态</span>
+          <h4>推荐 Skill</h4>
+          <p class="muted">${escapeHtml(productTermLabel(humanReviewStatus))}</p>
+        </div>
+        <span class="pill">${reviewContract.human_review_required ? "需要审阅" : "已满足"}</span>
+      </div>
+      <div class="supervisor-plan-skill-list">
+        ${recommendedSkills.length ? recommendedSkills.map((skill) => {
+          const skillId = skill.skill_id || "";
+          const reason = applicabilityReason[skillId]
+            || skill.semantic_selection_reason
+            || skill.matched_reason
+            || "等待 Supervisor 补充选择理由。";
+          const skillMissingEvidence = missingEvidence.filter((item) => item.skill_id === skillId);
+          const sourceNames = Array.isArray(skill.external_source_names) ? skill.external_source_names : [];
+          return `
+            <article class="supervisor-plan-skill-item">
+              <div>
+                <span class="meta-label">${escapeHtml(skillId)}</span>
+                <strong>${escapeHtml(skill.name || skillId || "未命名 Skill")}</strong>
+              </div>
+              <div>
+                <span class="meta-label">选择理由</span>
+                <p>${escapeHtml(reason)}</p>
+              </div>
+              <div>
+                <span class="meta-label">缺失证据</span>
+                ${skillMissingEvidence.length ? `
+                  <ul>
+                    ${skillMissingEvidence.map((item) => `
+                      <li>${escapeHtml(item.required_state || item.description || item.reason || "待补齐证据")}</li>
+                    `).join("")}
+                  </ul>
+                ` : "<p class='muted'>当前没有额外缺失项。</p>"}
+              </div>
+              <div>
+                <span class="meta-label">Skill 来源</span>
+                <p class="muted">${escapeHtml(sourceNames.length ? sourceNames.join("、") : (skill.selection_source || "internal_registry"))}</p>
+              </div>
+            </article>
+          `;
+        }).join("") : "<p class='muted'>当前计划没有推荐内部 Skill。</p>"}
+      </div>
+      <div class="supervisor-plan-skill-contract">
+        <span class="meta-label">审阅契约</span>
+        <p class="muted">${escapeHtml(reviewContract.auto_mode_boundary || "Auto Mode 只能生成草案层建议，正式层仍需人工确认。")}</p>
+      </div>
+    </section>
+  `;
+}
+
 function renderSupervisorPlan() {
   const container = document.getElementById("supervisor-plan-body");
   if (!container) return;
@@ -1095,6 +1161,7 @@ function renderSupervisorPlan() {
             <div><span class="meta-label">ResearchQuestion 版本</span><strong>${escapeHtml(String(inputQuestion.version ?? "-"))}</strong></div>
             <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
           </div>
+          ${renderSupervisorPlanSkillReview(plan)}
           ${hasPlan ? `
             <div class="supervisor-plan-grid">
               ${renderSupervisorPlanColumn("阶段计划", stagePlan, "goal")}
@@ -1271,6 +1338,70 @@ function renderAgentTaskBackendSelection(task) {
   return "";
 }
 
+function renderAgentTaskSkillBindings(task) {
+  const bindings = Array.isArray(task.internal_skill_bindings) ? task.internal_skill_bindings : [];
+  if (!bindings.length) {
+    return `
+      <div class="agent-task-skill-bindings is-empty">
+        <span class="meta-label">Skill 绑定</span>
+        <p class="muted">尚未绑定内部 Skill。这个任务会按 SupervisorPlan 的普通派工要求审阅。</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="agent-task-skill-bindings">
+      ${bindings.map((binding) => {
+        const why = binding.why_this_skill
+          || binding.semantic_selection_reason
+          || binding.matched_reason
+          || "等待 Supervisor 补充选择理由。";
+        const artifacts = Array.isArray(binding.expected_artifacts) ? binding.expected_artifacts : [];
+        const sources = Array.isArray(binding.skill_sources) ? binding.skill_sources : [];
+        return `
+          <article class="agent-task-skill-binding">
+            <div class="agent-task-skill-head">
+              <div>
+                <span class="meta-label">内部 Skill</span>
+                <strong>${escapeHtml(binding.name || binding.skill_id || "未命名 Skill")}</strong>
+                <p class="muted">${escapeHtml(binding.skill_id || "")} · ${escapeHtml(productTermLabel(binding.selection_source || "registry_rule_match"))}</p>
+              </div>
+              <span class="pill">${escapeHtml(productTermLabel(binding.risk_level || "medium"))}</span>
+            </div>
+            <div class="agent-task-skill-grid">
+              <div>
+                <span class="meta-label">为什么选这个 Skill</span>
+                <p>${escapeHtml(why)}</p>
+              </div>
+              <div>
+                <span class="meta-label">预期产物</span>
+                ${artifacts.length ? `
+                  <ul>
+                    ${artifacts.map((artifact) => `<li>${escapeHtml(String(artifact))}</li>`).join("")}
+                  </ul>
+                ` : "<p class='muted'>尚未声明。</p>"}
+              </div>
+              <div>
+                <span class="meta-label">执行边界</span>
+                <p>${escapeHtml(productTermLabel(binding.execution_boundary || "review_before_execution"))}</p>
+              </div>
+              <div>
+                <span class="meta-label">Skill 来源</span>
+                ${sources.length ? `
+                  <ul>
+                    ${sources.map((source) => `
+                      <li>${escapeHtml(source.name || source.url || "外部来源")}${source.license ? ` · ${escapeHtml(source.license)}` : ""}</li>
+                    `).join("")}
+                  </ul>
+                ` : "<p class='muted'>本地内部方法库。</p>"}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
 
 function renderAgentTaskQueueItem(task) {
   const inputEvidence = task.input_evidence || {};
@@ -1325,6 +1456,7 @@ function renderAgentTaskQueueItem(task) {
               <p class="muted">${escapeHtml(item.requirement || item.id || JSON.stringify(item))}</p>
             `).join("") : "<p class='muted'>尚未声明。</p>"}
           </div>
+          ${renderAgentTaskSkillBindings(task)}
           <div>
             <span class="meta-label">风险</span>
             ${riskFlags.length ? riskFlags.map((item) => `
@@ -3014,6 +3146,8 @@ function renderJourney() {
 
   intake.style.display = "none";
   pipeline.style.display = "block";
+  renderSupervisorPlan();
+  renderAgentTaskQueue();
 
   // Build stage statuses from backend data or fallback
   const stageSummaries = data.stage_summaries || [];

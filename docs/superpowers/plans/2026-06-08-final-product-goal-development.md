@@ -1067,3 +1067,58 @@ P1-J implementation:
 - The frontend now renders draft review actions and a `引用核验任务` section under the Agent Task Queue item.
 
 Next node: **P1-K verify citation tasks with connector/manual evidence records**.
+
+## P1-K Citation Verification Evidence Records
+
+Boundary: turn the candidate citation list into an auditable verification gate. This node records connector/manual evidence for each citation task and writes a citation verification log only after every required check is present. It does not fetch CNKI/Scholar/Zotero automatically yet.
+
+BDD:
+
+```text
+Behavior 25: record evidence for one citation verification task
+Given a LiteratureAgent task is citation_verification_ready
+And it contains pending citation_verification_tasks
+When the user or connector records authors, year, title, venue, doi_or_stable_url, relevance, connector, evidence_url, and note for one citation task
+Then that citation task becomes verified,
+stores the evidence record,
+keeps formal_write_allowed=false,
+and leaves the parent task blocked until all citation tasks are verified.
+
+Behavior 26: block incomplete citation evidence
+Given a citation verification task is pending
+When the user records evidence without a required check such as doi_or_stable_url
+Then the system rejects the request with citation_verification_evidence_incomplete
+and does not mutate the queue.
+
+Behavior 27: complete the citation verification gate
+Given every citation_verification_task has verified evidence
+When the final citation task is recorded
+Then the parent task becomes citation_verification_complete,
+writes Results/json/citation_verification_log.json,
+sets claims_verified_citations=true only for this evidence log,
+and exposes the next action as generate_verified_literature_package.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added the citation evidence API:
+  `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/citation-verification/{citation_task_id}`.
+- Required evidence fields are explicit: connector, authors, year, title, venue, DOI or stable URL, relevance, and evidence URL.
+- Incomplete evidence returns `citation_verification_evidence_incomplete` before the queue file is touched.
+- A verified citation task stores `evidence_record`, remains outside the formal layer, and leaves the parent task blocked until all candidate citations are verified.
+- When every citation task is verified, the parent task becomes `citation_verification_complete`, writes `Results/json/citation_verification_log.json`, and exposes `generate_verified_literature_package` as the next action.
+- The frontend now renders each citation task’s evidence state, a JSON evidence editor, and a `记录核验证据` action wired to the API.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_25_records_single_citation_verification_evidence tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_26_blocks_incomplete_citation_verification_evidence tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_27_all_verified_citations_write_verification_log tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_20_frontend_exposes_citation_evidence_recording_state -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+```
+
+Next node: **P1-L generate verified literature package from citation verification log**.

@@ -767,6 +767,37 @@ textarea {
   margin: 6px 0 0;
 }
 
+.agent-task-citation-evidence {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(32, 32, 32, 0.1);
+}
+
+.agent-task-citation-evidence textarea {
+  width: 100%;
+  min-height: 132px;
+  padding: 10px 12px;
+  border: 1px solid rgba(32, 32, 32, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.agent-task-citation-evidence textarea:focus {
+  outline: 2px solid rgba(32, 32, 32, 0.22);
+  outline-offset: 2px;
+}
+
+.agent-task-citation-evidence .secondary-button {
+  justify-self: start;
+}
+
 .agent-task-item h5 {
   margin: 0 0 4px;
   font-size: 16px;

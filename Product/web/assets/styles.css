@@ -672,6 +672,45 @@ textarea {
   justify-content: flex-end;
 }
 
+.agent-task-literature-draft {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(32, 32, 32, 0.14);
+  border-radius: 10px;
+  background: rgba(245, 245, 244, 0.86);
+}
+
+.agent-task-literature-draft strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.agent-task-literature-draft__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-task-literature-draft__grid > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(32, 32, 32, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.agent-task-literature-draft p,
+.agent-task-literature-draft code {
+  display: block;
+  margin: 6px 0 0;
+}
+
+.agent-task-literature-draft code {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
 .agent-task-item h5 {
   margin: 0 0 4px;
   font-size: 16px;

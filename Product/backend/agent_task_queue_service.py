@@ -325,6 +325,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "draft_literature_review",
         }
+    if status == "draft_literature_review_ready":
+        return {
+            "id": "review_draft_literature_review",
+            "label": "审阅草稿综述",
+            "reason": "草稿层文献综述已生成，下一步审阅引用候选、缺失证据和正式层边界。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "draft_literature_review_review",
+        }
     if status == "rejected":
         return {
             "id": "replace_literature_search",
@@ -1157,6 +1166,69 @@ def review_project_reference_seed_package(
     return response
 
 
+def generate_project_draft_literature_review(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    seed_review = task.get("reference_seed_review") if isinstance(task.get("reference_seed_review"), dict) else {}
+    if seed_review.get("status") != "approved_for_draft":
+        raise AgentTaskQueueBlockedError(
+            "reference_seed_review_required",
+            "Approved reference seed package review is required before drafting a literature review.",
+        )
+    execution_result = task.get("execution_result") if isinstance(task.get("execution_result"), dict) else {}
+    if execution_result.get("execution_kind") != "reference_chain_seed_package":
+        raise AgentTaskQueueBlockedError(
+            "reference_seed_package_required",
+            "Reference seed package execution result is required before drafting a literature review.",
+        )
+    seed_artifact_path = str(execution_result.get("artifact_path") or "")
+    seed_artifact = project_root / seed_artifact_path
+    if not seed_artifact_path or not seed_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "reference_seed_package_missing",
+            "Reference seed package file is missing.",
+        )
+
+    package = json.loads(seed_artifact.read_text(encoding="utf-8"))
+    timestamp = utc_now()
+    draft_artifact_path = seed_artifact.parent / "draft_literature_review.md"
+    draft_text = build_draft_literature_review_markdown(package, task)
+    draft_artifact_path.write_text(draft_text, encoding="utf-8")
+    relative_draft_path = draft_artifact_path.relative_to(project_root).as_posix()
+    draft = build_draft_literature_review_record(package, seed_artifact_path, relative_draft_path, timestamp)
+    task["draft_literature_review"] = draft
+    task["status"] = "draft_literature_review_ready"
+    task["next_action"] = "review_draft_literature_review"
+    task["can_execute"] = False
+    task["blockers"] = []
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "draft_literature_review_generated",
+            "actor": "system",
+            "timestamp": timestamp,
+            "source_artifact_path": seed_artifact_path,
+            "artifact_path": relative_draft_path,
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["draft_literature_review"] = draft
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1188,3 +1260,79 @@ def build_reference_seed_package_review(action: str, note: str, timestamp: str) 
         "next_action_label": next_action_label,
         "evidence_level": "local_file",
     }
+
+
+def build_draft_literature_review_record(
+    package: dict[str, Any],
+    seed_artifact_path: str,
+    draft_artifact_path: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    candidate_queries = normalize_list(package.get("candidate_queries"))
+    return {
+        "status": "draft_ready",
+        "schema_version": "p1.draft_literature_review.v1",
+        "draft_layer": "exploratory",
+        "artifact_path": draft_artifact_path,
+        "source_artifact_path": seed_artifact_path,
+        "source_review_gate": "review_literature_seed_package",
+        "research_question": str(package.get("research_question") or ""),
+        "candidate_query_count": len(candidate_queries),
+        "citation_state": "candidate",
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "claims_verified_citations": False,
+        "next_action": "review_draft_literature_review",
+        "next_action_label": "审阅草稿综述",
+        "limitations": "这份文献综述来自候选来源种子包，只能作为草稿层材料；引用、作者、年份、期刊和 DOI 仍需人工或连接器核验。",
+        "created_at": timestamp,
+        "evidence_level": "local_file",
+    }
+
+
+def build_draft_literature_review_markdown(package: dict[str, Any], task: dict[str, Any]) -> str:
+    question = str(package.get("research_question") or task.get("summary") or task.get("title") or "").strip()
+    candidate_queries = [item for item in normalize_list(package.get("candidate_queries")) if isinstance(item, dict)]
+    source_lines = []
+    for query in candidate_queries:
+        source_lines.append(
+            "- "
+            f"{query.get('source_label') or query.get('source_id')}: "
+            f"`{query.get('query') or ''}`；"
+            f"模式={query.get('mode') or 'candidate'}；"
+            f"状态={query.get('review_state') or 'candidate'}。"
+        )
+    if not source_lines:
+        source_lines.append("- 暂无候选检索式；需要回到 reference chain 重新生成种子包。")
+    return "\n".join(
+        [
+            "# 文献综述草稿",
+            "",
+            f"研究题目：{question}",
+            "",
+            "## 1. 研究问题定位",
+            "",
+            f"本草稿围绕“{question}”展开。当前材料用于确认相关文献方向、变量线索和方法规范，不直接进入正式论文层。",
+            "",
+            "## 2. 候选检索式",
+            "",
+            *source_lines,
+            "",
+            "## 3. 初步综述结构",
+            "",
+            "1. 先整理与研究题目直接相关的核心实证研究，确认主要因变量、自变量和控制变量的常见设定。",
+            "2. 再追踪数据来源和制度背景文献，判断现有数据是否支持题目要求的样本、时间和层级。",
+            "3. 最后进入方法规范检查，确认是否需要 DID、IV、RDD、PSM、DML 或其他识别门。",
+            "",
+            "## 4. 待补证据",
+            "",
+            "- CNKI、Google Scholar、Zotero 和本地笔记中的候选文献需要继续核验。",
+            "- 每条引用进入正式层前，需要核对作者、年份、题名、期刊/工作论文版本和 DOI 或稳定链接。",
+            "- 当前还没有声明任何引用已验证，也没有写回正式论文。",
+            "",
+            "## 5. 草稿层边界",
+            "",
+            "这份文档由候选来源种子包生成，只能作为 exploratory / draft 材料。进入正式层前必须经过文献相关性审阅、引用元数据核验和人工确认。",
+            "",
+        ]
+    )

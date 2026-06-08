@@ -838,6 +838,55 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "reference_seed_package_required")
 
+    def test_bdd_21_approved_seed_package_generates_draft_layer_literature_review(self) -> None:
+        """行为 21：通过审阅的候选来源种子包可以生成草稿层文献综述，但不能写入正式层。"""
+        self._execute_reference_seed_package_task()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/reference-seed-review",
+            json={"action": "approve_for_draft", "note": "可以进入草稿综述。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+
+        drafted = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review"
+        )
+
+        self.assertEqual(drafted.status_code, 200, msg=drafted.text)
+        task = drafted.json()["agent_task_queue"]["tasks"][0]
+        draft = task["draft_literature_review"]
+        self.assertEqual(draft["status"], "draft_ready")
+        self.assertEqual(draft["draft_layer"], "exploratory")
+        self.assertEqual(draft["source_review_gate"], "review_literature_seed_package")
+        self.assertFalse(draft["formal_write_allowed"])
+        self.assertFalse(draft["claims_verified_citations"])
+        self.assertEqual(draft["next_action"], "review_draft_literature_review")
+        self.assertIn("候选来源种子包", draft["limitations"])
+        self.assertEqual(task["status"], "draft_literature_review_ready")
+        self.assertEqual(task["next_action"], "review_draft_literature_review")
+        self.assertEqual(task["primary_action"]["id"], "review_draft_literature_review")
+        self.assertEqual(task["primary_action"]["label"], "审阅草稿综述")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "draft_literature_review_generated")
+
+        draft_path = self.project_root / draft["artifact_path"]
+        self.assertTrue(draft_path.exists())
+        draft_text = draft_path.read_text(encoding="utf-8")
+        self.assertIn("# 文献综述草稿", draft_text)
+        self.assertIn("培训是否影响工资？", draft_text)
+        self.assertIn("候选检索式", draft_text)
+        self.assertIn("草稿层边界", draft_text)
+
+    def test_bdd_22_draft_literature_review_requires_approved_seed_package(self) -> None:
+        """行为 22：候选来源包未通过人工审阅时，不能跳过门禁直接生成综述草稿。"""
+        self._execute_reference_seed_package_task()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review"
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "reference_seed_review_required")
+
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
             status="approved",
@@ -1148,6 +1197,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("拒绝种子包", self.app_js)
         self.assertIn("不会写入正式层", self.app_js)
         self.assertIn(".agent-task-reference-seed-result__actions", self.styles_css)
+
+    def test_bdd_18_frontend_exposes_draft_literature_review_generation(self) -> None:
+        """行为 18：前端必须能从已审阅候选来源包进入草稿层文献综述生成。"""
+        self.assertIn("draftLiteratureReview", self.app_js)
+        self.assertIn("handleDraftLiteratureReview", self.app_js)
+        self.assertIn("data-draft-literature-review-action", self.app_js)
+        self.assertIn("草稿层文献综述", self.app_js)
+        self.assertIn("审阅草稿综述", self.app_js)
+        self.assertIn("不写入正式层", self.app_js)
+        self.assertIn(".agent-task-literature-draft", self.styles_css)
 
 
 if __name__ == "__main__":

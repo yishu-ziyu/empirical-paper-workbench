@@ -12,6 +12,7 @@ from .project_service import (
     execute_run_plan_method_tasks,
     utc_now,
 )
+from .reference_chain_seed_runner import write_reference_chain_seed_package
 
 
 class ExecutionBackendSelectionError(RuntimeError):
@@ -471,6 +472,45 @@ def _execute_with_codex(
     Generates code/scripts only. Does NOT execute statistical estimation.
     Evidence level is local_file, NOT local_execution.
     """
+    if _is_reference_chain_task(task):
+        seed_package = write_reference_chain_seed_package(task, project_root, run_id, timestamp)
+        artifact_path = seed_package["artifact_path"]
+        task["status"] = "succeeded"
+        task["next_action"] = "completed"
+        task["can_execute"] = False
+        task["run_id"] = run_id
+        task["execution_result"] = {
+            "engine": "codex",
+            "execution_kind": "reference_chain_seed_package",
+            "evidence_level": "local_file",
+            "artifact_path": artifact_path,
+            "note": "Candidate source package generated. No citation is marked verified.",
+            "formal_write_allowed": False,
+            "writes_formal_layer": False,
+            "execution_boundary": _build_execution_boundary("codex", "local_file"),
+        }
+        task.setdefault("audit_log", []).append({
+            "event": "execution_succeeded",
+            "actor": "codex",
+            "timestamp": timestamp,
+            "run_id": run_id,
+            "backend_id": "codex",
+            "execution_kind": "reference_chain_seed_package",
+            "note": "Candidate source package generated, not formal writeback",
+        })
+        return {
+            "status": "succeeded",
+            "run_id": run_id,
+            "engine": "codex",
+            "execution_kind": "reference_chain_seed_package",
+            "evidence_level": "local_file",
+            "artifact_path": artifact_path,
+            "note": "Candidate source package generated. No citation is marked verified.",
+            "formal_write_allowed": False,
+            "writes_formal_layer": False,
+            "execution_boundary": _build_execution_boundary("codex", "local_file"),
+        }
+
     # Generate a script file
     script_dir = project_root / "Program" / "generated"
     script_dir.mkdir(parents=True, exist_ok=True)
@@ -522,6 +562,16 @@ print("Generated script for {method_id}: {formula}")
         "formal_write_allowed": False,
         "execution_boundary": _build_execution_boundary("codex", "local_file"),
     }
+
+
+def _is_reference_chain_task(task: dict[str, Any]) -> bool:
+    if isinstance(task.get("reference_chain_policy"), dict):
+        return True
+    task_text = " ".join(
+        str(task.get(key) or "")
+        for key in ("owner_agent", "role", "title", "summary")
+    ).lower()
+    return "literature" in task_text or "文献" in task_text or "引用" in task_text
 
 
 def _fail_execution(

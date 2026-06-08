@@ -823,3 +823,48 @@ P1-D implementation:
 - Kept CNKI / Scholar / Zotero / local notes / arXiv as a visible policy contract; no real crawler was added in this node.
 
 Next node: **P1-E add a deterministic literature-source runner scaffold that reads the policy but does not yet claim verified citations**.
+
+20-minute boundary for P1-E:
+
+- Do not add real CNKI / Scholar / Zotero crawling yet.
+- Do not mark any citation as verified.
+- Do not write into the formal manuscript or canonical method library.
+- Route only LiteratureAgent / reference-chain tasks through the new runner; keep ordinary Codex tasks as script generation.
+
+P1-E BDD:
+
+```text
+Given a LiteratureAgent task inherited reference_chain_policy
+When the user approves dispatch, selects Codex backend, and executes the task
+Then the system writes a candidate reference seed package under workspace/runs,
+and returns it as local_file evidence.
+
+Given the seed package is produced from source_priority
+When the package is inspected
+Then it preserves CNKI / Scholar / Zotero / local notes / arXiv priority,
+search bounds, required artifacts, and the review_literature_seed_package gate.
+
+Given candidate queries are generated
+When the package is inspected
+Then every query remains review_state=candidate and can_enter_formal_layer=false;
+the package explicitly says it does not claim verified citations.
+```
+
+P1-E verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_18_literature_task_codex_execution_writes_candidate_reference_seed_package -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/reference_chain_seed_runner.py Product/backend/execution_backend_service.py
+```
+
+P1-E implementation:
+
+- Added `Product/backend/reference_chain_seed_runner.py`.
+- LiteratureAgent / reference-chain Codex execution now writes `workspace/runs/{run_id}/reference_chain_seed_package.json`.
+- The package includes source priority, ordered sources, candidate queries, citation verification queue, verification policy, formal writeback gate, and `claims_verified_citations=false`.
+- `execute_agent_task_with_backend` now returns `execution_kind=reference_chain_seed_package` only for reference-chain tasks.
+- Existing non-literature Codex tasks still generate reviewable scripts, and the P2-AA execution backend tests remain green.
+
+Next node: **P1-F surface the seed package in task result review and connect it to the next human gate**.

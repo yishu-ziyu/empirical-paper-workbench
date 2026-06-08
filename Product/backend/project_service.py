@@ -568,6 +568,15 @@ def build_empirical_execution_contract(active_backend: str) -> dict[str, Any]:
                 "activation_policy": "必须生成并执行 do-file/log；未产生 Stata log 前不得标记为 local_execution。",
                 "detected_path": stata_path if stata_available else None,
             },
+            {
+                "id": "codex",
+                "label": "CodexSubagent",
+                "role": "draft_code_generation_engine",
+                "availability_status": "ready",
+                "evidence_level": "local_file",
+                "purpose": "生成可审阅的分析脚本、修复建议或执行草案；不直接冒充统计执行结果。",
+                "activation_policy": "只允许写入草案层脚本和审计说明；未经过人工审阅和真实执行前不得标记为 local_execution。",
+            },
         ],
     }
 

@@ -48,6 +48,22 @@ from pathlib import Path
 #   Then：只生成代码/脚本，不直接执行统计估计；执行结果标记为 local_file
 #         不冒充 local_execution 证据
 #
+# 行为 7：后端选择必须可解释
+#   Given：Agent Task 已完成人工派工审阅
+#   When：系统选择一个执行后端
+#   Then：任务记录 selection_reason、fallback_backend_ids、execution_boundary
+#         以及 formal_write_allowed=false，前端可以解释“为什么由它执行”
+#
+# 行为 8：后端不可用时要留下可见转路信息
+#   Given：用户选择的后端当前不可用
+#   When：尝试选择该后端
+#   Then：任务状态记录为 blocked_by_backend_unavailable，并暴露 retry/fallback choices
+#
+# 行为 9：Codex 子 Agent 后端属于草案层能力
+#   Given：任务选择 CodexSubagent 后端
+#   When：触发执行
+#   Then：只生成可审阅脚本，结果不能自动进入正式论文层
+#
 # 边界条件：
 #   - StatsPAI 未安装时 availability_status=not_installed，不能选为 active_backend
 #   - Stata 未安装时 availability_status=not_available，不能选为 active_backend
@@ -101,6 +117,67 @@ class TestAgentTaskExecutionBackendSelection:
             select_execution_backend(task, backend_id="statspai", _check_available=lambda b: False)
 
         assert exc_info.value.code == "backend_not_available"
+
+    def test_select_backend_records_product_explanation_fallback_and_boundary(self, tmp_path):
+        """
+        行为 7：
+        Given：任务已完成人工派工审阅
+        When：选择 Python OLS adapter 作为执行后端
+        Then：任务记录后端选择理由、fallback、执行边界和正式层阻断状态
+        """
+        task = _build_reviewed_task(tmp_path, task_id="task_ols_07")
+
+        result = select_execution_backend(task, backend_id="python_ols_adapter")
+
+        backend = result["selected_backend"]
+        assert backend["id"] == "python_ols_adapter"
+        assert backend["selection_reason"]
+        assert "python_ols_adapter" in backend["selection_reason"]
+        assert isinstance(backend["fallback_backend_ids"], list)
+        assert backend["fallback_backend_ids"]
+        assert backend["formal_write_allowed"] is False
+        assert backend["execution_boundary"]["can_enter_formal_layer_automatically"] is False
+        assert result["next_action"] == "execute"
+
+    def test_unavailable_backend_records_visible_blocker_and_fallback_choices(self, tmp_path):
+        """
+        行为 8：
+        Given：用户选择的 StatsPAI 后端不可用
+        When：尝试选择该后端
+        Then：任务留下 blocked_by_backend_unavailable 状态和可见 fallback choices
+        """
+        task = _build_reviewed_task(tmp_path, task_id="task_ols_08")
+
+        with pytest.raises(ExecutionBackendSelectionError) as exc_info:
+            select_execution_backend(task, backend_id="statspai", _check_available=lambda b: False)
+
+        assert exc_info.value.code == "backend_not_available"
+        assert task["status"] == "blocked_by_backend_unavailable"
+        assert task["next_action"] == "choose_fallback_backend"
+        assert task["can_execute"] is False
+        assert task["backend_blocker"]["code"] == "blocked_by_backend_unavailable"
+        assert "statspai" == task["backend_blocker"]["backend_id"]
+        assert task["backend_blocker"]["fallback_backend_ids"]
+        assert task["backend_blocker"]["retry_action"] == "retry_backend_selection"
+        assert any(event["event"] == "backend_unavailable" for event in task["audit_log"])
+
+    def test_codex_subagent_backend_can_be_selected_with_review_boundary(self, tmp_path):
+        """
+        行为 7 + 行为 9：
+        Given：任务已完成人工派工审阅
+        When：选择 CodexSubagent 作为后端
+        Then：任务记录它是草案层代码生成后端，不能自动进入正式层
+        """
+        task = _build_reviewed_task(tmp_path, task_id="task_ols_09")
+
+        result = select_execution_backend(task, backend_id="codex")
+
+        backend = result["selected_backend"]
+        assert backend["id"] == "codex"
+        assert backend["label"] == "CodexSubagent"
+        assert backend["formal_write_allowed"] is False
+        assert backend["execution_boundary"]["kind"] == "draft_code_generation"
+        assert backend["execution_boundary"]["requires_human_review_before_formal_layer"] is True
 
 
 class TestStatsPAIExecution:
@@ -231,6 +308,37 @@ class TestExecutionIsolation:
         assert result_a["run_id"] != result_b["run_id"]
         assert result_a["engine"] == "statspai"
         assert result_b["engine"] == "python_ols_adapter"
+
+
+class TestCodexSubagentExecutionBoundary:
+    """行为 9：Codex 子 Agent 后端属于草案层能力"""
+
+    def test_codex_execution_generates_script_without_formal_write_permission(self, tmp_path):
+        """
+        Given：任务选择 CodexSubagent 后端
+        When：触发执行
+        Then：只生成脚本，不执行统计估计，也不能自动写入正式论文层
+        """
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        (project_root / "Data").mkdir()
+        _create_sample_csv(project_root / "Data" / "analysis_sample.csv")
+
+        task = _build_backend_selected_task(
+            project_root,
+            task_id="task_codex_01",
+            backend_id="codex",
+            method_id="ols",
+        )
+
+        result = execute_agent_task_with_backend(task, project_root)
+
+        assert result["status"] == "succeeded"
+        assert result["engine"] == "codex"
+        assert result["evidence_level"] == "local_file"
+        assert result["formal_write_allowed"] is False
+        assert result["execution_boundary"]["can_enter_formal_layer_automatically"] is False
+        assert (project_root / result["artifact_path"]).exists()
 
 
 # =============================================================================

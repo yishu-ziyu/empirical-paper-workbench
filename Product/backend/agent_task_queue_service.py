@@ -29,6 +29,16 @@ CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "doi_or_stable_url",
     "relevance",
 ]
+CITATION_VERIFICATION_EVIDENCE_REQUIRED_FIELDS = [
+    "connector",
+    "authors",
+    "year",
+    "title",
+    "venue",
+    "doi_or_stable_url",
+    "relevance",
+    "evidence_url",
+]
 
 
 class AgentTaskQueueBlockedError(RuntimeError):
@@ -355,6 +365,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "citation_verification_tasks",
+        }
+    if status == "citation_verification_complete":
+        return {
+            "id": "generate_verified_literature_package",
+            "label": "生成已核验文献包",
+            "reason": "全部候选引用已记录核验证据，可以生成可追溯文献包。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "verified_literature_package",
         }
     if status == "rejected":
         return {
@@ -1334,6 +1353,95 @@ def review_project_draft_literature_review(
     return response
 
 
+def record_project_citation_verification_evidence(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    citation_task_id: str,
+    evidence: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_evidence = build_citation_verification_evidence_record(evidence)
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    citation_tasks = task.get("citation_verification_tasks")
+    if not isinstance(citation_tasks, list) or not citation_tasks:
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_task_not_found",
+            "Citation verification tasks are not open for this agent task.",
+        )
+
+    citation_task = next(
+        (
+            item
+            for item in citation_tasks
+            if isinstance(item, dict) and item.get("id") == citation_task_id
+        ),
+        None,
+    )
+    if citation_task is None:
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_task_not_found",
+            f"Citation verification task not found: {citation_task_id}.",
+        )
+
+    timestamp = utc_now()
+    citation_task["status"] = "verified"
+    citation_task["citation_state"] = "verified"
+    citation_task["review_state"] = "source_verified"
+    citation_task["evidence_record"] = normalized_evidence
+    citation_task["evidence_level"] = "verified_source_record"
+    citation_task["formal_write_allowed"] = False
+    citation_task["writes_formal_layer"] = False
+    citation_task["claims_verified_citations"] = True
+    citation_task["verified_at"] = timestamp
+
+    summary = build_citation_verification_summary(citation_tasks)
+    task["citation_verification_summary"] = summary
+    task["can_execute"] = False
+
+    if summary["pending_count"] == 0 and summary["needs_revision_count"] == 0:
+        log_record = write_citation_verification_log(project_root, task, citation_tasks, timestamp)
+        task["status"] = "citation_verification_complete"
+        task["next_action"] = "generate_verified_literature_package"
+        task["blockers"] = []
+        task["citation_verification_log"] = log_record
+    else:
+        task["status"] = "citation_verification_ready"
+        task["next_action"] = "verify_citations"
+        task["blockers"] = [
+            {
+                "code": "citation_verification_pending",
+                "label": "引用核验未完成",
+                "description": f"还有 {summary['pending_count']} 条候选引用需要补充来源证据。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "citation_verification_evidence_recorded",
+            "actor": "human",
+            "timestamp": timestamp,
+            "citation_task_id": citation_task_id,
+            "connector": normalized_evidence["connector"],
+            "evidence_level": "verified_source_record",
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["citation_verification_summary"] = summary
+    response["citation_task"] = citation_task
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1455,6 +1563,94 @@ def build_citation_verification_tasks(
             }
         )
     return tasks
+
+
+def build_citation_verification_evidence_record(evidence: dict[str, Any]) -> dict[str, Any]:
+    missing = []
+    for field in CITATION_VERIFICATION_EVIDENCE_REQUIRED_FIELDS:
+        value = evidence.get(field)
+        if field == "authors":
+            if not normalize_list(value):
+                missing.append(field)
+        elif value is None or str(value).strip() == "":
+            missing.append(field)
+    if missing:
+        raise AgentTaskQueueBlockedError(
+            "citation_verification_evidence_incomplete",
+            f"Citation verification evidence is missing required fields: {', '.join(missing)}.",
+        )
+
+    timestamp = utc_now()
+    authors = [str(author).strip() for author in normalize_list(evidence.get("authors")) if str(author).strip()]
+    return {
+        "schema_version": "citation_verification_evidence.v1",
+        "connector": str(evidence.get("connector") or "").strip(),
+        "authors": authors,
+        "year": str(evidence.get("year") or "").strip(),
+        "title": str(evidence.get("title") or "").strip(),
+        "venue": str(evidence.get("venue") or "").strip(),
+        "doi_or_stable_url": str(evidence.get("doi_or_stable_url") or "").strip(),
+        "relevance": str(evidence.get("relevance") or "").strip(),
+        "evidence_url": str(evidence.get("evidence_url") or "").strip(),
+        "note": str(evidence.get("note") or "").strip(),
+        "required_checks_satisfied": CITATION_VERIFICATION_REQUIRED_CHECKS,
+        "verified_at": timestamp,
+        "formal_write_allowed": False,
+        "claims_verified_citations": True,
+    }
+
+
+def build_citation_verification_summary(citation_tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    total_count = len(citation_tasks)
+    verified_count = sum(1 for item in citation_tasks if isinstance(item, dict) and item.get("status") == "verified")
+    needs_revision_count = sum(1 for item in citation_tasks if isinstance(item, dict) and item.get("status") == "needs_revision")
+    pending_count = max(total_count - verified_count - needs_revision_count, 0)
+    return {
+        "total_count": total_count,
+        "verified_count": verified_count,
+        "pending_count": pending_count,
+        "needs_revision_count": needs_revision_count,
+        "formal_write_allowed": False,
+        "claims_verified_citations": pending_count == 0 and needs_revision_count == 0 and total_count > 0,
+    }
+
+
+def write_citation_verification_log(
+    project_root: Path,
+    task: dict[str, Any],
+    citation_tasks: list[dict[str, Any]],
+    timestamp: str,
+) -> dict[str, Any]:
+    log_path = Path("Results/json/citation_verification_log.json")
+    records = [
+        item.get("evidence_record", {})
+        for item in citation_tasks
+        if isinstance(item, dict) and isinstance(item.get("evidence_record"), dict)
+    ]
+    payload = {
+        "schema_version": "citation_verification_log.v1",
+        "evidence_id": "citation_verification_log",
+        "status": "verified",
+        "source_task_id": str(task.get("id") or ""),
+        "verified_count": len(records),
+        "total_count": len(citation_tasks),
+        "claims_verified_citations": True,
+        "formal_write_allowed": False,
+        "records": records,
+        "created_at": timestamp,
+    }
+    absolute_log_path = project_root / log_path
+    absolute_log_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_log_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "schema_version": payload["schema_version"],
+        "status": payload["status"],
+        "artifact_path": str(log_path),
+        "verified_count": payload["verified_count"],
+        "claims_verified_citations": True,
+        "formal_write_allowed": False,
+        "created_at": timestamp,
+    }
 
 
 def build_draft_literature_review_record(

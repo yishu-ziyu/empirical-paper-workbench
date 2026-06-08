@@ -80,6 +80,8 @@ const state = {
   draftingLiteratureReviewTaskId: null,
   reviewingDraftLiteratureReviewTaskId: null,
   reviewingDraftLiteratureReviewAction: null,
+  recordingCitationEvidenceTaskId: null,
+  recordingCitationEvidenceCitationId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -496,6 +498,13 @@ const v2api = {
     },
     async reviewDraftLiteratureReview(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/draft-literature-review-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    async recordCitationVerificationEvidence(projectId, taskId, citationTaskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/citation-verification/${citationTaskId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1626,13 +1635,14 @@ function renderCitationVerificationTasks(task = {}) {
     : [];
   if (!citationTasks.length) return "";
   const pendingCount = citationTasks.filter((item) => item.status === "pending").length;
+  const verifiedCount = citationTasks.filter((item) => item.status === "verified").length;
   return `
     <div class="agent-task-citation-verification">
       <div class="agent-task-citation-verification__head">
         <div>
           <span class="meta-label">引用核验任务</span>
           <strong>${escapeHtml(String(citationTasks.length))} 条候选来源待核验</strong>
-          <p class="muted">待处理 ${escapeHtml(String(pendingCount))} 条 · 不宣称引用已验证 · 不写入正式层</p>
+          <p class="muted">已核验 ${escapeHtml(String(verifiedCount))} 条 · 等待补证 ${escapeHtml(String(pendingCount))} 条 · 不写入正式层</p>
         </div>
         <span class="pill">${escapeHtml(productTermLabel(task.next_action || "verify_citations"))}</span>
       </div>
@@ -1643,11 +1653,37 @@ function renderCitationVerificationTasks(task = {}) {
             <strong>${escapeHtml(productTermLabel(item.status || "pending"))}</strong>
             <p>${escapeHtml(item.query || "等待补充检索式")}</p>
             <p class="muted">需要核验：${escapeHtml((item.required_checks || []).join(" / "))}</p>
+            <div class="agent-task-citation-evidence">
+              <div>
+                <strong>${item.status === "verified" ? "已核验证据" : "等待补证"}</strong>
+                <p class="muted">${escapeHtml(item.evidence_record?.doi_or_stable_url || "录入作者、年份、题名、来源和 DOI 或稳定链接后才算完成。")}</p>
+              </div>
+              ${item.status === "verified" ? "" : `
+                <textarea data-citation-evidence-json data-agent-task-id="${escapeHtml(task.id || "")}" data-citation-task-id="${escapeHtml(item.id || "")}" rows="5">${escapeHtml(citationEvidenceTemplate(item))}</textarea>
+                <button class="secondary-button" data-citation-verification-evidence-action data-agent-task-id="${escapeHtml(task.id || "")}" data-citation-task-id="${escapeHtml(item.id || "")}" ${state.recordingCitationEvidenceTaskId === task.id && state.recordingCitationEvidenceCitationId === item.id ? "disabled" : ""}>
+                  ${state.recordingCitationEvidenceTaskId === task.id && state.recordingCitationEvidenceCitationId === item.id ? "写回中..." : "记录核验证据"}
+                </button>
+              `}
+            </div>
           </article>
         `).join("")}
       </div>
     </div>
   `;
+}
+
+function citationEvidenceTemplate(item = {}) {
+  return JSON.stringify({
+    connector: "manual",
+    authors: [],
+    year: "",
+    title: item.source_label || "",
+    venue: "",
+    doi_or_stable_url: "",
+    relevance: "direct",
+    evidence_url: "",
+    note: `核验：${item.query || item.source_label || item.id || ""}`,
+  }, null, 2);
 }
 
 function renderAgentTaskExecutionHandoff(task) {
@@ -2386,6 +2422,39 @@ async function handleDraftLiteratureReviewReview(taskId, action) {
   } finally {
     state.reviewingDraftLiteratureReviewTaskId = null;
     state.reviewingDraftLiteratureReviewAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleCitationVerificationEvidence(taskId, citationTaskId) {
+  if (!state.selectedProjectId || !taskId || !citationTaskId) return;
+  clearV2Error("overview");
+  const selector = `textarea[data-citation-evidence-json][data-agent-task-id="${CSS.escape(taskId)}"][data-citation-task-id="${CSS.escape(citationTaskId)}"]`;
+  const textarea = document.querySelector(selector);
+  let payload;
+  try {
+    payload = JSON.parse(textarea?.value || "{}");
+  } catch (error) {
+    showV2Error("overview", `引用核验证据不是有效 JSON：${error.message}`);
+    return;
+  }
+
+  state.recordingCitationEvidenceTaskId = taskId;
+  state.recordingCitationEvidenceCitationId = citationTaskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.recordCitationVerificationEvidence(
+      state.selectedProjectId,
+      taskId,
+      citationTaskId,
+      payload,
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `记录引用核验证据失败：${error.message}`);
+  } finally {
+    state.recordingCitationEvidenceTaskId = null;
+    state.recordingCitationEvidenceCitationId = null;
     renderAgentTaskQueue();
   }
 }
@@ -7418,6 +7487,14 @@ async function boot() {
       void handleDraftLiteratureReviewReview(
         draftLiteratureReviewReviewButton.dataset.agentTaskId || "",
         draftLiteratureReviewReviewButton.dataset.draftLiteratureReviewReviewAction || "",
+      );
+      return;
+    }
+    const citationEvidenceButton = target.closest("[data-citation-verification-evidence-action]");
+    if (citationEvidenceButton) {
+      void handleCitationVerificationEvidence(
+        citationEvidenceButton.dataset.agentTaskId || "",
+        citationEvidenceButton.dataset.citationTaskId || "",
       );
       return;
     }

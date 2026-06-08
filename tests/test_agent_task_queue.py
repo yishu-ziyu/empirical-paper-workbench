@@ -938,6 +938,85 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "draft_literature_review_required")
 
+    def test_bdd_25_records_single_citation_verification_evidence(self) -> None:
+        """行为 25：单条候选引用可以写入人工或连接器证据，但父任务仍等待剩余引用。"""
+        self._open_citation_verification_tasks()
+
+        verified = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/citation-verification/citation_verification_01",
+            json=self._valid_citation_evidence_payload(),
+        )
+
+        self.assertEqual(verified.status_code, 200, msg=verified.text)
+        task = verified.json()["agent_task_queue"]["tasks"][0]
+        citation_task = task["citation_verification_tasks"][0]
+        self.assertEqual(citation_task["status"], "verified")
+        self.assertEqual(citation_task["citation_state"], "verified")
+        self.assertEqual(citation_task["evidence_record"]["connector"], "manual")
+        self.assertEqual(citation_task["evidence_record"]["doi_or_stable_url"], "https://doi.org/10.1257/aer.20200123")
+        self.assertFalse(citation_task["formal_write_allowed"])
+        self.assertTrue(citation_task["claims_verified_citations"])
+        self.assertEqual(task["status"], "citation_verification_ready")
+        self.assertEqual(task["next_action"], "verify_citations")
+        self.assertEqual(task["citation_verification_summary"]["verified_count"], 1)
+        self.assertGreater(task["citation_verification_summary"]["pending_count"], 0)
+        self.assertEqual(task["audit_log"][-1]["event"], "citation_verification_evidence_recorded")
+
+    def test_bdd_26_blocks_incomplete_citation_verification_evidence(self) -> None:
+        """行为 26：引用核验证据缺少必需字段时，不能污染候选引用任务。"""
+        self._open_citation_verification_tasks()
+        before = (self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8")
+        payload = self._valid_citation_evidence_payload()
+        payload.pop("doi_or_stable_url")
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/citation-verification/citation_verification_01",
+            json=payload,
+        )
+
+        self.assertEqual(blocked.status_code, 400, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "citation_verification_evidence_incomplete")
+        after = (self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8")
+        self.assertEqual(before, after)
+
+    def test_bdd_27_all_verified_citations_write_verification_log(self) -> None:
+        """行为 27：全部候选引用核验完成后，写出 citation_verification_log.json 并开放下一步。"""
+        self._open_citation_verification_tasks()
+        queue = json.loads((self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8"))
+        citation_tasks = queue["tasks"][0]["citation_verification_tasks"]
+
+        response = None
+        for index, citation_task in enumerate(citation_tasks, start=1):
+            payload = self._valid_citation_evidence_payload(
+                title=f"Verified citation {index}",
+                doi=f"https://doi.org/10.1257/aer.2020{index:04d}",
+            )
+            response = self.client.put(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/citation-verification/{citation_task['id']}",
+                json=payload,
+            )
+            self.assertEqual(response.status_code, 200, msg=response.text)
+
+        self.assertIsNotNone(response)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        self.assertEqual(task["status"], "citation_verification_complete")
+        self.assertEqual(task["next_action"], "generate_verified_literature_package")
+        self.assertEqual(task["primary_action"]["id"], "generate_verified_literature_package")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["citation_verification_summary"]["pending_count"], 0)
+        self.assertEqual(task["citation_verification_summary"]["verified_count"], len(citation_tasks))
+        log_record = task["citation_verification_log"]
+        self.assertEqual(log_record["status"], "verified")
+        self.assertTrue(log_record["claims_verified_citations"])
+        self.assertFalse(log_record["formal_write_allowed"])
+
+        log_path = self.project_root / "Results" / "json" / "citation_verification_log.json"
+        self.assertTrue(log_path.exists())
+        log = json.loads(log_path.read_text(encoding="utf-8"))
+        self.assertEqual(log["schema_version"], "citation_verification_log.v1")
+        self.assertEqual(log["verified_count"], len(citation_tasks))
+        self.assertTrue(log["claims_verified_citations"])
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -949,6 +1028,32 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review"
         )
         self.assertEqual(drafted.status_code, 200, msg=drafted.text)
+
+    def _open_citation_verification_tasks(self) -> None:
+        self._generate_draft_literature_review_task()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review-review",
+            json={"action": "approve_for_citation_verification", "note": "草稿可进入引用核验。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+
+    def _valid_citation_evidence_payload(
+        self,
+        *,
+        title: str = "Verified empirical reference",
+        doi: str = "https://doi.org/10.1257/aer.20200123",
+    ) -> dict:
+        return {
+            "connector": "manual",
+            "authors": ["Acemoglu", "Restrepo"],
+            "year": "2020",
+            "title": title,
+            "venue": "American Economic Review",
+            "doi_or_stable_url": doi,
+            "relevance": "direct",
+            "evidence_url": doi,
+            "note": "人工核对作者、年份、题名、来源和稳定链接。",
+        }
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1281,6 +1386,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("引用核验任务", self.app_js)
         self.assertIn("不宣称引用已验证", self.app_js)
         self.assertIn(".agent-task-citation-verification", self.styles_css)
+
+    def test_bdd_20_frontend_exposes_citation_evidence_recording_state(self) -> None:
+        """行为 20：前端必须展示引用核验证据状态和证据记录入口。"""
+        self.assertIn("recordCitationVerificationEvidence", self.app_js)
+        self.assertIn("handleCitationVerificationEvidence", self.app_js)
+        self.assertIn("data-citation-verification-evidence-action", self.app_js)
+        self.assertIn("记录核验证据", self.app_js)
+        self.assertIn("已核验证据", self.app_js)
+        self.assertIn("等待补证", self.app_js)
+        self.assertIn(".agent-task-citation-evidence", self.styles_css)
 
 
 if __name__ == "__main__":

@@ -539,18 +539,18 @@ export function ExecutionPanel({
           display: inline-flex;
           align-items: center;
           gap: 0.4rem;
-          background: #dedede;
-          color: #101010;
-          border: 1px solid #dedede;
+          background: var(--color-button-primary-bg);
+          color: var(--color-button-primary-ink);
+          border: 1px solid var(--color-button-primary-bg);
           border-radius: 6px;
           padding: 0.5rem 0.9rem;
           cursor: pointer;
           font-size: 0.9rem;
         }
         .execution-panel__button:disabled {
-          background: rgba(230, 230, 230, 0.08);
-          color: #9a9a9a;
-          border-color: rgba(230, 230, 230, 0.16);
+          background: var(--color-button-disabled-bg);
+          color: var(--color-button-disabled-text);
+          border-color: var(--color-button-disabled-border);
           opacity: 1;
           cursor: not-allowed;
         }

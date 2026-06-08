@@ -78,8 +78,9 @@ class ReactInputTabsContractTest(unittest.TestCase):
 
         source = app_path.read_text(encoding="utf-8")
         self.assertIn("ResearchCommandInput", source)
-        self.assertIn("SemanticGlowCards", source)
         self.assertIn("SlideTabs", source)
+        self.assertIn("SystemStatusBar", source)
+        self.assertIn("stage-panel__current-action", source)
         self.assertIn("analysis-workspace", source)
         self.assertNotIn("AgentTaskQueue", source)
         self.assertNotIn("RightAuditDrawer", source)
@@ -131,8 +132,8 @@ class ReactInputTabsContractTest(unittest.TestCase):
         for token in overly_harsh_tokens:
             self.assertNotIn(token, css)
 
-        self.assertIn("--color-bg: #101010", css)
-        self.assertIn("--color-ink: #dddddd", css)
+        self.assertIn("--color-bg: #1d1d1d", css)
+        self.assertIn("--color-ink: #d2d2d2", css)
 
 
 if __name__ == "__main__":

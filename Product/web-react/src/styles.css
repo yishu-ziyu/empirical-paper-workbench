@@ -6,13 +6,13 @@
    * ────────────────────────────────────────────────────────────── */
 
   /* === 暗色主题色板 === */
-  --color-bg: #151515;
-  --color-panel: #202020;
-  --color-panel-soft: #282828;
-  --color-ink: #d4d4d4;
-  --color-strong: #e0e0e0;
-  --color-muted: #a4a4a4;
-  --color-subtle: #6a6a6a;
+  --color-bg: #1d1d1d;
+  --color-panel: #262626;
+  --color-panel-soft: #303030;
+  --color-ink: #d2d2d2;
+  --color-strong: #dedede;
+  --color-muted: #a8a8a8;
+  --color-subtle: #777777;
   --color-quaternary: #4a4a4a;
   --color-line: rgba(230, 230, 230, 0.1);
   --color-line-strong: rgba(230, 230, 230, 0.22);
@@ -32,6 +32,15 @@
   --color-info-soft: rgba(90, 138, 196, 0.18);
   --color-inverse: #161616;
   --color-tab-active: #d9d9d9;
+  --color-button-primary-bg: #d6d6d6;
+  --color-button-primary-bg-hover: #e2e2e2;
+  --color-button-primary-ink: #171717;
+  --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
+  --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
+  --color-button-secondary-text: #d2d2d2;
+  --color-button-disabled-bg: rgba(230, 230, 230, 0.055);
+  --color-button-disabled-text: #b8b8b8;
+  --color-button-disabled-border: rgba(230, 230, 230, 0.18);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
   --shadow-ring: 0 0 0 1px var(--color-line);
@@ -64,7 +73,7 @@ body,
 }
 
 body {
-  background: radial-gradient(ellipse at top, #1b1b1b 0%, #151515 100%);
+  background: radial-gradient(ellipse at top, #242424 0%, #1d1d1d 100%);
   color: var(--color-ink);
   /* 排版细节 (Kami) */
   line-height: 1.55;
@@ -112,7 +121,7 @@ button {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.26;
+  opacity: 0.18;
 }
 
 .dotted-surface canvas {
@@ -656,14 +665,20 @@ button {
 }
 
 .send-button {
-  background: #f3f3f3;
-  color: var(--color-inverse);
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-ink);
 }
 
 .send-button:hover:not(:disabled),
 .send-button:focus-visible:not(:disabled) {
-  background: #e2e2e2;
-  color: #202020;
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-ink);
+}
+
+.send-button:disabled {
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border);
 }
 
 .mode-selector {
@@ -836,6 +851,30 @@ button {
   font-size: 18px;
 }
 
+.stage-panel__current-action {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 12px auto 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.045);
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.stage-panel__current-action strong {
+  color: var(--color-strong);
+  font-weight: 650;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -932,24 +971,23 @@ button {
   min-width: 118px;
   height: 44px;
   border: 1px solid rgba(230, 230, 230, 0.26);
-  background: #dedede;
-  color: #101010;
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-ink);
   box-shadow: none;
 }
 
 .task-brief__restart:hover:not(:disabled),
 .task-brief__restart:focus-visible:not(:disabled) {
   border-color: rgba(230, 230, 230, 0.42);
-  background: #eeeeee;
-  color: #101010;
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-ink);
   outline: 0;
 }
 
 .task-brief__restart:disabled {
-  opacity: 0.88;
-  background: rgba(230, 230, 230, 0.07);
-  color: #d8d8d8;
-  border-color: rgba(230, 230, 230, 0.22);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border);
   cursor: not-allowed;
 }
 
@@ -1016,6 +1054,9 @@ button {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  border: 1px solid var(--color-line);
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
   transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 100ms ease;
 }
 
@@ -1024,63 +1065,83 @@ button {
 }
 
 .btn--primary {
-  background: #dedede;
-  color: #121212;
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-ink);
   border: 1px solid transparent;
 }
 
 .btn--primary:hover {
-  background: #eeeeee;
-  color: #101010;
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-ink);
 }
 
 .btn--primary:disabled {
-  border-color: rgba(230, 230, 230, 0.16);
-  background: rgba(230, 230, 230, 0.08);
-  color: #9a9a9a;
+  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
   cursor: not-allowed;
 }
 
 .btn:disabled {
-  border-color: rgba(230, 230, 230, 0.16);
-  background: rgba(230, 230, 230, 0.08);
-  color: #9a9a9a;
+  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
   cursor: not-allowed;
 }
 
 .btn--secondary {
-  background: rgba(230, 230, 230, 0.035);
-  color: #dedede;
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
   border: 1px solid var(--color-line);
 }
 
 .btn--secondary:hover {
-  background: rgba(230, 230, 230, 0.076);
+  background: var(--color-button-secondary-bg-hover);
   border-color: var(--color-line-strong);
+}
+
+.btn--ghost {
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
+  border: 1px solid var(--color-line);
+}
+
+.btn--ghost:hover:not(:disabled),
+.btn--ghost:focus-visible:not(:disabled) {
+  background: var(--color-button-secondary-bg-hover);
+  color: var(--color-strong);
+  border-color: var(--color-line-strong);
+  outline: 0;
+}
+
+.btn--small {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
 }
 
 .workbench-saved-brief {
   min-width: 150px;
   height: 42px;
   border: 1px solid rgba(230, 230, 230, 0.22);
-  background: rgba(230, 230, 230, 0.07);
-  color: #d8d8d8;
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
   box-shadow: none;
 }
 
 .workbench-saved-brief:hover:not(:disabled),
 .workbench-saved-brief:focus-visible:not(:disabled) {
   border-color: rgba(230, 230, 230, 0.36);
-  background: rgba(230, 230, 230, 0.12);
-  color: #eeeeee;
+  background: var(--color-button-secondary-bg-hover);
+  color: var(--color-strong);
   outline: 0;
 }
 
 .workbench-saved-brief:disabled {
-  opacity: 0.88;
-  background: rgba(230, 230, 230, 0.07);
-  color: #d8d8d8;
-  border-color: rgba(230, 230, 230, 0.22);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border);
   cursor: not-allowed;
 }
 
@@ -1556,7 +1617,7 @@ button {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #dedede;
+  background: var(--color-strong);
   box-shadow: 0 0 8px rgba(230, 230, 230, 0.6);
 }
 
@@ -2410,50 +2471,50 @@ button {
   min-width: 118px;
   height: 44px;
   border: 1px solid rgba(230, 230, 230, 0.22);
-  background: #dedede;
-  color: #101010;
+  background: var(--color-button-primary-bg);
+  color: var(--color-button-primary-ink);
   box-shadow: none;
 }
 
 .step-card__buttons .btn:hover:not(:disabled),
 .step-card__buttons .btn:focus-visible:not(:disabled) {
   border-color: rgba(230, 230, 230, 0.42);
-  background: #eeeeee;
-  color: #101010;
+  background: var(--color-button-primary-bg-hover);
+  color: var(--color-button-primary-ink);
   outline: 0;
 }
 
 .step-card__buttons .btn:not(.btn--primary) {
-  background: rgba(230, 230, 230, 0.08);
-  color: #d8d8d8;
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
   border-color: rgba(230, 230, 230, 0.26);
 }
 
 .step-card__buttons .btn:not(.btn--primary):hover:not(:disabled),
 .step-card__buttons .btn:not(.btn--primary):focus-visible:not(:disabled) {
-  background: rgba(230, 230, 230, 0.14);
-  color: #f0f0f0;
+  background: var(--color-button-secondary-bg-hover);
+  color: var(--color-strong);
   border-color: rgba(230, 230, 230, 0.42);
 }
 
 .step-card__buttons .btn--ghost {
-  background: rgba(230, 230, 230, 0.04);
-  color: #d8d8d8;
+  background: var(--color-button-secondary-bg);
+  color: var(--color-button-secondary-text);
   border-color: rgba(230, 230, 230, 0.22);
 }
 
 .step-card__buttons .btn:disabled {
-  border-color: rgba(230, 230, 230, 0.16);
-  background: rgba(230, 230, 230, 0.08);
-  color: #9a9a9a;
+  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
   opacity: 1;
   cursor: not-allowed;
 }
 
 .step-card__buttons .btn:not(.btn--primary):disabled {
-  background: rgba(230, 230, 230, 0.08);
-  color: #9a9a9a;
-  border-color: rgba(230, 230, 230, 0.16);
+  background: var(--color-button-disabled-bg);
+  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border);
 }
 
 .step-card__modify {

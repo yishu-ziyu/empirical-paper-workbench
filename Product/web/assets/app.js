@@ -1378,6 +1378,59 @@ function renderAgentTaskBackendDetails(task) {
   `;
 }
 
+function firstMethodExecutionResult(executionResult) {
+  const methods = executionResult?.method_execution?.methods;
+  if (!Array.isArray(methods) || !methods.length) return {};
+  return methods.find((method) => method.task_id) || methods[0] || {};
+}
+
+function renderAgentTaskExecutionHandoff(task) {
+  const executionResult = task.execution_result || {};
+  const methodResult = firstMethodExecutionResult(executionResult);
+  const reproducibility = methodResult.reproducibility || {};
+  const evaluator = methodResult.evaluator || executionResult.evaluator || {};
+  const resultPath = executionResult.artifact_path
+    || executionResult.method_execution?.artifact_path
+    || reproducibility.result_artifact_path
+    || "";
+  const manifestPath = reproducibility.manifest_artifact_path
+    || executionResult.method_execution?.manifest_artifact_path
+    || "";
+  const auditLog = Array.isArray(task.audit_log) ? task.audit_log : [];
+  const runId = methodResult.run_id || reproducibility.run_id || "";
+  const evaluatorStatus = evaluator.status || executionResult.evaluator_status || "needs_review";
+  const nextAction = task.status === "succeeded"
+    ? (task.next_action === "completed" ? "进入结果审阅或草稿生成" : productTermLabel(task.next_action || "review_execution_result"))
+    : "查看失败原因并重新选择后端";
+
+  if (!resultPath && !manifestPath && !runId && !auditLog.length && !evaluatorStatus) return "";
+
+  return `
+    <div class="agent-task-execution-handoff">
+      <div>
+        <span class="meta-label">结果文件</span>
+        <code>${escapeHtml(resultPath || "等待写入结果文件")}</code>
+      </div>
+      <div>
+        <span class="meta-label">运行清单</span>
+        <code>${escapeHtml(manifestPath || "等待生成 run_manifest.json")}</code>
+      </div>
+      <div>
+        <span class="meta-label">评估器状态</span>
+        <p>${escapeHtml(evaluatorStatusLabel(evaluatorStatus))}${runId ? ` · ${escapeHtml(runId)}` : ""}</p>
+      </div>
+      <div>
+        <span class="meta-label">下一步动作</span>
+        <p>${escapeHtml(nextAction)}</p>
+      </div>
+      <div>
+        <span class="meta-label">审计线索</span>
+        <p>${escapeHtml(auditLog.length ? `${auditLog.length} 个任务审计事件已记录在任务详情中` : "运行清单和结果文件可用于复核本次执行。")}</p>
+      </div>
+    </div>
+  `;
+}
+
 function renderAgentTaskBackendSelection(task) {
   const status = task.status || "";
   const selectedBackend = task.selected_backend || {};
@@ -1462,6 +1515,7 @@ function renderAgentTaskBackendSelection(task) {
           <p class="muted">${resultLabel}</p>
         </div>
       </div>
+      ${renderAgentTaskExecutionHandoff(task)}
       ${renderAgentTaskBackendDetails(task)}
     `;
   }

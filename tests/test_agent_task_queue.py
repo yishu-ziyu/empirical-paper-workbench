@@ -1125,6 +1125,40 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.json()["error"]["code"], "verified_literature_package_review_required")
         self.assertFalse((self.project_root / "Results" / "json" / "manuscript_citation_plan.json").exists())
 
+    def test_bdd_34_review_manuscript_citation_plan_opens_draft_section_planning(self) -> None:
+        """行为 34：论文引用计划通过人工审阅后，才开放章节草稿规划。"""
+        self._generate_manuscript_citation_plan()
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/manuscript-citation-plan-review",
+            json={"action": "approve_for_draft_sections", "note": "引用绑定可以进入章节草稿规划。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        review = task["manuscript_citation_plan_review"]
+        self.assertEqual(review["status"], "approved_for_draft_sections")
+        self.assertEqual(review["review_gate"], "review_manuscript_citation_plan")
+        self.assertTrue(review["draft_section_plan_allowed"])
+        self.assertFalse(review["formal_write_allowed"])
+        self.assertEqual(task["status"], "manuscript_citation_plan_approved")
+        self.assertEqual(task["next_action"], "generate_draft_section_plan")
+        self.assertEqual(task["primary_action"]["id"], "generate_draft_section_plan")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "manuscript_citation_plan_reviewed")
+
+    def test_bdd_35_manuscript_citation_plan_review_requires_plan(self) -> None:
+        """行为 35：没有论文引用计划时，不能伪造引用计划审阅。"""
+        self._approve_verified_literature_package()
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/manuscript-citation-plan-review",
+            json={"action": "approve_for_draft_sections", "note": "还没有引用计划。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "manuscript_citation_plan_required")
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1196,6 +1230,14 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
         return reviewed
+
+    def _generate_manuscript_citation_plan(self):
+        self._approve_verified_literature_package()
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/manuscript-citation-plan"
+        )
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        return generated
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1565,6 +1607,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("生成论文引用计划", self.app_js)
         self.assertIn("manuscript_citation_plan", self.app_js)
         self.assertIn(".agent-task-manuscript-citation-plan", self.styles_css)
+
+    def test_bdd_24_frontend_exposes_manuscript_citation_plan_review_gate(self) -> None:
+        """行为 24：前端必须能审阅论文引用计划，再开放章节草稿规划。"""
+        self.assertIn("reviewManuscriptCitationPlan", self.app_js)
+        self.assertIn("handleManuscriptCitationPlanReview", self.app_js)
+        self.assertIn("data-manuscript-citation-plan-review-action", self.app_js)
+        self.assertIn("批准进入章节草稿", self.app_js)
+        self.assertIn("manuscript_citation_plan_review", self.app_js)
+        self.assertIn(".agent-task-manuscript-citation-plan__review", self.styles_css)
 
 
 if __name__ == "__main__":

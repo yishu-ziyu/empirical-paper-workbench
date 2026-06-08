@@ -26,6 +26,11 @@ VALID_VERIFIED_LITERATURE_PACKAGE_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_MANUSCRIPT_CITATION_PLAN_REVIEW_ACTIONS = {
+    "approve_for_draft_sections",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -406,6 +411,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "manuscript_citation_plan_review",
+        }
+    if status == "manuscript_citation_plan_approved":
+        return {
+            "id": "generate_draft_section_plan",
+            "label": "生成章节草稿计划",
+            "reason": "引用计划已通过审阅，下一步可以把已核验来源映射到章节草稿任务。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "draft_section_plan",
         }
     if status == "rejected":
         return {
@@ -1726,6 +1740,99 @@ def generate_project_manuscript_citation_plan(
     return response
 
 
+def review_project_manuscript_citation_plan(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_MANUSCRIPT_CITATION_PLAN_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_manuscript_citation_plan_review_action",
+            f"Unsupported manuscript citation plan review action: {action}.",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    plan_summary = task.get("manuscript_citation_plan") if isinstance(task.get("manuscript_citation_plan"), dict) else {}
+    plan_artifact_path = str(plan_summary.get("artifact_path") or "")
+    plan_artifact = project_root / plan_artifact_path
+    if task.get("status") != "manuscript_citation_plan_ready" or not plan_artifact_path or not plan_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "manuscript_citation_plan_required",
+            "Manuscript citation plan is required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_manuscript_citation_plan_review(action, note, timestamp)
+    task["manuscript_citation_plan_review"] = review
+    plan_summary["review_status"] = review["status"]
+    plan_summary["review_gate"] = review["review_gate"]
+    plan_summary["draft_section_plan_allowed"] = review["draft_section_plan_allowed"]
+    plan_summary["formal_write_allowed"] = False
+    task["manuscript_citation_plan"] = plan_summary
+
+    plan = json.loads(plan_artifact.read_text(encoding="utf-8"))
+    plan["review"] = review
+    plan["formal_write_allowed"] = False
+    plan["draft_section_plan_allowed"] = review["draft_section_plan_allowed"]
+    plan_artifact.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if action == "approve_for_draft_sections":
+        task["status"] = "manuscript_citation_plan_approved"
+        task["next_action"] = "generate_draft_section_plan"
+        task["can_execute"] = False
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "manuscript_citation_plan_needs_revision"
+        task["next_action"] = "revise_manuscript_citation_plan"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "manuscript_citation_plan_needs_revision",
+                "label": "论文引用计划需要修订",
+                "description": note or "按审阅意见调整引用绑定、章节归属或论证用途。",
+            }
+        ]
+    else:
+        task["status"] = "manuscript_citation_plan_rejected"
+        task["next_action"] = "replace_manuscript_citation_plan"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "manuscript_citation_plan_rejected",
+                "label": "论文引用计划已拒绝",
+                "description": note or "需要重新生成或替换引用计划。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "manuscript_citation_plan_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "status": review["status"],
+            "artifact_path": plan_artifact_path,
+            "draft_section_plan_allowed": review["draft_section_plan_allowed"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["manuscript_citation_plan_review"] = review
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1784,6 +1891,39 @@ def build_verified_literature_package_review(action: str, note: str, timestamp: 
         "reviewed_at": timestamp,
         "citation_state": "verified_source_record",
         "manuscript_citation_plan_allowed": manuscript_citation_plan_allowed,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_manuscript_citation_plan_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_draft_sections":
+        status = "approved_for_draft_sections"
+        next_action = "generate_draft_section_plan"
+        next_action_label = "生成章节草稿计划"
+        draft_section_plan_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_manuscript_citation_plan"
+        next_action_label = "要求修订引用计划"
+        draft_section_plan_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_manuscript_citation_plan"
+        next_action_label = "拒绝引用计划"
+        draft_section_plan_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_manuscript_citation_plan",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "citation_state": "section_binding_plan",
+        "draft_section_plan_allowed": draft_section_plan_allowed,
         "formal_write_allowed": False,
         "writes_formal_layer": False,
         "next_action": next_action,

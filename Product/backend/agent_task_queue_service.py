@@ -21,6 +21,11 @@ VALID_DRAFT_LITERATURE_REVIEW_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_VERIFIED_LITERATURE_PACKAGE_REVIEW_ACTIONS = {
+    "approve_for_manuscript_citations",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -383,6 +388,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "verified_literature_package_review",
+        }
+    if status == "verified_literature_package_approved":
+        return {
+            "id": "generate_manuscript_citation_plan",
+            "label": "生成论文引用计划",
+            "reason": "已核验文献包通过人工审阅，可以生成草稿层引用计划；正式正文仍需单独审批。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "manuscript_citation_plan",
         }
     if status == "rejected":
         return {
@@ -1536,6 +1550,97 @@ def generate_project_verified_literature_package(
     return response
 
 
+def review_project_verified_literature_package(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_VERIFIED_LITERATURE_PACKAGE_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_verified_literature_package_review_action",
+            f"Unsupported verified literature package review action: {action}.",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    package_summary = task.get("verified_literature_package") if isinstance(task.get("verified_literature_package"), dict) else {}
+    package_artifact_path = str(package_summary.get("artifact_path") or "")
+    package_artifact = project_root / package_artifact_path
+    if task.get("status") != "verified_literature_package_ready" or not package_artifact_path or not package_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "verified_literature_package_required",
+            "Verified literature package is required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_verified_literature_package_review(action, note, timestamp)
+    task["verified_literature_package_review"] = review
+    package_summary["review_status"] = review["status"]
+    package_summary["review_gate"] = review["review_gate"]
+    package_summary["manuscript_citation_plan_allowed"] = review["manuscript_citation_plan_allowed"]
+    package_summary["formal_write_allowed"] = False
+    task["verified_literature_package"] = package_summary
+
+    package = json.loads(package_artifact.read_text(encoding="utf-8"))
+    package["review"] = review
+    package["formal_write_allowed"] = False
+    package["manuscript_citation_plan_allowed"] = review["manuscript_citation_plan_allowed"]
+    package_artifact.write_text(json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if action == "approve_for_manuscript_citations":
+        task["status"] = "verified_literature_package_approved"
+        task["next_action"] = "generate_manuscript_citation_plan"
+        task["can_execute"] = False
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "verified_literature_package_needs_revision"
+        task["next_action"] = "revise_verified_literature_package"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "verified_literature_package_needs_revision",
+                "label": "文献包需要修订",
+                "description": note or "按审阅意见补充或替换引用来源。",
+            }
+        ]
+    else:
+        task["status"] = "verified_literature_package_rejected"
+        task["next_action"] = "replace_verified_literature_package"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "verified_literature_package_rejected",
+                "label": "文献包已拒绝",
+                "description": note or "重新生成或补充已核验文献包。",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "verified_literature_package_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "note": note,
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["verified_literature_package_review"] = review
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -1566,6 +1671,39 @@ def build_reference_seed_package_review(action: str, note: str, timestamp: str) 
         "next_action": next_action,
         "next_action_label": next_action_label,
         "evidence_level": "local_file",
+    }
+
+
+def build_verified_literature_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_manuscript_citations":
+        status = "approved_for_manuscript_citations"
+        next_action = "generate_manuscript_citation_plan"
+        next_action_label = "生成论文引用计划"
+        manuscript_citation_plan_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_verified_literature_package"
+        next_action_label = "要求修订文献包"
+        manuscript_citation_plan_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_verified_literature_package"
+        next_action_label = "拒绝文献包"
+        manuscript_citation_plan_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_verified_literature_package",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "citation_state": "verified_source_record",
+        "manuscript_citation_plan_allowed": manuscript_citation_plan_allowed,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "verified_source_record",
     }
 
 

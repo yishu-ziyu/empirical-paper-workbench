@@ -1048,6 +1048,40 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.json()["error"]["code"], "citation_verification_complete_required")
         self.assertFalse((self.project_root / "Results" / "json" / "verified_literature_package.json").exists())
 
+    def test_bdd_30_review_verified_literature_package_opens_manuscript_citation_plan(self) -> None:
+        """行为 30：已核验文献包通过人工审阅后，才开放论文引用计划。"""
+        self._generate_verified_literature_package()
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package-review",
+            json={"action": "approve_for_manuscript_citations", "note": "引用元数据和来源证据可用于草稿引用计划。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        review = task["verified_literature_package_review"]
+        self.assertEqual(review["status"], "approved_for_manuscript_citations")
+        self.assertEqual(review["review_gate"], "review_verified_literature_package")
+        self.assertTrue(review["manuscript_citation_plan_allowed"])
+        self.assertFalse(review["formal_write_allowed"])
+        self.assertEqual(task["status"], "verified_literature_package_approved")
+        self.assertEqual(task["next_action"], "generate_manuscript_citation_plan")
+        self.assertEqual(task["primary_action"]["id"], "generate_manuscript_citation_plan")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "verified_literature_package_reviewed")
+
+    def test_bdd_31_verified_literature_package_review_requires_package(self) -> None:
+        """行为 31：没有已核验文献包时，不能伪造文献包审阅。"""
+        self._complete_citation_verification()
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package-review",
+            json={"action": "approve_for_manuscript_citations", "note": "还没有文献包。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "verified_literature_package_required")
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1102,6 +1136,14 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200, msg=response.text)
         return response
+
+    def _generate_verified_literature_package(self):
+        self._complete_citation_verification()
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/verified-literature-package"
+        )
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        return generated
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1453,6 +1495,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("生成已核验文献包", self.app_js)
         self.assertIn("已核验文献包", self.app_js)
         self.assertIn(".agent-task-verified-literature-package", self.styles_css)
+
+    def test_bdd_22_frontend_exposes_verified_literature_package_review_gate(self) -> None:
+        """行为 22：前端必须能审阅已核验文献包，再开放论文引用计划。"""
+        self.assertIn("reviewVerifiedLiteraturePackage", self.app_js)
+        self.assertIn("handleVerifiedLiteraturePackageReview", self.app_js)
+        self.assertIn("data-verified-literature-package-review-action", self.app_js)
+        self.assertIn("批准进入引用计划", self.app_js)
+        self.assertIn("verified_literature_package_review", self.app_js)
+        self.assertIn(".agent-task-verified-literature-package__review", self.styles_css)
 
 
 if __name__ == "__main__":

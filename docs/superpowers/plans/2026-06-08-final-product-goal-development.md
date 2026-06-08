@@ -1163,3 +1163,45 @@ python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_
 ```
 
 Next node: **P1-M review verified literature package before manuscript citation use**.
+
+## P1-M Verified Literature Package Review Gate
+
+Boundary: a verified literature package is useful evidence, but it still needs human review before the system can build a manuscript citation plan. This node opens the citation-plan step without writing formal manuscript text.
+
+BDD:
+
+```text
+Behavior 30: approve a verified literature package for manuscript citation planning
+Given Results/json/verified_literature_package.json exists
+And the Agent task is waiting for verified literature package review
+When the user approves the package for manuscript citations
+Then the system records a human review gate,
+sets manuscript_citation_plan_allowed=true,
+keeps formal_write_allowed=false,
+and exposes generate_manuscript_citation_plan as the next action.
+
+Behavior 31: block literature package review before a package exists
+Given citation verification has completed
+But Results/json/verified_literature_package.json has not been generated
+When the user tries to approve a literature package review
+Then the system returns verified_literature_package_required
+and does not open manuscript citation planning.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/verified-literature-package-review`.
+- The service accepts `approve_for_manuscript_citations`, `needs_revision`, and `reject`.
+- Approval records `review_gate=review_verified_literature_package`, `reviewer=human`, `manuscript_citation_plan_allowed=true`, and `formal_write_allowed=false`.
+- The parent Agent task moves to `verified_literature_package_approved` and exposes `generate_manuscript_citation_plan`.
+- The frontend renders the review gate with `批准进入引用计划`, `要求修订`, and `拒绝文献包` actions.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_30_review_verified_literature_package_opens_manuscript_citation_plan tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_31_verified_literature_package_review_requires_package tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_22_frontend_exposes_verified_literature_package_review_gate -v
+```
+
+Next node: **P1-N generate manuscript citation plan from approved verified literature package**.

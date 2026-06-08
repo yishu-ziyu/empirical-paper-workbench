@@ -81,6 +81,8 @@ UI 设计原则：
 - Review & Export 已有 verifier gates。
 - Auto Mode 草稿层和正式层边界已经多轮固化。
 - 内部方法库、统计结果契约、Level 3 manuscript gate、formal writeback gates 有一批 CLI-first 资产。
+- P0-F 已完成并提交 `4be3d7a`：intake 阶段的研究问题分析不再注入固定“机器人 / 工资 / DID / 工具变量”假设，LLM preview 必须绑定用户当前题目。
+- P2-AB 已完成并提交 `00f055f`：Agent Task Queue 执行 API 必须先选择执行后端；未选后端时返回 `execution_backend_required`，不会把任务污染成真实执行失败。
 
 仍缺的关键能力：
 
@@ -90,6 +92,15 @@ UI 设计原则：
 - 文献检索和 Journal Skill 审稿门还没有稳定进入主链路。
 - 论文草稿能生成，但距离 CoPaper-like “可直接审阅的完整论文包”还要补长度、结构、引用校验、方法规范和多轮修订。
 - 前端仍有体验问题：部分按钮不可读，背景对比度偏高，任务处理页缺少足够的下一步引导。
+
+今天已验证的测试：
+
+- `python3 -m unittest tests.api.test_mode_dispatch_endpoints -v`
+- `python3 -m unittest tests.test_demo_server_real_llm_contract tests.test_agent_task_queue tests.test_agent_task_dispatch_audit -v`
+- `python3 -m unittest tests.test_agent_task_queue tests.test_agent_task_dispatch_audit -v`
+- `python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q`
+- `python3 -m py_compile Product/api/auto_research.py Product/api/supervisor.py Product/backend/agent_task_queue_service.py Product/app.py`
+- `git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py tests/test_agent_task_queue.py`
 
 ## 5. LLM 介入编排
 
@@ -344,6 +355,6 @@ This Goal is complete when all conditions below are true:
 
 ## 11. Next node
 
-Start with **P0-B Skill Registry explanation contract**.
+Start with **P0-D UX contrast and action clarity fix**, then return to the browser and test the visible path.
 
-Reason: it connects the user’s strongest product requirement directly into the current main chain: the system must show which expert Skill / method standard / execution capability it chose, why it chose it, what evidence is missing, and which Agent owns the next task.
+Reason: backend contracts for topic-bound planning and backend selection are now guarded by tests and commits. The user is currently validating through the app, so the next highest-value node is making the current task page readable, reducing contrast, and ensuring each stage tells the user the one next action. After that, wire the visible buttons to the backend selection / execution API and save browser screenshot evidence.

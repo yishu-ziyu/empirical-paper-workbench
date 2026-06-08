@@ -1247,3 +1247,45 @@ python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_
 ```
 
 Next node: **P1-O review manuscript citation plan before draft section use**.
+
+## P1-O Manuscript Citation Plan Review Gate
+
+Boundary: a manuscript citation plan only proves that checked sources can be mapped to draft sections. It must pass a human review gate before the system opens section-level draft planning, and it still cannot write to the formal manuscript layer.
+
+BDD:
+
+```text
+Behavior 34: approve a manuscript citation plan for draft section planning
+Given Results/json/manuscript_citation_plan.json exists
+And the Agent task is waiting for manuscript citation plan review
+When the user approves the plan for draft sections
+Then the system records a human review gate,
+sets draft_section_plan_allowed=true,
+keeps formal_write_allowed=false,
+and exposes generate_draft_section_plan as the next action.
+
+Behavior 35: block citation plan review before the plan exists
+Given the verified literature package has been approved
+But Results/json/manuscript_citation_plan.json has not been generated
+When the user tries to approve a manuscript citation plan review
+Then the system returns manuscript_citation_plan_required
+and does not open draft section planning.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/manuscript-citation-plan-review`.
+- The service accepts `approve_for_draft_sections`, `needs_revision`, and `reject`.
+- Approval records `review_gate=review_manuscript_citation_plan`, `reviewer=human`, `draft_section_plan_allowed=true`, and `formal_write_allowed=false`.
+- The parent Agent task moves to `manuscript_citation_plan_approved` and exposes `generate_draft_section_plan`.
+- The frontend renders the review gate with `批准进入章节草稿`, `要求修订`, and `拒绝引用计划` actions.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_34_review_manuscript_citation_plan_opens_draft_section_planning tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_35_manuscript_citation_plan_review_requires_plan tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_24_frontend_exposes_manuscript_citation_plan_review_gate -v
+```
+
+Next node: **P1-P generate draft section plan from approved manuscript citation plan**.

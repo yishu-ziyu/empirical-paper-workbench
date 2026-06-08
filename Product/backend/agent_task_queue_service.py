@@ -229,6 +229,7 @@ def build_task_internal_skill_bindings(
 
 
 def compact_task_internal_skill_binding(skill: dict[str, Any]) -> dict[str, Any]:
+    semantic_reason = skill.get("semantic_selection_reason") or skill.get("matched_reason", "")
     return {
         "id": skill.get("id"),
         "skill_id": skill.get("skill_id"),
@@ -239,8 +240,15 @@ def compact_task_internal_skill_binding(skill: dict[str, Any]) -> dict[str, Any]
         "status": skill.get("status", "checklist"),
         "matched_reason": skill.get("matched_reason", ""),
         "selection_source": skill.get("selection_source", "registry_rule_match"),
-        "semantic_selection_reason": skill.get("semantic_selection_reason") or skill.get("matched_reason", ""),
+        "semantic_selection_reason": semantic_reason,
+        "why_this_skill": semantic_reason,
         "llm_semantic_judgment": skill.get("llm_semantic_judgment") or {},
+        "expected_artifacts": normalize_list(skill.get("expected_artifacts")),
+        "execution_boundary": skill.get("execution_boundary") or "review_before_execution",
+        "skill_sources": [
+            source for source in normalize_list(skill.get("skill_sources")) if isinstance(source, dict)
+        ],
+        "can_execute_without_human_review": bool(skill.get("can_execute_without_human_review", False)),
         "quality_gates": skill.get("quality_gates") or {},
         "human_confirmation": skill.get("human_confirmation") or {},
         "benchmark": skill.get("benchmark") or {},

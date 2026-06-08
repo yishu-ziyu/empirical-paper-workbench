@@ -567,6 +567,72 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertFalse(aer_preflight["canonical_policy"]["auto_mode"]["can_write_canonical"])
         self.assertEqual(plan["unmatched_internal_skill_judgments"][0]["skill_id"], "unknown_external_skill")
 
+    def test_bdd_17_supervisor_plan_exposes_human_readable_skill_review_contract(self) -> None:
+        """行为 17：SupervisorPlan 必须把 skill 选择变成用户可审阅的产品契约。"""
+        generated = {
+            "stage_plan": [
+                {"stage": "递归搜索", "goal": "检索文献、数据和方法缺口", "status": "planned"},
+            ],
+            "subagent_dispatch": [
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索与变量证据",
+                }
+            ],
+            "evidence_requirements": [],
+            "risks": [],
+            "human_gates": [],
+            "internal_skill_judgments": [
+                {
+                    "skill_id": "recursive_research_search",
+                    "reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "evidence_fit": "当前只有题目和研究方向，缺少已验证文献与数据线索。",
+                    "agent_fit": "LiteratureAgent 负责检索与证据归档。",
+                    "risk_note": "检索结果只能进入草案层，不能直接写成正式综述。",
+                    "human_review_note": "正式写入文献综述前需要人工确认引用。",
+                    "confidence": "high",
+                },
+                {
+                    "skill_id": "unknown_external_skill",
+                    "reason": "LLM 提到了 registry 外部能力。",
+                },
+            ],
+        }
+
+        plan = normalize_supervisor_plan(
+            generated=generated,
+            project={"id": "p1", "title": "Project", "question": "社会资本是否影响幸福感？"},
+            objective="规划递归研究搜索",
+            note="把 skill 选择解释给用户",
+            provider={"provider": "local_codex"},
+            research_question={
+                "question": "社会资本是否影响幸福感？",
+                "topic_session_id": "topic_session_v1",
+                "version": 1,
+                "status": "confirmed",
+            },
+            variable_roles={"version": 1, "status": "approved"},
+            design_spec={"version": 1, "status": "approved"},
+            run_plan={"version": 1, "status": "approved"},
+            version=2,
+            timestamp="2026-06-08T00:00:00Z",
+        )
+
+        self.assertEqual(plan["skill_review_status"], "needs_human_skill_review")
+        self.assertEqual(plan["selected_skill_ids"], ["recursive_research_search"])
+        self.assertEqual(
+            plan["applicability_reason"]["recursive_research_search"],
+            "题目需要先从文献、数据和变量证据形成递归搜索图。",
+        )
+        self.assertEqual(plan["skill_sources"][0]["skill_id"], "recursive_research_search")
+        self.assertEqual(plan["skill_sources"][0]["selection_source"], "registry_and_llm_semantic_judgment")
+        self.assertIn("Auto-Empirical-Research-Skills", plan["skill_sources"][0]["external_source_names"])
+        self.assertEqual(plan["missing_evidence"][0]["skill_id"], "recursive_research_search")
+        self.assertIn("TaskBrief.approved", plan["missing_evidence"][0]["required_state"])
+        self.assertEqual(plan["missing_evidence"][-1]["skill_id"], "unknown_external_skill")
+        self.assertTrue(plan["skill_review_contract"]["human_review_required"])
+
 
 if __name__ == "__main__":
     unittest.main()

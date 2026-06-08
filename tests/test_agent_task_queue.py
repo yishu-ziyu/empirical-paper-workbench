@@ -312,6 +312,77 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertFalse(binding["canonical_policy"]["auto_mode"]["can_write_canonical"])
 
+    def test_bdd_11_queue_exposes_user_facing_skill_reason_artifacts_and_boundary(self) -> None:
+        """行为 11：每个队列任务必须能解释绑定 skill 的理由、预期产物和执行边界。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "allowed_agents": ["Supervisor", "LiteratureAgent", "ReviewerAgent"],
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "verification_queue"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                    "skill_sources": [
+                        {
+                            "name": "Auto-Empirical-Research-Skills",
+                            "url": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills",
+                            "license": "CC-BY-SA-4.0",
+                        }
+                    ],
+                    "quality_gates": {
+                        "machine_checkable": ["aers:eval:citation-hygiene-no-fake-refs"],
+                        "manual_review": ["source_relevance_review"],
+                    },
+                    "human_confirmation": {
+                        "required_before": ["formal_literature_review_writeback"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        binding = response.json()["agent_task_queue"]["tasks"][0]["internal_skill_bindings"][0]
+        self.assertEqual(binding["skill_id"], "recursive_research_search")
+        self.assertEqual(
+            binding["why_this_skill"],
+            "题目需要先从文献、数据和变量证据形成递归搜索图。",
+        )
+        self.assertEqual(
+            binding["expected_artifacts"],
+            ["LiteratureSeedPackage", "search_query_graph", "verification_queue"],
+        )
+        self.assertEqual(binding["execution_boundary"], "review_only_until_dispatch_approved")
+        self.assertEqual(binding["skill_sources"][0]["name"], "Auto-Empirical-Research-Skills")
+        self.assertFalse(binding["can_execute_without_human_review"])
+
     def _write_supervisor_plan(
         self,
         status: str,

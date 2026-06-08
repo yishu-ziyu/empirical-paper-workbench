@@ -55,19 +55,23 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
         self.assertIn("workbench-saved-brief", self.app)
         self.assertIn(".workbench-saved-brief", self.css)
         self.assertIn(".workbench-saved-brief:disabled", self.css)
-        self.assertIn("color: #d8d8d8", self.css)
-        self.assertIn("background: rgba(230, 230, 230, 0.07)", self.css)
+        self.assertIn("--color-button-disabled-bg", self.css)
+        self.assertIn("--color-button-disabled-text", self.css)
+        self.assertIn("background: var(--color-button-disabled-bg)", self.css)
+        self.assertIn("color: var(--color-button-disabled-text)", self.css)
+        self.assertNotIn("opacity: 0.88", self.css)
 
     def test_bdd_workbench_uses_softer_dark_contrast(self) -> None:
         """行为 11：工作台背景和文字使用柔和黑白灰，不回到高硬度黑白。"""
-        self.assertIn("--color-bg: #151515", self.css)
-        self.assertIn("--color-ink: #d4d4d4", self.css)
+        self.assertIn("--color-bg: #1d1d1d", self.css)
+        self.assertIn("--color-panel: #262626", self.css)
+        self.assertIn("--color-ink: #d2d2d2", self.css)
         self.assertIn(
-            "background: radial-gradient(ellipse at top, #1b1b1b 0%, #151515 100%)",
+            "background: radial-gradient(ellipse at top, #242424 0%, #1d1d1d 100%)",
             self.css,
         )
-        self.assertIn("opacity: 0.26", self.css)
-        self.assertIn("opacity: 0.16", self.surface)
+        self.assertIn("opacity: 0.18", self.css)
+        self.assertIn("opacity: 0.12", self.surface)
 
     def test_bdd_stage_navigation_uses_research_task_language(self) -> None:
         """行为 12：阶段导航要说用户任务，不裸露单一来源或后端术语。"""
@@ -123,6 +127,8 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
 
     def test_bdd_each_stage_explains_current_action_and_next_step(self) -> None:
         """行为 18：每个阶段页要告诉用户当前要做什么、点完进入哪里。"""
+        for text in ["stage-panel__current-action", "现在只做", "完成后进入"]:
+            self.assertIn(text, self.app)
         expected_copy = {
             "brief": ["先把题目变成可执行研究简报", "确认后进入文献检索"],
             "auto": ["自动整理研究简报", "完成后进入文献检索"],

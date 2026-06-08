@@ -50,10 +50,11 @@ class BriefPanelSelfCritiqueContractTests(unittest.TestCase):
         self.assertIn(".step-card__buttons .btn", self.css)
         self.assertIn(".step-card__buttons .btn:not(.btn--primary)", self.css)
         self.assertIn(".step-card__buttons .btn--ghost", self.css)
-        self.assertIn("color: #101010", self.css)
-        self.assertIn("color: #d8d8d8", self.css)
+        self.assertIn("color: var(--color-button-primary-ink)", self.css)
+        self.assertIn("color: var(--color-button-secondary-text)", self.css)
         self.assertIn(".step-card__buttons .btn:not(.btn--primary):disabled", self.css)
-        self.assertIn("opacity: 0.88", self.css)
+        self.assertIn("color: var(--color-button-disabled-text)", self.css)
+        self.assertNotIn("opacity: 0.88", self.css)
 
     def test_bdd_restart_button_has_readable_completed_state(self) -> None:
         """行为 9：任务书完成后的“重新研究”按钮在深色面板上必须可读。"""
@@ -61,7 +62,8 @@ class BriefPanelSelfCritiqueContractTests(unittest.TestCase):
         self.assertIn("task-brief__restart", self.source)
         self.assertIn(".task-brief__restart", self.css)
         self.assertIn(".task-brief__restart:disabled", self.css)
-        self.assertIn("color: #101010", self.css)
+        self.assertIn("color: var(--color-button-primary-ink)", self.css)
+        self.assertIn("color: var(--color-button-disabled-text)", self.css)
 
 
 if __name__ == "__main__":

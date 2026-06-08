@@ -61,13 +61,46 @@ const STAGE_ORDER: Stage[] = [
   "identification-audit",
 ];
 
-const STAGE_LABELS: Record<Stage, { label: string; hint: string }> = {
-  brief: { label: "研究简报", hint: "确认研究问题、边界、贡献和成功标准" },
-  search: { label: "文献检索", hint: "从中文和英文来源筛选相关文献，形成综述素材" },
-  variables: { label: "变量审阅", hint: "确认因变量、解释变量和控制变量是否能被数据支持" },
-  design: { label: "方法选择", hint: "比较可行识别策略，查看假设、风险和所需检验" },
-  execution: { label: "论文生成", hint: "生成论文草稿、PDF、结果记录和可复现产物" },
-  "identification-audit": { label: "识别审计", hint: "检查趋势、工具变量强度和因果路径是否支撑结论" },
+const STAGE_LABELS: Record<
+  Stage,
+  { label: string; hint: string; action: string; next: string }
+> = {
+  brief: {
+    label: "研究简报",
+    hint: "确认研究问题、边界、贡献和成功标准",
+    action: "确认研究简报",
+    next: "文献检索",
+  },
+  search: {
+    label: "文献检索",
+    hint: "从中文和英文来源筛选相关文献，形成综述素材",
+    action: "筛选可用文献",
+    next: "变量审阅",
+  },
+  variables: {
+    label: "变量审阅",
+    hint: "确认因变量、解释变量和控制变量是否能被数据支持",
+    action: "确认变量角色",
+    next: "方法选择",
+  },
+  design: {
+    label: "方法选择",
+    hint: "比较可行识别策略，查看假设、风险和所需检验",
+    action: "选择识别策略",
+    next: "论文生成",
+  },
+  execution: {
+    label: "论文生成",
+    hint: "生成论文草稿、PDF、结果记录和可复现产物",
+    action: "生成论文与结果包",
+    next: "识别审计",
+  },
+  "identification-audit": {
+    label: "识别审计",
+    hint: "检查趋势、工具变量强度和因果路径是否支撑结论",
+    action: "核验识别可信度",
+    next: "导出或修订",
+  },
 };
 
 /**
@@ -251,6 +284,7 @@ export function App() {
       hint: unlocked ? info.hint : "请按顺序完成前一阶段后再进入。",
     };
   });
+  const currentStageMeta = STAGE_LABELS[activeStage];
 
   return (
     <main className="app-shell analysis-workspace">
@@ -292,6 +326,12 @@ export function App() {
         ) : null}
 
         <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
+
+        <div className="stage-panel__current-action" data-testid="stage-current-action">
+          <span>现在只做</span>
+          <strong>{currentStageMeta.action}</strong>
+          <span>完成后进入：{currentStageMeta.next}</span>
+        </div>
 
         {activeStage === "brief" ? (
           task.mode === "codex-supervisor" ? (
@@ -441,8 +481,8 @@ export function App() {
 
         <div className="stage-panel__summary">
           <span>当前阶段</span>
-          <strong>{STAGE_LABELS[activeStage].label}</strong>
-          <p>{STAGE_LABELS[activeStage].hint}</p>
+          <strong>{currentStageMeta.label}</strong>
+          <p>{currentStageMeta.hint}</p>
         </div>
       </section>
     </main>

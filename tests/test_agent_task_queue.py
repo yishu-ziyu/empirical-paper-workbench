@@ -700,6 +700,89 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertFalse(literature_task["reference_chain_policy"]["writes_formal_layer"])
         self.assertNotIn("reference_chain_policy", method_task)
 
+    def test_bdd_18_literature_task_codex_execution_writes_candidate_reference_seed_package(self) -> None:
+        """行为 18：文献任务执行时先生成候选来源种子包，不宣称引用已验证。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "citation_verification_queue"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                },
+            ],
+            reference_chain_policy={
+                "contract_version": "reference_chain.v1",
+                "status": "needs_review",
+                "source_priority": ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+                "max_depth": 2,
+                "max_iterations": 5,
+                "formal_writeback_gate": "review_literature_seed_package",
+                "writes_formal_layer": True,
+            },
+        )
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
+            json={"action": "approve", "note": "先生成候选来源种子包"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/select-backend",
+            json={"backend_id": "codex"},
+        )
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+
+        executed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/execute"
+        )
+
+        self.assertEqual(executed.status_code, 200, msg=executed.text)
+        result = executed.json()["execution_result"]
+        self.assertEqual(result["engine"], "codex")
+        self.assertEqual(result["execution_kind"], "reference_chain_seed_package")
+        self.assertEqual(result["evidence_level"], "local_file")
+        self.assertFalse(result["formal_write_allowed"])
+        self.assertFalse(result["writes_formal_layer"])
+        artifact_path = self.project_root / result["artifact_path"]
+        self.assertTrue(artifact_path.exists())
+
+        package = json.loads(artifact_path.read_text(encoding="utf-8"))
+        self.assertEqual(package["schema_version"], "p1.reference_chain_seed_package.v1")
+        self.assertEqual(package["status"], "candidate_reference_seed_package_ready")
+        self.assertEqual(package["source_priority"], ["cnki", "scholar", "zotero", "local_notes", "arxiv"])
+        self.assertEqual(package["max_depth"], 2)
+        self.assertEqual(package["max_iterations"], 5)
+        self.assertEqual(package["formal_writeback_gate"], "review_literature_seed_package")
+        self.assertFalse(package["writes_formal_layer"])
+        self.assertGreaterEqual(len(package["candidate_queries"]), 5)
+        self.assertTrue(
+            all(query["review_state"] == "candidate" for query in package["candidate_queries"])
+        )
+        self.assertTrue(
+            all(not query["can_enter_formal_layer"] for query in package["candidate_queries"])
+        )
+        self.assertEqual(package["citation_verification_policy"]["default_state"], "candidate")
+        self.assertIn("verified_requires", package["citation_verification_policy"])
+        self.assertFalse(package["claims_verified_citations"])
+
     def _write_supervisor_plan(
         self,
         status: str,

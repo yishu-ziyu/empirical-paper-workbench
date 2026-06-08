@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 import Product.app as product_app
 from Product.backend.registry import ensure_registry
-from Product.backend.supervisor_plan_service import normalize_supervisor_plan
+from Product.backend.supervisor_plan_service import build_supervisor_plan_prompt, normalize_supervisor_plan
 
 
 class SupervisorPlanApiTests(unittest.TestCase):
@@ -99,6 +99,39 @@ class SupervisorPlanApiTests(unittest.TestCase):
         self.assertEqual(saved["status"], "needs_review")
         self.assertEqual(saved["raw_output_path"], "state/product/supervisor_plan.raw.md")
         self.assertEqual(saved["input_research_question"]["version"], 1)
+
+    def test_bdd_19_supervisor_plan_prompt_requests_reference_chain_policy(self) -> None:
+        """行为 19：SupervisorPlan 提示词必须要求 LLM 规划文献/引用链路策略。"""
+        prompt = build_supervisor_plan_prompt(
+            project={
+                "id": "p1",
+                "title": "Project",
+                "question": "社会资本是否影响居民主观幸福感？",
+            },
+            objective="规划下一轮递归文献检索、数据变量和方法选择。",
+            research_question={
+                "question": "社会资本是否影响居民主观幸福感？",
+                "topic_session_id": "topic_session_v1",
+                "version": 1,
+                "status": "confirmed",
+            },
+            variable_roles={"version": 1, "status": "approved"},
+            design_spec={"version": 1, "status": "approved"},
+            run_plan={"version": 1, "status": "approved"},
+        )
+
+        for required in (
+            "reference_chain_policy",
+            "source_priority",
+            "max_depth",
+            "max_iterations",
+            "CNKI",
+            "Zotero",
+            "draft_citation_policy",
+            "formal_writeback_gate",
+            "writes_formal_layer",
+        ):
+            self.assertIn(required, prompt)
 
     def test_bdd_7_generation_requires_confirmed_research_question(self) -> None:
         """行为 7：没有 confirmed ResearchQuestion 时，SupervisorPlan 不得生成。"""
@@ -645,6 +678,77 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn("TaskBrief.approved", plan["missing_evidence"][0]["required_state"])
         self.assertEqual(plan["missing_evidence"][-1]["skill_id"], "unknown_external_skill")
         self.assertTrue(plan["skill_review_contract"]["human_review_required"])
+
+    def test_bdd_20_supervisor_plan_keeps_reference_chain_policy_for_queue_contract(self) -> None:
+        """行为 20：LLM 生成的文献/引用链路策略必须进入可审阅 SupervisorPlan。"""
+        generated = {
+            "stage_plan": [
+                {"stage": "递归搜索", "goal": "先建立文献、变量和数据证据链", "status": "planned"},
+            ],
+            "subagent_dispatch": [
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索中文和英文文献，形成引用候选池",
+                }
+            ],
+            "evidence_requirements": [],
+            "risks": [],
+            "human_gates": [],
+            "reference_chain_policy": {
+                "contract_version": "reference_chain.v1",
+                "status": "needs_review",
+                "source_priority": ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+                "sources": [
+                    {
+                        "id": "cnki",
+                        "label": "CNKI",
+                        "trigger": "中文制度背景、国内实证研究和硕博论文线索",
+                        "mode": "manual_assisted_or_browser_assisted_search",
+                    },
+                    {
+                        "id": "scholar",
+                        "label": "Google Scholar",
+                        "trigger": "英文引用网络和高被引实证文献",
+                        "mode": "browser_or_manual_assisted_search",
+                    },
+                ],
+                "max_depth": 2,
+                "max_iterations": 5,
+                "draft_citation_policy": "候选文献可以进入草案，但必须显示待核验状态。",
+                "formal_writeback_gate": "review_literature_seed_package",
+                "writes_formal_layer": True,
+            },
+        }
+
+        plan = normalize_supervisor_plan(
+            generated=generated,
+            project={"id": "p1", "title": "Project", "question": "社会资本是否影响幸福感？"},
+            objective="规划递归文献检索与证据链",
+            note="保存引用链路策略",
+            provider={"provider": "local_codex"},
+            research_question={
+                "question": "社会资本是否影响幸福感？",
+                "topic_session_id": "topic_session_v1",
+                "version": 1,
+                "status": "confirmed",
+            },
+            variable_roles={"version": 1, "status": "approved"},
+            design_spec={"version": 1, "status": "approved"},
+            run_plan={"version": 1, "status": "approved"},
+            version=2,
+            timestamp="2026-06-08T00:00:00Z",
+        )
+
+        policy = plan["reference_chain_policy"]
+        self.assertEqual(policy["contract_version"], "reference_chain.v1")
+        self.assertEqual(policy["status"], "needs_review")
+        self.assertEqual(policy["source_priority"], ["cnki", "scholar", "zotero", "local_notes", "arxiv"])
+        self.assertEqual(policy["sources"][0]["id"], "cnki")
+        self.assertEqual(policy["max_depth"], 2)
+        self.assertEqual(policy["max_iterations"], 5)
+        self.assertEqual(policy["formal_writeback_gate"], "review_literature_seed_package")
+        self.assertFalse(policy["writes_formal_layer"])
 
 
 if __name__ == "__main__":

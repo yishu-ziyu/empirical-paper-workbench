@@ -19,6 +19,40 @@ from Product.backend.variable_role_service import load_saved_variable_role_set
 SUPERVISOR_PLAN_PATH = Path("state/product/supervisor_plan.json")
 SUPERVISOR_PLAN_RAW_PATH = Path("state/product/supervisor_plan.raw.md")
 
+REFERENCE_CHAIN_SOURCE_PRIORITY = ["cnki", "scholar", "zotero", "local_notes", "arxiv"]
+REFERENCE_CHAIN_SOURCES: list[dict[str, Any]] = [
+    {
+        "id": "cnki",
+        "label": "CNKI",
+        "trigger": "中文制度背景、国内实证研究、硕博论文和政策语境。",
+        "mode": "manual_assisted_or_browser_assisted_search",
+    },
+    {
+        "id": "scholar",
+        "label": "Google Scholar",
+        "trigger": "英文引用网络、高被引经济学和社会科学文献。",
+        "mode": "browser_or_manual_assisted_search",
+    },
+    {
+        "id": "zotero",
+        "label": "Zotero",
+        "trigger": "用户已有文献库、PDF、笔记和引用条目。",
+        "mode": "local_library_or_connector",
+    },
+    {
+        "id": "local_notes",
+        "label": "Local Notes",
+        "trigger": "本机 Obsidian、项目笔记、人工摘录和已有资料。",
+        "mode": "local_file_search",
+    },
+    {
+        "id": "arxiv",
+        "label": "arXiv",
+        "trigger": "开放论文、方法论文和英文技术背景。",
+        "mode": "api_or_web_search",
+    },
+]
+
 
 class SupervisorPlanBlockedError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
@@ -240,6 +274,7 @@ def build_empty_supervisor_plan(project_root: Path) -> dict[str, Any]:
         "evidence_requirements": [],
         "risks": [],
         "human_gates": [],
+        "reference_chain_policy": build_default_reference_chain_policy(),
         "next_action": {
             "id": "generate_supervisor_plan",
             "label": "生成 SupervisorPlan",
@@ -288,16 +323,22 @@ def build_supervisor_plan_prompt(
         "approved_design_spec": compact_state(design_spec),
         "approved_run_plan": compact_state(run_plan),
         "internal_skill_registry": compact_internal_agent_skills_for_prompt(),
+        "reference_chain_policy_template": build_default_reference_chain_policy(),
         "write_boundary": "You must not modify VariableRoleSet, DesignSpec, or RunPlan. Propose a reviewable plan only.",
     }
     return (
         "你是本地 Codex Supervisor，负责为实证论文工作台生成下一轮可审阅研究执行计划。\n"
         "只输出 JSON，不要输出 Markdown。JSON 必须包含：stage_plan、subagent_dispatch、"
-        "evidence_requirements、risks、human_gates、internal_skill_judgments、next_action。\n"
+        "evidence_requirements、risks、human_gates、internal_skill_judgments、"
+        "reference_chain_policy、next_action。\n"
         "internal_skill_judgments 用来解释你为什么选择某个内部 Agent Skill；"
         "每项必须只使用 internal_skill_registry.skills 中存在的 skill_id，并包含 reason、"
         "evidence_fit、agent_fit、risk_note、human_review_note、confidence。"
         "如果没有合适 skill，输出空数组，不要编造 registry 外 skill。\n"
+        "reference_chain_policy 用来规划文献和引用证据链；必须包含 source_priority、sources、"
+        "max_depth、max_iterations、draft_citation_policy、formal_writeback_gate、writes_formal_layer。"
+        "可用来源包括 CNKI、Google Scholar、Zotero、Local Notes、arXiv；"
+        "writes_formal_layer 必须为 false，候选引用只能进入草案层和人工审阅队列。\n"
         "所有建议必须基于输入状态，不得声称已执行分析，不得改写任何已批准状态。\n\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
@@ -334,6 +375,84 @@ def compact_state(state: dict[str, Any]) -> dict[str, Any]:
     return {key: state.get(key) for key in keys if key in state}
 
 
+def build_default_reference_chain_policy() -> dict[str, Any]:
+    return {
+        "contract_version": "reference_chain.v1",
+        "status": "needs_review",
+        "source_priority": list(REFERENCE_CHAIN_SOURCE_PRIORITY),
+        "sources": [dict(source) for source in REFERENCE_CHAIN_SOURCES],
+        "max_depth": 2,
+        "max_iterations": 5,
+        "required_artifacts": [
+            "LiteratureSeedPackage",
+            "search_query_graph",
+            "citation_verification_queue",
+            "source_relevance_review",
+        ],
+        "draft_citation_policy": "候选文献可以进入草案，但必须显示 candidate / verified / rejected 审阅状态。",
+        "formal_writeback_gate": "review_literature_seed_package",
+        "writes_formal_layer": False,
+    }
+
+
+def normalize_reference_chain_policy(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    default = build_default_reference_chain_policy()
+    source_priority = [
+        str(item)
+        for item in normalize_list(raw.get("source_priority"))
+        if str(item).strip()
+    ] or default["source_priority"]
+    sources = normalize_reference_chain_sources(raw.get("sources")) or default["sources"]
+    return {
+        "contract_version": str(raw.get("contract_version") or default["contract_version"]),
+        "status": str(raw.get("status") or default["status"]),
+        "source_priority": source_priority,
+        "sources": sources,
+        "max_depth": normalize_positive_int(raw.get("max_depth"), default["max_depth"]),
+        "max_iterations": normalize_positive_int(raw.get("max_iterations"), default["max_iterations"]),
+        "required_artifacts": [
+            str(item)
+            for item in normalize_list(raw.get("required_artifacts"))
+            if str(item).strip()
+        ] or default["required_artifacts"],
+        "draft_citation_policy": str(
+            raw.get("draft_citation_policy") or default["draft_citation_policy"]
+        ),
+        "formal_writeback_gate": str(
+            raw.get("formal_writeback_gate") or default["formal_writeback_gate"]
+        ),
+        "writes_formal_layer": False,
+    }
+
+
+def normalize_reference_chain_sources(value: Any) -> list[dict[str, str]]:
+    sources = []
+    for source in normalize_list(value):
+        if not isinstance(source, dict):
+            continue
+        source_id = str(source.get("id") or source.get("name") or "").strip()
+        if not source_id:
+            continue
+        sources.append(
+            {
+                "id": source_id,
+                "label": str(source.get("label") or source_id),
+                "trigger": str(source.get("trigger") or ""),
+                "mode": str(source.get("mode") or ""),
+            }
+        )
+    return sources
+
+
+def normalize_positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
 def parse_supervisor_plan_output(raw_text: str) -> dict[str, Any]:
     text = raw_text.strip()
     if not text:
@@ -366,6 +485,7 @@ def normalize_supervisor_plan(
     evidence_requirements = normalize_list(generated.get("evidence_requirements"))
     risks = normalize_list(generated.get("risks"))
     human_gates = normalize_list(generated.get("human_gates"))
+    reference_chain_policy = normalize_reference_chain_policy(generated.get("reference_chain_policy"))
     llm_internal_skill_judgments = normalize_list(
         generated.get("internal_skill_judgments")
         or generated.get("skill_judgments")
@@ -409,6 +529,7 @@ def normalize_supervisor_plan(
         "evidence_requirements": evidence_requirements,
         "risks": risks,
         "human_gates": human_gates,
+        "reference_chain_policy": reference_chain_policy,
         "llm_internal_skill_judgments": llm_internal_skill_judgments,
         "recommended_internal_skills": recommended_internal_skills,
         "unmatched_internal_skill_judgments": unmatched_internal_skill_judgments,

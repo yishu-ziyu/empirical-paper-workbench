@@ -520,6 +520,60 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertFalse(queue["tasks"][0]["can_execute"])
 
+    def test_bdd_15_queue_and_tasks_expose_one_primary_next_action(self) -> None:
+        """行为 15：队列必须从任务状态推导一个清晰的下一步动作。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_execution",
+                    "role": "ExecutionAgent",
+                    "task": "执行并验证模型",
+                },
+            ],
+        )
+
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        created_queue = created.json()["agent_task_queue"]
+        self.assertEqual(created_queue["primary_action"]["id"], "dispatch_review_required")
+        self.assertEqual(created_queue["primary_action"]["task_id"], "agent_task_01")
+        self.assertEqual(created_queue["tasks"][0]["primary_action"]["label"], "打开派工审阅")
+        self.assertIn("不能直接执行", created_queue["tasks"][0]["primary_action"]["reason"])
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
+            json={"action": "approve", "note": "可以进入后端选择"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        reviewed_queue = reviewed.json()["agent_task_queue"]
+        self.assertEqual(reviewed_queue["primary_action"]["id"], "select_execution_backend")
+        self.assertEqual(reviewed_queue["tasks"][0]["primary_action"]["label"], "选择执行后端")
+
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/select-backend",
+            json={"backend_id": "codex"},
+        )
+
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+        selected_queue = selected.json()["agent_task_queue"]
+        self.assertEqual(selected_queue["primary_action"]["id"], "execute_agent_task")
+        self.assertEqual(selected_queue["tasks"][0]["primary_action"]["label"], "开始真实执行")
+        self.assertTrue(selected_queue["tasks"][0]["primary_action"]["enabled"])
+
+        executed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/execute"
+        )
+
+        self.assertEqual(executed.status_code, 200, msg=executed.text)
+        executed_queue = executed.json()["agent_task_queue"]
+        self.assertEqual(executed_queue["primary_action"]["id"], "review_execution_result")
+        self.assertEqual(executed_queue["tasks"][0]["primary_action"]["label"], "查看运行结果")
+        self.assertFalse(executed_queue["tasks"][0]["primary_action"]["writes_formal_layer"])
+
     def _write_supervisor_plan(
         self,
         status: str,

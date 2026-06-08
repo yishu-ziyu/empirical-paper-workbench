@@ -84,6 +84,7 @@ def build_empty_agent_task_queue(project_root: Path) -> dict[str, Any]:
         "blockers": blockers,
         "llm_intervention_contract": llm_intervention_contract,
         "ui_contract": build_queue_ui_contract(),
+        "primary_action": build_empty_queue_primary_action(can_create),
         "next_action": {
             "id": "create_agent_task_queue" if can_create else "approve_supervisor_plan",
             "label": "创建 Agent 任务队列" if can_create else "先批准 SupervisorPlan",
@@ -152,6 +153,7 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         "blockers": [],
         "llm_intervention_contract": llm_intervention_contract,
         "ui_contract": build_queue_ui_contract(),
+        "primary_action": build_queue_primary_action(tasks),
         "next_action": {
             "id": "dispatch_agent_tasks",
             "label": "检查后进入真实 Agent 执行队列",
@@ -173,7 +175,7 @@ def build_agent_task(
     role = str(dispatch_item.get("role") or owner_agent)
     title = str(dispatch_item.get("task") or dispatch_item.get("title") or dispatch_item.get("goal") or f"Agent task {index}")
     internal_skill_bindings = build_task_internal_skill_bindings(plan, dispatch_item, owner_agent, role)
-    return {
+    task = {
         "id": f"agent_task_{index:02d}",
         "source_dispatch_id": dispatch_item.get("agent_id") or "",
         "owner_agent": owner_agent,
@@ -208,6 +210,118 @@ def build_agent_task(
                 "source_supervisor_plan_version": plan.get("version", 0),
             }
         ],
+    }
+    task["primary_action"] = build_task_primary_action(task)
+    return task
+
+
+def build_empty_queue_primary_action(can_create: bool) -> dict[str, Any]:
+    if can_create:
+        return {
+            "id": "create_agent_task_queue",
+            "label": "创建 Agent 任务队列",
+            "reason": "SupervisorPlan 已批准，可以先生成可审阅任务队列。",
+            "enabled": True,
+            "writes_formal_layer": False,
+        }
+    return {
+        "id": "approve_supervisor_plan",
+        "label": "先批准 SupervisorPlan",
+        "reason": "还没有可派发的已批准计划，不能创建任务队列。",
+        "enabled": False,
+        "writes_formal_layer": False,
+    }
+
+
+def build_queue_primary_action(tasks: list[Any]) -> dict[str, Any]:
+    task_dicts = [task for task in tasks if isinstance(task, dict)]
+    if not task_dicts:
+        return {
+            "id": "none",
+            "label": "暂无可执行动作",
+            "reason": "任务队列为空。",
+            "enabled": False,
+            "writes_formal_layer": False,
+        }
+    for task in task_dicts:
+        action = task.get("primary_action") if isinstance(task.get("primary_action"), dict) else {}
+        if action.get("id") != "review_execution_result":
+            return {
+                **action,
+                "task_id": task.get("id", ""),
+                "task_title": task.get("title", ""),
+            }
+    action = task_dicts[0].get("primary_action") if isinstance(task_dicts[0].get("primary_action"), dict) else {}
+    return {
+        **action,
+        "task_id": task_dicts[0].get("id", ""),
+        "task_title": task_dicts[0].get("title", ""),
+    }
+
+
+def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
+    status = str(task.get("status") or "queued")
+    if status == "queued":
+        return {
+            "id": "dispatch_review_required",
+            "label": "打开派工审阅",
+            "reason": "这个任务还在草案层，不能直接执行；先确认是否真的要派给这个 Agent。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "dispatch_review",
+        }
+    if status == "reviewed_for_dispatch":
+        return {
+            "id": "select_execution_backend",
+            "label": "选择执行后端",
+            "reason": "派工已批准，下一步需要选择 StatsPAI、Python、StataMCP 或 Codex 等执行后端。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "backend_selection",
+        }
+    if status == "backend_selected":
+        return {
+            "id": "execute_agent_task",
+            "label": "开始真实执行",
+            "reason": "后端已选择，可以运行本地执行、脚本生成或统计适配器；产物仍进入审阅层。",
+            "enabled": bool(task.get("can_execute")),
+            "writes_formal_layer": False,
+            "target": "agent_task_execution",
+        }
+    if status == "succeeded":
+        return {
+            "id": "review_execution_result",
+            "label": "查看运行结果",
+            "reason": "任务已产生结果，下一步是审阅产物、日志和 evaluator 结论。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "execution_result_review",
+        }
+    if status == "blocked_by_backend_unavailable":
+        return {
+            "id": "choose_fallback_backend",
+            "label": "选择备用后端",
+            "reason": "当前执行后端不可用，先切换到可用后端或重试。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "backend_selection",
+        }
+    if status in {"blocked", "needs_revision"}:
+        return {
+            "id": "revise_dispatch_task",
+            "label": "修改任务",
+            "reason": "派工被拒绝或要求修改，先调整任务边界再继续。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "dispatch_revision",
+        }
+    return {
+        "id": str(task.get("next_action") or "review_task_state"),
+        "label": "查看任务状态",
+        "reason": "当前任务状态需要人工查看后决定下一步。",
+        "enabled": False,
+        "writes_formal_layer": False,
+        "target": "task_state",
     }
 
 
@@ -455,6 +569,7 @@ def normalize_agent_task_queue(queue: dict[str, Any]) -> dict[str, Any]:
             if isinstance(task, dict):
                 ensure_task_dispatch_audit_fields(task, queue["llm_intervention_contract"])
         queue["summary"] = build_agent_task_queue_summary(tasks)
+        queue["primary_action"] = build_queue_primary_action(tasks)
     return queue
 
 
@@ -500,6 +615,7 @@ def ensure_task_dispatch_audit_fields(task: dict[str, Any], llm_intervention_con
             "evidence_level": "local_file",
         },
     )
+    task["primary_action"] = build_task_primary_action(task)
 
 
 def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:

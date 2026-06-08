@@ -38,9 +38,9 @@
   --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
   --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
   --color-button-secondary-text: #d2d2d2;
-  --color-button-disabled-bg: rgba(230, 230, 230, 0.055);
-  --color-button-disabled-text: #b8b8b8;
-  --color-button-disabled-border: rgba(230, 230, 230, 0.18);
+  --color-button-disabled-bg: rgba(230, 230, 230, 0.17);
+  --color-button-disabled-text: #d0d0d0;
+  --color-button-disabled-border: rgba(230, 230, 230, 0.24);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
   --shadow-ring: 0 0 0 1px var(--color-line);
@@ -121,7 +121,7 @@ button {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.1;
 }
 
 .dotted-surface canvas {
@@ -991,9 +991,9 @@ button {
 }
 
 .task-brief__restart:disabled {
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
-  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
+  border-color: var(--color-button-disabled-border) !important;
   cursor: not-allowed;
 }
 
@@ -1082,16 +1082,16 @@ button {
 }
 
 .btn--primary:disabled {
-  border-color: var(--color-button-disabled-border);
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border) !important;
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
   cursor: not-allowed;
 }
 
 .btn:disabled {
-  border-color: var(--color-button-disabled-border);
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border) !important;
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
   cursor: not-allowed;
 }
 
@@ -1145,9 +1145,9 @@ button {
 }
 
 .workbench-saved-brief:disabled {
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
-  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
+  border-color: var(--color-button-disabled-border) !important;
   cursor: not-allowed;
 }
 
@@ -2510,17 +2510,17 @@ button {
 }
 
 .step-card__buttons .btn:disabled {
-  border-color: var(--color-button-disabled-border);
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
+  border-color: var(--color-button-disabled-border) !important;
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
   opacity: 1;
   cursor: not-allowed;
 }
 
 .step-card__buttons .btn:not(.btn--primary):disabled {
-  background: var(--color-button-disabled-bg);
-  color: var(--color-button-disabled-text);
-  border-color: var(--color-button-disabled-border);
+  background: var(--color-button-disabled-bg) !important;
+  color: var(--color-button-disabled-text) !important;
+  border-color: var(--color-button-disabled-border) !important;
 }
 
 .step-card__modify {

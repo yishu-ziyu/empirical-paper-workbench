@@ -1291,18 +1291,56 @@ function backendOptionLabel(backendId) {
   return map[backendId] || backendId || "-";
 }
 
+function backendDefaultSelectionReason(backendId) {
+  const map = {
+    statspai: "选择 StatsPAI，因为它适合本地统计执行、结构化结果和可追溯产物。",
+    python_ols_adapter: "选择 Python OLS，因为当前任务可以用本地 Python 快速生成基准回归草案和结果证据。",
+    stata_mcp: "选择 StataMCP，因为当前任务需要 Stata 生态命令或复现既有 do-file 流程。",
+    codex: "选择 Codex，因为当前任务更适合生成脚本草案、诊断建议或人工审阅材料。",
+  };
+  return map[backendId] || "";
+}
+
+function backendDefaultFallbackIds(backendId) {
+  const map = {
+    statspai: ["python_ols_adapter", "stata_mcp", "codex"],
+    python_ols_adapter: ["statspai", "codex"],
+    stata_mcp: ["statspai", "python_ols_adapter", "codex"],
+    codex: ["statspai", "python_ols_adapter"],
+  };
+  return map[backendId] || [];
+}
+
+function backendDefaultExecutionBoundary(backendId) {
+  if (!backendId) return {};
+  if (backendId === "codex") {
+    return {
+      kind: "draft_code_generation",
+      output_boundary: "script_or_plan_only",
+      can_enter_formal_layer_automatically: false,
+    };
+  }
+  return {
+    kind: "statistical_execution",
+    output_boundary: "local_execution_artifacts",
+    can_enter_formal_layer_automatically: false,
+  };
+}
+
 function renderAgentTaskBackendDetails(task) {
   const selectedBackend = task.selected_backend || {};
   const blocker = task.backend_blocker || {};
-  const executionBoundary = selectedBackend.execution_boundary || {};
+  const backendId = selectedBackend.id || blocker.backend_id || task.execution_backend_id || "";
+  const executionBoundary = selectedBackend.execution_boundary || backendDefaultExecutionBoundary(backendId);
   const fallbackBackendIds = Array.isArray(selectedBackend.fallback_backend_ids)
     ? selectedBackend.fallback_backend_ids
-    : (Array.isArray(blocker.fallback_backend_ids) ? blocker.fallback_backend_ids : []);
+    : (Array.isArray(blocker.fallback_backend_ids) ? blocker.fallback_backend_ids : backendDefaultFallbackIds(backendId));
+  const selectionReason = selectedBackend.selection_reason || blocker.message || backendDefaultSelectionReason(backendId);
   const hasDetails = Boolean(
-    selectedBackend.selection_reason
+    selectionReason
     || fallbackBackendIds.length
     || Object.keys(executionBoundary).length
-    || blocker.message
+    || backendId
   );
   if (!hasDetails) return "";
 
@@ -1318,7 +1356,7 @@ function renderAgentTaskBackendDetails(task) {
     <div class="agent-task-backend-details">
       <div>
         <span class="meta-label">为什么选这个后端</span>
-        <p>${escapeHtml(selectedBackend.selection_reason || blocker.message || "等待后端选择后显示。")}</p>
+        <p>${escapeHtml(selectionReason || "等待后端选择后显示。")}</p>
       </div>
       <div>
         <span class="meta-label">失败后备选</span>

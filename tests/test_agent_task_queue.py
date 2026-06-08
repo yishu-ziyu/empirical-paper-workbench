@@ -635,6 +635,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("正式层边界", self.app_js)
         self.assertIn(".agent-task-backend-details", self.styles_css)
 
+    def test_bdd_12_legacy_backend_selection_still_has_human_explanation(self) -> None:
+        """行为 12：旧任务只有后端 id 时，也必须显示兼容的人话解释。"""
+        self.assertIn("backendDefaultSelectionReason", self.app_js)
+        self.assertIn("backendDefaultFallbackIds", self.app_js)
+        self.assertIn("backendDefaultExecutionBoundary", self.app_js)
+        self.assertIn("适合本地统计执行、结构化结果和可追溯产物", self.app_js)
+        self.assertIn("python_ols_adapter", self.app_js)
+        self.assertIn("can_enter_formal_layer_automatically: false", self.app_js)
+
 
 if __name__ == "__main__":
     unittest.main()

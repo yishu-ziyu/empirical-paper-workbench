@@ -491,10 +491,50 @@ P0-E implementation:
 - Non-skill tasks fall back to the `agent_task_queue` handoff.
 - Legacy queues are normalized with the default contract so old state files still load.
 
-Next node: **P0-G execution handoff and one-primary-action guidance**.
+P0-G completed.
 
-20-minute boundary for P0-G:
+Reason: 用户反馈任务处理页“不知道自己在干嘛”，核心原因之一是后端没有给前端一个明确的主动作。现在 Agent Task Queue 和每个任务都会从状态机推导 `primary_action`，前端可以直接展示“当前唯一建议动作”，不用从多个按钮和状态里猜。
 
-- Do not redesign the page.
-- Make the next executable action clearer from persisted task state.
-- Preserve human gate before real execution.
+P0-G behavior added:
+
+```gherkin
+Given a queued Agent Task
+When the queue is shown
+Then the primary action is to open dispatch review, not to execute.
+
+Given the dispatch was approved
+When the queue is shown
+Then the primary action is to select an execution backend.
+
+Given a backend was selected
+When the queue is shown
+Then the primary action is to start real execution.
+
+Given execution succeeded
+When the queue is shown
+Then the primary action is to review the result, without writing to the formal layer.
+```
+
+P0-G verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_15_queue_and_tasks_expose_one_primary_next_action -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py
+```
+
+P0-G implementation:
+
+- Empty queues expose a create/approve primary action.
+- Created tasks expose `primary_action` from current status.
+- Queue-level `primary_action` points to the first task that still needs user action.
+- State changes from dispatch review, backend selection and execution recompute the primary action.
+- `writes_formal_layer` is explicitly `false` through this chain.
+
+Next node: **P0-H frontend consumes queue primary_action**.
+
+20-minute boundary for P0-H:
+
+- Do not redesign visual language.
+- Show the backend-provided `primary_action` label and reason in the Agent Task Queue panel.
+- Keep the action gated by existing buttons/endpoints; do not add new execution authority.

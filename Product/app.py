@@ -18,6 +18,7 @@ from Product.backend.agent_task_queue_service import (
     execute_project_agent_task,
     generate_project_draft_literature_review,
     get_project_agent_task_queue,
+    review_project_draft_literature_review,
     review_project_reference_seed_package,
     select_project_agent_task_backend,
 )
@@ -413,6 +414,11 @@ class AgentTaskDispatchReviewPayload(BaseModel):
 
 
 class AgentTaskReferenceSeedReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+
+
+class AgentTaskDraftLiteratureReviewReviewPayload(BaseModel):
     action: str
     note: str = ""
 
@@ -1078,6 +1084,30 @@ def api_v1_generate_project_draft_literature_review(
         )
     except AgentTaskQueueBlockedError as exc:
         status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.put("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-literature-review-review")
+def api_v1_review_project_draft_literature_review(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskDraftLiteratureReviewReviewPayload,
+) -> dict:
+    try:
+        return review_project_draft_literature_review(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.action,
+            payload.note,
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 400 if exc.code == "invalid_draft_literature_review_review_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
         return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

@@ -887,6 +887,69 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "reference_seed_review_required")
 
+    def test_bdd_23_reviewed_draft_literature_review_opens_citation_verification_tasks(self) -> None:
+        """行为 23：草稿综述通过人工审阅后，只能打开引用核验任务，不能声明引用已验证。"""
+        self._generate_draft_literature_review_task()
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review-review",
+            json={"action": "approve_for_citation_verification", "note": "草稿结构可进入引用核验。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        review = task["draft_literature_review_review"]
+        self.assertEqual(review["status"], "approved_for_citation_verification")
+        self.assertEqual(review["review_gate"], "review_draft_literature_review")
+        self.assertTrue(review["citation_verification_allowed"])
+        self.assertFalse(review["formal_write_allowed"])
+        self.assertFalse(review["claims_verified_citations"])
+        self.assertEqual(task["status"], "citation_verification_ready")
+        self.assertEqual(task["next_action"], "verify_citations")
+        self.assertEqual(task["primary_action"]["id"], "verify_citations")
+        self.assertEqual(task["primary_action"]["label"], "进入引用核验")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+
+        citation_tasks = task["citation_verification_tasks"]
+        self.assertGreaterEqual(len(citation_tasks), 5)
+        self.assertTrue(all(item["status"] == "pending" for item in citation_tasks))
+        self.assertTrue(all(item["citation_state"] == "candidate" for item in citation_tasks))
+        self.assertTrue(all(not item["formal_write_allowed"] for item in citation_tasks))
+        self.assertTrue(all(not item["claims_verified_citations"] for item in citation_tasks))
+        self.assertIn("authors", citation_tasks[0]["required_checks"])
+        self.assertIn("doi_or_stable_url", citation_tasks[0]["required_checks"])
+        self.assertEqual(task["audit_log"][-1]["event"], "draft_literature_review_reviewed")
+
+        saved = json.loads(
+            (self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(saved["tasks"][0]["status"], "citation_verification_ready")
+        self.assertEqual(saved["tasks"][0]["citation_verification_tasks"][0]["status"], "pending")
+
+    def test_bdd_24_draft_literature_review_review_requires_draft(self) -> None:
+        """行为 24：没有综述草稿时，不能伪造草稿审阅并打开引用核验队列。"""
+        self._execute_reference_seed_package_task()
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review-review",
+            json={"action": "approve_for_citation_verification", "note": "还没有草稿。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "draft_literature_review_required")
+
+    def _generate_draft_literature_review_task(self) -> None:
+        self._execute_reference_seed_package_task()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/reference-seed-review",
+            json={"action": "approve_for_draft", "note": "可以进入草稿综述。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        drafted = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-literature-review"
+        )
+        self.assertEqual(drafted.status_code, 200, msg=drafted.text)
+
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
             status="approved",
@@ -1207,6 +1270,17 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("审阅草稿综述", self.app_js)
         self.assertIn("不写入正式层", self.app_js)
         self.assertIn(".agent-task-literature-draft", self.styles_css)
+
+    def test_bdd_19_frontend_exposes_draft_review_and_citation_verification(self) -> None:
+        """行为 19：前端必须能审阅草稿综述，并展示引用核验任务队列。"""
+        self.assertIn("reviewDraftLiteratureReview", self.app_js)
+        self.assertIn("handleDraftLiteratureReviewReview", self.app_js)
+        self.assertIn("data-draft-literature-review-review-action", self.app_js)
+        self.assertIn("approve_for_citation_verification", self.app_js)
+        self.assertIn("进入引用核验", self.app_js)
+        self.assertIn("引用核验任务", self.app_js)
+        self.assertIn("不宣称引用已验证", self.app_js)
+        self.assertIn(".agent-task-citation-verification", self.styles_css)
 
 
 if __name__ == "__main__":

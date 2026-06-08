@@ -1019,3 +1019,51 @@ P1-I implementation:
 - The frontend now exposes `生成草稿层文献综述` after approval and renders the resulting draft artifact, source artifact, next action, and formal-layer boundary.
 
 Next node: **P1-J review draft_literature_review and open citation-verification tasks**.
+
+20-minute boundary for P1-J:
+
+- Do not implement CNKI / Scholar / Zotero connector crawling.
+- Do not claim citations are verified.
+- Do not write to Manuscripts formal sections.
+- Only let a reviewed `draft_literature_review.md` open a persisted citation verification task list.
+
+P1-J BDD:
+
+```text
+Given a LiteratureAgent task has generated draft_literature_review.md
+And the draft is still in exploratory / draft state
+When the user approves the draft for citation verification
+Then the system records draft_literature_review_review.status=approved_for_citation_verification,
+creates citation_verification_tasks from the candidate source queries,
+sets next_action=verify_citations,
+and keeps formal_write_allowed=false and claims_verified_citations=false.
+
+Given no draft_literature_review.md has been generated
+When the user calls the draft literature review review endpoint
+Then the system rejects the request with draft_literature_review_required.
+
+Given the frontend receives citation_verification_tasks
+When the agent task queue renders the task
+Then it exposes draft review actions and a citation verification task section,
+with copy that citations are not yet verified and cannot enter the formal layer.
+```
+
+P1-J verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_23_reviewed_draft_literature_review_opens_citation_verification_tasks tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_24_draft_literature_review_review_requires_draft tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_19_frontend_exposes_draft_review_and_citation_verification -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m pytest tests/test_p2_aa_agent_task_execution_backend.py -q
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+```
+
+P1-J implementation:
+
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-literature-review-review`.
+- The endpoint supports `approve_for_citation_verification`, `needs_revision`, and `reject`.
+- `approve_for_citation_verification` moves the task to `citation_verification_ready` and creates persisted `citation_verification_tasks`.
+- Each citation verification task remains `pending`, `candidate`, `formal_write_allowed=false`, and `claims_verified_citations=false`.
+- The frontend now renders draft review actions and a `引用核验任务` section under the Agent Task Queue item.
+
+Next node: **P1-K verify citation tasks with connector/manual evidence records**.

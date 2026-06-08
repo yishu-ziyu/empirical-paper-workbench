@@ -1381,3 +1381,50 @@ git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py P
 ```
 
 Next node: **P1-R generate draft section task packages after draft section plan approval**.
+
+## P1-R Draft Section Task Packages After Plan Approval
+
+Boundary: section task packages are still draft-layer orchestration. They turn an approved section plan into concrete writing tasks for later WriterAgent work, but they do not generate manuscript prose and do not write the formal layer.
+
+BDD:
+
+```text
+Behavior 40: generate draft section task package from an approved draft section plan
+Given Results/json/draft_section_plan.json exists
+And the draft section plan review approved section task generation
+When the user generates draft section tasks
+Then the system writes Results/json/draft_section_tasks.json,
+stores one queued writing task per planned section,
+keeps citation_binding_ids attached to each section task,
+keeps formal_write_allowed=false,
+and exposes review_draft_section_tasks as the next action.
+
+Behavior 41: block draft section tasks before draft section plan approval
+Given Results/json/draft_section_plan.json exists
+But the section plan has not been approved for section task generation
+When the user tries to generate draft section tasks
+Then the system returns draft_section_plan_review_required
+and does not create Results/json/draft_section_tasks.json.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added `POST /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-section-tasks`.
+- The service requires `draft_section_plan_approved`, human review status `approved_for_section_tasks`, `section_task_generation_allowed=true`, and a real `Results/json/draft_section_plan.json`.
+- The generated artifact has schema `p1.draft_section_tasks.v1`, section-level queued tasks, required upstream inputs, output artifact paths, pending human review, and formal-layer boundary.
+- The parent Agent task moves to `draft_section_tasks_ready` and exposes `review_draft_section_tasks`.
+- Frontend wiring is intentionally left to the next node so this node stays focused on the product state contract and API.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_40_approved_draft_section_plan_generates_section_task_package tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_41_draft_section_tasks_require_approved_section_plan -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+Next node: **P1-S expose draft section task packages in the Agent Task Queue UI**.

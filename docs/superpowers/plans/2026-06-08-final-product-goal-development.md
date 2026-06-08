@@ -793,3 +793,33 @@ Next node: **P1-D make reference policy visible to product users without adding 
 - Do not implement real CNKI / Scholar / Zotero connectors yet.
 - Expose the reference policy in a user-facing API/UI contract section as collapsed-by-default evidence requirements.
 - Make the user see why CNKI/Scholar/Zotero/local notes/arXiv were selected and what still needs review.
+
+P1-D BDD:
+
+```text
+Given SupervisorPlan contains a reference_chain_policy
+When the user opens the collapsed plan details
+Then the page shows source priority, required artifacts, draft citation policy,
+and the formal writeback gate.
+
+Given a LiteratureAgent task inherited the reference_chain_policy
+When the user opens the collapsed task details
+Then the task explains the reference sources, search bounds, candidate citation
+state, and why it cannot silently write into the formal layer.
+```
+
+P1-D verified:
+
+```bash
+python3 -m unittest tests.test_supervisor_plan.SupervisorPlanFrontendTests.test_bdd_21_frontend_exposes_reference_chain_policy_as_progressive_disclosure tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_15_frontend_exposes_reference_chain_policy_in_literature_task_details -v
+python3 -m unittest tests.test_supervisor_plan tests.test_agent_task_queue -v
+```
+
+P1-D implementation:
+
+- Added a shared `renderReferenceChainPolicy` UI renderer.
+- Exposed SupervisorPlan `reference_chain_policy` in the existing collapsed plan details.
+- Exposed LiteratureAgent task `reference_chain_policy` in the existing collapsed task details.
+- Kept CNKI / Scholar / Zotero / local notes / arXiv as a visible policy contract; no real crawler was added in this node.
+
+Next node: **P1-E add a deterministic literature-source runner scaffold that reads the policy but does not yet claim verified citations**.

@@ -924,6 +924,17 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn(".agent-task-primary-action", self.styles_css)
         self.assertIn("20260608-p0h-primary-action", self.index_html)
 
+    def test_bdd_15_frontend_exposes_reference_chain_policy_in_literature_task_details(self) -> None:
+        """行为 15：文献类任务详情必须说明引用链路来源、检索边界和正式层写回门。"""
+        self.assertIn("renderReferenceChainPolicy", self.app_js)
+        self.assertIn("task.reference_chain_policy", self.app_js)
+        self.assertIn("agent-task-reference-policy", self.app_js)
+        self.assertIn("source_priority", self.app_js)
+        self.assertIn("formal_writeback_gate", self.app_js)
+        self.assertIn("writes_formal_layer", self.app_js)
+        self.assertIn("任务引用链路", self.app_js)
+        self.assertIn(".reference-chain-policy", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

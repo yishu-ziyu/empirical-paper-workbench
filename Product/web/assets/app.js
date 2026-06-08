@@ -1099,6 +1099,76 @@ function renderSupervisorPlanSkillReview(plan) {
   `;
 }
 
+function renderReferenceChainPolicy(policy, options = {}) {
+  if (!policy || typeof policy !== "object") return "";
+  const title = options.title || "引用链路策略";
+  const className = options.className || "";
+  const sourcePriority = Array.isArray(policy.source_priority) ? policy.source_priority : [];
+  const sources = (Array.isArray(policy.sources) ? policy.sources : [])
+    .map((source) => (typeof source === "string" ? { id: source, label: source } : source))
+    .filter(Boolean);
+  const sourceById = new Map(
+    sources.map((source) => [source.id || source.source_id || source.label, source]),
+  );
+  const orderedSources = sourcePriority.length
+    ? sourcePriority.map((sourceId) => sourceById.get(sourceId) || { id: sourceId, label: sourceId })
+    : sources;
+  const requiredArtifacts = Array.isArray(policy.required_artifacts) ? policy.required_artifacts : [];
+  const statusLabel = productTermLabel(policy.status || "needs_review");
+  const sourceLimit = `深度 ${escapeHtml(String(policy.max_depth || 2))} · ${escapeHtml(String(policy.max_iterations || 5))} 轮`;
+  const writebackGate = policy.formal_writeback_gate || "review_literature_seed_package";
+  const draftPolicy = policy.draft_citation_policy || "候选引用只能进入草案；正式写回前需要人工审阅来源、DOI、作者年份和引用位置。";
+  const formalLayerNote = policy.writes_formal_layer
+    ? "会触及正式层，必须先完成正式写回门。"
+    : "不会静默写入正式层。";
+
+  return `
+    <section class="reference-chain-policy ${escapeHtml(className)}">
+      <div class="reference-chain-policy__head">
+        <div>
+          <span class="meta-label">${escapeHtml(title)}</span>
+          <strong>${escapeHtml(statusLabel)}</strong>
+          <p class="muted">候选引用进入草案，正式层写回前必须通过 ${escapeHtml(writebackGate)}。</p>
+        </div>
+        <span class="pill">${sourceLimit}</span>
+      </div>
+      <div class="reference-chain-policy__grid">
+        <div>
+          <span class="meta-label">来源优先级</span>
+          ${orderedSources.length ? `
+            <ol>
+              ${orderedSources.map((source) => `
+                <li>
+                  <strong>${escapeHtml(source.label || source.name || source.id || "未命名来源")}</strong>
+                  <span class="muted">${escapeHtml(source.reason || source.boundary || source.access_mode || "")}</span>
+                </li>
+              `).join("")}
+            </ol>
+          ` : "<p class='muted'>等待 Supervisor 指定来源。</p>"}
+        </div>
+        <div>
+          <span class="meta-label">待生成证据</span>
+          ${requiredArtifacts.length ? `
+            <ul>
+              ${requiredArtifacts.map((artifact) => `<li>${escapeHtml(artifact.label || artifact.id || String(artifact))}</li>`).join("")}
+            </ul>
+          ` : "<p class='muted'>等待文献 Agent 生成引用种子包。</p>"}
+        </div>
+        <div>
+          <span class="meta-label">草案引用规则</span>
+          <p>${escapeHtml(draftPolicy)}</p>
+          <p class="muted">候选引用需要标记为 candidate / verified / rejected。</p>
+        </div>
+        <div>
+          <span class="meta-label">正式写回门</span>
+          <p>${escapeHtml(writebackGate)}</p>
+          <p class="muted">${escapeHtml(formalLayerNote)}</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderSupervisorPlan() {
   const container = document.getElementById("supervisor-plan-body");
   if (!container) return;
@@ -1171,6 +1241,7 @@ function renderSupervisorPlan() {
             <div><span class="meta-label">边界</span><strong>${escapeHtml(plan.write_boundary || "不可直接改写已确认研究状态")}</strong></div>
           </div>
           ${renderSupervisorPlanSkillReview(plan)}
+          ${renderReferenceChainPolicy(plan.reference_chain_policy, { title: "引用链路策略", className: "supervisor-plan-reference-policy" })}
           ${hasPlan ? `
             <div class="supervisor-plan-grid">
               ${renderSupervisorPlanColumn("阶段计划", stagePlan, "goal")}
@@ -1667,6 +1738,7 @@ function renderAgentTaskQueueItem(task) {
             `).join("") : "<p class='muted'>尚未声明。</p>"}
           </div>
           ${renderAgentTaskSkillBindings(task)}
+          ${renderReferenceChainPolicy(task.reference_chain_policy, { title: "任务引用链路", className: "agent-task-reference-policy" })}
           <div>
             <span class="meta-label">风险</span>
             ${riskFlags.length ? riskFlags.map((item) => `

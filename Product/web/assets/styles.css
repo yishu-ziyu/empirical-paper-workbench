@@ -754,6 +754,64 @@ textarea {
   background: rgba(255, 255, 255, 0.7);
 }
 
+.reference-chain-policy {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(30, 111, 98, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.reference-chain-policy__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.reference-chain-policy__head strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.reference-chain-policy__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reference-chain-policy__grid > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(30, 111, 98, 0.1);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.74);
+}
+
+.reference-chain-policy p,
+.reference-chain-policy ol,
+.reference-chain-policy ul {
+  margin: 6px 0 0;
+}
+
+.reference-chain-policy ol,
+.reference-chain-policy ul {
+  padding-left: 18px;
+}
+
+.reference-chain-policy li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.reference-chain-policy li span {
+  display: block;
+  margin-top: 2px;
+}
+
 .supervisor-plan-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

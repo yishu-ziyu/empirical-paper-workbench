@@ -466,6 +466,15 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
         self.assertIn("人工审阅状态", self.app_js)
         self.assertIn(".supervisor-plan-skill-review", self.styles_css)
 
+    def test_bdd_21_frontend_exposes_reference_chain_policy_as_progressive_disclosure(self) -> None:
+        """行为 21：SupervisorPlan 详情里必须低噪声展示引用链路来源、草案边界和正式写回门。"""
+        self.assertIn("renderReferenceChainPolicy", self.app_js)
+        self.assertIn("reference_chain_policy", self.app_js)
+        self.assertIn("supervisor-plan-reference-policy", self.app_js)
+        for label in ("引用链路策略", "来源优先级", "待生成证据", "草案引用规则", "正式写回门", "候选引用"):
+            self.assertIn(label, self.app_js)
+        self.assertIn(".reference-chain-policy", self.styles_css)
+
     def test_bdd_15_supervisor_plan_recommends_internal_skills_from_plan_context(self) -> None:
         """行为 15：SupervisorPlan 必须把相关 internal skills 作为待审能力推荐，而不是自由发挥。"""
         generated = {

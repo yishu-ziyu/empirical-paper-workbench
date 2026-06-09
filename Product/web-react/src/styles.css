@@ -6,13 +6,13 @@
    * ────────────────────────────────────────────────────────────── */
 
   /* === 暗色主题色板 === */
-  --color-bg: #2a2a2a;
-  --color-panel: #303030;
-  --color-panel-soft: #393939;
-  --color-ink: #cfcfcf;
-  --color-strong: #e0e0e0;
-  --color-muted: #a8a8a8;
-  --color-subtle: #747474;
+  --color-bg: #303030;
+  --color-panel: #343434;
+  --color-panel-soft: #3d3d3d;
+  --color-ink: #c8c8c8;
+  --color-strong: #d8d8d8;
+  --color-muted: #a6a6a6;
+  --color-subtle: #7e7e7e;
   --color-quaternary: #4a4a4a;
   --color-line: rgba(230, 230, 230, 0.1);
   --color-line-strong: rgba(230, 230, 230, 0.22);
@@ -31,16 +31,16 @@
   --color-info: #5a8ac4;
   --color-info-soft: rgba(90, 138, 196, 0.18);
   --color-inverse: #161616;
-  --color-tab-active: #d9d9d9;
-  --color-button-primary-bg: #cfcfcf;
-  --color-button-primary-bg-hover: #dddddd;
-  --color-button-primary-ink: #171717;
+  --color-tab-active: #c8c8c8;
+  --color-button-primary-bg: #c2c2c2;
+  --color-button-primary-bg-hover: #cdcdcd;
+  --color-button-primary-ink: #202020;
   --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
   --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
   --color-button-secondary-text: #d2d2d2;
-  --color-button-disabled-bg: rgba(210, 210, 210, 0.16);
-  --color-button-disabled-text: #b8b8b8;
-  --color-button-disabled-border: rgba(230, 230, 230, 0.22);
+  --color-button-disabled-bg: rgba(190, 190, 190, 0.1);
+  --color-button-disabled-text: #a6a6a6;
+  --color-button-disabled-border: rgba(230, 230, 230, 0.16);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
   --shadow-ring: 0 0 0 1px var(--color-line);
@@ -1990,9 +1990,9 @@ button {
 }
 
 .badge--readiness {
-  background: rgba(220, 160, 80, 0.08);
-  color: #e5c07b;
-  border: 1px solid rgba(220, 160, 80, 0.2);
+  background: rgba(230, 230, 230, 0.055);
+  color: #bdbdbd;
+  border: 1px solid rgba(230, 230, 230, 0.14);
 }
 
 .text-highlight {
@@ -2094,9 +2094,9 @@ button {
 }
 
 .stage-node-status--running {
-  background: rgba(140, 186, 140, 0.08);
-  color: #8cba8c;
-  border: 1px solid rgba(140, 186, 140, 0.18);
+  background: rgba(230, 230, 230, 0.08);
+  color: #d2d2d2;
+  border: 1px solid rgba(230, 230, 230, 0.18);
 }
 
 .stage-node-status--ready {
@@ -2109,6 +2109,18 @@ button {
   background: rgba(230, 230, 230, 0.04);
   color: #8a8a8a;
   border: 1px solid rgba(230, 230, 230, 0.1);
+}
+
+.stage-node-status--completed {
+  background: rgba(230, 230, 230, 0.08);
+  color: #d0d0d0;
+  border: 1px solid rgba(230, 230, 230, 0.18);
+}
+
+.stage-node-status--failed {
+  background: rgba(230, 230, 230, 0.06);
+  color: #c4c4c4;
+  border: 1px solid rgba(230, 230, 230, 0.16);
 }
 
 .stage-node-status--empty {
@@ -2160,6 +2172,33 @@ button {
   border-top: 1px solid var(--color-line);
   padding-top: 16px;
   margin-top: 6px;
+}
+
+.supervisor-plan__approval-error {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(230, 230, 230, 0.18);
+  border-radius: 12px;
+  background: rgba(230, 230, 230, 0.055);
+  color: var(--color-muted);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.supervisor-plan__approval-error strong {
+  color: var(--color-strong);
+}
+
+.modal-quote {
+  margin: 0;
+  padding: 12px;
+  border-left: 2px solid rgba(230, 230, 230, 0.28);
+  border-radius: 6px;
+  background: rgba(230, 230, 230, 0.04);
+  color: var(--color-strong);
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 /* Modal revision overlay */

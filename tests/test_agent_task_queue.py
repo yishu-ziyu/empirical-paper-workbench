@@ -2039,6 +2039,9 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
             root / "Product" / "web-react" / "src" / "components" / "AgentTaskQueuePanel.tsx"
         ).read_text(encoding="utf-8")
         cls.react_app = (root / "Product" / "web-react" / "src" / "App.tsx").read_text(encoding="utf-8")
+        cls.react_supervisor_plan_review = (
+            root / "Product" / "web-react" / "src" / "components" / "SupervisorPlanReview.tsx"
+        ).read_text(encoding="utf-8")
         cls.react_api_base = (root / "Product" / "web-react" / "src" / "lib" / "apiBase.ts").read_text(
             encoding="utf-8"
         )
@@ -2424,6 +2427,53 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("没有拿到 SupervisorPlan", self.react_app)
         self.assertIn("FastAPI Product.app", self.react_app)
         self.assertIn("普通静态文件服务", self.react_app)
+
+    def test_bdd_40_supervisor_plan_review_consumes_backend_plan_payload(self) -> None:
+        """行为 40：规划审阅页必须渲染后端返回的 stages 与 inspector，而不是固定演示数据。"""
+        self.assertIn("interface SupervisorPlanInspector", self.react_supervisor_plan_review)
+        self.assertIn("stages?: StageNode[]", self.react_supervisor_plan_review)
+        self.assertIn("inspector?: SupervisorPlanInspector | null", self.react_supervisor_plan_review)
+        self.assertIn("const stagesToRender = stages?.length ? stages : DEFAULT_STAGES", self.react_supervisor_plan_review)
+        self.assertIn("stagesToRender.map", self.react_supervisor_plan_review)
+        self.assertNotIn("DEFAULT_STAGES.map", self.react_supervisor_plan_review)
+        self.assertIn("inputsUsed", self.react_supervisor_plan_review)
+        self.assertIn("evidenceRequired", self.react_supervisor_plan_review)
+        self.assertIn("formalBoundary", self.react_supervisor_plan_review)
+        self.assertNotIn("中国家庭追踪调查(CFPS)", self.react_supervisor_plan_review)
+
+    def test_bdd_41_app_passes_fetched_supervisor_plan_to_review_component(self) -> None:
+        """行为 41：App 拉到 SupervisorPlan 后必须把 stages、inspector、topic 传入审阅页。"""
+        self.assertIn("interface SupervisorPlanInspector", self.react_app)
+        self.assertIn("planInspector", self.react_app)
+        self.assertIn("setPlanInspector(data.inspector ?? null)", self.react_app)
+        self.assertIn("setPlanEvidenceLevel(data.evidence_level ?? null)", self.react_app)
+        self.assertIn("stages={planStages}", self.react_app)
+        self.assertIn("inspector={planInspector}", self.react_app)
+        self.assertIn("topic={task.message}", self.react_app)
+        self.assertIn("evidenceLevel={planEvidenceLevel}", self.react_app)
+
+    def test_bdd_42_approving_supervisor_plan_calls_review_and_queue_creation(self) -> None:
+        """行为 42：批准路线必须先写入 SupervisorPlan 审阅，再创建 Agent Task Queue。"""
+        self.assertIn("approveSupervisorPlan", self.react_app)
+        self.assertIn("planApprovalError", self.react_app)
+        self.assertIn("setApprovingPlan(true)", self.react_app)
+        self.assertIn("supervisor-plan/review", self.react_app)
+        self.assertIn('method: "PUT"', self.react_app)
+        self.assertIn('"approve"', self.react_app)
+        self.assertIn("agent-task-queue", self.react_app)
+        self.assertIn('method: "POST"', self.react_app)
+        self.assertIn("setPlanApproved(true)", self.react_app)
+        self.assertIn('data-testid="plan-approval-error"', self.react_supervisor_plan_review)
+
+    def test_bdd_43_plan_review_ui_exposes_readable_loading_error_and_disabled_states(self) -> None:
+        """行为 43：规划审阅 UI 必须展示可读的批准中、失败和禁用按钮状态。"""
+        self.assertIn("approving?: boolean", self.react_supervisor_plan_review)
+        self.assertIn("approvalError?: string | null", self.react_supervisor_plan_review)
+        self.assertIn("正在批准并创建队列", self.react_supervisor_plan_review)
+        self.assertIn("plan-approval-error", self.react_supervisor_plan_review)
+        self.assertIn("btn:disabled", self.react_styles_css)
+        self.assertIn("color-button-disabled-bg", self.react_styles_css)
+        self.assertIn("color-button-disabled-text", self.react_styles_css)
 
 
 if __name__ == "__main__":

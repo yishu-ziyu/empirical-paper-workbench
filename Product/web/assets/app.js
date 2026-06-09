@@ -100,6 +100,7 @@ const state = {
   reviewingFormalWritebackPreflightTaskId: null,
   reviewingFormalWritebackPreflightAction: null,
   generatingFormalExportPreflightTaskId: null,
+  generatingPdfCandidateExportTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -612,6 +613,13 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async generatePdfCandidateExport(projectId, taskId, payload = {}) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/pdf-candidate-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -1060,6 +1068,7 @@ function productTermLabel(value) {
     formal_sections_written: "正式章节已写入",
     formal_export_preflight_ready: "导出预检已通过",
     formal_export_preflight_blocked: "导出预检有阻断项",
+    pdf_candidate_exported: "PDF 候选稿已生成",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
     review_verified_literature_package: "审阅已核验文献包",
@@ -1078,6 +1087,7 @@ function productTermLabel(value) {
     review_formal_writeback_preflight: "审阅正式写回预检",
     prepare_export_preflight: "准备导出预检",
     run_pdf_export_preflight: "运行 PDF 导出预检",
+    review_pdf_candidate: "审阅 PDF 候选稿",
     resolve_export_preflight_blockers: "处理导出阻断项",
     revise_section_drafts: "修订章节草稿",
     replace_section_drafts: "替换章节草稿",
@@ -2139,6 +2149,7 @@ function renderSectionDrafts(task = {}) {
   const preflight = task.formal_writeback_preflight || {};
   const manifest = task.formal_writeback_manifest || {};
   const exportPreflight = task.formal_export_preflight || {};
+  const pdfCandidateExport = task.pdf_candidate_export || {};
   const exportFollowups = Array.isArray(task.export_preflight_followups) ? task.export_preflight_followups : [];
   const canGenerate = task.status === "draft_section_tasks_approved";
   const isGenerating = state.generatingSectionDraftsTaskId === task.id;
@@ -2149,9 +2160,13 @@ function renderSectionDrafts(task = {}) {
   const isReviewingPreflight = state.reviewingFormalWritebackPreflightTaskId === task.id;
   const hasFormalWriteback = Boolean(manifest.status || manifest.artifact_path);
   const hasExportPreflight = Boolean(exportPreflight.status || exportPreflight.artifact_path);
+  const hasPdfCandidateExport = Boolean(pdfCandidateExport.status || pdfCandidateExport.pdf_candidate_path);
   const canGenerateExportPreflight = hasFormalWriteback && task.status === "formal_sections_written";
   const isGeneratingExportPreflight = state.generatingFormalExportPreflightTaskId === task.id;
-  if (!drafts.status && !canGenerate && !hasPreflight && !hasFormalWriteback && !hasExportPreflight) return "";
+  const canGeneratePdfCandidateExport =
+    task.status === "formal_export_preflight_ready" && exportPreflight.status === "formal_export_preflight_ready";
+  const isGeneratingPdfCandidateExport = state.generatingPdfCandidateExportTaskId === task.id;
+  if (!drafts.status && !canGenerate && !hasPreflight && !hasFormalWriteback && !hasExportPreflight && !hasPdfCandidateExport) return "";
 
   return `
     <div class="agent-task-section-drafts">
@@ -2308,7 +2323,7 @@ function renderSectionDrafts(task = {}) {
             <div>
               <span class="meta-label">导出预检台</span>
               <strong>${escapeHtml(productTermLabel(exportPreflight.status || task.status))}</strong>
-              <p>${exportPreflight.status === "formal_export_preflight_blocked" ? "有缺口需要先处理，处理后再进入 PDF/DOCX 预检。" : "正式章节基础检查已通过，可以进入 PDF 候选包预检。"}</p>
+              <p>${exportPreflight.status === "formal_export_preflight_blocked" ? "有缺口需要先处理，处理后再进入 PDF/DOCX 预检。" : "正式章节基础检查已通过，可以生成 PDF 候选稿供人工审阅。"}</p>
             </div>
             <span class="pill">${escapeHtml(productTermLabel(exportPreflight.next_action || task.next_action || "run_pdf_export_preflight"))}</span>
           </div>
@@ -2338,8 +2353,20 @@ function renderSectionDrafts(task = {}) {
               </ul>
             </div>
           ` : `
-            <p class="muted">没有发现正式章节缺失；后续交给 PDF/DOCX 导出预检继续检查排版、引用和工具链。</p>
+            <p class="muted">没有发现正式章节缺失；下一步生成 PDF 候选稿，检查排版、引用和复现边界。</p>
           `}
+          ${canGeneratePdfCandidateExport ? `
+            <div class="agent-task-formal-export-preflight__actions">
+              <button
+                class="primary-button"
+                data-pdf-candidate-export-action
+                data-agent-task-id="${escapeHtml(task.id || "")}"
+                ${isGeneratingPdfCandidateExport ? "disabled" : ""}
+              >
+                ${isGeneratingPdfCandidateExport ? "生成中..." : "生成 PDF 候选稿"}
+              </button>
+            </div>
+          ` : ""}
           ${exportFollowups.length ? `
             <div class="agent-task-formal-export-preflight__followups">
               <span class="meta-label">Agent 后续任务</span>
@@ -2351,6 +2378,37 @@ function renderSectionDrafts(task = {}) {
               `).join("")}
             </div>
           ` : ""}
+        </div>
+      ` : ""}
+      ${hasPdfCandidateExport ? `
+        <div class="agent-task-pdf-candidate-export" data-testid="agent-task-pdf-candidate-export">
+          <div class="agent-task-pdf-candidate-export__head">
+            <div>
+              <span class="meta-label">PDF 候选稿</span>
+              <strong>${escapeHtml(productTermLabel(pdfCandidateExport.status || task.status))}</strong>
+              <p>先检查排版、章节完整性、引用边界和复现说明；通过后再进入正式 PDF/DOCX 导出。</p>
+            </div>
+            <span class="pill">${escapeHtml(productTermLabel(pdfCandidateExport.next_action || task.next_action || "review_pdf_candidate"))}</span>
+          </div>
+          <div class="agent-task-pdf-candidate-export__grid">
+            <div>
+              <span class="meta-label">PDF 候选稿</span>
+              <code>${escapeHtml(pdfCandidateExport.pdf_candidate_path || "Submissions/formal_package/paper_candidate.pdf")}</code>
+            </div>
+            <div>
+              <span class="meta-label">候选清单</span>
+              <code>${escapeHtml(pdfCandidateExport.artifact_path || "Submissions/formal_package/pdf_candidate_manifest.json")}</code>
+            </div>
+            <div>
+              <span class="meta-label">审阅文档</span>
+              <code>${escapeHtml(pdfCandidateExport.review_path || "Reviews/pdf_candidate_export_review.md")}</code>
+            </div>
+            <div>
+              <span class="meta-label">正式层</span>
+              <p>${pdfCandidateExport.writes_formal_layer ? "会改写正式层" : "不会改写正式层"}</p>
+            </div>
+          </div>
+          <p class="muted">候选稿不覆盖 paper.pdf / paper.docx；人工审阅通过后再进入正式导出。</p>
         </div>
       ` : ""}
     </div>
@@ -3396,6 +3454,26 @@ async function handleFormalExportPreflight(taskId) {
     showV2Error("overview", `生成导出预检失败：${error.message}`);
   } finally {
     state.generatingFormalExportPreflightTaskId = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handlePdfCandidateExport(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.generatingPdfCandidateExportTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.generatePdfCandidateExport(
+      state.selectedProjectId,
+      taskId,
+      { note: "生成 PDF 候选稿，供人工检查排版、章节和引用边界。" },
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成 PDF 候选稿失败：${error.message}`);
+  } finally {
+    state.generatingPdfCandidateExportTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -8564,6 +8642,11 @@ async function boot() {
     const formalExportPreflightButton = target.closest("[data-formal-export-preflight-action]");
     if (formalExportPreflightButton) {
       void handleFormalExportPreflight(formalExportPreflightButton.dataset.agentTaskId || "");
+      return;
+    }
+    const pdfCandidateExportButton = target.closest("[data-pdf-candidate-export-action]");
+    if (pdfCandidateExportButton) {
+      void handlePdfCandidateExport(pdfCandidateExportButton.dataset.agentTaskId || "");
       return;
     }
     const sectionDraftsButton = target.closest("[data-section-drafts-action]");

@@ -11,6 +11,7 @@ import { IdentificationAuditPanel } from "./components/IdentificationAuditPanel"
 import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
+import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
 
 interface SupervisorPlanStage {
   id: string;
@@ -347,15 +348,18 @@ export function App() {
                 }}
               />
               {planApproved ? (
-                <BriefPanel
-                  topic={task.message}
-                  initialSnapshot={briefSnapshot}
-                  onComplete={(b, snapshot) => {
-                    setBriefResult(b);
-                    setBriefSnapshot(snapshot);
-                    setActiveStage("search");
-                  }}
-                />
+                <>
+                  <AgentTaskQueuePanel projectId={`proj_${topicSlug}`} />
+                  <BriefPanel
+                    topic={task.message}
+                    initialSnapshot={briefSnapshot}
+                    onComplete={(b, snapshot) => {
+                      setBriefResult(b);
+                      setBriefSnapshot(snapshot);
+                      setActiveStage("search");
+                    }}
+                  />
+                </>
               ) : planFetchError ? (
                 <div className="task-brief__error" role="alert" data-testid="plan-fetch-error">
                   <strong>计划加载失败：</strong> {planFetchError}

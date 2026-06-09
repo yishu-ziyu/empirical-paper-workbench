@@ -105,11 +105,52 @@ class ReactInputTabsContractTest(unittest.TestCase):
         self.assertIn("SystemStatusBar", source)
         self.assertIn("stage-panel__current-action", source)
         self.assertIn("analysis-workspace", source)
-        self.assertNotIn("AgentTaskQueue", source)
+        self.assertIn("AgentTaskQueuePanel", source)
         self.assertNotIn("RightAuditDrawer", source)
         self.assertNotIn("系统只进入草案层", source)
         self.assertNotIn("这个 React 切片", source)
         self.assertNotIn("不展开 Agent", source)
+
+    def test_react_agent_task_queue_is_wired_to_project_api(self) -> None:
+        """行为：React 工作台必须展示真实 Agent 队列入口，并使用当前项目 API。"""
+        component_path = WEB_REACT_ROOT / "src" / "components" / "AgentTaskQueuePanel.tsx"
+        app_path = WEB_REACT_ROOT / "src" / "App.tsx"
+        styles_path = WEB_REACT_ROOT / "src" / "styles.css"
+        self.assertTrue(component_path.exists(), "AgentTaskQueuePanel component is missing.")
+
+        source = component_path.read_text(encoding="utf-8")
+        app_source = app_path.read_text(encoding="utf-8")
+        styles = styles_path.read_text(encoding="utf-8")
+
+        for marker in [
+            "AgentTaskQueuePanel",
+            "/api/v1/projects/",
+            "/agent-task-queue",
+            "loadQueue",
+            "createQueue",
+            "reviewDraftSectionTasks",
+            "data-testid=\"agent-task-queue-panel\"",
+            "批准给 WriterAgent",
+            "要求修订",
+            "拒绝任务包",
+            "正式层仍保持锁定",
+            "draft-section-tasks-review",
+        ]:
+            self.assertIn(marker, source)
+        self.assertIn("<AgentTaskQueuePanel", app_source)
+        self.assertIn('projectId={`proj_${topicSlug}`}', app_source)
+        self.assertIn(".agent-task-queue-panel", styles)
+        self.assertIn(".agent-task-queue-review", styles)
+
+    def test_brief_panel_hides_raw_network_errors_from_users(self) -> None:
+        """行为：研究简报服务未连上时，不能把底层网络错误直接展示给用户。"""
+        component_path = WEB_REACT_ROOT / "src" / "components" / "BriefPanel.tsx"
+        source = component_path.read_text(encoding="utf-8")
+
+        self.assertIn("SERVICE_ERROR_MESSAGE", source)
+        self.assertIn("toBriefErrorMessage", source)
+        self.assertIn("Failed to fetch", source)
+        self.assertNotIn("setError(err instanceof Error ? err.message : SERVICE_ERROR_MESSAGE)", source)
 
     def test_new_react_styles_are_black_white_gray_only(self) -> None:
         styles_path = WEB_REACT_ROOT / "src" / "styles.css"
@@ -142,7 +183,7 @@ class ReactInputTabsContractTest(unittest.TestCase):
         for marker in required_markers:
             self.assertIn(marker, css)
 
-    def test_start_screen_contrast_is_softened_from_pure_black_and_white(self) -> None:
+    def test_start_screen_contrast_uses_soft_gray_tokens(self) -> None:
         styles_path = WEB_REACT_ROOT / "src" / "styles.css"
         css = styles_path.read_text(encoding="utf-8").lower()
 
@@ -155,8 +196,8 @@ class ReactInputTabsContractTest(unittest.TestCase):
         for token in overly_harsh_tokens:
             self.assertNotIn(token, css)
 
-        self.assertIn("--color-bg: #1d1d1d", css)
-        self.assertIn("--color-ink: #d2d2d2", css)
+        self.assertIn("--color-bg: #242424", css)
+        self.assertIn("--color-ink: #c8c8c8", css)
 
 
 if __name__ == "__main__":

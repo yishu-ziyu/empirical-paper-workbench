@@ -60,6 +60,16 @@ function isStepIndex(n: unknown): n is 1 | 2 | 3 | 4 {
   return n === 1 || n === 2 || n === 3 || n === 4;
 }
 
+function toBriefErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message === SERVICE_ERROR_MESSAGE) {
+    return SERVICE_ERROR_MESSAGE;
+  }
+  if (err instanceof Error && /Failed to fetch|NetworkError|Load failed/i.test(err.message)) {
+    return SERVICE_ERROR_MESSAGE;
+  }
+  return SERVICE_ERROR_MESSAGE;
+}
+
 interface BriefSseEvent {
   event: string;
   step_index?: number;
@@ -318,7 +328,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       if (err instanceof Error && err.name === "AbortError") {
         return; // 主动中止, 不算错误
       }
-      setError(err instanceof Error ? err.message : SERVICE_ERROR_MESSAGE);
+      setError(toBriefErrorMessage(err));
       setPhase("error");
       setResumeInFlight(false);
     }
@@ -358,7 +368,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
         if (err instanceof Error && err.name === "AbortError") {
           return; // 主动中止, 不算错误
         }
-        setError(err instanceof Error ? err.message : SERVICE_ERROR_MESSAGE);
+        setError(toBriefErrorMessage(err));
         setPhase("error");
       } finally {
         setResumeInFlight(false);

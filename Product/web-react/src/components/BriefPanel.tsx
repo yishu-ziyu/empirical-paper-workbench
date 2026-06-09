@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { StepCard, stripTemplateMarkers, type StepStatus } from "./StepCard";
+import { apiUrl } from "../lib/apiBase";
 
 export interface BriefResult {
   markdown: string;
@@ -40,7 +41,7 @@ interface StepState {
 type Phase = "idle" | "running" | "awaiting" | "completed" | "error";
 
 const SERVICE_ERROR_MESSAGE =
-  "这一步没有跑通。请检查后端服务或模型配置后重试，已保存的研究材料不会丢。";
+  "这一步没有跑通。通常是本地研究服务还没启动，或模型配置暂时不可用。研究材料已经保留，处理好后可以直接重试。";
 
 const STEP_TITLES: Record<1 | 2 | 3 | 4, string> = {
   1: "分析研究问题",
@@ -142,10 +143,7 @@ export function BriefPanel({ topic, initialSnapshot, onComplete }: BriefPanelPro
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
-      const res = await fetch(fullUrl, {
+      const res = await fetch(apiUrl(url), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

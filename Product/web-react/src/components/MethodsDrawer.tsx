@@ -12,6 +12,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X, Library, ChevronRight } from "lucide-react";
+import { apiUrl } from "../lib/apiBase";
 import { cn } from "../lib/cn";
 
 export interface MethodItem {
@@ -86,9 +87,7 @@ export function MethodsDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const env = import.meta.env as Record<string, string | undefined>;
-    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-    fetch(`${base}/api/capabilities/methods`)
+    fetch(apiUrl("/api/capabilities/methods"))
       .then((r) => {
         if (!r.ok) throw new Error("methods_service_unavailable");
         return r.json();

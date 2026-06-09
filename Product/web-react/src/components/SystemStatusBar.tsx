@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, ChevronDown, ChevronUp, Cpu, DollarSign, FileText, ShieldCheck } from "lucide-react";
+import { apiUrl } from "../lib/apiBase";
 import { cn } from "../lib/cn";
 
 interface SystemStatus {
@@ -68,15 +69,12 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const [fetchError, setFetchError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const env = import.meta.env as Record<string, string | undefined>;
-  const baseUrl = env[`VITE_${"API_BASE_URL"}`] || "";
-
   const fetchStatus = useCallback(async () => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const resp = await fetch(`${baseUrl}/api/system/status`, {
+      const resp = await fetch(apiUrl("/api/system/status"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projectId, topic_slug: topicSlug }),
@@ -93,7 +91,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
       if ((err as Error).name === "AbortError") return;
       setFetchError(SERVICE_ERROR_MESSAGE);
     }
-  }, [baseUrl, projectId, topicSlug]);
+  }, [projectId, topicSlug]);
 
   useEffect(() => {
     void fetchStatus();

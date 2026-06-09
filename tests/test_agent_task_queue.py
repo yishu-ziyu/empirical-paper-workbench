@@ -1329,6 +1329,65 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, msg=blocked.text)
         self.assertEqual(blocked.json()["error"]["code"], "draft_section_tasks_required")
 
+    def test_bdd_44_approved_draft_section_tasks_generate_draft_layer_section_files(self) -> None:
+        """行为 44：通过审阅的章节任务包可以生成草稿层章节文件，但正式层继续锁定。"""
+        self._approve_draft_section_tasks()
+
+        generated = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/section-drafts"
+        )
+
+        self.assertEqual(generated.status_code, 200, msg=generated.text)
+        task = generated.json()["agent_task_queue"]["tasks"][0]
+        drafts = task["section_drafts"]
+        self.assertEqual(drafts["status"], "section_drafts_ready")
+        self.assertEqual(drafts["schema_version"], "p1.section_drafts.v1")
+        self.assertEqual(drafts["draft_layer"], "section_drafts")
+        self.assertEqual(drafts["source_review_gate"], "review_draft_section_tasks")
+        self.assertEqual(drafts["generated_from_review_status"], "approved_for_writer_agent")
+        self.assertGreaterEqual(drafts["section_count"], 4)
+        self.assertTrue(drafts["requires_human_review"])
+        self.assertFalse(drafts["formal_write_allowed"])
+        self.assertFalse(drafts["writes_formal_layer"])
+        self.assertEqual(drafts["next_action"], "review_section_drafts")
+        self.assertEqual(task["status"], "section_drafts_ready")
+        self.assertEqual(task["next_action"], "review_section_drafts")
+        self.assertEqual(task["primary_action"]["id"], "review_section_drafts")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "section_drafts_generated")
+
+        manifest = self.project_root / drafts["artifact_path"]
+        self.assertTrue(manifest.exists())
+        manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+        self.assertEqual(manifest_data["schema_version"], "p1.section_drafts.v1")
+        self.assertEqual(manifest_data["status"], "section_drafts_ready")
+        self.assertEqual(manifest_data["writer_agent"]["mode"], "draft_only")
+        self.assertFalse(manifest_data["formal_write_allowed"])
+        self.assertFalse(manifest_data["writes_formal_layer"])
+        self.assertTrue(manifest_data["requires_human_review"])
+        self.assertGreaterEqual(len(manifest_data["sections"]), 4)
+        for section in manifest_data["sections"]:
+            draft_path = self.project_root / section["artifact_path"]
+            self.assertTrue(draft_path.exists())
+            draft_text = draft_path.read_text(encoding="utf-8")
+            self.assertIn("草稿层章节", draft_text)
+            self.assertIn("正式层写回：未批准", draft_text)
+            self.assertIn(section["section_title"], draft_text)
+            self.assertTrue(section["requires_human_review"])
+            self.assertFalse(section["formal_write_allowed"])
+
+    def test_bdd_45_section_drafts_require_approved_task_package(self) -> None:
+        """行为 45：章节任务包未通过人工审阅时，不能直接生成章节草稿。"""
+        self._generate_draft_section_tasks()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/section-drafts"
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "draft_section_tasks_review_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "section_drafts.json").exists())
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1442,6 +1501,15 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(generated.status_code, 200, msg=generated.text)
         return generated
+
+    def _approve_draft_section_tasks(self):
+        self._generate_draft_section_tasks()
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/draft-section-tasks-review",
+            json={"action": "approve_for_writer_agent", "note": "章节任务包可以进入 WriterAgent 草稿生成。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        return reviewed
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1628,9 +1696,14 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         root = Path(__file__).resolve().parents[1]
+        cls.root = root
         cls.index_html = (root / "Product" / "web" / "index.html").read_text(encoding="utf-8")
         cls.app_js = (root / "Product" / "web" / "assets" / "app.js").read_text(encoding="utf-8")
         cls.styles_css = (root / "Product" / "web" / "assets" / "styles.css").read_text(encoding="utf-8")
+        cls.react_agent_task_queue = (
+            root / "Product" / "web-react" / "src" / "components" / "AgentTaskQueuePanel.tsx"
+        ).read_text(encoding="utf-8")
+        cls.react_styles_css = (root / "Product" / "web-react" / "src" / "styles.css").read_text(encoding="utf-8")
 
     def test_bdd_5_frontend_contains_summary_first_queue_surface(self) -> None:
         """行为 5：前端必须有摘要优先的 Agent Task Queue 面板。"""
@@ -1863,6 +1936,22 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("draft_section_tasks_review", self.app_js)
         self.assertIn("正式层仍保持锁定", self.app_js)
         self.assertIn(".agent-task-draft-section-tasks__review", self.styles_css)
+
+    def test_bdd_29_frontend_exposes_section_drafts_generation_and_review_state(self) -> None:
+        """行为 29：前端必须能生成章节草稿，并展示草稿已生成、等待审阅和正式层锁定。"""
+        self.assertIn("generateSectionDrafts", self.app_js)
+        self.assertIn("handleSectionDrafts", self.app_js)
+        self.assertIn("data-section-drafts-action", self.app_js)
+        self.assertIn("renderSectionDrafts", self.app_js)
+        self.assertIn("章节草稿已生成", self.app_js)
+        self.assertIn("等待人工审阅", self.app_js)
+        self.assertIn("正式层仍保持锁定", self.app_js)
+        self.assertIn("section_drafts", self.app_js)
+        self.assertIn(".agent-task-section-drafts", self.styles_css)
+        self.assertIn("generateSectionDrafts", self.react_agent_task_queue)
+        self.assertIn("section-drafts-result", self.react_agent_task_queue)
+        self.assertIn("WriterAgent 只写草稿层章节", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-drafts", self.react_styles_css)
 
 
 if __name__ == "__main__":

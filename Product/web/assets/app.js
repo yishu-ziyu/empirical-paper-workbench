@@ -94,6 +94,7 @@ const state = {
   generatingDraftSectionTasksTaskId: null,
   reviewingDraftSectionTasksTaskId: null,
   reviewingDraftSectionTasksAction: null,
+  generatingSectionDraftsTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -578,6 +579,13 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async generateSectionDrafts(projectId, taskId) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/section-drafts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -1019,6 +1027,7 @@ function productTermLabel(value) {
     draft_section_tasks_approved: "章节任务包已批准",
     draft_section_tasks_needs_revision: "章节任务包需修订",
     draft_section_tasks_rejected: "章节任务包已拒绝",
+    section_drafts_ready: "章节草稿待审阅",
     review_verified_literature_package: "审阅已核验文献包",
     generate_manuscript_citation_plan: "生成论文引用计划",
     review_manuscript_citation_plan: "审阅论文引用计划",
@@ -1031,6 +1040,7 @@ function productTermLabel(value) {
     generate_draft_section_plan: "生成章节草稿计划",
     generate_draft_section_tasks: "生成章节草稿任务包",
     generate_section_drafts: "生成章节草稿",
+    review_section_drafts: "审阅章节草稿",
     revise_manuscript_citation_plan: "修订论文引用计划",
     replace_manuscript_citation_plan: "替换论文引用计划",
     revise_draft_section_plan: "修订章节草稿计划",
@@ -2081,6 +2091,70 @@ function renderDraftSectionTasks(task = {}) {
   `;
 }
 
+function renderSectionDrafts(task = {}) {
+  const drafts = task.section_drafts || {};
+  const canGenerate = task.status === "draft_section_tasks_approved";
+  const isGenerating = state.generatingSectionDraftsTaskId === task.id;
+  if (!drafts.status && !canGenerate) return "";
+
+  return `
+    <div class="agent-task-section-drafts">
+      <div class="agent-task-section-drafts__head">
+        <div>
+          <span class="meta-label">章节草稿</span>
+          <strong>${drafts.status ? "章节草稿已生成" : "等待 WriterAgent 生成草稿"}</strong>
+          <p class="muted">WriterAgent 只写草稿层章节；生成后等待人工审阅，正式层仍保持锁定。</p>
+        </div>
+        ${canGenerate ? `
+          <button class="primary-button" data-section-drafts-action data-agent-task-id="${escapeHtml(task.id || "")}" ${isGenerating ? "disabled" : ""}>
+            ${isGenerating ? "生成中..." : "生成章节草稿"}
+          </button>
+        ` : `<span class="pill">${escapeHtml(productTermLabel(task.next_action || drafts.next_action || "review_section_drafts"))}</span>`}
+      </div>
+      ${drafts.status ? `
+        <div class="agent-task-section-drafts__checkpoint">
+          <div>
+            <span class="meta-label">当前产物</span>
+            <strong>章节草稿已生成</strong>
+            <p>等待人工审阅内容、引用绑定和证据边界。</p>
+          </div>
+          <div>
+            <span class="meta-label">正式层</span>
+            <strong>正式层仍保持锁定</strong>
+            <p>这些文件只在草稿层，不写入正式论文。</p>
+          </div>
+        </div>
+        <div class="agent-task-section-drafts__grid">
+          <div>
+            <span class="meta-label">草稿清单</span>
+            <code>${escapeHtml(drafts.artifact_path || "Results/json/section_drafts.json")}</code>
+          </div>
+          <div>
+            <span class="meta-label">来源任务包</span>
+            <code>${escapeHtml(drafts.source_artifact_path || "Results/json/draft_section_tasks.json")}</code>
+          </div>
+          <div>
+            <span class="meta-label">章节数量</span>
+            <p>${escapeHtml(String(drafts.section_count || 0))} 个草稿章节</p>
+          </div>
+          <div>
+            <span class="meta-label">下一步</span>
+            <p>${escapeHtml(productTermLabel(drafts.next_action || task.next_action || "review_section_drafts"))}</p>
+          </div>
+          <div>
+            <span class="meta-label">审阅状态</span>
+            <p>等待人工审阅</p>
+          </div>
+          <div>
+            <span class="meta-label">写回边界</span>
+            <p>${drafts.formal_write_allowed ? "允许写入正式层" : "正式层仍保持锁定"}</p>
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function renderAgentTaskExecutionHandoff(task) {
   const executionResult = task.execution_result || {};
   const methodResult = firstMethodExecutionResult(executionResult);
@@ -2110,6 +2184,7 @@ function renderAgentTaskExecutionHandoff(task) {
     ${renderManuscriptCitationPlan(task)}
     ${renderDraftSectionPlan(task)}
     ${renderDraftSectionTasks(task)}
+    ${renderSectionDrafts(task)}
     <div class="agent-task-execution-handoff">
       <div>
         <span class="meta-label">结果文件</span>
@@ -3030,6 +3105,25 @@ async function handleDraftSectionTasksReview(taskId, action) {
   } finally {
     state.reviewingDraftSectionTasksTaskId = null;
     state.reviewingDraftSectionTasksAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleSectionDrafts(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.generatingSectionDraftsTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.generateSectionDrafts(
+      state.selectedProjectId,
+      taskId,
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成章节草稿失败：${error.message}`);
+  } finally {
+    state.generatingSectionDraftsTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -8159,6 +8253,11 @@ async function boot() {
         draftSectionTasksReviewButton.dataset.agentTaskId || "",
         draftSectionTasksReviewButton.dataset.draftSectionTasksReviewAction || "",
       );
+      return;
+    }
+    const sectionDraftsButton = target.closest("[data-section-drafts-action]");
+    if (sectionDraftsButton) {
+      void handleSectionDrafts(sectionDraftsButton.dataset.agentTaskId || "");
       return;
     }
     const selectBackendButton = target.closest("[data-select-backend-action]");

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, Code2, FlaskConical, Library } from "lucide-react";
 import { cn } from "../lib/cn";
+import { apiUrl } from "../lib/apiBase";
 import { MethodsDrawer } from "./MethodsDrawer";
 
 /** 与 Product/types/research.py DesignCandidate 一致 */
@@ -55,9 +56,7 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
     setResponse(null);
 
     try {
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const r = await fetch(`${base}/api/design`, {
+      const r = await fetch(apiUrl("/api/design"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

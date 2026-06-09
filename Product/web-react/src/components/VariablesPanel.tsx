@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { apiUrl } from "../lib/apiBase";
 
 /** 与 Product/types/research.py 对齐 */
 export type VariableRole = "X" | "Y" | "control" | "mediator" | "moderator";
@@ -87,9 +88,7 @@ export function VariablesPanel({
     setLoading(true);
     setError(null);
     try {
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const resp = await fetch(`${base}/api/variables`, {
+      const resp = await fetch(apiUrl("/api/variables"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

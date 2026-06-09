@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Play, FileText, CheckCircle2, AlertCircle, Loader2, Activity } from "lucide-react";
 import { cn } from "../lib/cn";
+import { apiUrl } from "../lib/apiBase";
 import { ReasoningChainView } from "./ReasoningChainView";
 import { FormalPackageAcceptancePanel } from "./FormalPackageAcceptancePanel";
 
@@ -143,9 +144,7 @@ export function ExecutionPanel({
     setStatusStage("connecting");
 
     try {
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const response = await fetch(`${base}/api/execute`, {
+      const response = await fetch(apiUrl("/api/execute"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

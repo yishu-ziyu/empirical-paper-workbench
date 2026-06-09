@@ -802,7 +802,8 @@ textarea {
 .agent-task-verified-literature-package,
 .agent-task-manuscript-citation-plan,
 .agent-task-draft-section-plan,
-.agent-task-draft-section-tasks {
+.agent-task-draft-section-tasks,
+.agent-task-section-drafts {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -832,14 +833,16 @@ textarea {
   gap: 12px;
 }
 
-.agent-task-draft-section-tasks {
+.agent-task-draft-section-tasks,
+.agent-task-section-drafts {
   display: grid;
   gap: 12px;
 }
 
 .agent-task-manuscript-citation-plan__head,
 .agent-task-draft-section-plan__head,
-.agent-task-draft-section-tasks__head {
+.agent-task-draft-section-tasks__head,
+.agent-task-section-drafts__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -854,13 +857,15 @@ textarea {
 
 .agent-task-manuscript-citation-plan__grid,
 .agent-task-draft-section-plan__grid,
-.agent-task-draft-section-tasks__grid {
+.agent-task-draft-section-tasks__grid,
+.agent-task-section-drafts__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
 }
 
-.agent-task-draft-section-tasks__checkpoint {
+.agent-task-draft-section-tasks__checkpoint,
+.agent-task-section-drafts__checkpoint {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
@@ -875,21 +880,24 @@ textarea {
 
 .agent-task-manuscript-citation-plan__grid > div,
 .agent-task-draft-section-plan__grid > div,
-.agent-task-draft-section-tasks__grid > div {
+.agent-task-draft-section-tasks__grid > div,
+.agent-task-section-drafts__grid > div {
   padding: 10px;
   border: 1px solid rgba(32, 32, 32, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.58);
 }
 
-.agent-task-draft-section-tasks__checkpoint > div {
+.agent-task-draft-section-tasks__checkpoint > div,
+.agent-task-section-drafts__checkpoint > div {
   padding: 12px;
   border: 1px solid rgba(32, 32, 32, 0.12);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.72);
 }
 
-.agent-task-draft-section-tasks__checkpoint p {
+.agent-task-draft-section-tasks__checkpoint p,
+.agent-task-section-drafts__checkpoint p {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 13px;
@@ -3461,6 +3469,7 @@ textarea {
   .export-workbench-grid,
   .execution-context-grid,
   .agent-task-draft-section-tasks__checkpoint,
+  .agent-task-section-drafts__checkpoint,
   #view-empirical-execution .observable-grid {
     grid-template-columns: 1fr;
   }

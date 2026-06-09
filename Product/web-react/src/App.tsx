@@ -12,6 +12,7 @@ import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
+import { apiUrl } from "./lib/apiBase";
 
 interface SupervisorPlanStage {
   id: string;
@@ -214,9 +215,7 @@ export function App() {
     if (task.mode !== "codex-supervisor") return;
     if (planStages !== null) return;
     const ctrl = new AbortController();
-    const env = import.meta.env as Record<string, string | undefined>;
-    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-    fetch(`${base}/api/supervisor/plan`, {
+    fetch(apiUrl("/api/supervisor/plan"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic: task.message }),

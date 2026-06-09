@@ -21,6 +21,7 @@ from Product.backend.agent_task_queue_service import (
     generate_project_draft_section_tasks,
     generate_project_formal_export_preflight,
     generate_project_manuscript_citation_plan,
+    generate_project_pdf_candidate_export,
     generate_project_section_drafts,
     generate_project_verified_literature_package,
     get_project_agent_task_queue,
@@ -468,6 +469,10 @@ class AgentTaskFormalWritebackPreflightReviewPayload(BaseModel):
 
 
 class AgentTaskFormalExportPreflightPayload(BaseModel):
+    note: str = ""
+
+
+class AgentTaskPdfCandidateExportPayload(BaseModel):
     note: str = ""
 
 
@@ -1448,6 +1453,27 @@ def api_v1_generate_project_formal_export_preflight(
 ) -> dict:
     try:
         return generate_project_formal_export_preflight(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.note if payload else "",
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/pdf-candidate-export")
+def api_v1_generate_project_pdf_candidate_export(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskPdfCandidateExportPayload | None = None,
+) -> dict:
+    try:
+        return generate_project_pdf_candidate_export(
             PRODUCT_ROOT,
             REPO_ROOT,
             project_id,

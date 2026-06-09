@@ -12,7 +12,7 @@ import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
-import { apiUrl } from "./lib/apiBase";
+import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
 interface SupervisorPlanStage {
   id: string;
@@ -231,7 +231,7 @@ export function App() {
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
-        setPlanFetchError("服务暂时没连上，稍后重试。不会影响已保存的研究材料。");
+        setPlanFetchError("计划服务没有响应。");
         // 兜底: 即使拉取失败也给一个空 stages, 让 SupervisorPlanReview 仍可渲染
         setPlanStages([]);
       });
@@ -286,6 +286,13 @@ export function App() {
     };
   });
   const currentStageMeta = STAGE_LABELS[activeStage];
+  const currentApiBase = apiBase() || "同源服务";
+  const handleResetApiBase = () => {
+    setBrowserApiBase(DEFAULT_LOCAL_API_BASE);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("api_base", DEFAULT_LOCAL_API_BASE);
+    window.location.assign(nextUrl.toString());
+  };
 
   return (
     <main className="app-shell analysis-workspace">
@@ -362,6 +369,21 @@ export function App() {
               ) : planFetchError ? (
                 <div className="task-brief__error" role="alert" data-testid="plan-fetch-error">
                   <strong>计划加载失败：</strong> {planFetchError}
+                  <p>
+                    当前后端地址：
+                    <code className="task-brief__error-address">{currentApiBase}</code>
+                  </p>
+                  <div className="task-brief__error-actions">
+                    <button
+                      className="btn btn--secondary"
+                      type="button"
+                      onClick={handleResetApiBase}
+                      data-testid="reset-api-base-action"
+                    >
+                      切回本地后端
+                    </button>
+                    <span>本地后端默认地址：{DEFAULT_LOCAL_API_BASE}</span>
+                  </div>
                 </div>
               ) : null}
             </>

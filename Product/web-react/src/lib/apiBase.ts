@@ -1,4 +1,4 @@
-const DEFAULT_LOCAL_API_BASE = "http://127.0.0.1:8765";
+export const DEFAULT_LOCAL_API_BASE = "http://127.0.0.1:8765";
 const LOCAL_API_BASE_STORAGE_KEY = "empiricalWorkbench.apiBase";
 
 declare global {
@@ -68,6 +68,17 @@ export function apiBase(): string {
   const configured = configuredApiBase();
   if (configured) return configured;
   return isLocalFrontend() ? DEFAULT_LOCAL_API_BASE : "";
+}
+
+export function setBrowserApiBase(value: string): void {
+  if (typeof window === "undefined") return;
+  const normalized = stripTrailingSlash(value.trim());
+  if (!normalized) return;
+  try {
+    window.localStorage.setItem(LOCAL_API_BASE_STORAGE_KEY, normalized);
+  } catch {
+    // Local browser storage can be unavailable in private or restricted contexts.
+  }
 }
 
 export function apiUrl(path: string): string {

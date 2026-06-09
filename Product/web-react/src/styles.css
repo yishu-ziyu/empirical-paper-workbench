@@ -6,12 +6,12 @@
    * ────────────────────────────────────────────────────────────── */
 
   /* === 暗色主题色板 === */
-  --color-bg: #242424;
-  --color-panel: #2b2b2b;
-  --color-panel-soft: #343434;
-  --color-ink: #c8c8c8;
-  --color-strong: #d9d9d9;
-  --color-muted: #9d9d9d;
+  --color-bg: #2a2a2a;
+  --color-panel: #303030;
+  --color-panel-soft: #393939;
+  --color-ink: #cfcfcf;
+  --color-strong: #e0e0e0;
+  --color-muted: #a8a8a8;
   --color-subtle: #747474;
   --color-quaternary: #4a4a4a;
   --color-line: rgba(230, 230, 230, 0.1);
@@ -32,15 +32,15 @@
   --color-info-soft: rgba(90, 138, 196, 0.18);
   --color-inverse: #161616;
   --color-tab-active: #d9d9d9;
-  --color-button-primary-bg: #d6d6d6;
-  --color-button-primary-bg-hover: #e2e2e2;
+  --color-button-primary-bg: #cfcfcf;
+  --color-button-primary-bg-hover: #dddddd;
   --color-button-primary-ink: #171717;
   --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
   --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
   --color-button-secondary-text: #d2d2d2;
-  --color-button-disabled-bg: rgba(230, 230, 230, 0.075);
-  --color-button-disabled-text: #8f8f8f;
-  --color-button-disabled-border: rgba(230, 230, 230, 0.16);
+  --color-button-disabled-bg: rgba(210, 210, 210, 0.16);
+  --color-button-disabled-text: #b8b8b8;
+  --color-button-disabled-border: rgba(230, 230, 230, 0.22);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
   --shadow-ring: 0 0 0 1px var(--color-line);
@@ -73,7 +73,7 @@ body,
 }
 
 body {
-  background: radial-gradient(ellipse at top, #2d2d2d 0%, #242424 100%);
+  background: radial-gradient(ellipse at top, #303030 0%, #292929 100%);
   color: var(--color-ink);
   /* 排版细节 (Kami) */
   line-height: 1.55;
@@ -121,7 +121,7 @@ button {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.06;
+  opacity: 0.035;
 }
 
 .dotted-surface canvas {
@@ -628,6 +628,51 @@ button {
   color: var(--color-muted);
   font-size: 13px;
   line-height: 1.65;
+}
+
+.task-brief__error {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 980px);
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: 18px;
+  background: rgba(40, 40, 40, 0.72);
+  color: var(--color-muted);
+  padding: 18px;
+  box-shadow:
+    inset 0 0 0 1px rgba(230, 230, 230, 0.035),
+    0 14px 34px rgba(0, 0, 0, 0.2);
+}
+
+.task-brief__error strong {
+  color: var(--color-strong);
+}
+
+.task-brief__error p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.task-brief__error-address {
+  display: inline-block;
+  margin-left: 8px;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.06);
+  color: var(--color-ink);
+  padding: 4px 8px;
+}
+
+.task-brief__error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-brief__error-actions span {
+  color: var(--color-subtle);
+  font-size: 13px;
 }
 
 .icon-button {
@@ -1256,6 +1301,15 @@ button {
   padding: 15px;
 }
 
+.agent-task-queue-pdf-candidate {
+  display: grid;
+  gap: 13px;
+  border: 1px solid rgba(230, 230, 230, 0.2);
+  border-radius: var(--radius-lg);
+  background: rgba(230, 230, 230, 0.09);
+  padding: 15px;
+}
+
 .agent-task-queue-export-preflight__head {
   display: flex;
   align-items: start;
@@ -1263,7 +1317,23 @@ button {
   gap: 14px;
 }
 
+.agent-task-queue-pdf-candidate__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
 .agent-task-queue-export-preflight h3 {
+  margin: 6px 0 6px;
+  color: var(--color-strong);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.agent-task-queue-pdf-candidate h3 {
   margin: 6px 0 6px;
   color: var(--color-strong);
   font-family: var(--font-serif);
@@ -1283,7 +1353,24 @@ button {
   line-height: 1.35;
 }
 
+.agent-task-queue-pdf-candidate__pill {
+  flex: 0 0 auto;
+  border: 1px solid rgba(230, 230, 230, 0.14);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.08);
+  color: #d5d5d5;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .agent-task-queue-export-preflight__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agent-task-queue-pdf-candidate__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
@@ -1298,12 +1385,32 @@ button {
   padding: 10px;
 }
 
+.agent-task-queue-pdf-candidate__grid > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.3);
+  padding: 10px;
+}
+
 .agent-task-queue-export-preflight__grid small {
   color: var(--color-subtle);
   font-size: 12px;
 }
 
+.agent-task-queue-pdf-candidate__grid small {
+  color: var(--color-subtle);
+  font-size: 12px;
+}
+
 .agent-task-queue-export-preflight__grid strong {
+  color: var(--color-strong);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.agent-task-queue-pdf-candidate__grid strong {
   color: var(--color-strong);
   font-size: 15px;
   line-height: 1.4;
@@ -1321,6 +1428,33 @@ button {
   font-size: 12px;
   line-height: 1.5;
   padding: 5px 7px;
+}
+
+.agent-task-queue-pdf-candidate code {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-sm);
+  background: rgba(12, 12, 12, 0.58);
+  color: #d6d6d6;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 5px 7px;
+}
+
+.agent-task-queue-export-preflight__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.agent-task-queue-pdf-candidate__note {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .agent-task-queue-export-preflight__blockers,
@@ -1370,7 +1504,15 @@ button {
     display: grid;
   }
 
+  .agent-task-queue-pdf-candidate__head {
+    display: grid;
+  }
+
   .agent-task-queue-export-preflight__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-task-queue-pdf-candidate__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

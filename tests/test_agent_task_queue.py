@@ -1629,6 +1629,75 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(task["export_preflight_followups"][0]["owner_agent"], "ManuscriptAgent")
         self.assertIn(missing_target["formal_target_path"], task["export_preflight_followups"][0]["description"])
 
+    def test_bdd_54_pdf_candidate_export_requires_ready_export_preflight(self) -> None:
+        """行为 54：没有通过导出预检时，不能跳过到 PDF 候选稿生成。"""
+        self._approve_formal_writeback()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "尝试跳过导出预检。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "formal_export_preflight_required")
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper_candidate.pdf").exists())
+
+    def test_bdd_55_ready_export_preflight_generates_reviewable_pdf_candidate(self) -> None:
+        """行为 55：通过导出预检后，可以生成可审阅 PDF 候选稿，但不覆盖终稿。"""
+        self._approve_formal_writeback()
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "正式章节已写入，准备候选稿导出。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "生成 PDF 候选稿供人工审阅。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        export = task["pdf_candidate_export"]
+        self.assertEqual(task["status"], "pdf_candidate_exported")
+        self.assertEqual(task["next_action"], "review_pdf_candidate")
+        self.assertEqual(task["primary_action"]["id"], "review_pdf_candidate")
+        self.assertEqual(export["schema_version"], "p1.agent_task_pdf_candidate_export.v1")
+        self.assertEqual(export["status"], "pdf_candidate_exported")
+        self.assertTrue(export["wrote_pdf_candidate"])
+        self.assertFalse(export["wrote_final_pdf"])
+        self.assertFalse(export["wrote_docx"])
+        self.assertFalse(export["writes_formal_layer"])
+        self.assertEqual(export["next_action"], "review_pdf_candidate")
+        self.assertEqual(task["audit_log"][-1]["event"], "pdf_candidate_exported")
+
+        pdf_path = self.project_root / export["pdf_candidate_path"]
+        manifest_path = self.project_root / export["artifact_path"]
+        review_path = self.project_root / export["review_path"]
+        self.assertTrue(pdf_path.exists())
+        pdf_bytes = pdf_path.read_bytes()
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"))
+        self.assertGreater(pdf_path.stat().st_size, 500)
+        import fitz
+
+        pdf_doc = fitz.open(pdf_path)
+        pdf_text = "\n".join(page.get_text() for page in pdf_doc)
+        self.assertIn("PDF 候选稿", pdf_text)
+        self.assertIn("候选稿仅供审阅", pdf_text)
+        self.assertTrue(manifest_path.exists())
+        self.assertTrue(review_path.exists())
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.pdf").exists())
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.docx").exists())
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["note"], "生成 PDF 候选稿供人工审阅。")
+        self.assertEqual(manifest["source_preflight_path"], task["formal_export_preflight"]["artifact_path"])
+        self.assertEqual(manifest["review"]["status"], "needs_human_review")
+        self.assertEqual(manifest["usage_boundary"], "PDF 候选稿只供人工审阅，不代表最终投稿文件。")
+        review_text = review_path.read_text(encoding="utf-8")
+        self.assertIn("PDF 候选稿审阅", review_text)
+        self.assertIn("不覆盖终稿", review_text)
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1969,6 +2038,7 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         cls.react_agent_task_queue = (
             root / "Product" / "web-react" / "src" / "components" / "AgentTaskQueuePanel.tsx"
         ).read_text(encoding="utf-8")
+        cls.react_app = (root / "Product" / "web-react" / "src" / "App.tsx").read_text(encoding="utf-8")
         cls.react_api_base = (root / "Product" / "web-react" / "src" / "lib" / "apiBase.ts").read_text(
             encoding="utf-8"
         )
@@ -2277,6 +2347,31 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("URLSearchParams", self.react_api_base)
         self.assertIn("localStorage", self.react_api_base)
         self.assertIn("empiricalWorkbench.apiBase", self.react_api_base)
+
+    def test_bdd_34_frontend_exposes_pdf_candidate_export_review_gate(self) -> None:
+        """行为 34：前端必须把 PDF 候选稿生成做成可审阅 gate，而不是隐藏在导出预检后。"""
+        self.assertIn("generatePdfCandidateExport", self.app_js)
+        self.assertIn("handlePdfCandidateExport", self.app_js)
+        self.assertIn("data-pdf-candidate-export-action", self.app_js)
+        self.assertIn("PDF 候选稿", self.app_js)
+        self.assertIn("pdf_candidate_export", self.app_js)
+        self.assertIn("review_pdf_candidate", self.app_js)
+        self.assertIn("agent-task-pdf-candidate-export", self.styles_css)
+        self.assertIn("generatePdfCandidateExport", self.react_agent_task_queue)
+        self.assertIn("pdf-candidate-export", self.react_agent_task_queue)
+        self.assertIn("PDF 候选稿", self.react_agent_task_queue)
+        self.assertIn("pdf_candidate_export", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-pdf-candidate", self.react_styles_css)
+
+    def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:
+        """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供切回本地后端动作。"""
+        self.assertIn("currentApiBase", self.react_app)
+        self.assertIn("切回本地后端", self.react_app)
+        self.assertIn("DEFAULT_LOCAL_API_BASE", self.react_app)
+        self.assertIn("data-testid=\"reset-api-base-action\"", self.react_app)
+        self.assertIn("setBrowserApiBase", self.react_api_base)
+        self.assertIn("DEFAULT_LOCAL_API_BASE", self.react_api_base)
+        self.assertIn("127.0.0.1:8765", self.react_api_base)
 
 
 if __name__ == "__main__":

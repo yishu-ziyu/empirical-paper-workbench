@@ -523,6 +523,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "export_preflight_blockers",
         }
+    if status == "pdf_candidate_exported":
+        return {
+            "id": "review_pdf_candidate",
+            "label": "审阅 PDF 候选稿",
+            "reason": "PDF 候选稿已经生成，下一步检查排版、章节完整性、引用边界和复现说明。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "pdf_candidate_review",
+        }
     if status == "formal_writeback_preflight_needs_revision":
         return {
             "id": "revise_formal_writeback_preflight",
@@ -2769,6 +2778,109 @@ def generate_project_formal_export_preflight(
     return response
 
 
+def generate_project_pdf_candidate_export(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    preflight_summary = task.get("formal_export_preflight") if isinstance(task.get("formal_export_preflight"), dict) else {}
+    preflight_artifact_path = str(preflight_summary.get("artifact_path") or "")
+    preflight_path = project_root / preflight_artifact_path if preflight_artifact_path else None
+    if (
+        task.get("status") != "formal_export_preflight_ready"
+        or preflight_summary.get("status") != "formal_export_preflight_ready"
+        or not preflight_path
+        or not preflight_path.exists()
+    ):
+        raise AgentTaskQueueBlockedError(
+            "formal_export_preflight_required",
+            "Ready formal export preflight is required before PDF candidate export.",
+        )
+
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    if preflight.get("status") != "formal_export_preflight_ready" or normalize_list(preflight.get("blockers")):
+        raise AgentTaskQueueBlockedError(
+            "formal_export_preflight_required",
+            "Ready formal export preflight is required before PDF candidate export.",
+        )
+
+    timestamp = utc_now()
+    pdf_candidate_path = Path("Submissions/formal_package/paper_candidate.pdf")
+    manifest_artifact_path = Path("Submissions/formal_package/pdf_candidate_manifest.json")
+    review_path = Path("Reviews/pdf_candidate_export_review.md")
+    export_record = build_pdf_candidate_export_record(
+        task,
+        preflight,
+        preflight_artifact_path,
+        note,
+        timestamp,
+        project_root,
+        pdf_candidate_path,
+        review_path,
+    )
+
+    absolute_pdf_path = project_root / pdf_candidate_path
+    absolute_pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    write_pdf_candidate_file(absolute_pdf_path, export_record)
+
+    absolute_manifest_path = project_root / manifest_artifact_path
+    absolute_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_manifest_path.write_text(json.dumps(export_record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    absolute_review_path = project_root / review_path
+    absolute_review_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_review_path.write_text(format_pdf_candidate_export_review(export_record), encoding="utf-8")
+
+    summary = {
+        "schema_version": export_record["schema_version"],
+        "status": export_record["status"],
+        "source_task_id": export_record["source_task_id"],
+        "source_preflight_path": export_record["source_preflight_path"],
+        "artifact_path": str(manifest_artifact_path),
+        "review_path": str(review_path),
+        "pdf_candidate_path": str(pdf_candidate_path),
+        "wrote_pdf_candidate": True,
+        "wrote_final_pdf": False,
+        "wrote_docx": False,
+        "writes_formal_layer": False,
+        "next_action": "review_pdf_candidate",
+        "created_at": timestamp,
+        "evidence_level": export_record["evidence_level"],
+    }
+    task["pdf_candidate_export"] = summary
+    task["status"] = "pdf_candidate_exported"
+    task["next_action"] = "review_pdf_candidate"
+    task["can_execute"] = False
+    task["blockers"] = []
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "pdf_candidate_exported",
+            "actor": "system",
+            "timestamp": timestamp,
+            "artifact_path": str(manifest_artifact_path),
+            "review_path": str(review_path),
+            "pdf_candidate_path": str(pdf_candidate_path),
+            "status": "pdf_candidate_exported",
+            "next_action": "review_pdf_candidate",
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["pdf_candidate_export"] = summary
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -3870,6 +3982,204 @@ def format_formal_export_preflight_review(preflight: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def build_pdf_candidate_export_record(
+    task: dict[str, Any],
+    preflight: dict[str, Any],
+    source_preflight_path: str,
+    note: str,
+    timestamp: str,
+    project_root: Path,
+    pdf_candidate_path: Path,
+    review_path: Path,
+) -> dict[str, Any]:
+    section_checks = [check for check in normalize_list(preflight.get("section_checks")) if isinstance(check, dict)]
+    sections = [
+        build_pdf_candidate_section(section_check, project_root, index)
+        for index, section_check in enumerate(section_checks, start=1)
+        if section_check.get("exists")
+    ]
+    return {
+        "schema_version": "p1.agent_task_pdf_candidate_export.v1",
+        "status": "pdf_candidate_exported",
+        "source_task_id": str(task.get("id") or preflight.get("source_task_id") or ""),
+        "source_preflight_path": source_preflight_path,
+        "pdf_candidate_path": str(pdf_candidate_path),
+        "review_path": str(review_path),
+        "section_count": len(sections),
+        "sections": sections,
+        "outputs_written": {
+            "pdf_candidate": True,
+            "pdf_final": False,
+            "docx": False,
+            "formal_state": False,
+        },
+        "review": {
+            "status": "needs_human_review",
+            "review_gate": "review_pdf_candidate",
+            "required_checks": [
+                "章节顺序和标题是否正确",
+                "关键表格和图是否有明确占位或引用",
+                "引用与复现边界是否清楚",
+                "是否允许进入正式 PDF/DOCX 导出",
+            ],
+        },
+        "writes_formal_layer": False,
+        "wrote_pdf_candidate": True,
+        "wrote_final_pdf": False,
+        "wrote_docx": False,
+        "note": note,
+        "next_action": "review_pdf_candidate",
+        "next_action_label": "审阅 PDF 候选稿",
+        "usage_boundary": "PDF 候选稿只供人工审阅，不代表最终投稿文件。",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_pdf_candidate_section(section_check: dict[str, Any], project_root: Path, index: int) -> dict[str, Any]:
+    formal_target_path = str(section_check.get("formal_target_path") or "")
+    section_path = project_root / formal_target_path if formal_target_path else None
+    text = section_path.read_text(encoding="utf-8") if section_path and section_path.exists() else ""
+    excerpt = " ".join(line.strip() for line in text.splitlines() if line.strip())[:900]
+    return {
+        "id": f"pdf_candidate_section_{index:02d}",
+        "section_id": str(section_check.get("section_id") or f"section_{index:02d}"),
+        "section_title": str(section_check.get("section_title") or "未命名章节"),
+        "formal_target_path": formal_target_path,
+        "bytes": section_check.get("bytes") or len(text.encode("utf-8")),
+        "excerpt": excerpt,
+        "evidence_level": str(section_check.get("evidence_level") or "verified_source_record"),
+    }
+
+
+def format_pdf_candidate_export_review(export_record: dict[str, Any]) -> str:
+    required_checks = normalize_list(export_record.get("review", {}).get("required_checks"))
+    lines = [
+        "# PDF 候选稿审阅",
+        "",
+        f"- 状态：{export_record.get('status')}",
+        f"- 来源任务：{export_record.get('source_task_id')}",
+        f"- 来源预检：{export_record.get('source_preflight_path')}",
+        f"- PDF 候选稿：{export_record.get('pdf_candidate_path')}",
+        f"- 候选清单：{export_record.get('review_path')}",
+        "- 不覆盖终稿：paper.pdf / paper.docx 未写入。",
+        "- 正式层：不改写正式论文章节。",
+        "",
+        "## 人工审阅清单",
+    ]
+    lines.extend(f"- {item}" for item in required_checks)
+    lines.extend(["", "## 边界", f"- {export_record.get('usage_boundary')}", ""])
+    return "\n".join(lines)
+
+
+def write_pdf_candidate_file(path: Path, export_record: dict[str, Any]) -> None:
+    lines = [
+        "Local Empirical Research OS",
+        "PDF 候选稿（人工审阅版）",
+        f"状态：{export_record.get('status')}",
+        f"来源预检：{export_record.get('source_preflight_path')}",
+        f"审阅动作：{export_record.get('next_action')}",
+        "边界：只生成候选稿，不写入最终 PDF/DOCX。",
+        "",
+    ]
+    for section in normalize_list(export_record.get("sections")):
+        if not isinstance(section, dict):
+            continue
+        lines.extend(
+            [
+                str(section.get("section_title") or "Untitled section"),
+                str(section.get("formal_target_path") or ""),
+                str(section.get("excerpt") or "")[:420],
+                "",
+            ]
+        )
+    if len(lines) < 18:
+        lines.extend(["正式导出前需要人工审阅。"] * (18 - len(lines)))
+    try:
+        write_reportlab_pdf_candidate_file(path, lines)
+    except Exception:
+        path.write_bytes(build_simple_pdf_bytes(lines))
+
+
+def write_reportlab_pdf_candidate_file(path: Path, lines: list[str]) -> None:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+
+    font_name = "SongtiCandidate"
+    font_path = Path("/System/Library/Fonts/Supplemental/Songti.ttc")
+    if font_name not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+
+    pdf = canvas.Canvas(str(path), pagesize=A4, pageCompression=0)
+    pdf.setTitle("PDF 候选稿（人工审阅版）")
+    width, height = A4
+    left = 42
+    top = height - 52
+    line_height = 18
+    y = top
+    pdf.setFont(font_name, 12)
+    for line in lines:
+        wrapped = wrap_pdf_line(line, 58)
+        for part in wrapped:
+            if y < 54:
+                pdf.showPage()
+                pdf.setFont(font_name, 12)
+                y = top
+            pdf.drawString(left, y, part)
+            y -= line_height
+    pdf.setFont(font_name, 9)
+    pdf.drawRightString(width - left, 32, "候选稿仅供审阅；通过后再进入正式导出。")
+    pdf.save()
+
+
+def wrap_pdf_line(text: str, limit: int) -> list[str]:
+    if not text:
+        return [""]
+    return [text[index : index + limit] for index in range(0, len(text), limit)]
+
+
+def build_simple_pdf_bytes(lines: list[str]) -> bytes:
+    content_lines = ["BT", "/F1 13 Tf", "72 748 Td"]
+    first_line = True
+    for line in lines[:42]:
+        if not first_line:
+            content_lines.append("0 -17 Td")
+        content_lines.append(f"{pdf_literal(line[:96])} Tj")
+        first_line = False
+    content_lines.append("ET")
+    content = "\n".join(content_lines).encode("ascii", errors="ignore")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(content)).encode("ascii") + b" >>\nstream\n" + content + b"\nendstream",
+    ]
+    body = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(body))
+        body.extend(f"{index} 0 obj\n".encode("ascii"))
+        body.extend(obj)
+        body.extend(b"\nendobj\n")
+    xref_offset = len(body)
+    body.extend(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii"))
+    for offset in offsets:
+        body.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    body.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(body)
+
+
+def pdf_literal(text: str) -> str:
+    safe = "".join(ch if 32 <= ord(ch) <= 126 else "?" for ch in text)
+    safe = safe.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    return f"({safe})"
 
 
 def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:

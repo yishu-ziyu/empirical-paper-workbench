@@ -1428,3 +1428,59 @@ git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py t
 ```
 
 Next node: **P1-S expose draft section task packages in the Agent Task Queue UI**.
+
+## P1-S Draft Section Task Packages in Agent Task Queue UI
+
+Boundary: the UI exposes the task package generation checkpoint and renders the generated package summary. It still does not run WriterAgent prose generation, and it does not write to the formal manuscript layer.
+
+BDD:
+
+```text
+Behavior 42: expose draft section task package generation in the queue UI
+Given the Agent task status is draft_section_plan_approved
+When the user opens the Agent Task Queue
+Then the task card shows a "生成章节草稿任务包" action,
+calls POST /draft-section-tasks when clicked,
+and refreshes the queue with the returned draft_section_tasks state.
+
+Behavior 43: render generated draft section task package evidence
+Given draft_section_tasks exists on an Agent task
+When the queue renders the task card
+Then the UI shows the task package artifact path,
+source section plan path,
+section task count,
+citation binding count,
+next review action,
+and formal_write_allowed boundary.
+
+Behavior 44: make the draft section task package checkpoint readable
+Given draft_section_tasks exists on an Agent task
+When the queue renders the task package
+Then the user sees a compact checkpoint with current artifact, next action, and formal-layer lock,
+and the checkpoint collapses to one column on narrow screens.
+```
+
+Status: implemented and verified.
+
+Implemented:
+
+- Added frontend API client `generateDraftSectionTasks`.
+- Added queue action handler `handleDraftSectionTasks`.
+- Added `renderDraftSectionTasks` after the approved section plan checkpoint.
+- Added UI labels for `draft_section_tasks_ready` and `review_draft_section_tasks`.
+- Added scoped CSS for `.agent-task-draft-section-tasks`.
+- Added checkpoint UX copy for "当前产物 / 下一步 / 边界" so the task package is readable without opening raw JSON.
+
+Verified:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_27_frontend_exposes_draft_section_task_package_generation -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+git diff --check -- Product/web/assets/app.js Product/web/assets/styles.css tests/test_agent_task_queue.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```
+
+Manual browser acceptance: pending. Current Codex sandbox rejected local uvicorn port binding with `operation not permitted`; the in-app browser can open tabs but blocks `data:` pages by policy. Do not mark live browser acceptance complete until a normal local service can be opened.
+
+Next node: **P1-T review draft section task packages before WriterAgent drafting**.

@@ -24,6 +24,14 @@ interface SupervisorPlanStage {
   outputs: string[];
 }
 
+interface SupervisorPlanInspector {
+  inputs_used?: string[];
+  assumptions?: string[];
+  evidence_required?: string[];
+  risks?: string[];
+  formal_boundary?: string[];
+}
+
 interface SubmittedResearchTask {
   message: string;
   mode: string;
@@ -145,6 +153,32 @@ function initialTopicSlugFromUrl(): string {
   return slugify(buildInitialTaskFromUrl()?.message ?? "");
 }
 
+async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = await response.json();
+    const error = body?.error;
+    return error?.message || error?.code || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function explainPlanApprovalError(message: string): string {
+  if (message.includes("project_not_found") || message.includes("does not exist")) {
+    return "当前题目还没有注册为项目。请先完成研究简报落盘，或从已登记项目进入规划审阅。";
+  }
+  if (message.includes("SupervisorPlan is required") || message.includes("supervisor_plan_required")) {
+    return "还没有可审阅的正式 SupervisorPlan。需要先生成并保存项目级计划。";
+  }
+  if (message.includes("must be approved") || message.includes("can_dispatch")) {
+    return "SupervisorPlan 还没有达到可派发状态。请先完成计划审阅。";
+  }
+  if (message.includes("subagent_dispatch")) {
+    return "SupervisorPlan 还没有子 Agent 派工清单。需要让 Supervisor 重新生成包含分工的计划。";
+  }
+  return message || "批准失败，请检查本地后端和项目状态。";
+}
+
 export function App() {
   const [task, setTask] = useState<SubmittedResearchTask | null>(() => buildInitialTaskFromUrl());
   const [topicSlug, setTopicSlug] = useState<string>(() => initialTopicSlugFromUrl());
@@ -152,7 +186,11 @@ export function App() {
   // codex-supervisor mode: 计划审核通过前, BriefPanel 不渲染
   const [planApproved, setPlanApproved] = useState<boolean>(false);
   const [planStages, setPlanStages] = useState<SupervisorPlanStage[] | null>(null);
+  const [planInspector, setPlanInspector] = useState<SupervisorPlanInspector | null>(null);
+  const [planEvidenceLevel, setPlanEvidenceLevel] = useState<string | null>(null);
   const [planFetchError, setPlanFetchError] = useState<string | null>(null);
+  const [approvingPlan, setApprovingPlan] = useState(false);
+  const [planApprovalError, setPlanApprovalError] = useState<string | null>(null);
 
   // Results from each stage. Preserved across navigation so the user can
   // jump back to an earlier tab without losing state.
@@ -229,7 +267,11 @@ export function App() {
     setExecutionResult(null);
     setPlanApproved(false);
     setPlanStages(null);
+    setPlanInspector(null);
+    setPlanEvidenceLevel(null);
     setPlanFetchError(null);
+    setPlanApprovalError(null);
+    setApprovingPlan(false);
   };
 
   // codex-supervisor mode: 进入 brief tab 时拉计划草案.
@@ -249,9 +291,12 @@ export function App() {
         if (!r.ok) throw new Error("plan_service_unavailable");
         return r.json();
       })
-      .then((data: { stages?: SupervisorPlanStage[] }) => {
+      .then((data: { stages?: SupervisorPlanStage[]; inspector?: SupervisorPlanInspector; evidence_level?: string }) => {
         setPlanStages(data.stages ?? []);
+        setPlanInspector(data.inspector ?? null);
+        setPlanEvidenceLevel(data.evidence_level ?? null);
         setPlanFetchError(null);
+        setPlanApprovalError(null);
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -259,6 +304,8 @@ export function App() {
           "没有拿到 SupervisorPlan。请确认当前地址运行的是 FastAPI Product.app，而不是普通静态文件服务。",
         );
         setPlanStages(null);
+        setPlanInspector(null);
+        setPlanEvidenceLevel(null);
       });
     return () => ctrl.abort();
   }, [task, planStages]);
@@ -267,8 +314,12 @@ export function App() {
   useEffect(() => {
     if (task === null) {
       setPlanStages(null);
+      setPlanInspector(null);
+      setPlanEvidenceLevel(null);
       setPlanApproved(false);
       setPlanFetchError(null);
+      setPlanApprovalError(null);
+      setApprovingPlan(false);
     }
   }, [task]);
 
@@ -312,11 +363,48 @@ export function App() {
   });
   const currentStageMeta = STAGE_LABELS[activeStage];
   const currentApiBase = apiBase() || "同源服务";
+  const projectId = `proj_${topicSlug}`;
   const handleResetApiBase = () => {
     setBrowserApiBase(DEFAULT_LOCAL_API_BASE);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("api_base", DEFAULT_LOCAL_API_BASE);
     window.location.assign(nextUrl.toString());
+  };
+  const approveSupervisorPlan = async () => {
+    setApprovingPlan(true);
+    setPlanApprovalError(null);
+    try {
+      const reviewResponse = await fetch(apiUrl(`/api/v1/projects/${projectId}/supervisor-plan/review`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve",
+          note: "用户在研究工作台批准 SupervisorPlan，并请求创建 Agent Task Queue。",
+        }),
+      });
+      if (!reviewResponse.ok) {
+        throw new Error(
+          await responseErrorMessage(reviewResponse, "SupervisorPlan 审阅写回失败。"),
+        );
+      }
+
+      const queueResponse = await fetch(apiUrl(`/api/v1/projects/${projectId}/agent-task-queue`), {
+        method: "POST",
+      });
+      if (!queueResponse.ok) {
+        throw new Error(
+          await responseErrorMessage(queueResponse, "Agent Task Queue 创建失败。"),
+        );
+      }
+
+      setPlanApproved(true);
+      setPlanApprovalError(null);
+    } catch (err) {
+      setPlanApproved(false);
+      setPlanApprovalError(explainPlanApprovalError(err instanceof Error ? err.message : ""));
+    } finally {
+      setApprovingPlan(false);
+    }
   };
 
   return (
@@ -344,7 +432,7 @@ export function App() {
             <code data-testid="topic-slug">{topicSlug}</code>
           </p>
           <SystemStatusBar
-            projectId={`proj_${topicSlug}`}
+            projectId={projectId}
             topicSlug={topicSlug}
           />
         </div>
@@ -397,9 +485,13 @@ export function App() {
               ) : (
                 <div data-testid="supervisor-plan-ready">
                   <SupervisorPlanReview
-                    onApprove={() => {
-                      setPlanApproved(true);
-                    }}
+                    stages={planStages}
+                    inspector={planInspector}
+                    topic={task.message}
+                    evidenceLevel={planEvidenceLevel}
+                    approving={approvingPlan}
+                    approvalError={planApprovalError}
+                    onApprove={approveSupervisorPlan}
                     onReject={() => {
                       showToast("已否决计划，回到新任务选择。");
                       resetAll();
@@ -409,7 +501,7 @@ export function App() {
               )}
               {planApproved ? (
                 <>
-                  <AgentTaskQueuePanel projectId={`proj_${topicSlug}`} />
+                  <AgentTaskQueuePanel projectId={projectId} />
                   <BriefPanel
                     topic={task.message}
                     initialSnapshot={briefSnapshot}

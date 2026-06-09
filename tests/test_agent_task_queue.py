@@ -1791,6 +1791,20 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("draft_section_plan_review", self.app_js)
         self.assertIn(".agent-task-draft-section-plan__review", self.styles_css)
 
+    def test_bdd_27_frontend_exposes_draft_section_task_package_generation(self) -> None:
+        """行为 27：前端必须能从已批准章节计划生成并展示章节草稿任务包。"""
+        self.assertIn("generateDraftSectionTasks", self.app_js)
+        self.assertIn("handleDraftSectionTasks", self.app_js)
+        self.assertIn("data-draft-section-tasks-action", self.app_js)
+        self.assertIn("renderDraftSectionTasks", self.app_js)
+        self.assertIn("生成章节草稿任务包", self.app_js)
+        self.assertIn("生成后进入章节任务审阅", self.app_js)
+        self.assertIn("正式层保持锁定", self.app_js)
+        self.assertIn("agent-task-draft-section-tasks__checkpoint", self.app_js)
+        self.assertIn("draft_section_tasks", self.app_js)
+        self.assertIn(".agent-task-draft-section-tasks", self.styles_css)
+        self.assertIn(".agent-task-draft-section-tasks__checkpoint", self.styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

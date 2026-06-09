@@ -801,7 +801,8 @@ textarea {
 .agent-task-citation-verification__action,
 .agent-task-verified-literature-package,
 .agent-task-manuscript-citation-plan,
-.agent-task-draft-section-plan {
+.agent-task-draft-section-plan,
+.agent-task-draft-section-tasks {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -831,8 +832,14 @@ textarea {
   gap: 12px;
 }
 
+.agent-task-draft-section-tasks {
+  display: grid;
+  gap: 12px;
+}
+
 .agent-task-manuscript-citation-plan__head,
-.agent-task-draft-section-plan__head {
+.agent-task-draft-section-plan__head,
+.agent-task-draft-section-tasks__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -846,9 +853,16 @@ textarea {
 }
 
 .agent-task-manuscript-citation-plan__grid,
-.agent-task-draft-section-plan__grid {
+.agent-task-draft-section-plan__grid,
+.agent-task-draft-section-tasks__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.agent-task-draft-section-tasks__checkpoint {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -860,11 +874,26 @@ textarea {
 }
 
 .agent-task-manuscript-citation-plan__grid > div,
-.agent-task-draft-section-plan__grid > div {
+.agent-task-draft-section-plan__grid > div,
+.agent-task-draft-section-tasks__grid > div {
   padding: 10px;
   border: 1px solid rgba(32, 32, 32, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.58);
+}
+
+.agent-task-draft-section-tasks__checkpoint > div {
+  padding: 12px;
+  border: 1px solid rgba(32, 32, 32, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.agent-task-draft-section-tasks__checkpoint p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .agent-task-verified-literature-package__review {
@@ -3429,6 +3458,7 @@ textarea {
   .export-decision-strip,
   .export-workbench-grid,
   .execution-context-grid,
+  .agent-task-draft-section-tasks__checkpoint,
   #view-empirical-execution .observable-grid {
     grid-template-columns: 1fr;
   }

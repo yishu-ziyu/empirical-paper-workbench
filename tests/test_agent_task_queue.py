@@ -2373,6 +2373,58 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("DEFAULT_LOCAL_API_BASE", self.react_api_base)
         self.assertIn("127.0.0.1:8765", self.react_api_base)
 
+    def test_bdd_36_react_workbench_can_resume_from_topic_url(self) -> None:
+        """行为 36：前端必须支持从 URL 题目直接进入工作台，便于验收、复盘和分享同一研究任务。"""
+        self.assertIn("buildInitialTaskFromUrl", self.react_app)
+        self.assertIn("initialTopicSlugFromUrl", self.react_app)
+        self.assertIn("URLSearchParams(window.location.search)", self.react_app)
+        self.assertIn('params.get("topic")', self.react_app)
+        self.assertIn('params.get("research_topic")', self.react_app)
+        self.assertIn('params.get("mode")', self.react_app)
+        self.assertIn('"codex-supervisor"', self.react_app)
+        self.assertIn("fileCount: 0", self.react_app)
+        self.assertIn("pastedCount: 0", self.react_app)
+
+    def test_bdd_37_react_task_queue_exposes_internal_skill_review_console(self) -> None:
+        """行为 37：React 任务详情必须把 Skill 选择和 LLM 介入做成可审阅信息，而不是隐藏在 JSON。"""
+        self.assertIn("internal_skill_bindings", self.react_agent_task_queue)
+        self.assertIn("llm_intervention_handoff", self.react_agent_task_queue)
+        self.assertIn("why_this_skill", self.react_agent_task_queue)
+        self.assertIn("llm_semantic_judgment", self.react_agent_task_queue)
+        self.assertIn("quality_gates", self.react_agent_task_queue)
+        self.assertIn("human_confirmation", self.react_agent_task_queue)
+        self.assertIn("Skill 审阅台", self.react_agent_task_queue)
+        self.assertIn("为什么选这个 Skill", self.react_agent_task_queue)
+        self.assertIn("LLM 判断", self.react_agent_task_queue)
+        self.assertIn("执行边界", self.react_agent_task_queue)
+        self.assertIn("人工确认点", self.react_agent_task_queue)
+        self.assertIn("预期产物", self.react_agent_task_queue)
+        self.assertIn("质量门", self.react_agent_task_queue)
+        self.assertIn("Auto Mode 可以生成 patch proposal", self.react_agent_task_queue)
+        self.assertIn("agent-task-skill-review", self.react_styles_css)
+        self.assertIn("agent-task-skill-review__grid", self.react_styles_css)
+        self.assertIn("agent-task-skill-review__sources", self.react_styles_css)
+
+    def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
+        """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
+        self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)
+        self.assertIn("正在生成 SupervisorPlan", self.react_app)
+        self.assertIn("data-testid=\"supervisor-plan-ready\"", self.react_app)
+        self.assertIn("planFetchError ? (", self.react_app)
+        self.assertIn("planStages === null ? (", self.react_app)
+        self.assertIn("setPlanStages(null);", self.react_app)
+        self.assertNotIn("让 SupervisorPlanReview 仍可渲染", self.react_app)
+        self.assertLess(
+            self.react_app.index("data-testid=\"plan-fetch-error\""),
+            self.react_app.index("data-testid=\"supervisor-plan-ready\""),
+        )
+
+    def test_bdd_39_plan_fetch_error_names_wrong_static_server_risk(self) -> None:
+        """行为 39：计划服务失败文案必须让用户知道可能是端口跑错服务，而不是空泛报错。"""
+        self.assertIn("没有拿到 SupervisorPlan", self.react_app)
+        self.assertIn("FastAPI Product.app", self.react_app)
+        self.assertIn("普通静态文件服务", self.react_app)
+
 
 if __name__ == "__main__":
     unittest.main()

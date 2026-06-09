@@ -32,6 +32,68 @@ interface QueuePrimaryAction {
   action?: string;
 }
 
+interface InternalSkillSource {
+  name?: string;
+  label?: string;
+  type?: string;
+  url?: string;
+  note?: string;
+}
+
+interface InternalSkillBinding {
+  id?: string;
+  skill_id?: string;
+  name?: string;
+  owner_agent?: string;
+  stage?: string;
+  risk_level?: string;
+  status?: string;
+  matched_reason?: string;
+  selection_source?: string;
+  semantic_selection_reason?: string;
+  why_this_skill?: string;
+  llm_semantic_judgment?: {
+    reason?: string;
+    confidence?: string | number;
+    missing_evidence?: string[];
+    recommended_next_step?: string;
+  };
+  expected_artifacts?: string[];
+  execution_boundary?: string;
+  skill_sources?: InternalSkillSource[];
+  can_execute_without_human_review?: boolean;
+  quality_gates?: {
+    machine_checkable?: string[];
+    manual_review?: string[];
+  };
+  human_confirmation?: {
+    required_before?: string[];
+    approver_role?: string;
+  };
+  formal_write_targets?: string[];
+  canonical_policy?: {
+    auto_mode?: {
+      can_generate_patch_proposal?: boolean;
+      can_write_canonical?: boolean;
+      proposal_status?: string;
+    };
+  };
+  next_action?: string;
+}
+
+interface LlmInterventionHandoff {
+  stage?: string;
+  llm_role?: string;
+  deterministic_owner?: string;
+  handoff_condition?: string;
+  human_gate?: string;
+  formal_boundary?: string;
+  selected_skill_id?: string;
+  selected_skill_name?: string;
+  selected_skill_reason?: string;
+  selection_source?: string;
+}
+
 interface AgentTask {
   id: string;
   title?: string;
@@ -41,6 +103,8 @@ interface AgentTask {
   next_action?: string;
   blockers?: Array<{ code?: string; message?: string }>;
   primary_action?: QueuePrimaryAction;
+  internal_skill_bindings?: InternalSkillBinding[];
+  llm_intervention_handoff?: LlmInterventionHandoff;
   draft_section_tasks?: {
     status?: string;
     next_action?: string;
@@ -197,6 +261,124 @@ function reviewActionLabel(action: ReviewAction): string {
   if (action === "approve_formal_writeback") return "批准写入正式层";
   if (action === "needs_revision") return "要求修订";
   return "拒绝";
+}
+
+function textList(items?: string[]): string {
+  return (items ?? []).filter(Boolean).join(" / ");
+}
+
+function skillDisplayName(skill?: InternalSkillBinding, handoff?: LlmInterventionHandoff): string {
+  return skill?.name ?? handoff?.selected_skill_name ?? skill?.skill_id ?? handoff?.selected_skill_id ?? "待确认 Skill";
+}
+
+function skillSelectionReason(skill?: InternalSkillBinding, handoff?: LlmInterventionHandoff): string {
+  return (
+    skill?.why_this_skill ??
+    skill?.semantic_selection_reason ??
+    handoff?.selected_skill_reason ??
+    skill?.matched_reason ??
+    "等待 Supervisor 补充选择理由。"
+  );
+}
+
+function skillQualityGateText(skill?: InternalSkillBinding): string {
+  const machine = textList(skill?.quality_gates?.machine_checkable);
+  const manual = textList(skill?.quality_gates?.manual_review);
+  if (machine && manual) return `机器检查：${machine}；人工审阅：${manual}`;
+  if (machine) return `机器检查：${machine}`;
+  if (manual) return `人工审阅：${manual}`;
+  return "等待队列生成质量门。";
+}
+
+function renderTaskSkillReview(task: AgentTask) {
+  const skill = task.internal_skill_bindings?.[0];
+  const handoff = task.llm_intervention_handoff;
+  if (!skill && !handoff) return null;
+
+  const llmJudgment =
+    skill?.llm_semantic_judgment?.reason ??
+    handoff?.llm_role ??
+    "Supervisor 根据研究阶段、任务角色和内部方法库匹配当前 Skill。";
+  const humanGate =
+    textList(skill?.human_confirmation?.required_before) ||
+    handoff?.human_gate ||
+    "review_internal_skill_before_execution";
+  const expectedArtifacts = textList(skill?.expected_artifacts) || "等待任务执行后生成。";
+  const executionBoundary = skill?.execution_boundary ?? handoff?.formal_boundary ?? "draft_only_until_human_review";
+  const sources = skill?.skill_sources ?? [];
+  const canWriteCanonical = skill?.canonical_policy?.auto_mode?.can_write_canonical;
+
+  return (
+    <div className="agent-task-skill-review" data-testid="agent-task-skill-review">
+      <div className="agent-task-skill-review__head">
+        <div>
+          <span className="eyebrow">Skill 审阅台</span>
+          <h3>{skillDisplayName(skill, handoff)}</h3>
+          <p>
+            <strong>为什么选这个 Skill：</strong>
+            {skillSelectionReason(skill, handoff)}
+          </p>
+        </div>
+        <span>{skill?.selection_source ?? handoff?.selection_source ?? "SupervisorPlan"}</span>
+      </div>
+
+      <div className="agent-task-skill-review__grid">
+        <div>
+          <small>LLM 判断</small>
+          <strong>{llmJudgment}</strong>
+          {skill?.llm_semantic_judgment?.confidence ? (
+            <em>置信度：{skill.llm_semantic_judgment.confidence}</em>
+          ) : null}
+        </div>
+        <div>
+          <small>执行边界</small>
+          <strong>{executionBoundary}</strong>
+        </div>
+        <div>
+          <small>人工确认点</small>
+          <strong>{humanGate}</strong>
+          {skill?.human_confirmation?.approver_role ? <em>{skill.human_confirmation.approver_role}</em> : null}
+        </div>
+        <div>
+          <small>预期产物</small>
+          <strong>{expectedArtifacts}</strong>
+        </div>
+        <div>
+          <small>质量门</small>
+          <strong>{skillQualityGateText(skill)}</strong>
+        </div>
+        <div>
+          <small>缺失证据</small>
+          <strong>{textList(skill?.llm_semantic_judgment?.missing_evidence) || "暂无额外缺口。"}</strong>
+        </div>
+      </div>
+
+      <div className="agent-task-skill-review__sources">
+        <strong>Skill 来源</strong>
+        {sources.length ? (
+          sources.map((source) =>
+            source.url ? (
+              <a key={`${task.id}-${source.url}`} href={source.url} target="_blank" rel="noreferrer">
+                {source.name ?? source.label ?? source.type ?? source.url}
+              </a>
+            ) : (
+              <span key={`${task.id}-${source.name ?? source.label ?? source.type}`}>
+                {source.name ?? source.label ?? source.type}
+              </span>
+            ),
+          )
+        ) : (
+          <span>{skill?.selection_source ?? handoff?.selection_source ?? "internal_skill_registry"}</span>
+        )}
+      </div>
+
+      {canWriteCanonical === false ? (
+        <p className="agent-task-skill-review__note">
+          Auto Mode 可以生成 patch proposal；canonical 规则库需人工 review 后合并。
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<AgentTaskQueueResponse> {
@@ -512,6 +694,8 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                       <span>下一步</span>
                       <strong>{actionLabel(task.next_action)}</strong>
                     </div>
+
+                    {renderTaskSkillReview(task)}
 
                     {reviewReady ? (
                       <div className="agent-task-queue-review" data-testid="draft-section-tasks-review">

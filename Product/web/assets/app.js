@@ -95,6 +95,8 @@ const state = {
   reviewingDraftSectionTasksTaskId: null,
   reviewingDraftSectionTasksAction: null,
   generatingSectionDraftsTaskId: null,
+  reviewingSectionDraftsTaskId: null,
+  reviewingSectionDraftsAction: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -586,6 +588,13 @@ const v2api = {
         body: JSON.stringify({}),
       });
     },
+    async reviewSectionDrafts(projectId, taskId, payload) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/section-drafts-review`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -1028,6 +1037,9 @@ function productTermLabel(value) {
     draft_section_tasks_needs_revision: "章节任务包需修订",
     draft_section_tasks_rejected: "章节任务包已拒绝",
     section_drafts_ready: "章节草稿待审阅",
+    section_drafts_needs_revision: "章节草稿需修订",
+    section_drafts_rejected: "章节草稿已拒绝",
+    formal_writeback_preflight_ready: "正式写回预检已准备",
     review_verified_literature_package: "审阅已核验文献包",
     generate_manuscript_citation_plan: "生成论文引用计划",
     review_manuscript_citation_plan: "审阅论文引用计划",
@@ -1041,6 +1053,10 @@ function productTermLabel(value) {
     generate_draft_section_tasks: "生成章节草稿任务包",
     generate_section_drafts: "生成章节草稿",
     review_section_drafts: "审阅章节草稿",
+    review_formal_writeback_preflight: "审阅正式写回预检",
+    revise_section_drafts: "修订章节草稿",
+    replace_section_drafts: "替换章节草稿",
+    approved_for_formal_writeback_preflight: "已批准进入正式写回预检",
     revise_manuscript_citation_plan: "修订论文引用计划",
     replace_manuscript_citation_plan: "替换论文引用计划",
     revise_draft_section_plan: "修订章节草稿计划",
@@ -2093,9 +2109,14 @@ function renderDraftSectionTasks(task = {}) {
 
 function renderSectionDrafts(task = {}) {
   const drafts = task.section_drafts || {};
+  const review = task.section_drafts_review || {};
+  const preflight = task.formal_writeback_preflight || {};
   const canGenerate = task.status === "draft_section_tasks_approved";
   const isGenerating = state.generatingSectionDraftsTaskId === task.id;
-  if (!drafts.status && !canGenerate) return "";
+  const canReview = task.status === "section_drafts_ready" && Boolean(drafts.status);
+  const isReviewing = state.reviewingSectionDraftsTaskId === task.id;
+  const hasPreflight = Boolean(preflight.status || preflight.artifact_path);
+  if (!drafts.status && !canGenerate && !hasPreflight) return "";
 
   return `
     <div class="agent-task-section-drafts">
@@ -2148,6 +2169,58 @@ function renderSectionDrafts(task = {}) {
           <div>
             <span class="meta-label">写回边界</span>
             <p>${drafts.formal_write_allowed ? "允许写入正式层" : "正式层仍保持锁定"}</p>
+          </div>
+        </div>
+        ${canReview ? `
+          <div class="agent-task-section-drafts__review">
+            <div>
+              <span class="meta-label">章节草稿审阅</span>
+              <strong>决定是否进入正式写回预检</strong>
+              <p>预检只生成候选写回清单，不覆盖正式论文。</p>
+            </div>
+            <div class="action-row">
+              ${["approve_for_formal_writeback_preflight", "needs_revision", "reject"].map((action) => `
+                <button
+                  class="${action === "approve_for_formal_writeback_preflight" ? "primary-button" : "secondary-button"}"
+                  data-section-drafts-review-action="${action}"
+                  data-agent-task-id="${escapeHtml(task.id || "")}"
+                  ${isReviewing ? "disabled" : ""}
+                >
+                  ${isReviewing && state.reviewingSectionDraftsAction === action ? "保存中..." : sectionDraftsReviewActionLabel(action)}
+                </button>
+              `).join("")}
+            </div>
+          </div>
+        ` : review.status ? `
+          <div class="agent-task-section-drafts__review is-complete">
+            <div>
+              <span class="meta-label">章节草稿审阅结果</span>
+              <strong>${escapeHtml(productTermLabel(review.status))}</strong>
+              <p>${escapeHtml(productTermLabel(review.next_action || task.next_action || "review_formal_writeback_preflight"))}</p>
+            </div>
+          </div>
+        ` : ""}
+      ` : ""}
+      ${hasPreflight ? `
+        <div class="agent-task-formal-writeback-preflight" data-testid="formal-writeback-preflight">
+          <div>
+            <span class="meta-label">正式写回预检</span>
+            <strong>正式写回预检已准备</strong>
+            <p>候选写回目标 ${escapeHtml(String(preflight.target_count || 0))} 个；正式层仍需人工确认。</p>
+          </div>
+          <div class="agent-task-formal-writeback-preflight__grid">
+            <div>
+              <span class="meta-label">预检清单</span>
+              <code>${escapeHtml(preflight.artifact_path || "Results/json/section_draft_formal_writeback_preflight.json")}</code>
+            </div>
+            <div>
+              <span class="meta-label">写入权限</span>
+              <p>${preflight.formal_write_allowed ? "允许写入" : "仍未授权写入正式层"}</p>
+            </div>
+            <div>
+              <span class="meta-label">下一步</span>
+              <p>${escapeHtml(productTermLabel(preflight.next_action || task.next_action || "review_formal_writeback_preflight"))}</p>
+            </div>
           </div>
         </div>
       ` : ""}
@@ -3128,6 +3201,31 @@ async function handleSectionDrafts(taskId) {
   }
 }
 
+async function handleSectionDraftsReview(taskId, action) {
+  if (!state.selectedProjectId || !taskId || !action) return;
+  clearV2Error("overview");
+  state.reviewingSectionDraftsTaskId = taskId;
+  state.reviewingSectionDraftsAction = action;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.reviewSectionDrafts(
+      state.selectedProjectId,
+      taskId,
+      {
+        action,
+        note: `章节草稿审阅：${sectionDraftsReviewActionLabel(action)}`,
+      },
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `保存章节草稿审阅失败：${error.message}`);
+  } finally {
+    state.reviewingSectionDraftsTaskId = null;
+    state.reviewingSectionDraftsAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
 function referenceSeedReviewActionLabel(action) {
   const labels = {
     approve_for_draft: "进入草稿综述",
@@ -3178,6 +3276,15 @@ function draftSectionTasksReviewActionLabel(action) {
     approve_for_writer_agent: "批准给 WriterAgent",
     needs_revision: "要求修订",
     reject: "拒绝任务包",
+  };
+  return labels[action] || action || "审阅";
+}
+
+function sectionDraftsReviewActionLabel(action) {
+  const labels = {
+    approve_for_formal_writeback_preflight: "进入正式写回预检",
+    needs_revision: "要求修订",
+    reject: "拒绝草稿",
   };
   return labels[action] || action || "审阅";
 }
@@ -8252,6 +8359,14 @@ async function boot() {
       void handleDraftSectionTasksReview(
         draftSectionTasksReviewButton.dataset.agentTaskId || "",
         draftSectionTasksReviewButton.dataset.draftSectionTasksReviewAction || "",
+      );
+      return;
+    }
+    const sectionDraftsReviewButton = target.closest("[data-section-drafts-review-action]");
+    if (sectionDraftsReviewButton) {
+      void handleSectionDraftsReview(
+        sectionDraftsReviewButton.dataset.agentTaskId || "",
+        sectionDraftsReviewButton.dataset.sectionDraftsReviewAction || "",
       );
       return;
     }

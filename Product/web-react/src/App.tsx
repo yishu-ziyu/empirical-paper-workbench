@@ -121,9 +121,33 @@ function slugify(s: string): string {
   );
 }
 
+function normalizeTaskMode(mode: string | null): string {
+  if (mode === "codex-supervisor" || mode === "auto-research" || mode === "human-review") {
+    return mode;
+  }
+  return "codex-supervisor";
+}
+
+function buildInitialTaskFromUrl(): SubmittedResearchTask | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const message = (params.get("topic") ?? params.get("research_topic") ?? "").trim();
+  if (!message) return null;
+  return {
+    message,
+    mode: normalizeTaskMode(params.get("mode")),
+    fileCount: 0,
+    pastedCount: 0,
+  };
+}
+
+function initialTopicSlugFromUrl(): string {
+  return slugify(buildInitialTaskFromUrl()?.message ?? "");
+}
+
 export function App() {
-  const [task, setTask] = useState<SubmittedResearchTask | null>(null);
-  const [topicSlug, setTopicSlug] = useState<string>("");
+  const [task, setTask] = useState<SubmittedResearchTask | null>(() => buildInitialTaskFromUrl());
+  const [topicSlug, setTopicSlug] = useState<string>(() => initialTopicSlugFromUrl());
   const [activeStage, setActiveStage] = useState<Stage>("brief");
   // codex-supervisor mode: 计划审核通过前, BriefPanel 不渲染
   const [planApproved, setPlanApproved] = useState<boolean>(false);
@@ -231,9 +255,10 @@ export function App() {
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === "AbortError") return;
-        setPlanFetchError("计划服务没有响应。");
-        // 兜底: 即使拉取失败也给一个空 stages, 让 SupervisorPlanReview 仍可渲染
-        setPlanStages([]);
+        setPlanFetchError(
+          "没有拿到 SupervisorPlan。请确认当前地址运行的是 FastAPI Product.app，而不是普通静态文件服务。",
+        );
+        setPlanStages(null);
       });
     return () => ctrl.abort();
   }, [task, planStages]);
@@ -344,29 +369,7 @@ export function App() {
         {activeStage === "brief" ? (
           task.mode === "codex-supervisor" ? (
             <>
-              <SupervisorPlanReview
-                onApprove={() => {
-                  setPlanApproved(true);
-                }}
-                onReject={() => {
-                  showToast("已否决计划，回到新任务选择。");
-                  resetAll();
-                }}
-              />
-              {planApproved ? (
-                <>
-                  <AgentTaskQueuePanel projectId={`proj_${topicSlug}`} />
-                  <BriefPanel
-                    topic={task.message}
-                    initialSnapshot={briefSnapshot}
-                    onComplete={(b, snapshot) => {
-                      setBriefResult(b);
-                      setBriefSnapshot(snapshot);
-                      setActiveStage("search");
-                    }}
-                  />
-                </>
-              ) : planFetchError ? (
+              {planFetchError ? (
                 <div className="task-brief__error" role="alert" data-testid="plan-fetch-error">
                   <strong>计划加载失败：</strong> {planFetchError}
                   <p>
@@ -385,6 +388,38 @@ export function App() {
                     <span>本地后端默认地址：{DEFAULT_LOCAL_API_BASE}</span>
                   </div>
                 </div>
+              ) : planStages === null ? (
+                <div className="task-brief__loading" role="status" data-testid="supervisor-plan-loading">
+                  <span className="eyebrow">SupervisorPlan</span>
+                  <strong>正在生成 SupervisorPlan</strong>
+                  <p>系统正在读取题目、模式和本地服务状态，完成后再进入路线审阅。</p>
+                </div>
+              ) : (
+                <div data-testid="supervisor-plan-ready">
+                  <SupervisorPlanReview
+                    onApprove={() => {
+                      setPlanApproved(true);
+                    }}
+                    onReject={() => {
+                      showToast("已否决计划，回到新任务选择。");
+                      resetAll();
+                    }}
+                  />
+                </div>
+              )}
+              {planApproved ? (
+                <>
+                  <AgentTaskQueuePanel projectId={`proj_${topicSlug}`} />
+                  <BriefPanel
+                    topic={task.message}
+                    initialSnapshot={briefSnapshot}
+                    onComplete={(b, snapshot) => {
+                      setBriefResult(b);
+                      setBriefSnapshot(snapshot);
+                      setActiveStage("search");
+                    }}
+                  />
+                </>
               ) : null}
             </>
           ) : task.mode === "auto-research" ? (

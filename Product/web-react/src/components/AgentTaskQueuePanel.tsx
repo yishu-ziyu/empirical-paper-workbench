@@ -91,6 +91,26 @@ interface AgentTask {
     target_count?: number;
     writes_formal_layer?: boolean;
   };
+  formal_export_preflight?: {
+    status?: string;
+    source_review_gate?: string;
+    source_task_id?: string;
+    artifact_path?: string;
+    review_path?: string;
+    section_count?: number;
+    missing_section_count?: number;
+    blocker_count?: number;
+    next_action?: string;
+    writes_formal_layer?: boolean;
+    wrote_pdf?: boolean;
+    wrote_docx?: boolean;
+  };
+  export_preflight_followups?: Array<{
+    owner_agent?: string;
+    title?: string;
+    description?: string;
+    target_path?: string;
+  }>;
 }
 
 interface AgentTaskQueue {
@@ -127,6 +147,8 @@ function statusLabel(status?: string): string {
     section_drafts_rejected: "章节草稿已拒绝",
     formal_writeback_preflight_ready: "正式写回预检待审阅",
     formal_sections_written: "正式章节已写入",
+    formal_export_preflight_ready: "导出预检已通过",
+    formal_export_preflight_blocked: "导出预检有阻断项",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
     succeeded: "完成",
@@ -144,6 +166,8 @@ function actionLabel(action?: string): string {
     review_section_drafts: "审阅章节草稿",
     review_formal_writeback_preflight: "审阅正式写回预检",
     prepare_export_preflight: "准备导出预检",
+    run_pdf_export_preflight: "运行 PDF 导出预检",
+    resolve_export_preflight_blockers: "处理导出阻断项",
     revise_draft_section_tasks: "修订章节任务包",
     replace_draft_section_tasks: "替换章节任务包",
     revise_section_drafts: "修订章节草稿",
@@ -183,6 +207,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
+  const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -314,6 +339,25 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
     }
   };
 
+  const generateFormalExportPreflight = async (taskId: string) => {
+    setGeneratingFormalExportPreflightTaskId(taskId);
+    try {
+      const data = await fetchJson(
+        `/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/formal-export-preflight`,
+        {
+          method: "POST",
+          body: JSON.stringify({ note: "正式章节已写入，检查 PDF/DOCX 导出前置条件。" }),
+        },
+      );
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("导出预检没有生成成功，请确认正式章节已经写入。");
+    } finally {
+      setGeneratingFormalExportPreflightTaskId(null);
+    }
+  };
+
   const summary = queue?.summary ?? {};
   const tasks = queue?.tasks ?? [];
   const currentAction = queue?.primary_action?.id ?? queue?.primary_action?.action;
@@ -393,8 +437,11 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const sectionDraftReviewReady = task.status === "section_drafts_ready" && hasSectionDrafts;
             const hasPreflight = !!task.formal_writeback_preflight;
             const hasFormalWriteback = !!task.formal_writeback_manifest;
+            const hasExportPreflight = !!task.formal_export_preflight;
             const formalWritebackReviewReady = task.status === "formal_writeback_preflight_ready" && hasPreflight;
             const generatingDrafts = generatingSectionDrafts === task.id;
+            const exportPreflightReady = hasFormalWriteback && task.status === "formal_sections_written";
+            const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             return (
               <article key={task.id} className="agent-task-card" data-status={task.status}>
                 <button
@@ -413,7 +460,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                   </span>
                 </button>
 
-                {expanded || reviewReady || generationReady || hasSectionDrafts || hasPreflight || hasFormalWriteback ? (
+                {expanded || reviewReady || generationReady || hasSectionDrafts || hasPreflight || hasFormalWriteback || hasExportPreflight ? (
                   <div className="agent-task-card__body">
                     <div className="agent-task-card__action">
                       <span>下一步</span>
@@ -604,6 +651,84 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         </p>
                         {task.formal_writeback_manifest?.artifact_path ? (
                           <code>{task.formal_writeback_manifest.artifact_path}</code>
+                        ) : null}
+                        {exportPreflightReady ? (
+                          <div className="agent-task-queue-formal-writeback__actions">
+                            <button
+                              className="btn btn--primary"
+                              type="button"
+                              data-formal-export-preflight-action
+                              onClick={() => void generateFormalExportPreflight(task.id)}
+                              disabled={generatingExportPreflight}
+                            >
+                              {generatingExportPreflight ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
+                              <span>{generatingExportPreflight ? "预检中" : "生成导出预检台"}</span>
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {hasExportPreflight ? (
+                      <div className="agent-task-queue-export-preflight" data-testid="agent-task-queue-export-preflight">
+                        <div className="agent-task-queue-export-preflight__head">
+                          <div>
+                            <span className="eyebrow">导出预检台</span>
+                            <h3>{statusLabel(task.formal_export_preflight?.status)}</h3>
+                            <p>
+                              {task.formal_export_preflight?.status === "formal_export_preflight_blocked"
+                                ? "先处理正式章节缺口，再进入 PDF/DOCX 导出。"
+                                : "正式章节基础检查已通过，可以进入 PDF 候选包预检。"}
+                            </p>
+                          </div>
+                          <span className="agent-task-queue-export-preflight__pill">
+                            {actionLabel(task.formal_export_preflight?.next_action ?? task.next_action)}
+                          </span>
+                        </div>
+                        <div className="agent-task-queue-export-preflight__grid">
+                          <div>
+                            <small>正式章节</small>
+                            <strong>{task.formal_export_preflight?.section_count ?? "—"}</strong>
+                          </div>
+                          <div>
+                            <small>缺失章节</small>
+                            <strong>{task.formal_export_preflight?.missing_section_count ?? "—"}</strong>
+                          </div>
+                          <div>
+                            <small>PDF/DOCX</small>
+                            <strong>
+                              {task.formal_export_preflight?.wrote_pdf || task.formal_export_preflight?.wrote_docx ? "已生成" : "未生成"}
+                            </strong>
+                          </div>
+                          <div>
+                            <small>正式层写入</small>
+                            <strong>{task.formal_export_preflight?.writes_formal_layer ? "会写入" : "不写入"}</strong>
+                          </div>
+                        </div>
+                        {task.formal_export_preflight?.artifact_path ? <code>{task.formal_export_preflight.artifact_path}</code> : null}
+                        {task.formal_export_preflight?.review_path ? <code>{task.formal_export_preflight.review_path}</code> : null}
+                        {(task.blockers ?? []).length > 0 ? (
+                          <div className="agent-task-queue-export-preflight__blockers">
+                            <strong>需要先处理</strong>
+                            <ul>
+                              {(task.blockers ?? []).map((blocker) => (
+                                <li key={`${task.id}-export-${blocker.code}`}>{blocker.message ?? blocker.code}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <p className="agent-task-queue-export-preflight__clear">没有发现正式章节缺口。</p>
+                        )}
+                        {(task.export_preflight_followups ?? []).length > 0 ? (
+                          <div className="agent-task-queue-export-preflight__followups">
+                            <strong>后续 Agent 任务</strong>
+                            {(task.export_preflight_followups ?? []).map((followup) => (
+                              <p key={`${task.id}-export-followup-${followup.target_path ?? followup.title}`}>
+                                {followup.owner_agent ?? "Agent"} · {followup.title ?? "补齐导出前置条件"}：
+                                {followup.description ?? followup.target_path}
+                              </p>
+                            ))}
+                          </div>
                         ) : null}
                       </div>
                     ) : null}

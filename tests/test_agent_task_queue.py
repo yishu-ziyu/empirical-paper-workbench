@@ -1551,6 +1551,84 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         for target in preflight_artifact["targets"]:
             self.assertFalse((self.project_root / target["formal_target_path"]).exists())
 
+    def test_bdd_51_export_preflight_requires_written_formal_sections(self) -> None:
+        """行为 51：没有已批准写入的正式章节时，不能进入导出预检。"""
+        self._generate_section_drafts()
+
+        blocked = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "尝试跳过正式章节写入。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "formal_sections_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "agent_task_export_preflight.json").exists())
+
+    def test_bdd_52_written_formal_sections_generate_export_preflight_console(self) -> None:
+        """行为 52：正式章节写入后，可以生成导出预检台，但不直接生成 PDF/DOCX。"""
+        self._approve_formal_writeback()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "检查正式章节能否进入 PDF/DOCX 导出。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        preflight = task["formal_export_preflight"]
+        self.assertEqual(preflight["schema_version"], "p1.agent_task_export_preflight.v1")
+        self.assertEqual(preflight["source_review_gate"], "review_formal_writeback_preflight")
+        self.assertEqual(preflight["source_task_id"], "agent_task_01")
+        self.assertEqual(preflight["status"], "formal_export_preflight_ready")
+        self.assertEqual(preflight["section_count"], task["formal_writeback_manifest"]["written_count"])
+        self.assertEqual(preflight["missing_section_count"], 0)
+        self.assertFalse(preflight["writes_formal_layer"])
+        self.assertFalse(preflight["wrote_pdf"])
+        self.assertFalse(preflight["wrote_docx"])
+        self.assertEqual(preflight["next_action"], "run_pdf_export_preflight")
+        self.assertEqual(task["status"], "formal_export_preflight_ready")
+        self.assertEqual(task["next_action"], "run_pdf_export_preflight")
+        self.assertEqual(task["primary_action"]["id"], "run_pdf_export_preflight")
+        self.assertEqual(task["audit_log"][-1]["event"], "formal_export_preflight_generated")
+
+        preflight_path = self.project_root / preflight["artifact_path"]
+        self.assertTrue(preflight_path.exists())
+        preflight_artifact = json.loads(preflight_path.read_text(encoding="utf-8"))
+        self.assertEqual(preflight_artifact["note"], "检查正式章节能否进入 PDF/DOCX 导出。")
+        self.assertFalse(preflight_artifact["outputs_written"]["pdf"])
+        self.assertFalse(preflight_artifact["outputs_written"]["docx"])
+        self.assertIn("Submissions/formal_package/paper_candidate.pdf", preflight_artifact["targets"]["pdf_candidate"])
+        self.assertIn("Submissions/formal_package/paper.docx", preflight_artifact["targets"]["docx"])
+        self.assertEqual(preflight_artifact["agent_followups"], [])
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.docx").exists())
+
+    def test_bdd_53_export_preflight_turns_missing_sections_into_agent_followups(self) -> None:
+        """行为 53：导出预检发现正式章节缺失时，必须转成后续 Agent 任务，不只显示错误。"""
+        writeback = self._approve_formal_writeback()
+        task = writeback.json()["agent_task_queue"]["tasks"][0]
+        manifest_path = self.project_root / task["formal_writeback_manifest"]["artifact_path"]
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        missing_target = manifest["targets"][0]
+        (self.project_root / missing_target["formal_target_path"]).unlink()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "检查缺失正式章节如何处理。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        preflight = task["formal_export_preflight"]
+        self.assertEqual(preflight["status"], "formal_export_preflight_blocked")
+        self.assertEqual(preflight["missing_section_count"], 1)
+        self.assertEqual(preflight["next_action"], "resolve_export_preflight_blockers")
+        self.assertEqual(task["status"], "formal_export_preflight_blocked")
+        self.assertEqual(task["next_action"], "resolve_export_preflight_blockers")
+        self.assertEqual(task["primary_action"]["id"], "resolve_export_preflight_blockers")
+        self.assertEqual(task["blockers"][0]["code"], "formal_section_missing")
+        self.assertEqual(task["export_preflight_followups"][0]["owner_agent"], "ManuscriptAgent")
+        self.assertIn(missing_target["formal_target_path"], task["export_preflight_followups"][0]["description"])
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -1681,6 +1759,23 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(generated.status_code, 200, msg=generated.text)
         return generated
+
+    def _approve_formal_writeback(self):
+        self._generate_section_drafts()
+        preflight_response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/section-drafts-review",
+            json={
+                "action": "approve_for_formal_writeback_preflight",
+                "note": "章节草稿可进入正式写回预检。",
+            },
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-writeback-preflight-review",
+            json={"action": "approve_formal_writeback", "note": "批准写入正式层章节。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        return reviewed
 
     def _execute_reference_seed_package_task(self) -> None:
         self._write_supervisor_plan(
@@ -1874,6 +1969,9 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         cls.react_agent_task_queue = (
             root / "Product" / "web-react" / "src" / "components" / "AgentTaskQueuePanel.tsx"
         ).read_text(encoding="utf-8")
+        cls.react_api_base = (root / "Product" / "web-react" / "src" / "lib" / "apiBase.ts").read_text(
+            encoding="utf-8"
+        )
         cls.react_styles_css = (root / "Product" / "web-react" / "src" / "styles.css").read_text(encoding="utf-8")
 
     def test_bdd_5_frontend_contains_summary_first_queue_surface(self) -> None:
@@ -2156,6 +2254,29 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("正式章节已写入", self.react_agent_task_queue)
         self.assertIn("formal_writeback_manifest", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-formal-writeback", self.react_styles_css)
+
+    def test_bdd_32_frontend_exposes_formal_export_preflight_console(self) -> None:
+        """行为 32：前端必须把正式章节后的下一步做成导出预检台。"""
+        self.assertIn("generateFormalExportPreflight", self.app_js)
+        self.assertIn("handleFormalExportPreflight", self.app_js)
+        self.assertIn("data-formal-export-preflight-action", self.app_js)
+        self.assertIn("导出预检台", self.app_js)
+        self.assertIn("formal_export_preflight", self.app_js)
+        self.assertIn("resolve_export_preflight_blockers", self.app_js)
+        self.assertIn("agent-task-formal-export-preflight", self.styles_css)
+        self.assertIn("generateFormalExportPreflight", self.react_agent_task_queue)
+        self.assertIn("formal-export-preflight", self.react_agent_task_queue)
+        self.assertIn("导出预检台", self.react_agent_task_queue)
+        self.assertIn("formal_export_preflight", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-export-preflight", self.react_styles_css)
+
+    def test_bdd_33_react_frontend_can_pin_local_api_base_from_url(self) -> None:
+        """行为 33：本地验收时，前端必须能从 URL 绑定真实后端地址。"""
+        self.assertIn("api_base", self.react_api_base)
+        self.assertIn("apiBase", self.react_api_base)
+        self.assertIn("URLSearchParams", self.react_api_base)
+        self.assertIn("localStorage", self.react_api_base)
+        self.assertIn("empiricalWorkbench.apiBase", self.react_api_base)
 
 
 if __name__ == "__main__":

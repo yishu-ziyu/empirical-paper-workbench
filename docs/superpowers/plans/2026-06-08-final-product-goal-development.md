@@ -1484,3 +1484,60 @@ git diff --check -- Product/web/assets/app.js Product/web/assets/styles.css test
 Manual browser acceptance: pending. Current Codex sandbox rejected local uvicorn port binding with `operation not permitted`; the in-app browser can open tabs but blocks `data:` pages by policy. Do not mark live browser acceptance complete until a normal local service can be opened.
 
 Next node: **P1-T review draft section task packages before WriterAgent drafting**.
+
+## P1-T Review Draft Section Task Packages Before WriterAgent Drafting
+
+Boundary: the task package review gate decides whether WriterAgent may start draft-section writing. It does not generate manuscript prose, and it still does not write the formal manuscript layer.
+
+BDD behaviors:
+
+```text
+Behavior 42: approve draft section task packages before WriterAgent drafting
+Given Results/json/draft_section_tasks.json exists
+And the Agent task status is draft_section_tasks_ready
+When the user approves the package for WriterAgent
+Then the system records review_gate=review_draft_section_tasks,
+sets writer_agent_allowed=true,
+keeps formal_write_allowed=false,
+and exposes generate_section_drafts as the next action.
+
+Behavior 43: block review without a generated task package
+Given only the draft section plan is approved
+But Results/json/draft_section_tasks.json has not been generated
+When the user tries to review a task package
+Then the system returns draft_section_tasks_required
+and does not move the task forward.
+
+Behavior 45: expose the draft section task package review gate in the queue UI
+Given draft_section_tasks exists on an Agent task
+When the Agent Task Queue renders
+Then the user sees the review gate,
+can choose 批准给 WriterAgent / 要求修订 / 拒绝任务包,
+and sees that the formal layer remains locked.
+```
+
+Implemented:
+
+- Added backend review action set for `approve_for_writer_agent`, `needs_revision`, and `reject`.
+- Added `PUT /api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/draft-section-tasks-review`.
+- Approval writes `draft_section_tasks_review`, updates `Results/json/draft_section_tasks.json`, appends `draft_section_tasks_reviewed` audit event, and exposes `generate_section_drafts`.
+- Added frontend API client `reviewDraftSectionTasks`.
+- Added queue handler `handleDraftSectionTasksReview`.
+- Added review gate UI inside `.agent-task-draft-section-tasks__review`.
+- Added labels for `draft_section_tasks_approved`, `approved_for_writer_agent`, and `generate_section_drafts`.
+- Added the React workbench `AgentTaskQueuePanel` so the modern UI exposes the same review gate instead of leaving the capability only in the legacy page.
+- The React panel uses progressive disclosure: the user first sees queue state, current action, and review boundary; raw task details stay collapsed until opened.
+- React approval/revision/rejection actions call the real project API and refresh queue state after writeback.
+- React copy keeps the formal manuscript layer visibly locked while WriterAgent is only cleared to draft.
+
+Verification target:
+
+```bash
+python3 -m unittest tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_42_review_draft_section_tasks_opens_writer_agent_draft_generation tests.test_agent_task_queue.AgentTaskQueueApiTests.test_bdd_43_draft_section_tasks_review_requires_task_package tests.test_agent_task_queue.AgentTaskQueueFrontendTests.test_bdd_28_frontend_exposes_draft_section_task_package_review_gate -v
+python3 -m unittest tests.test_agent_task_queue -v
+python3 -m unittest tests.test_p3_react_input_tabs -v
+python3 -m py_compile Product/backend/agent_task_queue_service.py Product/app.py
+node --check Product/web/assets/app.js
+cd Product/web-react && npm run build
+git diff --check -- Product/backend/agent_task_queue_service.py Product/app.py Product/web/assets/app.js Product/web/assets/styles.css Product/web-react/src/App.tsx Product/web-react/src/components/AgentTaskQueuePanel.tsx Product/web-react/src/styles.css tests/test_agent_task_queue.py tests/test_p3_react_input_tabs.py docs/superpowers/plans/2026-06-08-final-product-goal-development.md
+```

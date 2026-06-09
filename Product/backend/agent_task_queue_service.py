@@ -36,6 +36,11 @@ VALID_DRAFT_SECTION_PLAN_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_DRAFT_SECTION_TASKS_REVIEW_ACTIONS = {
+    "approve_for_writer_agent",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -452,6 +457,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "draft_section_tasks_review",
+        }
+    if status == "draft_section_tasks_approved":
+        return {
+            "id": "generate_section_drafts",
+            "label": "生成章节草稿",
+            "reason": "章节草稿任务包已通过人工审阅，可以交给 WriterAgent 生成草稿层章节；正式层仍保持锁定。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "section_drafts",
         }
     if status == "rejected":
         return {
@@ -2126,6 +2140,99 @@ def generate_project_draft_section_tasks(
     return response
 
 
+def review_project_draft_section_tasks(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_DRAFT_SECTION_TASKS_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_draft_section_tasks_review_action",
+            f"Unsupported draft section tasks review action: {action}",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    task_summary = task.get("draft_section_tasks") if isinstance(task.get("draft_section_tasks"), dict) else {}
+    task_artifact_path = str(task_summary.get("artifact_path") or "")
+    task_artifact = project_root / task_artifact_path
+    if task.get("status") != "draft_section_tasks_ready" or not task_artifact_path or not task_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "draft_section_tasks_required",
+            "Draft section tasks are required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_draft_section_tasks_review(action, note, timestamp)
+    task["draft_section_tasks_review"] = review
+    task_summary["review_status"] = review["status"]
+    task_summary["review_gate"] = review["review_gate"]
+    task_summary["writer_agent_allowed"] = review["writer_agent_allowed"]
+    task_summary["formal_write_allowed"] = False
+    task_summary["writes_formal_layer"] = False
+    task["draft_section_tasks"] = task_summary
+
+    artifact = json.loads(task_artifact.read_text(encoding="utf-8"))
+    artifact["review"] = review
+    artifact["writer_agent_allowed"] = review["writer_agent_allowed"]
+    artifact["formal_write_allowed"] = False
+    artifact["writes_formal_layer"] = False
+    task_artifact.write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if action == "approve_for_writer_agent":
+        task["status"] = "draft_section_tasks_approved"
+        task["next_action"] = "generate_section_drafts"
+        task["can_execute"] = False
+        task["blockers"] = []
+    elif action == "needs_revision":
+        task["status"] = "draft_section_tasks_needs_revision"
+        task["next_action"] = "revise_draft_section_tasks"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "draft_section_tasks_needs_revision",
+                "message": "Draft section tasks need revision before WriterAgent can draft.",
+            }
+        ]
+    else:
+        task["status"] = "draft_section_tasks_rejected"
+        task["next_action"] = "replace_draft_section_tasks"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "draft_section_tasks_rejected",
+                "message": "Draft section tasks were rejected and must be replaced.",
+            }
+        ]
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "draft_section_tasks_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "status": review["status"],
+            "artifact_path": task_artifact_path,
+            "writer_agent_allowed": review["writer_agent_allowed"],
+            "formal_write_allowed": False,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["draft_section_tasks_review"] = review
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -2250,6 +2357,39 @@ def build_draft_section_plan_review(action: str, note: str, timestamp: str) -> d
         "reviewed_at": timestamp,
         "draft_state": "section_task_plan",
         "section_task_generation_allowed": section_task_generation_allowed,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_draft_section_tasks_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_writer_agent":
+        status = "approved_for_writer_agent"
+        next_action = "generate_section_drafts"
+        next_action_label = "生成章节草稿"
+        writer_agent_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_draft_section_tasks"
+        next_action_label = "要求修订章节任务包"
+        writer_agent_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_draft_section_tasks"
+        next_action_label = "拒绝章节任务包"
+        writer_agent_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_draft_section_tasks",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "draft_state": "section_draft_tasks",
+        "writer_agent_allowed": writer_agent_allowed,
         "formal_write_allowed": False,
         "writes_formal_layer": False,
         "next_action": next_action,

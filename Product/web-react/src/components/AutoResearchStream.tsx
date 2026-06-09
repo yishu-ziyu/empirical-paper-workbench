@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StepCard, type StepStatus } from "./StepCard";
 import type { BriefResult, BriefStepsSnapshot } from "./BriefPanel";
+import { apiUrl } from "../lib/apiBase";
 
 /**
  * AutoResearchStream — auto-research mode brief tab panel.
@@ -200,10 +201,7 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const fullUrl = url.startsWith("http") ? url : `${base}${url}`;
-      const res = await fetch(fullUrl, {
+      const res = await fetch(apiUrl(url), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

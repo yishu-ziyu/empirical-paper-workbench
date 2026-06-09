@@ -253,6 +253,8 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
                 + self.methods_drawer
                 + self.system_status,
             )
+        for text in ["本地研究服务", "模型配置", "研究材料已经保留"]:
+            self.assertIn(text, self.brief_panel)
 
 
 if __name__ == "__main__":

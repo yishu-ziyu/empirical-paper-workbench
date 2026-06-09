@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { apiUrl } from "../lib/apiBase";
 
 /**
  * 6th tab — Identification Audit.
@@ -81,12 +82,8 @@ export function IdentificationAuditPanel({
 
   useEffect(() => {
     const ctrl = new AbortController();
-    const env = import.meta.env as Record<string, string | undefined>;
-    const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-    const url = `${base}${API_PATH}`;
-
     setState({ kind: "loading" });
-    fetch(url, {
+    fetch(apiUrl(API_PATH), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ results_path: resultsPath, design_path: designPath }),

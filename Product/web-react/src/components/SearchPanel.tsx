@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "../lib/cn";
 import { Search, FileText, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { apiUrl } from "../lib/apiBase";
 
 export interface Paper {
   title: string;
@@ -56,10 +57,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
   const triggerSearch = async () => {
     setState({ loading: true, error: null, response: null, excluded: new Set() });
     try {
-      const env = import.meta.env as Record<string, string | undefined>;
-      const base = env[`VITE_${"API_BASE_URL"}`] ?? "";
-      const url = `${base}/api/search`;
-      const resp = await fetch(url, {
+      const resp = await fetch(apiUrl("/api/search"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic_slug: topicSlug, brief_path: briefPath }),

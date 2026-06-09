@@ -11,8 +11,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { apiUrl } from "../lib/apiBase";
 
-type ReviewAction = "approve_for_writer_agent" | "request_revision" | "reject";
+type ReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
 
 interface QueueSummary {
   total_tasks?: number;
@@ -22,6 +23,7 @@ interface QueueSummary {
 }
 
 interface QueuePrimaryAction {
+  id?: string;
   label?: string;
   reason?: string;
   action?: string;
@@ -53,6 +55,16 @@ interface AgentTask {
     next_action?: string;
     note?: string;
   };
+  section_drafts?: {
+    status?: string;
+    next_action?: string;
+    artifact_path?: string;
+    source_artifact_path?: string;
+    section_count?: number;
+    requires_human_review?: boolean;
+    formal_write_allowed?: boolean;
+    writes_formal_layer?: boolean;
+  };
 }
 
 interface AgentTaskQueue {
@@ -74,11 +86,6 @@ interface AgentTaskQueuePanelProps {
 
 const SERVICE_ERROR_MESSAGE = "任务队列暂时没连上，稍后重试。已保存材料不会丢。";
 
-function apiBase(): string {
-  const env = import.meta.env as Record<string, string | undefined>;
-  return env[`VITE_${"API_BASE_URL"}`] ?? "";
-}
-
 function statusLabel(status?: string): string {
   const labels: Record<string, string> = {
     empty: "未创建",
@@ -89,6 +96,7 @@ function statusLabel(status?: string): string {
     draft_section_tasks_approved: "已交给 WriterAgent",
     draft_section_tasks_needs_revision: "需要修订",
     draft_section_tasks_rejected: "已拒绝",
+    section_drafts_ready: "章节草稿待审阅",
     succeeded: "完成",
     failed: "失败",
   };
@@ -101,6 +109,7 @@ function actionLabel(action?: string): string {
     dispatch_review_required: "审阅派工",
     review_draft_section_tasks: "审阅章节任务包",
     generate_section_drafts: "生成章节草稿",
+    review_section_drafts: "审阅章节草稿",
     revise_draft_section_tasks: "修订章节任务包",
     replace_draft_section_tasks: "替换章节任务包",
   };
@@ -109,12 +118,12 @@ function actionLabel(action?: string): string {
 
 function reviewActionLabel(action: ReviewAction): string {
   if (action === "approve_for_writer_agent") return "批准给 WriterAgent";
-  if (action === "request_revision") return "要求修订";
+  if (action === "needs_revision") return "要求修订";
   return "拒绝任务包";
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<AgentTaskQueueResponse> {
-  const response = await fetch(`${apiBase()}${url}`, {
+  const response = await fetch(apiUrl(url), {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -134,6 +143,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
+  const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -202,9 +212,25 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
     }
   };
 
+  const generateSectionDrafts = async (taskId: string) => {
+    setGeneratingSectionDrafts(taskId);
+    try {
+      const data = await fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/section-drafts`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("章节草稿没有生成成功，请确认章节任务包已经批准。");
+    } finally {
+      setGeneratingSectionDrafts(null);
+    }
+  };
+
   const summary = queue?.summary ?? {};
   const tasks = queue?.tasks ?? [];
-  const currentAction = queue?.primary_action?.action;
+  const currentAction = queue?.primary_action?.id ?? queue?.primary_action?.action;
   const ownerAgents = useMemo(() => (summary.owner_agents ?? []).slice(0, 4), [summary.owner_agents]);
 
   return (
@@ -276,6 +302,9 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
           {tasks.map((task) => {
             const expanded = expandedTaskId === task.id;
             const reviewReady = task.status === "draft_section_tasks_ready" && !!task.draft_section_tasks;
+            const generationReady = task.status === "draft_section_tasks_approved";
+            const hasSectionDrafts = !!task.section_drafts;
+            const generatingDrafts = generatingSectionDrafts === task.id;
             return (
               <article key={task.id} className="agent-task-card" data-status={task.status}>
                 <button
@@ -294,7 +323,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                   </span>
                 </button>
 
-                {expanded || reviewReady ? (
+                {expanded || reviewReady || generationReady || hasSectionDrafts ? (
                   <div className="agent-task-card__body">
                     <div className="agent-task-card__action">
                       <span>下一步</span>
@@ -315,7 +344,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           ) : null}
                         </div>
                         <div className="agent-task-queue-review__actions">
-                          {(["approve_for_writer_agent", "request_revision", "reject"] as ReviewAction[]).map((action) => (
+                          {(["approve_for_writer_agent", "needs_revision", "reject"] as ReviewAction[]).map((action) => (
                             <button
                               key={action}
                               className={cn("btn", action === "approve_for_writer_agent" ? "btn--primary" : "btn--secondary")}
@@ -325,7 +354,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             >
                               {action === "approve_for_writer_agent" ? (
                                 <CheckCircle2 size={15} />
-                              ) : action === "request_revision" ? (
+                              ) : action === "needs_revision" ? (
                                 <Pencil size={15} />
                               ) : (
                                 <XCircle size={15} />
@@ -345,6 +374,40 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         <p>
                           {statusLabel(task.status)}。下一步：{actionLabel(task.draft_section_tasks_review.next_action)}。
                         </p>
+                      </div>
+                    ) : null}
+
+                    {generationReady ? (
+                      <div className="agent-task-queue-drafts" data-testid="section-drafts-generate">
+                        <div>
+                          <span className="eyebrow">章节草稿</span>
+                          <h3>WriterAgent 只写草稿层章节</h3>
+                          <p>章节任务包已批准。点击后会生成草稿层章节文件，正式层仍保持锁定。</p>
+                        </div>
+                        <div className="agent-task-queue-drafts__actions">
+                          <button
+                            className="btn btn--primary"
+                            type="button"
+                            onClick={() => void generateSectionDrafts(task.id)}
+                            disabled={generatingDrafts}
+                          >
+                            {generatingDrafts ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
+                            <span>{generatingDrafts ? "生成中" : "生成章节草稿"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {hasSectionDrafts ? (
+                      <div className="agent-task-queue-drafts agent-task-queue-drafts--ready" data-testid="section-drafts-result">
+                        <span className="eyebrow">草稿产物</span>
+                        <h3>章节草稿已生成</h3>
+                        <p>等待人工审阅。正式层仍保持锁定。</p>
+                        {task.section_drafts?.artifact_path ? <code>{task.section_drafts.artifact_path}</code> : null}
+                        <small>
+                          章节数 {task.section_drafts?.section_count ?? "—"} · 下一步{" "}
+                          {actionLabel(task.section_drafts?.next_action ?? task.next_action)}
+                        </small>
                       </div>
                     ) : null}
 

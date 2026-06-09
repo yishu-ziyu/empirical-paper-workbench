@@ -804,7 +804,8 @@ textarea {
 .agent-task-draft-section-plan,
 .agent-task-draft-section-tasks,
 .agent-task-section-drafts,
-.agent-task-formal-writeback-preflight {
+.agent-task-formal-writeback-preflight,
+.agent-task-formal-writeback-result {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -836,7 +837,8 @@ textarea {
 
 .agent-task-draft-section-tasks,
 .agent-task-section-drafts,
-.agent-task-formal-writeback-preflight {
+.agent-task-formal-writeback-preflight,
+.agent-task-formal-writeback-result {
   display: grid;
   gap: 12px;
 }
@@ -920,7 +922,8 @@ textarea {
 .agent-task-manuscript-citation-plan__review,
 .agent-task-draft-section-plan__review,
 .agent-task-draft-section-tasks__review,
-.agent-task-section-drafts__review {
+.agent-task-section-drafts__review,
+.agent-task-formal-writeback-preflight__review {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -938,19 +941,38 @@ textarea {
 .agent-task-manuscript-citation-plan__review .action-row,
 .agent-task-draft-section-plan__review .action-row,
 .agent-task-draft-section-tasks__review .action-row,
-.agent-task-section-drafts__review .action-row {
+.agent-task-section-drafts__review .action-row,
+.agent-task-formal-writeback-preflight__review .action-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .agent-task-section-drafts__review.is-complete,
-.agent-task-formal-writeback-preflight {
+.agent-task-formal-writeback-preflight,
+.agent-task-formal-writeback-result {
   border-color: rgba(32, 32, 32, 0.16);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(229, 229, 226, 0.54);
 }
 
-.agent-task-formal-writeback-preflight code {
+.agent-task-formal-writeback-preflight__review {
+  border-color: rgba(32, 32, 32, 0.16);
+  background: rgba(229, 229, 226, 0.46);
+}
+
+.agent-task-formal-writeback-preflight__grid > div {
+  border-color: rgba(32, 32, 32, 0.14);
+  background: rgba(229, 229, 226, 0.42);
+}
+
+.agent-task-formal-writeback-preflight code,
+.agent-task-formal-writeback-result code {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(24, 24, 24, 0.82);
+  color: #eeeeec;
   overflow-wrap: anywhere;
 }
 

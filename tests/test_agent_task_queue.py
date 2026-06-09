@@ -1453,6 +1453,104 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             self.assertTrue(target["requires_human_review"])
             self.assertFalse(target["formal_write_allowed"])
 
+    def test_bdd_48_formal_writeback_requires_preflight(self) -> None:
+        """行为 48：没有正式写回预检时，不能直接批准写入正式层。"""
+        self._generate_section_drafts()
+
+        blocked = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-writeback-preflight-review",
+            json={"action": "approve_formal_writeback", "note": "尝试跳过正式写回预检。"},
+        )
+
+        self.assertEqual(blocked.status_code, 409, msg=blocked.text)
+        self.assertEqual(blocked.json()["error"]["code"], "formal_writeback_preflight_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_writeback_manifest.json").exists())
+
+    def test_bdd_49_approved_formal_writeback_preflight_writes_formal_sections_with_manifest(self) -> None:
+        """行为 49：人工批准正式写回预检后，才写入正式层章节并生成写回清单。"""
+        self._generate_section_drafts()
+        preflight_response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/section-drafts-review",
+            json={
+                "action": "approve_for_formal_writeback_preflight",
+                "note": "章节草稿可进入正式写回预检。",
+            },
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        task = preflight_response.json()["agent_task_queue"]["tasks"][0]
+        preflight_path = self.project_root / task["formal_writeback_preflight"]["artifact_path"]
+        preflight_artifact = json.loads(preflight_path.read_text(encoding="utf-8"))
+        first_target = self.project_root / preflight_artifact["targets"][0]["formal_target_path"]
+        first_target.parent.mkdir(parents=True)
+        first_target.write_text("旧正式层内容，应被明确批准后的写回替换。\n", encoding="utf-8")
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-writeback-preflight-review",
+            json={"action": "approve_formal_writeback", "note": "批准写入正式层章节。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        manifest = task["formal_writeback_manifest"]
+        self.assertEqual(task["status"], "formal_sections_written")
+        self.assertEqual(task["next_action"], "prepare_export_preflight")
+        self.assertEqual(task["primary_action"]["id"], "prepare_export_preflight")
+        self.assertFalse(task["primary_action"]["writes_formal_layer"])
+        self.assertEqual(manifest["status"], "formal_sections_written")
+        self.assertEqual(manifest["schema_version"], "p1.formal_writeback_manifest.v1")
+        self.assertEqual(manifest["review_status"], "approved_formal_writeback")
+        self.assertEqual(manifest["written_count"], len(preflight_artifact["targets"]))
+        self.assertTrue(manifest["writes_formal_layer"])
+        self.assertEqual(task["audit_log"][-1]["event"], "formal_sections_written")
+
+        manifest_path = self.project_root / manifest["artifact_path"]
+        self.assertTrue(manifest_path.exists())
+        manifest_artifact = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest_artifact["status"], "formal_sections_written")
+        self.assertEqual(manifest_artifact["review"]["note"], "批准写入正式层章节。")
+        self.assertEqual(len(manifest_artifact["targets"]), len(preflight_artifact["targets"]))
+        self.assertTrue(any(target["previous_exists"] for target in manifest_artifact["targets"]))
+        for target in manifest_artifact["targets"]:
+            formal_path = self.project_root / target["formal_target_path"]
+            self.assertTrue(formal_path.exists())
+            text = formal_path.read_text(encoding="utf-8")
+            self.assertIn("正式层写回：已批准", text)
+            self.assertIn(target["section_title"], text)
+
+        updated_preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+        self.assertEqual(updated_preflight["review"]["status"], "approved_formal_writeback")
+        self.assertTrue(updated_preflight["formal_write_allowed"])
+        self.assertTrue(updated_preflight["writes_formal_layer"])
+
+    def test_bdd_50_rejected_formal_writeback_preflight_does_not_write_formal_sections(self) -> None:
+        """行为 50：拒绝正式写回预检时，正式层不发生写入。"""
+        self._generate_section_drafts()
+        preflight_response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/section-drafts-review",
+            json={
+                "action": "approve_for_formal_writeback_preflight",
+                "note": "章节草稿可进入正式写回预检。",
+            },
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        task = preflight_response.json()["agent_task_queue"]["tasks"][0]
+        preflight_path = self.project_root / task["formal_writeback_preflight"]["artifact_path"]
+        preflight_artifact = json.loads(preflight_path.read_text(encoding="utf-8"))
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-writeback-preflight-review",
+            json={"action": "reject", "note": "正式写回目标还需要重新审阅。"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        self.assertEqual(task["status"], "formal_writeback_preflight_rejected")
+        self.assertEqual(task["next_action"], "replace_section_drafts")
+        self.assertNotIn("formal_writeback_manifest", task)
+        self.assertEqual(task["audit_log"][-1]["event"], "formal_writeback_preflight_reviewed")
+        for target in preflight_artifact["targets"]:
+            self.assertFalse((self.project_root / target["formal_target_path"]).exists())
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -2040,6 +2138,24 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("section-drafts-review", self.react_agent_task_queue)
         self.assertIn("正式写回预检已准备", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-preflight", self.react_styles_css)
+
+    def test_bdd_31_frontend_exposes_formal_writeback_preflight_review_and_written_state(self) -> None:
+        """行为 31：前端必须能审阅正式写回预检，并展示正式层写入结果。"""
+        self.assertIn("reviewFormalWritebackPreflight", self.app_js)
+        self.assertIn("handleFormalWritebackPreflightReview", self.app_js)
+        self.assertIn("data-formal-writeback-preflight-review-action", self.app_js)
+        self.assertIn("approve_formal_writeback", self.app_js)
+        self.assertIn("批准写入正式层", self.app_js)
+        self.assertIn("正式章节已写入", self.app_js)
+        self.assertIn("formal_writeback_manifest", self.app_js)
+        self.assertIn(".agent-task-formal-writeback-preflight__review", self.styles_css)
+        self.assertIn(".agent-task-formal-writeback-result", self.styles_css)
+        self.assertIn("reviewFormalWritebackPreflight", self.react_agent_task_queue)
+        self.assertIn("formal-writeback-preflight-review", self.react_agent_task_queue)
+        self.assertIn("批准写入正式层", self.react_agent_task_queue)
+        self.assertIn("正式章节已写入", self.react_agent_task_queue)
+        self.assertIn("formal_writeback_manifest", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-formal-writeback", self.react_styles_css)
 
 
 if __name__ == "__main__":

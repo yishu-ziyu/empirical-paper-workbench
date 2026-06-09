@@ -13,7 +13,9 @@ import {
 import { cn } from "../lib/cn";
 import { apiUrl } from "../lib/apiBase";
 
-type ReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
+type DraftSectionTasksReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
+type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "needs_revision" | "reject";
+type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction;
 
 interface QueueSummary {
   total_tasks?: number;
@@ -65,6 +67,22 @@ interface AgentTask {
     formal_write_allowed?: boolean;
     writes_formal_layer?: boolean;
   };
+  section_drafts_review?: {
+    action?: string;
+    status?: string;
+    next_action?: string;
+    note?: string;
+    formal_writeback_preflight_allowed?: boolean;
+  };
+  formal_writeback_preflight?: {
+    status?: string;
+    artifact_path?: string;
+    target_count?: number;
+    requires_human_review?: boolean;
+    formal_write_allowed?: boolean;
+    writes_formal_layer?: boolean;
+    next_action?: string;
+  };
 }
 
 interface AgentTaskQueue {
@@ -97,6 +115,9 @@ function statusLabel(status?: string): string {
     draft_section_tasks_needs_revision: "需要修订",
     draft_section_tasks_rejected: "已拒绝",
     section_drafts_ready: "章节草稿待审阅",
+    section_drafts_needs_revision: "章节草稿需修订",
+    section_drafts_rejected: "章节草稿已拒绝",
+    formal_writeback_preflight_ready: "正式写回预检待审阅",
     succeeded: "完成",
     failed: "失败",
   };
@@ -110,16 +131,20 @@ function actionLabel(action?: string): string {
     review_draft_section_tasks: "审阅章节任务包",
     generate_section_drafts: "生成章节草稿",
     review_section_drafts: "审阅章节草稿",
+    review_formal_writeback_preflight: "审阅正式写回预检",
     revise_draft_section_tasks: "修订章节任务包",
     replace_draft_section_tasks: "替换章节任务包",
+    revise_section_drafts: "修订章节草稿",
+    replace_section_drafts: "替换章节草稿",
   };
   return labels[action ?? ""] ?? action ?? "查看下一步";
 }
 
 function reviewActionLabel(action: ReviewAction): string {
   if (action === "approve_for_writer_agent") return "批准给 WriterAgent";
+  if (action === "approve_for_formal_writeback_preflight") return "进入正式写回预检";
   if (action === "needs_revision") return "要求修订";
-  return "拒绝任务包";
+  return "拒绝";
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<AgentTaskQueueResponse> {
@@ -187,7 +212,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
     }
   };
 
-  const reviewDraftSectionTasks = async (taskId: string, action: ReviewAction) => {
+  const reviewDraftSectionTasks = async (taskId: string, action: DraftSectionTasksReviewAction) => {
     setReviewing({ taskId, action });
     try {
       const data = await fetchJson(
@@ -207,6 +232,31 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError(null);
     } catch {
       setError("章节任务包审阅没有写回成功，请稍后重试。");
+    } finally {
+      setReviewing(null);
+    }
+  };
+
+  const reviewSectionDrafts = async (taskId: string, action: SectionDraftsReviewAction) => {
+    setReviewing({ taskId, action });
+    try {
+      const data = await fetchJson(
+        `/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/section-drafts-review`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            action,
+            note:
+              action === "approve_for_formal_writeback_preflight"
+                ? "章节草稿已审阅，同意生成正式写回预检。"
+                : "",
+          }),
+        },
+      );
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("章节草稿审阅没有写回成功，请确认草稿已经生成。");
     } finally {
       setReviewing(null);
     }
@@ -304,6 +354,8 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const reviewReady = task.status === "draft_section_tasks_ready" && !!task.draft_section_tasks;
             const generationReady = task.status === "draft_section_tasks_approved";
             const hasSectionDrafts = !!task.section_drafts;
+            const sectionDraftReviewReady = task.status === "section_drafts_ready" && hasSectionDrafts;
+            const hasPreflight = !!task.formal_writeback_preflight;
             const generatingDrafts = generatingSectionDrafts === task.id;
             return (
               <article key={task.id} className="agent-task-card" data-status={task.status}>
@@ -323,7 +375,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                   </span>
                 </button>
 
-                {expanded || reviewReady || generationReady || hasSectionDrafts ? (
+                {expanded || reviewReady || generationReady || hasSectionDrafts || hasPreflight ? (
                   <div className="agent-task-card__body">
                     <div className="agent-task-card__action">
                       <span>下一步</span>
@@ -344,7 +396,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           ) : null}
                         </div>
                         <div className="agent-task-queue-review__actions">
-                          {(["approve_for_writer_agent", "needs_revision", "reject"] as ReviewAction[]).map((action) => (
+                          {(["approve_for_writer_agent", "needs_revision", "reject"] as DraftSectionTasksReviewAction[]).map((action) => (
                             <button
                               key={action}
                               className={cn("btn", action === "approve_for_writer_agent" ? "btn--primary" : "btn--secondary")}
@@ -407,6 +459,65 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         <small>
                           章节数 {task.section_drafts?.section_count ?? "—"} · 下一步{" "}
                           {actionLabel(task.section_drafts?.next_action ?? task.next_action)}
+                        </small>
+                      </div>
+                    ) : null}
+
+                    {sectionDraftReviewReady ? (
+                      <div className="agent-task-queue-review agent-task-queue-drafts__review" data-testid="section-drafts-review">
+                        <div>
+                          <span className="eyebrow">章节草稿审阅</span>
+                          <h3>确认草稿是否进入正式写回预检</h3>
+                          <p>这里不会写入正式层，只会生成候选写回清单，供下一道人工门继续确认。</p>
+                        </div>
+                        <div className="agent-task-queue-review__actions">
+                          {(["approve_for_formal_writeback_preflight", "needs_revision", "reject"] as SectionDraftsReviewAction[]).map((action) => (
+                            <button
+                              key={action}
+                              className={cn(
+                                "btn",
+                                action === "approve_for_formal_writeback_preflight" ? "btn--primary" : "btn--secondary",
+                              )}
+                              type="button"
+                              onClick={() => void reviewSectionDrafts(task.id, action)}
+                              disabled={reviewing?.taskId === task.id}
+                            >
+                              {action === "approve_for_formal_writeback_preflight" ? (
+                                <CheckCircle2 size={15} />
+                              ) : action === "needs_revision" ? (
+                                <Pencil size={15} />
+                              ) : (
+                                <XCircle size={15} />
+                              )}
+                              <span>
+                                {reviewing?.taskId === task.id && reviewing.action === action
+                                  ? "写回中"
+                                  : reviewActionLabel(action)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : task.section_drafts_review ? (
+                      <div className="agent-task-queue-review agent-task-queue-review--done">
+                        <span className="eyebrow">章节草稿审阅结果</span>
+                        <p>
+                          {statusLabel(task.status)}。下一步：{actionLabel(task.section_drafts_review.next_action)}。
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {hasPreflight ? (
+                      <div className="agent-task-queue-preflight" data-testid="formal-writeback-preflight-result">
+                        <span className="eyebrow">正式写回预检</span>
+                        <h3>正式写回预检已准备</h3>
+                        <p>系统已列出草稿章节到正式文件的候选映射；正式层仍未写入。</p>
+                        {task.formal_writeback_preflight?.artifact_path ? (
+                          <code>{task.formal_writeback_preflight.artifact_path}</code>
+                        ) : null}
+                        <small>
+                          候选目标 {task.formal_writeback_preflight?.target_count ?? "—"} · 下一步{" "}
+                          {actionLabel(task.formal_writeback_preflight?.next_action ?? task.next_action)}
                         </small>
                       </div>
                     ) : null}

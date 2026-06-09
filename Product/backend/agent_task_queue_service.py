@@ -41,6 +41,11 @@ VALID_DRAFT_SECTION_TASKS_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_SECTION_DRAFTS_REVIEW_ACTIONS = {
+    "approve_for_formal_writeback_preflight",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -475,6 +480,15 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "section_drafts_review",
+        }
+    if status == "formal_writeback_preflight_ready":
+        return {
+            "id": "review_formal_writeback_preflight",
+            "label": "审阅正式写回预检",
+            "reason": "章节草稿已通过审阅，系统已生成正式层候选写回清单；真正写入仍需下一道人工批准。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "formal_writeback_preflight",
         }
     if status == "rejected":
         return {
@@ -2335,6 +2349,143 @@ def generate_project_section_drafts(
     return response
 
 
+def review_project_section_drafts(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_SECTION_DRAFTS_REVIEW_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_section_drafts_review_action",
+            f"Unsupported section drafts review action: {action}",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    drafts_summary = task.get("section_drafts") if isinstance(task.get("section_drafts"), dict) else {}
+    drafts_artifact_path = str(drafts_summary.get("artifact_path") or "")
+    drafts_artifact = project_root / drafts_artifact_path
+    if task.get("status") != "section_drafts_ready" or not drafts_artifact_path or not drafts_artifact.exists():
+        raise AgentTaskQueueBlockedError(
+            "section_drafts_required",
+            "Generated section drafts are required before review.",
+        )
+
+    timestamp = utc_now()
+    review = build_section_drafts_review(action, note, timestamp)
+    task["section_drafts_review"] = review
+    drafts_summary["review_status"] = review["status"]
+    drafts_summary["review_gate"] = review["review_gate"]
+    drafts_summary["formal_writeback_preflight_allowed"] = review["formal_writeback_preflight_allowed"]
+    drafts_summary["formal_write_allowed"] = False
+    drafts_summary["writes_formal_layer"] = False
+    task["section_drafts"] = drafts_summary
+
+    drafts = json.loads(drafts_artifact.read_text(encoding="utf-8"))
+    drafts["review"] = review
+    drafts["formal_writeback_preflight_allowed"] = review["formal_writeback_preflight_allowed"]
+    drafts["formal_write_allowed"] = False
+    drafts["writes_formal_layer"] = False
+    drafts_artifact.write_text(json.dumps(drafts, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "section_drafts_reviewed",
+            "actor": "human",
+            "timestamp": timestamp,
+            "action": action,
+            "status": review["status"],
+            "artifact_path": drafts_artifact_path,
+            "formal_writeback_preflight_allowed": review["formal_writeback_preflight_allowed"],
+            "formal_write_allowed": False,
+        }
+    )
+
+    if action == "approve_for_formal_writeback_preflight":
+        preflight_artifact_path = Path("Results/json/section_draft_formal_writeback_preflight.json")
+        preflight = build_formal_writeback_preflight_record(
+            task,
+            drafts,
+            drafts_artifact_path,
+            review,
+            timestamp,
+            project_root,
+        )
+        absolute_preflight_artifact = project_root / preflight_artifact_path
+        absolute_preflight_artifact.parent.mkdir(parents=True, exist_ok=True)
+        absolute_preflight_artifact.write_text(json.dumps(preflight, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        preflight_summary = {
+            "status": "formal_writeback_preflight_ready",
+            "schema_version": preflight["schema_version"],
+            "artifact_path": str(preflight_artifact_path),
+            "source_artifact_path": drafts_artifact_path,
+            "source_review_gate": preflight["source_review_gate"],
+            "generated_from_review_status": preflight["generated_from_review_status"],
+            "target_count": preflight["target_count"],
+            "requires_human_review": True,
+            "formal_write_allowed": False,
+            "writes_formal_layer": False,
+            "next_action": "review_formal_writeback_preflight",
+            "next_action_label": "审阅正式写回预检",
+            "created_at": timestamp,
+            "evidence_level": "verified_source_record",
+        }
+        task["formal_writeback_preflight"] = preflight_summary
+        task["status"] = "formal_writeback_preflight_ready"
+        task["next_action"] = "review_formal_writeback_preflight"
+        task["can_execute"] = False
+        task["blockers"] = []
+        task.setdefault("audit_log", []).append(
+            {
+                "event": "formal_writeback_preflight_created",
+                "actor": "system",
+                "timestamp": timestamp,
+                "source_artifact_path": drafts_artifact_path,
+                "artifact_path": str(preflight_artifact_path),
+                "target_count": preflight["target_count"],
+                "formal_write_allowed": False,
+            }
+        )
+    elif action == "needs_revision":
+        task["status"] = "section_drafts_needs_revision"
+        task["next_action"] = "revise_section_drafts"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "section_drafts_needs_revision",
+                "message": note or "Section drafts need revision before formal writeback preflight.",
+            }
+        ]
+    else:
+        task["status"] = "section_drafts_rejected"
+        task["next_action"] = "replace_section_drafts"
+        task["can_execute"] = False
+        task["blockers"] = [
+            {
+                "code": "section_drafts_rejected",
+                "message": note or "Section drafts were rejected and must be replaced.",
+            }
+        ]
+
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["section_drafts_review"] = review
+    if isinstance(task.get("formal_writeback_preflight"), dict):
+        response["formal_writeback_preflight"] = task["formal_writeback_preflight"]
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -2492,6 +2643,39 @@ def build_draft_section_tasks_review(action: str, note: str, timestamp: str) -> 
         "reviewed_at": timestamp,
         "draft_state": "section_draft_tasks",
         "writer_agent_allowed": writer_agent_allowed,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": next_action,
+        "next_action_label": next_action_label,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_section_drafts_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
+    if action == "approve_for_formal_writeback_preflight":
+        status = "approved_for_formal_writeback_preflight"
+        next_action = "review_formal_writeback_preflight"
+        next_action_label = "审阅正式写回预检"
+        preflight_allowed = True
+    elif action == "needs_revision":
+        status = "needs_revision"
+        next_action = "revise_section_drafts"
+        next_action_label = "要求修订章节草稿"
+        preflight_allowed = False
+    else:
+        status = "rejected"
+        next_action = "replace_section_drafts"
+        next_action_label = "拒绝章节草稿"
+        preflight_allowed = False
+    return {
+        "status": status,
+        "action": action,
+        "review_gate": "review_section_drafts",
+        "reviewer": "human",
+        "note": note,
+        "reviewed_at": timestamp,
+        "draft_state": "section_drafts",
+        "formal_writeback_preflight_allowed": preflight_allowed,
         "formal_write_allowed": False,
         "writes_formal_layer": False,
         "next_action": next_action,
@@ -3060,6 +3244,83 @@ def build_section_draft_markdown(
             "",
         ]
     )
+
+
+def build_formal_writeback_preflight_record(
+    task: dict[str, Any],
+    drafts: dict[str, Any],
+    source_artifact_path: str,
+    review: dict[str, Any],
+    timestamp: str,
+    project_root: Path,
+) -> dict[str, Any]:
+    sections = [
+        item
+        for item in normalize_list(drafts.get("sections"))
+        if isinstance(item, dict)
+    ]
+    targets = [
+        build_formal_writeback_preflight_target(section, index, project_root)
+        for index, section in enumerate(sections, start=1)
+    ]
+    return {
+        "schema_version": "p1.formal_writeback_preflight.v1",
+        "status": "formal_writeback_preflight_ready",
+        "source_task_id": str(task.get("id") or drafts.get("source_task_id") or ""),
+        "source_artifact_path": source_artifact_path,
+        "source_review_gate": "review_section_drafts",
+        "generated_from_review_status": str(review.get("status") or ""),
+        "draft_layer": "section_drafts",
+        "formal_layer": "manuscript_sections",
+        "target_count": len(targets),
+        "targets": targets,
+        "required_checks": [
+            "人工确认章节内容",
+            "人工确认引用绑定",
+            "人工确认正式目标文件",
+            "人工确认不会覆盖正式层已有内容",
+        ],
+        "review": {
+            "status": "pending",
+            "review_gate": "review_formal_writeback_preflight",
+            "reviewer": "human",
+            "formal_write_allowed": False,
+            "writes_formal_layer": False,
+        },
+        "requires_human_review": True,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "review_formal_writeback_preflight",
+        "next_action_label": "审阅正式写回预检",
+        "usage_boundary": "这份预检只列出草稿层章节到正式层候选文件的映射；人工批准正式写回前不会修改正式正文。",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_formal_writeback_preflight_target(
+    section: dict[str, Any],
+    index: int,
+    project_root: Path,
+) -> dict[str, Any]:
+    section_id = str(section.get("section_id") or f"section_{index:02d}")
+    section_slug = safe_section_slug(section_id)
+    formal_target_path = f"Manuscripts/sections/{section_slug}.md"
+    draft_artifact_path = str(section.get("artifact_path") or "")
+    return {
+        "id": f"formal_writeback_target_{index:02d}",
+        "section_id": section_id,
+        "section_title": str(section.get("section_title") or "未命名章节"),
+        "draft_artifact_path": draft_artifact_path,
+        "formal_target_path": formal_target_path,
+        "draft_exists": bool(draft_artifact_path and (project_root / draft_artifact_path).exists()),
+        "formal_target_exists": (project_root / formal_target_path).exists(),
+        "write_mode": "candidate_replace_or_create",
+        "requires_human_review": True,
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "evidence_level": str(section.get("evidence_level") or "verified_source_record"),
+    }
 
 
 def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:

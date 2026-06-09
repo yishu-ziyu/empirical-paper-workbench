@@ -803,7 +803,8 @@ textarea {
 .agent-task-manuscript-citation-plan,
 .agent-task-draft-section-plan,
 .agent-task-draft-section-tasks,
-.agent-task-section-drafts {
+.agent-task-section-drafts,
+.agent-task-formal-writeback-preflight {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -834,7 +835,8 @@ textarea {
 }
 
 .agent-task-draft-section-tasks,
-.agent-task-section-drafts {
+.agent-task-section-drafts,
+.agent-task-formal-writeback-preflight {
   display: grid;
   gap: 12px;
 }
@@ -858,7 +860,8 @@ textarea {
 .agent-task-manuscript-citation-plan__grid,
 .agent-task-draft-section-plan__grid,
 .agent-task-draft-section-tasks__grid,
-.agent-task-section-drafts__grid {
+.agent-task-section-drafts__grid,
+.agent-task-formal-writeback-preflight__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
@@ -881,7 +884,8 @@ textarea {
 .agent-task-manuscript-citation-plan__grid > div,
 .agent-task-draft-section-plan__grid > div,
 .agent-task-draft-section-tasks__grid > div,
-.agent-task-section-drafts__grid > div {
+.agent-task-section-drafts__grid > div,
+.agent-task-formal-writeback-preflight__grid > div {
   padding: 10px;
   border: 1px solid rgba(32, 32, 32, 0.1);
   border-radius: 8px;
@@ -915,7 +919,8 @@ textarea {
 
 .agent-task-manuscript-citation-plan__review,
 .agent-task-draft-section-plan__review,
-.agent-task-draft-section-tasks__review {
+.agent-task-draft-section-tasks__review,
+.agent-task-section-drafts__review {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -932,10 +937,21 @@ textarea {
 
 .agent-task-manuscript-citation-plan__review .action-row,
 .agent-task-draft-section-plan__review .action-row,
-.agent-task-draft-section-tasks__review .action-row {
+.agent-task-draft-section-tasks__review .action-row,
+.agent-task-section-drafts__review .action-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.agent-task-section-drafts__review.is-complete,
+.agent-task-formal-writeback-preflight {
+  border-color: rgba(32, 32, 32, 0.16);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.agent-task-formal-writeback-preflight code {
+  overflow-wrap: anywhere;
 }
 
 .agent-task-item h5 {
@@ -3470,6 +3486,7 @@ textarea {
   .execution-context-grid,
   .agent-task-draft-section-tasks__checkpoint,
   .agent-task-section-drafts__checkpoint,
+  .agent-task-formal-writeback-preflight__grid,
   #view-empirical-execution .observable-grid {
     grid-template-columns: 1fr;
   }

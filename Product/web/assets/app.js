@@ -99,6 +99,7 @@ const state = {
   reviewingSectionDraftsAction: null,
   reviewingFormalWritebackPreflightTaskId: null,
   reviewingFormalWritebackPreflightAction: null,
+  generatingFormalExportPreflightTaskId: null,
   executingAgentTaskId: null,
   executingAgentTaskBackend: null,
 
@@ -604,6 +605,13 @@ const v2api = {
         body: JSON.stringify(payload),
       });
     },
+    async generateFormalExportPreflight(projectId, taskId, payload = {}) {
+      return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/formal-export-preflight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
     async selectBackend(projectId, taskId, payload) {
       return fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
         method: "POST",
@@ -1050,6 +1058,8 @@ function productTermLabel(value) {
     section_drafts_rejected: "章节草稿已拒绝",
     formal_writeback_preflight_ready: "正式写回预检已准备",
     formal_sections_written: "正式章节已写入",
+    formal_export_preflight_ready: "导出预检已通过",
+    formal_export_preflight_blocked: "导出预检有阻断项",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
     review_verified_literature_package: "审阅已核验文献包",
@@ -1067,6 +1077,8 @@ function productTermLabel(value) {
     review_section_drafts: "审阅章节草稿",
     review_formal_writeback_preflight: "审阅正式写回预检",
     prepare_export_preflight: "准备导出预检",
+    run_pdf_export_preflight: "运行 PDF 导出预检",
+    resolve_export_preflight_blockers: "处理导出阻断项",
     revise_section_drafts: "修订章节草稿",
     replace_section_drafts: "替换章节草稿",
     revise_formal_writeback_preflight: "修订正式写回预检",
@@ -2126,6 +2138,8 @@ function renderSectionDrafts(task = {}) {
   const review = task.section_drafts_review || {};
   const preflight = task.formal_writeback_preflight || {};
   const manifest = task.formal_writeback_manifest || {};
+  const exportPreflight = task.formal_export_preflight || {};
+  const exportFollowups = Array.isArray(task.export_preflight_followups) ? task.export_preflight_followups : [];
   const canGenerate = task.status === "draft_section_tasks_approved";
   const isGenerating = state.generatingSectionDraftsTaskId === task.id;
   const canReview = task.status === "section_drafts_ready" && Boolean(drafts.status);
@@ -2134,7 +2148,10 @@ function renderSectionDrafts(task = {}) {
   const canReviewPreflight = task.status === "formal_writeback_preflight_ready" && hasPreflight;
   const isReviewingPreflight = state.reviewingFormalWritebackPreflightTaskId === task.id;
   const hasFormalWriteback = Boolean(manifest.status || manifest.artifact_path);
-  if (!drafts.status && !canGenerate && !hasPreflight && !hasFormalWriteback) return "";
+  const hasExportPreflight = Boolean(exportPreflight.status || exportPreflight.artifact_path);
+  const canGenerateExportPreflight = hasFormalWriteback && task.status === "formal_sections_written";
+  const isGeneratingExportPreflight = state.generatingFormalExportPreflightTaskId === task.id;
+  if (!drafts.status && !canGenerate && !hasPreflight && !hasFormalWriteback && !hasExportPreflight) return "";
 
   return `
     <div class="agent-task-section-drafts">
@@ -2271,6 +2288,69 @@ function renderSectionDrafts(task = {}) {
             <p>已写入 ${escapeHtml(String(manifest.written_count || 0))} / ${escapeHtml(String(manifest.target_count || 0))} 个正式章节。下一步：${escapeHtml(productTermLabel(task.next_action || "prepare_export_preflight"))}</p>
           </div>
           <code>${escapeHtml(manifest.artifact_path || "Results/json/formal_writeback_manifest.json")}</code>
+          ${canGenerateExportPreflight ? `
+            <div class="agent-task-formal-writeback-result__actions">
+              <button
+                class="primary-button"
+                data-formal-export-preflight-action
+                data-agent-task-id="${escapeHtml(task.id || "")}"
+                ${isGeneratingExportPreflight ? "disabled" : ""}
+              >
+                ${isGeneratingExportPreflight ? "预检中..." : "生成导出预检台"}
+              </button>
+            </div>
+          ` : ""}
+        </div>
+      ` : ""}
+      ${hasExportPreflight ? `
+        <div class="agent-task-formal-export-preflight" data-testid="agent-task-formal-export-preflight">
+          <div class="agent-task-formal-export-preflight__head">
+            <div>
+              <span class="meta-label">导出预检台</span>
+              <strong>${escapeHtml(productTermLabel(exportPreflight.status || task.status))}</strong>
+              <p>${exportPreflight.status === "formal_export_preflight_blocked" ? "有缺口需要先处理，处理后再进入 PDF/DOCX 预检。" : "正式章节基础检查已通过，可以进入 PDF 候选包预检。"}</p>
+            </div>
+            <span class="pill">${escapeHtml(productTermLabel(exportPreflight.next_action || task.next_action || "run_pdf_export_preflight"))}</span>
+          </div>
+          <div class="agent-task-formal-export-preflight__grid">
+            <div>
+              <span class="meta-label">正式章节</span>
+              <p>${escapeHtml(String(exportPreflight.section_count || 0))} 个；缺失 ${escapeHtml(String(exportPreflight.missing_section_count || 0))} 个</p>
+            </div>
+            <div>
+              <span class="meta-label">预检记录</span>
+              <code>${escapeHtml(exportPreflight.artifact_path || "Results/json/agent_task_export_preflight.json")}</code>
+            </div>
+            <div>
+              <span class="meta-label">审阅文档</span>
+              <code>${escapeHtml(exportPreflight.review_path || "Reviews/agent_task_export_preflight.md")}</code>
+            </div>
+            <div>
+              <span class="meta-label">正式层</span>
+              <p>${exportPreflight.writes_formal_layer ? "会改写正式层" : "不会改写正式层"}</p>
+            </div>
+          </div>
+          ${(task.blockers || []).length ? `
+            <div class="agent-task-formal-export-preflight__blockers">
+              <span class="meta-label">阻断项</span>
+              <ul>
+                ${(task.blockers || []).map((blocker) => `<li>${escapeHtml(blocker.message || blocker.code || "")}</li>`).join("")}
+              </ul>
+            </div>
+          ` : `
+            <p class="muted">没有发现正式章节缺失；后续交给 PDF/DOCX 导出预检继续检查排版、引用和工具链。</p>
+          `}
+          ${exportFollowups.length ? `
+            <div class="agent-task-formal-export-preflight__followups">
+              <span class="meta-label">Agent 后续任务</span>
+              ${exportFollowups.map((followup) => `
+                <div>
+                  <strong>${escapeHtml(followup.owner_agent || "Agent")}</strong>
+                  <p>${escapeHtml(followup.description || followup.title || "")}</p>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
         </div>
       ` : ""}
     </div>
@@ -3296,6 +3376,26 @@ async function handleFormalWritebackPreflightReview(taskId, action) {
   } finally {
     state.reviewingFormalWritebackPreflightTaskId = null;
     state.reviewingFormalWritebackPreflightAction = null;
+    renderAgentTaskQueue();
+  }
+}
+
+async function handleFormalExportPreflight(taskId) {
+  if (!state.selectedProjectId || !taskId) return;
+  clearV2Error("overview");
+  state.generatingFormalExportPreflightTaskId = taskId;
+  renderAgentTaskQueue();
+  try {
+    state.agentTaskQueueData = await v2api.agentTaskQueue.generateFormalExportPreflight(
+      state.selectedProjectId,
+      taskId,
+      { note: "正式章节已写入，检查 PDF/DOCX 导出前置条件。" },
+    );
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("overview", `生成导出预检失败：${error.message}`);
+  } finally {
+    state.generatingFormalExportPreflightTaskId = null;
     renderAgentTaskQueue();
   }
 }
@@ -8459,6 +8559,11 @@ async function boot() {
         formalWritebackReviewButton.dataset.agentTaskId || "",
         formalWritebackReviewButton.dataset.formalWritebackPreflightReviewAction || "",
       );
+      return;
+    }
+    const formalExportPreflightButton = target.closest("[data-formal-export-preflight-action]");
+    if (formalExportPreflightButton) {
+      void handleFormalExportPreflight(formalExportPreflightButton.dataset.agentTaskId || "");
       return;
     }
     const sectionDraftsButton = target.closest("[data-section-drafts-action]");

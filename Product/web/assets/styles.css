@@ -805,7 +805,8 @@ textarea {
 .agent-task-draft-section-tasks,
 .agent-task-section-drafts,
 .agent-task-formal-writeback-preflight,
-.agent-task-formal-writeback-result {
+.agent-task-formal-writeback-result,
+.agent-task-formal-export-preflight {
   margin-top: 14px;
   padding: 14px;
   border: 1px solid rgba(32, 32, 32, 0.12);
@@ -838,7 +839,8 @@ textarea {
 .agent-task-draft-section-tasks,
 .agent-task-section-drafts,
 .agent-task-formal-writeback-preflight,
-.agent-task-formal-writeback-result {
+.agent-task-formal-writeback-result,
+.agent-task-formal-export-preflight {
   display: grid;
   gap: 12px;
 }
@@ -863,7 +865,8 @@ textarea {
 .agent-task-draft-section-plan__grid,
 .agent-task-draft-section-tasks__grid,
 .agent-task-section-drafts__grid,
-.agent-task-formal-writeback-preflight__grid {
+.agent-task-formal-writeback-preflight__grid,
+.agent-task-formal-export-preflight__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
@@ -887,7 +890,8 @@ textarea {
 .agent-task-draft-section-plan__grid > div,
 .agent-task-draft-section-tasks__grid > div,
 .agent-task-section-drafts__grid > div,
-.agent-task-formal-writeback-preflight__grid > div {
+.agent-task-formal-writeback-preflight__grid > div,
+.agent-task-formal-export-preflight__grid > div {
   padding: 10px;
   border: 1px solid rgba(32, 32, 32, 0.1);
   border-radius: 8px;
@@ -950,7 +954,8 @@ textarea {
 
 .agent-task-section-drafts__review.is-complete,
 .agent-task-formal-writeback-preflight,
-.agent-task-formal-writeback-result {
+.agent-task-formal-writeback-result,
+.agent-task-formal-export-preflight {
   border-color: rgba(32, 32, 32, 0.16);
   background: rgba(229, 229, 226, 0.54);
 }
@@ -966,7 +971,8 @@ textarea {
 }
 
 .agent-task-formal-writeback-preflight code,
-.agent-task-formal-writeback-result code {
+.agent-task-formal-writeback-result code,
+.agent-task-formal-export-preflight code {
   display: inline-block;
   max-width: 100%;
   padding: 3px 6px;
@@ -974,6 +980,43 @@ textarea {
   background: rgba(24, 24, 24, 0.82);
   color: #eeeeec;
   overflow-wrap: anywhere;
+}
+
+.agent-task-formal-writeback-result__actions,
+.agent-task-formal-export-preflight__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-task-formal-export-preflight__blockers,
+.agent-task-formal-export-preflight__followups {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(32, 32, 32, 0.16);
+  border-radius: 8px;
+  background: rgba(245, 244, 240, 0.62);
+}
+
+.agent-task-formal-export-preflight__blockers ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.agent-task-formal-export-preflight__blockers li,
+.agent-task-formal-export-preflight__followups p {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.48;
+}
+
+.agent-task-formal-export-preflight__followups > div {
+  padding: 10px;
+  border: 1px solid rgba(32, 32, 32, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.54);
 }
 
 .agent-task-item h5 {

@@ -78,21 +78,21 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
 
     def test_bdd_workbench_uses_softer_dark_contrast(self) -> None:
         """行为 11：工作台背景和文字使用柔和黑白灰，不回到高硬度黑白。"""
-        self.assertIn("--color-bg: #1d1d1d", self.css)
-        self.assertIn("--color-panel: #262626", self.css)
-        self.assertIn("--color-ink: #d2d2d2", self.css)
+        self.assertIn("--color-bg: #242424", self.css)
+        self.assertIn("--color-panel: #2b2b2b", self.css)
+        self.assertIn("--color-ink: #c8c8c8", self.css)
         self.assertIn(
-            "background: radial-gradient(ellipse at top, #242424 0%, #1d1d1d 100%)",
+            "background: radial-gradient(ellipse at top, #2d2d2d 0%, #242424 100%)",
             self.css,
         )
-        self.assertIn("opacity: 0.1", self.css)
-        self.assertIn("opacity: 0.075", self.surface)
+        self.assertIn("opacity: 0.06", self.css)
+        self.assertIn("opacity: 0.06", self.surface)
 
     def test_bdd_disabled_actions_cannot_be_overridden_into_white_blocks(self) -> None:
         """行为 21：禁用按钮必须强制继承暗色可读状态，不能被基础按钮白底覆盖。"""
         alpha = self._rgba_alpha_for_var("--color-button-disabled-bg")
-        self.assertGreaterEqual(alpha, 0.14)
-        self.assertLessEqual(alpha, 0.24)
+        self.assertGreaterEqual(alpha, 0.07)
+        self.assertLessEqual(alpha, 0.09)
 
         for selector in [
             ".btn:disabled",
@@ -114,8 +114,8 @@ class WorkbenchVisualContrastContractTests(unittest.TestCase):
 
     def test_bdd_background_particles_stay_below_primary_content_contrast(self) -> None:
         """行为 22：背景粒子只是质感，不能抢主内容的视觉层级。"""
-        self.assertIn("opacity: 0.1", self.css)
-        self.assertIn("opacity: 0.075", self.surface)
+        self.assertIn("opacity: 0.06", self.css)
+        self.assertIn("opacity: 0.06", self.surface)
 
     def test_bdd_stage_navigation_uses_research_task_language(self) -> None:
         """行为 12：阶段导航要说用户任务，不裸露单一来源或后端术语。"""

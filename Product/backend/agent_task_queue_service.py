@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -503,6 +504,24 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "export_preflight",
+        }
+    if status == "formal_export_preflight_ready":
+        return {
+            "id": "run_pdf_export_preflight",
+            "label": "运行 PDF 导出预检",
+            "reason": "导出预检已确认正式章节齐备，可以进入 PDF 候选包预检；这一步仍不生成最终论文文件。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "formal_pdf_export_preflight",
+        }
+    if status == "formal_export_preflight_blocked":
+        return {
+            "id": "resolve_export_preflight_blockers",
+            "label": "处理导出阻断项",
+            "reason": "导出预检发现章节或工具链缺口，需要先补齐再进入 PDF/DOCX 预检。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "export_preflight_blockers",
         }
     if status == "formal_writeback_preflight_needs_revision":
         return {
@@ -2654,6 +2673,102 @@ def review_project_formal_writeback_preflight(
     return response
 
 
+def generate_project_formal_export_preflight(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    manifest_summary = task.get("formal_writeback_manifest") if isinstance(task.get("formal_writeback_manifest"), dict) else {}
+    manifest_artifact_path = str(manifest_summary.get("artifact_path") or "")
+    manifest_path = project_root / manifest_artifact_path if manifest_artifact_path else None
+    allowed_statuses = {
+        "formal_sections_written",
+        "formal_export_preflight_ready",
+        "formal_export_preflight_blocked",
+    }
+    if (
+        task.get("status") not in allowed_statuses
+        or manifest_summary.get("status") != "formal_sections_written"
+        or not manifest_path
+        or not manifest_path.exists()
+    ):
+        raise AgentTaskQueueBlockedError(
+            "formal_sections_required",
+            "Formal sections must be written before export preflight.",
+        )
+
+    timestamp = utc_now()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight_artifact_path = Path("Results/json/agent_task_export_preflight.json")
+    preflight_review_path = Path("Reviews/agent_task_export_preflight.md")
+    preflight = build_formal_export_preflight_record(
+        task,
+        manifest,
+        manifest_artifact_path,
+        note,
+        timestamp,
+        project_root,
+        preflight_review_path,
+    )
+    absolute_preflight_path = project_root / preflight_artifact_path
+    absolute_preflight_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_preflight_path.write_text(json.dumps(preflight, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    absolute_review_path = project_root / preflight_review_path
+    absolute_review_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_review_path.write_text(format_formal_export_preflight_review(preflight), encoding="utf-8")
+
+    summary = {
+        "schema_version": preflight["schema_version"],
+        "status": preflight["status"],
+        "source_task_id": preflight["source_task_id"],
+        "source_review_gate": preflight["source_review_gate"],
+        "artifact_path": str(preflight_artifact_path),
+        "review_path": str(preflight_review_path),
+        "section_count": preflight["section_count"],
+        "missing_section_count": preflight["missing_section_count"],
+        "blocker_count": len(preflight["blockers"]),
+        "next_action": preflight["next_action"],
+        "writes_formal_layer": preflight["writes_formal_layer"],
+        "wrote_pdf": preflight["wrote_pdf"],
+        "wrote_docx": preflight["wrote_docx"],
+        "created_at": timestamp,
+        "evidence_level": preflight["evidence_level"],
+    }
+    task["formal_export_preflight"] = summary
+    task["export_preflight_followups"] = preflight["agent_followups"]
+    task["status"] = preflight["status"]
+    task["next_action"] = preflight["next_action"]
+    task["can_execute"] = False
+    task["blockers"] = preflight["blockers"]
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "formal_export_preflight_generated",
+            "actor": "system",
+            "timestamp": timestamp,
+            "artifact_path": str(preflight_artifact_path),
+            "review_path": str(preflight_review_path),
+            "status": preflight["status"],
+            "next_action": preflight["next_action"],
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["formal_export_preflight"] = summary
+    return response
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -3611,6 +3726,150 @@ def write_formal_sections_from_preflight(
     absolute_manifest.parent.mkdir(parents=True, exist_ok=True)
     absolute_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return manifest
+
+
+def build_formal_export_preflight_record(
+    task: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_artifact_path: str,
+    note: str,
+    timestamp: str,
+    project_root: Path,
+    review_path: Path,
+) -> dict[str, Any]:
+    section_checks = [
+        build_formal_export_section_check(target, index, project_root)
+        for index, target in enumerate(normalize_list(manifest.get("targets")), start=1)
+        if isinstance(target, dict)
+    ]
+    missing_sections = [check for check in section_checks if not check["exists"]]
+    blockers = [
+        {
+            "code": "formal_section_missing",
+            "message": f"正式章节文件缺失：{check['formal_target_path']}",
+            "section_id": check["section_id"],
+            "formal_target_path": check["formal_target_path"],
+        }
+        for check in missing_sections
+    ]
+    agent_followups = [
+        {
+            "id": f"export_preflight_followup_{index:02d}",
+            "owner_agent": "ManuscriptAgent",
+            "title": "补齐正式章节文件",
+            "description": f"重新生成或恢复正式章节文件：{check['formal_target_path']}",
+            "source_section_id": check["section_id"],
+            "target_path": check["formal_target_path"],
+            "required_before": "formal_pdf_export_preflight",
+        }
+        for index, check in enumerate(missing_sections, start=1)
+    ]
+    status = "formal_export_preflight_blocked" if blockers else "formal_export_preflight_ready"
+    next_action = "resolve_export_preflight_blockers" if blockers else "run_pdf_export_preflight"
+    pandoc_path = shutil.which("pandoc") or ""
+    return {
+        "schema_version": "p1.agent_task_export_preflight.v1",
+        "status": status,
+        "source_task_id": str(task.get("id") or manifest.get("source_task_id") or ""),
+        "source_artifact_path": manifest_artifact_path,
+        "source_review_gate": "review_formal_writeback_preflight",
+        "formal_layer": "manuscript_sections",
+        "section_count": len(section_checks),
+        "missing_section_count": len(missing_sections),
+        "section_checks": section_checks,
+        "blockers": blockers,
+        "agent_followups": agent_followups,
+        "targets": {
+            "pdf_candidate": "Submissions/formal_package/paper_candidate.pdf",
+            "pdf_final": "Submissions/formal_package/paper.pdf",
+            "docx": "Submissions/formal_package/paper.docx",
+            "preflight_review": str(review_path),
+        },
+        "toolchain": {
+            "pandoc": {
+                "available": bool(pandoc_path),
+                "path": pandoc_path,
+                "blocks_export": False,
+                "note": "Pandoc availability is advisory here; PDF/DOCX generation happens in later export gates.",
+            }
+        },
+        "outputs_written": {
+            "pdf": False,
+            "docx": False,
+            "formal_state": False,
+        },
+        "writes_formal_layer": False,
+        "wrote_pdf": False,
+        "wrote_docx": False,
+        "requires_human_review": False,
+        "note": note,
+        "next_action": next_action,
+        "next_action_label": "处理导出阻断项" if blockers else "运行 PDF 导出预检",
+        "usage_boundary": "导出预检只检查正式章节和导出目标，不生成 PDF/DOCX，也不改写正式正文。",
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_formal_export_section_check(target: dict[str, Any], index: int, project_root: Path) -> dict[str, Any]:
+    formal_target_path = str(target.get("formal_target_path") or "")
+    absolute_target = project_root / formal_target_path if formal_target_path else None
+    exists = bool(absolute_target and absolute_target.exists())
+    return {
+        "id": f"formal_export_section_check_{index:02d}",
+        "section_id": str(target.get("section_id") or f"section_{index:02d}"),
+        "section_title": str(target.get("section_title") or "未命名章节"),
+        "formal_target_path": formal_target_path,
+        "exists": exists,
+        "bytes": absolute_target.stat().st_size if absolute_target and absolute_target.exists() else 0,
+        "source_draft_artifact_path": str(target.get("draft_artifact_path") or ""),
+        "evidence_level": str(target.get("evidence_level") or "verified_source_record"),
+    }
+
+
+def format_formal_export_preflight_review(preflight: dict[str, Any]) -> str:
+    blockers = normalize_list(preflight.get("blockers"))
+    section_checks = normalize_list(preflight.get("section_checks"))
+    lines = [
+        "# 导出预检台",
+        "",
+        f"- 状态：{preflight.get('status')}",
+        f"- 来源任务：{preflight.get('source_task_id')}",
+        f"- 来源清单：{preflight.get('source_artifact_path')}",
+        f"- 正式章节：{preflight.get('section_count')} 个",
+        f"- 缺失章节：{preflight.get('missing_section_count')} 个",
+        f"- 下一步：{preflight.get('next_action_label')}",
+        "",
+        "## 导出目标",
+        f"- PDF 候选：{preflight.get('targets', {}).get('pdf_candidate')}",
+        f"- PDF 终稿：{preflight.get('targets', {}).get('pdf_final')}",
+        f"- DOCX：{preflight.get('targets', {}).get('docx')}",
+        "",
+        "## 正式章节检查",
+    ]
+    for check in section_checks:
+        if not isinstance(check, dict):
+            continue
+        status = "存在" if check.get("exists") else "缺失"
+        lines.append(f"- {status}｜{check.get('section_title')}｜{check.get('formal_target_path')}")
+    lines.extend(["", "## 阻断项"])
+    if blockers:
+        for blocker in blockers:
+            if isinstance(blocker, dict):
+                lines.append(f"- {blocker.get('message') or blocker.get('code')}")
+    else:
+        lines.append("- 无")
+    lines.extend(
+        [
+            "",
+            "## 边界",
+            "- 本预检不会生成 PDF。",
+            "- 本预检不会生成 DOCX。",
+            "- 本预检不会改写正式论文章节。",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def format_verified_citation_text(authors: list[str], year: str, title: str, venue: str) -> str:

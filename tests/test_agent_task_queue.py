@@ -2762,6 +2762,19 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-execution-review", self.react_styles_css)
         self.assertIn("agent-task-execution-review__actions", self.react_styles_css)
 
+    def test_bdd_37g_react_execution_result_review_is_a_guided_decision_panel(self) -> None:
+        """行为 37g：执行结果审阅门必须引导用户判断下一步，而不是只暴露按钮。"""
+        self.assertIn("agent-task-execution-review__decision", self.react_agent_task_queue)
+        self.assertIn("你现在要判断三件事", self.react_agent_task_queue)
+        self.assertIn("产物能否作为草稿综述素材", self.react_agent_task_queue)
+        self.assertIn("还要补哪些来源或检索式", self.react_agent_task_queue)
+        self.assertIn("正式层保持锁定", self.react_agent_task_queue)
+        self.assertIn("推荐动作", self.react_agent_task_queue)
+        self.assertIn("先批准进入草稿综述", self.react_agent_task_queue)
+        self.assertIn("需要补证时再要求修订", self.react_agent_task_queue)
+        self.assertIn("agent-task-execution-review__decision", self.react_styles_css)
+        self.assertIn("agent-task-execution-review__next-step", self.react_styles_css)
+
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
         self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)

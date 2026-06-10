@@ -1806,6 +1806,46 @@ button {
   font-weight: 500;
 }
 
+.agent-task-execution-review__decision {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agent-task-execution-review__decision > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(230, 230, 230, 0.038);
+  padding: 11px;
+}
+
+.agent-task-execution-review__decision span,
+.agent-task-execution-review__next-step small {
+  color: var(--color-subtle);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-task-execution-review__decision strong,
+.agent-task-execution-review__next-step strong {
+  color: var(--color-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.agent-task-execution-review__decision p,
+.agent-task-execution-review__next-step p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
 .agent-task-execution-review__focus {
   display: grid;
   gap: 8px;
@@ -1825,6 +1865,15 @@ button {
   gap: 5px;
   margin: 0;
   padding-left: 18px;
+}
+
+.agent-task-execution-review__next-step {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(230, 230, 230, 0.055);
+  padding: 12px;
 }
 
 .agent-task-execution-review__actions {
@@ -2249,7 +2298,8 @@ button {
   .agent-task-backend-selection__grid,
   .agent-task-backend-selection__summary,
   .agent-task-execution-console__grid,
-  .agent-task-execution-review__grid {
+  .agent-task-execution-review__grid,
+  .agent-task-execution-review__decision {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2264,7 +2314,8 @@ button {
   .agent-task-backend-selection__grid,
   .agent-task-backend-selection__summary,
   .agent-task-execution-console__grid,
-  .agent-task-execution-review__grid {
+  .agent-task-execution-review__grid,
+  .agent-task-execution-review__decision {
     grid-template-columns: 1fr;
   }
 }

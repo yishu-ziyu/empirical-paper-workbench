@@ -154,3 +154,15 @@
 - Agent Team 默认用于提速和复核；如果线程上限或工具限制导致无法派出，必须记录失败原因，并继续走本地可验证闭环，不能停在调度失败。
 - 小节点不得混合多个目标；例如“渲染 PDF”和“批准正式写回”必须拆成两个节点。
 - 质量要求不降低：20 分钟限制约束的是任务切片大小，不是允许跳过 BDD/TDD、真实运行、测试、提交或人工 gate。
+
+## 2026-06-10：Trace Learning 进入开发闭环
+
+用户提供 Trace Learning 方法论：Agent 系统不能只靠“反思”变好；每个真实 bad case 都要绑定执行轨迹、用户反馈、错误分类、根因、修复层和回归验证。
+
+后续规则：
+
+- 用户在浏览器验收中指出错误时，先把它当作 bad case，而不是普通 UI 意见；记录输入、当前页面状态、错误表现、用户预期和相关文件路径。
+- 每个高价值 bad case 必须归因到一层：prompt、skill/playbook、decision rule、knowledge base、retrieval、tool interface、memory、output format、clarification flow、product boundary 或 eval set。
+- 修复不能只改 prompt；要说明实际修的是哪一层，并把同类问题转成 BDD/TDD、fixture、UI 契约或 CLI 回归测试。
+- 如果用户反馈来自真实页面截图或浏览器评论，优先生成可回放测试或可验收步骤，避免只写解释。
+- 每轮完成后，在汇报里说明“这次 bad case 被沉淀成了什么”：规则、测试、组件、服务恢复、skill registry、方法库补丁或产品边界。

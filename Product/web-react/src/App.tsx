@@ -39,6 +39,8 @@ interface SubmittedResearchTask {
   pastedCount: number;
 }
 
+type TopicIntakeStatus = "idle" | "registering" | "ready" | "failed";
+
 /** Six end-to-end stages (BDD ref: spec §6.1 + §6.2 + D3 6th tab stub). */
 type Stage = "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
 
@@ -113,20 +115,22 @@ const STAGE_LABELS: Record<
   },
 };
 
-/**
- * Convert a free-form research topic into a filesystem-safe slug.
- * Falls back to "untitled" when the input contains no ASCII alphanumerics
- * (e.g. pure Chinese topics will slugify to "untitled" — acceptable for
- * Phase 1; downstream code can read the raw topic from brief.md).
- */
+function topicHash(s: string): string {
+  let hash = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    hash = (hash * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36).padStart(6, "0").slice(0, 10);
+}
+
+/** Convert a free-form research topic into a filesystem-safe slug. */
 function slugify(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 50) || "untitled"
-  );
+  const asciiSlug = s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+  return asciiSlug || `topic-${topicHash(s)}`;
 }
 
 function normalizeTaskMode(mode: string | null): string {
@@ -179,6 +183,65 @@ function explainPlanApprovalError(message: string): string {
   return message || "批准失败，请检查本地后端和项目状态。";
 }
 
+function toStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item)).filter((item) => item.trim().length > 0);
+}
+
+function normalizePlanStatus(value: unknown): SupervisorPlanStage["status"] {
+  if (
+    value === "empty" ||
+    value === "draft" ||
+    value === "ready" ||
+    value === "running" ||
+    value === "completed" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+  return "draft";
+}
+
+function normalizeSupervisorPlanStages(value: unknown): SupervisorPlanStage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((stage, index) => ({
+      id: String(stage.id || `stage-${index + 1}`),
+      title: String(stage.title || stage.task || `阶段 ${index + 1}`),
+      owner: String(stage.owner || stage.owner_agent || stage.role || "Supervisor"),
+      status: normalizePlanStatus(stage.status),
+      reason: String(stage.reason || stage.summary || "等待审阅后进入下一步。"),
+      inputs: toStringList(stage.inputs),
+      outputs: toStringList(stage.outputs),
+    }));
+}
+
+function normalizeSupervisorPlanInspector(
+  plan: Record<string, unknown>,
+  fallback: SupervisorPlanInspector | null,
+): SupervisorPlanInspector {
+  const inputResearchQuestion =
+    plan.input_research_question && typeof plan.input_research_question === "object"
+      ? (plan.input_research_question as Record<string, unknown>)
+      : {};
+  const question = inputResearchQuestion.question ? String(inputResearchQuestion.question) : "";
+  return {
+    inputs_used: question ? [`研究题目：${question}`] : fallback?.inputs_used,
+    assumptions: toStringList(plan.human_gates).length
+      ? toStringList(plan.human_gates)
+      : fallback?.assumptions,
+    evidence_required: toStringList(plan.evidence_requirements).length
+      ? toStringList(plan.evidence_requirements)
+      : fallback?.evidence_required,
+    risks: toStringList(plan.risks).length ? toStringList(plan.risks) : fallback?.risks,
+    formal_boundary:
+      typeof plan.write_boundary === "string" && plan.write_boundary
+        ? [plan.write_boundary]
+        : fallback?.formal_boundary,
+  };
+}
+
 export function App() {
   const [task, setTask] = useState<SubmittedResearchTask | null>(() => buildInitialTaskFromUrl());
   const [topicSlug, setTopicSlug] = useState<string>(() => initialTopicSlugFromUrl());
@@ -191,6 +254,9 @@ export function App() {
   const [planFetchError, setPlanFetchError] = useState<string | null>(null);
   const [approvingPlan, setApprovingPlan] = useState(false);
   const [planApprovalError, setPlanApprovalError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string>("");
+  const [planIntakeStatus, setPlanIntakeStatus] = useState<TopicIntakeStatus>("idle");
+  const [planIntakeMessage, setPlanIntakeMessage] = useState<string | null>(null);
 
   // Results from each stage. Preserved across navigation so the user can
   // jump back to an earlier tab without losing state.
@@ -272,6 +338,9 @@ export function App() {
     setPlanFetchError(null);
     setPlanApprovalError(null);
     setApprovingPlan(false);
+    setProjectId("");
+    setPlanIntakeStatus("idle");
+    setPlanIntakeMessage(null);
   };
 
   // codex-supervisor mode: 进入 brief tab 时拉计划草案.
@@ -320,6 +389,9 @@ export function App() {
       setPlanFetchError(null);
       setPlanApprovalError(null);
       setApprovingPlan(false);
+      setProjectId("");
+      setPlanIntakeStatus("idle");
+      setPlanIntakeMessage(null);
     }
   }, [task]);
 
@@ -343,6 +415,9 @@ export function App() {
               });
               setTopicSlug(slugify(message));
               setActiveStage("brief");
+              setProjectId("");
+              setPlanIntakeStatus("idle");
+              setPlanIntakeMessage(null);
             }}
           />
         </section>
@@ -363,18 +438,55 @@ export function App() {
   });
   const currentStageMeta = STAGE_LABELS[activeStage];
   const currentApiBase = apiBase() || "同源服务";
-  const projectId = `proj_${topicSlug}`;
+  const candidateProjectId = topicSlug ? `proj_${topicSlug.replace(/-/g, "_")}` : "";
+  const effectiveProjectId = projectId || candidateProjectId;
   const handleResetApiBase = () => {
     setBrowserApiBase(DEFAULT_LOCAL_API_BASE);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("api_base", DEFAULT_LOCAL_API_BASE);
     window.location.assign(nextUrl.toString());
   };
+  const ensureTopicProjectAndSupervisorPlan = async (): Promise<string> => {
+    if (!task) {
+      throw new Error("missing_task");
+    }
+    setPlanIntakeStatus("registering");
+    setPlanIntakeMessage("正在登记题目和任务路线");
+    const response = await fetch(apiUrl("/api/v1/topic-intake/supervisor-plan"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: task.message,
+        slug: topicSlug,
+        note: "用户从研究入口批准路线前登记题目和 SupervisorPlan。",
+      }),
+    });
+    if (!response.ok) {
+      const message = await responseErrorMessage(response, "题目登记失败。");
+      setPlanIntakeStatus("failed");
+      setPlanIntakeMessage(message);
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    setProjectId(data.project.id);
+    const supervisorPlan = (data.supervisor_plan ?? {}) as Record<string, unknown>;
+    setPlanStages(normalizeSupervisorPlanStages(supervisorPlan.stage_plan));
+    setPlanInspector(normalizeSupervisorPlanInspector(supervisorPlan, planInspector));
+    setPlanEvidenceLevel(String(supervisorPlan.evidence_level || "topic_intake"));
+    setPlanFetchError(null);
+    setPlanApprovalError(null);
+    setPlanIntakeStatus("ready");
+    setPlanIntakeMessage(`已登记项目：${data.project.id}`);
+    return data.project.id;
+  };
+
   const approveSupervisorPlan = async () => {
     setApprovingPlan(true);
     setPlanApprovalError(null);
     try {
-      const reviewResponse = await fetch(apiUrl(`/api/v1/projects/${projectId}/supervisor-plan/review`), {
+      const activeProjectId = await ensureTopicProjectAndSupervisorPlan();
+      const reviewResponse = await fetch(apiUrl(`/api/v1/projects/${activeProjectId}/supervisor-plan/review`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -388,7 +500,7 @@ export function App() {
         );
       }
 
-      const queueResponse = await fetch(apiUrl(`/api/v1/projects/${projectId}/agent-task-queue`), {
+      const queueResponse = await fetch(apiUrl(`/api/v1/projects/${activeProjectId}/agent-task-queue`), {
         method: "POST",
       });
       if (!queueResponse.ok) {
@@ -432,7 +544,7 @@ export function App() {
             <code data-testid="topic-slug">{topicSlug}</code>
           </p>
           <SystemStatusBar
-            projectId={projectId}
+            projectId={effectiveProjectId}
             topicSlug={topicSlug}
           />
         </div>
@@ -491,6 +603,9 @@ export function App() {
                     evidenceLevel={planEvidenceLevel}
                     approving={approvingPlan}
                     approvalError={planApprovalError}
+                    intakeStatus={planIntakeStatus}
+                    intakeMessage={planIntakeMessage}
+                    projectId={effectiveProjectId}
                     onApprove={approveSupervisorPlan}
                     onReject={() => {
                       showToast("已否决计划，回到新任务选择。");
@@ -501,7 +616,7 @@ export function App() {
               )}
               {planApproved ? (
                 <>
-                  <AgentTaskQueuePanel projectId={projectId} />
+                  <AgentTaskQueuePanel projectId={effectiveProjectId} />
                   <BriefPanel
                     topic={task.message}
                     initialSnapshot={briefSnapshot}

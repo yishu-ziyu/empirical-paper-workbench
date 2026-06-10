@@ -138,7 +138,8 @@ class ReactInputTabsContractTest(unittest.TestCase):
         ]:
             self.assertIn(marker, source)
         self.assertIn("<AgentTaskQueuePanel", app_source)
-        self.assertIn('projectId={`proj_${topicSlug}`}', app_source)
+        self.assertIn("effectiveProjectId", app_source)
+        self.assertIn('projectId={effectiveProjectId}', app_source)
         self.assertIn(".agent-task-queue-panel", styles)
         self.assertIn(".agent-task-queue-review", styles)
 
@@ -197,6 +198,8 @@ class ReactInputTabsContractTest(unittest.TestCase):
             self.assertNotIn(token, css)
 
         self.assertIn("--color-bg: #242424", css)
+        self.assertIn("--color-panel: #2b2b2b", css)
+        self.assertIn("--color-panel-soft: #323232", css)
         self.assertIn("--color-ink: #c8c8c8", css)
 
 

@@ -263,6 +263,11 @@ function reviewActionLabel(action: ReviewAction): string {
   return "拒绝";
 }
 
+function draftSectionTasksReviewActionLabel(action: DraftSectionTasksReviewAction): string {
+  if (action === "reject") return "拒绝任务包";
+  return reviewActionLabel(action);
+}
+
 function textList(items?: string[]): string {
   return (items ?? []).filter(Boolean).join(" / ");
 }
@@ -729,7 +734,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                               <span>
                                 {reviewing?.taskId === task.id && reviewing.action === action
                                   ? "写回中"
-                                  : reviewActionLabel(action)}
+                                  : draftSectionTasksReviewActionLabel(action)}
                               </span>
                             </button>
                           ))}

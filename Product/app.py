@@ -149,6 +149,7 @@ from Product.backend.supervisor_plan_service import (
     get_project_supervisor_plan,
     review_project_supervisor_plan,
 )
+from Product.backend.topic_intake_service import ensure_topic_supervisor_plan
 from Product.backend.task_dispatch_service import (
     AgentTaskDispatchReviewError,
     review_project_agent_task_dispatch,
@@ -411,6 +412,12 @@ class ReviewerScorecardPayload(BaseModel):
 
 class SupervisorPlanPayload(BaseModel):
     objective: str = Field(min_length=1)
+    note: str = ""
+
+
+class TopicIntakeSupervisorPlanPayload(BaseModel):
+    topic: str = Field(min_length=1)
+    slug: str | None = None
     note: str = ""
 
 
@@ -688,6 +695,22 @@ def api_v1_workflow_report(workflow_id: str) -> dict:
 @app.get("/api/v1/projects")
 def api_v1_projects() -> dict:
     return {"items": list_project_api_views(PRODUCT_ROOT, REPO_ROOT)}
+
+
+@app.post("/api/v1/topic-intake/supervisor-plan", status_code=201)
+def api_v1_topic_intake_supervisor_plan(payload: TopicIntakeSupervisorPlanPayload) -> dict:
+    try:
+        return ensure_topic_supervisor_plan(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            payload.topic,
+            payload.slug,
+            payload.note,
+        )
+    except ValueError as exc:
+        return error_response(400, "invalid_topic_intake", str(exc))
+    except FileNotFoundError as exc:
+        return error_response(400, "topic_workspace_invalid", f"Missing required file: {exc}")
 
 
 @app.post("/api/v1/projects", status_code=201)

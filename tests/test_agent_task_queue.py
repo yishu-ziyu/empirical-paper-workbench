@@ -1899,6 +1899,64 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         self.assertEqual(executed.status_code, 200, msg=executed.text)
 
+    def test_bdd_44_topic_intake_registers_project_persists_plan_and_creates_queue_after_review(self) -> None:
+        """行为 44：中文题目必须先登记为真实项目，再保存可审阅计划，批准后才能创建队列。"""
+        topic = "父母的教育水平对子女工资水平的影响"
+
+        intake = self.client.post(
+            "/api/v1/topic-intake/supervisor-plan",
+            json={
+                "topic": topic,
+                "slug": "parent-education-wage",
+                "note": "用户从首页输入题目，准备审阅 SupervisorPlan。",
+            },
+        )
+
+        self.assertEqual(intake.status_code, 201, msg=intake.text)
+        payload = intake.json()
+        project = payload["project"]
+        self.assertEqual(project["id"], "proj_parent_education_wage")
+        self.assertEqual(project["slug"], "parent-education-wage")
+        self.assertTrue(Path(project["project_root"]).exists())
+
+        research_question = payload["research_question"]
+        self.assertEqual(research_question["status"], "confirmed")
+        self.assertEqual(research_question["question"], topic)
+        self.assertEqual(research_question["source"], "user_input")
+
+        plan = payload["supervisor_plan"]
+        self.assertEqual(plan["project_id"], project["id"])
+        self.assertEqual(plan["status"], "needs_review")
+        self.assertFalse(plan.get("can_dispatch", False))
+        self.assertGreaterEqual(len(plan["stage_plan"]), 4)
+        self.assertGreaterEqual(len(plan["subagent_dispatch"]), 3)
+        self.assertIn("recursive_research_search", plan["selected_skill_ids"])
+        self.assertEqual(plan["intake_mode"], "topic_to_project")
+
+        project_root = Path(project["project_root"])
+        self.assertTrue((project_root / "paper.yaml").exists())
+        self.assertTrue((project_root / "Program" / "run_paper.py").exists())
+        self.assertTrue((project_root / "state" / "product" / "research_question.json").exists())
+        self.assertTrue((project_root / "state" / "product" / "supervisor_plan.json").exists())
+        self.assertFalse((project_root / "state" / "product" / "variable_roles.json").exists())
+        self.assertFalse((project_root / "state" / "product" / "design_spec.json").exists())
+        self.assertFalse((project_root / "state" / "product" / "run_plan.json").exists())
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{project['id']}/supervisor-plan/review",
+            json={"action": "approve", "note": "确认路线后创建队列。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        self.assertTrue(reviewed.json()["supervisor_plan"]["can_dispatch"])
+
+        queue = self.client.post(f"/api/v1/projects/{project['id']}/agent-task-queue")
+        self.assertEqual(queue.status_code, 201, msg=queue.text)
+        task_queue = queue.json()["agent_task_queue"]
+        self.assertEqual(task_queue["status"], "ready_for_dispatch")
+        self.assertGreaterEqual(task_queue["summary"]["total_tasks"], 3)
+        self.assertGreaterEqual(task_queue["summary"]["internal_skill_count"], 1)
+        self.assertTrue((project_root / "state" / "product" / "agent_task_queue.json").exists())
+
     def _write_supervisor_plan(
         self,
         status: str,
@@ -2433,9 +2491,11 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("interface SupervisorPlanInspector", self.react_supervisor_plan_review)
         self.assertIn("stages?: StageNode[]", self.react_supervisor_plan_review)
         self.assertIn("inspector?: SupervisorPlanInspector | null", self.react_supervisor_plan_review)
-        self.assertIn("const stagesToRender = stages?.length ? stages : DEFAULT_STAGES", self.react_supervisor_plan_review)
+        self.assertIn("const hasStages = Boolean(stages?.length)", self.react_supervisor_plan_review)
+        self.assertNotIn("const stagesToRender = stages?.length ? stages : DEFAULT_STAGES", self.react_supervisor_plan_review)
         self.assertIn("stagesToRender.map", self.react_supervisor_plan_review)
         self.assertNotIn("DEFAULT_STAGES.map", self.react_supervisor_plan_review)
+        self.assertIn('data-testid="supervisor-plan-empty-state"', self.react_supervisor_plan_review)
         self.assertIn("inputsUsed", self.react_supervisor_plan_review)
         self.assertIn("evidenceRequired", self.react_supervisor_plan_review)
         self.assertIn("formalBoundary", self.react_supervisor_plan_review)
@@ -2469,11 +2529,35 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         """行为 43：规划审阅 UI 必须展示可读的批准中、失败和禁用按钮状态。"""
         self.assertIn("approving?: boolean", self.react_supervisor_plan_review)
         self.assertIn("approvalError?: string | null", self.react_supervisor_plan_review)
-        self.assertIn("正在批准并创建队列", self.react_supervisor_plan_review)
+        self.assertIn("正在创建队列", self.react_supervisor_plan_review)
         self.assertIn("plan-approval-error", self.react_supervisor_plan_review)
         self.assertIn("btn:disabled", self.react_styles_css)
         self.assertIn("color-button-disabled-bg", self.react_styles_css)
         self.assertIn("color-button-disabled-text", self.react_styles_css)
+
+    def test_bdd_44_react_registers_topic_project_before_review_and_queue_creation(self) -> None:
+        """行为 44：React 批准路线前必须先登记题目项目，并用后端返回的 project_id 继续审阅和建队列。"""
+        self.assertIn("ensureTopicProjectAndSupervisorPlan", self.react_app)
+        self.assertIn("/api/v1/topic-intake/supervisor-plan", self.react_app)
+        self.assertIn("setProjectId(data.project.id)", self.react_app)
+        self.assertIn("const activeProjectId = await ensureTopicProjectAndSupervisorPlan()", self.react_app)
+        self.assertLess(
+            self.react_app.index("ensureTopicProjectAndSupervisorPlan"),
+            self.react_app.index("supervisor-plan/review"),
+        )
+        self.assertIn("projectId={effectiveProjectId}", self.react_app)
+        self.assertIn("<AgentTaskQueuePanel projectId={effectiveProjectId} />", self.react_app)
+
+    def test_bdd_45_supervisor_plan_review_shows_topic_intake_status_and_recovery_actions(self) -> None:
+        """行为 45：规划页必须说明题目登记和队列创建进度，并给失败状态可恢复动作。"""
+        self.assertIn("intakeStatus?:", self.react_supervisor_plan_review)
+        self.assertIn("intakeMessage?: string | null", self.react_supervisor_plan_review)
+        self.assertIn("data-testid=\"plan-intake-status\"", self.react_supervisor_plan_review)
+        self.assertIn("正在登记题目和任务路线", self.react_supervisor_plan_review)
+        self.assertIn("已登记项目", self.react_supervisor_plan_review)
+        self.assertIn("重新登记并创建队列", self.react_supervisor_plan_review)
+        self.assertIn("supervisor-plan__intake-status", self.react_styles_css)
+        self.assertIn("supervisor-plan__empty-state", self.react_styles_css)
 
 
 if __name__ == "__main__":

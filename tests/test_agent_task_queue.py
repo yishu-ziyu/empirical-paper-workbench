@@ -2706,6 +2706,26 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("dispatchApproveDisabled", self.react_agent_task_queue)
         self.assertIn("agent-task-dispatch-review", self.react_styles_css)
 
+    def test_bdd_37d_react_task_queue_can_select_execution_backend_after_dispatch_review(self) -> None:
+        """行为 37d：派工审阅通过后，React 队列必须提供执行后端选择、理由、fallback 和阻断提示。"""
+        self.assertIn("selectAgentTaskBackend", self.react_agent_task_queue)
+        self.assertIn("/select-backend", self.react_agent_task_queue)
+        self.assertIn("ExecutionBackendId", self.react_agent_task_queue)
+        self.assertIn("selected_backend", self.react_agent_task_queue)
+        self.assertIn("backend_blocker", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"agent-task-backend-selection\"", self.react_agent_task_queue)
+        self.assertIn("data-backend-id={backend.id}", self.react_agent_task_queue)
+        self.assertIn("id: \"statspai\"", self.react_agent_task_queue)
+        self.assertIn("id: \"python_ols_adapter\"", self.react_agent_task_queue)
+        self.assertIn("id: \"stata_mcp\"", self.react_agent_task_queue)
+        self.assertIn("选择执行后端", self.react_agent_task_queue)
+        self.assertIn("为什么现在选它", self.react_agent_task_queue)
+        self.assertIn("失败后备选", self.react_agent_task_queue)
+        self.assertIn("推荐先选 StatsPAI", self.react_agent_task_queue)
+        self.assertIn("请先完成人工派工审阅", self.react_agent_task_queue)
+        self.assertIn("backendSelectionDisabled", self.react_agent_task_queue)
+        self.assertIn("agent-task-backend-selection", self.react_styles_css)
+
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
         self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)

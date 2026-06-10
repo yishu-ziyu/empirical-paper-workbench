@@ -17,6 +17,7 @@ type DraftSectionTasksReviewAction = "approve_for_writer_agent" | "needs_revisio
 type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "needs_revision" | "reject";
 type FormalWritebackPreflightReviewAction = "approve_formal_writeback" | "needs_revision" | "reject";
 type DispatchReviewAction = "approve" | "reject";
+type ExecutionBackendId = "statspai" | "python_ols_adapter" | "stata_mcp" | "codex";
 type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction | FormalWritebackPreflightReviewAction;
 
 interface QueueSummary {
@@ -109,6 +110,34 @@ interface LlmInterventionHandoff {
   selection_source?: string;
 }
 
+interface SelectedExecutionBackend {
+  id?: ExecutionBackendId | string;
+  label?: string;
+  evidence_level?: string;
+  availability_status?: string;
+  selection_reason?: string;
+  fallback_backend_ids?: string[];
+  formal_write_allowed?: boolean;
+  execution_boundary?: {
+    kind?: string;
+    output_boundary?: string;
+    evidence_level?: string;
+    formal_write_allowed?: boolean;
+    can_enter_formal_layer_automatically?: boolean;
+    requires_human_review_before_formal_layer?: boolean;
+  };
+}
+
+interface ExecutionBackendBlocker {
+  code?: string;
+  backend_id?: string;
+  label?: string;
+  availability_status?: string;
+  fallback_backend_ids?: string[];
+  retry_action?: string;
+  message?: string;
+}
+
 interface AgentTask {
   id: string;
   title?: string;
@@ -129,6 +158,8 @@ interface AgentTask {
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
   llm_intervention_handoff?: LlmInterventionHandoff;
+  selected_backend?: SelectedExecutionBackend;
+  backend_blocker?: ExecutionBackendBlocker;
   draft_section_tasks?: {
     status?: string;
     next_action?: string;
@@ -232,6 +263,39 @@ interface AgentTaskQueuePanelProps {
 }
 
 const SERVICE_ERROR_MESSAGE = "任务队列暂时没连上，稍后重试。已保存材料不会丢。";
+const EXECUTION_BACKEND_OPTIONS: Array<{
+  id: ExecutionBackendId;
+  label: string;
+  purpose: string;
+  boundary: string;
+  recommended?: boolean;
+}> = [
+  {
+    id: "statspai",
+    label: "StatsPAI",
+    purpose: "优先承接因果推断、稳健性和结构化结果输出。",
+    boundary: "本地执行产物，正式层写入仍需人工审阅。",
+    recommended: true,
+  },
+  {
+    id: "python_ols_adapter",
+    label: "Python OLS",
+    purpose: "快速跑通基准回归或做 fallback 校验。",
+    boundary: "生成本地结果、日志和可复查表格。",
+  },
+  {
+    id: "stata_mcp",
+    label: "Stata MCP",
+    purpose: "适合需要 do-file、log 和 Stata 复现链路的任务。",
+    boundary: "Stata 可用时执行，不可用时回落其他后端。",
+  },
+  {
+    id: "codex",
+    label: "Codex Subagent",
+    purpose: "先生成可审阅脚本草案或修复执行计划。",
+    boundary: "只进入草案层，不直接写入正式论文。",
+  },
+];
 
 function statusLabel(status?: string): string {
   const labels: Record<string, string> = {
@@ -255,6 +319,8 @@ function statusLabel(status?: string): string {
     formal_export_preflight_blocked: "导出预检有阻断项",
     pdf_candidate_exported: "PDF 候选稿已生成",
     draft_execution_packet_ready: "草案层执行包已生成",
+    blocked_by_backend_unavailable: "后端不可用",
+    backend_selected: "后端已选",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
     succeeded: "完成",
@@ -283,6 +349,8 @@ function actionLabel(action?: string): string {
     revise_formal_writeback_preflight: "修订正式写回预检",
     select_execution_backend: "选择执行后端",
     revise_dispatch_task: "修订派工任务",
+    choose_fallback_backend: "选择备用后端",
+    execute: "开始执行",
     draft_execution_packet_ready: "草案层执行包已生成",
   };
   return labels[action ?? ""] ?? action ?? "查看下一步";
@@ -316,6 +384,20 @@ function dispatchReviewErrorMessage(err: unknown): string {
   return "派工审阅没有写回成功，请稍后重试。";
 }
 
+function backendSelectionErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("dispatch_review_required")) {
+    return "请先完成人工派工审阅，再选择执行后端。";
+  }
+  if (message.includes("backend_not_available")) {
+    return "这个执行后端当前不可用，请选择可用的 fallback 后端。";
+  }
+  if (message.includes("invalid_backend_id")) {
+    return "执行后端不在当前支持范围内，请刷新后重试。";
+  }
+  return "执行后端没有写回成功，请稍后重试。";
+}
+
 function textList(items?: string[]): string {
   return (items ?? []).filter(Boolean).join(" / ");
 }
@@ -341,6 +423,24 @@ function skillQualityGateText(skill?: InternalSkillBinding): string {
   if (machine) return `机器检查：${machine}`;
   if (manual) return `人工审阅：${manual}`;
   return "等待队列生成质量门。";
+}
+
+function backendOptionLabel(backendId?: string): string {
+  return EXECUTION_BACKEND_OPTIONS.find((backend) => backend.id === backendId)?.label ?? backendId ?? "待选后端";
+}
+
+function backendSelectionReason(task: AgentTask, backend: SelectedExecutionBackend): string {
+  return (
+    backend.selection_reason ??
+    `为什么现在选它：${backendOptionLabel(backend.id)} 适合承接 ${task.role ?? task.owner_agent ?? "当前 Agent"} 的下一步执行。`
+  );
+}
+
+function backendFallbackText(backend?: SelectedExecutionBackend, blocker?: ExecutionBackendBlocker): string {
+  const fallbackIds = backend?.fallback_backend_ids?.length
+    ? backend.fallback_backend_ids
+    : blocker?.fallback_backend_ids ?? [];
+  return fallbackIds.length ? fallbackIds.map(backendOptionLabel).join(" / ") : "暂无可用 fallback";
 }
 
 function renderTaskSkillReview(
@@ -511,6 +611,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
   const [dispatchReviewing, setDispatchReviewing] = useState<{ taskId: string; action: DispatchReviewAction } | null>(null);
+  const [selectingBackend, setSelectingBackend] = useState<{ taskId: string; backendId: ExecutionBackendId } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
   const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
@@ -649,6 +750,22 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError(dispatchReviewErrorMessage(err));
     } finally {
       setDispatchReviewing(null);
+    }
+  };
+
+  const selectAgentTaskBackend = async (taskId: string, backendId: ExecutionBackendId) => {
+    setSelectingBackend({ taskId, backendId });
+    try {
+      const data = await fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/select-backend`, {
+        method: "POST",
+        body: JSON.stringify({ backend_id: backendId }),
+      });
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch (err) {
+      setError(backendSelectionErrorMessage(err));
+    } finally {
+      setSelectingBackend(null);
     }
   };
 
@@ -816,6 +933,14 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const dispatchReviewDone = task.dispatch_review?.status === "reviewed";
             const dispatchApproveDisabled = hasInternalSkillBinding && !internalSkillPacketReady;
             const dispatchBusy = dispatchReviewing?.taskId === task.id;
+            const backendSelectionReady =
+              task.status === "reviewed_for_dispatch" ||
+              task.next_action === "select_execution_backend" ||
+              task.status === "blocked_by_backend_unavailable" ||
+              task.next_action === "choose_fallback_backend";
+            const backendSelectionDone = task.status === "backend_selected" && Boolean(task.selected_backend?.id);
+            const backendSelectionDisabled = task.status !== "reviewed_for_dispatch" && !task.backend_blocker;
+            const backendBusy = selectingBackend?.taskId === task.id;
             const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             const canGeneratePdfCandidateExport =
               task.status === "formal_export_preflight_ready" &&
@@ -914,6 +1039,104 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           {task.dispatch_review?.action === "approve" ? "已批准进入执行后端选择。" : "已退回修订。"}下一步：
                           {actionLabel(task.next_action)}。
                         </p>
+                      </div>
+                    ) : null}
+
+                    {backendSelectionReady ? (
+                      <div className="agent-task-backend-selection" data-testid="agent-task-backend-selection">
+                        <div className="agent-task-backend-selection__head">
+                          <div>
+                            <span className="eyebrow">执行后端</span>
+                            <h3>选择执行后端</h3>
+                            <p>
+                              这一步决定由哪个工具真正跑任务。选择后进入执行态；正式论文层仍由后续人工门控制。
+                            </p>
+                          </div>
+                          {task.backend_blocker ? <span>需要备用</span> : <span>{actionLabel(task.next_action)}</span>}
+                        </div>
+
+                        {backendSelectionDisabled ? (
+                          <p className="agent-task-backend-selection__gate">请先完成人工派工审阅。</p>
+                        ) : null}
+
+                        {task.backend_blocker ? (
+                          <div className="agent-task-backend-selection__blocker">
+                            <strong>{task.backend_blocker.message ?? "所选执行后端当前不可用。"}</strong>
+                            <p>
+                              失败后备选：{backendFallbackText(undefined, task.backend_blocker)}。可以直接选择下方备用后端继续。
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <p className="agent-task-backend-selection__guide">
+                          推荐先选 StatsPAI；如果本地环境不可用，用 Python OLS 先跑通基准结果，再进入复现和稳健性补强。
+                        </p>
+
+                        <div className="agent-task-backend-selection__grid">
+                          {EXECUTION_BACKEND_OPTIONS.map((backend) => {
+                            const selected = task.selected_backend?.id === backend.id;
+                            const busy = backendBusy && selectingBackend?.backendId === backend.id;
+                            return (
+                              <button
+                                key={`${task.id}-${backend.id}`}
+                                className={cn(
+                                  "agent-task-backend-selection__option",
+                                  selected ? "agent-task-backend-selection__option--selected" : undefined,
+                                )}
+                                type="button"
+                                data-backend-id={backend.id}
+                                aria-label={`选择执行后端：${backend.label}`}
+                                onClick={() => void selectAgentTaskBackend(task.id, backend.id)}
+                                disabled={backendSelectionDisabled || backendBusy}
+                              >
+                                <span>
+                                  {backend.label}
+                                  {backend.recommended ? <em>推荐</em> : null}
+                                </span>
+                                <strong>{backend.purpose}</strong>
+                                <small>{backend.boundary}</small>
+                                {busy ? <em>写回中</em> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : backendSelectionDone ? (
+                      <div className="agent-task-backend-selection agent-task-backend-selection--done" data-testid="agent-task-backend-selection">
+                        <div className="agent-task-backend-selection__head">
+                          <div>
+                            <span className="eyebrow">执行后端已选</span>
+                            <h3>{task.selected_backend?.label ?? backendOptionLabel(task.selected_backend?.id)}</h3>
+                            <p>
+                              <strong>为什么现在选它：</strong>
+                              {backendSelectionReason(task, task.selected_backend ?? {})}
+                            </p>
+                          </div>
+                          <span>{statusLabel(task.status)}</span>
+                        </div>
+                        <div className="agent-task-backend-selection__summary">
+                          <div>
+                            <small>证据等级</small>
+                            <strong>{task.selected_backend?.evidence_level ?? "local_file"}</strong>
+                          </div>
+                          <div>
+                            <small>可用状态</small>
+                            <strong>{task.selected_backend?.availability_status ?? "ready"}</strong>
+                          </div>
+                          <div>
+                            <small>失败后备选</small>
+                            <strong>{backendFallbackText(task.selected_backend, task.backend_blocker)}</strong>
+                          </div>
+                          <div>
+                            <small>正式层边界</small>
+                            <strong>
+                              {task.selected_backend?.execution_boundary?.requires_human_review_before_formal_layer === false
+                                ? "可自动进入正式层"
+                                : "需人工审阅"}
+                            </strong>
+                          </div>
+                        </div>
+                        <p className="agent-task-backend-selection__next">下一步：{actionLabel(task.next_action)}。</p>
                       </div>
                     ) : null}
 

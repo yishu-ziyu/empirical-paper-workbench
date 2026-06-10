@@ -2938,6 +2938,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("onRetry={runAudit}", self.react_identification_audit_panel)
         self.assertNotIn("请刷新页面，或重新启动本地服务后再试", self.react_identification_audit_panel)
 
+    def test_bdd_49_workbench_visual_tokens_reduce_contrast_and_keep_disabled_buttons_readable(self) -> None:
+        """行为 49：工作台必须降低黑白硬对比，且禁用按钮不能白底白字。"""
+        self.assertIn("--color-bg: #282828", self.react_styles_css)
+        self.assertIn("--color-panel: #303030", self.react_styles_css)
+        self.assertIn("--color-strong: #d0d0d0", self.react_styles_css)
+        self.assertIn("--color-button-disabled-bg: #353535", self.react_styles_css)
+        self.assertIn("--color-button-disabled-text: #9a9a9a", self.react_styles_css)
+        self.assertIn("opacity: 0.035;", self.react_styles_css)
+        self.assertIn(".btn:disabled", self.react_styles_css)
+        self.assertIn(".step-card__buttons .btn:disabled", self.react_styles_css)
+        self.assertNotIn("rgba(255, 255, 255", self.react_styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

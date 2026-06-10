@@ -6,18 +6,18 @@
    * ────────────────────────────────────────────────────────────── */
 
   /* === 暗色主题色板 === */
-  --color-bg: #242424;
-  --color-panel: #2b2b2b;
-  --color-panel-soft: #323232;
-  --color-ink: #c8c8c8;
-  --color-strong: #d8d8d8;
+  --color-bg: #282828;
+  --color-panel: #303030;
+  --color-panel-soft: #383838;
+  --color-ink: #bebebe;
+  --color-strong: #d0d0d0;
   --color-muted: #a6a6a6;
   --color-subtle: #7e7e7e;
   --color-quaternary: #4a4a4a;
   --color-line: rgba(230, 230, 230, 0.1);
   --color-line-strong: rgba(230, 230, 230, 0.22);
   --color-line-emphasis: #f5a623;
-  --color-brand: #ededed;
+  --color-brand: #d8d8d8;
   --color-brand-soft: rgba(230, 230, 230, 0.05);
   --color-brand-soft-2: rgba(230, 230, 230, 0.08);
   --color-brand-soft-3: rgba(230, 230, 230, 0.22);
@@ -32,15 +32,15 @@
   --color-info-soft: rgba(90, 138, 196, 0.18);
   --color-inverse: #161616;
   --color-tab-active: #c8c8c8;
-  --color-button-primary-bg: #b8b8b8;
-  --color-button-primary-bg-hover: #c4c4c4;
+  --color-button-primary-bg: #a8a8a8;
+  --color-button-primary-bg-hover: #b4b4b4;
   --color-button-primary-ink: #242424;
   --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
   --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
   --color-button-secondary-text: #d2d2d2;
-  --color-button-disabled-bg: rgba(230, 230, 230, 0.075);
-  --color-button-disabled-text: #8f8f8f;
-  --color-button-disabled-border: rgba(230, 230, 230, 0.16);
+  --color-button-disabled-bg: #353535;
+  --color-button-disabled-text: #9a9a9a;
+  --color-button-disabled-border: rgba(230, 230, 230, 0.24);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
   --shadow-ring: 0 0 0 1px var(--color-line);
@@ -73,7 +73,7 @@ body,
 }
 
 body {
-  background: radial-gradient(ellipse at top, #2d2d2d 0%, #242424 100%);
+  background: radial-gradient(ellipse at top, #303030 0%, var(--color-bg) 100%);
   color: var(--color-ink);
   /* 排版细节 (Kami) */
   line-height: 1.55;
@@ -121,7 +121,7 @@ button {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.06;
+  opacity: 0.035;
 }
 
 .dotted-surface canvas {
@@ -3688,7 +3688,7 @@ button {
   gap: 4px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(230, 230, 230, 0.045);
   color: var(--color-subtle);
   font-weight: 400;
 }
@@ -3704,7 +3704,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(230, 230, 230, 0.026);
   border: 1px solid var(--color-line);
 }
 

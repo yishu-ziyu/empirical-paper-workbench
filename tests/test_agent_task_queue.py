@@ -2950,6 +2950,21 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn(".step-card__buttons .btn:disabled", self.react_styles_css)
         self.assertNotIn("rgba(255, 255, 255", self.react_styles_css)
 
+    def test_bdd_50_stage_navigation_explains_delivery_and_unlock_requirements(self) -> None:
+        """行为 50：阶段导航必须说明当前交付物和下一阶段解锁条件。"""
+        self.assertIn("stageRequirement", self.react_app)
+        self.assertIn("stageStatusLabel", self.react_app)
+        self.assertIn("先完成研究简报并保存 brief.md", self.react_app)
+        self.assertIn("先完成文献检索并保存 literature_review.md", self.react_app)
+        self.assertIn("showToast(stageRequirement(target))", self.react_app)
+        self.assertIn('data-testid="stage-guide"', self.react_app)
+        self.assertIn('data-testid="stage-unlock-requirement"', self.react_app)
+        self.assertIn('data-testid="stage-unlock-list"', self.react_app)
+        self.assertIn(".stage-panel__guide", self.react_styles_css)
+        self.assertIn(".stage-unlock-list", self.react_styles_css)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr));", self.react_styles_css)
+        self.assertIn(".stage-panel__guide,\n  .stage-unlock-list", self.react_styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

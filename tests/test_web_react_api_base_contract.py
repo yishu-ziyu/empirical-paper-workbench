@@ -20,6 +20,29 @@ class WebReactApiBaseContractTests(unittest.TestCase):
         self.assertIn("apiUrl", helper)
         self.assertIn("__VITE_API_BASE_URL", helper)
 
+    def test_bdd_03_url_api_base_overrides_env_for_live_acceptance(self) -> None:
+        """Given 验收 URL 指定 api_base When 环境变量仍是旧端口 Then URL 必须优先。"""
+
+        helper = (WEB_REACT_SRC / "lib" / "apiBase.ts").read_text(encoding="utf-8")
+        query_index = helper.index("const queryBase = queryApiBase();")
+        env_index = helper.index("const envBase = env[`VITE_${\"API_BASE_URL\"}`]?.trim();")
+
+        self.assertLess(query_index, env_index)
+        self.assertIn("if (queryBase) return queryBase;", helper)
+
+    def test_bdd_04_recovery_keeps_current_local_api_base_before_default(self) -> None:
+        """Given 当前页已经绑定本地后端 When 用户点击恢复 Then 不能强制写回默认端口。"""
+
+        recovery = (WEB_REACT_SRC / "components" / "ServiceConnectionRecovery.tsx").read_text(
+            encoding="utf-8"
+        )
+        app = (WEB_REACT_SRC / "App.tsx").read_text(encoding="utf-8")
+
+        self.assertIn("preferredLocalApiBase", recovery)
+        self.assertIn("setBrowserApiBase(preferredLocalApiBase)", recovery)
+        self.assertIn("targetApiBase", app)
+        self.assertIn('nextUrl.searchParams.set("api_base", targetApiBase)', app)
+
     def test_bdd_02_stage_panels_do_not_each_reimplement_api_base(self) -> None:
         """Given 多个阶段页面 When 请求后端 Then 不允许每个组件各自读取 env 拼地址。"""
 

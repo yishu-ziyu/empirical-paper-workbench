@@ -12,6 +12,10 @@ interface ServiceConnectionRecoveryProps {
 const LOCAL_START_COMMAND =
   "python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8765";
 
+function isLocalApiBase(value: string): boolean {
+  return /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(value.trim());
+}
+
 export function ServiceConnectionRecovery({
   message,
   currentApiBase,
@@ -23,9 +27,12 @@ export function ServiceConnectionRecovery({
   const resolvedApiBase = currentApiBase?.trim() || apiBase() || "同源服务";
   const healthEndpoint =
     resolvedApiBase === "同源服务" ? "/api/v1/health" : `${resolvedApiBase}/api/v1/health`;
+  const preferredLocalApiBase = isLocalApiBase(resolvedApiBase)
+    ? resolvedApiBase.replace(/\/+$/, "")
+    : DEFAULT_LOCAL_API_BASE;
 
   const useLocalBackend = () => {
-    setBrowserApiBase(DEFAULT_LOCAL_API_BASE);
+    setBrowserApiBase(preferredLocalApiBase);
     if (onUseLocalBackend) {
       void onUseLocalBackend();
       return;

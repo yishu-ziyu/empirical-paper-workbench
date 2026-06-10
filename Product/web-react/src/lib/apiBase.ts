@@ -12,12 +12,12 @@ function stripTrailingSlash(value: string): string {
 }
 
 function configuredApiBase(): string {
+  const queryBase = queryApiBase();
+  if (queryBase) return queryBase;
+
   const env = import.meta.env as Record<string, string | undefined>;
   const envBase = env[`VITE_${"API_BASE_URL"}`]?.trim();
   if (envBase) return stripTrailingSlash(envBase);
-
-  const queryBase = queryApiBase();
-  if (queryBase) return queryBase;
 
   const runtimeBase =
     typeof window !== "undefined" ? window.__VITE_API_BASE_URL?.trim() : "";

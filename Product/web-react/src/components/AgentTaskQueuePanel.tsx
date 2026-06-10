@@ -114,6 +114,30 @@ interface LlmInterventionHandoff {
   selection_source?: string;
 }
 
+interface LlmOrchestration {
+  call_stage?: string;
+  llm_role?: string;
+  deterministic_owner?: string;
+  current_provider?: {
+    provider_id?: string;
+    provider_name?: string;
+    model?: string;
+  };
+  selected_skill?: {
+    skill_id?: string;
+    name?: string;
+    stage?: string;
+    risk_level?: string;
+    selection_source?: string;
+  };
+  selection_reason?: string;
+  human_gate_required?: boolean;
+  human_gate?: string;
+  human_confirmation_required_before?: string[];
+  output_boundary?: string;
+  formal_write_allowed?: boolean;
+}
+
 interface SelectedExecutionBackend {
   id?: ExecutionBackendId | string;
   label?: string;
@@ -264,6 +288,7 @@ interface AgentTask {
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
   llm_intervention_handoff?: LlmInterventionHandoff;
+  llm_orchestration?: LlmOrchestration;
   llm_execution_preflight?: LlmExecutionPreflight;
   selected_backend?: SelectedExecutionBackend;
   backend_blocker?: ExecutionBackendBlocker;
@@ -890,6 +915,12 @@ function renderTaskSkillReview(
   const canWriteCanonical = skill?.canonical_policy?.auto_mode?.can_write_canonical;
   const packet = task.internal_skill_execution_packet;
   const internalSkillPacketReady = packet?.status === "draft_execution_packet_ready";
+  const orchestration = task.llm_orchestration;
+  const providerLabel =
+    orchestration?.current_provider?.provider_name ??
+    orchestration?.current_provider?.provider_id ??
+    "当前 LLM Supervisor";
+  const modelLabel = orchestration?.current_provider?.model ?? "按当前配置";
 
   return (
     <div className="agent-task-skill-review" data-testid="agent-task-skill-review">
@@ -904,6 +935,32 @@ function renderTaskSkillReview(
         </div>
         <span>{skill?.selection_source ?? handoff?.selection_source ?? "SupervisorPlan"}</span>
       </div>
+
+      {orchestration ? (
+        <div className="agent-task-llm-orchestration" data-testid="agent-task-llm-orchestration">
+          <span className="eyebrow">LLM 编排</span>
+          <dl>
+            <div>
+              <dt>调用时机</dt>
+              <dd>{orchestration.call_stage ?? handoff?.stage ?? "agent_task_queue"}</dd>
+            </div>
+            <div>
+              <dt>当前模型</dt>
+              <dd>
+                {providerLabel} · {modelLabel}
+              </dd>
+            </div>
+            <div>
+              <dt>选择理由</dt>
+              <dd>{orchestration.selection_reason || skillSelectionReason(skill, handoff)}</dd>
+            </div>
+            <div>
+              <dt>输出边界</dt>
+              <dd>{orchestration.output_boundary ?? executionBoundary}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
 
       <div className="agent-task-skill-review__grid">
         <div>

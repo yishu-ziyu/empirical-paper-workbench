@@ -221,6 +221,23 @@ def write_formal_pdf_final_approval_outputs(
 def render_review_markdown(report: dict[str, Any]) -> str:
     blockers = report.get("blocking_reasons") or []
     blocker_lines = "\n".join(f"- `{item}`" for item in blockers) if blockers else "- 无"
+    llm_provider_snapshot = (
+        report.get("llm_provider_snapshot") if isinstance(report.get("llm_provider_snapshot"), dict) else {}
+    )
+    primary_provider = (
+        llm_provider_snapshot.get("primary_provider") if isinstance(llm_provider_snapshot.get("primary_provider"), dict) else {}
+    )
+    llm_lines = ""
+    if primary_provider:
+        llm_lines = f"""
+## LLM 判断来源
+
+- Provider：`{primary_provider.get("provider_name") or primary_provider.get("provider_id")}`
+- Model：`{primary_provider.get("model")}`
+- 选择来源：`{llm_provider_snapshot.get("selection", {}).get("source") if isinstance(llm_provider_snapshot.get("selection"), dict) else ""}`
+- 预检摘要：{report.get("llm_preflight_summary") or "无"}
+- 人工审阅提示：{report.get("llm_preflight_human_review_note") or "无"}
+"""
     return f"""# P5-E5 最终写回人工批准
 
 ## 当前状态
@@ -237,6 +254,7 @@ def render_review_markdown(report: dict[str, Any]) -> str:
 ## 阻断原因
 
 {blocker_lines}
+{llm_lines}
 
 ## 人工意见
 

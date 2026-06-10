@@ -2467,6 +2467,75 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertTrue((self.project_root / "Results" / "json" / "formal_pdf_final_writeback.json").exists())
         self.assertTrue((self.project_root / "Reviews" / "formal_pdf_final_writeback.md").exists())
 
+    def test_bdd_59a_final_pdf_approval_and_writeback_carry_llm_provider_snapshot(self) -> None:
+        """行为 59a：最终 PDF 批准和写回必须继续保留 LLM 判断来源。"""
+        self._approve_formal_writeback()
+        queue_path = self.project_root / "state" / "product" / "agent_task_queue.json"
+        queue = json.loads(queue_path.read_text(encoding="utf-8"))
+        task = queue["tasks"][0]
+        task["execution_result"] = {
+            "llm_execution_preflight": {
+                "schema_version": "p6.llm_execution_preflight.v1",
+                "summary": "LLM 已确认最终 PDF 可以进入人工批准。",
+                "backend_reason": "候选稿审阅通过后，最终写回仍要继承模型判断来源。",
+                "human_review_note": "批准前核对模型来源、候选稿边界和最终写回条件。",
+                "provider": {"provider_id": "openai", "model": "gpt-5.5"},
+                "provider_snapshot": {
+                    "ready": True,
+                    "primary_provider": {
+                        "provider_id": "openai",
+                        "provider_name": "OpenAI",
+                        "model": "gpt-5.5",
+                    },
+                    "selection": {"source": "runtime_preflight_call"},
+                    "attempt_count": 2,
+                },
+                "formal_write_allowed": False,
+            }
+        }
+        queue_path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "带 LLM 来源进入导出预检。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        export_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "带 LLM 来源生成 PDF 候选稿。"},
+        )
+        self.assertEqual(export_response.status_code, 200, msg=export_response.text)
+        review_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-review",
+            json={"note": "带 LLM 来源进入最终写回预检。"},
+        )
+        self.assertEqual(review_response.status_code, 200, msg=review_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/final-pdf-writeback",
+            json={"action": "approve", "note": "批准候选 PDF 写入最终包。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        approval = task["pdf_final_approval"]
+        writeback = task["pdf_final_writeback"]
+        self.assertEqual(approval["llm_provider_snapshot"]["primary_provider"]["provider_name"], "OpenAI")
+        self.assertEqual(approval["llm_provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
+        self.assertEqual(approval["llm_preflight_summary"], "LLM 已确认最终 PDF 可以进入人工批准。")
+        self.assertEqual(writeback["llm_provider_snapshot"]["primary_provider"]["provider_id"], "openai")
+        self.assertEqual(writeback["llm_provider_snapshot"]["selection"]["source"], "runtime_preflight_call")
+        self.assertEqual(writeback["llm_preflight_human_review_note"], "批准前核对模型来源、候选稿边界和最终写回条件。")
+
+        approval_report = json.loads((self.project_root / approval["artifact_path"]).read_text(encoding="utf-8"))
+        writeback_report = json.loads((self.project_root / writeback["artifact_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(approval_report["llm_provider_snapshot"]["primary_provider"]["provider_name"], "OpenAI")
+        self.assertEqual(writeback_report["llm_provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
+        approval_text = (self.project_root / approval["review_path"]).read_text(encoding="utf-8")
+        writeback_text = (self.project_root / writeback["review_path"]).read_text(encoding="utf-8")
+        self.assertIn("LLM 判断来源", approval_text)
+        self.assertIn("OpenAI", approval_text)
+        self.assertIn("gpt-5.5", writeback_text)
+
     def test_bdd_60_pdf_candidate_revision_decision_does_not_write_final_pdf(self) -> None:
         """行为 60：人工要求修订 PDF 候选稿时，只记录决定，不写入最终 PDF。"""
         self._prepare_pdf_candidate_reviewed_task()
@@ -3401,6 +3470,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("pdf_candidate_review?:", self.react_agent_task_queue)
         self.assertIn("task.pdf_candidate_review?.llm_provider_snapshot", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-pdf-candidate-review-llm", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-pdf-candidate__llm", self.react_styles_css)
+
+    def test_bdd_34c_frontend_final_pdf_approval_and_writeback_show_llm_provider_snapshot(self) -> None:
+        """行为 34c：前端最终 PDF 批准和写回卡片必须继续展示 LLM 来源。"""
+        self.assertIn("pdf_final_approval?:", self.react_agent_task_queue)
+        self.assertIn("pdf_final_writeback?:", self.react_agent_task_queue)
+        self.assertIn("task.pdf_final_approval?.llm_provider_snapshot", self.react_agent_task_queue)
+        self.assertIn("task.pdf_final_writeback?.llm_provider_snapshot", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-final-pdf-approval-llm", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-final-pdf-writeback-llm", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-pdf-candidate__llm", self.react_styles_css)
 
     def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:

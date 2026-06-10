@@ -738,6 +738,61 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "Codex 后端适合先生成可审阅代码草案。",
         )
 
+    def test_bdd_13c_llm_execution_preflight_persists_provider_snapshot(self) -> None:
+        """行为 13c：执行前 LLM 判断必须落盘当时使用的模型快照，便于之后审计。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/dispatch-review",
+            json={"action": "approve", "note": "验证模型审计快照"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/select-backend",
+            json={"backend_id": "codex"},
+        )
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+
+        with patch.object(
+            llm_client,
+            "chat_completion_with_fallback",
+            return_value=(
+                json.dumps(
+                    {
+                        "summary": "LLM 已确认本轮只能进入草案层。",
+                        "backend_reason": "Codex 适合先生成可审阅执行脚本。",
+                        "method_risk": ["缺少变量角色复核。"],
+                        "evidence_requirements": ["保留 LLM 预检和脚本草案。"],
+                        "handoff_to_backend": "生成草案，不写正式层。",
+                        "human_review_note": "人工确认后再执行真实回归。",
+                    },
+                    ensure_ascii=False,
+                ),
+                {
+                    "provider_id": "openai",
+                    "provider_name": "OpenAI",
+                    "model": "gpt-5.5",
+                    "api_type": "openai-compatible",
+                    "input_tokens": 120,
+                    "output_tokens": 80,
+                },
+            ),
+        ):
+            executed = self.client.post(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+            )
+
+        self.assertEqual(executed.status_code, 200, msg=executed.text)
+        preflight = executed.json()["execution_result"]["llm_execution_preflight"]
+        self.assertEqual(preflight["provider"]["provider_id"], "openai")
+        self.assertEqual(preflight["provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
+        self.assertEqual(preflight["provider_snapshot"]["selection"]["source"], "runtime_preflight_call")
+        self.assertTrue(preflight["provider_snapshot"]["ready"])
+        self.assertGreaterEqual(preflight["provider_snapshot"]["attempt_count"], 1)
+        saved = json.loads((self.project_root / preflight["artifact_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(saved["provider_snapshot"]["primary_provider"]["provider_id"], "openai")
+
     def test_bdd_13a_execution_requires_llm_supervisor_handoff_before_running(self) -> None:
         """行为 13a：执行实验前必须有 LLM Supervisor 交接，不能只靠工程后端直接跑。"""
         self._write_supervisor_plan(
@@ -3286,8 +3341,10 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
     def test_bdd_37ea_react_execution_result_shows_llm_preflight(self) -> None:
         """行为 37ea：每次实验执行后，React 队列必须展示 LLM 预检理由、风险和证据要求。"""
         self.assertIn("llm_execution_preflight", self.react_agent_task_queue)
+        self.assertIn("provider_snapshot", self.react_agent_task_queue)
         self.assertIn("LLM 实验预检", self.react_agent_task_queue)
         self.assertIn("模型", self.react_agent_task_queue)
+        self.assertIn("判断来源", self.react_agent_task_queue)
         self.assertIn("放行理由", self.react_agent_task_queue)
         self.assertIn("方法风险", self.react_agent_task_queue)
         self.assertIn("证据要求", self.react_agent_task_queue)
@@ -3304,6 +3361,7 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         )
         self.assertIn("data-testid=\"agent-task-llm-preflight\"", self.react_agent_task_queue)
         self.assertIn("agent-task-llm-preflight", self.react_styles_css)
+        self.assertIn("agent-task-llm-preflight__provider-snapshot", self.react_styles_css)
 
     def test_bdd_37f_react_task_queue_exposes_execution_result_review_gate(self) -> None:
         """行为 37f：候选来源种子包执行完成后，React 队列必须提供执行结果审阅门。"""

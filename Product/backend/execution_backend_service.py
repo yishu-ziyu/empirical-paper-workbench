@@ -363,6 +363,7 @@ def run_llm_execution_preflight(
         "method_id": method_id,
         "created_at": timestamp,
         "provider": provider,
+        "provider_snapshot": build_llm_preflight_provider_snapshot(provider),
         "summary": str(parsed.get("summary") or "LLM 已完成执行前预检。"),
         "backend_reason": str(parsed.get("backend_reason") or ""),
         "method_risk": _as_string_list(parsed.get("method_risk")),
@@ -463,6 +464,42 @@ def parse_llm_execution_preflight_output(raw_text: str) -> dict[str, Any]:
     return parsed
 
 
+def build_llm_preflight_provider_snapshot(provider: dict[str, Any]) -> dict[str, Any]:
+    runtime_provider = {
+        key: provider.get(key)
+        for key in ("provider_id", "provider_name", "model", "api_type", "input_tokens", "output_tokens")
+        if provider.get(key) is not None
+    }
+    attempts: list[dict[str, Any]] = []
+    for attempt in llm_client.build_default_llm_attempts():
+        provider_id = str(attempt.get("provider_id") or "")
+        if not provider_id:
+            continue
+        preset = llm_client.resolve_provider(provider_id)
+        attempts.append({
+            "provider_id": provider_id,
+            "provider_name": preset.name,
+            "model": str(attempt.get("model") or llm_client._provider_default_model(preset) or ""),
+            "api_type": preset.api_type,
+            "configured": llm_client._provider_has_key(provider_id, preset),
+            "current": provider_id == runtime_provider.get("provider_id"),
+        })
+    return {
+        "label": "LLM Supervisor",
+        "ready": bool(runtime_provider.get("provider_id")),
+        "primary_provider": runtime_provider,
+        "runtime_provider": runtime_provider,
+        "attempts": attempts,
+        "attempt_count": len(attempts),
+        "selection": {
+            "current_provider_id": str(runtime_provider.get("provider_id") or ""),
+            "current_model": str(runtime_provider.get("model") or ""),
+            "source": "runtime_preflight_call",
+            "fallback_chain_active": len(attempts) > 1,
+        },
+    }
+
+
 def compact_llm_execution_preflight(preflight: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": str(preflight.get("schema_version") or "p6.llm_execution_preflight.v1"),
@@ -470,6 +507,7 @@ def compact_llm_execution_preflight(preflight: dict[str, Any]) -> dict[str, Any]
         "backend_id": str(preflight.get("backend_id") or ""),
         "method_id": str(preflight.get("method_id") or ""),
         "provider": preflight.get("provider") if isinstance(preflight.get("provider"), dict) else {},
+        "provider_snapshot": preflight.get("provider_snapshot") if isinstance(preflight.get("provider_snapshot"), dict) else {},
         "summary": str(preflight.get("summary") or ""),
         "backend_reason": str(preflight.get("backend_reason") or ""),
         "method_risk": _as_string_list(preflight.get("method_risk")),

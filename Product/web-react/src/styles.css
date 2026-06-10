@@ -2091,6 +2091,13 @@ button {
   color: var(--color-strong);
 }
 
+.agent-task-llm-preflight__provider-snapshot {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .agent-task-llm-preflight__grid,
 .agent-task-llm-preflight__lists {
   display: grid;

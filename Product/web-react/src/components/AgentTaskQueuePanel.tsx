@@ -170,8 +170,25 @@ interface LlmExecutionPreflight {
   next_action?: string;
   provider?: {
     provider_id?: string;
+    provider_name?: string;
     model?: string;
     fallback_used?: boolean;
+  };
+  provider_snapshot?: {
+    ready?: boolean;
+    attempt_count?: number;
+    primary_provider?: {
+      provider_id?: string;
+      provider_name?: string;
+      model?: string;
+      api_type?: string;
+    };
+    selection?: {
+      current_provider_id?: string;
+      current_model?: string;
+      source?: string;
+      fallback_chain_active?: boolean;
+    };
   };
   summary?: string;
   backend_reason?: string;
@@ -2247,6 +2264,19 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                               <p className="agent-task-llm-preflight__blocked">
                                 {llmExecutionPreflight.message || "LLM Supervisor 暂时不可用。"}
                                 {" "}恢复 LLM Supervisor 后重试。
+                              </p>
+                            ) : null}
+                            {llmExecutionPreflight.provider_snapshot?.primary_provider ? (
+                              <p className="agent-task-llm-preflight__provider-snapshot">
+                                判断来源：
+                                {llmExecutionPreflight.provider_snapshot.primary_provider.provider_name ??
+                                  llmExecutionPreflight.provider_snapshot.primary_provider.provider_id ??
+                                  "LLM Supervisor"}
+                                {" / "}
+                                {llmExecutionPreflight.provider_snapshot.primary_provider.model ?? "未记录模型"}
+                                {" · 备用链 "}
+                                {llmExecutionPreflight.provider_snapshot.attempt_count ?? 0}
+                                {" 个"}
                               </p>
                             ) : null}
                             <div className="agent-task-llm-preflight__grid">

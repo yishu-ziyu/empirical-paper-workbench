@@ -156,8 +156,11 @@ from Product.backend.task_dispatch_service import (
     review_project_agent_task_dispatch,
 )
 from Product.backend.trace_learning_service import (
+    TraceLearningProposalBlockedError,
     capture_project_trace_learning_bad_case,
     get_project_trace_learning_bad_cases,
+    generate_project_trace_learning_regression_proposal,
+    get_project_trace_learning_regression_proposals,
 )
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
@@ -1137,6 +1140,24 @@ def api_v1_project_trace_learning_bad_cases(project_id: str) -> dict:
 def api_v1_capture_project_trace_learning_bad_case(project_id: str, payload: TraceLearningBadCasePayload) -> dict:
     try:
         return capture_project_trace_learning_bad_case(PRODUCT_ROOT, REPO_ROOT, project_id, payload.model_dump())
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/trace-learning/regression-proposals")
+def api_v1_project_trace_learning_regression_proposals(project_id: str) -> dict:
+    try:
+        return get_project_trace_learning_regression_proposals(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/trace-learning/regression-proposals", status_code=201)
+def api_v1_generate_project_trace_learning_regression_proposal(project_id: str) -> dict:
+    try:
+        return generate_project_trace_learning_regression_proposal(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except TraceLearningProposalBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 

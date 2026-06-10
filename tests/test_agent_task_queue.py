@@ -2315,6 +2315,65 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertIn("PDF 候选稿机器审阅", review_text)
         self.assertIn("最终写回预检", review_text)
 
+    def test_bdd_56a_pdf_candidate_review_carries_llm_provider_snapshot_to_final_preflight(self) -> None:
+        """行为 56a：候选稿审阅和最终写回预检必须继续保留 LLM 判断来源。"""
+        self._approve_formal_writeback()
+        queue_path = self.project_root / "state" / "product" / "agent_task_queue.json"
+        queue = json.loads(queue_path.read_text(encoding="utf-8"))
+        task = queue["tasks"][0]
+        task["execution_result"] = {
+            "llm_execution_preflight": {
+                "schema_version": "p6.llm_execution_preflight.v1",
+                "summary": "LLM 已确认候选稿可以进入最终写回预检。",
+                "backend_reason": "候选稿审阅只能生成最终批准门槛，不能直接写入终稿。",
+                "human_review_note": "最终批准前核对模型来源、候选稿边界和写回条件。",
+                "provider": {"provider_id": "openai", "model": "gpt-5.5"},
+                "provider_snapshot": {
+                    "ready": True,
+                    "primary_provider": {
+                        "provider_id": "openai",
+                        "provider_name": "OpenAI",
+                        "model": "gpt-5.5",
+                    },
+                    "selection": {"source": "runtime_preflight_call"},
+                    "attempt_count": 2,
+                },
+                "formal_write_allowed": False,
+            }
+        }
+        queue_path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "记录 LLM 判断来源后进入候选稿导出。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        export_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "生成带 LLM 来源的 PDF 候选稿。"},
+        )
+        self.assertEqual(export_response.status_code, 200, msg=export_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-review",
+            json={"note": "候选稿审阅继续保留模型来源。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        review = task["pdf_candidate_review"]
+        self.assertEqual(review["llm_provider_snapshot"]["primary_provider"]["provider_name"], "OpenAI")
+        self.assertEqual(review["llm_provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
+        self.assertEqual(review["llm_preflight_summary"], "LLM 已确认候选稿可以进入最终写回预检。")
+        review_report = json.loads((self.project_root / review["artifact_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(review_report["llm_provider_snapshot"]["selection"]["source"], "runtime_preflight_call")
+        final_preflight = json.loads((self.project_root / review["final_preflight_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(final_preflight["llm_provider_snapshot"]["primary_provider"]["provider_id"], "openai")
+        self.assertEqual(final_preflight["llm_preflight_human_review_note"], "最终批准前核对模型来源、候选稿边界和写回条件。")
+        review_text = (self.project_root / review["review_path"]).read_text(encoding="utf-8")
+        self.assertIn("LLM 判断来源", review_text)
+        self.assertIn("OpenAI", review_text)
+        self.assertIn("gpt-5.5", review_text)
+
     def test_bdd_57_pdf_candidate_review_is_blocked_before_candidate_export(self) -> None:
         """行为 57：没有 PDF 候选稿时，队列不能生成候选稿审阅或最终写回预检。"""
         self._approve_formal_writeback()
@@ -3336,6 +3395,13 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-queue-pdf-candidate__llm", self.react_styles_css)
         self.assertIn("审批账本", self.react_agent_task_queue)
         self.assertIn("docx 仍交给后续导出预检处理", self.react_agent_task_queue)
+
+    def test_bdd_34b_frontend_pdf_candidate_review_shows_llm_provider_snapshot(self) -> None:
+        """行为 34b：前端候选稿审阅区必须继续展示最终写回预检继承的 LLM 来源。"""
+        self.assertIn("pdf_candidate_review?:", self.react_agent_task_queue)
+        self.assertIn("task.pdf_candidate_review?.llm_provider_snapshot", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-pdf-candidate-review-llm", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-pdf-candidate__llm", self.react_styles_css)
 
     def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:
         """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供本地服务恢复动作。"""

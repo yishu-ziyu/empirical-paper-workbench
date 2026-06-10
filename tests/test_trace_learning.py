@@ -224,6 +224,137 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         after = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
         self.assertEqual(before, after)
 
+    def test_bdd_6a_review_regression_proposal_records_human_decision(self) -> None:
+        """Given 待审阅回归建议；When 人工批准；Then 只记录审阅决定和下一步补丁状态。"""
+        created = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/bad-cases",
+            json={
+                "stage": "brief",
+                "user_feedback": "这里把当前题目误判成旧题目。",
+                "expected_behavior": "生成回归测试补丁前必须先人工审阅。",
+                "fix_layer": "decision_rule",
+            },
+        )
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        proposed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals"
+        )
+        self.assertEqual(proposed.status_code, 201, msg=proposed.text)
+        proposal_id = proposed.json()["regression_proposal"]["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{proposal_id}/review",
+            json={
+                "decision": "approve",
+                "reviewer": "mahaoxuan",
+                "note": "可以进入回归测试补丁，但不要自动改正式规则。",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        review = response.json()["regression_proposal_review"]
+        self.assertEqual(review["proposal_id"], proposal_id)
+        self.assertEqual(review["decision"], "approve")
+        self.assertEqual(review["status"], "approved")
+        self.assertEqual(review["reviewer"], "mahaoxuan")
+        self.assertEqual(review["next_action"], "prepare_regression_test_patch")
+        self.assertFalse(review["writes_formal_layer"])
+        self.assertFalse(review["canonical_rule_write_allowed"])
+        self.assertFalse(review["test_file_write_allowed"])
+        self.assertEqual(review["artifact_path"], "state/product/trace_learning_regression_proposal_reviews.jsonl")
+
+        review_path = self.project_root / "state" / "product" / "trace_learning_regression_proposal_reviews.jsonl"
+        self.assertTrue(review_path.exists())
+        saved = json.loads(review_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(saved["id"], review["id"])
+
+    def test_bdd_6b_get_regression_proposals_restores_review_records(self) -> None:
+        """Given 已审阅回归建议；When 重新读取建议；Then 返回审阅账本和每个建议的最新状态。"""
+        created = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/bad-cases",
+            json={
+                "stage": "search",
+                "user_feedback": "检索结果没有围绕当前题目。",
+                "expected_behavior": "先生成可审阅的回归测试建议。",
+                "fix_layer": "retrieval",
+            },
+        )
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        proposed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals"
+        )
+        self.assertEqual(proposed.status_code, 201, msg=proposed.text)
+        proposal_id = proposed.json()["regression_proposal"]["id"]
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{proposal_id}/review",
+            json={"decision": "request_revision", "reviewer": "mahaoxuan", "note": "需要把断言写得更窄。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+
+        response = self.client.get(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals"
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        trace_learning = response.json()["trace_learning"]
+        self.assertEqual(trace_learning["proposal_count"], 1)
+        self.assertEqual(trace_learning["review_count"], 1)
+        self.assertEqual(trace_learning["proposal_reviews"][0]["decision"], "request_revision")
+        self.assertEqual(trace_learning["proposal_reviews"][0]["status"], "needs_revision")
+        self.assertEqual(trace_learning["review_status_by_proposal_id"][proposal_id], "needs_revision")
+
+    def test_bdd_6c_review_requires_existing_regression_proposal(self) -> None:
+        """Given 不存在的建议编号；When 试图审阅；Then API 阻止伪造审阅账本。"""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/missing/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "missing"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "trace_learning_proposal_not_found")
+        review_path = self.project_root / "state" / "product" / "trace_learning_regression_proposal_reviews.jsonl"
+        self.assertFalse(review_path.exists())
+
+    def test_bdd_6d_regression_proposal_review_does_not_mutate_formal_research_states(self) -> None:
+        """Given 正式层状态已存在；When 审阅回归建议；Then 仍然只写审阅账本。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        protected_states = {
+            "research_question.json": {"question": "父母教育水平对子女工资水平的影响"},
+            "variable_roles.json": {"roles": {"outcome": ["wage"], "treatment": ["parent_edu"]}},
+            "design_spec.json": {"model": {"estimator": "ols"}},
+            "run_plan.json": {"tasks": [{"id": "baseline"}]},
+            "supervisor_plan.json": {"status": "approved", "can_dispatch": True},
+            "agent_task_queue.json": {"status": "ready_for_dispatch", "tasks": []},
+        }
+        for name, payload in protected_states.items():
+            (state_dir / name).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        created = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/bad-cases",
+            json={
+                "stage": "brief",
+                "user_feedback": "这里把当前题目误判成旧题目。",
+                "expected_behavior": "审阅只决定是否准备补丁。",
+                "fix_layer": "decision_rule",
+            },
+        )
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        proposed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals"
+        )
+        self.assertEqual(proposed.status_code, 201, msg=proposed.text)
+        proposal_id = proposed.json()["regression_proposal"]["id"]
+        before = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{proposal_id}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "进入补丁准备。"},
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        after = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+        self.assertEqual(before, after)
+
     def test_bdd_7_missing_user_feedback_is_rejected_without_creating_ledger(self) -> None:
         """Given 没有用户反馈正文；When 试图记录；Then API 拒绝且不创建账本。"""
         response = self.client.post(
@@ -310,6 +441,14 @@ class TraceLearningFrontendContractTests(unittest.TestCase):
             self.agent_task_queue.find("trace-learning-feedback__actions"),
             self.agent_task_queue.find("trace-learning-regression-proposal"),
         )
+
+    def test_bdd_7_agent_queue_exposes_regression_proposal_review_boundary(self) -> None:
+        """Given 回归建议等待人工处理；When 用户查看队列页；Then 页面说明审阅不会自动写测试或规则。"""
+        self.assertIn("trace-learning-regression-proposal-review", self.agent_task_queue)
+        self.assertIn("/trace-learning/regression-proposals/${", self.agent_task_queue)
+        self.assertIn("/review", self.agent_task_queue)
+        self.assertIn("审阅回归建议", self.agent_task_queue)
+        self.assertIn("不会自动写测试文件", self.agent_task_queue)
 
 
 if __name__ == "__main__":

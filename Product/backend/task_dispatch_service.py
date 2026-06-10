@@ -43,6 +43,7 @@ def review_project_agent_task_dispatch(
     queue = normalize_agent_task_queue(load_required_queue(project_root))
     task = find_agent_task(queue, task_id)
     timestamp = utc_now()
+    require_internal_skill_execution_packet_before_dispatch(task, action)
     apply_dispatch_review(task, action, note, timestamp)
     queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
     queue["updated_at"] = timestamp
@@ -70,6 +71,23 @@ def find_agent_task(queue: dict[str, Any], task_id: str) -> dict[str, Any]:
         "agent_task_not_found",
         f"Agent task {task_id} does not exist.",
     )
+
+
+def require_internal_skill_execution_packet_before_dispatch(task: dict[str, Any], action: str) -> None:
+    if action != "approve" or not has_internal_skill_binding(task):
+        return
+    packet = task.get("internal_skill_execution_packet")
+    if isinstance(packet, dict) and packet.get("status") == "draft_execution_packet_ready":
+        return
+    raise AgentTaskDispatchReviewError(
+        "internal_skill_execution_packet_required",
+        "Internal skill task must generate a reviewable execution packet before dispatch approval.",
+    )
+
+
+def has_internal_skill_binding(task: dict[str, Any]) -> bool:
+    bindings = task.get("internal_skill_bindings")
+    return isinstance(bindings, list) and any(isinstance(binding, dict) for binding in bindings)
 
 
 def apply_dispatch_review(task: dict[str, Any], action: str, note: str, timestamp: str) -> None:

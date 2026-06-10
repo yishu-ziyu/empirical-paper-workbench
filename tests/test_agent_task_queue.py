@@ -2058,6 +2058,53 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(preflight_artifact["agent_followups"], [])
         self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.docx").exists())
 
+    def test_bdd_52a_export_preflight_carries_llm_provider_snapshot(self) -> None:
+        """行为 52a：导出预检台必须继承前序 LLM 判断来源，方便人工验收模型介入。"""
+        self._approve_formal_writeback()
+        queue_path = self.project_root / "state" / "product" / "agent_task_queue.json"
+        queue = json.loads(queue_path.read_text(encoding="utf-8"))
+        task = queue["tasks"][0]
+        task["execution_result"] = {
+            "llm_execution_preflight": {
+                "schema_version": "p6.llm_execution_preflight.v1",
+                "summary": "LLM 已确认执行链路。",
+                "backend_reason": "题目需要先完成草案层分析，再进入导出预检。",
+                "human_review_note": "导出前核对模型判断、正式层边界和证据要求。",
+                "provider": {"provider_id": "openai", "model": "gpt-5.5"},
+                "provider_snapshot": {
+                    "ready": True,
+                    "primary_provider": {
+                        "provider_id": "openai",
+                        "provider_name": "OpenAI",
+                        "model": "gpt-5.5",
+                    },
+                    "selection": {"source": "runtime_preflight_call"},
+                    "attempt_count": 2,
+                },
+                "formal_write_allowed": False,
+            }
+        }
+        queue_path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "检查导出前模型判断来源。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        preflight = task["formal_export_preflight"]
+        self.assertEqual(preflight["llm_provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
+        self.assertEqual(preflight["llm_provider_snapshot"]["selection"]["source"], "runtime_preflight_call")
+        self.assertEqual(preflight["llm_preflight_summary"], "LLM 已确认执行链路。")
+        preflight_artifact = json.loads((self.project_root / preflight["artifact_path"]).read_text(encoding="utf-8"))
+        self.assertEqual(preflight_artifact["llm_provider_snapshot"]["primary_provider"]["provider_id"], "openai")
+        self.assertEqual(preflight_artifact["llm_preflight_human_review_note"], "导出前核对模型判断、正式层边界和证据要求。")
+        review_text = (self.project_root / preflight["review_path"]).read_text(encoding="utf-8")
+        self.assertIn("LLM 判断来源", review_text)
+        self.assertIn("OpenAI", review_text)
+        self.assertIn("gpt-5.5", review_text)
+
     def test_bdd_53_export_preflight_turns_missing_sections_into_agent_followups(self) -> None:
         """行为 53：导出预检发现正式章节缺失时，必须转成后续 Agent 任务，不只显示错误。"""
         writeback = self._approve_formal_writeback()
@@ -3182,6 +3229,13 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("导出预检台", self.react_agent_task_queue)
         self.assertIn("formal_export_preflight", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-export-preflight", self.react_styles_css)
+
+    def test_bdd_32a_frontend_export_preflight_shows_llm_provider_snapshot(self) -> None:
+        """行为 32a：前端导出预检台必须显示本轮 LLM 判断来源。"""
+        self.assertIn("llm_provider_snapshot", self.react_agent_task_queue)
+        self.assertIn("llm_preflight_summary", self.react_agent_task_queue)
+        self.assertIn("LLM 判断来源", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-export-preflight__llm", self.react_styles_css)
 
     def test_bdd_33_react_frontend_can_pin_local_api_base_from_url(self) -> None:
         """行为 33：本地验收时，前端必须能从 URL 绑定真实后端地址。"""

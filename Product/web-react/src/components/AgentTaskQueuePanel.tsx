@@ -330,6 +330,9 @@ interface AgentTask {
     writes_formal_layer?: boolean;
     wrote_pdf?: boolean;
     wrote_docx?: boolean;
+    llm_provider_snapshot?: LlmExecutionPreflight["provider_snapshot"];
+    llm_preflight_summary?: string;
+    llm_preflight_human_review_note?: string;
   };
   pdf_candidate_export?: {
     status?: string;
@@ -2727,6 +2730,27 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         </div>
                         {task.formal_export_preflight?.artifact_path ? <code>{task.formal_export_preflight.artifact_path}</code> : null}
                         {task.formal_export_preflight?.review_path ? <code>{task.formal_export_preflight.review_path}</code> : null}
+                        {task.formal_export_preflight?.llm_provider_snapshot?.primary_provider ? (
+                          <div
+                            className="agent-task-queue-export-preflight__llm"
+                            data-testid="agent-task-queue-export-preflight-llm"
+                          >
+                            <strong>LLM 判断来源</strong>
+                            <p>
+                              {task.formal_export_preflight.llm_provider_snapshot.primary_provider.provider_name ??
+                                task.formal_export_preflight.llm_provider_snapshot.primary_provider.provider_id ??
+                                "LLM Supervisor"}
+                              {" / "}
+                              {task.formal_export_preflight.llm_provider_snapshot.primary_provider.model ?? "未记录模型"}
+                              {" · 备用链 "}
+                              {task.formal_export_preflight.llm_provider_snapshot.attempt_count ?? 0}
+                              {" 个"}
+                            </p>
+                            {task.formal_export_preflight.llm_preflight_summary ? (
+                              <small>{task.formal_export_preflight.llm_preflight_summary}</small>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {(task.blockers ?? []).length > 0 ? (
                           <div className="agent-task-queue-export-preflight__blockers">
                             <strong>需要先处理</strong>

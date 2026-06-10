@@ -1,17 +1,17 @@
 /**
  * SystemStatusBar — Task 41 状态栏.
  *
- * 顶部常驻 4 个 pill: 能力 · 成本 · 产物 · 审计.
+ * 顶部常驻 5 个 pill: 能力 · 成本 · 产物 · 审计 · LLM.
  * - 每 30s 刷新一次当前项目状态
  * - 任一字段为 null → 显示 "—"
- * - 点击 pill 展开详情 (4 个 section: capabilities / cost / artifacts / observability)
+ * - 点击 pill 展开详情 (capabilities / cost / artifacts / observability / llm)
  *
  * 设计原则 (Tufte § chartjunk):
  * - 默认态: 4 pill 一行, 不带边框背景, 极简
  * - 展开态: 网格 2 列, 每列 2 张详情卡
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, ChevronDown, ChevronUp, Cpu, DollarSign, FileText, ShieldCheck } from "lucide-react";
+import { Box, Brain, ChevronDown, ChevronUp, Cpu, DollarSign, FileText, ShieldCheck } from "lucide-react";
 import { apiUrl } from "../lib/apiBase";
 import { cn } from "../lib/cn";
 
@@ -33,6 +33,29 @@ interface SystemStatus {
     created_at: string;
   }>;
   cost_breakdown?: Array<{ service: string; amount: number }>;
+}
+
+interface LlmSupervisorStatus {
+  label: string;
+  ready: boolean;
+  primary_provider?: {
+    provider_id?: string;
+    provider_name?: string;
+    model?: string;
+    configured?: boolean;
+  };
+  attempts?: Array<{
+    provider_id: string;
+    provider_name: string;
+    model: string;
+    api_key_env: string;
+    configured: boolean;
+  }>;
+  primary_action?: {
+    id: string;
+    label: string;
+    hint: string;
+  };
 }
 
 interface SystemStatusBarProps {
@@ -63,8 +86,33 @@ function obsGlyph(status: string | null): string {
   return status;
 }
 
+function llmGlyph(status: LlmSupervisorStatus | null): string {
+  if (!status) return "—";
+  return status.ready ? "ready" : "待配置";
+}
+
+function llmModelLabel(status: LlmSupervisorStatus | null): string {
+  if (!status?.primary_provider) return "未连接模型";
+  const provider = status.primary_provider.provider_name || status.primary_provider.provider_id;
+  const model = status.primary_provider.model || "已配置模型";
+  return provider ? `${provider} · ${model}` : model;
+}
+
+function llmCompactLabel(status: LlmSupervisorStatus | null): string {
+  if (!status?.primary_provider) return "未连接";
+  const provider = status.primary_provider.provider_name || status.primary_provider.provider_id;
+  const model = status.primary_provider.model;
+  if (provider && model) return `${provider} · ${model}`;
+  return provider || model || "已连接";
+}
+
+function llmConfiguredAttempts(status: LlmSupervisorStatus | null): LlmSupervisorStatus["attempts"] {
+  return (status?.attempts ?? []).filter((attempt) => attempt.configured);
+}
+
 export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }: SystemStatusBarProps) {
   const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [llmStatus, setLlmStatus] = useState<LlmSupervisorStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -90,6 +138,21 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setFetchError(SERVICE_ERROR_MESSAGE);
+    }
+
+    try {
+      const llmResp = await fetch(apiUrl("/api/v1/providers/llm-supervisor"), {
+        method: "GET",
+        signal: controller.signal,
+      });
+      if (llmResp.ok) {
+        const llmData: LlmSupervisorStatus = await llmResp.json();
+        setLlmStatus(llmData);
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        setLlmStatus(null);
+      }
     }
   }, [projectId, topicSlug]);
 
@@ -136,6 +199,11 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
           <ShieldCheck size={13} aria-hidden="true" />
           <strong data-testid="status-pill-obs-glyph">{obsGlyph(status?.obs_status ?? null)}</strong>
           <span>审计</span>
+        </span>
+        <span className="system-status-bar__pill" data-testid="status-pill-llm">
+          <Brain size={13} aria-hidden="true" />
+          <strong data-testid="status-pill-llm-glyph">{llmGlyph(llmStatus)}</strong>
+          <span data-testid="status-pill-llm-model">{llmCompactLabel(llmStatus)}</span>
         </span>
         {expanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
       </button>
@@ -200,6 +268,38 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
             <p className="system-status-bar__obs">
               状态：<strong>{status?.obs_status ?? "—"}</strong>
             </p>
+          </DetailSection>
+
+          <DetailSection
+            testId="status-detail-llm"
+            title="LLM Supervisor"
+            icon={<Brain size={14} />}
+            empty={!llmStatus}
+          >
+            <p className="system-status-bar__obs">
+              主模型：<strong>{llmModelLabel(llmStatus)}</strong>
+            </p>
+            {llmConfiguredAttempts(llmStatus).length > 1 ? (
+              <div className="system-status-bar__obs">
+                <span>备用链：</span>
+                <ul className="system-status-bar__list system-status-bar__list--compact">
+                  {llmConfiguredAttempts(llmStatus)
+                    .slice(1, 5)
+                    .map((attempt) => (
+                      <li key={`${attempt.provider_id}-${attempt.model}`}>
+                        <code>{attempt.provider_name || attempt.provider_id}</code>
+                        <span>{attempt.model}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            <p className="system-status-bar__obs">
+              探测入口：<code>/api/v1/providers/llm-supervisor/probe</code>
+            </p>
+            {llmStatus?.primary_action?.hint ? (
+              <p className="system-status-bar__obs">{llmStatus.primary_action.hint}</p>
+            ) : null}
           </DetailSection>
         </div>
       ) : null}

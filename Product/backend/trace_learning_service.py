@@ -17,6 +17,9 @@ TRACE_LEARNING_REGRESSION_PROPOSAL_REVIEWS_PATH = Path(
 TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSALS_PATH = Path(
     "state/product/trace_learning_regression_test_patch_proposals.jsonl"
 )
+TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH = Path(
+    "state/product/trace_learning_regression_test_patch_proposal_reviews.jsonl"
+)
 ALLOWED_TRACE_LEARNING_FIX_LAYERS = [
     "prompt",
     "skill_playbook",
@@ -52,6 +55,10 @@ def trace_learning_regression_proposal_reviews_path(project_root: Path) -> Path:
 
 def trace_learning_regression_test_patch_proposals_path(project_root: Path) -> Path:
     return project_root / TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSALS_PATH
+
+
+def trace_learning_regression_test_patch_proposal_reviews_path(project_root: Path) -> Path:
+    return project_root / TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH
 
 
 def capture_project_trace_learning_bad_case(
@@ -187,13 +194,36 @@ def get_project_trace_learning_regression_proposals(product_root: Path, repo_roo
     project_root = Path(project.get("project_root") or project["root"]).resolve()
     path = trace_learning_regression_proposals_path(project_root)
     reviews_path = trace_learning_regression_proposal_reviews_path(project_root)
+    patch_proposals_path = trace_learning_regression_test_patch_proposals_path(project_root)
+    patch_reviews_path = trace_learning_regression_test_patch_proposal_reviews_path(project_root)
     proposals = load_trace_learning_regression_proposals(path)
     reviews = load_trace_learning_regression_proposal_reviews(reviews_path)
     proposal_ids = {str(proposal.get("id")) for proposal in proposals}
     proposal_reviews = [review for review in reviews if str(review.get("proposal_id")) in proposal_ids]
+    patch_proposals = [
+        patch_proposal
+        for patch_proposal in load_trace_learning_regression_test_patch_proposals(patch_proposals_path)
+        if str(patch_proposal.get("proposal_id")) in proposal_ids
+    ]
+    patch_proposal_ids = {str(patch_proposal.get("id")) for patch_proposal in patch_proposals}
+    patch_reviews = [
+        review
+        for review in load_trace_learning_regression_test_patch_proposal_reviews(patch_reviews_path)
+        if str(review.get("proposal_id")) in patch_proposal_ids
+    ]
     summary = build_trace_learning_regression_proposal_summary(path, len(proposals), proposal_reviews)
     summary["regression_proposals"] = enrich_regression_proposals_with_review_status(proposals, proposal_reviews)
     summary["proposal_reviews"] = proposal_reviews
+    summary["regression_test_patch_proposals"] = enrich_regression_test_patch_proposals_with_review_status(
+        patch_proposals,
+        patch_reviews,
+    )
+    summary["regression_test_patch_proposal_reviews"] = patch_reviews
+    summary["regression_test_patch_proposal_count"] = len(patch_proposals)
+    summary["regression_test_patch_proposal_review_count"] = len(patch_reviews)
+    summary["regression_test_patch_proposal_review_status_by_proposal_id"] = latest_review_status_by_proposal_id(
+        patch_reviews
+    )
     return {"project_id": project["id"], "trace_learning": summary}
 
 
@@ -289,15 +319,28 @@ def generate_project_trace_learning_regression_test_patch_proposal(
         item for item in existing_patch_proposals if str(item.get("proposal_id") or "") == proposal_id
     ]
     if existing_for_proposal:
+        patch_reviews_path = trace_learning_regression_test_patch_proposal_reviews_path(project_root)
+        patch_reviews = load_trace_learning_regression_test_patch_proposal_reviews(patch_reviews_path)
+        enriched_patch_proposals = enrich_regression_test_patch_proposals_with_review_status(
+            existing_patch_proposals,
+            patch_reviews,
+        )
         patch_proposal = existing_for_proposal[-1]
+        enriched_patch_proposal = next(
+            (item for item in enriched_patch_proposals if str(item.get("id")) == str(patch_proposal.get("id"))),
+            patch_proposal,
+        )
         summary = build_trace_learning_regression_test_patch_proposal_summary(
             patch_proposals_path,
             len(existing_patch_proposals),
+            patch_reviews,
         )
-        summary["latest_patch_proposal"] = patch_proposal
+        summary["latest_patch_proposal"] = enriched_patch_proposal
+        summary["regression_test_patch_proposals"] = enriched_patch_proposals
+        summary["proposal_reviews"] = patch_reviews
         return {
             "project_id": project["id"],
-            "regression_test_patch_proposal": patch_proposal,
+            "regression_test_patch_proposal": enriched_patch_proposal,
             "trace_learning": summary,
         }
 
@@ -336,6 +379,73 @@ def generate_project_trace_learning_regression_test_patch_proposal(
     return {
         "project_id": project["id"],
         "regression_test_patch_proposal": patch_proposal,
+        "trace_learning": summary,
+    }
+
+
+def review_project_trace_learning_regression_test_patch_proposal(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    patch_proposal_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    patch_proposals_path = trace_learning_regression_test_patch_proposals_path(project_root)
+    reviews_path = trace_learning_regression_test_patch_proposal_reviews_path(project_root)
+    patch_proposals = load_trace_learning_regression_test_patch_proposals(patch_proposals_path)
+    patch_proposal = next((item for item in patch_proposals if str(item.get("id")) == patch_proposal_id), None)
+    if patch_proposal is None:
+        raise TraceLearningProposalBlockedError(
+            "trace_learning_test_patch_proposal_not_found",
+            f"Trace Learning test patch proposal {patch_proposal_id} does not exist.",
+        )
+
+    existing_reviews = load_trace_learning_regression_test_patch_proposal_reviews(reviews_path)
+    decision = normalize_review_decision(payload.get("decision"))
+    review = {
+        "id": build_regression_test_patch_proposal_review_id(existing_reviews, patch_proposal_id),
+        "trace_learning_version": 1,
+        "status": status_for_review_decision(decision),
+        "created_at": utc_now(),
+        "project_id": project["id"],
+        "proposal_id": patch_proposal_id,
+        "source_regression_proposal_id": patch_proposal.get("proposal_id"),
+        "decision": decision,
+        "reviewer": str(payload.get("reviewer") or "human"),
+        "note": str(payload.get("note") or ""),
+        "writes_formal_layer": False,
+        "canonical_rule_write_allowed": False,
+        "test_file_write_allowed": False,
+        "artifact_path": TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH.as_posix(),
+        "next_action": next_action_for_test_patch_review_decision(decision),
+    }
+
+    reviews_path.parent.mkdir(parents=True, exist_ok=True)
+    with reviews_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(review, ensure_ascii=False, sort_keys=True) + "\n")
+
+    proposal_reviews = existing_reviews + [review]
+    enriched_patch_proposals = enrich_regression_test_patch_proposals_with_review_status(
+        patch_proposals,
+        proposal_reviews,
+    )
+    enriched_patch_proposal = next(
+        (item for item in enriched_patch_proposals if str(item.get("id")) == patch_proposal_id),
+        patch_proposal,
+    )
+    summary = build_trace_learning_regression_test_patch_proposal_summary(
+        patch_proposals_path,
+        len(patch_proposals),
+        proposal_reviews,
+    )
+    summary["regression_test_patch_proposals"] = enriched_patch_proposals
+    summary["proposal_reviews"] = proposal_reviews
+    return {
+        "project_id": project["id"],
+        "regression_test_patch_proposal": enriched_patch_proposal,
+        "regression_test_patch_proposal_review": review,
         "trace_learning": summary,
     }
 
@@ -380,6 +490,16 @@ def load_trace_learning_regression_test_patch_proposals(path: Path) -> list[dict
     return patch_proposals
 
 
+def load_trace_learning_regression_test_patch_proposal_reviews(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    reviews: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            reviews.append(json.loads(line))
+    return reviews
+
+
 def build_trace_learning_summary(path: Path, case_count: int) -> dict[str, Any]:
     return {
         "path": TRACE_LEARNING_BAD_CASES_PATH.as_posix(),
@@ -409,12 +529,17 @@ def build_trace_learning_regression_proposal_summary(
 def build_trace_learning_regression_test_patch_proposal_summary(
     path: Path,
     patch_proposal_count: int,
+    reviews: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    review_records = reviews or []
     return {
         "path": TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSALS_PATH.as_posix(),
         "patch_proposal_count": patch_proposal_count,
         "absolute_path": str(path),
         "proposal_status": "needs_review",
+        "review_path": TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH.as_posix(),
+        "review_count": len(review_records),
+        "review_status_by_proposal_id": latest_review_status_by_proposal_id(review_records),
     }
 
 
@@ -429,6 +554,23 @@ def enrich_regression_proposals_with_review_status(
         latest_review = latest_reviews.get(proposal_id)
         item = dict(proposal)
         current_review_status = latest_review.get("status") if latest_review else proposal.get("status")
+        item["current_review_status"] = str(current_review_status or "needs_review")
+        item["latest_review_id"] = latest_review.get("id") if latest_review else None
+        enriched.append(item)
+    return enriched
+
+
+def enrich_regression_test_patch_proposals_with_review_status(
+    patch_proposals: list[dict[str, Any]],
+    reviews: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    latest_reviews = latest_review_by_proposal_id(reviews)
+    enriched: list[dict[str, Any]] = []
+    for patch_proposal in patch_proposals:
+        patch_proposal_id = str(patch_proposal.get("id") or "")
+        latest_review = latest_reviews.get(patch_proposal_id)
+        item = dict(patch_proposal)
+        current_review_status = latest_review.get("status") if latest_review else patch_proposal.get("status")
         item["current_review_status"] = str(current_review_status or "needs_review")
         item["latest_review_id"] = latest_review.get("id") if latest_review else None
         enriched.append(item)
@@ -518,6 +660,14 @@ def next_action_for_review_decision(decision: str) -> str:
     }[decision]
 
 
+def next_action_for_test_patch_review_decision(decision: str) -> str:
+    return {
+        "approve": "human_apply_regression_test_patch",
+        "request_revision": "revise_regression_test_patch_proposal",
+        "reject": "close_regression_test_patch_proposal",
+    }[decision]
+
+
 def latest_review_status_by_proposal_id(reviews: list[dict[str, Any]]) -> dict[str, str]:
     return {
         proposal_id: str(review.get("status") or "unknown")
@@ -548,6 +698,10 @@ def build_regression_proposal_review_id(existing_reviews: list[dict[str, Any]], 
 
 def build_regression_test_patch_proposal_id(existing_patch_proposals: list[dict[str, Any]], proposal_id: Any) -> str:
     return f"regression_test_patch_proposal_{len(existing_patch_proposals) + 1:04d}_{slugify(proposal_id or 'unknown')}"
+
+
+def build_regression_test_patch_proposal_review_id(existing_reviews: list[dict[str, Any]], proposal_id: Any) -> str:
+    return f"regression_test_patch_proposal_review_{len(existing_reviews) + 1:04d}_{slugify(proposal_id or 'unknown')}"
 
 
 def slugify(value: Any) -> str:

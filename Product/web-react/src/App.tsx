@@ -465,9 +465,12 @@ export function App() {
   const candidateProjectId = topicSlug ? `proj_${topicSlug.replace(/-/g, "_")}` : "";
   const effectiveProjectId = projectId || candidateProjectId;
   const handleResetApiBase = () => {
-    setBrowserApiBase(DEFAULT_LOCAL_API_BASE);
+    const targetApiBase = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(currentApiBase)
+      ? currentApiBase.replace(/\/+$/, "")
+      : DEFAULT_LOCAL_API_BASE;
+    setBrowserApiBase(targetApiBase);
     const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("api_base", DEFAULT_LOCAL_API_BASE);
+    nextUrl.searchParams.set("api_base", targetApiBase);
     window.location.assign(nextUrl.toString());
   };
   const retrySupervisorPlan = () => {

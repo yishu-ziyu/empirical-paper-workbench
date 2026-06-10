@@ -138,6 +138,43 @@ interface ExecutionBackendBlocker {
   message?: string;
 }
 
+interface AgentTaskError {
+  code?: string;
+  message?: string;
+  status?: string;
+  student_message?: string;
+}
+
+interface AgentTaskAuditEvent {
+  event?: string;
+  actor?: string;
+  timestamp?: string;
+  run_id?: string;
+  backend_id?: string;
+  error_code?: string;
+  note?: string;
+}
+
+interface ExecutionResult {
+  status?: string;
+  run_id?: string;
+  engine?: string;
+  evidence_level?: string;
+  artifact_path?: string;
+  output_path?: string;
+  execution_kind?: string;
+  formal_write_allowed?: boolean;
+  writes_formal_layer?: boolean;
+  student_message?: string;
+  note?: string;
+  error?: AgentTaskError;
+  result_review?: {
+    status?: string;
+    can_enter_formal_layer?: boolean;
+    last_review_action?: string;
+  };
+}
+
 interface AgentTask {
   id: string;
   title?: string;
@@ -145,6 +182,11 @@ interface AgentTask {
   owner_agent?: string;
   status?: string;
   next_action?: string;
+  can_execute?: boolean;
+  run_id?: string;
+  execution_result?: ExecutionResult;
+  error?: AgentTaskError;
+  audit_log?: AgentTaskAuditEvent[];
   blockers?: Array<{ code?: string; message?: string }>;
   primary_action?: QueuePrimaryAction;
   dispatch_review?: {
@@ -398,6 +440,17 @@ function backendSelectionErrorMessage(err: unknown): string {
   return "执行后端没有写回成功，请稍后重试。";
 }
 
+function executionErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("execution_backend_required")) {
+    return "请先选择执行后端，再开始执行。";
+  }
+  if (message.includes("task_not_executable")) {
+    return "当前任务还没有进入可执行状态，请先完成前置审阅。";
+  }
+  return "执行没有启动成功，请查看任务状态后重试。";
+}
+
 function textList(items?: string[]): string {
   return (items ?? []).filter(Boolean).join(" / ");
 }
@@ -441,6 +494,32 @@ function backendFallbackText(backend?: SelectedExecutionBackend, blocker?: Execu
     ? backend.fallback_backend_ids
     : blocker?.fallback_backend_ids ?? [];
   return fallbackIds.length ? fallbackIds.map(backendOptionLabel).join(" / ") : "暂无可用 fallback";
+}
+
+function executionArtifactPath(result?: ExecutionResult): string {
+  return result?.artifact_path ?? result?.output_path ?? "等待产物路径";
+}
+
+function executionLogTrace(task: AgentTask): string {
+  const logs = task.audit_log ?? [];
+  const last = logs.length ? logs[logs.length - 1] : undefined;
+  if (!last) return task.run_id ? `run_id=${task.run_id}` : "等待日志写入";
+  return [last.event, last.actor, last.run_id ?? task.run_id, last.error_code].filter(Boolean).join(" · ");
+}
+
+function executionFailureText(task: AgentTask, localFailure?: { message: string }): string {
+  return (
+    task.execution_result?.student_message ??
+    task.execution_result?.error?.message ??
+    task.error?.student_message ??
+    task.error?.message ??
+    localFailure?.message ??
+    "执行失败，请根据日志线索检查后端环境或选择备用后端。"
+  );
+}
+
+function executionBackendName(task: AgentTask): string {
+  return task.execution_result?.engine ?? task.selected_backend?.label ?? backendOptionLabel(task.selected_backend?.id);
 }
 
 function renderTaskSkillReview(
@@ -612,6 +691,8 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
   const [dispatchReviewing, setDispatchReviewing] = useState<{ taskId: string; action: DispatchReviewAction } | null>(null);
   const [selectingBackend, setSelectingBackend] = useState<{ taskId: string; backendId: ExecutionBackendId } | null>(null);
+  const [executingTaskId, setExecutingTaskId] = useState<string | null>(null);
+  const [executionFailure, setExecutionFailure] = useState<{ taskId: string; message: string } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
   const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
@@ -766,6 +847,26 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError(backendSelectionErrorMessage(err));
     } finally {
       setSelectingBackend(null);
+    }
+  };
+
+  const executeAgentTask = async (taskId: string) => {
+    setExecutingTaskId(taskId);
+    setExecutionFailure(null);
+    setExpandedTaskId(taskId);
+    try {
+      const data = await fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/execute`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch (err) {
+      const message = executionErrorMessage(err);
+      setExecutionFailure({ taskId, message });
+      setError(message);
+    } finally {
+      setExecutingTaskId(null);
     }
   };
 
@@ -938,9 +1039,17 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
               task.next_action === "select_execution_backend" ||
               task.status === "blocked_by_backend_unavailable" ||
               task.next_action === "choose_fallback_backend";
-            const backendSelectionDone = task.status === "backend_selected" && Boolean(task.selected_backend?.id);
+            const hasSelectedBackend = Boolean(task.selected_backend?.id);
+            const backendSelectionDone = hasSelectedBackend && !backendSelectionReady;
             const backendSelectionDisabled = task.status !== "reviewed_for_dispatch" && !task.backend_blocker;
             const backendBusy = selectingBackend?.taskId === task.id;
+            const executionReady = task.next_action === "execute" && task.can_execute !== false && hasSelectedBackend;
+            const executingThisTask = executingTaskId === task.id;
+            const localExecutionFailure = executionFailure?.taskId === task.id ? executionFailure : undefined;
+            const executionFailed =
+              task.status === "failed" || task.execution_result?.status === "failed" || Boolean(task.error) || Boolean(localExecutionFailure);
+            const hasExecutionResult =
+              Boolean(task.execution_result) || task.status === "succeeded" || task.status === "failed" || Boolean(localExecutionFailure);
             const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             const canGeneratePdfCandidateExport =
               task.status === "formal_export_preflight_ready" &&
@@ -971,7 +1080,9 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                 hasPreflight ||
                 hasFormalWriteback ||
                 hasExportPreflight ||
-                hasPdfCandidateExport ? (
+                hasPdfCandidateExport ||
+                hasSelectedBackend ||
+                hasExecutionResult ? (
                   <div className="agent-task-card__body">
                     <div className="agent-task-card__action">
                       <span>下一步</span>
@@ -1137,6 +1248,76 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           </div>
                         </div>
                         <p className="agent-task-backend-selection__next">下一步：{actionLabel(task.next_action)}。</p>
+                      </div>
+                    ) : null}
+
+                    {hasSelectedBackend ? (
+                      <div
+                        className={cn(
+                          "agent-task-execution-console",
+                          executionFailed ? "agent-task-execution-console--failed" : undefined,
+                        )}
+                        data-testid="agent-task-execution-console"
+                      >
+                        <div className="agent-task-execution-console__head">
+                          <div>
+                            <span className="eyebrow">执行控制台</span>
+                            <h3>{hasExecutionResult ? (executionFailed ? "失败诊断" : "执行结果") : "准备开始执行"}</h3>
+                            <p>
+                              当前由 {executionBackendName(task)} 承接。执行结果会写回任务队列，并保留产物路径和日志线索。
+                            </p>
+                          </div>
+                          <span>{hasExecutionResult ? statusLabel(task.status) : actionLabel(task.next_action)}</span>
+                        </div>
+
+                        <div className="agent-task-execution-console__grid">
+                          <div>
+                            <small>执行后端</small>
+                            <strong>{executionBackendName(task)}</strong>
+                          </div>
+                          <div>
+                            <small>证据等级</small>
+                            <strong>{task.execution_result?.evidence_level ?? task.selected_backend?.evidence_level ?? "local_file"}</strong>
+                          </div>
+                          <div>
+                            <small>产物路径</small>
+                            <strong>{executionArtifactPath(task.execution_result)}</strong>
+                          </div>
+                          <div>
+                            <small>日志线索</small>
+                            <strong>{executionLogTrace(task)}</strong>
+                          </div>
+                        </div>
+
+                        {executionFailed ? (
+                          <div className="agent-task-execution-console__failure">
+                            <strong>失败诊断</strong>
+                            <p>{executionFailureText(task, localExecutionFailure)}</p>
+                            <small>选择备用后端：{backendFallbackText(task.selected_backend, task.backend_blocker)}</small>
+                          </div>
+                        ) : hasExecutionResult ? (
+                          <p className="agent-task-execution-console__note">
+                            执行结果已落盘。下一步：{actionLabel(task.next_action)}。正式层写入仍按后续审阅门处理。
+                          </p>
+                        ) : (
+                          <div className="agent-task-execution-console__actions">
+                            <button
+                              className="btn btn--primary"
+                              type="button"
+                              data-execute-agent-task-action
+                              onClick={() => void executeAgentTask(task.id)}
+                              disabled={!executionReady || executingThisTask}
+                            >
+                              {executingThisTask ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
+                              <span>{executingThisTask ? "执行中" : "开始执行"}</span>
+                            </button>
+                            <p>
+                              {executionReady
+                                ? "执行会生成本地结果、日志和可复查产物。"
+                                : "当前任务还在等待前置审阅或后端选择。"}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ) : null}
 

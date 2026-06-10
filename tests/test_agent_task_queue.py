@@ -481,6 +481,70 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(binding["skill_sources"][0]["name"], "Auto-Empirical-Research-Skills")
         self.assertFalse(binding["can_execute_without_human_review"])
 
+    def test_bdd_11e_queue_exposes_task_level_llm_orchestration_for_internal_skill(self) -> None:
+        """行为 11e：绑定 internal skill 的任务必须显式说明 LLM 何时介入、为什么选 skill、输出进入哪一层。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            provider={
+                "provider_id": "stepfun",
+                "provider_name": "StepFun",
+                "model": "step-3.7-flash",
+            },
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                    "human_confirmation": {
+                        "required_before": ["formal_literature_review_writeback"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        orchestration = response.json()["agent_task_queue"]["tasks"][0]["llm_orchestration"]
+        self.assertEqual(orchestration["call_stage"], "skill_selection")
+        self.assertEqual(orchestration["current_provider"]["provider_name"], "StepFun")
+        self.assertEqual(orchestration["current_provider"]["model"], "step-3.7-flash")
+        self.assertEqual(orchestration["selected_skill"]["skill_id"], "recursive_research_search")
+        self.assertEqual(
+            orchestration["selection_reason"],
+            "题目需要先从文献、数据和变量证据形成递归搜索图。",
+        )
+        self.assertTrue(orchestration["human_gate_required"])
+        self.assertEqual(orchestration["human_gate"], "review_internal_skill_before_execution")
+        self.assertEqual(orchestration["output_boundary"], "draft_layer_only_until_human_review")
+        self.assertFalse(orchestration["formal_write_allowed"])
+        self.assertEqual(orchestration["deterministic_owner"], "internal_skill_registry")
+
     def test_bdd_11a_internal_skill_task_generates_draft_execution_packet_without_formal_writeback(
         self,
     ) -> None:
@@ -3525,6 +3589,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-skill-review__grid", self.react_styles_css)
         self.assertIn("agent-task-skill-review__sources", self.react_styles_css)
 
+    def test_bdd_37aa_react_task_queue_exposes_llm_orchestration_console(self) -> None:
+        """行为 37aa：React 任务详情必须展示 LLM 编排说明，用户能看懂模型何时介入和输出边界。"""
+        self.assertIn("llm_orchestration", self.react_agent_task_queue)
+        self.assertIn("LLM 编排", self.react_agent_task_queue)
+        self.assertIn("调用时机", self.react_agent_task_queue)
+        self.assertIn("选择理由", self.react_agent_task_queue)
+        self.assertIn("输出边界", self.react_agent_task_queue)
+        self.assertIn("当前模型", self.react_agent_task_queue)
+        self.assertIn("agent-task-llm-orchestration", self.react_styles_css)
+
     def test_bdd_37a_react_task_queue_can_generate_internal_skill_execution_packet(self) -> None:
         """行为 37a：React Skill 审阅台必须有生成执行包入口，并能显示草案层执行包结果。"""
         self.assertIn("InternalSkillExecutionPacket", self.react_agent_task_queue)
@@ -3756,6 +3830,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("当前主模型可能仍在后台处理", self.react_app)
         self.assertIn("setPlanIntakeStatus(\"failed\")", self.react_app)
         self.assertIn("重新登记并创建队列", self.react_supervisor_plan_review)
+
+    def test_bdd_45b_plan_approval_failure_marks_intake_failed(self) -> None:
+        """行为 45b：审阅或建队列失败时，页面必须退出创建中状态并显示失败信息。"""
+        approval_start = self.react_app.index("const approveSupervisorPlan = async () =>")
+        approval_end = self.react_app.index("return (", approval_start)
+        approval_source = self.react_app[approval_start:approval_end]
+
+        self.assertIn('const message = explainPlanApprovalError(err instanceof Error ? err.message : "")', approval_source)
+        self.assertIn("setPlanApproved(false)", approval_source)
+        self.assertIn("setPlanApprovalError(message)", approval_source)
+        self.assertIn('setPlanIntakeStatus("failed")', approval_source)
+        self.assertIn("setPlanIntakeMessage(message)", approval_source)
 
     def test_bdd_46_service_disconnect_state_is_actionable_and_reusable(self) -> None:
         """行为 46：本地研究服务断开时，UI 必须给出可恢复步骤，而不是一句空泛报错。"""

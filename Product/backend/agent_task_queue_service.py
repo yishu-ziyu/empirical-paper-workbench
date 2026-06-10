@@ -254,6 +254,10 @@ def build_agent_task(
     role = str(dispatch_item.get("role") or owner_agent)
     title = str(dispatch_item.get("task") or dispatch_item.get("title") or dispatch_item.get("goal") or f"Agent task {index}")
     internal_skill_bindings = build_task_internal_skill_bindings(plan, dispatch_item, owner_agent, role)
+    llm_intervention_handoff = build_task_llm_intervention_handoff(
+        llm_intervention_contract,
+        internal_skill_bindings,
+    )
     task_reference_chain_policy = build_task_reference_chain_policy(
         reference_chain_policy,
         internal_skill_bindings,
@@ -282,8 +286,9 @@ def build_agent_task(
         "input_evidence": build_task_input_evidence(plan),
         "output_requirements": build_output_requirements(plan, dispatch_item),
         "internal_skill_bindings": internal_skill_bindings,
-        "llm_intervention_handoff": build_task_llm_intervention_handoff(
-            llm_intervention_contract,
+        "llm_intervention_handoff": llm_intervention_handoff,
+        "llm_orchestration": build_task_llm_orchestration(
+            llm_intervention_handoff,
             internal_skill_bindings,
         ),
         "blockers": [],
@@ -935,6 +940,61 @@ def build_task_llm_intervention_handoff(
     return result
 
 
+def build_task_llm_orchestration(
+    llm_intervention_handoff: dict[str, Any],
+    internal_skill_bindings: list[dict[str, Any]],
+) -> dict[str, Any]:
+    first_skill = internal_skill_bindings[0] if internal_skill_bindings else {}
+    provider = llm_intervention_handoff.get("source_provider")
+    if not isinstance(provider, dict):
+        provider = {}
+    selected_skill: dict[str, Any] = {}
+    if first_skill:
+        selected_skill = {
+            "skill_id": first_skill.get("skill_id") or first_skill.get("id"),
+            "name": first_skill.get("name", ""),
+            "stage": first_skill.get("stage", ""),
+            "risk_level": first_skill.get("risk_level", "medium"),
+            "selection_source": first_skill.get("selection_source", ""),
+        }
+    canonical_policy = first_skill.get("canonical_policy") if isinstance(first_skill.get("canonical_policy"), dict) else {}
+    auto_mode = canonical_policy.get("auto_mode") if isinstance(canonical_policy.get("auto_mode"), dict) else {}
+    human_confirmation = (
+        first_skill.get("human_confirmation") if isinstance(first_skill.get("human_confirmation"), dict) else {}
+    )
+    formal_write_allowed = bool(auto_mode.get("can_write_canonical") is True and first_skill.get("formal_write_targets"))
+    default_human_gate = (
+        "review_internal_skill_before_execution"
+        if first_skill
+        else str(llm_intervention_handoff.get("human_gate") or "dispatch_review_required")
+    )
+    default_output_boundary = (
+        "draft_layer_only_until_human_review"
+        if first_skill
+        else str(llm_intervention_handoff.get("formal_boundary") or "draft_only_until_human_review")
+    )
+    return {
+        "call_stage": str(llm_intervention_handoff.get("stage") or "agent_task_queue"),
+        "llm_role": str(llm_intervention_handoff.get("llm_role") or ""),
+        "deterministic_owner": str(llm_intervention_handoff.get("deterministic_owner") or ""),
+        "current_provider": provider,
+        "selected_skill": selected_skill,
+        "selection_reason": str(
+            first_skill.get("why_this_skill")
+            or first_skill.get("semantic_selection_reason")
+            or llm_intervention_handoff.get("selected_skill_reason")
+            or ""
+        ),
+        "human_gate_required": True,
+        "human_gate": str(first_skill.get("next_action") or default_human_gate),
+        "human_confirmation_required_before": normalize_list(human_confirmation.get("required_before")),
+        "output_boundary": "formal_layer_after_human_review"
+        if formal_write_allowed
+        else default_output_boundary,
+        "formal_write_allowed": formal_write_allowed,
+    }
+
+
 def require_llm_intervention_handoff_before_execution(task: dict[str, Any]) -> dict[str, Any]:
     handoff = task.get("llm_intervention_handoff")
     if not isinstance(handoff, dict):
@@ -1295,6 +1355,13 @@ def ensure_task_dispatch_audit_fields(
         "llm_intervention_handoff",
         build_task_llm_intervention_handoff(
             llm_intervention_contract,
+            internal_skill_bindings,
+        ),
+    )
+    task.setdefault(
+        "llm_orchestration",
+        build_task_llm_orchestration(
+            task["llm_intervention_handoff"],
             internal_skill_bindings,
         ),
     )

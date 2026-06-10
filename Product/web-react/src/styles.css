@@ -1556,6 +1556,42 @@ button {
   line-height: 1.35;
 }
 
+.agent-task-llm-orchestration {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(12, 12, 12, 0.28);
+  padding: 12px;
+}
+
+.agent-task-llm-orchestration dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.agent-task-llm-orchestration dl > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.agent-task-llm-orchestration dt {
+  color: var(--color-subtle);
+  font-size: 12px;
+}
+
+.agent-task-llm-orchestration dd {
+  margin: 0;
+  color: var(--color-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .agent-task-skill-review__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

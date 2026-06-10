@@ -566,8 +566,11 @@ export function App() {
       setPlanApproved(true);
       setPlanApprovalError(null);
     } catch (err) {
+      const message = explainPlanApprovalError(err instanceof Error ? err.message : "");
       setPlanApproved(false);
-      setPlanApprovalError(explainPlanApprovalError(err instanceof Error ? err.message : ""));
+      setPlanApprovalError(message);
+      setPlanIntakeStatus("failed");
+      setPlanIntakeMessage(message);
     } finally {
       setApprovingPlan(false);
     }

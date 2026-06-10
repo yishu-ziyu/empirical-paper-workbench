@@ -3430,6 +3430,10 @@ def generate_project_pdf_candidate_review(
         "created_at": timestamp,
         "evidence_level": review_record["evidence_level"],
     }
+    if review_record.get("llm_provider_snapshot"):
+        summary["llm_provider_snapshot"] = review_record["llm_provider_snapshot"]
+        summary["llm_preflight_summary"] = review_record.get("llm_preflight_summary", "")
+        summary["llm_preflight_human_review_note"] = review_record.get("llm_preflight_human_review_note", "")
     task["pdf_candidate_review"] = summary
     task["status"] = "pdf_candidate_reviewed" if ready else "pdf_candidate_review_blocked"
     task["next_action"] = next_action
@@ -5012,7 +5016,7 @@ def build_pdf_candidate_review_record(
         blockers.append({"code": reason, "message": pdf_candidate_review_blocker_message(reason)})
 
     ready = not blocking_reasons
-    return {
+    review_record = {
         "schema_version": "p5.formal_pdf_candidate_review.v1",
         "status": "ready_for_final_approval_review" if ready else "blocked_by_pdf_candidate_review",
         "source": "agent_task_queue",
@@ -5045,6 +5049,8 @@ def build_pdf_candidate_review_record(
         "created_at": timestamp,
         "evidence_level": "verified_source_record",
     }
+    review_record.update(build_export_llm_preflight_provenance_from_source(candidate_report))
+    return review_record
 
 
 def build_pdf_candidate_final_writeback_preflight(
@@ -5055,7 +5061,7 @@ def build_pdf_candidate_final_writeback_preflight(
     timestamp: str,
 ) -> dict[str, Any]:
     ready = review_record.get("status") == "ready_for_final_approval_review"
-    return {
+    final_preflight = {
         "schema_version": "p5.formal_pdf_final_writeback_preflight.v1",
         "status": "ready_for_human_final_approval" if ready else "blocked_by_pdf_candidate_review",
         "source": "agent_task_queue",
@@ -5089,6 +5095,8 @@ def build_pdf_candidate_final_writeback_preflight(
         "created_at": timestamp,
         "evidence_level": "verified_source_record",
     }
+    final_preflight.update(build_export_llm_preflight_provenance_from_source(review_record))
+    return final_preflight
 
 
 def pdf_candidate_review_blocker_message(reason: str) -> str:
@@ -5193,6 +5201,17 @@ def format_pdf_candidate_qmd(export_record: dict[str, Any]) -> str:
 
 
 def format_pdf_candidate_review(review_record: dict[str, Any], final_preflight: dict[str, Any]) -> str:
+    llm_provider_snapshot = (
+        review_record.get("llm_provider_snapshot")
+        if isinstance(review_record.get("llm_provider_snapshot"), dict)
+        else {}
+    )
+    primary_provider = (
+        llm_provider_snapshot.get("primary_provider")
+        if isinstance(llm_provider_snapshot.get("primary_provider"), dict)
+        else {}
+    )
+    selection = llm_provider_snapshot.get("selection") if isinstance(llm_provider_snapshot.get("selection"), dict) else {}
     lines = [
         "# PDF 候选稿机器审阅",
         "",
@@ -5210,6 +5229,18 @@ def format_pdf_candidate_review(review_record: dict[str, Any], final_preflight: 
             continue
         lines.append(f"- {check.get('id')}：{check.get('status')}")
     blockers = normalize_list(review_record.get("blockers"))
+    if primary_provider:
+        lines.extend(
+            [
+                "",
+                "## LLM 判断来源",
+                f"- Provider：{primary_provider.get('provider_name') or primary_provider.get('provider_id')}",
+                f"- Model：{primary_provider.get('model')}",
+                f"- 选择来源：{selection.get('source') or 'unknown'}",
+                f"- 预检摘要：{review_record.get('llm_preflight_summary') or '未记录'}",
+                f"- 人工审阅提示：{review_record.get('llm_preflight_human_review_note') or '未记录'}",
+            ]
+        )
     if blockers:
         lines.extend(["", "## 阻断项"])
         for blocker in blockers:

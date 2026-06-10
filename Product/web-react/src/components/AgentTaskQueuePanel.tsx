@@ -363,6 +363,9 @@ interface AgentTask {
     blocking_reason_count?: number;
     writes_formal_layer?: boolean;
     wrote_final_outputs?: boolean;
+    llm_provider_snapshot?: LlmExecutionPreflight["provider_snapshot"];
+    llm_preflight_summary?: string;
+    llm_preflight_human_review_note?: string;
     next_action?: string;
   };
   pdf_final_approval?: {
@@ -2908,6 +2911,27 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         <p className="agent-task-queue-pdf-candidate__note">
                           最终写回预检只说明候选稿是否可进入人工批准，不会写入 paper.pdf / paper.docx。
                         </p>
+                        {task.pdf_candidate_review?.llm_provider_snapshot?.primary_provider ? (
+                          <div
+                            className="agent-task-queue-pdf-candidate__llm"
+                            data-testid="agent-task-queue-pdf-candidate-review-llm"
+                          >
+                            <strong>LLM 判断来源</strong>
+                            <p>
+                              {task.pdf_candidate_review.llm_provider_snapshot.primary_provider.provider_name ??
+                                task.pdf_candidate_review.llm_provider_snapshot.primary_provider.provider_id ??
+                                "LLM Supervisor"}
+                              {" / "}
+                              {task.pdf_candidate_review.llm_provider_snapshot.primary_provider.model ?? "未记录模型"}
+                              {" · 备用链 "}
+                              {task.pdf_candidate_review.llm_provider_snapshot.attempt_count ?? 0}
+                              {" 个"}
+                            </p>
+                            {task.pdf_candidate_review.llm_preflight_summary ? (
+                              <small>{task.pdf_candidate_review.llm_preflight_summary}</small>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {finalPdfApprovalReady ? (
                           <div className="agent-task-card__actions" data-testid="agent-task-queue-final-pdf-actions">
                             <button

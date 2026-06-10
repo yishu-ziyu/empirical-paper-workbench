@@ -179,7 +179,7 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertIn("inference_diagnostics", check_ids)
 
     def test_bdd_8_method_execution_declares_rigorous_backend_contract(self) -> None:
-        """行为 8：方法执行必须声明 Python/StatsPAI/StataMCP 后端契约。"""
+        """行为 8：方法执行必须声明统计后端与 LLM 编排后端的契约。"""
         self._approve_variable_roles()
         self._approve_design_spec()
         self._approve_run_plan()
@@ -193,14 +193,17 @@ class OlsExecutionAdapterApiTests(unittest.TestCase):
         self.assertEqual(contract["analysis_boundary"], "analysis_ready_numeric_formula_rows")
         self.assertIn("frontend_inference", contract["prohibits"])
         backend_ids = {backend["id"] for backend in contract["available_backends"]}
-        self.assertEqual(backend_ids, {"statspai", "python_ols_adapter", "stata_mcp"})
+        self.assertEqual(backend_ids, {"statspai", "python_ols_adapter", "stata_mcp", "codex"})
         backends = {backend["id"]: backend for backend in contract["available_backends"]}
         self.assertEqual(backends["statspai"]["role"], "active_execution")
         self.assertEqual(backends["statspai"]["evidence_level"], "local_execution")
         self.assertEqual(backends["python_ols_adapter"]["role"], "candidate_execution_engine")
         self.assertEqual(backends["stata_mcp"]["role"], "candidate_reproducibility_engine")
+        self.assertEqual(backends["codex"]["role"], "draft_code_generation_engine")
         self.assertNotEqual(backends["python_ols_adapter"]["evidence_level"], "local_execution")
         self.assertNotEqual(backends["stata_mcp"]["evidence_level"], "local_execution")
+        self.assertNotEqual(backends["codex"]["evidence_level"], "local_execution")
+        self.assertIn("草案层", backends["codex"]["activation_policy"])
 
     def test_bdd_9_ols_method_records_data_preflight_and_reproducibility(self) -> None:
         """行为 9：OLS 方法结果必须记录数据预检和可复现执行说明。"""

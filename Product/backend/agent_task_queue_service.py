@@ -14,6 +14,7 @@ from Product.backend.supervisor_plan_service import load_saved_supervisor_plan
 
 AGENT_TASK_QUEUE_PATH = Path("state/product/agent_task_queue.json")
 INTERNAL_SKILL_EXECUTION_PACKET_DIR = Path("state/product/internal_skill_execution_packets")
+LLM_SUPERVISOR_ACTORS = {"llm_supervisor", "local_codex_supervisor"}
 VALID_REFERENCE_SEED_REVIEW_ACTIONS = {
     "approve_for_draft",
     "needs_revision",
@@ -810,6 +811,46 @@ def build_llm_intervention_contract(plan: dict[str, Any] | None) -> dict[str, An
         ),
         "product_chain": product_chain,
         "stage_handoffs": stage_handoffs,
+        "source": build_llm_supervisor_source(plan),
+    }
+
+
+def build_llm_supervisor_source(plan: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(plan, dict):
+        return {
+            "source_actor": "",
+            "source_action": "",
+            "source_evidence_level": "none",
+            "provider": {},
+            "has_llm_supervisor_decision": False,
+        }
+    decision_events = [
+        event
+        for event in normalize_list(plan.get("decision_events"))
+        if isinstance(event, dict)
+    ]
+    llm_events = [
+        event
+        for event in decision_events
+        if str(event.get("actor") or "") in LLM_SUPERVISOR_ACTORS
+    ]
+    source_event = llm_events[-1] if llm_events else (decision_events[-1] if decision_events else {})
+    provider = plan.get("provider") if isinstance(plan.get("provider"), dict) else {}
+    evidence_level = str(plan.get("evidence_level") or "none")
+    has_llm_supervisor_decision = bool(llm_events) and evidence_level in {
+        "llm_supervisor",
+        "local_execution",
+    }
+    return {
+        "source_actor": str(source_event.get("actor") or ""),
+        "source_action": str(source_event.get("action") or ""),
+        "source_evidence_level": evidence_level,
+        "provider": {
+            key: provider.get(key)
+            for key in ("provider_id", "provider_name", "provider", "model", "version")
+            if provider.get(key)
+        },
+        "has_llm_supervisor_decision": has_llm_supervisor_decision,
     }
 
 
@@ -867,7 +908,19 @@ def build_task_llm_intervention_handoff(
         "handoff_condition": handoff["handoff_condition"],
         "human_gate": handoff["human_gate"],
         "formal_boundary": handoff["formal_boundary"],
+        "required_for_execution": True,
     }
+    source = llm_intervention_contract.get("source")
+    if isinstance(source, dict):
+        result.update(
+            {
+                "source_actor": source.get("source_actor", ""),
+                "source_action": source.get("source_action", ""),
+                "source_evidence_level": source.get("source_evidence_level", "none"),
+                "source_provider": source.get("provider", {}),
+                "has_llm_supervisor_decision": bool(source.get("has_llm_supervisor_decision")),
+            }
+        )
     if first_skill:
         result.update(
             {
@@ -880,6 +933,54 @@ def build_task_llm_intervention_handoff(
             }
         )
     return result
+
+
+def require_llm_intervention_handoff_before_execution(task: dict[str, Any]) -> dict[str, Any]:
+    handoff = task.get("llm_intervention_handoff")
+    if not isinstance(handoff, dict):
+        raise AgentTaskQueueBlockedError(
+            "llm_intervention_handoff_required",
+            "Agent task must include an LLM Supervisor handoff before execution.",
+        )
+    if handoff.get("required_for_execution") is not True:
+        raise AgentTaskQueueBlockedError(
+            "llm_intervention_handoff_required",
+            "Agent task LLM handoff must explicitly mark execution as gated by the Supervisor.",
+        )
+    if handoff.get("has_llm_supervisor_decision") is not True:
+        raise AgentTaskQueueBlockedError(
+            "llm_intervention_handoff_required",
+            "Agent task execution requires a real LLM Supervisor decision, not only deterministic queue metadata.",
+        )
+    return handoff
+
+
+def compact_llm_intervention_handoff(handoff: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "stage": str(handoff.get("stage") or ""),
+        "llm_role": str(handoff.get("llm_role") or ""),
+        "human_gate": str(handoff.get("human_gate") or ""),
+        "formal_boundary": str(handoff.get("formal_boundary") or ""),
+        "source_actor": str(handoff.get("source_actor") or ""),
+        "source_action": str(handoff.get("source_action") or ""),
+        "source_evidence_level": str(handoff.get("source_evidence_level") or "none"),
+        "source_provider": handoff.get("source_provider") if isinstance(handoff.get("source_provider"), dict) else {},
+        "has_llm_supervisor_decision": bool(handoff.get("has_llm_supervisor_decision")),
+        "required_for_execution": bool(handoff.get("required_for_execution")),
+    }
+
+
+def attach_llm_intervention_handoff_to_execution_result(
+    task: dict[str, Any],
+    result: dict[str, Any],
+    handoff: dict[str, Any],
+) -> None:
+    compact_handoff = compact_llm_intervention_handoff(handoff)
+    result["llm_intervention_handoff"] = compact_handoff
+    execution_result = task.get("execution_result")
+    if isinstance(execution_result, dict):
+        execution_result["llm_intervention_handoff"] = compact_handoff
+        task["execution_result"] = execution_result
 
 
 def find_llm_stage_handoff(contract: dict[str, Any], stage: str) -> dict[str, str]:
@@ -1519,7 +1620,9 @@ def execute_project_agent_task(
             "execution_backend_required",
             "Select an execution backend before executing this agent task.",
         )
+    llm_handoff = require_llm_intervention_handoff_before_execution(task)
     result = execute_agent_task_with_backend(task, project_root)
+    attach_llm_intervention_handoff_to_execution_result(task, result, llm_handoff)
     queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
     queue["updated_at"] = utc_now()
     path = agent_task_queue_state_path(project_root)

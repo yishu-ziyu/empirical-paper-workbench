@@ -20,6 +20,7 @@ from Product.backend.agent_task_queue_service import (
     generate_project_draft_section_plan,
     generate_project_draft_section_tasks,
     generate_project_formal_export_preflight,
+    generate_project_internal_skill_execution_packet,
     generate_project_manuscript_citation_plan,
     generate_project_pdf_candidate_export,
     generate_project_section_drafts,
@@ -1103,6 +1104,25 @@ def api_v1_create_project_agent_task_queue(
         return create_project_agent_task_queue(PRODUCT_ROOT, REPO_ROOT, project_id)
     except AgentTaskQueueBlockedError as exc:
         return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/internal-skill-execution-packet")
+def api_v1_generate_project_internal_skill_execution_packet(
+    project_id: str,
+    task_id: str,
+) -> dict:
+    try:
+        return generate_project_internal_skill_execution_packet(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 

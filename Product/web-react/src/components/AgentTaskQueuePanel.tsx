@@ -81,6 +81,20 @@ interface InternalSkillBinding {
   next_action?: string;
 }
 
+interface InternalSkillExecutionPacket {
+  status?: string;
+  artifact_path?: string;
+  skill_id?: string;
+  skill_name?: string;
+  draft_layer?: string;
+  expected_artifacts?: string[];
+  review_gate?: string;
+  formal_write_allowed?: boolean;
+  writes_formal_layer?: boolean;
+  next_action?: string;
+  created_at?: string;
+}
+
 interface LlmInterventionHandoff {
   stage?: string;
   llm_role?: string;
@@ -104,6 +118,7 @@ interface AgentTask {
   blockers?: Array<{ code?: string; message?: string }>;
   primary_action?: QueuePrimaryAction;
   internal_skill_bindings?: InternalSkillBinding[];
+  internal_skill_execution_packet?: InternalSkillExecutionPacket;
   llm_intervention_handoff?: LlmInterventionHandoff;
   draft_section_tasks?: {
     status?: string;
@@ -200,6 +215,7 @@ interface AgentTaskQueue {
 
 interface AgentTaskQueueResponse {
   agent_task_queue: AgentTaskQueue;
+  internal_skill_execution_packet?: InternalSkillExecutionPacket;
 }
 
 interface AgentTaskQueuePanelProps {
@@ -226,6 +242,7 @@ function statusLabel(status?: string): string {
     formal_export_preflight_ready: "导出预检已通过",
     formal_export_preflight_blocked: "导出预检有阻断项",
     pdf_candidate_exported: "PDF 候选稿已生成",
+    draft_execution_packet_ready: "草案层执行包已生成",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
     succeeded: "完成",
@@ -238,6 +255,7 @@ function actionLabel(action?: string): string {
   const labels: Record<string, string> = {
     create_agent_task_queue: "创建 Agent 任务队列",
     dispatch_review_required: "审阅派工",
+    review_internal_skill_before_execution: "审阅 Skill 执行包",
     review_draft_section_tasks: "审阅章节任务包",
     generate_section_drafts: "生成章节草稿",
     review_section_drafts: "审阅章节草稿",
@@ -251,6 +269,7 @@ function actionLabel(action?: string): string {
     revise_section_drafts: "修订章节草稿",
     replace_section_drafts: "替换章节草稿",
     revise_formal_writeback_preflight: "修订正式写回预检",
+    draft_execution_packet_ready: "草案层执行包已生成",
   };
   return labels[action ?? ""] ?? action ?? "查看下一步";
 }
@@ -295,7 +314,13 @@ function skillQualityGateText(skill?: InternalSkillBinding): string {
   return "等待队列生成质量门。";
 }
 
-function renderTaskSkillReview(task: AgentTask) {
+function renderTaskSkillReview(
+  task: AgentTask,
+  options?: {
+    generatingSkillPacket?: boolean;
+    onGenerateSkillPacket?: (taskId: string) => void;
+  },
+) {
   const skill = task.internal_skill_bindings?.[0];
   const handoff = task.llm_intervention_handoff;
   if (!skill && !handoff) return null;
@@ -312,6 +337,7 @@ function renderTaskSkillReview(task: AgentTask) {
   const executionBoundary = skill?.execution_boundary ?? handoff?.formal_boundary ?? "draft_only_until_human_review";
   const sources = skill?.skill_sources ?? [];
   const canWriteCanonical = skill?.canonical_policy?.auto_mode?.can_write_canonical;
+  const packet = task.internal_skill_execution_packet;
 
   return (
     <div className="agent-task-skill-review" data-testid="agent-task-skill-review">
@@ -382,6 +408,35 @@ function renderTaskSkillReview(task: AgentTask) {
           Auto Mode 可以生成 patch proposal；canonical 规则库需人工 review 后合并。
         </p>
       ) : null}
+
+      {packet ? (
+        <div className="agent-task-skill-review__packet" data-testid="internal-skill-execution-packet">
+          <div>
+            <span className="eyebrow">草案层执行包</span>
+            <strong>{statusLabel(packet.status)}</strong>
+            <p>下一步：{actionLabel(packet.next_action)}</p>
+          </div>
+          {packet.artifact_path ? <code>{packet.artifact_path}</code> : null}
+          <small>
+            Skill：{packet.skill_name || packet.skill_id || skillDisplayName(skill, handoff)} · 正式层
+            {packet.writes_formal_layer ? "会写入" : "不写入"}
+          </small>
+        </div>
+      ) : skill ? (
+        <div className="agent-task-skill-review__actions">
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-internal-skill-execution-packet-action
+            onClick={() => options?.onGenerateSkillPacket?.(task.id)}
+            disabled={options?.generatingSkillPacket}
+          >
+            {options?.generatingSkillPacket ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
+            <span>{options?.generatingSkillPacket ? "生成中" : "生成 Skill 执行包"}</span>
+          </button>
+          <p>先把 Skill 的操作步骤、质量门和正式层边界落成本地文件，再进入派工审阅。</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -408,6 +463,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
+  const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
   const [generatingPdfCandidateExportTaskId, setGeneratingPdfCandidateExportTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -541,6 +597,25 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
     }
   };
 
+  const generateInternalSkillExecutionPacket = async (taskId: string) => {
+    setGeneratingSkillPacketTaskId(taskId);
+    try {
+      const data = await fetchJson(
+        `/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/internal-skill-execution-packet`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      );
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("Skill 执行包没有生成成功，请确认这个任务已经绑定内部 Skill。");
+    } finally {
+      setGeneratingSkillPacketTaskId(null);
+    }
+  };
+
   const generateFormalExportPreflight = async (taskId: string) => {
     setGeneratingFormalExportPreflightTaskId(taskId);
     try {
@@ -663,6 +738,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const formalWritebackReviewReady = task.status === "formal_writeback_preflight_ready" && hasPreflight;
             const generatingDrafts = generatingSectionDrafts === task.id;
             const exportPreflightReady = hasFormalWriteback && task.status === "formal_sections_written";
+            const generatingSkillPacket = generatingSkillPacketTaskId === task.id;
             const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             const canGeneratePdfCandidateExport =
               task.status === "formal_export_preflight_ready" &&
@@ -700,7 +776,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                       <strong>{actionLabel(task.next_action)}</strong>
                     </div>
 
-                    {renderTaskSkillReview(task)}
+                    {renderTaskSkillReview(task, {
+                      generatingSkillPacket,
+                      onGenerateSkillPacket: generateInternalSkillExecutionPacket,
+                    })}
 
                     {reviewReady ? (
                       <div className="agent-task-queue-review" data-testid="draft-section-tasks-review">

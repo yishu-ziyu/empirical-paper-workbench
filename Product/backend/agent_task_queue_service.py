@@ -12,6 +12,7 @@ from Product.backend.supervisor_plan_service import load_saved_supervisor_plan
 
 
 AGENT_TASK_QUEUE_PATH = Path("state/product/agent_task_queue.json")
+INTERNAL_SKILL_EXECUTION_PACKET_DIR = Path("state/product/internal_skill_execution_packets")
 VALID_REFERENCE_SEED_REVIEW_ACTIONS = {
     "approve_for_draft",
     "needs_revision",
@@ -1238,6 +1239,174 @@ def _find_agent_task(queue: dict[str, Any], task_id: str) -> dict[str, Any]:
         "agent_task_not_found",
         f"Agent task {task_id} does not exist.",
     )
+
+
+def internal_skill_execution_packet_artifact_path(task_id: str) -> str:
+    return (INTERNAL_SKILL_EXECUTION_PACKET_DIR / f"{task_id}.json").as_posix()
+
+
+def build_internal_skill_execution_steps(task: dict[str, Any], skill: dict[str, Any]) -> list[dict[str, Any]]:
+    owner_agent = str(task.get("owner_agent") or task.get("role") or skill.get("owner_agent") or "Agent")
+    expected_artifacts = normalize_list(skill.get("expected_artifacts")) or ["skill_execution_notes"]
+    return [
+        {
+            "id": "review_skill_reason_and_boundary",
+            "label": "审阅 Skill 适配理由与正式层边界",
+            "owner_agent": "Supervisor",
+            "requires_human_review": True,
+            "writes_formal_layer": False,
+        },
+        {
+            "id": "collect_required_inputs",
+            "label": "收集执行所需输入、证据和缺口",
+            "owner_agent": owner_agent,
+            "requires_human_review": False,
+            "writes_formal_layer": False,
+        },
+        {
+            "id": "run_skill_in_draft_layer",
+            "label": "在草案层运行 Skill",
+            "owner_agent": owner_agent,
+            "expected_artifacts": expected_artifacts,
+            "requires_human_review": False,
+            "writes_formal_layer": False,
+        },
+        {
+            "id": "return_to_human_review_gate",
+            "label": "回到人工审阅门",
+            "owner_agent": "Supervisor",
+            "requires_human_review": True,
+            "writes_formal_layer": False,
+        },
+    ]
+
+
+def build_internal_skill_execution_packet(
+    task: dict[str, Any],
+    skill: dict[str, Any],
+    queue: dict[str, Any],
+    timestamp: str,
+) -> dict[str, Any]:
+    task_id = str(task.get("id") or "agent_task")
+    expected_artifacts = normalize_list(skill.get("expected_artifacts")) or ["skill_execution_notes"]
+    human_confirmation = skill.get("human_confirmation") if isinstance(skill.get("human_confirmation"), dict) else {}
+    return {
+        "schema_version": "internal_skill_execution_packet.v1",
+        "status": "draft_execution_packet_ready",
+        "task_id": task_id,
+        "task_title": task.get("title", ""),
+        "owner_agent": task.get("owner_agent", ""),
+        "role": task.get("role", ""),
+        "draft_layer": "exploratory",
+        "selected_skill": {
+            "id": skill.get("id", ""),
+            "skill_id": skill.get("skill_id", ""),
+            "name": skill.get("name", ""),
+            "stage": skill.get("stage", ""),
+            "risk_level": skill.get("risk_level", ""),
+            "selection_source": skill.get("selection_source", ""),
+            "why_this_skill": (
+                skill.get("why_this_skill")
+                or skill.get("semantic_selection_reason")
+                or skill.get("matched_reason")
+                or ""
+            ),
+            "source_policy": skill.get("source_policy", ""),
+            "skill_sources": normalize_list(skill.get("skill_sources")),
+        },
+        "llm_semantic_judgment": skill.get("llm_semantic_judgment") or {},
+        "execution_boundary": skill.get("execution_boundary") or "review_before_execution",
+        "formal_boundary": "draft_only_until_human_review",
+        "human_confirmation_required_before": normalize_list(
+            human_confirmation.get("required_before")
+        )
+        or ["review_internal_skill_before_execution"],
+        "review_gate": "review_internal_skill_before_execution",
+        "expected_artifacts": expected_artifacts,
+        "quality_gates": skill.get("quality_gates") or {},
+        "canonical_policy": skill.get("canonical_policy") or {},
+        "reference_chain_policy": (
+            task.get("reference_chain_policy")
+            or skill.get("reference_chain_policy")
+            or queue.get("reference_chain_policy")
+            or {}
+        ),
+        "agent_team_handoff": task.get("llm_intervention_handoff") or {},
+        "execution_steps": build_internal_skill_execution_steps(task, skill),
+        "artifact_path": internal_skill_execution_packet_artifact_path(task_id),
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": "dispatch_review_required",
+        "created_at": timestamp,
+    }
+
+
+def compact_internal_skill_execution_packet(packet: dict[str, Any]) -> dict[str, Any]:
+    selected_skill = packet.get("selected_skill") if isinstance(packet.get("selected_skill"), dict) else {}
+    return {
+        "status": packet.get("status", "draft_execution_packet_ready"),
+        "artifact_path": packet.get("artifact_path", ""),
+        "skill_id": selected_skill.get("skill_id", ""),
+        "skill_name": selected_skill.get("name", ""),
+        "draft_layer": packet.get("draft_layer", "exploratory"),
+        "expected_artifacts": normalize_list(packet.get("expected_artifacts")),
+        "review_gate": packet.get("review_gate", "review_internal_skill_before_execution"),
+        "formal_write_allowed": False,
+        "writes_formal_layer": False,
+        "next_action": packet.get("next_action", "dispatch_review_required"),
+        "created_at": packet.get("created_at", ""),
+    }
+
+
+def generate_project_internal_skill_execution_packet(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    skill_bindings = [
+        binding
+        for binding in normalize_list(task.get("internal_skill_bindings"))
+        if isinstance(binding, dict)
+    ]
+    if not skill_bindings:
+        raise AgentTaskQueueBlockedError(
+            "internal_skill_binding_required",
+            "Agent task must include an internal skill binding before generating an execution packet.",
+        )
+
+    timestamp = utc_now()
+    packet = build_internal_skill_execution_packet(task, skill_bindings[0], queue, timestamp)
+    packet_path = project_root / str(packet["artifact_path"])
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    packet_path.write_text(json.dumps(packet, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    compact_packet = compact_internal_skill_execution_packet(packet)
+    task["internal_skill_execution_packet"] = compact_packet
+    task["next_action"] = "dispatch_review_required"
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "internal_skill_execution_packet_generated",
+            "artifact_path": compact_packet["artifact_path"],
+            "skill_id": compact_packet["skill_id"],
+            "created_at": timestamp,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["primary_action"] = build_queue_primary_action(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    response = build_agent_task_queue_response(project, queue)
+    response["internal_skill_execution_packet"] = compact_packet
+    return response
 
 
 def select_project_agent_task_backend(

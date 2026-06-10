@@ -686,14 +686,40 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "draft_code_generation",
         )
 
-        executed = self.client.post(
-            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
-        )
+        with patch(
+            "Product.backend.execution_backend_service.run_llm_execution_preflight",
+            create=True,
+            return_value={
+                "schema_version": "p6.llm_execution_preflight.v1",
+                "task_id": "agent_task_02",
+                "backend_id": "codex",
+                "method_id": "ols",
+                "provider": {"provider_id": "codex", "model": "gpt-5.5"},
+                "summary": "LLM 已确认该任务只能生成草案脚本，不能写入正式层。",
+                "backend_reason": "Codex 后端适合先生成可审阅代码草案。",
+                "method_risk": ["变量角色仍需人工确认。"],
+                "evidence_requirements": ["保留脚本和后续运行日志。"],
+                "human_review_note": "执行产物进入草案层。",
+                "artifact_path": "state/product/llm_execution_preflights/agent_task_02.json",
+                "formal_write_allowed": False,
+                "required_for_execution": True,
+                "evidence_level": "llm_supervisor",
+            },
+        ) as preflight:
+            executed = self.client.post(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+            )
 
         self.assertEqual(executed.status_code, 200, msg=executed.text)
+        preflight.assert_called_once()
         body = executed.json()
         self.assertEqual(body["execution_result"]["engine"], "codex")
         self.assertEqual(body["execution_result"]["evidence_level"], "local_file")
+        self.assertEqual(
+            body["execution_result"]["llm_execution_preflight"]["provider"]["model"],
+            "gpt-5.5",
+        )
+        self.assertFalse(body["execution_result"]["llm_execution_preflight"]["formal_write_allowed"])
         artifact_path = self.project_root / body["execution_result"]["artifact_path"]
         self.assertTrue(artifact_path.exists())
         task = body["agent_task_queue"]["tasks"][1]
@@ -706,6 +732,10 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(
             body["execution_result"]["llm_intervention_handoff"]["source_actor"],
             "local_codex_supervisor",
+        )
+        self.assertEqual(
+            task["execution_result"]["llm_execution_preflight"]["backend_reason"],
+            "Codex 后端适合先生成可审阅代码草案。",
         )
 
     def test_bdd_13a_execution_requires_llm_supervisor_handoff_before_running(self) -> None:
@@ -749,6 +779,41 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         task = queue["tasks"][1]
         self.assertEqual(task["status"], "backend_selected")
         self.assertNotIn("execution_result", task)
+
+    def test_bdd_13b_execution_blocks_when_llm_preflight_is_unavailable(self) -> None:
+        """行为 13b：LLM 实验预检不可用时，执行保持可恢复阻断，不启动后端。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/dispatch-review",
+            json={"action": "approve", "note": "先生成脚本草案"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/select-backend",
+            json={"backend_id": "codex"},
+        )
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+
+        with patch(
+            "Product.backend.execution_backend_service.run_llm_execution_preflight",
+            create=True,
+            side_effect=RuntimeError("no configured LLM provider"),
+        ):
+            executed = self.client.post(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+            )
+
+        self.assertEqual(executed.status_code, 409, msg=executed.text)
+        self.assertEqual(executed.json()["error"]["code"], "llm_execution_preflight_required")
+        queue = self.client.get(f"/api/v1/projects/{self.project_id}/agent-task-queue").json()[
+            "agent_task_queue"
+        ]
+        task = queue["tasks"][1]
+        self.assertEqual(task["status"], "backend_selected")
+        self.assertNotIn("execution_result", task)
+        self.assertFalse((self.project_root / "Program" / "generated").exists())
 
     def test_bdd_14_queue_exposes_llm_intervention_handoff_contract(self) -> None:
         """行为 14：队列必须说明 LLM 何时判断、何时交还确定性服务、何处人工确认。"""
@@ -3157,6 +3222,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("选择备用后端", self.react_agent_task_queue)
         self.assertIn("agent-task-execution-console", self.react_styles_css)
         self.assertIn("agent-task-execution-console--failed", self.react_styles_css)
+
+    def test_bdd_37ea_react_execution_result_shows_llm_preflight(self) -> None:
+        """行为 37ea：每次实验执行后，React 队列必须展示 LLM 预检理由、风险和证据要求。"""
+        self.assertIn("llm_execution_preflight", self.react_agent_task_queue)
+        self.assertIn("LLM 实验预检", self.react_agent_task_queue)
+        self.assertIn("模型", self.react_agent_task_queue)
+        self.assertIn("放行理由", self.react_agent_task_queue)
+        self.assertIn("方法风险", self.react_agent_task_queue)
+        self.assertIn("证据要求", self.react_agent_task_queue)
+        self.assertIn("人工审阅提示", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"agent-task-llm-preflight\"", self.react_agent_task_queue)
+        self.assertIn("agent-task-llm-preflight", self.react_styles_css)
 
     def test_bdd_37f_react_task_queue_exposes_execution_result_review_gate(self) -> None:
         """行为 37f：候选来源种子包执行完成后，React 队列必须提供执行结果审阅门。"""

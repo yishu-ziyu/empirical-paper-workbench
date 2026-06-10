@@ -16,6 +16,7 @@ import { apiUrl } from "../lib/apiBase";
 type DraftSectionTasksReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
 type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "needs_revision" | "reject";
 type FormalWritebackPreflightReviewAction = "approve_formal_writeback" | "needs_revision" | "reject";
+type DispatchReviewAction = "approve" | "reject";
 type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction | FormalWritebackPreflightReviewAction;
 
 interface QueueSummary {
@@ -117,6 +118,14 @@ interface AgentTask {
   next_action?: string;
   blockers?: Array<{ code?: string; message?: string }>;
   primary_action?: QueuePrimaryAction;
+  dispatch_review?: {
+    status?: string;
+    action?: string;
+    reviewer?: string;
+    note?: string;
+    reviewed_at?: string;
+    evidence_level?: string;
+  };
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
   llm_intervention_handoff?: LlmInterventionHandoff;
@@ -230,6 +239,9 @@ function statusLabel(status?: string): string {
     ready_for_dispatch: "待派发",
     queued: "待审阅",
     dispatched: "已派发",
+    reviewed_for_dispatch: "派工已审阅",
+    blocked: "已阻断",
+    needs_revision: "需要修订",
     draft_section_tasks_ready: "章节任务包待审阅",
     draft_section_tasks_approved: "已交给 WriterAgent",
     draft_section_tasks_needs_revision: "需要修订",
@@ -269,6 +281,8 @@ function actionLabel(action?: string): string {
     revise_section_drafts: "修订章节草稿",
     replace_section_drafts: "替换章节草稿",
     revise_formal_writeback_preflight: "修订正式写回预检",
+    select_execution_backend: "选择执行后端",
+    revise_dispatch_task: "修订派工任务",
     draft_execution_packet_ready: "草案层执行包已生成",
   };
   return labels[action ?? ""] ?? action ?? "查看下一步";
@@ -285,6 +299,21 @@ function reviewActionLabel(action: ReviewAction): string {
 function draftSectionTasksReviewActionLabel(action: DraftSectionTasksReviewAction): string {
   if (action === "reject") return "拒绝任务包";
   return reviewActionLabel(action);
+}
+
+function dispatchReviewActionLabel(action: DispatchReviewAction): string {
+  return action === "approve" ? "批准派工" : "退回修订";
+}
+
+function dispatchReviewErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("internal_skill_execution_packet_required")) {
+    return "先生成 Skill 执行包后再批准派工。";
+  }
+  if (message.includes("invalid_dispatch_review_action")) {
+    return "派工审阅动作不合法，请刷新后重试。";
+  }
+  return "派工审阅没有写回成功，请稍后重试。";
 }
 
 function textList(items?: string[]): string {
@@ -481,6 +510,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<{ taskId: string; action: ReviewAction } | null>(null);
+  const [dispatchReviewing, setDispatchReviewing] = useState<{ taskId: string; action: DispatchReviewAction } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
   const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
@@ -597,6 +627,28 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError("正式写回预检审阅没有写回成功，请确认预检清单已经生成。");
     } finally {
       setReviewing(null);
+    }
+  };
+
+  const reviewAgentTaskDispatch = async (taskId: string, action: DispatchReviewAction) => {
+    setDispatchReviewing({ taskId, action });
+    try {
+      const data = await fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/dispatch-review`, {
+        method: "PUT",
+        body: JSON.stringify({
+          action,
+          note:
+            action === "approve"
+              ? "执行包和派工边界已审阅，同意进入执行后端选择。"
+              : "当前派工需要先修订，暂不进入执行。",
+        }),
+      });
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch (err) {
+      setError(dispatchReviewErrorMessage(err));
+    } finally {
+      setDispatchReviewing(null);
     }
   };
 
@@ -758,6 +810,12 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const generatingDrafts = generatingSectionDrafts === task.id;
             const exportPreflightReady = hasFormalWriteback && task.status === "formal_sections_written";
             const generatingSkillPacket = generatingSkillPacketTaskId === task.id;
+            const hasInternalSkillBinding = Boolean(task.internal_skill_bindings?.length);
+            const internalSkillPacketReady = task.internal_skill_execution_packet?.status === "draft_execution_packet_ready";
+            const dispatchReviewPending = task.dispatch_review?.status === "pending" || task.next_action === "dispatch_review_required";
+            const dispatchReviewDone = task.dispatch_review?.status === "reviewed";
+            const dispatchApproveDisabled = hasInternalSkillBinding && !internalSkillPacketReady;
+            const dispatchBusy = dispatchReviewing?.taskId === task.id;
             const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             const canGeneratePdfCandidateExport =
               task.status === "formal_export_preflight_ready" &&
@@ -799,6 +857,65 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                       generatingSkillPacket,
                       onGenerateSkillPacket: generateInternalSkillExecutionPacket,
                     })}
+
+                    {dispatchReviewPending ? (
+                      <div className="agent-task-dispatch-review" data-testid="agent-task-dispatch-review">
+                        <div className="agent-task-dispatch-review__head">
+                          <span className="eyebrow">派工审阅</span>
+                          <h3>确认这个 Agent 任务是否进入执行</h3>
+                          <p>批准后只进入执行后端选择；退回后任务停在修订状态，已保存的研究材料不会被覆盖。</p>
+                        </div>
+                        {dispatchApproveDisabled ? (
+                          <p className="agent-task-dispatch-review__gate">先生成 Skill 执行包后再批准派工。</p>
+                        ) : null}
+                        <div className="agent-task-dispatch-review__actions">
+                          <button
+                            className="btn btn--primary"
+                            type="button"
+                            data-dispatch-review-action="approve"
+                            onClick={() => void reviewAgentTaskDispatch(task.id, "approve")}
+                            disabled={dispatchBusy || dispatchApproveDisabled}
+                          >
+                            {dispatchReviewing?.taskId === task.id && dispatchReviewing.action === "approve" ? (
+                              <Loader2 size={15} className="spin" />
+                            ) : (
+                              <CheckCircle2 size={15} />
+                            )}
+                            <span>
+                              {dispatchReviewing?.taskId === task.id && dispatchReviewing.action === "approve"
+                                ? "写回中"
+                                : dispatchReviewActionLabel("approve")}
+                            </span>
+                          </button>
+                          <button
+                            className="btn btn--secondary"
+                            type="button"
+                            data-dispatch-review-action="reject"
+                            onClick={() => void reviewAgentTaskDispatch(task.id, "reject")}
+                            disabled={dispatchBusy}
+                          >
+                            {dispatchReviewing?.taskId === task.id && dispatchReviewing.action === "reject" ? (
+                              <Loader2 size={15} className="spin" />
+                            ) : (
+                              <XCircle size={15} />
+                            )}
+                            <span>
+                              {dispatchReviewing?.taskId === task.id && dispatchReviewing.action === "reject"
+                                ? "写回中"
+                                : dispatchReviewActionLabel("reject")}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : dispatchReviewDone ? (
+                      <div className="agent-task-dispatch-review agent-task-dispatch-review--done">
+                        <span className="eyebrow">派工审阅结果</span>
+                        <p>
+                          {task.dispatch_review?.action === "approve" ? "已批准进入执行后端选择。" : "已退回修订。"}下一步：
+                          {actionLabel(task.next_action)}。
+                        </p>
+                      </div>
+                    ) : null}
 
                     {reviewReady ? (
                       <div className="agent-task-queue-review" data-testid="draft-section-tasks-review">

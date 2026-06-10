@@ -3322,6 +3322,10 @@ def generate_project_pdf_candidate_export(
         "created_at": timestamp,
         "evidence_level": export_record["evidence_level"],
     }
+    if export_record.get("llm_provider_snapshot"):
+        summary["llm_provider_snapshot"] = export_record["llm_provider_snapshot"]
+        summary["llm_preflight_summary"] = export_record.get("llm_preflight_summary", "")
+        summary["llm_preflight_human_review_note"] = export_record.get("llm_preflight_human_review_note", "")
     task["pdf_candidate_export"] = summary
     task["status"] = "pdf_candidate_exported"
     task["next_action"] = "review_pdf_candidate"
@@ -4765,6 +4769,19 @@ def build_export_llm_preflight_provenance(task: dict[str, Any]) -> dict[str, Any
     }
 
 
+def build_export_llm_preflight_provenance_from_source(source: dict[str, Any]) -> dict[str, Any]:
+    provider_snapshot = source.get("llm_provider_snapshot")
+    if not isinstance(provider_snapshot, dict) or not provider_snapshot:
+        return {}
+    return {
+        "llm_provider_snapshot": provider_snapshot,
+        "llm_preflight_summary": str(source.get("llm_preflight_summary") or ""),
+        "llm_preflight_backend_reason": str(source.get("llm_preflight_backend_reason") or ""),
+        "llm_preflight_human_review_note": str(source.get("llm_preflight_human_review_note") or ""),
+        "llm_preflight_artifact_path": str(source.get("llm_preflight_artifact_path") or ""),
+    }
+
+
 def build_formal_export_section_check(target: dict[str, Any], index: int, project_root: Path) -> dict[str, Any]:
     formal_target_path = str(target.get("formal_target_path") or "")
     absolute_target = project_root / formal_target_path if formal_target_path else None
@@ -4865,7 +4882,7 @@ def build_pdf_candidate_export_record(
         for index, section_check in enumerate(section_checks, start=1)
         if section_check.get("exists")
     ]
-    return {
+    export_record = {
         "schema_version": "p1.agent_task_pdf_candidate_export.v1",
         "status": "pdf_candidate_exported",
         "source_task_id": str(task.get("id") or preflight.get("source_task_id") or ""),
@@ -4903,6 +4920,8 @@ def build_pdf_candidate_export_record(
         "created_at": timestamp,
         "evidence_level": "verified_source_record",
     }
+    export_record.update(build_export_llm_preflight_provenance_from_source(preflight))
+    return export_record
 
 
 def build_formal_pdf_candidate_report_from_queue_export(
@@ -4912,7 +4931,7 @@ def build_formal_pdf_candidate_report_from_queue_export(
     absolute_pdf_path: Path,
     absolute_qmd_path: Path,
 ) -> dict[str, Any]:
-    return {
+    report = {
         "schema_version": "p5.formal_pdf_candidate.v1",
         "status": "pdf_candidate_ready",
         "source": "agent_task_queue",
@@ -4951,6 +4970,8 @@ def build_formal_pdf_candidate_report_from_queue_export(
         "created_at": export_record.get("created_at"),
         "evidence_level": "verified_source_record",
     }
+    report.update(build_export_llm_preflight_provenance_from_source(export_record))
+    return report
 
 
 def build_pdf_candidate_review_record(
@@ -5102,6 +5123,17 @@ def build_pdf_candidate_section(section_check: dict[str, Any], project_root: Pat
 
 def format_pdf_candidate_export_review(export_record: dict[str, Any]) -> str:
     required_checks = normalize_list(export_record.get("review", {}).get("required_checks"))
+    llm_provider_snapshot = (
+        export_record.get("llm_provider_snapshot")
+        if isinstance(export_record.get("llm_provider_snapshot"), dict)
+        else {}
+    )
+    primary_provider = (
+        llm_provider_snapshot.get("primary_provider")
+        if isinstance(llm_provider_snapshot.get("primary_provider"), dict)
+        else {}
+    )
+    selection = llm_provider_snapshot.get("selection") if isinstance(llm_provider_snapshot.get("selection"), dict) else {}
     lines = [
         "# PDF 候选稿审阅",
         "",
@@ -5116,6 +5148,18 @@ def format_pdf_candidate_export_review(export_record: dict[str, Any]) -> str:
         "## 人工审阅清单",
     ]
     lines.extend(f"- {item}" for item in required_checks)
+    if primary_provider:
+        lines.extend(
+            [
+                "",
+                "## LLM 判断来源",
+                f"- Provider：{primary_provider.get('provider_name') or primary_provider.get('provider_id')}",
+                f"- Model：{primary_provider.get('model')}",
+                f"- 选择来源：{selection.get('source') or 'unknown'}",
+                f"- 预检摘要：{export_record.get('llm_preflight_summary') or '未记录'}",
+                f"- 人工审阅提示：{export_record.get('llm_preflight_human_review_note') or '未记录'}",
+            ]
+        )
     lines.extend(["", "## 边界", f"- {export_record.get('usage_boundary')}", ""])
     return "\n".join(lines)
 

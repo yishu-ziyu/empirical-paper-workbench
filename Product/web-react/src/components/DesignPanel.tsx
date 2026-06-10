@@ -3,6 +3,7 @@ import { Sparkles, CheckCircle2, AlertCircle, Loader2, Code2, FlaskConical, Libr
 import { cn } from "../lib/cn";
 import { apiUrl } from "../lib/apiBase";
 import { MethodsDrawer } from "./MethodsDrawer";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 /** 与 Product/types/research.py DesignCandidate 一致 */
 export interface DesignCandidateFE {
@@ -130,9 +131,8 @@ export function DesignPanel({ topicSlug, briefPath, variablesPath, onComplete }:
       )}
 
       {error && (
-        <div className="design-panel__error" role="alert">
-          <AlertCircle size={16} />
-          <span>{error}</span>
+        <div className="design-panel__error" role="alert" data-testid="design-error">
+          <ServiceConnectionRecovery message={error} onRetry={handleDesign} />
         </div>
       )}
 

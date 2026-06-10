@@ -6,10 +6,10 @@ import {
   XCircle,
   FileText,
   Sparkles,
-  AlertCircle,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { apiUrl } from "../lib/apiBase";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 /** 与 Product/types/research.py 对齐 */
 export type VariableRole = "X" | "Y" | "control" | "mediator" | "moderator";
@@ -180,8 +180,7 @@ export function VariablesPanel({
       {/* ── 错误 / 状态条 ── */}
       {error ? (
         <div className="variables-panel__error" role="alert" data-testid="variables-error">
-          <AlertCircle aria-hidden />
-          <span>{error}</span>
+          <ServiceConnectionRecovery message={error} onRetry={() => void run()} />
         </div>
       ) : null}
 

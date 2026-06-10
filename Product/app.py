@@ -158,6 +158,7 @@ from Product.backend.task_dispatch_service import (
 from Product.backend.trace_learning_service import (
     TraceLearningProposalBlockedError,
     capture_project_trace_learning_bad_case,
+    generate_project_trace_learning_regression_test_patch_proposal,
     get_project_trace_learning_bad_cases,
     generate_project_trace_learning_regression_proposal,
     get_project_trace_learning_regression_proposals,
@@ -1182,6 +1183,27 @@ def api_v1_review_project_trace_learning_regression_proposal(
             project_id,
             proposal_id,
             payload.model_dump(),
+        )
+    except TraceLearningProposalBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post(
+    "/api/v1/projects/{project_id}/trace-learning/regression-proposals/{proposal_id}/test-patch-proposals",
+    status_code=201,
+)
+def api_v1_generate_project_trace_learning_regression_test_patch_proposal(
+    project_id: str,
+    proposal_id: str,
+) -> dict:
+    try:
+        return generate_project_trace_learning_regression_test_patch_proposal(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            proposal_id,
         )
     except TraceLearningProposalBlockedError as exc:
         return error_response(409, exc.code, str(exc))

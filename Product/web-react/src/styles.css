@@ -1221,6 +1221,68 @@ button {
   font-size: 16px;
 }
 
+.agent-task-queue-focus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(230, 230, 230, 0.16);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(230, 230, 230, 0.08), rgba(230, 230, 230, 0.035)),
+    rgba(17, 17, 17, 0.46);
+  box-shadow: inset 0 0 0 1px rgba(230, 230, 230, 0.035);
+  padding: 15px;
+}
+
+.agent-task-queue-focus h3 {
+  margin: 6px 0 6px;
+  color: var(--color-strong);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.32;
+  letter-spacing: 0;
+}
+
+.agent-task-queue-focus p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.agent-task-queue-focus__action {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(12, 12, 12, 0.34);
+  padding: 11px 12px;
+}
+
+.agent-task-queue-focus__action span {
+  color: var(--color-subtle);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agent-task-queue-focus__action strong {
+  overflow-wrap: anywhere;
+  color: var(--color-strong);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.agent-task-queue-focus__action small {
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .agent-task-queue-panel__error {
   border: 1px solid rgba(230, 230, 230, 0.16);
   border-radius: var(--radius-md);
@@ -1249,6 +1311,11 @@ button {
   border: 1px solid rgba(230, 230, 230, 0.11);
   border-radius: var(--radius-md);
   background: rgba(22, 22, 22, 0.5);
+}
+
+.agent-task-card--focus {
+  border-color: rgba(230, 230, 230, 0.22);
+  background: rgba(230, 230, 230, 0.055);
 }
 
 .agent-task-card__top {
@@ -2423,6 +2490,10 @@ button {
 
   .agent-task-queue-panel__summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-task-queue-focus {
+    grid-template-columns: 1fr;
   }
 
   .stage-unlock-list {

@@ -152,7 +152,7 @@ from Product.backend.supervisor_plan_service import (
     get_project_supervisor_plan,
     review_project_supervisor_plan,
 )
-from Product.backend.topic_intake_service import ensure_topic_supervisor_plan
+from Product.backend.topic_intake_service import TopicIntakeLLMUnavailableError, ensure_topic_supervisor_plan
 from Product.backend.task_dispatch_service import (
     AgentTaskDispatchReviewError,
     review_project_agent_task_dispatch,
@@ -751,6 +751,8 @@ def api_v1_topic_intake_supervisor_plan(payload: TopicIntakeSupervisorPlanPayloa
         )
     except ValueError as exc:
         return error_response(400, "invalid_topic_intake", str(exc))
+    except TopicIntakeLLMUnavailableError as exc:
+        return error_response(503, "llm_supervisor_unavailable", str(exc))
     except FileNotFoundError as exc:
         return error_response(400, "topic_workspace_invalid", f"Missing required file: {exc}")
 

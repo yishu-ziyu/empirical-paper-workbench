@@ -5,11 +5,109 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 import Product.app as product_app
+from Product.backend import llm_client
 from Product.backend.registry import ensure_registry
+
+
+def _topic_intake_llm_response(topic: str) -> str:
+    return json.dumps(
+        {
+            "stage_plan": [
+                {
+                    "id": "task-brief",
+                    "title": "确认研究题目和边界",
+                    "owner": "Supervisor",
+                    "status": "ready",
+                    "reason": f"围绕题目“{topic}”确认研究对象、样本、边界和成功标准。",
+                    "inputs": ["用户题目"],
+                    "outputs": ["TaskBrief"],
+                },
+                {
+                    "id": "recursive-evidence-search",
+                    "title": "递归检索文献与数据线索",
+                    "owner": "LiteratureAgent",
+                    "status": "draft",
+                    "reason": "需要把题目连接到文献、变量定义和可用数据。",
+                    "inputs": ["ResearchQuestion"],
+                    "outputs": ["LiteratureSeedPackage"],
+                },
+                {
+                    "id": "variable-profile",
+                    "title": "建立变量画像",
+                    "owner": "DataAgent",
+                    "status": "draft",
+                    "reason": "变量角色必须由字段证据和样本口径支撑。",
+                    "inputs": ["候选数据"],
+                    "outputs": ["VariableRoleSet 草案"],
+                },
+                {
+                    "id": "method-design",
+                    "title": "设计方法门",
+                    "owner": "MethodAgent",
+                    "status": "draft",
+                    "reason": "根据变量和数据结构选择合适的实证方法。",
+                    "inputs": ["变量画像"],
+                    "outputs": ["DesignSpec 草案"],
+                },
+            ],
+            "subagent_dispatch": [
+                {
+                    "agent_id": "LiteratureAgent",
+                    "role": "LiteratureAgent",
+                    "task": "检索相关文献和引用证据",
+                    "summary": "形成候选引用与缺口清单。",
+                },
+                {
+                    "agent_id": "DataAgent",
+                    "role": "DataAgent",
+                    "task": "读取候选数据并提出变量角色草案",
+                    "summary": "不写正式变量角色。",
+                },
+                {
+                    "agent_id": "MethodAgent",
+                    "role": "MethodAgent",
+                    "task": "提出方法门和识别风险",
+                    "summary": "等待人工审阅。",
+                },
+            ],
+            "evidence_requirements": ["文献、变量和方法选择必须有可追溯证据。"],
+            "risks": ["变量选择和方法设定需要人工确认。"],
+            "human_gates": ["审阅 SupervisorPlan 后才能创建 Agent Task Queue。"],
+            "internal_skill_judgments": [
+                {
+                    "skill_id": "recursive_research_search",
+                    "reason": "题目需要从文献、数据、变量和方法缺口递归展开。",
+                    "evidence_fit": "先产出候选证据包，再进入变量角色确认。",
+                    "agent_fit": "LiteratureAgent 先行，DataAgent 和 MethodAgent 跟进。",
+                    "risk_note": "候选证据只进入草案层。",
+                    "human_review_note": "正式写回前必须人工确认。",
+                    "confidence": "high",
+                }
+            ],
+            "reference_chain_policy": {
+                "source_priority": ["CNKI", "Google Scholar", "Zotero", "Local Notes"],
+                "sources": [
+                    {"id": "CNKI", "label": "CNKI", "trigger": "中文实证文献", "mode": "manual_assisted"},
+                    {"id": "Google Scholar", "label": "Google Scholar", "trigger": "英文文献", "mode": "browser_assisted"},
+                ],
+                "max_depth": 2,
+                "max_iterations": 5,
+                "draft_citation_policy": "候选引用进入草案层。",
+                "formal_writeback_gate": "review_literature_seed_package",
+                "writes_formal_layer": False,
+            },
+            "next_action": {
+                "id": "review_supervisor_plan",
+                "label": "审阅路线后创建 Agent Task Queue",
+            },
+        },
+        ensure_ascii=False,
+    )
 
 
 class AgentTaskQueueApiTests(unittest.TestCase):
@@ -2260,14 +2358,29 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         """行为 44：中文题目必须先登记为真实项目，再保存可审阅计划，批准后才能创建队列。"""
         topic = "父母的教育水平对子女工资水平的影响"
 
-        intake = self.client.post(
-            "/api/v1/topic-intake/supervisor-plan",
-            json={
-                "topic": topic,
-                "slug": "parent-education-wage",
-                "note": "用户从首页输入题目，准备审阅 SupervisorPlan。",
-            },
-        )
+        with patch.object(
+            llm_client,
+            "chat_completion_with_fallback",
+            return_value=(
+                _topic_intake_llm_response(topic),
+                {
+                    "provider_id": "openai",
+                    "provider_name": "Codex GPT",
+                    "model": "gpt-5.5",
+                    "api_type": "openai-compatible",
+                    "input_tokens": 640,
+                    "output_tokens": 360,
+                },
+            ),
+        ):
+            intake = self.client.post(
+                "/api/v1/topic-intake/supervisor-plan",
+                json={
+                    "topic": topic,
+                    "slug": "parent-education-wage",
+                    "note": "用户从首页输入题目，准备审阅 SupervisorPlan。",
+                },
+            )
 
         self.assertEqual(intake.status_code, 201, msg=intake.text)
         payload = intake.json()
@@ -2285,6 +2398,9 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(plan["project_id"], project["id"])
         self.assertEqual(plan["status"], "needs_review")
         self.assertFalse(plan.get("can_dispatch", False))
+        self.assertEqual(plan["evidence_level"], "llm_supervisor")
+        self.assertEqual(plan["provider"]["provider_id"], "openai")
+        self.assertEqual(plan["provider"]["model"], "gpt-5.5")
         self.assertGreaterEqual(len(plan["stage_plan"]), 4)
         self.assertGreaterEqual(len(plan["subagent_dispatch"]), 3)
         self.assertIn("recursive_research_search", plan["selected_skill_ids"])

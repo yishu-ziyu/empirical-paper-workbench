@@ -26,6 +26,7 @@ LLM_ENV_KEYS = (
     "MINIMAX_MODEL",
     "OPENROUTER_API_KEY",
     "OPENROUTER_MODEL",
+    "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
 )
 
 
@@ -74,8 +75,49 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         self.assertEqual(body["primary_action"]["id"], "configure_llm_provider")
         self.assertIn("OPENAI_API_KEY", body["primary_action"]["hint"])
 
+    def test_bdd_llm_supervisor_status_lists_gpt55_as_selectable_choice_even_when_not_configured(self) -> None:
+        """行为 3：GPT-5.5 没接上时，产品仍要显示它是可切换候选以及缺什么配置。"""
+        os.environ["STEPFUN_API_KEY"] = "test-stepfun"
+        os.environ["STEPFUN_MODEL"] = "step-3.7-flash"
+
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None):
+            response = self.client.get("/api/v1/providers/llm-supervisor")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        body = response.json()
+        openai_choice = next(item for item in body["model_choices"] if item["provider_id"] == "openai")
+        self.assertEqual(openai_choice["provider_name"], "OpenAI")
+        self.assertEqual(openai_choice["default_model"], "gpt-5.5")
+        self.assertFalse(openai_choice["configured"])
+        self.assertEqual(openai_choice["api_key_env"], "OPENAI_API_KEY")
+        self.assertIn("EMPIRICAL_LLM_PROVIDER=openai", openai_choice["activation_hint"])
+        self.assertEqual(body["selection"]["current_provider_id"], "stepfun")
+        self.assertIn("切换", body["selection"]["change_hint"])
+
+    def test_bdd_llm_supervisor_status_exposes_local_codex_cli_state(self) -> None:
+        """行为 4：本地 Codex 不能只在后台存在，状态页要说明是否可作为本地执行型 Supervisor。"""
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.app.local_codex_status",
+            return_value={
+                "provider": "local_codex",
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "version": "codex-cli 0.137.0",
+                "execution_enabled": False,
+                "execution_env": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
+            },
+        ):
+            response = self.client.get("/api/v1/providers/llm-supervisor")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        body = response.json()
+        self.assertTrue(body["local_codex"]["available"])
+        self.assertFalse(body["local_codex"]["execution_enabled"])
+        self.assertEqual(body["local_codex"]["execution_env"], "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC")
+        self.assertIn("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1", body["local_codex"]["activation_hint"])
+
     def test_bdd_llm_supervisor_probe_uses_real_fallback_call_and_returns_model_metadata(self) -> None:
-        """行为 3：用户需要确认真实连通时，探测接口必须触发一次 LLM 调用并回传模型元数据。"""
+        """行为 5：用户需要确认真实连通时，探测接口必须触发一次 LLM 调用并回传模型元数据。"""
         os.environ["OPENAI_API_KEY"] = "test-openai"
         os.environ["OPENAI_MODEL"] = "gpt-5.5"
         with patch.object(
@@ -103,7 +145,7 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         self.assertIn("LLM Supervisor", mocked_call.call_args.args[0][0]["content"])
 
     def test_bdd_llm_supervisor_probe_returns_actionable_error_when_call_fails(self) -> None:
-        """行为 4：探测失败时不能只说服务没连上，要指出这是模型层不可用。"""
+        """行为 6：探测失败时不能只说服务没连上，要指出这是模型层不可用。"""
         with patch.object(
             llm_client,
             "chat_completion_with_fallback",
@@ -136,6 +178,10 @@ class LlmSupervisorProviderFrontendTests(unittest.TestCase):
         self.assertIn("status-pill-llm-model", source)
         self.assertIn("status-detail-llm", source)
         self.assertIn("备用链", source)
+        self.assertIn("可选模型", source)
+        self.assertIn("本地 Codex", source)
+        self.assertIn("model_choices", source)
+        self.assertIn("local_codex", source)
 
 
 if __name__ == "__main__":

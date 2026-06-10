@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import queue
 from pathlib import Path
 
@@ -639,16 +640,76 @@ def _llm_attempt_api_view(attempt: dict) -> dict:
     }
 
 
+LLM_MODEL_CHOICE_PROVIDER_IDS = ("openai", "stepfun", "mimo", "deepseek", "minimax", "openrouter")
+
+
+def _llm_model_choice_api_view(provider_id: str, current_provider_id: str = "") -> dict:
+    preset = llm_client.resolve_provider(provider_id)
+    configured = llm_client._provider_has_key(provider_id, preset)
+    default_model = llm_client._provider_default_model(preset) or ""
+    provider_hint = f"EMPIRICAL_LLM_PROVIDER={preset.id}"
+    model_hint = f" / EMPIRICAL_LLM_MODEL={default_model}" if default_model else ""
+    if configured:
+        activation_hint = f"已配置。设置 {provider_hint}{model_hint} 可设为主模型。"
+    elif preset.api_key_env:
+        activation_hint = f"配置 {preset.api_key_env}，并设置 {provider_hint}{model_hint} 后可切换。"
+    else:
+        activation_hint = f"设置 {provider_hint} 后可切换。"
+    return {
+        "provider_id": preset.id,
+        "provider_name": preset.name,
+        "default_model": default_model,
+        "models": list(preset.models),
+        "api_type": preset.api_type,
+        "base_url": llm_client._provider_default_base_url(preset),
+        "api_key_env": preset.api_key_env,
+        "configured": configured,
+        "current": preset.id == current_provider_id,
+        "activation_hint": activation_hint,
+    }
+
+
+def _local_codex_api_view() -> dict:
+    status = local_codex_status()
+    if status.get("available") and status.get("execution_enabled"):
+        activation_hint = "本地 Codex CLI 已启用，可承担本地执行型 Supervisor 或子 Agent。"
+    elif status.get("available"):
+        activation_hint = f"Codex CLI 已安装；设置 {status.get('execution_env')}=1 后可进入本地执行链路。"
+    else:
+        activation_hint = "未找到本地 Codex CLI；安装并完成登录后可作为本地执行型 Supervisor。"
+    return {
+        **status,
+        "label": "本地 Codex",
+        "activation_hint": activation_hint,
+    }
+
+
 @app.get("/api/v1/providers/llm-supervisor")
 def api_v1_llm_supervisor_provider() -> dict:
     attempts = [_llm_attempt_api_view(attempt) for attempt in llm_client.build_default_llm_attempts()]
     configured_attempts = [attempt for attempt in attempts if attempt["configured"]]
     primary_provider = configured_attempts[0] if configured_attempts else {}
+    current_provider_id = str(primary_provider.get("provider_id") or "")
+    preferred_provider = os.getenv("EMPIRICAL_LLM_PROVIDER", "").strip()
+    preferred_model = os.getenv("EMPIRICAL_LLM_MODEL", "").strip()
     return {
         "label": "LLM Supervisor",
         "ready": bool(primary_provider),
         "primary_provider": primary_provider,
         "attempts": attempts,
+        "model_choices": [
+            _llm_model_choice_api_view(provider_id, current_provider_id)
+            for provider_id in LLM_MODEL_CHOICE_PROVIDER_IDS
+        ],
+        "selection": {
+            "current_provider_id": current_provider_id,
+            "current_model": str(primary_provider.get("model") or ""),
+            "preferred_provider_id": preferred_provider,
+            "preferred_model": preferred_model,
+            "source": "env_preference" if preferred_provider else "configured_fallback",
+            "change_hint": "切换主模型：设置 EMPIRICAL_LLM_PROVIDER 和 EMPIRICAL_LLM_MODEL，再重启本地服务。",
+        },
+        "local_codex": _local_codex_api_view(),
         "primary_action": {}
         if primary_provider
         else {

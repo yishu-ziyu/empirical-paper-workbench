@@ -31,6 +31,7 @@ from Product.backend.agent_task_queue_service import (
     review_project_draft_literature_review,
     review_project_draft_section_plan,
     review_project_draft_section_tasks,
+    review_project_final_pdf_writeback,
     review_project_formal_writeback_preflight,
     review_project_manuscript_citation_plan,
     review_project_section_drafts,
@@ -516,6 +517,11 @@ class AgentTaskPdfCandidateExportPayload(BaseModel):
 
 
 class AgentTaskPdfCandidateReviewPayload(BaseModel):
+    note: str = ""
+
+
+class AgentTaskFinalPdfWritebackPayload(BaseModel):
+    action: str = "approve"
     note: str = ""
 
 
@@ -1700,6 +1706,30 @@ def api_v1_generate_project_pdf_candidate_review(
         )
     except AgentTaskQueueBlockedError as exc:
         status_code = 404 if exc.code == "agent_task_not_found" else 409
+        return error_response(status_code, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/agent-task-queue/tasks/{task_id}/final-pdf-writeback")
+def api_v1_review_project_final_pdf_writeback(
+    project_id: str,
+    task_id: str,
+    payload: AgentTaskFinalPdfWritebackPayload,
+) -> dict:
+    try:
+        return review_project_final_pdf_writeback(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            task_id,
+            payload.action,
+            payload.note,
+        )
+    except AgentTaskQueueBlockedError as exc:
+        status_code = 400 if exc.code == "invalid_final_pdf_writeback_action" else 409
+        if exc.code == "agent_task_not_found":
+            status_code = 404
         return error_response(status_code, exc.code, str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")

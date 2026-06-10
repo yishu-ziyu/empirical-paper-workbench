@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,11 @@ VALID_FORMAL_WRITEBACK_PREFLIGHT_REVIEW_ACTIONS = {
     "needs_revision",
     "reject",
 }
+VALID_FINAL_PDF_WRITEBACK_ACTIONS = {
+    "approve",
+    "needs_revision",
+    "reject",
+}
 CITATION_VERIFICATION_REQUIRED_CHECKS = [
     "authors",
     "year",
@@ -71,6 +77,13 @@ CITATION_VERIFICATION_EVIDENCE_REQUIRED_FIELDS = [
     "relevance",
     "evidence_url",
 ]
+
+
+def ensure_program_workbench_import_path() -> None:
+    program_root = Path(__file__).resolve().parents[2] / "Program"
+    program_root_text = str(program_root)
+    if program_root_text not in sys.path:
+        sys.path.insert(0, program_root_text)
 
 
 class AgentTaskQueueBlockedError(RuntimeError):
@@ -541,6 +554,42 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "enabled": True,
             "writes_formal_layer": False,
             "target": "pdf_candidate_human_review",
+        }
+    if status == "pdf_candidate_final_approval_needs_revision":
+        return {
+            "id": "repair_pdf_candidate",
+            "label": "修订 PDF 候选稿",
+            "reason": "人工审阅要求修订候选 PDF，先修复候选稿再重新进入最终批准。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "pdf_candidate_review",
+        }
+    if status == "pdf_candidate_final_approval_rejected":
+        return {
+            "id": "repair_pdf_candidate",
+            "label": "重做 PDF 候选稿",
+            "reason": "本轮候选 PDF 已被拒绝，需要重新生成候选稿后再进入最终批准。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "pdf_candidate_review",
+        }
+    if status == "final_pdf_writeback_blocked":
+        return {
+            "id": "repair_final_pdf_writeback_inputs",
+            "label": "修复最终 PDF 写回输入",
+            "reason": "最终写回被批准账本、候选稿完整性或预检条件阻断，需要修复后重跑。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "final_pdf_writeback",
+        }
+    if status in {"final_pdf_written", "final_pdf_already_written"}:
+        return {
+            "id": "docx_export_preflight",
+            "label": "进入 docx 导出预检",
+            "reason": "最终 PDF 已进入正式包；下一步检查 docx 导出工具链和投稿包完整性。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "docx_export_preflight",
         }
     if status == "pdf_candidate_review_blocked":
         return {
@@ -3196,6 +3245,252 @@ def generate_project_pdf_candidate_review(
     return response
 
 
+def review_project_final_pdf_writeback(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    action: str,
+    note: str = "",
+) -> dict[str, Any]:
+    if action not in VALID_FINAL_PDF_WRITEBACK_ACTIONS:
+        raise AgentTaskQueueBlockedError(
+            "invalid_final_pdf_writeback_action",
+            f"Unsupported final PDF writeback action: {action}",
+        )
+
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    review_summary = task.get("pdf_candidate_review") if isinstance(task.get("pdf_candidate_review"), dict) else {}
+    final_preflight_rel = str(review_summary.get("final_preflight_path") or "")
+    final_preflight_path = project_root / final_preflight_rel if final_preflight_rel else None
+    if task.get("status") != "pdf_candidate_reviewed" or not final_preflight_path or not final_preflight_path.exists():
+        raise AgentTaskQueueBlockedError(
+            "pdf_candidate_review_required",
+            "Reviewed PDF candidate and final writeback preflight are required before final PDF approval.",
+        )
+
+    ensure_program_workbench_import_path()
+    from workbench.formal_pdf_final_approval import (  # type: ignore
+        build_formal_pdf_final_approval,
+        write_formal_pdf_final_approval_outputs,
+    )
+    from workbench.formal_pdf_final_writeback import (  # type: ignore
+        build_formal_pdf_final_writeback,
+        write_formal_pdf_final_writeback_outputs,
+    )
+    from workbench.paper_revision_round import snapshot_formal_state  # type: ignore
+
+    timestamp = utc_now()
+    final_preflight = json.loads(final_preflight_path.read_text(encoding="utf-8"))
+    approval_report_rel = Path("Results/json/formal_pdf_final_approval.json")
+    approval_review_rel = Path("Reviews/formal_pdf_final_approval.md")
+    approval_ledger_rel = Path("state/product/writeback_approvals.json")
+    approval_report, approval_exit_code = build_formal_pdf_final_approval(
+        project_root,
+        final_preflight,
+        final_preflight_path,
+        action=action,
+        note=note,
+        actor="human",
+        approval_path=project_root / approval_ledger_rel,
+        formal_state_before=snapshot_formal_state(project_root),
+    )
+    write_formal_pdf_final_approval_outputs(
+        project_root / approval_report_rel,
+        project_root / approval_review_rel,
+        approval_report,
+    )
+    approval_summary = build_final_pdf_approval_summary(
+        approval_report,
+        str(approval_report_rel),
+        str(approval_review_rel),
+    )
+    task["pdf_final_approval"] = approval_summary
+
+    if approval_exit_code != 0 or action != "approve" or approval_report.get("can_enter_p6") is not True:
+        if action == "needs_revision":
+            task["status"] = "pdf_candidate_final_approval_needs_revision"
+            task["next_action"] = "repair_pdf_candidate"
+        elif action == "reject":
+            task["status"] = "pdf_candidate_final_approval_rejected"
+            task["next_action"] = "repair_pdf_candidate"
+        else:
+            task["status"] = "final_pdf_writeback_blocked"
+            task["next_action"] = "repair_final_pdf_writeback_inputs"
+        task["can_execute"] = False
+        task["blockers"] = build_final_pdf_blockers(approval_report.get("blocking_reasons") or [])
+        task.setdefault("audit_log", []).append(
+            {
+                "event": "formal_pdf_final_approval_recorded",
+                "actor": "human",
+                "timestamp": timestamp,
+                "artifact_path": str(approval_report_rel),
+                "review_path": str(approval_review_rel),
+                "status": approval_summary["status"],
+                "next_action": task["next_action"],
+            }
+        )
+        task["primary_action"] = build_task_primary_action(task)
+        return persist_agent_task_queue_response(project, project_root, queue, timestamp, task, approval_summary)
+
+    writeback_report_rel = Path("Results/json/formal_pdf_final_writeback.json")
+    writeback_review_rel = Path("Reviews/formal_pdf_final_writeback.md")
+    final_pdf_rel = Path("Submissions/formal_package/paper.pdf")
+    candidate_report_rel = str(review_summary.get("source_candidate_report") or "Results/json/formal_pdf_candidate_report.json")
+    writeback_report, writeback_exit_code = build_formal_pdf_final_writeback(
+        project_root,
+        candidate_report_path=project_root / candidate_report_rel,
+        final_preflight_path=final_preflight_path,
+        approval_report_path=project_root / approval_report_rel,
+        approval_ledger_path=project_root / approval_ledger_rel,
+        output_pdf_path=project_root / final_pdf_rel,
+        formal_state_before=snapshot_formal_state(project_root),
+    )
+    write_formal_pdf_final_writeback_outputs(
+        project_root / writeback_report_rel,
+        project_root / writeback_review_rel,
+        writeback_report,
+    )
+    writeback_summary = build_final_pdf_writeback_summary(
+        writeback_report,
+        str(writeback_report_rel),
+        str(writeback_review_rel),
+    )
+    task["pdf_final_writeback"] = writeback_summary
+    task["can_execute"] = False
+    task["blockers"] = build_final_pdf_blockers(writeback_report.get("blocking_reasons") or [])
+    if writeback_exit_code == 0:
+        task["status"] = writeback_summary["status"]
+        task["next_action"] = writeback_report.get("next_action", {}).get("id") or "docx_export_preflight"
+        event = "formal_pdf_final_writeback_completed"
+    else:
+        task["status"] = "final_pdf_writeback_blocked"
+        task["next_action"] = "repair_final_pdf_writeback_inputs"
+        event = "formal_pdf_final_writeback_blocked"
+    task.setdefault("audit_log", []).append(
+        {
+            "event": event,
+            "actor": "human",
+            "timestamp": timestamp,
+            "approval_artifact_path": str(approval_report_rel),
+            "artifact_path": str(writeback_report_rel),
+            "review_path": str(writeback_review_rel),
+            "final_pdf": writeback_summary["final_pdf"],
+            "status": writeback_summary["status"],
+            "next_action": task["next_action"],
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    return persist_agent_task_queue_response(
+        project,
+        project_root,
+        queue,
+        timestamp,
+        task,
+        approval_summary,
+        writeback_summary,
+    )
+
+
+def persist_agent_task_queue_response(
+    project: dict[str, Any],
+    project_root: Path,
+    queue: dict[str, Any],
+    timestamp: str,
+    task: dict[str, Any],
+    approval_summary: dict[str, Any],
+    writeback_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["pdf_final_approval"] = approval_summary
+    if writeback_summary is not None:
+        response["pdf_final_writeback"] = writeback_summary
+    return response
+
+
+def build_final_pdf_approval_summary(
+    report: dict[str, Any],
+    report_path: str,
+    review_path: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": report.get("schema_version"),
+        "status": report.get("status"),
+        "action": report.get("action"),
+        "artifact_path": report_path,
+        "review_path": review_path,
+        "approval_path": report.get("approval_path"),
+        "candidate_pdf": report.get("candidate_pdf"),
+        "candidate_qmd": report.get("candidate_qmd"),
+        "can_enter_p6": report.get("can_enter_p6") is True,
+        "final_writeback_authorized": report.get("final_writeback_authorized") is True,
+        "blocking_reason_count": len(normalize_list(report.get("blocking_reasons"))),
+        "writes_formal_layer": report.get("this_command_wrote_formal_state") is True,
+        "wrote_final_outputs": report.get("this_command_wrote_final_outputs") is True,
+        "next_action": report.get("next_action", {}).get("id"),
+        "created_at": report.get("generated_at"),
+        "evidence_level": "local_file",
+    }
+
+
+def build_final_pdf_writeback_summary(
+    report: dict[str, Any],
+    report_path: str,
+    review_path: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": report.get("schema_version"),
+        "status": report.get("status"),
+        "artifact_path": report_path,
+        "review_path": review_path,
+        "source_candidate_report": report.get("source_candidate_report"),
+        "source_final_preflight": report.get("source_final_preflight"),
+        "source_approval_report": report.get("source_approval_report"),
+        "source_candidate_pdf": report.get("source_candidate_pdf"),
+        "final_pdf": report.get("final_pdf"),
+        "final_pdf_exists": report.get("final_pdf_exists") is True,
+        "source_candidate_pdf_sha256": report.get("source_candidate_pdf_sha256"),
+        "final_pdf_sha256": report.get("final_pdf_sha256"),
+        "final_writeback_authorized": report.get("final_writeback_authorized") is True,
+        "blocking_reason_count": len(normalize_list(report.get("blocking_reasons"))),
+        "wrote_final_pdf": report.get("this_command_wrote_final_pdf") is True,
+        "wrote_docx": report.get("this_command_wrote_docx") is True,
+        "writes_formal_layer": report.get("this_command_wrote_formal_state") is True,
+        "next_action": report.get("next_action", {}).get("id"),
+        "created_at": report.get("generated_at"),
+        "evidence_level": "local_file",
+    }
+
+
+def build_final_pdf_blockers(reasons: list[str]) -> list[dict[str, str]]:
+    return [{"code": reason, "message": final_pdf_blocker_message(reason)} for reason in reasons]
+
+
+def final_pdf_blocker_message(reason: str) -> str:
+    messages = {
+        "final_preflight_not_ready": "最终写回预检还没有 ready。",
+        "final_approval_not_requested_by_preflight": "预检没有请求最终人工批准。",
+        "human_approval_not_required_by_preflight": "预检缺少人工批准要求。",
+        "formal_state_changed_before_final_approval": "正式层状态在批准前发生变化。",
+        "candidate_pdf_missing": "候选 PDF 缺失。",
+        "candidate_qmd_missing": "候选 QMD 缺失。",
+        "final_approval_not_authorized": "人工批准报告未授权最终写回。",
+        "approval_ledger_not_approved": "审批账本未批准最终写回。",
+        "candidate_pdf_mismatch": "候选 PDF 与审批对象不一致。",
+        "candidate_qmd_mismatch": "候选 QMD 与审批对象不一致。",
+        "final_pdf_exists_with_different_hash": "最终 PDF 已存在且内容不同，不能覆盖。",
+    }
+    return messages.get(reason, reason)
+
+
 def build_reference_seed_package_review(action: str, note: str, timestamp: str) -> dict[str, Any]:
     if action == "approve_for_draft":
         status = "approved_for_draft"
@@ -4488,7 +4783,7 @@ def build_pdf_candidate_final_writeback_preflight(
     ready = review_record.get("status") == "ready_for_final_approval_review"
     return {
         "schema_version": "p5.formal_pdf_final_writeback_preflight.v1",
-        "status": "waiting_for_human_final_approval" if ready else "blocked_by_pdf_candidate_review",
+        "status": "ready_for_human_final_approval" if ready else "blocked_by_pdf_candidate_review",
         "source": "agent_task_queue",
         "source_review": review_report_path,
         "source_candidate_report": review_record.get("source_candidate_report"),
@@ -4498,12 +4793,24 @@ def build_pdf_candidate_final_writeback_preflight(
         "final_pdf": "Submissions/formal_package/paper.pdf",
         "final_docx": "Submissions/formal_package/paper.docx",
         "final_writeback_allowed": False,
+        "can_request_final_approval": ready,
+        "requires_human_approval": True,
         "can_enter_p6": False,
         "required_before_final_writeback": [
             "human_review_pdf_candidate",
             "formal_pdf_final_approval",
         ],
         "blocking_reasons": normalize_list(review_record.get("blocking_reasons")),
+        "formal_state_guard": {
+            "changed": False,
+            "changed_paths": [],
+        },
+        "approval_contract": {
+            "approval_key": "formal_pdf_candidate",
+            "required_action": "approve",
+            "writes_formal_layer": False,
+            "writes_final_outputs_before_p6": False,
+        },
         "note": note,
         "created_at": timestamp,
         "evidence_level": "verified_source_record",

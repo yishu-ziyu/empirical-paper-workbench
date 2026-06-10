@@ -1907,8 +1907,12 @@ class AgentTaskQueueApiTests(unittest.TestCase):
 
         final_preflight = json.loads(final_preflight_path.read_text(encoding="utf-8"))
         self.assertEqual(final_preflight["schema_version"], "p5.formal_pdf_final_writeback_preflight.v1")
+        self.assertEqual(final_preflight["status"], "ready_for_human_final_approval")
         self.assertEqual(final_preflight["source_review"], review["artifact_path"])
+        self.assertTrue(final_preflight["can_request_final_approval"])
+        self.assertTrue(final_preflight["requires_human_approval"])
         self.assertFalse(final_preflight["final_writeback_allowed"])
+        self.assertFalse(final_preflight["formal_state_guard"]["changed"])
         self.assertIn("human_review_pdf_candidate", final_preflight["required_before_final_writeback"])
         review_text = review_doc_path.read_text(encoding="utf-8")
         self.assertIn("PDF 候选稿机器审阅", review_text)
@@ -1938,6 +1942,114 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         task = queue_state["tasks"][0]
         self.assertEqual(task["status"], "formal_export_preflight_ready")
         self.assertEqual(task["next_action"], "run_pdf_export_preflight")
+
+    def test_bdd_58_final_pdf_writeback_requires_reviewed_pdf_candidate(self) -> None:
+        """行为 58：没有经过候选稿审阅时，不能直接写入最终 PDF。"""
+        self._approve_formal_writeback()
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "正式章节已写入，准备候选稿导出。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        export_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "生成 PDF 候选稿供人工审阅。"},
+        )
+        self.assertEqual(export_response.status_code, 200, msg=export_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/final-pdf-writeback",
+            json={"action": "approve", "note": "尝试跳过候选稿审阅。"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "pdf_candidate_review_required")
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.pdf").exists())
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_pdf_final_approval.json").exists())
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_pdf_final_writeback.json").exists())
+
+    def test_bdd_59_human_approved_pdf_candidate_writes_final_pdf_with_audit(self) -> None:
+        """行为 59：人工批准 PDF 候选稿后，队列写入最终 PDF 并保留审批和写回账本。"""
+        task = self._prepare_pdf_candidate_reviewed_task()
+        candidate_pdf = self.project_root / task["pdf_candidate_review"]["candidate_pdf"]
+        candidate_bytes = candidate_pdf.read_bytes()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/final-pdf-writeback",
+            json={"action": "approve", "note": "批准候选 PDF 写入最终包。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        approval = task["pdf_final_approval"]
+        writeback = task["pdf_final_writeback"]
+        self.assertEqual(task["status"], "final_pdf_written")
+        self.assertEqual(task["next_action"], "docx_export_preflight")
+        self.assertEqual(task["primary_action"]["id"], "docx_export_preflight")
+        self.assertEqual(task["audit_log"][-1]["event"], "formal_pdf_final_writeback_completed")
+
+        self.assertEqual(approval["schema_version"], "p5.formal_pdf_final_approval.v1")
+        self.assertEqual(approval["status"], "approved_for_final_writeback")
+        self.assertTrue(approval["can_enter_p6"])
+        self.assertTrue(approval["final_writeback_authorized"])
+        self.assertFalse(approval["wrote_final_outputs"])
+        self.assertEqual(writeback["schema_version"], "p6.formal_pdf_final_writeback.v1")
+        self.assertIn(writeback["status"], {"final_pdf_written", "final_pdf_already_written"})
+        self.assertTrue(writeback["final_pdf_exists"])
+        self.assertTrue(writeback["final_writeback_authorized"])
+        self.assertTrue(writeback["wrote_final_pdf"] or writeback["status"] == "final_pdf_already_written")
+        self.assertFalse(writeback["wrote_docx"])
+        self.assertFalse(writeback["writes_formal_layer"])
+
+        final_pdf = self.project_root / "Submissions" / "formal_package" / "paper.pdf"
+        self.assertTrue(final_pdf.exists())
+        self.assertEqual(final_pdf.read_bytes(), candidate_bytes)
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.docx").exists())
+        self.assertTrue((self.project_root / "Results" / "json" / "formal_pdf_final_approval.json").exists())
+        self.assertTrue((self.project_root / "Reviews" / "formal_pdf_final_approval.md").exists())
+        self.assertTrue((self.project_root / "state" / "product" / "writeback_approvals.json").exists())
+        self.assertTrue((self.project_root / "Results" / "json" / "formal_pdf_final_writeback.json").exists())
+        self.assertTrue((self.project_root / "Reviews" / "formal_pdf_final_writeback.md").exists())
+
+    def test_bdd_60_pdf_candidate_revision_decision_does_not_write_final_pdf(self) -> None:
+        """行为 60：人工要求修订 PDF 候选稿时，只记录决定，不写入最终 PDF。"""
+        self._prepare_pdf_candidate_reviewed_task()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/final-pdf-writeback",
+            json={"action": "needs_revision", "note": "候选稿目录和图表说明需要修订。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        approval = task["pdf_final_approval"]
+        self.assertEqual(task["status"], "pdf_candidate_final_approval_needs_revision")
+        self.assertEqual(task["next_action"], "repair_pdf_candidate")
+        self.assertEqual(task["primary_action"]["id"], "repair_pdf_candidate")
+        self.assertEqual(approval["status"], "needs_revision")
+        self.assertFalse(approval["can_enter_p6"])
+        self.assertFalse(approval["final_writeback_authorized"])
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.pdf").exists())
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_pdf_final_writeback.json").exists())
+
+    def _prepare_pdf_candidate_reviewed_task(self) -> dict:
+        self._approve_formal_writeback()
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "正式章节已写入，准备候选稿导出。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        export_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "生成 PDF 候选稿供人工审阅。"},
+        )
+        self.assertEqual(export_response.status_code, 200, msg=export_response.text)
+        review_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-review",
+            json={"note": "检查候选稿能否进入最终写回批准。"},
+        )
+        self.assertEqual(review_response.status_code, 200, msg=review_response.text)
+        return review_response.json()["agent_task_queue"]["tasks"][0]
 
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
@@ -2731,6 +2843,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("pdf-candidate-review", self.react_agent_task_queue)
         self.assertIn("pdf_candidate_review", self.react_agent_task_queue)
         self.assertIn("最终写回预检", self.react_agent_task_queue)
+        self.assertIn("FinalPdfWritebackAction", self.react_agent_task_queue)
+        self.assertIn("reviewFinalPdfWriteback", self.react_agent_task_queue)
+        self.assertIn("/final-pdf-writeback", self.react_agent_task_queue)
+        self.assertIn("pdf_final_approval", self.react_agent_task_queue)
+        self.assertIn("pdf_final_writeback", self.react_agent_task_queue)
+        self.assertIn("agent-task-queue-final-pdf-actions", self.react_agent_task_queue)
+        self.assertIn('data-final-pdf-writeback-action="approve"', self.react_agent_task_queue)
+        self.assertIn("批准写入最终 PDF", self.react_agent_task_queue)
+        self.assertIn("最终 PDF 人工决定", self.react_agent_task_queue)
+        self.assertIn("最终 PDF 写回", self.react_agent_task_queue)
+        self.assertIn("审批账本", self.react_agent_task_queue)
+        self.assertIn("docx 仍交给后续导出预检处理", self.react_agent_task_queue)
 
     def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:
         """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供本地服务恢复动作。"""

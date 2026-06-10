@@ -331,9 +331,19 @@ interface TraceLearningBadCaseResponse {
 }
 
 interface TraceLearningRegressionProposalResponse {
-  regression_proposal?: {
-    id?: string;
-    status?: string;
+  regression_proposal?: TraceLearningRegressionProposal;
+}
+
+interface TraceLearningRegressionProposal {
+  id?: string;
+  status?: string;
+  current_review_status?: string;
+  latest_review_id?: string | null;
+}
+
+interface TraceLearningRegressionProposalListResponse {
+  trace_learning?: {
+    regression_proposals?: TraceLearningRegressionProposal[];
   };
 }
 
@@ -517,6 +527,10 @@ function referenceSeedReviewErrorMessage(err: unknown): string {
     return "还没有可审阅的候选来源种子包。";
   }
   return "执行结果审阅没有写回成功，请稍后重试。";
+}
+
+function isReviewableTraceLearningProposal(proposal?: TraceLearningRegressionProposal): boolean {
+  return (proposal?.current_review_status ?? proposal?.status) === "needs_review";
 }
 
 function textList(items?: string[]): string {
@@ -827,12 +841,40 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [traceFeedback, setTraceFeedback] = useState("");
   const [traceSaving, setTraceSaving] = useState(false);
   const [traceProposalGenerating, setTraceProposalGenerating] = useState(false);
+  const [traceProposalsLoading, setTraceProposalsLoading] = useState(false);
   const [traceProposalReviewing, setTraceProposalReviewing] = useState(false);
   const [latestTraceProposalId, setLatestTraceProposalId] = useState<string | null>(null);
   const [traceProposalReviewDecision, setTraceProposalReviewDecision] =
     useState<TraceLearningProposalReviewDecision>("request_revision");
   const [traceMessage, setTraceMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const loadTraceLearningRegressionProposals = useCallback(
+    async (options?: { announce?: boolean }) => {
+      setTraceProposalsLoading(true);
+      try {
+        const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/trace-learning/regression-proposals`), {
+          method: "GET",
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as TraceLearningRegressionProposalListResponse;
+        const reviewableProposal =
+          data.trace_learning?.regression_proposals?.find(
+            (proposal) => proposal.current_review_status === "needs_review" || isReviewableTraceLearningProposal(proposal),
+          ) ?? null;
+        setLatestTraceProposalId(reviewableProposal?.id ?? null);
+        if (reviewableProposal?.id && options?.announce) {
+          setTraceMessage(`已有待审阅回归建议：${reviewableProposal.id}`);
+        }
+        return reviewableProposal;
+      } catch {
+        return null;
+      } finally {
+        setTraceProposalsLoading(false);
+      }
+    },
+    [projectId],
+  );
 
   const loadQueue = useCallback(async () => {
     abortRef.current?.abort();
@@ -845,13 +887,14 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
         signal: controller.signal,
       });
       setQueue(data.agent_task_queue);
+      void loadTraceLearningRegressionProposals();
       setError(null);
     } catch (err) {
       if ((err as Error).name !== "AbortError") setError(SERVICE_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [loadTraceLearningRegressionProposals, projectId]);
 
   useEffect(() => {
     void loadQueue();
@@ -1153,7 +1196,20 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/trace-learning/regression-proposals`), {
         method: "POST",
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { code?: string } } | null;
+        if (payload?.error?.code === "no_new_trace_learning_bad_cases") {
+          const restored = await loadTraceLearningRegressionProposals({ announce: true });
+          if (restored) return;
+          setTraceMessage("已有回归建议，但当前没有待审阅项。");
+          return;
+        }
+        if (payload?.error?.code === "no_captured_trace_learning_bad_cases") {
+          setTraceMessage("还没有可生成建议的坏案例，先写入一个问题。");
+          return;
+        }
+        throw new Error(payload?.error?.code ?? "trace_learning_regression_proposal_failed");
+      }
       const data = (await response.json()) as TraceLearningRegressionProposalResponse;
       const proposalId = data.regression_proposal?.id ?? null;
       setLatestTraceProposalId(proposalId);
@@ -1188,6 +1244,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       if (!response.ok) throw new Error(await response.text());
       const data = (await response.json()) as TraceLearningRegressionProposalReviewResponse;
       setTraceMessage(`已记录审阅：${data.regression_proposal_review?.status ?? "已审阅"}`);
+      void loadTraceLearningRegressionProposals();
     } catch {
       setTraceMessage("审阅记录暂时没写入成功，请稍后再试。");
     } finally {
@@ -1319,10 +1376,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             type="button"
             data-testid="trace-learning-regression-proposal-review"
             onClick={() => void reviewTraceLearningRegressionProposal()}
-            disabled={!latestTraceProposalId || traceProposalReviewing}
+            disabled={!latestTraceProposalId || traceProposalReviewing || traceProposalsLoading}
           >
-            {traceProposalReviewing ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
-            <span>{traceProposalReviewing ? "审阅中" : "审阅回归建议"}</span>
+            {traceProposalReviewing || traceProposalsLoading ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
+            <span>{traceProposalReviewing ? "审阅中" : traceProposalsLoading ? "读取中" : "审阅回归建议"}</span>
           </button>
           {traceMessage ? <small>{traceMessage}</small> : null}
         </div>

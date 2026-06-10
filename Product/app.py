@@ -42,6 +42,7 @@ from Product.backend.agent_task_queue_service import (
 from Product.backend.agent_registry_service import get_agent_details, list_agents
 from Product.backend.artifact_service import get_artifact, promote_artifact
 from Product.backend.codex_provider import local_codex_status
+from Product.backend import llm_client
 from Product.backend.design_spec_service import (
     get_project_design_spec,
     get_project_run_plan,
@@ -620,6 +621,71 @@ def api_v1_health() -> dict:
 @app.get("/api/v1/providers/local-codex")
 def api_v1_local_codex_provider() -> dict:
     return local_codex_status()
+
+
+def _llm_attempt_api_view(attempt: dict) -> dict:
+    provider_id = str(attempt.get("provider_id") or "")
+    preset = llm_client.resolve_provider(provider_id)
+    configured = llm_client._provider_has_key(provider_id, preset)
+    model = str(attempt.get("model") or llm_client._provider_default_model(preset) or "")
+    return {
+        "provider_id": provider_id,
+        "provider_name": preset.name,
+        "model": model,
+        "api_type": preset.api_type,
+        "base_url": llm_client._provider_default_base_url(preset),
+        "api_key_env": preset.api_key_env,
+        "configured": configured,
+    }
+
+
+@app.get("/api/v1/providers/llm-supervisor")
+def api_v1_llm_supervisor_provider() -> dict:
+    attempts = [_llm_attempt_api_view(attempt) for attempt in llm_client.build_default_llm_attempts()]
+    configured_attempts = [attempt for attempt in attempts if attempt["configured"]]
+    primary_provider = configured_attempts[0] if configured_attempts else {}
+    return {
+        "label": "LLM Supervisor",
+        "ready": bool(primary_provider),
+        "primary_provider": primary_provider,
+        "attempts": attempts,
+        "primary_action": {}
+        if primary_provider
+        else {
+            "id": "configure_llm_provider",
+            "label": "配置 LLM Supervisor",
+            "hint": "配置 OPENAI_API_KEY / OPENAI_MODEL，或配置 STEPFUN、MIMO、DEEPSEEK、MINIMAX 等本地可用 provider。",
+        },
+    }
+
+
+@app.post("/api/v1/providers/llm-supervisor/probe")
+def api_v1_llm_supervisor_probe():
+    messages = [
+        {
+            "role": "system",
+            "content": "You are the LLM Supervisor connectivity probe for an empirical research Agent product.",
+        },
+        {
+            "role": "user",
+            "content": 'LLM Supervisor 连通性测试。只返回 JSON：{"status":"ok"}',
+        },
+    ]
+    try:
+        raw_text, provider = llm_client.chat_completion_with_fallback(messages, temperature=0)
+    except llm_client.LLMError as exc:
+        return error_response(
+            503,
+            "llm_supervisor_unavailable",
+            f"LLM Supervisor 模型层暂时不可用：{exc.code}。请检查 provider 密钥、模型名或网络。",
+            {"reason": exc.code},
+        )
+    return {
+        "ok": True,
+        "label": "LLM Supervisor",
+        "provider": provider,
+        "raw_response": raw_text[:500],
+    }
 
 
 @app.get("/api/v1/agents")

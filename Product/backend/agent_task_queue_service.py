@@ -3515,6 +3515,7 @@ def review_project_final_pdf_writeback(
         approval_path=project_root / approval_ledger_rel,
         formal_state_before=snapshot_formal_state(project_root),
     )
+    approval_report.update(build_export_llm_preflight_provenance_from_source(final_preflight))
     write_formal_pdf_final_approval_outputs(
         project_root / approval_report_rel,
         project_root / approval_review_rel,
@@ -3566,6 +3567,7 @@ def review_project_final_pdf_writeback(
         output_pdf_path=project_root / final_pdf_rel,
         formal_state_before=snapshot_formal_state(project_root),
     )
+    writeback_report.update(build_export_llm_preflight_provenance_from_source(final_preflight))
     write_formal_pdf_final_writeback_outputs(
         project_root / writeback_report_rel,
         project_root / writeback_review_rel,
@@ -3638,7 +3640,7 @@ def build_final_pdf_approval_summary(
     report_path: str,
     review_path: str,
 ) -> dict[str, Any]:
-    return {
+    summary = {
         "schema_version": report.get("schema_version"),
         "status": report.get("status"),
         "action": report.get("action"),
@@ -3656,6 +3658,13 @@ def build_final_pdf_approval_summary(
         "created_at": report.get("generated_at"),
         "evidence_level": "local_file",
     }
+    if report.get("llm_provider_snapshot"):
+        summary["llm_provider_snapshot"] = report["llm_provider_snapshot"]
+        summary["llm_preflight_summary"] = report.get("llm_preflight_summary", "")
+        summary["llm_preflight_backend_reason"] = report.get("llm_preflight_backend_reason", "")
+        summary["llm_preflight_human_review_note"] = report.get("llm_preflight_human_review_note", "")
+        summary["llm_preflight_artifact_path"] = report.get("llm_preflight_artifact_path", "")
+    return summary
 
 
 def build_final_pdf_writeback_summary(
@@ -3663,7 +3672,7 @@ def build_final_pdf_writeback_summary(
     report_path: str,
     review_path: str,
 ) -> dict[str, Any]:
-    return {
+    summary = {
         "schema_version": report.get("schema_version"),
         "status": report.get("status"),
         "artifact_path": report_path,
@@ -3685,6 +3694,13 @@ def build_final_pdf_writeback_summary(
         "created_at": report.get("generated_at"),
         "evidence_level": "local_file",
     }
+    if report.get("llm_provider_snapshot"):
+        summary["llm_provider_snapshot"] = report["llm_provider_snapshot"]
+        summary["llm_preflight_summary"] = report.get("llm_preflight_summary", "")
+        summary["llm_preflight_backend_reason"] = report.get("llm_preflight_backend_reason", "")
+        summary["llm_preflight_human_review_note"] = report.get("llm_preflight_human_review_note", "")
+        summary["llm_preflight_artifact_path"] = report.get("llm_preflight_artifact_path", "")
+    return summary
 
 
 def build_final_pdf_blockers(reasons: list[str]) -> list[dict[str, str]]:

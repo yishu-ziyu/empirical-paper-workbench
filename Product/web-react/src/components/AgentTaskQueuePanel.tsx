@@ -381,6 +381,9 @@ interface AgentTask {
     blocking_reason_count?: number;
     writes_formal_layer?: boolean;
     wrote_final_outputs?: boolean;
+    llm_provider_snapshot?: LlmExecutionPreflight["provider_snapshot"];
+    llm_preflight_summary?: string;
+    llm_preflight_human_review_note?: string;
     next_action?: string;
   };
   pdf_final_writeback?: {
@@ -400,6 +403,9 @@ interface AgentTask {
     wrote_final_pdf?: boolean;
     wrote_docx?: boolean;
     writes_formal_layer?: boolean;
+    llm_provider_snapshot?: LlmExecutionPreflight["provider_snapshot"];
+    llm_preflight_summary?: string;
+    llm_preflight_human_review_note?: string;
     next_action?: string;
   };
   export_preflight_followups?: Array<{
@@ -3028,6 +3034,27 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             <strong>{task.pdf_final_approval?.writes_formal_layer ? "会写入" : "不写入"}</strong>
                           </div>
                         </div>
+                        {task.pdf_final_approval?.llm_provider_snapshot?.primary_provider ? (
+                          <div
+                            className="agent-task-queue-pdf-candidate__llm"
+                            data-testid="agent-task-queue-final-pdf-approval-llm"
+                          >
+                            <strong>LLM 判断来源</strong>
+                            <p>
+                              {task.pdf_final_approval.llm_provider_snapshot.primary_provider.provider_name ??
+                                task.pdf_final_approval.llm_provider_snapshot.primary_provider.provider_id ??
+                                "LLM Supervisor"}
+                              {" / "}
+                              {task.pdf_final_approval.llm_provider_snapshot.primary_provider.model ?? "未记录模型"}
+                              {" · 备用链 "}
+                              {task.pdf_final_approval.llm_provider_snapshot.attempt_count ?? 0}
+                              {" 个"}
+                            </p>
+                            {task.pdf_final_approval.llm_preflight_summary ? (
+                              <small>{task.pdf_final_approval.llm_preflight_summary}</small>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -3072,6 +3099,27 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             <strong>{task.pdf_final_writeback?.writes_formal_layer ? "已变更" : "未变更"}</strong>
                           </div>
                         </div>
+                        {task.pdf_final_writeback?.llm_provider_snapshot?.primary_provider ? (
+                          <div
+                            className="agent-task-queue-pdf-candidate__llm"
+                            data-testid="agent-task-queue-final-pdf-writeback-llm"
+                          >
+                            <strong>LLM 判断来源</strong>
+                            <p>
+                              {task.pdf_final_writeback.llm_provider_snapshot.primary_provider.provider_name ??
+                                task.pdf_final_writeback.llm_provider_snapshot.primary_provider.provider_id ??
+                                "LLM Supervisor"}
+                              {" / "}
+                              {task.pdf_final_writeback.llm_provider_snapshot.primary_provider.model ?? "未记录模型"}
+                              {" · 备用链 "}
+                              {task.pdf_final_writeback.llm_provider_snapshot.attempt_count ?? 0}
+                              {" 个"}
+                            </p>
+                            {task.pdf_final_writeback.llm_preflight_summary ? (
+                              <small>{task.pdf_final_writeback.llm_preflight_summary}</small>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 

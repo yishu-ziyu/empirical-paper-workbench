@@ -4135,6 +4135,53 @@ button {
   font-weight: 600;
 }
 
+.system-status-bar__probe-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.system-status-bar__probe-button {
+  appearance: none;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.08);
+  color: var(--color-strong);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.system-status-bar__probe-button:hover:not(:disabled),
+.system-status-bar__probe-button:focus-visible {
+  background: rgba(230, 230, 230, 0.14);
+  outline: none;
+}
+
+.system-status-bar__probe-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.system-status-bar__probe-result {
+  margin: 0;
+  color: var(--color-subtle);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.system-status-bar__probe-result--ok {
+  color: var(--color-strong);
+}
+
+.system-status-bar__probe-result--error {
+  color: var(--color-muted);
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * Step cards (BriefPanel 4-step LLM 扩写) — v2 visual upgrade
  * 2026-06-05: 用户反馈"可视化还是不够清楚".

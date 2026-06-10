@@ -163,6 +163,7 @@ from Product.backend.trace_learning_service import (
     generate_project_trace_learning_regression_proposal,
     get_project_trace_learning_regression_proposals,
     review_project_trace_learning_regression_proposal,
+    review_project_trace_learning_regression_test_patch_proposal,
 )
 from Product.backend.variable_role_service import (
     FieldProfileRequiredError,
@@ -1204,6 +1205,29 @@ def api_v1_generate_project_trace_learning_regression_test_patch_proposal(
             REPO_ROOT,
             project_id,
             proposal_id,
+        )
+    except TraceLearningProposalBlockedError as exc:
+        return error_response(409, exc.code, str(exc))
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post(
+    "/api/v1/projects/{project_id}/trace-learning/regression-test-patch-proposals/{patch_proposal_id}/review",
+    status_code=201,
+)
+def api_v1_review_project_trace_learning_regression_test_patch_proposal(
+    project_id: str,
+    patch_proposal_id: str,
+    payload: TraceLearningProposalReviewPayload,
+) -> dict:
+    try:
+        return review_project_trace_learning_regression_test_patch_proposal(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            patch_proposal_id,
+            payload.model_dump(),
         )
     except TraceLearningProposalBlockedError as exc:
         return error_response(409, exc.code, str(exc))

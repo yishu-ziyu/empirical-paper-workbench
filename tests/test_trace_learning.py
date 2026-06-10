@@ -537,6 +537,158 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         patch_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_proposals.jsonl"
         self.assertFalse(patch_path.exists())
 
+    def test_bdd_6i_review_test_patch_proposal_records_human_decision(self) -> None:
+        """Given 测试补丁建议已生成；When 人工批准；Then 只追加补丁建议审阅账本。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        patch_id = patch["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch_id}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "确认这个测试补丁建议可以进入人工落地。"},
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        review = response.json()["regression_test_patch_proposal_review"]
+        self.assertEqual(review["proposal_id"], patch_id)
+        self.assertEqual(review["decision"], "approve")
+        self.assertEqual(review["status"], "approved")
+        self.assertEqual(review["reviewer"], "mahaoxuan")
+        self.assertEqual(review["note"], "确认这个测试补丁建议可以进入人工落地。")
+        self.assertEqual(review["next_action"], "human_apply_regression_test_patch")
+        self.assertFalse(review["writes_formal_layer"])
+        self.assertFalse(review["test_file_write_allowed"])
+        self.assertFalse(review["canonical_rule_write_allowed"])
+        self.assertEqual(
+            review["artifact_path"],
+            "state/product/trace_learning_regression_test_patch_proposal_reviews.jsonl",
+        )
+
+        review_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_proposal_reviews.jsonl"
+        self.assertTrue(review_path.exists())
+        saved = json.loads(review_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(saved["id"], review["id"])
+
+    def test_bdd_6j_review_test_patch_proposal_supports_revision_and_rejection(self) -> None:
+        """Given 测试补丁建议已生成；When 要求修订或拒绝；Then 审阅状态和下一步清晰写入账本。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        patch_id = patch["id"]
+
+        cases = [
+            ("request_revision", "needs_revision", "revise_regression_test_patch_proposal"),
+            ("reject", "rejected", "close_regression_test_patch_proposal"),
+        ]
+        for decision, expected_status, expected_next_action in cases:
+            with self.subTest(decision=decision):
+                response = self.client.post(
+                    f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch_id}/review",
+                    json={"decision": decision, "reviewer": "mahaoxuan", "note": f"{decision} note"},
+                )
+
+                self.assertEqual(response.status_code, 201, msg=response.text)
+                review = response.json()["regression_test_patch_proposal_review"]
+                self.assertEqual(review["decision"], decision)
+                self.assertEqual(review["status"], expected_status)
+                self.assertEqual(review["next_action"], expected_next_action)
+                self.assertFalse(review["writes_formal_layer"])
+                self.assertFalse(review["test_file_write_allowed"])
+                self.assertFalse(review["canonical_rule_write_allowed"])
+
+        review_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_proposal_reviews.jsonl"
+        self.assertEqual(len(review_path.read_text(encoding="utf-8").splitlines()), 2)
+
+    def test_bdd_6k_review_test_patch_proposal_requires_existing_patch_proposal(self) -> None:
+        """Given 测试补丁建议不存在；When 试图审阅；Then API 阻止且不创建审阅账本。"""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/missing/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "missing"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "trace_learning_test_patch_proposal_not_found")
+        review_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_proposal_reviews.jsonl"
+        self.assertFalse(review_path.exists())
+
+    def test_bdd_6l_test_patch_proposal_review_does_not_mutate_formal_tests_or_canonical_rules(self) -> None:
+        """Given 正式状态、测试文件和规则文件已存在；When 审阅测试补丁建议；Then 只写审阅账本。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        protected_states = {
+            "research_question.json": {"question": "父母教育水平对子女工资水平的影响"},
+            "variable_roles.json": {"roles": {"outcome": ["wage"], "treatment": ["parent_edu"]}},
+            "design_spec.json": {"model": {"estimator": "ols"}},
+            "run_plan.json": {"tasks": [{"id": "baseline"}]},
+            "supervisor_plan.json": {"status": "approved", "can_dispatch": True},
+            "agent_task_queue.json": {"status": "ready_for_dispatch", "tasks": []},
+            "canonical_rules.json": {"rules": [{"id": "existing_rule"}]},
+        }
+        for name, payload in protected_states.items():
+            (state_dir / name).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tests_dir = self.repo_root / "tests"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        test_file = tests_dir / "test_trace_learning.py"
+        test_file.write_text("# existing tests stay unchanged\n", encoding="utf-8")
+        before_states = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+        before_test_file = test_file.read_text(encoding="utf-8")
+        patch = self._create_reviewable_test_patch_proposal()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "只批准进入人工落地。"},
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        after_states = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+        self.assertEqual(before_states, after_states)
+        self.assertEqual(before_test_file, test_file.read_text(encoding="utf-8"))
+
+    def test_bdd_6m_get_regression_proposals_restores_test_patch_proposal_reviews(self) -> None:
+        """Given 测试补丁建议已有审阅；When 刷新读取建议；Then 返回补丁建议和最新审阅状态。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "批准人工落地。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+        review_id = reviewed.json()["regression_test_patch_proposal_review"]["id"]
+
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        trace_learning = response.json()["trace_learning"]
+        patch_proposals = trace_learning["regression_test_patch_proposals"]
+        self.assertEqual(len(patch_proposals), 1)
+        self.assertEqual(patch_proposals[0]["id"], patch["id"])
+        self.assertEqual(patch_proposals[0]["current_review_status"], "approved")
+        self.assertEqual(patch_proposals[0]["latest_review_id"], review_id)
+        self.assertEqual(trace_learning["regression_test_patch_proposal_review_count"], 1)
+        self.assertEqual(
+            trace_learning["regression_test_patch_proposal_review_status_by_proposal_id"][patch["id"]],
+            "approved",
+        )
+
+    def test_bdd_6n_idempotent_test_patch_generation_returns_review_status(self) -> None:
+        """Given 测试补丁建议已审阅；When 再次生成同一建议；Then 返回同一建议及最新审阅状态。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "request_revision", "reviewer": "mahaoxuan", "note": "补充边界说明。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+        review_id = reviewed.json()["regression_test_patch_proposal_review"]["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{patch['proposal_id']}/test-patch-proposals"
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        returned_patch = response.json()["regression_test_patch_proposal"]
+        trace_learning = response.json()["trace_learning"]
+        self.assertEqual(returned_patch["id"], patch["id"])
+        self.assertEqual(returned_patch["current_review_status"], "needs_revision")
+        self.assertEqual(returned_patch["latest_review_id"], review_id)
+        self.assertEqual(trace_learning["review_count"], 1)
+        self.assertEqual(trace_learning["latest_patch_proposal"]["current_review_status"], "needs_revision")
+
     def test_bdd_7_missing_user_feedback_is_rejected_without_creating_ledger(self) -> None:
         """Given 没有用户反馈正文；When 试图记录；Then API 拒绝且不创建账本。"""
         response = self.client.post(
@@ -593,6 +745,37 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
             encoding="utf-8",
         )
         (project_root / "Program" / "run_paper.py").write_text("print('ok')\n", encoding="utf-8")
+
+    def _create_reviewable_test_patch_proposal(self) -> dict:
+        created = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/bad-cases",
+            json={
+                "stage": "brief",
+                "surface": "web_react",
+                "target_text": "分析研究问题",
+                "agent_output": "错误套用了旧题目。",
+                "user_feedback": "这个推断和我的题目一点关系都没有。",
+                "expected_behavior": "系统必须围绕当前题目重做语义判断。",
+                "fix_layer": "decision_rule",
+                "severity": "high",
+            },
+        )
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        proposed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals"
+        )
+        self.assertEqual(proposed.status_code, 201, msg=proposed.text)
+        proposal_id = proposed.json()["regression_proposal"]["id"]
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{proposal_id}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "可以准备测试补丁建议。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+        patch_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals/{proposal_id}/test-patch-proposals"
+        )
+        self.assertEqual(patch_response.status_code, 201, msg=patch_response.text)
+        return patch_response.json()["regression_test_patch_proposal"]
 
 
 class TraceLearningFrontendContractTests(unittest.TestCase):
@@ -653,6 +836,37 @@ class TraceLearningFrontendContractTests(unittest.TestCase):
             self.agent_task_queue.find("trace-learning-regression-proposal-review"),
             self.agent_task_queue.find("trace-learning-test-patch-proposal"),
         )
+
+    def test_bdd_10_agent_queue_exposes_test_patch_proposal_review_gate(self) -> None:
+        """Given 测试补丁建议已生成；When 用户查看队列页；Then 页面提供人工审阅门且声明不会自动写入。"""
+        self.assertIn("regression_test_patch_proposals", self.agent_task_queue)
+        self.assertIn("isReviewableTraceLearningTestPatchProposal", self.agent_task_queue)
+        self.assertIn("isReviewedTraceLearningTestPatchProposal", self.agent_task_queue)
+        self.assertIn("reviewablePatchProposal", self.agent_task_queue)
+        self.assertIn("reviewedPatchProposal", self.agent_task_queue)
+        self.assertIn("rememberLatestTracePatchProposalId(reviewablePatchProposal?.id ?? null)", self.agent_task_queue)
+        self.assertIn("isReviewableTraceLearningTestPatchProposal(patchProposal)", self.agent_task_queue)
+        self.assertIn("isReviewedTraceLearningTestPatchProposal(patchProposal)", self.agent_task_queue)
+        self.assertIn("测试补丁建议未进入待审阅状态，请刷新队列后重试。", self.agent_task_queue)
+        self.assertNotIn("regression_test_patch_proposals?.find((proposal) => Boolean(proposal.id))", self.agent_task_queue)
+        self.assertNotIn(
+            "const patchProposalId = data.regression_test_patch_proposal?.id ?? null;\n"
+            "      rememberLatestTracePatchProposalId(patchProposalId);",
+            self.agent_task_queue,
+        )
+        self.assertIn("trace-learning-test-patch-proposal-review", self.agent_task_queue)
+        self.assertIn("测试补丁建议审阅决定", self.agent_task_queue)
+        self.assertIn("/trace-learning/regression-test-patch-proposals/${", self.agent_task_queue)
+        self.assertIn("/review", self.agent_task_queue)
+        self.assertIn("审阅测试补丁建议", self.agent_task_queue)
+        self.assertIn("latestTracePatchProposalId", self.agent_task_queue)
+        self.assertIn("已记录测试补丁建议审阅", self.agent_task_queue)
+        self.assertIn("测试补丁建议已有审阅状态", self.agent_task_queue)
+        self.assertIn("测试补丁建议不在后端返回结果中，请重新生成或刷新队列。", self.agent_task_queue)
+        self.assertIn("测试补丁建议不存在，请重新生成或刷新队列。", self.agent_task_queue)
+        self.assertIn("不会自动写测试文件", self.agent_task_queue)
+        self.assertIn("不会改正式论文", self.agent_task_queue)
+        self.assertIn("canonical 规则库", self.agent_task_queue)
 
 
 if __name__ == "__main__":

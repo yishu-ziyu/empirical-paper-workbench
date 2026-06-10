@@ -2052,6 +2052,11 @@ button {
   padding: 12px;
 }
 
+.agent-task-llm-preflight--blocked {
+  border-color: rgba(230, 230, 230, 0.22);
+  background: rgba(230, 230, 230, 0.075);
+}
+
 .agent-task-llm-preflight__head {
   display: flex;
   align-items: start;
@@ -2076,6 +2081,14 @@ button {
   padding: 5px 8px;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.agent-task-llm-preflight__blocked {
+  border: 1px solid rgba(230, 230, 230, 0.14);
+  border-radius: var(--radius-sm);
+  background: rgba(10, 10, 10, 0.26);
+  padding: 9px 10px;
+  color: var(--color-strong);
 }
 
 .agent-task-llm-preflight__grid,

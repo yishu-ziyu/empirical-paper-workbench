@@ -74,6 +74,8 @@ const STAGE_ORDER: Stage[] = [
   "identification-audit",
 ];
 
+const TOPIC_INTAKE_TIMEOUT_MS = 30000;
+
 const STAGE_LABELS: Record<
   Stage,
   { label: string; hint: string; action: string; next: string }
@@ -485,33 +487,52 @@ export function App() {
     }
     setPlanIntakeStatus("registering");
     setPlanIntakeMessage("正在登记题目和任务路线");
-    const response = await fetch(apiUrl("/api/v1/topic-intake/supervisor-plan"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic: task.message,
-        slug: topicSlug,
-        note: "用户从研究入口批准路线前登记题目和 SupervisorPlan。",
-      }),
-    });
-    if (!response.ok) {
-      const message = await responseErrorMessage(response, "题目登记失败。");
-      setPlanIntakeStatus("failed");
-      setPlanIntakeMessage(message);
-      throw new Error(message);
-    }
+    const topicIntakeController = new AbortController();
+    const topicIntakeTimeoutId = window.setTimeout(
+      () => topicIntakeController.abort(),
+      TOPIC_INTAKE_TIMEOUT_MS,
+    );
+    try {
+      const response = await fetch(apiUrl("/api/v1/topic-intake/supervisor-plan"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: topicIntakeController.signal,
+        body: JSON.stringify({
+          topic: task.message,
+          slug: topicSlug,
+          note: "用户从研究入口批准路线前登记题目和 SupervisorPlan。",
+        }),
+      });
+      if (!response.ok) {
+        const message = await responseErrorMessage(response, "题目登记失败。");
+        setPlanIntakeStatus("failed");
+        setPlanIntakeMessage(message);
+        throw new Error(message);
+      }
 
-    const data = await response.json();
-    setProjectId(data.project.id);
-    const supervisorPlan = (data.supervisor_plan ?? {}) as Record<string, unknown>;
-    setPlanStages(normalizeSupervisorPlanStages(supervisorPlan.stage_plan));
-    setPlanInspector(normalizeSupervisorPlanInspector(supervisorPlan, planInspector));
-    setPlanEvidenceLevel(String(supervisorPlan.evidence_level || "topic_intake"));
-    setPlanFetchError(null);
-    setPlanApprovalError(null);
-    setPlanIntakeStatus("ready");
-    setPlanIntakeMessage(`已登记项目：${data.project.id}`);
-    return data.project.id;
+      const data = await response.json();
+      setProjectId(data.project.id);
+      const supervisorPlan = (data.supervisor_plan ?? {}) as Record<string, unknown>;
+      setPlanStages(normalizeSupervisorPlanStages(supervisorPlan.stage_plan));
+      setPlanInspector(normalizeSupervisorPlanInspector(supervisorPlan, planInspector));
+      setPlanEvidenceLevel(String(supervisorPlan.evidence_level || "topic_intake"));
+      setPlanFetchError(null);
+      setPlanApprovalError(null);
+      setPlanIntakeStatus("ready");
+      setPlanIntakeMessage(`已登记项目：${data.project.id}`);
+      return data.project.id;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        const message =
+          "LLM Supervisor 生成计划超时。当前主模型可能仍在后台处理；你可以重试，或稍后重新读取队列。";
+        setPlanIntakeStatus("failed");
+        setPlanIntakeMessage(message);
+        throw new Error(message);
+      }
+      throw err;
+    } finally {
+      window.clearTimeout(topicIntakeTimeoutId);
+    }
   };
 
   const approveSupervisorPlan = async () => {

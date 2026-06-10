@@ -1623,10 +1623,29 @@ def execute_project_agent_task(
             "execution_backend_required",
             "Select an execution backend before executing this agent task.",
         )
-    llm_handoff = require_llm_intervention_handoff_before_execution(task)
+    try:
+        llm_handoff = require_llm_intervention_handoff_before_execution(task)
+    except AgentTaskQueueBlockedError as exc:
+        if exc.code != "llm_intervention_handoff_required":
+            raise
+        _record_llm_intervention_handoff_blocked(task, exc, selected_backend)
+        task["primary_action"] = build_task_primary_action(task)
+        queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+        queue["updated_at"] = utc_now()
+        path = agent_task_queue_state_path(project_root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+        raise
     try:
         result = execute_agent_task_with_backend(task, project_root)
     except LLMExecutionPreflightError as exc:
+        _record_llm_execution_preflight_blocked(task, exc, selected_backend)
+        task["primary_action"] = build_task_primary_action(task)
+        queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+        queue["updated_at"] = utc_now()
+        path = agent_task_queue_state_path(project_root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
         raise AgentTaskQueueBlockedError(exc.code, str(exc)) from exc
     attach_llm_intervention_handoff_to_execution_result(task, result, llm_handoff)
     queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
@@ -1637,6 +1656,83 @@ def execute_project_agent_task(
     response = build_agent_task_queue_response(project, queue)
     response["execution_result"] = result
     return response
+
+
+def _record_llm_intervention_handoff_blocked(
+    task: dict[str, Any],
+    exc: AgentTaskQueueBlockedError,
+    selected_backend: dict[str, Any],
+) -> None:
+    timestamp = utc_now()
+    handoff = task.get("llm_intervention_handoff")
+    if not isinstance(handoff, dict):
+        handoff = {}
+    handoff["execution_blocked"] = True
+    handoff["block_reason"] = str(exc)
+    handoff["next_action"] = "regenerate_or_confirm_supervisor_plan"
+    handoff["formal_write_allowed"] = False
+    task["llm_intervention_handoff"] = handoff
+    task["error"] = {
+        "code": exc.code,
+        "message": str(exc),
+        "student_message": "LLM Supervisor 交接未完成，暂不启动执行后端。请重新生成或确认 SupervisorPlan 后再执行。",
+    }
+    task.setdefault("audit_log", []).append({
+        "event": "llm_intervention_handoff_blocked",
+        "actor": "llm_supervisor",
+        "timestamp": timestamp,
+        "backend_id": selected_backend.get("id"),
+        "method_id": task.get("method_id"),
+        "error_code": exc.code,
+        "formal_write_allowed": False,
+    })
+
+
+def _record_llm_execution_preflight_blocked(
+    task: dict[str, Any],
+    exc: Exception,
+    selected_backend: dict[str, Any],
+) -> None:
+    timestamp = utc_now()
+    error_code = str(getattr(exc, "code", "") or "llm_execution_preflight_required")
+    message = str(exc)
+    backend_id = str(selected_backend.get("id") or "")
+    preflight = {
+        "schema_version": "p6.llm_execution_preflight.v1",
+        "task_id": str(task.get("id") or ""),
+        "backend_id": backend_id,
+        "method_id": str(task.get("method_id") or ""),
+        "status": "blocked",
+        "error_code": error_code,
+        "message": message,
+        "summary": "LLM 实验预检未完成",
+        "backend_reason": "执行后端未启动；每次实验必须先经过 LLM Supervisor 的执行前判断。",
+        "method_risk": ["模型层不可用时，系统不能形成执行前方法风险判断。"],
+        "evidence_requirements": ["恢复 LLM Supervisor 后重新生成执行前预检。"],
+        "human_review_note": "先配置或恢复 LLM provider，再重试本任务。",
+        "next_action": "configure_llm_provider_or_retry",
+        "provider": {},
+        "artifact_path": "",
+        "formal_write_allowed": False,
+        "required_for_execution": True,
+        "evidence_level": "llm_supervisor",
+        "created_at": timestamp,
+    }
+    task["llm_execution_preflight"] = preflight
+    task["error"] = {
+        "code": error_code,
+        "message": message,
+        "student_message": "LLM 实验预检未完成，暂不启动执行后端。请检查模型配置后重试。",
+    }
+    task.setdefault("audit_log", []).append({
+        "event": "llm_execution_preflight_blocked",
+        "actor": "llm_supervisor",
+        "timestamp": timestamp,
+        "backend_id": backend_id,
+        "method_id": task.get("method_id"),
+        "error_code": error_code,
+        "formal_write_allowed": False,
+    })
 
 
 def review_project_reference_seed_package(

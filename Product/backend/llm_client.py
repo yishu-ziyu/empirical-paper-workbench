@@ -408,6 +408,7 @@ def _call_openai_compatible(
     messages: list[dict[str, str]],
     temperature: float,
     provider_name: str,
+    timeout_seconds: int = DEFAULT_TIMEOUT,
 ) -> tuple[str, dict[str, int]]:
     payload: dict[str, Any] = {
         "model": model,
@@ -429,7 +430,7 @@ def _call_openai_compatible(
     )
 
     try:
-        parsed = _read_response_json(req)
+        parsed = _read_response_json(req, timeout=timeout_seconds)
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise LLMError("provider_error", f"{provider_name} HTTP {exc.code}: {detail}") from exc
@@ -453,6 +454,7 @@ def _call_anthropic_compatible(
     messages: list[dict[str, str]],
     temperature: float,
     provider_name: str,
+    timeout_seconds: int = DEFAULT_TIMEOUT,
 ) -> tuple[str, dict[str, int]]:
     system_msg = ""
     user_messages: list[dict[str, str]] = []
@@ -486,7 +488,7 @@ def _call_anthropic_compatible(
     )
 
     try:
-        parsed = _read_response_json(req)
+        parsed = _read_response_json(req, timeout=timeout_seconds)
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise LLMError("provider_error", f"{provider_name} HTTP {exc.code}: {detail}") from exc
@@ -634,6 +636,7 @@ def chat_completion(
     temperature: float = 0.3,
     api_key: str | None = None,
     base_url: str | None = None,
+    timeout_seconds: int = DEFAULT_TIMEOUT,
 ) -> tuple[str, dict[str, int]]:
     """Call LLM with unified interface.
 
@@ -644,6 +647,7 @@ def chat_completion(
         temperature: Sampling temperature
         api_key: API key override (falls back to env var)
         base_url: Base URL override
+        timeout_seconds: Request timeout for non-streaming supervisor calls
 
     Returns:
         (generated_text, usage) where usage contains input_tokens and output_tokens.
@@ -687,6 +691,7 @@ def chat_completion(
             messages=messages,
             temperature=temperature,
             provider_name=preset.name,
+            timeout_seconds=timeout_seconds,
         )
 
     if preset.api_type == "anthropic-compatible":
@@ -700,6 +705,7 @@ def chat_completion(
             messages=messages,
             temperature=temperature,
             provider_name=preset.name,
+            timeout_seconds=timeout_seconds,
         )
 
     raise LLMError("unsupported_api_type", f"Unsupported protocol: {preset.api_type}")
@@ -710,6 +716,7 @@ def chat_completion_with_fallback(
     *,
     attempts: tuple[dict[str, Any], ...] | None = None,
     temperature: float = 0.3,
+    timeout_seconds: int = DEFAULT_TIMEOUT,
 ) -> tuple[str, dict[str, Any]]:
     """Call LLM with automatic fallback chain.
 
@@ -718,6 +725,7 @@ def chat_completion_with_fallback(
         attempts: Ordered tuple of attempt configs.
             Defaults to the local-first provider chain from build_default_llm_attempts().
         temperature: Sampling temperature
+        timeout_seconds: Request timeout applied to each provider attempt
 
     Returns:
         (text, metadata) where metadata contains provider_id, model, endpoint used.
@@ -741,6 +749,7 @@ def chat_completion_with_fallback(
                 provider_id=provider_id,
                 model=model,
                 temperature=temperature,
+                timeout_seconds=timeout_seconds,
             )
             preset = resolve_provider(provider_id)
             metadata = {

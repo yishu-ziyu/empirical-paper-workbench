@@ -62,6 +62,19 @@ artifacts/reference-learning/*
 docs/workflows/
 !docs/workflows/.gitkeep
 
+# Local agent runtime/worktree state
+.claude/settings.json
+.claude/worktrees/
+
+# Local verification and generated review outputs
+Product/artifacts/
+Results/final-smoke/
+Results/smoke-execute-test/
+artifacts/ui-checks/*.png
+journey-*.png
+ui-checks/
+workspace/runs/
+
 # Temporary code / outputs
 Program/temp/*
 Program/discarded/*

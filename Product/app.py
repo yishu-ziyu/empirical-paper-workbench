@@ -154,7 +154,11 @@ from Product.backend.supervisor_plan_service import (
     get_project_supervisor_plan,
     review_project_supervisor_plan,
 )
-from Product.backend.topic_intake_service import TopicIntakeLLMUnavailableError, ensure_topic_supervisor_plan
+from Product.backend.topic_intake_service import (
+    TopicIntakeLLMUnavailableError,
+    ensure_topic_supervisor_plan,
+    persist_topic_preview_supervisor_plan,
+)
 from Product.backend.task_dispatch_service import (
     AgentTaskDispatchReviewError,
     review_project_agent_task_dispatch,
@@ -435,6 +439,13 @@ class TopicIntakeSupervisorPlanPayload(BaseModel):
     topic: str = Field(min_length=1)
     slug: str | None = None
     note: str = ""
+
+
+class TopicIntakePreviewSupervisorPlanPayload(BaseModel):
+    topic: str = Field(min_length=1)
+    slug: str | None = None
+    note: str = ""
+    supervisor_plan: dict = Field(default_factory=dict)
 
 
 class SupervisorPlanReviewPayload(BaseModel):
@@ -880,6 +891,23 @@ def api_v1_topic_intake_supervisor_plan(payload: TopicIntakeSupervisorPlanPayloa
         return error_response(400, "invalid_topic_intake", str(exc))
     except TopicIntakeLLMUnavailableError as exc:
         return error_response(503, "llm_supervisor_unavailable", str(exc))
+    except FileNotFoundError as exc:
+        return error_response(400, "topic_workspace_invalid", f"Missing required file: {exc}")
+
+
+@app.post("/api/v1/topic-intake/supervisor-plan/preview", status_code=201)
+def api_v1_topic_intake_preview_supervisor_plan(payload: TopicIntakePreviewSupervisorPlanPayload) -> dict:
+    try:
+        return persist_topic_preview_supervisor_plan(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            payload.topic,
+            payload.supervisor_plan,
+            payload.slug,
+            payload.note,
+        )
+    except ValueError as exc:
+        return error_response(400, "invalid_topic_intake", str(exc))
     except FileNotFoundError as exc:
         return error_response(400, "topic_workspace_invalid", f"Missing required file: {exc}")
 

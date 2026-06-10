@@ -213,8 +213,8 @@ class TopicIntakeLlmSupervisorTests(unittest.TestCase):
         self.assertEqual(saved["provider"]["provider_id"], "openai")
         self.assertEqual(saved["evidence_level"], "llm_supervisor")
 
-    def test_bdd_topic_intake_returns_actionable_error_when_llm_is_unavailable(self) -> None:
-        """行为 3：模型层不可用时不能生成假计划，API 必须返回可操作错误。"""
+    def test_bdd_topic_intake_persists_fallback_plan_when_llm_is_unavailable(self) -> None:
+        """行为 3：模型层不可用时先登记项目，并保存明确标记的可重试 fallback 计划。"""
         with patch.object(
             llm_client,
             "chat_completion_with_fallback",
@@ -228,10 +228,32 @@ class TopicIntakeLlmSupervisorTests(unittest.TestCase):
                 },
             )
 
-        self.assertEqual(response.status_code, 503, msg=response.text)
-        self.assertEqual(response.json()["error"]["code"], "llm_supervisor_unavailable")
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        payload = response.json()
+        self.assertEqual(payload["_meta"]["evidence_level"], "topic_intake_fallback")
+        self.assertEqual(payload["_meta"]["llm_enrichment"]["status"], "failed")
+        self.assertTrue(payload["_meta"]["llm_enrichment"]["retryable"])
+
+        project = payload["project"]
+        self.assertEqual(project["id"], "proj_parent_education_wage")
         workspace = self.product_root / "workspaces" / "parent-education-wage"
-        self.assertFalse((workspace / "state" / "product" / "supervisor_plan.json").exists())
+        self.assertTrue((workspace / "paper.yaml").exists())
+        self.assertTrue((workspace / "state" / "product" / "research_question.json").exists())
+        self.assertTrue((workspace / "state" / "product" / "supervisor_plan.json").exists())
+
+        plan = payload["supervisor_plan"]
+        self.assertEqual(plan["evidence_level"], "topic_intake_fallback")
+        self.assertEqual(plan["provider"]["provider_id"], "unavailable")
+        self.assertEqual(plan["llm_enrichment"]["status"], "failed")
+        self.assertTrue(plan["llm_enrichment"]["retryable"])
+        self.assertEqual(plan["status"], "needs_review")
+        self.assertFalse(plan["can_dispatch"])
+        self.assertGreaterEqual(len(plan["stage_plan"]), 4)
+        self.assertGreaterEqual(len(plan["subagent_dispatch"]), 3)
+        self.assertNotIn("工业机器人", json.dumps(plan, ensure_ascii=False))
+        self.assertFalse((workspace / "state" / "product" / "variable_roles.json").exists())
+        self.assertFalse((workspace / "state" / "product" / "design_spec.json").exists())
+        self.assertFalse((workspace / "state" / "product" / "run_plan.json").exists())
 
     def test_bdd_default_llm_attempts_include_local_env_providers(self) -> None:
         """行为 4：默认 LLM fallback 必须识别本机已有 provider，而不是只尝试 OpenRouter。"""

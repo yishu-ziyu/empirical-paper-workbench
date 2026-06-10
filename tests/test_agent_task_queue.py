@@ -2953,6 +2953,73 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(completion.call_count, 1)
         self.assertEqual(completion.call_args.kwargs["timeout_seconds"], 30)
 
+    def test_bdd_44b_topic_preview_plan_persists_without_waiting_for_llm(self) -> None:
+        """行为 44b：已有审阅页 SupervisorPlan 预览时，批准前落盘不能再次等待 LLM。"""
+        topic = "父母教育水平对子女工资水平的影响"
+
+        with patch.object(llm_client, "chat_completion_with_fallback") as completion:
+            intake = self.client.post(
+                "/api/v1/topic-intake/supervisor-plan/preview",
+                json={
+                    "topic": topic,
+                    "slug": "parent-education-wage",
+                    "note": "用户已查看预览计划，批准前保存当前路线。",
+                    "supervisor_plan": {
+                        "stage_plan": [
+                            {
+                                "id": "task-brief",
+                                "title": "确认研究题目和边界",
+                                "owner": "Supervisor",
+                                "status": "ready",
+                                "reason": "确认研究对象、样本和成功标准。",
+                                "inputs": ["用户题目"],
+                                "outputs": ["TaskBrief"],
+                            },
+                            {
+                                "id": "recursive-search",
+                                "title": "递归检索文献与数据线索",
+                                "owner": "LiteratureAgent",
+                                "status": "draft",
+                                "reason": "形成候选证据包。",
+                                "inputs": ["ResearchQuestion"],
+                                "outputs": ["LiteratureSeedPackage"],
+                            },
+                            {
+                                "id": "variable-profile",
+                                "title": "建立变量画像",
+                                "owner": "DataAgent",
+                                "status": "draft",
+                                "reason": "提出变量角色草案。",
+                                "inputs": ["候选数据"],
+                                "outputs": ["VariableRoleSet 草案"],
+                            },
+                        ],
+                        "evidence_requirements": ["文献、变量和方法选择必须有证据。"],
+                        "risks": ["不能直接写入正式变量或方法。"],
+                        "human_gates": ["批准计划后才能创建队列。"],
+                    },
+                },
+            )
+
+        self.assertEqual(intake.status_code, 201, msg=intake.text)
+        self.assertEqual(completion.call_count, 0)
+        payload = intake.json()
+        project = payload["project"]
+        self.assertEqual(project["id"], "proj_parent_education_wage")
+        plan = payload["supervisor_plan"]
+        self.assertEqual(plan["evidence_level"], "review_surface")
+        self.assertEqual(plan["intake_mode"], "topic_to_project_preview")
+        self.assertEqual(plan["status"], "needs_review")
+        self.assertGreaterEqual(len(plan["subagent_dispatch"]), 3)
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{project['id']}/supervisor-plan/review",
+            json={"action": "approve", "note": "确认预览路线。"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        queue = self.client.post(f"/api/v1/projects/{project['id']}/agent-task-queue")
+        self.assertEqual(queue.status_code, 201, msg=queue.text)
+
     def _write_literature_internal_skill_supervisor_plan(self) -> None:
         self._write_supervisor_plan(
             status="approved",
@@ -3809,6 +3876,31 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         )
         self.assertIn("projectId={effectiveProjectId}", self.react_app)
         self.assertIn("<AgentTaskQueuePanel projectId={effectiveProjectId} />", self.react_app)
+
+    def test_bdd_44c_react_reuses_current_preview_plan_when_approving_plan(self) -> None:
+        """行为 44c：已有 SupervisorPlan 预览时，批准路线必须保存当前预览，不能重新等待 LLM。"""
+        intake_start = self.react_app.index("const ensureTopicProjectAndSupervisorPlan = async (): Promise<string> =>")
+        intake_end = self.react_app.index("setPlanIntakeStatus(\"registering\")", intake_start)
+        intake_guard = self.react_app[intake_start:intake_end]
+
+        self.assertIn("if (projectId && planStages !== null)", intake_guard)
+        self.assertIn("return projectId", intake_guard)
+        intake_body = self.react_app[intake_start:self.react_app.index("const approveSupervisorPlan", intake_start)]
+        self.assertIn('/api/v1/topic-intake/supervisor-plan/preview', intake_body)
+        self.assertIn("supervisor_plan:", intake_body)
+        self.assertIn("stage_plan: planStages", intake_body)
+        self.assertLess(
+            intake_body.index('/api/v1/topic-intake/supervisor-plan/preview'),
+            intake_body.index('/api/v1/topic-intake/supervisor-plan",'),
+        )
+
+    def test_bdd_44d_supervisor_plan_review_shows_queue_created_state_after_approval(self) -> None:
+        """行为 44d：路线批准后，规划审阅页必须显示队列已创建，并阻止重复批准。"""
+        self.assertIn("approved?: boolean", self.react_supervisor_plan_review)
+        self.assertIn("approved = false", self.react_supervisor_plan_review)
+        self.assertIn("队列已创建", self.react_supervisor_plan_review)
+        self.assertIn("disabled={approving || approved}", self.react_supervisor_plan_review)
+        self.assertIn("approved={planApproved}", self.react_app)
 
     def test_bdd_45_supervisor_plan_review_shows_topic_intake_status_and_recovery_actions(self) -> None:
         """行为 45：规划页必须说明题目登记和队列创建进度，并给失败状态可恢复动作。"""

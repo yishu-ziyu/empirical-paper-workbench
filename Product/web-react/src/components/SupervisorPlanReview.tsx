@@ -41,6 +41,7 @@ interface SupervisorPlanReviewProps {
   topic?: string;
   evidenceLevel?: string | null;
   approving?: boolean;
+  approved?: boolean;
   approvalError?: string | null;
   intakeStatus?: "idle" | "registering" | "ready" | "failed";
   intakeMessage?: string | null;
@@ -77,6 +78,7 @@ export function SupervisorPlanReview({
   topic,
   evidenceLevel,
   approving = false,
+  approved = false,
   approvalError,
   intakeStatus = "idle",
   intakeMessage,
@@ -123,7 +125,9 @@ export function SupervisorPlanReview({
   };
 
   const intakeLabel =
-    intakeStatus === "registering"
+    approved
+      ? "队列已创建"
+      : intakeStatus === "registering"
       ? "正在登记题目和任务路线"
       : intakeStatus === "ready"
         ? "已登记项目"
@@ -131,7 +135,9 @@ export function SupervisorPlanReview({
           ? "登记失败"
           : "等待确认路线";
   const approveLabel =
-    intakeStatus === "failed"
+    approved
+      ? "队列已创建"
+      : intakeStatus === "failed"
       ? "重新登记并创建队列"
       : approving
         ? "正在创建队列"
@@ -164,7 +170,9 @@ export function SupervisorPlanReview({
           <span>
             {intakeStatus === "ready"
               ? projectId || intakeMessage
-              : intakeMessage || "点击批准后会先登记题目，再创建 Agent 任务队列。"}
+              : approved
+                ? projectId || "Agent 任务队列已创建，可以继续处理下方任务。"
+                : intakeMessage || "点击批准后会先登记题目，再创建 Agent 任务队列。"}
           </span>
         </div>
 
@@ -233,20 +241,20 @@ export function SupervisorPlanReview({
         ) : null}
 
         <div className="supervisor-plan__actions">
-          <button className="btn btn--secondary" type="button" disabled={approving} onClick={onReject}>
+          <button className="btn btn--secondary" type="button" disabled={approving || approved} onClick={onReject}>
             <XCircle size={16} />
             <span>否决计划</span>
           </button>
           <button
             className="btn btn--secondary"
             type="button"
-            disabled={approving}
+            disabled={approving || approved}
             onClick={() => setShowRevisionModal(true)}
           >
             <RefreshCw size={16} />
             <span>请求修订</span>
           </button>
-          <button className="btn btn--primary" type="button" disabled={approving} onClick={onApprove}>
+          <button className="btn btn--primary" type="button" disabled={approving || approved} onClick={onApprove}>
             <Check size={16} />
             <span>{approveLabel}</span>
           </button>

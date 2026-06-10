@@ -485,24 +485,49 @@ export function App() {
     if (!task) {
       throw new Error("missing_task");
     }
+    if (projectId && planStages !== null) {
+      setPlanIntakeStatus("ready");
+      setPlanIntakeMessage(`已登记项目：${projectId}`);
+      return projectId;
+    }
     setPlanIntakeStatus("registering");
-    setPlanIntakeMessage("正在登记题目和任务路线");
+    setPlanIntakeMessage(planStages !== null ? "正在保存当前任务路线" : "正在登记题目和任务路线");
     const topicIntakeController = new AbortController();
     const topicIntakeTimeoutId = window.setTimeout(
       () => topicIntakeController.abort(),
       TOPIC_INTAKE_TIMEOUT_MS,
     );
     try {
-      const response = await fetch(apiUrl("/api/v1/topic-intake/supervisor-plan"), {
+      const response = await fetch(
+        apiUrl(
+          planStages !== null
+            ? "/api/v1/topic-intake/supervisor-plan/preview"
+            : "/api/v1/topic-intake/supervisor-plan",
+        ),
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: topicIntakeController.signal,
         body: JSON.stringify({
           topic: task.message,
           slug: topicSlug,
-          note: "用户从研究入口批准路线前登记题目和 SupervisorPlan。",
+          note:
+            planStages !== null
+              ? "用户批准当前 SupervisorPlan 预览前，将审阅页路线保存为项目级计划。"
+              : "用户从研究入口批准路线前登记题目和 SupervisorPlan。",
+          supervisor_plan:
+            planStages !== null
+              ? {
+                  stage_plan: planStages,
+                  evidence_requirements: planInspector?.evidence_required ?? [],
+                  risks: planInspector?.risks ?? [],
+                  human_gates: planInspector?.assumptions ?? [],
+                  reference_chain_policy: null,
+                }
+              : undefined,
         }),
-      });
+        },
+      );
       if (!response.ok) {
         const message = await responseErrorMessage(response, "题目登记失败。");
         setPlanIntakeStatus("failed");
@@ -679,6 +704,7 @@ export function App() {
                     topic={task.message}
                     evidenceLevel={planEvidenceLevel}
                     approving={approvingPlan}
+                    approved={planApproved}
                     approvalError={planApprovalError}
                     intakeStatus={planIntakeStatus}
                     intakeMessage={planIntakeMessage}

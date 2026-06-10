@@ -12,6 +12,7 @@ import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
+import { ServiceConnectionRecovery } from "./components/ServiceConnectionRecovery";
 import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
 interface SupervisorPlanStage {
@@ -257,6 +258,7 @@ export function App() {
   const [projectId, setProjectId] = useState<string>("");
   const [planIntakeStatus, setPlanIntakeStatus] = useState<TopicIntakeStatus>("idle");
   const [planIntakeMessage, setPlanIntakeMessage] = useState<string | null>(null);
+  const [planReloadNonce, setPlanReloadNonce] = useState(0);
 
   // Results from each stage. Preserved across navigation so the user can
   // jump back to an earlier tab without losing state.
@@ -341,6 +343,7 @@ export function App() {
     setProjectId("");
     setPlanIntakeStatus("idle");
     setPlanIntakeMessage(null);
+    setPlanReloadNonce(0);
   };
 
   // codex-supervisor mode: 进入 brief tab 时拉计划草案.
@@ -377,7 +380,7 @@ export function App() {
         setPlanEvidenceLevel(null);
       });
     return () => ctrl.abort();
-  }, [task, planStages]);
+  }, [task, planStages, planReloadNonce]);
 
   // task 重置时清掉 plan
   useEffect(() => {
@@ -392,6 +395,7 @@ export function App() {
       setProjectId("");
       setPlanIntakeStatus("idle");
       setPlanIntakeMessage(null);
+      setPlanReloadNonce(0);
     }
   }, [task]);
 
@@ -445,6 +449,12 @@ export function App() {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("api_base", DEFAULT_LOCAL_API_BASE);
     window.location.assign(nextUrl.toString());
+  };
+  const retrySupervisorPlan = () => {
+    setPlanFetchError(null);
+    setPlanApprovalError(null);
+    setPlanStages(null);
+    setPlanReloadNonce((value) => value + 1);
   };
   const ensureTopicProjectAndSupervisorPlan = async (): Promise<string> => {
     if (!task) {
@@ -570,23 +580,14 @@ export function App() {
           task.mode === "codex-supervisor" ? (
             <>
               {planFetchError ? (
-                <div className="task-brief__error" role="alert" data-testid="plan-fetch-error">
-                  <strong>计划加载失败：</strong> {planFetchError}
-                  <p>
-                    当前后端地址：
-                    <code className="task-brief__error-address">{currentApiBase}</code>
-                  </p>
-                  <div className="task-brief__error-actions">
-                    <button
-                      className="btn btn--secondary"
-                      type="button"
-                      onClick={handleResetApiBase}
-                      data-testid="reset-api-base-action"
-                    >
-                      切回本地后端
-                    </button>
-                    <span>本地后端默认地址：{DEFAULT_LOCAL_API_BASE}</span>
-                  </div>
+                <div data-testid="plan-fetch-error">
+                  <ServiceConnectionRecovery
+                    message={planFetchError}
+                    currentApiBase={currentApiBase}
+                    onRetry={retrySupervisorPlan}
+                    onUseLocalBackend={handleResetApiBase}
+                    localActionTestId="reset-api-base-action"
+                  />
                 </div>
               ) : planStages === null ? (
                 <div className="task-brief__loading" role="status" data-testid="supervisor-plan-loading">

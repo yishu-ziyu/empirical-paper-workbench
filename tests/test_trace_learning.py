@@ -173,7 +173,15 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, msg=response.text)
         trace_learning = response.json()["trace_learning"]
         self.assertEqual(trace_learning["proposal_count"], 1)
+        self.assertEqual(trace_learning["regression_proposals"][0]["id"], proposed.json()["regression_proposal"]["id"])
         self.assertEqual(trace_learning["regression_proposals"][0]["status"], "needs_review")
+        self.assertEqual(trace_learning["regression_proposals"][0]["current_review_status"], "needs_review")
+        self.assertIsNone(trace_learning["regression_proposals"][0]["latest_review_id"])
+        self.assertTrue(trace_learning["regression_proposals"][0]["requires_human_review"])
+        self.assertEqual(
+            trace_learning["regression_proposals"][0]["next_action"],
+            "human_review_regression_proposal",
+        )
         self.assertEqual(
             trace_learning["regression_proposals"][0]["source_bad_case_ids"],
             [created.json()["bad_case"]["id"]],
@@ -302,6 +310,12 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         self.assertEqual(trace_learning["proposal_reviews"][0]["decision"], "request_revision")
         self.assertEqual(trace_learning["proposal_reviews"][0]["status"], "needs_revision")
         self.assertEqual(trace_learning["review_status_by_proposal_id"][proposal_id], "needs_revision")
+        self.assertEqual(trace_learning["regression_proposals"][0]["id"], proposal_id)
+        self.assertEqual(trace_learning["regression_proposals"][0]["current_review_status"], "needs_revision")
+        self.assertEqual(
+            trace_learning["regression_proposals"][0]["latest_review_id"],
+            trace_learning["proposal_reviews"][0]["id"],
+        )
 
     def test_bdd_6c_review_requires_existing_regression_proposal(self) -> None:
         """Given 不存在的建议编号；When 试图审阅；Then API 阻止伪造审阅账本。"""
@@ -449,6 +463,17 @@ class TraceLearningFrontendContractTests(unittest.TestCase):
         self.assertIn("/review", self.agent_task_queue)
         self.assertIn("审阅回归建议", self.agent_task_queue)
         self.assertIn("不会自动写测试文件", self.agent_task_queue)
+
+    def test_bdd_8_agent_queue_restores_existing_reviewable_proposal(self) -> None:
+        """Given 已有待审阅回归建议；When 用户刷新队列页；Then 页面从后端恢复可审阅建议。"""
+        self.assertIn("loadTraceLearningRegressionProposals", self.agent_task_queue)
+        self.assertIn('method: "GET"', self.agent_task_queue)
+        self.assertIn("/trace-learning/regression-proposals", self.agent_task_queue)
+        self.assertIn('current_review_status === "needs_review"', self.agent_task_queue)
+        self.assertIn("setLatestTraceProposalId", self.agent_task_queue)
+        self.assertIn("void loadTraceLearningRegressionProposals();", self.agent_task_queue)
+        self.assertIn("current_review_status", self.agent_task_queue)
+        self.assertIn("已有待审阅回归建议", self.agent_task_queue)
 
 
 if __name__ == "__main__":

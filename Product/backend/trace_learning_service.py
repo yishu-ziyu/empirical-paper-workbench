@@ -161,15 +161,16 @@ def generate_project_trace_learning_regression_proposal(
 
     reviews_path = trace_learning_regression_proposal_reviews_path(project_root)
     existing_reviews = load_trace_learning_regression_proposal_reviews(reviews_path)
+    latest_proposal = enrich_regression_proposals_with_review_status([proposal], existing_reviews)[0]
     summary = build_trace_learning_regression_proposal_summary(
         proposals_path,
         len(existing_proposals) + 1,
         existing_reviews,
     )
-    summary["latest_proposal"] = proposal
+    summary["latest_proposal"] = latest_proposal
     return {
         "project_id": project["id"],
-        "regression_proposal": proposal,
+        "regression_proposal": latest_proposal,
         "trace_learning": summary,
     }
 
@@ -184,7 +185,7 @@ def get_project_trace_learning_regression_proposals(product_root: Path, repo_roo
     proposal_ids = {str(proposal.get("id")) for proposal in proposals}
     proposal_reviews = [review for review in reviews if str(review.get("proposal_id")) in proposal_ids]
     summary = build_trace_learning_regression_proposal_summary(path, len(proposals), proposal_reviews)
-    summary["regression_proposals"] = proposals
+    summary["regression_proposals"] = enrich_regression_proposals_with_review_status(proposals, proposal_reviews)
     summary["proposal_reviews"] = proposal_reviews
     return {"project_id": project["id"], "trace_learning": summary}
 
@@ -237,11 +238,13 @@ def review_project_trace_learning_regression_proposal(
         len(proposals),
         proposal_reviews,
     )
-    summary["regression_proposals"] = proposals
+    enriched_proposals = enrich_regression_proposals_with_review_status(proposals, proposal_reviews)
+    enriched_proposal = next((item for item in enriched_proposals if str(item.get("id")) == proposal_id), proposal)
+    summary["regression_proposals"] = enriched_proposals
     summary["proposal_reviews"] = proposal_reviews
     return {
         "project_id": project["id"],
-        "regression_proposal": proposal,
+        "regression_proposal": enriched_proposal,
         "regression_proposal_review": review,
         "trace_learning": summary,
     }
@@ -301,6 +304,23 @@ def build_trace_learning_regression_proposal_summary(
         "review_count": len(review_records),
         "review_status_by_proposal_id": latest_review_status_by_proposal_id(review_records),
     }
+
+
+def enrich_regression_proposals_with_review_status(
+    proposals: list[dict[str, Any]],
+    reviews: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    latest_reviews = latest_review_by_proposal_id(reviews)
+    enriched: list[dict[str, Any]] = []
+    for proposal in proposals:
+        proposal_id = str(proposal.get("id") or "")
+        latest_review = latest_reviews.get(proposal_id)
+        item = dict(proposal)
+        current_review_status = latest_review.get("status") if latest_review else proposal.get("status")
+        item["current_review_status"] = str(current_review_status or "needs_review")
+        item["latest_review_id"] = latest_review.get("id") if latest_review else None
+        enriched.append(item)
+    return enriched
 
 
 def build_suggested_regression_test(bad_case: dict[str, Any]) -> dict[str, Any]:
@@ -363,11 +383,18 @@ def next_action_for_review_decision(decision: str) -> str:
 
 
 def latest_review_status_by_proposal_id(reviews: list[dict[str, Any]]) -> dict[str, str]:
-    latest: dict[str, str] = {}
+    return {
+        proposal_id: str(review.get("status") or "unknown")
+        for proposal_id, review in latest_review_by_proposal_id(reviews).items()
+    }
+
+
+def latest_review_by_proposal_id(reviews: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
     for review in reviews:
         proposal_id = str(review.get("proposal_id") or "")
         if proposal_id:
-            latest[proposal_id] = str(review.get("status") or "unknown")
+            latest[proposal_id] = review
     return latest
 
 

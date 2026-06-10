@@ -2308,6 +2308,9 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         cls.react_api_base = (root / "Product" / "web-react" / "src" / "lib" / "apiBase.ts").read_text(
             encoding="utf-8"
         )
+        cls.react_service_connection_recovery = (
+            root / "Product" / "web-react" / "src" / "components" / "ServiceConnectionRecovery.tsx"
+        ).read_text(encoding="utf-8")
         cls.react_styles_css = (root / "Product" / "web-react" / "src" / "styles.css").read_text(encoding="utf-8")
 
     def test_bdd_5_frontend_contains_summary_first_queue_surface(self) -> None:
@@ -2630,11 +2633,12 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-queue-pdf-candidate", self.react_styles_css)
 
     def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:
-        """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供切回本地后端动作。"""
+        """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供本地服务恢复动作。"""
         self.assertIn("currentApiBase", self.react_app)
-        self.assertIn("切回本地后端", self.react_app)
+        self.assertIn("ServiceConnectionRecovery", self.react_app)
         self.assertIn("DEFAULT_LOCAL_API_BASE", self.react_app)
-        self.assertIn("data-testid=\"reset-api-base-action\"", self.react_app)
+        self.assertIn('localActionTestId="reset-api-base-action"', self.react_app)
+        self.assertIn("data-testid={localActionTestId}", self.react_service_connection_recovery)
         self.assertIn("setBrowserApiBase", self.react_api_base)
         self.assertIn("DEFAULT_LOCAL_API_BASE", self.react_api_base)
         self.assertIn("127.0.0.1:8765", self.react_api_base)
@@ -2867,6 +2871,31 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("重新登记并创建队列", self.react_supervisor_plan_review)
         self.assertIn("supervisor-plan__intake-status", self.react_styles_css)
         self.assertIn("supervisor-plan__empty-state", self.react_styles_css)
+
+    def test_bdd_46_service_disconnect_state_is_actionable_and_reusable(self) -> None:
+        """行为 46：本地研究服务断开时，UI 必须给出可恢复步骤，而不是一句空泛报错。"""
+        component_path = self.root / "Product" / "web-react" / "src" / "components" / "ServiceConnectionRecovery.tsx"
+        self.assertTrue(component_path.exists(), "缺少可复用的服务连接恢复组件")
+        component = component_path.read_text(encoding="utf-8")
+        auto_research = (
+            self.root / "Product" / "web-react" / "src" / "components" / "AutoResearchStream.tsx"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('data-testid="service-connection-recovery"', component)
+        self.assertIn("连接本地研究服务", component)
+        self.assertIn("当前后端地址", component)
+        self.assertIn("/api/v1/health", component)
+        self.assertIn("python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8765", component)
+        self.assertIn("不会丢失已保存的研究材料", component)
+        self.assertIn("使用本地后端", component)
+        self.assertIn("重新连接", component)
+        self.assertIn("ServiceConnectionRecovery", self.react_app)
+        self.assertIn('data-testid="plan-fetch-error"', self.react_app)
+        self.assertIn("onUseLocalBackend={handleResetApiBase}", self.react_app)
+        self.assertIn("ServiceConnectionRecovery", auto_research)
+        self.assertIn("onRetry={handleStart}", auto_research)
+        self.assertIn(".service-connection-recovery", self.react_styles_css)
+        self.assertIn(".service-connection-recovery__command", self.react_styles_css)
 
 
 if __name__ == "__main__":

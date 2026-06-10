@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StepCard, type StepStatus } from "./StepCard";
 import type { BriefResult, BriefStepsSnapshot } from "./BriefPanel";
 import { apiUrl } from "../lib/apiBase";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 /**
  * AutoResearchStream — auto-research mode brief tab panel.
@@ -62,7 +63,7 @@ export interface AutoResearchStreamProps {
 }
 
 const SERVICE_ERROR_MESSAGE =
-  "服务暂时没连上，稍后重试。不会影响已保存的研究材料。";
+  "自动探索还没有连到本地研究服务。先恢复连接，再继续生成研究简报。";
 
 export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearchStreamProps) {
   const [phase, setPhase] = useState<"idle" | "running" | "completed" | "error">("idle");
@@ -276,11 +277,8 @@ export function AutoResearchStream({ topic, topicSlug, onComplete }: AutoResearc
         </div>
 
         {phase === "error" && error && (
-          <div className="task-brief__error" role="alert" data-testid="auto-research-error">
-            <strong>服务暂时没连上：</strong> {error}
-            <button type="button" className="btn btn--ghost" onClick={handleStart}>
-              稍后重试
-            </button>
+          <div data-testid="auto-research-error">
+            <ServiceConnectionRecovery message={error} onRetry={handleStart} />
           </div>
         )}
 

@@ -14,6 +14,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 from urllib import error, request
 from urllib.parse import urlparse
@@ -36,6 +37,46 @@ class ProviderPreset:
 
 
 PROVIDER_PRESETS: dict[str, ProviderPreset] = {
+    "openai": ProviderPreset(
+        id="openai",
+        name="OpenAI",
+        api_type="openai-compatible",
+        base_url="https://api.openai.com/v1",
+        default_model=os.getenv("OPENAI_MODEL", "gpt-5.5"),
+        models=("gpt-5.5", "gpt-5", "gpt-4.1"),
+        api_key_env="OPENAI_API_KEY",
+        doc="https://platform.openai.com/docs",
+    ),
+    "stepfun": ProviderPreset(
+        id="stepfun",
+        name="StepFun",
+        api_type="openai-compatible",
+        base_url=os.getenv("STEPFUN_BASE_URL", "https://api.stepfun.com/v1"),
+        default_model=os.getenv("STEPFUN_MODEL", "step-2"),
+        models=("step-2", "step-1"),
+        api_key_env="STEPFUN_API_KEY",
+        doc="OpenAI-compatible StepFun endpoint",
+    ),
+    "deepseek": ProviderPreset(
+        id="deepseek",
+        name="DeepSeek",
+        api_type="openai-compatible",
+        base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+        default_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+        models=("deepseek-chat", "deepseek-reasoner"),
+        api_key_env="DEEPSEEK_API_KEY",
+        doc="https://api-docs.deepseek.com/",
+    ),
+    "mimo": ProviderPreset(
+        id="mimo",
+        name="Mimo",
+        api_type="openai-compatible",
+        base_url=os.getenv("MIMO_BASE_URL", ""),
+        default_model=os.getenv("MIMO_MODEL", ""),
+        models=(),
+        api_key_env="MIMO_API_KEY",
+        doc="Local/private OpenAI-compatible Mimo endpoint",
+    ),
     "openrouter": ProviderPreset(
         id="openrouter",
         name="OpenRouter",
@@ -123,6 +164,42 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
     ),
 }
 
+MODEL_ENV_BY_PROVIDER = {
+    "openai": "OPENAI_MODEL",
+    "stepfun": "STEPFUN_MODEL",
+    "deepseek": "DEEPSEEK_MODEL",
+    "mimo": "MIMO_MODEL",
+    "minimax": "MINIMAX_MODEL",
+    "openrouter": "OPENROUTER_MODEL",
+    "moonshot-kimi": "MOONSHOT_MODEL",
+    "kimi-code": "KIMI_CODE_MODEL",
+    "kimi-code-anthropic-token": "KIMI_CODE_MODEL",
+}
+
+BASE_URL_ENV_BY_PROVIDER = {
+    "openai": "OPENAI_BASE_URL",
+    "stepfun": "STEPFUN_BASE_URL",
+    "deepseek": "DEEPSEEK_BASE_URL",
+    "mimo": "MIMO_BASE_URL",
+    "minimax": "MINIMAX_BASE_URL",
+    "openrouter": "OPENROUTER_BASE_URL",
+    "moonshot-kimi": "MOONSHOT_BASE_URL",
+    "kimi-code": "KIMI_CODE_BASE_URL",
+    "kimi-code-anthropic-token": "KIMI_CODE_BASE_URL",
+}
+
+PROVIDER_ATTEMPT_ORDER = (
+    "openai",
+    "stepfun",
+    "mimo",
+    "deepseek",
+    "minimax",
+    "kimi-code-anthropic-token",
+    "kimi-code",
+    "moonshot-kimi",
+    "openrouter",
+)
+
 
 class LLMError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
@@ -133,6 +210,100 @@ class LLMError(RuntimeError):
 def resolve_provider(provider_id: str | None) -> ProviderPreset:
     key = (provider_id or DEFAULT_PROVIDER).strip() or DEFAULT_PROVIDER
     return PROVIDER_PRESETS.get(key, PROVIDER_PRESETS[DEFAULT_PROVIDER])
+
+
+def load_local_env_if_present(start: Path | None = None) -> None:
+    """Load `.env.local` values for local Agent execution without overriding env."""
+    candidates: list[Path] = []
+    base = (start or Path.cwd()).resolve()
+    candidates.extend(parent / ".env.local" for parent in (base, *base.parents))
+    candidates.extend(
+        [
+            Path(__file__).resolve().parents[2] / ".env.local",
+            Path(__file__).resolve().parents[1] / ".env.local",
+        ]
+    )
+
+    seen: set[Path] = set()
+    for path in candidates:
+        if path in seen or not path.exists() or not path.is_file():
+            continue
+        seen.add(path)
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key or key in os.environ:
+                continue
+            cleaned = value.strip().strip('"').strip("'")
+            os.environ[key] = cleaned
+
+
+def _provider_model_env(preset: ProviderPreset) -> str:
+    return MODEL_ENV_BY_PROVIDER.get(preset.id, f"{preset.id.upper().replace('-', '_')}_MODEL")
+
+
+def _provider_base_url_env(preset: ProviderPreset) -> str:
+    return BASE_URL_ENV_BY_PROVIDER.get(preset.id, f"{preset.id.upper().replace('-', '_')}_BASE_URL")
+
+
+def _provider_default_model(preset: ProviderPreset) -> str:
+    env_var = _provider_model_env(preset)
+    return os.getenv(env_var, "").strip() or preset.default_model
+
+
+def _provider_default_base_url(preset: ProviderPreset) -> str:
+    env_var = _provider_base_url_env(preset)
+    return os.getenv(env_var, "").strip() or preset.base_url
+
+
+def _provider_has_key(provider_id: str, preset: ProviderPreset) -> bool:
+    if not preset.requires_api_key:
+        return True
+    if preset.api_key_env and os.getenv(preset.api_key_env, "").strip():
+        return True
+    return provider_id == "minimax" and bool(os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip())
+
+
+def build_default_llm_attempts() -> tuple[dict[str, Any], ...]:
+    """Build local-first fallback attempts for Agent experiments.
+
+    The product should use the user's configured local/cloud providers before
+    falling back to OpenRouter. Missing keys are skipped so a broken provider
+    does not block the whole chain.
+    """
+    load_local_env_if_present()
+
+    attempts: list[dict[str, Any]] = []
+    preferred_provider = os.getenv("EMPIRICAL_LLM_PROVIDER", "").strip()
+    if preferred_provider:
+        preferred = resolve_provider(preferred_provider)
+        attempts.append(
+            {
+                "provider_id": preferred.id,
+                "model": os.getenv("EMPIRICAL_LLM_MODEL", "").strip() or _provider_default_model(preferred) or None,
+                "env": preferred.api_key_env or None,
+            }
+        )
+
+    for provider_id in PROVIDER_ATTEMPT_ORDER:
+        preset = resolve_provider(provider_id)
+        if not _provider_has_key(provider_id, preset):
+            continue
+        attempt = {
+            "provider_id": provider_id,
+            "model": _provider_default_model(preset) or None,
+            "env": preset.api_key_env or None,
+        }
+        if attempt not in attempts:
+            attempts.append(attempt)
+
+    if not attempts:
+        attempts.append({"provider_id": "openrouter", "model": None, "env": "OPENROUTER_API_KEY"})
+
+    return tuple(attempts)
 
 
 def normalize_base_url(raw_base_url: str | None, *, api_type: str, fallback: str = "") -> str:
@@ -480,6 +651,7 @@ def chat_completion(
     Raises:
         LLMError: On provider error, auth failure, or network issue.
     """
+    load_local_env_if_present()
     preset = resolve_provider(provider_id)
 
     # Resolve API key: explicit > primary env var > alias env vars > empty
@@ -494,19 +666,19 @@ def chat_completion(
         raise LLMError("missing_api_key", f"{preset.name} requires API key. Set env var {preset.api_key_env} or pass api_key.")
 
     # Resolve model
-    selected_model = (model or preset.default_model).strip()
+    selected_model = (model or _provider_default_model(preset)).strip()
     if not selected_model:
         raise LLMError("missing_model", f"{preset.name} model is required.")
 
     # Resolve base URL: explicit > per-provider env var > preset default
     effective_base_url = base_url
-    if not effective_base_url and preset.id == "minimax":
-        effective_base_url = os.getenv("MINIMAX_BASE_URL", "").strip() or None
+    if not effective_base_url:
+        effective_base_url = _provider_default_base_url(preset) or None
 
     # Resolve base URL
     if preset.api_type == "openai-compatible":
         normalized_base = normalize_base_url(
-            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
+            effective_base_url, api_type=preset.api_type, fallback=_provider_default_base_url(preset)
         )
         return _call_openai_compatible(
             api_key=resolved_key,
@@ -519,7 +691,7 @@ def chat_completion(
 
     if preset.api_type == "anthropic-compatible":
         normalized_base = normalize_base_url(
-            effective_base_url, api_type=preset.api_type, fallback=preset.base_url
+            effective_base_url, api_type=preset.api_type, fallback=_provider_default_base_url(preset)
         )
         return _call_anthropic_compatible(
             api_key=resolved_key,
@@ -544,16 +716,14 @@ def chat_completion_with_fallback(
     Args:
         messages: Chat messages
         attempts: Ordered tuple of attempt configs.
-            Defaults to [{"provider_id": "openrouter", "model": None}]
+            Defaults to the local-first provider chain from build_default_llm_attempts().
         temperature: Sampling temperature
 
     Returns:
         (text, metadata) where metadata contains provider_id, model, endpoint used.
     """
     if attempts is None:
-        attempts = (
-            {"provider_id": "openrouter", "model": None},
-        )
+        attempts = build_default_llm_attempts()
 
     last_error = ""
     for attempt in attempts:
@@ -576,7 +746,7 @@ def chat_completion_with_fallback(
             metadata = {
                 "provider_id": provider_id,
                 "provider_name": preset.name,
-                "model": model or preset.default_model,
+                "model": model or _provider_default_model(preset),
                 "api_type": preset.api_type,
                 "input_tokens": usage.get("input_tokens", 0),
                 "output_tokens": usage.get("output_tokens", 0),

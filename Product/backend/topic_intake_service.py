@@ -8,18 +8,26 @@ from typing import Any
 
 import yaml
 
-from Product.backend.codex_provider import local_codex_status
+from Product.backend import llm_client
 from Product.backend.project_service import project_api_view, register_project_root, utc_now
 from Product.backend.research_question_service import save_current_research_question
+from Product.backend.internal_agent_skill_registry import compact_internal_agent_skills_for_prompt
 from Product.backend.supervisor_plan_service import (
+    SupervisorPlanExecutionError,
     build_default_reference_chain_policy,
     load_saved_supervisor_plan,
     normalize_supervisor_plan,
+    parse_supervisor_plan_output,
+    supervisor_plan_raw_path,
     supervisor_plan_state_path,
 )
 
 
 TOPIC_WORKSPACE_ROOT = Path("workspaces")
+
+
+class TopicIntakeLLMUnavailableError(RuntimeError):
+    """Raised when topic intake cannot obtain a real LLM Supervisor plan."""
 
 
 def ensure_topic_supervisor_plan(
@@ -55,8 +63,30 @@ def ensure_topic_supervisor_plan(
     existing = load_saved_supervisor_plan(project_root)
     version = int(existing.get("version", 0)) + 1 if existing else 1
     timestamp = utc_now()
-    provider = local_codex_status()
-    generated = build_topic_intake_supervisor_generated(normalized_topic)
+    messages = build_topic_intake_supervisor_messages(
+        project,
+        research_question,
+        normalized_topic,
+        note,
+    )
+    try:
+        raw_text, provider = llm_client.chat_completion_with_fallback(messages, temperature=0.2)
+        generated = parse_supervisor_plan_output(raw_text)
+    except llm_client.LLMError as exc:
+        raise TopicIntakeLLMUnavailableError(
+            f"LLM Supervisor 未接通：{exc.code}。请检查本地模型或云端 provider 配置。"
+        ) from exc
+    except (SupervisorPlanExecutionError, json.JSONDecodeError, TypeError) as exc:
+        raise TopicIntakeLLMUnavailableError(
+            "LLM Supervisor 返回的研究计划无法解析。请重试或切换模型。"
+        ) from exc
+    if not isinstance(generated, dict):
+        raise TopicIntakeLLMUnavailableError("LLM Supervisor 返回的研究计划不是 JSON 对象。")
+
+    raw_path = supervisor_plan_raw_path(project_root)
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path.write_text(raw_text, encoding="utf-8")
+
     plan = normalize_supervisor_plan(
         generated,
         project,
@@ -75,7 +105,7 @@ def ensure_topic_supervisor_plan(
             "status": "needs_review",
             "can_dispatch": False,
             "intake_mode": "topic_to_project",
-            "evidence_level": "topic_intake",
+            "evidence_level": "llm_supervisor",
             "next_action": {
                 "id": "review_supervisor_plan",
                 "label": "审阅路线后创建 Agent Task Queue",
@@ -85,10 +115,10 @@ def ensure_topic_supervisor_plan(
     plan["decision_events"] = [
         *plan.get("decision_events", []),
         {
-            "actor": "product_workbench",
+            "actor": "llm_supervisor",
             "action": "topic_intake_supervisor_plan",
             "timestamp": timestamp,
-            "note": "题目已登记为本地项目，SupervisorPlan 等待人工审阅。",
+            "note": "题目已登记为本地项目，LLM Supervisor 已生成可审阅研究路线。",
         },
     ]
 
@@ -98,14 +128,65 @@ def ensure_topic_supervisor_plan(
 
     return {
         "_meta": {
-            "evidence_level": "topic_intake",
+            "evidence_level": "llm_supervisor",
             "service": "topic_intake_service",
+            "llm_provider": provider,
             "generated_at": timestamp,
         },
         "project": project_api_view(project),
         "research_question": research_question,
         "supervisor_plan": plan,
     }
+
+
+def build_topic_intake_supervisor_messages(
+    project: dict[str, Any],
+    research_question: dict[str, Any],
+    topic: str,
+    note: str,
+) -> list[dict[str, str]]:
+    context = {
+        "project": {
+            "id": project["id"],
+            "slug": project["slug"],
+            "title": project["title"],
+        },
+        "topic": topic,
+        "note": note,
+        "research_question": {
+            "status": research_question.get("status"),
+            "question": research_question.get("question"),
+            "source": research_question.get("source"),
+        },
+        "internal_skill_registry": compact_internal_agent_skills_for_prompt(),
+        "reference_chain_policy_template": build_default_reference_chain_policy(),
+        "write_boundary": {
+            "may_write": ["ResearchQuestion", "SupervisorPlan draft", "AgentTaskQueue after human review"],
+            "must_not_write": ["VariableRoleSet", "DesignSpec", "RunPlan", "formal manuscript layer"],
+        },
+    }
+    system = (
+        "你是本地实证研究 OS 的 LLM Supervisor。你的任务是根据用户题目生成可审阅的研究路线、"
+        "证据要求、风险、Agent 分工和内部 skill 选择理由。"
+        "你必须围绕用户真实题目判断，不得复用固定案例，不得声称已经读取数据或完成分析。"
+    )
+    user = (
+        "只输出 JSON，不要输出 Markdown。JSON 必须包含：stage_plan、subagent_dispatch、"
+        "evidence_requirements、risks、human_gates、internal_skill_judgments、"
+        "reference_chain_policy、next_action。\n"
+        "internal_skill_judgments 必须解释为什么选择某个 skill，并且 skill_id 必须来自 "
+        "internal_skill_registry.skills。每项包含 reason、evidence_fit、agent_fit、"
+        "risk_note、human_review_note、confidence。\n"
+        "reference_chain_policy 必须包含 source_priority、sources、max_depth、max_iterations、"
+        "draft_citation_policy、formal_writeback_gate、writes_formal_layer；writes_formal_layer 必须为 false。\n"
+        "stage_plan 至少 4 段，subagent_dispatch 至少 3 个 Agent。"
+        "所有判断必须使用题目语义、证据缺口和方法风险，不能写入正式变量、设计或运行计划。\n\n"
+        f"{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
 
 
 def normalize_topic_slug(topic: str, slug: str | None = None) -> str:
@@ -200,133 +281,4 @@ def build_empty_state(state_id: str) -> dict[str, Any]:
         "version": 0,
         "status": "empty",
         "evidence_level": "none",
-    }
-
-
-def build_topic_intake_supervisor_generated(topic: str) -> dict[str, Any]:
-    reference_policy = build_default_reference_chain_policy()
-    return {
-        "stage_plan": [
-            {
-                "id": "task-brief",
-                "title": "确认研究题目和边界",
-                "owner": "Supervisor",
-                "status": "ready",
-                "reason": "先固定题目、对象、数据线索和成功标准，避免后续 Agent 自行改题。",
-                "inputs": ["用户输入题目", "补充说明", "本地项目状态"],
-                "outputs": ["ResearchQuestion", "TaskBrief", "边界条件清单"],
-            },
-            {
-                "id": "recursive-evidence-search",
-                "title": "递归搜索文献、变量和数据线索",
-                "owner": "LiteratureAgent",
-                "status": "draft",
-                "reason": "题目需要先连接文献脉络、可用数据、候选变量和缺失证据，再决定方法路线。",
-                "inputs": ["ResearchQuestion", "CNKI/Scholar/Zotero/本地笔记来源策略"],
-                "outputs": ["LiteratureSeedPackage", "search_query_graph", "citation_verification_queue"],
-            },
-            {
-                "id": "data-variable-profile",
-                "title": "建立数据与变量画像",
-                "owner": "DataAgent",
-                "status": "draft",
-                "reason": "变量角色必须由真实字段、样本口径和缺失情况支撑。",
-                "inputs": ["候选数据源", "字段字典", "文献变量定义"],
-                "outputs": ["VariableRoleSet 草案", "字段质量报告", "缺失证据清单"],
-            },
-            {
-                "id": "method-design-gates",
-                "title": "设计方法门和前置检验",
-                "owner": "MethodAgent",
-                "status": "empty",
-                "reason": "根据数据结构和文献规范选择 OLS/FE/DID/IV/RDD/PSM/DML 等方法门。",
-                "inputs": ["VariableRoleSet 草案", "样本结构", "目标期刊规范"],
-                "outputs": ["DesignSpec 草案", "方法前置条件", "稳健性任务清单"],
-            },
-            {
-                "id": "execution-preflight",
-                "title": "执行预检与草案产物路线",
-                "owner": "ExecutionAgent",
-                "status": "empty",
-                "reason": "真实跑码前先确认环境、后端、产物目录和审计链。",
-                "inputs": ["DesignSpec 草案", "本地后端状态", "可复现目录结构"],
-                "outputs": ["RunPlan 草案", "preflight_report", "artifact_manifest"],
-            },
-        ],
-        "subagent_dispatch": [
-            {
-                "agent_id": "LiteratureAgent",
-                "role": "LiteratureAgent",
-                "task": "递归检索题目的文献、变量定义、数据线索和缺失证据",
-                "summary": "用递归研究搜索把题目连接到文献、数据、方法和下一轮缺口。",
-                "output_requirements": [
-                    {"artifact": "LiteratureSeedPackage", "review_state": "needs_human_review"},
-                    {"artifact": "search_query_graph", "review_state": "draft"},
-                    {"artifact": "citation_verification_queue", "review_state": "needs_human_review"},
-                ],
-            },
-            {
-                "agent_id": "DataAgent",
-                "role": "DataAgent",
-                "task": "根据题目和文献线索建立候选数据与变量画像",
-                "summary": "只生成 VariableRoleSet 草案，不写入正式变量角色。",
-                "output_requirements": [
-                    {"artifact": "VariableProfileDraft", "review_state": "draft"},
-                    {"artifact": "missing_data_evidence_queue", "review_state": "needs_human_review"},
-                ],
-            },
-            {
-                "agent_id": "MethodAgent",
-                "role": "MethodAgent",
-                "task": "基于变量画像和研究问题提出方法门与前置检验",
-                "summary": "给出 DesignSpec 草案和方法规范门，不直接启动回归。",
-                "output_requirements": [
-                    {"artifact": "DesignSpecDraft", "review_state": "draft"},
-                    {"artifact": "method_gate_checklist", "review_state": "needs_human_review"},
-                ],
-            },
-            {
-                "agent_id": "ExecutionAgent",
-                "role": "ExecutionAgent",
-                "task": "准备执行预检、产物目录和可复现包约束",
-                "summary": "检查后端与目录，不改写正式 RunPlan。",
-                "output_requirements": [
-                    {"artifact": "PreflightReport", "review_state": "draft"},
-                    {"artifact": "ArtifactManifestDraft", "review_state": "draft"},
-                ],
-            },
-        ],
-        "evidence_requirements": [
-            "题目中的核心概念需要被文献或用户说明界定。",
-            "变量角色需要绑定真实字段、样本口径、时间范围和缺失率。",
-            "方法设计需要说明前置假设、诊断检验和失败时的降级路线。",
-            "引用进入正式综述前必须经过候选、核验、人工确认三态。",
-        ],
-        "risks": [
-            "题目可能需要外部数据或中文文献补证，不能只依赖当前空项目目录。",
-            "变量自动选择只能进入草案层，正式变量角色需要人工确认。",
-            "方法门必须等待数据结构画像，不能提前承诺因果识别。",
-        ],
-        "human_gates": [
-            "审阅 SupervisorPlan 后创建 Agent Task Queue。",
-            "审阅 LiteratureSeedPackage 后进入草稿综述。",
-            "审阅 VariableRoleSet 草案后写入正式变量角色。",
-            "审阅 DesignSpec 和 RunPlan 后开始真实执行。",
-        ],
-        "internal_skill_judgments": [
-            {
-                "skill_id": "recursive_research_search",
-                "reason": "用户从题目出发，需要系统沿着题目、文献、变量、数据、方法和缺失证据做递归扩展。",
-                "evidence_fit": "第一轮证据不足时，递归搜索能把缺失文献、候选变量和数据线索转成下一轮任务。",
-                "agent_fit": "LiteratureAgent 负责主搜索，DataAgent 和 MethodAgent 消化变量和方法缺口。",
-                "risk_note": "搜索结果只能进入候选证据和草案层，不直接写入正式综述。",
-                "human_review_note": "引用核验、中文文献补证和正式写回必须由用户确认。",
-                "confidence": "high",
-            }
-        ],
-        "reference_chain_policy": reference_policy,
-        "next_action": {
-            "id": "review_supervisor_plan",
-            "label": "审阅路线后创建 Agent Task Queue",
-        },
     }

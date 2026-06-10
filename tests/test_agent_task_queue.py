@@ -699,6 +699,56 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         task = body["agent_task_queue"]["tasks"][1]
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["execution_result"]["engine"], "codex")
+        self.assertEqual(
+            task["execution_result"]["llm_intervention_handoff"]["source_actor"],
+            "local_codex_supervisor",
+        )
+        self.assertEqual(
+            body["execution_result"]["llm_intervention_handoff"]["source_actor"],
+            "local_codex_supervisor",
+        )
+
+    def test_bdd_13a_execution_requires_llm_supervisor_handoff_before_running(self) -> None:
+        """行为 13a：执行实验前必须有 LLM Supervisor 交接，不能只靠工程后端直接跑。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            evidence_level="local_file",
+            provider={},
+            decision_events=[
+                {
+                    "actor": "system",
+                    "action": "manual_fixture",
+                    "timestamp": "2026-06-10T00:00:00Z",
+                    "note": "这个计划没有经过 LLM Supervisor。",
+                }
+            ],
+        )
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/dispatch-review",
+            json={"action": "approve", "note": "尝试绕过 LLM 直接执行"},
+        )
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        selected = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/select-backend",
+            json={"backend_id": "codex"},
+        )
+        self.assertEqual(selected.status_code, 200, msg=selected.text)
+
+        executed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_02/execute"
+        )
+
+        self.assertEqual(executed.status_code, 409, msg=executed.text)
+        self.assertEqual(executed.json()["error"]["code"], "llm_intervention_handoff_required")
+        queue = self.client.get(f"/api/v1/projects/{self.project_id}/agent-task-queue").json()[
+            "agent_task_queue"
+        ]
+        task = queue["tasks"][1]
+        self.assertEqual(task["status"], "backend_selected")
+        self.assertNotIn("execution_result", task)
 
     def test_bdd_14_queue_exposes_llm_intervention_handoff_contract(self) -> None:
         """行为 14：队列必须说明 LLM 何时判断、何时交还确定性服务、何处人工确认。"""
@@ -2479,6 +2529,9 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         recommended_internal_skills: list[dict] | None = None,
         llm_intervention_plan: dict | None = None,
         reference_chain_policy: dict | None = None,
+        evidence_level: str = "llm_supervisor",
+        provider: dict | None = None,
+        decision_events: list[dict] | None = None,
     ) -> None:
         path = self.project_root / "state" / "product" / "supervisor_plan.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -2487,9 +2540,16 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             "version": 3,
             "status": status,
             "can_dispatch": can_dispatch,
-            "evidence_level": "local_execution",
+            "evidence_level": evidence_level,
             "objective": "把 approved plan 拆成可审阅任务队列",
             "path": "state/product/supervisor_plan.json",
+            "provider": provider
+            if provider is not None
+            else {
+                "provider_id": "openai",
+                "provider_name": "Codex GPT",
+                "model": "gpt-5.5",
+            },
             "input_research_question": {
                 "question": "培训是否影响工资？",
                 "topic_session_id": "topic_session_v1",
@@ -2522,6 +2582,16 @@ class AgentTaskQueueApiTests(unittest.TestCase):
                 {"id": "review_supervisor_plan", "label": "人工确认 SupervisorPlan", "required": True}
             ],
             "recommended_internal_skills": recommended_internal_skills or [],
+            "decision_events": decision_events
+            if decision_events is not None
+            else [
+                {
+                    "actor": "local_codex_supervisor",
+                    "action": "generate_supervisor_plan",
+                    "timestamp": "2026-06-10T00:00:00Z",
+                    "note": "LLM Supervisor 生成了可审阅研究路线。",
+                }
+            ],
         }
         if llm_intervention_plan is not None:
             plan["llm_intervention_plan"] = llm_intervention_plan

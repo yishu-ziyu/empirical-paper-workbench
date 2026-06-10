@@ -87,6 +87,13 @@ interface SystemStatusBarProps {
   pollIntervalMs?: number;
 }
 
+interface LlmProbeResult {
+  status: "ok" | "error";
+  message: string;
+  provider?: string;
+  model?: string;
+}
+
 const SERVICE_ERROR_MESSAGE =
   "状态暂时没连上，稍后会自动重试。不会影响已保存的研究材料。";
 
@@ -146,6 +153,8 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const [llmStatus, setLlmStatus] = useState<LlmSupervisorStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [llmProbeResult, setLlmProbeResult] = useState<LlmProbeResult | null>(null);
+  const [llmProbeRunning, setLlmProbeRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -197,6 +206,39 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
       abortRef.current?.abort();
     };
   }, [fetchStatus, pollIntervalMs]);
+
+  const probeLlmSupervisor = useCallback(async () => {
+    setLlmProbeRunning(true);
+    setLlmProbeResult(null);
+    try {
+      const resp = await fetch(apiUrl("/api/v1/providers/llm-supervisor/probe"), {
+        method: "POST",
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setLlmProbeResult({
+          status: "error",
+          message: data?.error?.message || "测试失败：LLM Supervisor 当前不可用。",
+        });
+        return;
+      }
+      const provider = data?.provider?.provider_name || data?.provider?.provider_id || "LLM Supervisor";
+      const model = data?.provider?.model || "已连接模型";
+      setLlmProbeResult({
+        status: "ok",
+        message: "测试通过",
+        provider,
+        model,
+      });
+    } catch {
+      setLlmProbeResult({
+        status: "error",
+        message: "测试失败：服务暂时没连上。",
+      });
+    } finally {
+      setLlmProbeRunning(false);
+    }
+  }, []);
 
   return (
     <div
@@ -360,9 +402,35 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
             {llmStatus?.local_codex?.activation_hint ? (
               <p className="system-status-bar__obs">{llmStatus.local_codex.activation_hint}</p>
             ) : null}
-            <p className="system-status-bar__obs">
-              探测入口：<code>/api/v1/providers/llm-supervisor/probe</code>
-            </p>
+            <div className="system-status-bar__probe-row">
+              <button
+                className="system-status-bar__probe-button"
+                data-testid="status-detail-llm-probe"
+                type="button"
+                disabled={llmProbeRunning}
+                onClick={probeLlmSupervisor}
+              >
+                {llmProbeRunning ? "正在测试" : "测试当前 LLM"}
+              </button>
+              {llmProbeResult ? (
+                <p
+                  className={cn(
+                    "system-status-bar__probe-result",
+                    llmProbeResult.status === "ok" && "system-status-bar__probe-result--ok",
+                    llmProbeResult.status === "error" && "system-status-bar__probe-result--error",
+                  )}
+                >
+                  {llmProbeResult.message}
+                  {llmProbeResult.provider || llmProbeResult.model ? (
+                    <span>
+                      {" "}
+                      {llmProbeResult.provider}
+                      {llmProbeResult.model ? ` · ${llmProbeResult.model}` : ""}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
             {llmStatus?.primary_action?.hint ? (
               <p className="system-status-bar__obs">{llmStatus.primary_action.hint}</p>
             ) : null}

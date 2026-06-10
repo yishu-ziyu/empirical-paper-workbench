@@ -183,6 +183,32 @@ class LlmSupervisorProviderFrontendTests(unittest.TestCase):
         self.assertIn("model_choices", source)
         self.assertIn("local_codex", source)
 
+    def test_bdd_system_status_bar_exposes_interactive_llm_probe(self) -> None:
+        """行为 7：用户必须能在状态栏直接测试当前 LLM，而不是只看到一个接口路径。"""
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "Product"
+            / "web-react"
+            / "src"
+            / "components"
+            / "SystemStatusBar.tsx"
+        ).read_text(encoding="utf-8")
+        styles = (
+            Path(__file__).resolve().parents[1]
+            / "Product"
+            / "web-react"
+            / "src"
+            / "styles.css"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("probeLlmSupervisor", source)
+        self.assertIn("data-testid=\"status-detail-llm-probe\"", source)
+        self.assertIn("测试当前 LLM", source)
+        self.assertIn("正在测试", source)
+        self.assertIn("测试通过", source)
+        self.assertIn("测试失败", source)
+        self.assertIn("system-status-bar__probe-result", styles)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2965,6 +2965,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr));", self.react_styles_css)
         self.assertIn(".stage-panel__guide,\n  .stage-unlock-list", self.react_styles_css)
 
+    def test_bdd_51_agent_queue_surfaces_single_focus_task_and_open_action(self) -> None:
+        """行为 51：任务队列必须先告诉用户当前只处理哪一个任务，并提供展开入口。"""
+        self.assertIn("selectFocusTask", self.react_agent_task_queue)
+        self.assertIn("focusTaskReason", self.react_agent_task_queue)
+        self.assertIn("const focusTask = useMemo(() => selectFocusTask(tasks), [tasks]);", self.react_agent_task_queue)
+        self.assertIn('data-testid="agent-task-queue-focus"', self.react_agent_task_queue)
+        self.assertIn('data-testid="agent-task-queue-focus-open"', self.react_agent_task_queue)
+        self.assertIn("现在处理这一个", self.react_agent_task_queue)
+        self.assertIn("setExpandedTaskId(focusTask.id)", self.react_agent_task_queue)
+        self.assertIn(".agent-task-queue-focus", self.react_styles_css)
+        self.assertIn(".agent-task-queue-focus__action", self.react_styles_css)
+
 
 if __name__ == "__main__":
     unittest.main()

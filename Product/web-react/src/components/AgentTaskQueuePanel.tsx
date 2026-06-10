@@ -563,6 +563,60 @@ function executionBackendName(task: AgentTask): string {
   return task.execution_result?.engine ?? task.selected_backend?.label ?? backendOptionLabel(task.selected_backend?.id);
 }
 
+function taskActionId(task: AgentTask): string {
+  return task.next_action ?? task.primary_action?.id ?? task.primary_action?.action ?? "";
+}
+
+function selectFocusTask(tasks: AgentTask[]): AgentTask | null {
+  const actionable = new Set([
+    "dispatch_review_required",
+    "review_internal_skill_before_execution",
+    "select_execution_backend",
+    "choose_fallback_backend",
+    "execute",
+    "review_literature_seed_package",
+    "draft_literature_review",
+    "review_draft_section_tasks",
+    "generate_section_drafts",
+    "review_section_drafts",
+    "review_formal_writeback_preflight",
+    "prepare_export_preflight",
+    "run_pdf_export_preflight",
+    "review_pdf_candidate",
+    "resolve_export_preflight_blockers",
+  ]);
+  return (
+    tasks.find((task) => {
+      const action = taskActionId(task);
+      return (
+        actionable.has(action) ||
+        Boolean(task.backend_blocker) ||
+        Boolean(task.error) ||
+        Boolean(task.execution_result?.status === "failed") ||
+        Boolean(task.blockers?.length) ||
+        Boolean(task.internal_skill_bindings?.length && !task.internal_skill_execution_packet)
+      );
+    }) ??
+    tasks[0] ??
+    null
+  );
+}
+
+function focusTaskReason(task: AgentTask): string {
+  const action = taskActionId(task);
+  if (task.backend_blocker) return "执行后端暂时不可用，先选择备用后端或处理阻断。";
+  if (task.error || task.execution_result?.status === "failed") return "上一轮执行没有通过，先看失败诊断和日志线索。";
+  if (task.internal_skill_bindings?.length && !task.internal_skill_execution_packet) {
+    return "这个任务已经匹配内部 Skill，先生成可审阅执行包再派工。";
+  }
+  if (action === "dispatch_review_required") return "需要先确认这个 Agent 任务是否进入执行。";
+  if (action === "select_execution_backend") return "派工已确认，下一步选择由哪个后端执行。";
+  if (action === "choose_fallback_backend") return "当前后端不可用，先选一个能跑通的备用后端。";
+  if (action === "execute") return "后端已选，可以启动一次真实执行并写回日志。";
+  if (action.startsWith("review_")) return "这里需要人工判断，确认后才进入下一层。";
+  return task.primary_action?.reason ?? "这是当前队列中最靠前的可处理任务。";
+}
+
 function renderTaskSkillReview(
   task: AgentTask,
   options?: {
@@ -1015,6 +1069,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const summary = queue?.summary ?? {};
   const tasks = queue?.tasks ?? [];
   const currentAction = queue?.primary_action?.id ?? queue?.primary_action?.action;
+  const focusTask = useMemo(() => selectFocusTask(tasks), [tasks]);
   const ownerAgents = useMemo(() => (summary.owner_agents ?? []).slice(0, 4), [summary.owner_agents]);
 
   return (
@@ -1058,6 +1113,30 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
           {queue?.primary_action?.reason ? <p>{queue.primary_action.reason}</p> : null}
         </div>
       </div>
+
+      {focusTask ? (
+        <div className="agent-task-queue-focus" data-testid="agent-task-queue-focus">
+          <div>
+            <span className="eyebrow">现在处理这一个</span>
+            <h3>{focusTask.title ?? focusTask.id}</h3>
+            <p>{focusTaskReason(focusTask)}</p>
+          </div>
+          <div className="agent-task-queue-focus__action">
+            <span>下一步</span>
+            <strong>{actionLabel(taskActionId(focusTask))}</strong>
+            <small>{focusTask.role ?? focusTask.owner_agent ?? "Agent"}</small>
+          </div>
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-testid="agent-task-queue-focus-open"
+            onClick={() => setExpandedTaskId(focusTask.id)}
+          >
+            <ListChecks size={15} />
+            <span>展开这个任务</span>
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="agent-task-queue-panel__error" role="alert">
@@ -1132,7 +1211,11 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
               task.formal_export_preflight?.status === "formal_export_preflight_ready";
             const generatingPdfCandidateExport = generatingPdfCandidateExportTaskId === task.id;
             return (
-              <article key={task.id} className="agent-task-card" data-status={task.status}>
+              <article
+                key={task.id}
+                className={cn("agent-task-card", focusTask?.id === task.id ? "agent-task-card--focus" : undefined)}
+                data-status={task.status}
+              >
                 <button
                   className="agent-task-card__top"
                   type="button"

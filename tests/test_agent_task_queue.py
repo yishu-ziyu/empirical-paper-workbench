@@ -493,6 +493,52 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             (self.project_root / "state" / "product" / "internal_skill_execution_packets").exists()
         )
 
+    def test_bdd_11c_internal_skill_task_requires_execution_packet_before_dispatch_approval(self) -> None:
+        """行为 11c：绑定 internal skill 的任务，派工批准前必须先形成可审阅执行包。"""
+        self._write_literature_internal_skill_supervisor_plan()
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+
+        response = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
+            json={"action": "approve", "note": "尝试直接进入后端选择"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "internal_skill_execution_packet_required")
+        queue = self.client.get(f"/api/v1/projects/{self.project_id}/agent-task-queue").json()[
+            "agent_task_queue"
+        ]
+        task = queue["tasks"][0]
+        self.assertEqual(task["status"], "queued")
+        self.assertEqual(task["next_action"], "dispatch_review_required")
+        self.assertEqual(
+            task["llm_intervention_handoff"]["human_gate"],
+            "review_internal_skill_before_execution",
+        )
+        self.assertEqual(task["dispatch_review"]["status"], "pending")
+
+    def test_bdd_11d_internal_skill_task_can_be_dispatch_approved_after_execution_packet(self) -> None:
+        """行为 11d：执行包落盘后，绑定 internal skill 的任务才能进入派工批准。"""
+        self._write_literature_internal_skill_supervisor_plan()
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+        packet_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/internal-skill-execution-packet"
+        )
+        self.assertEqual(packet_response.status_code, 200, msg=packet_response.text)
+
+        reviewed = self.client.put(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
+            json={"action": "approve", "note": "执行包已审阅，可以进入后端选择"},
+        )
+
+        self.assertEqual(reviewed.status_code, 200, msg=reviewed.text)
+        task = reviewed.json()["agent_task_queue"]["tasks"][0]
+        self.assertEqual(task["status"], "reviewed_for_dispatch")
+        self.assertEqual(task["next_action"], "select_execution_backend")
+        self.assertEqual(task["internal_skill_execution_packet"]["status"], "draft_execution_packet_ready")
+
     def test_bdd_12_execute_endpoint_requires_selected_backend_without_mutating_task(self) -> None:
         """行为 12：执行 API 必须先要求后端选择，不能把未选后端任务写成失败。"""
         self._write_supervisor_plan(status="approved", can_dispatch=True)
@@ -849,6 +895,10 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
         self.assertEqual(created.status_code, 201, msg=created.text)
+        packet_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/internal-skill-execution-packet"
+        )
+        self.assertEqual(packet_response.status_code, 200, msg=packet_response.text)
         reviewed = self.client.put(
             f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
             json={"action": "approve", "note": "先生成候选来源种子包"},
@@ -1994,6 +2044,10 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         )
         created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
         self.assertEqual(created.status_code, 201, msg=created.text)
+        packet_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/internal-skill-execution-packet"
+        )
+        self.assertEqual(packet_response.status_code, 200, msg=packet_response.text)
         reviewed = self.client.put(
             f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/dispatch-review",
             json={"action": "approve", "note": "先生成候选来源种子包"},
@@ -2066,6 +2120,47 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertGreaterEqual(task_queue["summary"]["total_tasks"], 3)
         self.assertGreaterEqual(task_queue["summary"]["internal_skill_count"], 1)
         self.assertTrue((project_root / "state" / "product" / "agent_task_queue.json").exists())
+
+    def _write_literature_internal_skill_supervisor_plan(self) -> None:
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "expected_artifacts": [
+                        "LiteratureSeedPackage",
+                        "search_query_graph",
+                        "citation_verification_queue",
+                    ],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                },
+            ],
+            reference_chain_policy={
+                "contract_version": "reference_chain.v1",
+                "status": "needs_review",
+                "source_priority": ["cnki", "scholar", "zotero", "local_notes", "arxiv"],
+                "max_depth": 2,
+                "max_iterations": 5,
+                "formal_writeback_gate": "review_literature_seed_package",
+                "writes_formal_layer": True,
+            },
+        )
 
     def _write_supervisor_plan(
         self,
@@ -2588,6 +2683,14 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("草案层执行包", self.react_agent_task_queue)
         self.assertIn("agent-task-skill-review__actions", self.react_styles_css)
         self.assertIn("agent-task-skill-review__packet", self.react_styles_css)
+
+    def test_bdd_37b_react_task_queue_marks_skill_packet_as_dispatch_gate(self) -> None:
+        """行为 37b：React Skill 审阅台必须说明执行包是派工批准前置门槛。"""
+        self.assertIn("internalSkillPacketReady", self.react_agent_task_queue)
+        self.assertIn("internal-skill-dispatch-gate", self.react_agent_task_queue)
+        self.assertIn("先生成执行包，派工批准才会开放", self.react_agent_task_queue)
+        self.assertIn("派工批准条件已满足", self.react_agent_task_queue)
+        self.assertIn("agent-task-skill-review__gate", self.react_styles_css)
 
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""

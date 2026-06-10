@@ -338,6 +338,7 @@ function renderTaskSkillReview(
   const sources = skill?.skill_sources ?? [];
   const canWriteCanonical = skill?.canonical_policy?.auto_mode?.can_write_canonical;
   const packet = task.internal_skill_execution_packet;
+  const internalSkillPacketReady = packet?.status === "draft_execution_packet_ready";
 
   return (
     <div className="agent-task-skill-review" data-testid="agent-task-skill-review">
@@ -407,6 +408,24 @@ function renderTaskSkillReview(
         <p className="agent-task-skill-review__note">
           Auto Mode 可以生成 patch proposal；canonical 规则库需人工 review 后合并。
         </p>
+      ) : null}
+
+      {skill ? (
+        <div
+          className={cn(
+            "agent-task-skill-review__gate",
+            internalSkillPacketReady ? "agent-task-skill-review__gate--ready" : undefined,
+          )}
+          data-testid="internal-skill-dispatch-gate"
+        >
+          <span>派工批准门槛</span>
+          <strong>{internalSkillPacketReady ? "派工批准条件已满足" : "先生成执行包，派工批准才会开放"}</strong>
+          <p>
+            {internalSkillPacketReady
+              ? "执行步骤、质量门和正式层边界已落盘，下一步可以进入派工审阅。"
+              : "系统会先把 Skill 的操作步骤、质量门和正式层边界写成可审阅文件。"}
+          </p>
+        </div>
       ) : null}
 
       {packet ? (

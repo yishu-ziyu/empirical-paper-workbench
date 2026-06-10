@@ -2663,7 +2663,8 @@ button {
   line-height: 1.6;
 }
 
-.agent-task-queue-export-preflight__llm {
+.agent-task-queue-export-preflight__llm,
+.agent-task-queue-pdf-candidate__llm {
   display: grid;
   gap: 5px;
   border: 1px solid rgba(230, 230, 230, 0.12);
@@ -2673,13 +2674,16 @@ button {
   padding: 12px;
 }
 
-.agent-task-queue-export-preflight__llm strong {
+.agent-task-queue-export-preflight__llm strong,
+.agent-task-queue-pdf-candidate__llm strong {
   color: var(--color-strong);
   font-size: 14px;
 }
 
 .agent-task-queue-export-preflight__llm p,
-.agent-task-queue-export-preflight__llm small {
+.agent-task-queue-export-preflight__llm small,
+.agent-task-queue-pdf-candidate__llm p,
+.agent-task-queue-pdf-candidate__llm small {
   margin: 0;
   color: var(--color-muted);
   font-size: 13px;

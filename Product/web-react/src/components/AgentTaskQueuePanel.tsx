@@ -346,6 +346,9 @@ interface AgentTask {
     wrote_final_pdf?: boolean;
     wrote_docx?: boolean;
     writes_formal_layer?: boolean;
+    llm_provider_snapshot?: LlmExecutionPreflight["provider_snapshot"];
+    llm_preflight_summary?: string;
+    llm_preflight_human_review_note?: string;
     next_action?: string;
   };
   pdf_candidate_review?: {
@@ -2826,6 +2829,24 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           </div>
                         </div>
                         <p className="agent-task-queue-pdf-candidate__note">候选稿不覆盖 paper.pdf / paper.docx；人工审阅通过后再进入正式导出。</p>
+                        {task.pdf_candidate_export?.llm_provider_snapshot?.primary_provider ? (
+                          <div className="agent-task-queue-pdf-candidate__llm" data-testid="agent-task-queue-pdf-candidate-llm">
+                            <strong>LLM 判断来源</strong>
+                            <p>
+                              {task.pdf_candidate_export.llm_provider_snapshot.primary_provider.provider_name ??
+                                task.pdf_candidate_export.llm_provider_snapshot.primary_provider.provider_id ??
+                                "LLM Supervisor"}
+                              {" / "}
+                              {task.pdf_candidate_export.llm_provider_snapshot.primary_provider.model ?? "未记录模型"}
+                              {" · 备用链 "}
+                              {task.pdf_candidate_export.llm_provider_snapshot.attempt_count ?? 0}
+                              {" 个"}
+                            </p>
+                            {task.pdf_candidate_export.llm_preflight_summary ? (
+                              <small>{task.pdf_candidate_export.llm_preflight_summary}</small>
+                            ) : null}
+                          </div>
+                        ) : null}
                         {canGeneratePdfCandidateReview ? (
                           <div className="agent-task-queue-pdf-candidate__actions">
                             <button

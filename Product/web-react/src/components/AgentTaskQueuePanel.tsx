@@ -339,12 +339,14 @@ interface TraceLearningRegressionProposal {
   status?: string;
   current_review_status?: string;
   latest_review_id?: string | null;
+  created_at?: string;
 }
 
 interface TraceLearningRegressionProposalListResponse {
   trace_learning?: {
     regression_proposals?: TraceLearningRegressionProposal[];
     regression_test_patch_proposals?: TraceLearningRegressionTestPatchProposal[];
+    regression_test_patch_apply_packages?: TraceLearningRegressionTestPatchApplyPackage[];
   };
 }
 
@@ -368,6 +370,7 @@ interface TraceLearningRegressionTestPatchProposal {
   latest_review_id?: string | null;
   artifact_path?: string;
   next_action?: string;
+  created_at?: string;
 }
 
 interface TraceLearningRegressionTestPatchProposalReviewResponse {
@@ -377,6 +380,19 @@ interface TraceLearningRegressionTestPatchProposalReviewResponse {
     status?: string;
     next_action?: string;
   };
+}
+
+interface TraceLearningRegressionTestPatchApplyPackage {
+  id?: string;
+  status?: string;
+  patch_proposal_id?: string;
+  artifact_path?: string;
+  next_action?: string;
+  created_at?: string;
+}
+
+interface TraceLearningRegressionTestPatchApplyPackageResponse {
+  regression_test_patch_apply_package?: TraceLearningRegressionTestPatchApplyPackage;
 }
 
 interface AgentTaskQueuePanelProps {
@@ -572,6 +588,21 @@ function isReviewableTraceLearningTestPatchProposal(proposal?: TraceLearningRegr
 function isReviewedTraceLearningTestPatchProposal(proposal?: TraceLearningRegressionTestPatchProposal): boolean {
   const status = traceLearningTestPatchReviewStatus(proposal);
   return Boolean(status && status !== "needs_review");
+}
+
+function traceLearningRecordTime(record?: { created_at?: string }): number {
+  const parsed = Date.parse(record?.created_at ?? "");
+  return Number.isFinite(parsed) ? parsed : -1;
+}
+
+function latestTraceLearningRecord<T extends { id?: string; created_at?: string }>(
+  items: T[] | undefined,
+  predicate: (item: T) => boolean = (item) => Boolean(item.id),
+): T | null {
+  return (items ?? []).filter(predicate).reduce<T | null>((latest, item) => {
+    if (!latest) return item;
+    return traceLearningRecordTime(item) >= traceLearningRecordTime(latest) ? item : latest;
+  }, null);
 }
 
 function textList(items?: string[]): string {
@@ -886,9 +917,11 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [traceProposalReviewing, setTraceProposalReviewing] = useState(false);
   const [tracePatchProposalGenerating, setTracePatchProposalGenerating] = useState(false);
   const [tracePatchProposalReviewing, setTracePatchProposalReviewing] = useState(false);
+  const [tracePatchApplyPackagePreparing, setTracePatchApplyPackagePreparing] = useState(false);
   const [latestTraceProposalId, setLatestTraceProposalId] = useState<string | null>(null);
   const [latestTracePatchSourceProposalId, setLatestTracePatchSourceProposalId] = useState<string | null>(null);
   const [latestTracePatchProposalId, setLatestTracePatchProposalId] = useState<string | null>(null);
+  const [latestTraceApprovedPatchProposalId, setLatestTraceApprovedPatchProposalId] = useState<string | null>(null);
   const [traceProposalReviewDecision, setTraceProposalReviewDecision] =
     useState<TraceLearningProposalReviewDecision>("request_revision");
   const [tracePatchProposalReviewDecision, setTracePatchProposalReviewDecision] =
@@ -911,28 +944,40 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
         });
         if (!response.ok) return null;
         const data = (await response.json()) as TraceLearningRegressionProposalListResponse;
-        const reviewableProposal =
-          data.trace_learning?.regression_proposals?.find(
-            (proposal) => proposal.current_review_status === "needs_review" || isReviewableTraceLearningProposal(proposal),
-          ) ?? null;
-        const approvedProposal =
-          data.trace_learning?.regression_proposals?.find(
-            (proposal) => proposal.current_review_status === "approved" || isApprovedTraceLearningProposal(proposal),
-          ) ?? null;
+        const reviewableProposal = latestTraceLearningRecord(
+          data.trace_learning?.regression_proposals,
+          (proposal) => proposal.current_review_status === "needs_review" || isReviewableTraceLearningProposal(proposal),
+        );
+        const approvedProposal = latestTraceLearningRecord(
+          data.trace_learning?.regression_proposals,
+          (proposal) => proposal.current_review_status === "approved" || isApprovedTraceLearningProposal(proposal),
+        );
         const patchProposals = data.trace_learning?.regression_test_patch_proposals ?? [];
-        const reviewablePatchProposal =
-          patchProposals.find((proposal) => isReviewableTraceLearningTestPatchProposal(proposal)) ?? null;
-        const reviewedPatchProposal =
-          patchProposals.find((proposal) => Boolean(proposal.id) && isReviewedTraceLearningTestPatchProposal(proposal)) ??
-          null;
+        const reviewablePatchProposal = latestTraceLearningRecord(
+          patchProposals,
+          (proposal) => isReviewableTraceLearningTestPatchProposal(proposal),
+        );
+        const reviewedPatchProposal = latestTraceLearningRecord(
+          patchProposals,
+          (proposal) => Boolean(proposal.id) && isReviewedTraceLearningTestPatchProposal(proposal),
+        );
+        const approvedPatchProposal = latestTraceLearningRecord(
+          patchProposals,
+          (proposal) => traceLearningTestPatchReviewStatus(proposal) === "approved",
+        );
+        const applyPackages = data.trace_learning?.regression_test_patch_apply_packages ?? [];
+        const latestApplyPackage = latestTraceLearningRecord(applyPackages);
         const previousPatchProposalId = latestTracePatchProposalIdRef.current;
         setLatestTraceProposalId(reviewableProposal?.id ?? null);
         setLatestTracePatchSourceProposalId(approvedProposal?.id ?? null);
         rememberLatestTracePatchProposalId(reviewablePatchProposal?.id ?? null);
+        setLatestTraceApprovedPatchProposalId(approvedPatchProposal?.id ?? null);
         if (reviewableProposal?.id && options?.announce) {
           setTraceMessage(`已有待审阅回归建议：${reviewableProposal.id}`);
         } else if (reviewablePatchProposal?.id && options?.announce) {
           setTraceMessage(`已有测试补丁建议等待审阅：${reviewablePatchProposal.id}`);
+        } else if (latestApplyPackage?.id && options?.announce) {
+          setTraceMessage(`测试落地包已生成：${latestApplyPackage.id}`);
         } else if (reviewedPatchProposal?.id && options?.announce) {
           setTraceMessage(
             `测试补丁建议已有审阅状态：${traceLearningTestPatchReviewStatus(reviewedPatchProposal) ?? "已审阅"}`,
@@ -1410,12 +1455,54 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setTraceMessage(
         `已记录测试补丁建议审阅：${data.regression_test_patch_proposal_review?.status ?? "已审阅"}`,
       );
+      if (data.regression_test_patch_proposal_review?.status === "approved") {
+        setLatestTraceApprovedPatchProposalId(latestTracePatchProposalId);
+      }
       rememberLatestTracePatchProposalId(null);
       void loadTraceLearningRegressionProposals();
     } catch {
       setTraceMessage("测试补丁建议审阅暂时没写入成功，请稍后再试。");
     } finally {
       setTracePatchProposalReviewing(false);
+    }
+  };
+
+  const prepareTraceLearningRegressionTestPatchApplyPackage = async () => {
+    if (!latestTraceApprovedPatchProposalId) {
+      setTraceMessage("先批准测试补丁建议，再生成测试落地包。");
+      return;
+    }
+
+    setTracePatchApplyPackagePreparing(true);
+    try {
+      const response = await fetch(
+        apiUrl(
+          `/api/v1/projects/${projectId}/trace-learning/regression-test-patch-proposals/${latestTraceApprovedPatchProposalId}/apply-package`,
+        ),
+        {
+          method: "POST",
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { code?: string } } | null;
+        if (payload?.error?.code === "trace_learning_test_patch_proposal_approval_required") {
+          setTraceMessage("测试补丁建议批准后，才会生成测试落地包。");
+          return;
+        }
+        if (payload?.error?.code === "trace_learning_test_patch_proposal_not_found") {
+          setLatestTraceApprovedPatchProposalId(null);
+          setTraceMessage("测试补丁建议不存在，请重新生成或刷新队列。");
+          return;
+        }
+        throw new Error(payload?.error?.code ?? "trace_learning_test_patch_apply_package_failed");
+      }
+      const data = (await response.json()) as TraceLearningRegressionTestPatchApplyPackageResponse;
+      setTraceMessage(`测试落地包已生成：${data.regression_test_patch_apply_package?.id ?? "等待人工应用"}`);
+      void loadTraceLearningRegressionProposals();
+    } catch {
+      setTraceMessage("测试落地包暂时没有生成成功，请稍后再试。");
+    } finally {
+      setTracePatchApplyPackagePreparing(false);
     }
   };
 
@@ -1579,10 +1666,24 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             {tracePatchProposalReviewing ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
             <span>{tracePatchProposalReviewing ? "审阅中" : "审阅测试补丁建议"}</span>
           </button>
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-testid="trace-learning-test-patch-apply-package"
+            onClick={() => void prepareTraceLearningRegressionTestPatchApplyPackage()}
+            disabled={!latestTraceApprovedPatchProposalId || tracePatchApplyPackagePreparing || traceProposalsLoading}
+          >
+            {tracePatchApplyPackagePreparing || traceProposalsLoading ? (
+              <Loader2 size={15} className="spin" />
+            ) : (
+              <FileCheck2 size={15} />
+            )}
+            <span>{tracePatchApplyPackagePreparing ? "生成中" : "生成测试落地包"}</span>
+          </button>
           {traceMessage ? <small>{traceMessage}</small> : null}
         </div>
         <small className="trace-learning-feedback__hint">
-          回归建议会进入等待人工审阅；回归建议批准后，才会生成测试补丁建议。测试补丁建议审阅后也不会自动写测试文件、不会改正式论文或 canonical 规则库。
+          回归建议会进入等待人工审阅；回归建议批准后，才会生成测试补丁建议。测试补丁建议批准后，可以显式生成测试落地包。它只生成落地包和人工应用步骤，不会自动改测试文件、不会改正式论文或 canonical 规则库。
         </small>
       </details>
 

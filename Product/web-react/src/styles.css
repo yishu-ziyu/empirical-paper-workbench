@@ -1221,6 +1221,59 @@ button {
   font-size: 16px;
 }
 
+.trace-learning-feedback {
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.3);
+  padding: 12px 14px;
+}
+
+.trace-learning-feedback summary {
+  cursor: pointer;
+  color: var(--color-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.trace-learning-feedback p {
+  margin: 10px 0 12px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.trace-learning-feedback textarea {
+  width: 100%;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(12, 12, 12, 0.5);
+  color: var(--color-strong);
+  font: inherit;
+  line-height: 1.6;
+  outline: none;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.trace-learning-feedback textarea:focus {
+  border-color: rgba(230, 230, 230, 0.32);
+  box-shadow: 0 0 0 3px rgba(230, 230, 230, 0.06);
+}
+
+.trace-learning-feedback__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.trace-learning-feedback__actions small {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .agent-task-queue-focus {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.42fr) auto;

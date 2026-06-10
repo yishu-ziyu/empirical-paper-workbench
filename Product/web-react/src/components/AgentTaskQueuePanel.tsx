@@ -319,6 +319,16 @@ interface AgentTaskQueueResponse {
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
 }
 
+interface TraceLearningBadCaseResponse {
+  bad_case?: {
+    id?: string;
+  };
+  trace_learning?: {
+    case_count?: number;
+    path?: string;
+  };
+}
+
 interface AgentTaskQueuePanelProps {
   projectId: string;
 }
@@ -798,6 +808,9 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
   const [generatingPdfCandidateExportTaskId, setGeneratingPdfCandidateExportTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [traceFeedback, setTraceFeedback] = useState("");
+  const [traceSaving, setTraceSaving] = useState(false);
+  const [traceMessage, setTraceMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const loadQueue = useCallback(async () => {
@@ -1073,6 +1086,46 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const focusTask = useMemo(() => selectFocusTask(tasks), [tasks]);
   const ownerAgents = useMemo(() => (summary.owner_agents ?? []).slice(0, 4), [summary.owner_agents]);
 
+  const captureTraceLearningBadCase = async () => {
+    const feedback = traceFeedback.trim();
+    if (!feedback) {
+      setTraceMessage("先写一句你看到的问题。");
+      return;
+    }
+
+    setTraceSaving(true);
+    try {
+      const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/trace-learning/bad-cases`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stage: "agent_task_queue",
+          surface: "web_react",
+          page_url: window.location.href,
+          target_text: actionLabel(currentAction),
+          agent_output: JSON.stringify({
+            queue_status: queue?.status ?? "unknown",
+            current_action: currentAction ?? "unknown",
+            focus_task: focusTask?.id ?? "",
+          }),
+          user_feedback: feedback,
+          expected_behavior: "把用户指出的坏案例写入改进账本，后续转成回归测试或规则修订。",
+          fix_layer: "eval_set",
+          severity: "medium",
+          related_files: ["Product/web-react/src/components/AgentTaskQueuePanel.tsx"],
+        }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const data = (await response.json()) as TraceLearningBadCaseResponse;
+      setTraceFeedback("");
+      setTraceMessage(`已写入改进账本：${data.bad_case?.id ?? "bad case"}`);
+    } catch {
+      setTraceMessage("暂时没写入成功，请稍后再试。");
+    } finally {
+      setTraceSaving(false);
+    }
+  };
+
   return (
     <section className="agent-task-queue-panel" data-testid="agent-task-queue-panel" aria-label="Agent 任务队列">
       <div className="agent-task-queue-panel__header">
@@ -1149,6 +1202,33 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
           />
         </div>
       ) : null}
+
+      <details className="trace-learning-feedback" data-testid="trace-learning-feedback">
+        <summary>记录一个问题</summary>
+        <p>题目误判、按钮不可读、流程不顺，都可以写在这里。系统会写入改进账本，不会改写正式研究状态。</p>
+        <textarea
+          value={traceFeedback}
+          onChange={(event) => {
+            setTraceFeedback(event.target.value);
+            setTraceMessage(null);
+          }}
+          placeholder="例如：这里把当前题目误判成旧题目。"
+          rows={3}
+        />
+        <div className="trace-learning-feedback__actions">
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-testid="trace-learning-capture"
+            onClick={() => void captureTraceLearningBadCase()}
+            disabled={traceSaving}
+          >
+            {traceSaving ? <Loader2 size={15} className="spin" /> : <Pencil size={15} />}
+            <span>{traceSaving ? "写入中" : "写入改进账本"}</span>
+          </button>
+          {traceMessage ? <small>{traceMessage}</small> : null}
+        </div>
+      </details>
 
       {tasks.length === 0 ? (
         <div className="agent-task-queue-empty" data-testid="agent-task-queue-empty">

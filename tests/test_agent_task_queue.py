@@ -2726,6 +2726,24 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("backendSelectionDisabled", self.react_agent_task_queue)
         self.assertIn("agent-task-backend-selection", self.react_styles_css)
 
+    def test_bdd_37e_react_task_queue_can_execute_selected_backend_and_show_result(self) -> None:
+        """行为 37e：后端已选后，React 队列必须能执行任务，并展示结果、日志和失败诊断。"""
+        self.assertIn("executeAgentTask", self.react_agent_task_queue)
+        self.assertIn("/execute", self.react_agent_task_queue)
+        self.assertIn("ExecutionResult", self.react_agent_task_queue)
+        self.assertIn("execution_result", self.react_agent_task_queue)
+        self.assertIn("executionFailure", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"agent-task-execution-console\"", self.react_agent_task_queue)
+        self.assertIn("data-execute-agent-task-action", self.react_agent_task_queue)
+        self.assertIn("开始执行", self.react_agent_task_queue)
+        self.assertIn("执行结果", self.react_agent_task_queue)
+        self.assertIn("产物路径", self.react_agent_task_queue)
+        self.assertIn("日志线索", self.react_agent_task_queue)
+        self.assertIn("失败诊断", self.react_agent_task_queue)
+        self.assertIn("选择备用后端", self.react_agent_task_queue)
+        self.assertIn("agent-task-execution-console", self.react_styles_css)
+        self.assertIn("agent-task-execution-console--failed", self.react_styles_css)
+
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
         self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)

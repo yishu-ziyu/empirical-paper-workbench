@@ -2977,6 +2977,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn(".agent-task-queue-focus", self.react_styles_css)
         self.assertIn(".agent-task-queue-focus__action", self.react_styles_css)
 
+    def test_bdd_52_agent_queue_reuses_service_recovery_when_queue_fetch_fails(self) -> None:
+        """行为 52：任务队列断线时必须给恢复路径，不能只显示一句错误。"""
+        self.assertIn("ServiceConnectionRecovery", self.react_agent_task_queue)
+        self.assertIn('data-testid="agent-task-queue-error"', self.react_agent_task_queue)
+        self.assertIn("onRetry={loadQueue}", self.react_agent_task_queue)
+        self.assertIn('retryLabel="重新读取队列"', self.react_agent_task_queue)
+        self.assertIn('localActionTestId="agent-task-queue-use-local-backend"', self.react_agent_task_queue)
+        self.assertNotIn('<div className="agent-task-queue-panel__error" role="alert">', self.react_agent_task_queue)
+
 
 if __name__ == "__main__":
     unittest.main()

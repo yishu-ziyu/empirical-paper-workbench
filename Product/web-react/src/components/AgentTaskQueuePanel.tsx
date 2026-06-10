@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { apiUrl } from "../lib/apiBase";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 type DraftSectionTasksReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
 type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "needs_revision" | "reject";
@@ -1139,8 +1140,13 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       ) : null}
 
       {error ? (
-        <div className="agent-task-queue-panel__error" role="alert">
-          {error}
+        <div data-testid="agent-task-queue-error">
+          <ServiceConnectionRecovery
+            message={error}
+            onRetry={loadQueue}
+            retryLabel="重新读取队列"
+            localActionTestId="agent-task-queue-use-local-backend"
+          />
         </div>
       ) : null}
 

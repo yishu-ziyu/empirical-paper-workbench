@@ -388,6 +388,13 @@ interface TraceLearningRegressionTestPatchApplyPackage {
   patch_proposal_id?: string;
   artifact_path?: string;
   next_action?: string;
+  target_files?: Array<{
+    path?: string;
+    operation?: string;
+    write_now?: boolean;
+  }>;
+  manual_steps?: string[];
+  target_command?: string;
   created_at?: string;
 }
 
@@ -922,6 +929,8 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [latestTracePatchSourceProposalId, setLatestTracePatchSourceProposalId] = useState<string | null>(null);
   const [latestTracePatchProposalId, setLatestTracePatchProposalId] = useState<string | null>(null);
   const [latestTraceApprovedPatchProposalId, setLatestTraceApprovedPatchProposalId] = useState<string | null>(null);
+  const [latestTraceApplyPackage, setLatestTraceApplyPackage] =
+    useState<TraceLearningRegressionTestPatchApplyPackage | null>(null);
   const [traceProposalReviewDecision, setTraceProposalReviewDecision] =
     useState<TraceLearningProposalReviewDecision>("request_revision");
   const [tracePatchProposalReviewDecision, setTracePatchProposalReviewDecision] =
@@ -972,6 +981,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
         setLatestTracePatchSourceProposalId(approvedProposal?.id ?? null);
         rememberLatestTracePatchProposalId(reviewablePatchProposal?.id ?? null);
         setLatestTraceApprovedPatchProposalId(approvedPatchProposal?.id ?? null);
+        setLatestTraceApplyPackage(latestApplyPackage ?? null);
         if (reviewableProposal?.id && options?.announce) {
           setTraceMessage(`已有待审阅回归建议：${reviewableProposal.id}`);
         } else if (reviewablePatchProposal?.id && options?.announce) {
@@ -1497,6 +1507,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
         throw new Error(payload?.error?.code ?? "trace_learning_test_patch_apply_package_failed");
       }
       const data = (await response.json()) as TraceLearningRegressionTestPatchApplyPackageResponse;
+      setLatestTraceApplyPackage(data.regression_test_patch_apply_package ?? null);
       setTraceMessage(`测试落地包已生成：${data.regression_test_patch_apply_package?.id ?? "等待人工应用"}`);
       void loadTraceLearningRegressionProposals();
     } catch {
@@ -1685,6 +1696,59 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
         <small className="trace-learning-feedback__hint">
           回归建议会进入等待人工审阅；回归建议批准后，才会生成测试补丁建议。测试补丁建议批准后，可以显式生成测试落地包。它只生成落地包和人工应用步骤，不会自动改测试文件、不会改正式论文或 canonical 规则库。
         </small>
+        {latestTraceApplyPackage ? (
+          <div
+            className="trace-learning-apply-package"
+            data-testid="trace-learning-test-patch-apply-package-summary"
+          >
+            <div>
+              <span className="eyebrow">测试落地包</span>
+              <h4>{latestTraceApplyPackage.id ?? "等待人工应用"}</h4>
+              <p>
+                {statusLabel(latestTraceApplyPackage.status)} · 下一步：
+                {actionLabel(latestTraceApplyPackage.next_action ?? "human_apply_patch_to_test_suite")}
+              </p>
+            </div>
+            <div className="trace-learning-apply-package__grid">
+              <section>
+                <strong>目标测试文件</strong>
+                {(latestTraceApplyPackage.target_files ?? []).length > 0 ? (
+                  <ul>
+                    {(latestTraceApplyPackage.target_files ?? []).map((file, index) => (
+                      <li key={`${latestTraceApplyPackage.id ?? "apply-package"}-target-${index}`}>
+                        <code>{file.path ?? "tests/test_trace_learning.py"}</code>
+                        <small>
+                          {file.operation ?? "manual_patch_required"} · write_now={String(Boolean(file.write_now))}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>等待后端返回 target_files。</p>
+                )}
+              </section>
+              <section>
+                <strong>验证命令</strong>
+                <code>
+                  {latestTraceApplyPackage.target_command ?? "python3 -m unittest tests.test_trace_learning -v"}
+                </code>
+              </section>
+              <section>
+                <strong>人工应用步骤</strong>
+                {(latestTraceApplyPackage.manual_steps ?? []).length > 0 ? (
+                  <ol>
+                    {(latestTraceApplyPackage.manual_steps ?? []).map((step, index) => (
+                      <li key={`${latestTraceApplyPackage.id ?? "apply-package"}-step-${index}`}>{step}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p>等待后端返回 manual_steps。</p>
+                )}
+              </section>
+            </div>
+            {latestTraceApplyPackage.artifact_path ? <code>{latestTraceApplyPackage.artifact_path}</code> : null}
+          </div>
+        ) : null}
       </details>
 
       {tasks.length === 0 ? (

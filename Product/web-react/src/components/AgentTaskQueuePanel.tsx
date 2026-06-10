@@ -16,6 +16,7 @@ import { apiUrl } from "../lib/apiBase";
 type DraftSectionTasksReviewAction = "approve_for_writer_agent" | "needs_revision" | "reject";
 type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "needs_revision" | "reject";
 type FormalWritebackPreflightReviewAction = "approve_formal_writeback" | "needs_revision" | "reject";
+type ReferenceSeedReviewAction = "approve_for_draft" | "needs_revision" | "reject";
 type DispatchReviewAction = "approve" | "reject";
 type ExecutionBackendId = "statspai" | "python_ols_adapter" | "stata_mcp" | "codex";
 type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction | FormalWritebackPreflightReviewAction;
@@ -170,8 +171,15 @@ interface ExecutionResult {
   error?: AgentTaskError;
   result_review?: {
     status?: string;
+    title?: string;
+    artifact_path?: string;
+    review_gate?: string;
+    next_action?: string;
+    reference_state?: string;
+    claims_verified_citations?: boolean;
     can_enter_formal_layer?: boolean;
     last_review_action?: string;
+    review_focus?: string[];
   };
 }
 
@@ -196,6 +204,16 @@ interface AgentTask {
     note?: string;
     reviewed_at?: string;
     evidence_level?: string;
+  };
+  reference_seed_review?: {
+    action?: string;
+    status?: string;
+    review_gate?: string;
+    next_action_label?: string;
+    note?: string;
+    draft_layer_allowed?: boolean;
+    formal_write_allowed?: boolean;
+    reference_state?: string;
   };
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
@@ -365,6 +383,8 @@ function statusLabel(status?: string): string {
     backend_selected: "后端已选",
     formal_writeback_preflight_needs_revision: "正式写回预检需修订",
     formal_writeback_preflight_rejected: "正式写回预检已拒绝",
+    reviewed_for_draft: "已确认进入草稿综述",
+    rejected: "已拒绝",
     succeeded: "完成",
     failed: "失败",
   };
@@ -393,6 +413,10 @@ function actionLabel(action?: string): string {
     revise_dispatch_task: "修订派工任务",
     choose_fallback_backend: "选择备用后端",
     execute: "开始执行",
+    review_literature_seed_package: "审阅候选来源",
+    draft_literature_review: "进入草稿综述",
+    revise_literature_search: "修订文献搜索",
+    replace_literature_search: "替换文献搜索",
     draft_execution_packet_ready: "草案层执行包已生成",
   };
   return labels[action ?? ""] ?? action ?? "查看下一步";
@@ -409,6 +433,12 @@ function reviewActionLabel(action: ReviewAction): string {
 function draftSectionTasksReviewActionLabel(action: DraftSectionTasksReviewAction): string {
   if (action === "reject") return "拒绝任务包";
   return reviewActionLabel(action);
+}
+
+function referenceSeedReviewActionLabel(action: ReferenceSeedReviewAction): string {
+  if (action === "approve_for_draft") return "批准进入草稿综述";
+  if (action === "needs_revision") return "要求修订";
+  return "拒绝结果";
 }
 
 function dispatchReviewActionLabel(action: DispatchReviewAction): string {
@@ -449,6 +479,17 @@ function executionErrorMessage(err: unknown): string {
     return "当前任务还没有进入可执行状态，请先完成前置审阅。";
   }
   return "执行没有启动成功，请查看任务状态后重试。";
+}
+
+function referenceSeedReviewErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("invalid_reference_seed_review_action")) {
+    return "执行结果审阅动作不合法，请刷新后重试。";
+  }
+  if (message.includes("reference_seed_package_required")) {
+    return "还没有可审阅的候选来源种子包。";
+  }
+  return "执行结果审阅没有写回成功，请稍后重试。";
 }
 
 function textList(items?: string[]): string {
@@ -693,6 +734,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [selectingBackend, setSelectingBackend] = useState<{ taskId: string; backendId: ExecutionBackendId } | null>(null);
   const [executingTaskId, setExecutingTaskId] = useState<string | null>(null);
   const [executionFailure, setExecutionFailure] = useState<{ taskId: string; message: string } | null>(null);
+  const [referenceSeedReviewing, setReferenceSeedReviewing] = useState<{
+    taskId: string;
+    action: ReferenceSeedReviewAction;
+  } | null>(null);
   const [generatingSectionDrafts, setGeneratingSectionDrafts] = useState<string | null>(null);
   const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
@@ -867,6 +912,30 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError(message);
     } finally {
       setExecutingTaskId(null);
+    }
+  };
+
+  const reviewReferenceSeedPackage = async (taskId: string, action: ReferenceSeedReviewAction) => {
+    setReferenceSeedReviewing({ taskId, action });
+    try {
+      const data = await fetchJson(`/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/reference-seed-review`, {
+        method: "PUT",
+        body: JSON.stringify({
+          action,
+          note:
+            action === "approve_for_draft"
+              ? "候选来源种子包已审阅，同意进入草稿综述；引用仍需后续核验。"
+              : action === "needs_revision"
+                ? "候选来源需要补充或调整。"
+                : "当前候选来源结果不采用。",
+        }),
+      });
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch (err) {
+      setError(referenceSeedReviewErrorMessage(err));
+    } finally {
+      setReferenceSeedReviewing(null);
     }
   };
 
@@ -1050,6 +1119,13 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
               task.status === "failed" || task.execution_result?.status === "failed" || Boolean(task.error) || Boolean(localExecutionFailure);
             const hasExecutionResult =
               Boolean(task.execution_result) || task.status === "succeeded" || task.status === "failed" || Boolean(localExecutionFailure);
+            const executionResultReviewReady =
+              task.execution_result?.execution_kind === "reference_chain_seed_package" &&
+              (task.next_action === "review_literature_seed_package" ||
+                task.execution_result?.result_review?.review_gate === "review_literature_seed_package") &&
+              !task.reference_seed_review;
+            const referenceSeedReviewBusy = referenceSeedReviewing?.taskId === task.id;
+            const referenceSeedReviewFocus = task.execution_result?.result_review?.review_focus?.filter(Boolean) ?? [];
             const generatingExportPreflight = generatingFormalExportPreflightTaskId === task.id;
             const canGeneratePdfCandidateExport =
               task.status === "formal_export_preflight_ready" &&
@@ -1082,7 +1158,8 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                 hasExportPreflight ||
                 hasPdfCandidateExport ||
                 hasSelectedBackend ||
-                hasExecutionResult ? (
+                hasExecutionResult ||
+                executionResultReviewReady ? (
                   <div className="agent-task-card__body">
                     <div className="agent-task-card__action">
                       <span>下一步</span>
@@ -1318,6 +1395,125 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             </p>
                           </div>
                         )}
+                      </div>
+                    ) : null}
+
+                    {executionResultReviewReady ? (
+                      <div
+                        className="agent-task-execution-review"
+                        data-testid="agent-task-execution-review-gate"
+                      >
+                        <div className="agent-task-execution-review__head">
+                          <div>
+                            <span className="eyebrow">审阅执行结果</span>
+                            <h3>{task.execution_result?.result_review?.title ?? "候选来源种子包"}</h3>
+                            <p>
+                              执行结果已经落盘。先检查产物、审阅重点和正式层边界；通过后只进入草稿综述，不写正式层。
+                            </p>
+                          </div>
+                          <span>{task.execution_result?.result_review?.status ?? "待人工判断"}</span>
+                        </div>
+
+                        <div className="agent-task-execution-review__grid">
+                          <div>
+                            <small>结果产物</small>
+                            <code>
+                              {task.execution_result?.result_review?.artifact_path ?? executionArtifactPath(task.execution_result)}
+                            </code>
+                          </div>
+                          <div>
+                            <small>引用状态</small>
+                            <strong>{task.execution_result?.result_review?.reference_state ?? "candidate"}</strong>
+                          </div>
+                          <div>
+                            <small>审阅门</small>
+                            <strong>{task.execution_result?.result_review?.review_gate ?? "review_literature_seed_package"}</strong>
+                          </div>
+                          <div>
+                            <small>正式层边界</small>
+                            <strong>
+                              {task.execution_result?.result_review?.can_enter_formal_layer ? "可进入正式层" : "不写正式层"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className="agent-task-execution-review__focus">
+                          <strong>审阅重点</strong>
+                          {referenceSeedReviewFocus.length ? (
+                            <ul>
+                              {referenceSeedReviewFocus.slice(0, 3).map((item) => (
+                                <li key={`${task.id}-reference-focus-${item}`}>{item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>当前结果没有审阅摘要。请先查看产物路径和日志，再决定是否继续。</p>
+                          )}
+                        </div>
+
+                        <div className="agent-task-execution-review__actions">
+                          <button
+                            className="btn btn--primary"
+                            type="button"
+                            data-reference-seed-review-action="approve_for_draft"
+                            onClick={() => void reviewReferenceSeedPackage(task.id, "approve_for_draft")}
+                            disabled={referenceSeedReviewBusy}
+                          >
+                            {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "approve_for_draft" ? (
+                              <Loader2 size={15} className="spin" />
+                            ) : (
+                              <CheckCircle2 size={15} />
+                            )}
+                            <span>
+                              {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "approve_for_draft"
+                                ? "写回中"
+                                : referenceSeedReviewActionLabel("approve_for_draft")}
+                            </span>
+                          </button>
+                          <button
+                            className="btn btn--secondary"
+                            type="button"
+                            data-reference-seed-review-action="needs_revision"
+                            onClick={() => void reviewReferenceSeedPackage(task.id, "needs_revision")}
+                            disabled={referenceSeedReviewBusy}
+                          >
+                            {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "needs_revision" ? (
+                              <Loader2 size={15} className="spin" />
+                            ) : (
+                              <Pencil size={15} />
+                            )}
+                            <span>
+                              {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "needs_revision"
+                                ? "写回中"
+                                : referenceSeedReviewActionLabel("needs_revision")}
+                            </span>
+                          </button>
+                          <button
+                            className="btn btn--secondary"
+                            type="button"
+                            data-reference-seed-review-action="reject"
+                            onClick={() => void reviewReferenceSeedPackage(task.id, "reject")}
+                            disabled={referenceSeedReviewBusy}
+                          >
+                            {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "reject" ? (
+                              <Loader2 size={15} className="spin" />
+                            ) : (
+                              <XCircle size={15} />
+                            )}
+                            <span>
+                              {referenceSeedReviewing?.taskId === task.id && referenceSeedReviewing.action === "reject"
+                                ? "写回中"
+                                : referenceSeedReviewActionLabel("reject")}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : task.reference_seed_review ? (
+                      <div className="agent-task-execution-review agent-task-execution-review--done">
+                        <span className="eyebrow">执行结果审阅结果</span>
+                        <p>
+                          {task.reference_seed_review.next_action_label ?? statusLabel(task.reference_seed_review.status)}。正式层
+                          {task.reference_seed_review.formal_write_allowed ? "可继续审阅" : "仍锁定"}。
+                        </p>
                       </div>
                     ) : null}
 

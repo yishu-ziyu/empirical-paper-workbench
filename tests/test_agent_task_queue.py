@@ -2744,6 +2744,24 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-execution-console", self.react_styles_css)
         self.assertIn("agent-task-execution-console--failed", self.react_styles_css)
 
+    def test_bdd_37f_react_task_queue_exposes_execution_result_review_gate(self) -> None:
+        """行为 37f：候选来源种子包执行完成后，React 队列必须提供执行结果审阅门。"""
+        self.assertIn("reviewReferenceSeedPackage", self.react_agent_task_queue)
+        self.assertIn("/reference-seed-review", self.react_agent_task_queue)
+        self.assertIn("ReferenceSeedReviewAction", self.react_agent_task_queue)
+        self.assertIn("executionResultReviewReady", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"agent-task-execution-review-gate\"", self.react_agent_task_queue)
+        self.assertIn("data-reference-seed-review-action=\"approve_for_draft\"", self.react_agent_task_queue)
+        self.assertIn("data-reference-seed-review-action=\"needs_revision\"", self.react_agent_task_queue)
+        self.assertIn("data-reference-seed-review-action=\"reject\"", self.react_agent_task_queue)
+        self.assertIn("审阅执行结果", self.react_agent_task_queue)
+        self.assertIn("批准进入草稿综述", self.react_agent_task_queue)
+        self.assertIn("要求修订", self.react_agent_task_queue)
+        self.assertIn("拒绝结果", self.react_agent_task_queue)
+        self.assertIn("不写正式层", self.react_agent_task_queue)
+        self.assertIn("agent-task-execution-review", self.react_styles_css)
+        self.assertIn("agent-task-execution-review__actions", self.react_styles_css)
+
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
         self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)

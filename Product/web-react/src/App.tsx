@@ -116,6 +116,24 @@ const STAGE_LABELS: Record<
   },
 };
 
+const STAGE_REQUIREMENTS: Record<Stage, string> = {
+  brief: "输入题目后即可生成研究简报。",
+  search: "先完成研究简报并保存 brief.md。",
+  variables: "先完成文献检索并保存 literature_review.md。",
+  design: "先完成变量审阅并保存 variables.json。",
+  execution: "先完成方法选择并保存 design.json。",
+  "identification-audit": "先完成论文生成并保存 results.json。",
+};
+
+function stageRequirement(stage: Stage): string {
+  return STAGE_REQUIREMENTS[stage];
+}
+
+function stageStatusLabel(stage: Stage, activeStage: Stage, unlocked: boolean): string {
+  if (stage === activeStage) return "当前";
+  return unlocked ? "已解锁" : "待解锁";
+}
+
 function topicHash(s: string): string {
   let hash = 0;
   for (let i = 0; i < s.length; i += 1) {
@@ -317,7 +335,7 @@ export function App() {
     if (!STAGE_ORDER.includes(newId as Stage)) return;
     const target = newId as Stage;
     if (!canEnter(target)) {
-      showToast("请按顺序完成前一阶段后再进入。");
+      showToast(stageRequirement(target));
       return;
     }
     setActiveStage(target);
@@ -436,11 +454,13 @@ export function App() {
     return {
       id: stage,
       label: info.label,
-      hint: unlocked ? info.hint : "请按顺序完成前一阶段后再进入。",
+      hint: unlocked ? info.hint : stageRequirement(stage),
       disabled: !unlocked,
     };
   });
   const currentStageMeta = STAGE_LABELS[activeStage];
+  const currentStageIndex = STAGE_ORDER.indexOf(activeStage);
+  const nextStage = STAGE_ORDER[currentStageIndex + 1] ?? null;
   const currentApiBase = apiBase() || "同源服务";
   const candidateProjectId = topicSlug ? `proj_${topicSlug.replace(/-/g, "_")}` : "";
   const effectiveProjectId = projectId || candidateProjectId;
@@ -575,6 +595,35 @@ export function App() {
           <strong>{currentStageMeta.action}</strong>
           <span>完成后进入：{currentStageMeta.next}</span>
         </div>
+
+        <div className="stage-panel__guide" data-testid="stage-guide">
+          <div>
+            <span>当前交付</span>
+            <strong>{currentStageMeta.action}</strong>
+            <p>{stageRequirement(activeStage)}</p>
+          </div>
+          <div data-testid="stage-unlock-requirement">
+            <span>下一步门槛</span>
+            <strong>{nextStage ? STAGE_LABELS[nextStage].label : "已到最后阶段"}</strong>
+            <p>{nextStage ? stageRequirement(nextStage) : "完成识别审计后进入导出或修订。"}</p>
+          </div>
+        </div>
+
+        <ol className="stage-unlock-list" data-testid="stage-unlock-list" aria-label="阶段解锁条件">
+          {STAGE_ORDER.map((stage) => {
+            const unlocked = canEnter(stage);
+            return (
+              <li
+                className={stage === activeStage ? "stage-unlock-list__item stage-unlock-list__item--active" : "stage-unlock-list__item"}
+                key={stage}
+              >
+                <span>{stageStatusLabel(stage, activeStage, unlocked)}</span>
+                <strong>{STAGE_LABELS[stage].label}</strong>
+                <p>{unlocked ? STAGE_LABELS[stage].hint : stageRequirement(stage)}</p>
+              </li>
+            );
+          })}
+        </ol>
 
         {activeStage === "brief" ? (
           task.mode === "codex-supervisor" ? (

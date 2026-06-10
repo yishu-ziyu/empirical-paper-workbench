@@ -533,6 +533,24 @@ def build_task_primary_action(task: dict[str, Any]) -> dict[str, Any]:
             "writes_formal_layer": False,
             "target": "pdf_candidate_review",
         }
+    if status == "pdf_candidate_reviewed":
+        return {
+            "id": "human_review_pdf_candidate",
+            "label": "人工确认 PDF 候选稿",
+            "reason": "PDF 候选稿机器审阅和最终写回预检已生成；下一步由人确认是否进入最终 PDF 批准。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "pdf_candidate_human_review",
+        }
+    if status == "pdf_candidate_review_blocked":
+        return {
+            "id": "repair_pdf_candidate",
+            "label": "修复 PDF 候选稿",
+            "reason": "PDF 候选稿审阅发现缺口，需要先修复候选稿或来源章节。",
+            "enabled": True,
+            "writes_formal_layer": False,
+            "target": "pdf_candidate_review",
+        }
     if status == "formal_writeback_preflight_needs_revision":
         return {
             "id": "revise_formal_writeback_preflight",
@@ -2981,7 +2999,9 @@ def generate_project_pdf_candidate_export(
 
     timestamp = utc_now()
     pdf_candidate_path = Path("Submissions/formal_package/paper_candidate.pdf")
+    candidate_qmd_path = Path("Submissions/formal_package/manuscript/paper_candidate.qmd")
     manifest_artifact_path = Path("Submissions/formal_package/pdf_candidate_manifest.json")
+    formal_candidate_report_path = Path("Results/json/formal_pdf_candidate_report.json")
     review_path = Path("Reviews/pdf_candidate_export_review.md")
     export_record = build_pdf_candidate_export_record(
         task,
@@ -2991,6 +3011,8 @@ def generate_project_pdf_candidate_export(
         timestamp,
         project_root,
         pdf_candidate_path,
+        candidate_qmd_path,
+        formal_candidate_report_path,
         review_path,
     )
 
@@ -2998,9 +3020,27 @@ def generate_project_pdf_candidate_export(
     absolute_pdf_path.parent.mkdir(parents=True, exist_ok=True)
     write_pdf_candidate_file(absolute_pdf_path, export_record)
 
+    absolute_qmd_path = project_root / candidate_qmd_path
+    absolute_qmd_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_qmd_path.write_text(format_pdf_candidate_qmd(export_record), encoding="utf-8")
+
     absolute_manifest_path = project_root / manifest_artifact_path
     absolute_manifest_path.parent.mkdir(parents=True, exist_ok=True)
     absolute_manifest_path.write_text(json.dumps(export_record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    formal_candidate_report = build_formal_pdf_candidate_report_from_queue_export(
+        export_record,
+        manifest_artifact_path,
+        formal_candidate_report_path,
+        absolute_pdf_path,
+        absolute_qmd_path,
+    )
+    absolute_formal_candidate_report_path = project_root / formal_candidate_report_path
+    absolute_formal_candidate_report_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_formal_candidate_report_path.write_text(
+        json.dumps(formal_candidate_report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     absolute_review_path = project_root / review_path
     absolute_review_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3014,6 +3054,8 @@ def generate_project_pdf_candidate_export(
         "artifact_path": str(manifest_artifact_path),
         "review_path": str(review_path),
         "pdf_candidate_path": str(pdf_candidate_path),
+        "candidate_qmd_path": str(candidate_qmd_path),
+        "formal_candidate_report_path": str(formal_candidate_report_path),
         "wrote_pdf_candidate": True,
         "wrote_final_pdf": False,
         "wrote_docx": False,
@@ -3047,6 +3089,110 @@ def generate_project_pdf_candidate_export(
     path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
     response = build_agent_task_queue_response(project, queue)
     response["pdf_candidate_export"] = summary
+    return response
+
+
+def generate_project_pdf_candidate_review(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    task_id: str,
+    note: str = "",
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    queue = normalize_agent_task_queue(_load_required_queue(project_root))
+    task = _find_agent_task(queue, task_id)
+    export_summary = task.get("pdf_candidate_export") if isinstance(task.get("pdf_candidate_export"), dict) else {}
+    candidate_report_rel = str(export_summary.get("formal_candidate_report_path") or "")
+    candidate_report_path = project_root / candidate_report_rel if candidate_report_rel else None
+    if task.get("status") != "pdf_candidate_exported" or not candidate_report_path or not candidate_report_path.exists():
+        raise AgentTaskQueueBlockedError(
+            "pdf_candidate_export_required",
+            "Reviewable PDF candidate export is required before candidate review.",
+        )
+
+    candidate_report = json.loads(candidate_report_path.read_text(encoding="utf-8"))
+    timestamp = utc_now()
+    review_report_path = Path("Results/json/formal_pdf_candidate_review.json")
+    review_doc_path = Path("Reviews/formal_pdf_candidate_review.md")
+    final_preflight_path = Path("Results/json/formal_pdf_final_writeback_preflight.json")
+    review_record = build_pdf_candidate_review_record(
+        task,
+        export_summary,
+        candidate_report,
+        candidate_report_rel,
+        str(review_report_path),
+        str(final_preflight_path),
+        note,
+        timestamp,
+        project_root,
+    )
+    final_preflight = build_pdf_candidate_final_writeback_preflight(
+        review_record,
+        str(review_report_path),
+        str(final_preflight_path),
+        note,
+        timestamp,
+    )
+
+    absolute_review_report_path = project_root / review_report_path
+    absolute_review_report_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_review_report_path.write_text(json.dumps(review_record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    absolute_review_doc_path = project_root / review_doc_path
+    absolute_review_doc_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_review_doc_path.write_text(format_pdf_candidate_review(review_record, final_preflight), encoding="utf-8")
+
+    absolute_final_preflight_path = project_root / final_preflight_path
+    absolute_final_preflight_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_final_preflight_path.write_text(json.dumps(final_preflight, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    ready = review_record.get("status") == "ready_for_final_approval_review"
+    next_action = "human_review_pdf_candidate" if ready else "repair_pdf_candidate"
+    summary = {
+        "schema_version": review_record["schema_version"],
+        "status": review_record["status"],
+        "source_task_id": review_record["source_task_id"],
+        "source_candidate_report": candidate_report_rel,
+        "artifact_path": str(review_report_path),
+        "review_path": str(review_doc_path),
+        "final_preflight_path": str(final_preflight_path),
+        "candidate_pdf": review_record["candidate_pdf"],
+        "candidate_qmd": review_record["candidate_qmd"],
+        "can_request_final_approval": ready,
+        "blocking_reason_count": len(normalize_list(review_record.get("blocking_reasons"))),
+        "writes_formal_layer": False,
+        "wrote_final_outputs": False,
+        "next_action": next_action,
+        "created_at": timestamp,
+        "evidence_level": review_record["evidence_level"],
+    }
+    task["pdf_candidate_review"] = summary
+    task["status"] = "pdf_candidate_reviewed" if ready else "pdf_candidate_review_blocked"
+    task["next_action"] = next_action
+    task["can_execute"] = False
+    task["blockers"] = [] if ready else review_record.get("blockers", [])
+    task.setdefault("audit_log", []).append(
+        {
+            "event": "pdf_candidate_reviewed",
+            "actor": "system",
+            "timestamp": timestamp,
+            "artifact_path": str(review_report_path),
+            "review_path": str(review_doc_path),
+            "final_preflight_path": str(final_preflight_path),
+            "status": summary["status"],
+            "next_action": next_action,
+        }
+    )
+    task["primary_action"] = build_task_primary_action(task)
+    queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
+    queue["updated_at"] = timestamp
+    path = agent_task_queue_state_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(queue, ensure_ascii=False, indent=2), encoding="utf-8")
+    response = build_agent_task_queue_response(project, queue)
+    response["pdf_candidate_review"] = summary
     return response
 
 
@@ -4161,6 +4307,8 @@ def build_pdf_candidate_export_record(
     timestamp: str,
     project_root: Path,
     pdf_candidate_path: Path,
+    candidate_qmd_path: Path,
+    formal_candidate_report_path: Path,
     review_path: Path,
 ) -> dict[str, Any]:
     section_checks = [check for check in normalize_list(preflight.get("section_checks")) if isinstance(check, dict)]
@@ -4175,6 +4323,8 @@ def build_pdf_candidate_export_record(
         "source_task_id": str(task.get("id") or preflight.get("source_task_id") or ""),
         "source_preflight_path": source_preflight_path,
         "pdf_candidate_path": str(pdf_candidate_path),
+        "candidate_qmd_path": str(candidate_qmd_path),
+        "formal_candidate_report_path": str(formal_candidate_report_path),
         "review_path": str(review_path),
         "section_count": len(sections),
         "sections": sections,
@@ -4205,6 +4355,173 @@ def build_pdf_candidate_export_record(
         "created_at": timestamp,
         "evidence_level": "verified_source_record",
     }
+
+
+def build_formal_pdf_candidate_report_from_queue_export(
+    export_record: dict[str, Any],
+    source_manifest_path: Path,
+    formal_candidate_report_path: Path,
+    absolute_pdf_path: Path,
+    absolute_qmd_path: Path,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "p5.formal_pdf_candidate.v1",
+        "status": "pdf_candidate_ready",
+        "source": "agent_task_queue",
+        "source_task_id": export_record.get("source_task_id"),
+        "source_preflight_path": export_record.get("source_preflight_path"),
+        "source_manifest_path": str(source_manifest_path),
+        "artifact_path": str(formal_candidate_report_path),
+        "candidate_layer_only": True,
+        "output_pdf": export_record.get("pdf_candidate_path"),
+        "output_qmd": export_record.get("candidate_qmd_path"),
+        "output_pdf_exists": absolute_pdf_path.exists(),
+        "output_qmd_exists": absolute_qmd_path.exists(),
+        "output_pdf_bytes": absolute_pdf_path.stat().st_size if absolute_pdf_path.exists() else 0,
+        "output_qmd_bytes": absolute_qmd_path.stat().st_size if absolute_qmd_path.exists() else 0,
+        "section_count": export_record.get("section_count"),
+        "sections": [
+            {
+                "section": section.get("section_title"),
+                "section_id": section.get("section_id"),
+                "source_path": section.get("formal_target_path"),
+                "evidence_level": section.get("evidence_level"),
+            }
+            for section in normalize_list(export_record.get("sections"))
+            if isinstance(section, dict)
+        ],
+        "render_result": {
+            "attempted": True,
+            "returncode": 0 if absolute_pdf_path.exists() else 1,
+            "renderer": "agent_task_queue_pdf_candidate",
+        },
+        "formal_state_guard": {"changed": False, "changed_paths": []},
+        "this_command_wrote_formal_state": False,
+        "this_command_wrote_final_outputs": False,
+        "next_action": {"id": "review_pdf_candidate", "label": "审阅 PDF 候选稿"},
+        "usage_boundary": export_record.get("usage_boundary"),
+        "created_at": export_record.get("created_at"),
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_pdf_candidate_review_record(
+    task: dict[str, Any],
+    export_summary: dict[str, Any],
+    candidate_report: dict[str, Any],
+    candidate_report_path: str,
+    review_report_path: str,
+    final_preflight_path: str,
+    note: str,
+    timestamp: str,
+    project_root: Path,
+) -> dict[str, Any]:
+    candidate_pdf = str(candidate_report.get("output_pdf") or export_summary.get("pdf_candidate_path") or "")
+    candidate_qmd = str(candidate_report.get("output_qmd") or export_summary.get("candidate_qmd_path") or "")
+    pdf_path = project_root / candidate_pdf if candidate_pdf else None
+    qmd_path = project_root / candidate_qmd if candidate_qmd else None
+    blocking_reasons: list[str] = []
+    blockers: list[dict[str, str]] = []
+    if candidate_report.get("schema_version") != "p5.formal_pdf_candidate.v1":
+        blocking_reasons.append("candidate_report_schema_mismatch")
+    if candidate_report.get("status") != "pdf_candidate_ready":
+        blocking_reasons.append("candidate_report_not_ready")
+    if candidate_report.get("candidate_layer_only") is not True:
+        blocking_reasons.append("candidate_layer_boundary_missing")
+    if not pdf_path or not pdf_path.exists():
+        blocking_reasons.append("candidate_pdf_missing")
+    if not qmd_path or not qmd_path.exists():
+        blocking_reasons.append("candidate_qmd_missing")
+    if pdf_path and pdf_path.exists() and pdf_path.stat().st_size < 500:
+        blocking_reasons.append("candidate_pdf_too_small")
+    if (project_root / "Submissions/formal_package/paper.pdf").exists():
+        blocking_reasons.append("final_pdf_already_exists")
+    if (project_root / "Submissions/formal_package/paper.docx").exists():
+        blocking_reasons.append("final_docx_already_exists")
+
+    for reason in blocking_reasons:
+        blockers.append({"code": reason, "message": pdf_candidate_review_blocker_message(reason)})
+
+    ready = not blocking_reasons
+    return {
+        "schema_version": "p5.formal_pdf_candidate_review.v1",
+        "status": "ready_for_final_approval_review" if ready else "blocked_by_pdf_candidate_review",
+        "source": "agent_task_queue",
+        "source_task_id": str(task.get("id") or ""),
+        "source_candidate_report": candidate_report_path,
+        "artifact_path": review_report_path,
+        "final_preflight_path": final_preflight_path,
+        "candidate_pdf": candidate_pdf,
+        "candidate_qmd": candidate_qmd,
+        "candidate_pdf_exists": bool(pdf_path and pdf_path.exists()),
+        "candidate_qmd_exists": bool(qmd_path and qmd_path.exists()),
+        "candidate_pdf_bytes": pdf_path.stat().st_size if pdf_path and pdf_path.exists() else 0,
+        "candidate_qmd_bytes": qmd_path.stat().st_size if qmd_path and qmd_path.exists() else 0,
+        "review_checks": [
+            {"id": "candidate_pdf_exists", "status": "passed" if pdf_path and pdf_path.exists() else "failed"},
+            {"id": "candidate_qmd_exists", "status": "passed" if qmd_path and qmd_path.exists() else "failed"},
+            {"id": "candidate_layer_only", "status": "passed" if candidate_report.get("candidate_layer_only") is True else "failed"},
+            {"id": "no_final_outputs_written", "status": "passed" if "final_pdf_already_exists" not in blocking_reasons and "final_docx_already_exists" not in blocking_reasons else "failed"},
+        ],
+        "blocking_reasons": blocking_reasons,
+        "blockers": blockers,
+        "can_request_final_approval": ready,
+        "writes_formal_layer": False,
+        "wrote_final_outputs": False,
+        "note": note,
+        "next_action": {
+            "id": "human_review_pdf_candidate" if ready else "repair_pdf_candidate",
+            "label": "人工确认 PDF 候选稿" if ready else "修复 PDF 候选稿",
+        },
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def build_pdf_candidate_final_writeback_preflight(
+    review_record: dict[str, Any],
+    review_report_path: str,
+    final_preflight_path: str,
+    note: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    ready = review_record.get("status") == "ready_for_final_approval_review"
+    return {
+        "schema_version": "p5.formal_pdf_final_writeback_preflight.v1",
+        "status": "waiting_for_human_final_approval" if ready else "blocked_by_pdf_candidate_review",
+        "source": "agent_task_queue",
+        "source_review": review_report_path,
+        "source_candidate_report": review_record.get("source_candidate_report"),
+        "artifact_path": final_preflight_path,
+        "candidate_pdf": review_record.get("candidate_pdf"),
+        "candidate_qmd": review_record.get("candidate_qmd"),
+        "final_pdf": "Submissions/formal_package/paper.pdf",
+        "final_docx": "Submissions/formal_package/paper.docx",
+        "final_writeback_allowed": False,
+        "can_enter_p6": False,
+        "required_before_final_writeback": [
+            "human_review_pdf_candidate",
+            "formal_pdf_final_approval",
+        ],
+        "blocking_reasons": normalize_list(review_record.get("blocking_reasons")),
+        "note": note,
+        "created_at": timestamp,
+        "evidence_level": "verified_source_record",
+    }
+
+
+def pdf_candidate_review_blocker_message(reason: str) -> str:
+    messages = {
+        "candidate_report_schema_mismatch": "候选稿报告结构不符合正式审阅链路。",
+        "candidate_report_not_ready": "候选稿报告还没有进入可审阅状态。",
+        "candidate_layer_boundary_missing": "候选稿没有明确标记为候选层，不能进入最终写回预检。",
+        "candidate_pdf_missing": "PDF 候选稿文件缺失。",
+        "candidate_qmd_missing": "PDF 候选源码文件缺失。",
+        "candidate_pdf_too_small": "PDF 候选稿过小，可能没有真实内容。",
+        "final_pdf_already_exists": "候选阶段已经存在最终 PDF，需要先确认来源。",
+        "final_docx_already_exists": "候选阶段已经存在最终 DOCX，需要先确认来源。",
+    }
+    return messages.get(reason, reason)
 
 
 def build_pdf_candidate_section(section_check: dict[str, Any], project_root: Path, index: int) -> dict[str, Any]:
@@ -4240,6 +4557,63 @@ def format_pdf_candidate_export_review(export_record: dict[str, Any]) -> str:
     ]
     lines.extend(f"- {item}" for item in required_checks)
     lines.extend(["", "## 边界", f"- {export_record.get('usage_boundary')}", ""])
+    return "\n".join(lines)
+
+
+def format_pdf_candidate_qmd(export_record: dict[str, Any]) -> str:
+    lines = [
+        "---",
+        'title: "PDF 候选稿"',
+        "format: pdf",
+        "---",
+        "",
+        "# PDF 候选稿",
+        "",
+        "> 这是人工审阅候选稿，不是最终投稿文件。",
+        "",
+    ]
+    for section in normalize_list(export_record.get("sections")):
+        if not isinstance(section, dict):
+            continue
+        lines.extend(
+            [
+                f"## {section.get('section_title') or '未命名章节'}",
+                "",
+                str(section.get("excerpt") or ""),
+                "",
+                f"_来源：{section.get('formal_target_path') or 'unknown'}_",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def format_pdf_candidate_review(review_record: dict[str, Any], final_preflight: dict[str, Any]) -> str:
+    lines = [
+        "# PDF 候选稿机器审阅",
+        "",
+        f"- 状态：{review_record.get('status')}",
+        f"- 来源候选报告：{review_record.get('source_candidate_report')}",
+        f"- PDF 候选稿：{review_record.get('candidate_pdf')}",
+        f"- QMD 候选源码：{review_record.get('candidate_qmd')}",
+        f"- 最终写回预检：{final_preflight.get('artifact_path')}",
+        "- 正式层：不写入 paper.pdf / paper.docx。",
+        "",
+        "## 审阅检查",
+    ]
+    for check in normalize_list(review_record.get("review_checks")):
+        if not isinstance(check, dict):
+            continue
+        lines.append(f"- {check.get('id')}：{check.get('status')}")
+    blockers = normalize_list(review_record.get("blockers"))
+    if blockers:
+        lines.extend(["", "## 阻断项"])
+        for blocker in blockers:
+            if not isinstance(blocker, dict):
+                continue
+            lines.append(f"- {blocker.get('message') or blocker.get('code')}")
+    else:
+        lines.extend(["", "## 下一步", "- 候选稿已进入最终写回预检，等待人工确认是否请求最终 PDF 批准。"])
     return "\n".join(lines)
 
 

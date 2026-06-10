@@ -292,10 +292,26 @@ interface AgentTask {
     artifact_path?: string;
     review_path?: string;
     pdf_candidate_path?: string;
+    candidate_qmd_path?: string;
+    formal_candidate_report_path?: string;
     wrote_pdf_candidate?: boolean;
     wrote_final_pdf?: boolean;
     wrote_docx?: boolean;
     writes_formal_layer?: boolean;
+    next_action?: string;
+  };
+  pdf_candidate_review?: {
+    status?: string;
+    source_candidate_report?: string;
+    artifact_path?: string;
+    review_path?: string;
+    final_preflight_path?: string;
+    candidate_pdf?: string;
+    candidate_qmd?: string;
+    can_request_final_approval?: boolean;
+    blocking_reason_count?: number;
+    writes_formal_layer?: boolean;
+    wrote_final_outputs?: boolean;
     next_action?: string;
   };
   export_preflight_followups?: Array<{
@@ -462,6 +478,10 @@ function statusLabel(status?: string): string {
     formal_export_preflight_ready: "导出预检已通过",
     formal_export_preflight_blocked: "导出预检有阻断项",
     pdf_candidate_exported: "PDF 候选稿已生成",
+    pdf_candidate_reviewed: "PDF 候选稿已审阅",
+    pdf_candidate_review_blocked: "PDF 候选稿需修复",
+    ready_for_final_approval_review: "可进入最终批准审阅",
+    blocked_by_pdf_candidate_review: "候选稿审阅有阻断项",
     draft_execution_packet_ready: "草案层执行包已生成",
     blocked_by_backend_unavailable: "后端不可用",
     backend_selected: "后端已选",
@@ -487,6 +507,8 @@ function actionLabel(action?: string): string {
     prepare_export_preflight: "准备导出预检",
     run_pdf_export_preflight: "运行 PDF 导出预检",
     review_pdf_candidate: "审阅 PDF 候选稿",
+    human_review_pdf_candidate: "人工确认 PDF 候选稿",
+    repair_pdf_candidate: "修复 PDF 候选稿",
     resolve_export_preflight_blockers: "处理导出阻断项",
     revise_draft_section_tasks: "修订章节任务包",
     replace_draft_section_tasks: "替换章节任务包",
@@ -916,6 +938,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [generatingSkillPacketTaskId, setGeneratingSkillPacketTaskId] = useState<string | null>(null);
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
   const [generatingPdfCandidateExportTaskId, setGeneratingPdfCandidateExportTaskId] = useState<string | null>(null);
+  const [generatingPdfCandidateReviewTaskId, setGeneratingPdfCandidateReviewTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [traceFeedback, setTraceFeedback] = useState("");
   const [traceSaving, setTraceSaving] = useState(false);
@@ -1272,6 +1295,25 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError("PDF 候选稿没有生成成功，请先确认导出预检已经通过。");
     } finally {
       setGeneratingPdfCandidateExportTaskId(null);
+    }
+  };
+
+  const generatePdfCandidateReview = async (taskId: string) => {
+    setGeneratingPdfCandidateReviewTaskId(taskId);
+    try {
+      const data = await fetchJson(
+        `/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/pdf-candidate-review`,
+        {
+          method: "POST",
+          body: JSON.stringify({ note: "审阅 PDF 候选稿并生成最终写回预检。" }),
+        },
+      );
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("PDF 候选稿审阅没有生成成功，请先确认候选稿已经生成。");
+    } finally {
+      setGeneratingPdfCandidateReviewTaskId(null);
     }
   };
 
@@ -1779,6 +1821,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const hasFormalWriteback = !!task.formal_writeback_manifest;
             const hasExportPreflight = !!task.formal_export_preflight;
             const hasPdfCandidateExport = !!task.pdf_candidate_export;
+            const hasPdfCandidateReview = !!task.pdf_candidate_review;
             const formalWritebackReviewReady = task.status === "formal_writeback_preflight_ready" && hasPreflight;
             const generatingDrafts = generatingSectionDrafts === task.id;
             const exportPreflightReady = hasFormalWriteback && task.status === "formal_sections_written";
@@ -1817,6 +1860,9 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
               task.status === "formal_export_preflight_ready" &&
               task.formal_export_preflight?.status === "formal_export_preflight_ready";
             const generatingPdfCandidateExport = generatingPdfCandidateExportTaskId === task.id;
+            const canGeneratePdfCandidateReview =
+              task.status === "pdf_candidate_exported" && task.pdf_candidate_export?.status === "pdf_candidate_exported";
+            const generatingPdfCandidateReview = generatingPdfCandidateReviewTaskId === task.id;
             return (
               <article
                 key={task.id}
@@ -1847,6 +1893,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                 hasFormalWriteback ||
                 hasExportPreflight ||
                 hasPdfCandidateExport ||
+                hasPdfCandidateReview ||
                 hasSelectedBackend ||
                 hasExecutionResult ||
                 executionResultReviewReady ? (
@@ -2537,11 +2584,76 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             <code>{task.pdf_candidate_export?.review_path ?? "Reviews/pdf_candidate_export_review.md"}</code>
                           </div>
                           <div>
+                            <small>候选 QMD</small>
+                            <code>{task.pdf_candidate_export?.candidate_qmd_path ?? "Submissions/formal_package/manuscript/paper_candidate.qmd"}</code>
+                          </div>
+                          <div>
                             <small>正式层</small>
                             <strong>{task.pdf_candidate_export?.writes_formal_layer ? "会写入" : "不写入"}</strong>
                           </div>
                         </div>
                         <p className="agent-task-queue-pdf-candidate__note">候选稿不覆盖 paper.pdf / paper.docx；人工审阅通过后再进入正式导出。</p>
+                        {canGeneratePdfCandidateReview ? (
+                          <div className="agent-task-queue-pdf-candidate__actions">
+                            <button
+                              className="btn btn--primary"
+                              type="button"
+                              data-pdf-candidate-review-action
+                              onClick={() => void generatePdfCandidateReview(task.id)}
+                              disabled={generatingPdfCandidateReview}
+                            >
+                              {generatingPdfCandidateReview ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
+                              <span>{generatingPdfCandidateReview ? "审阅中" : "审阅 PDF 候选稿"}</span>
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {hasPdfCandidateReview ? (
+                      <div
+                        className="agent-task-queue-pdf-candidate agent-task-queue-pdf-candidate--review"
+                        data-testid="agent-task-queue-pdf-candidate-review"
+                      >
+                        <div className="agent-task-queue-pdf-candidate__head">
+                          <div>
+                            <span className="eyebrow">PDF 候选稿审阅</span>
+                            <h3>{statusLabel(task.pdf_candidate_review?.status)}</h3>
+                            <p>系统已检查候选 PDF/QMD 与正式输出边界，并生成最终写回预检；下一步仍由人工确认。</p>
+                          </div>
+                          <span className="agent-task-queue-pdf-candidate__pill">
+                            {actionLabel(task.pdf_candidate_review?.next_action ?? task.next_action)}
+                          </span>
+                        </div>
+                        <div className="agent-task-queue-pdf-candidate__grid">
+                          <div>
+                            <small>审阅报告</small>
+                            <code>{task.pdf_candidate_review?.artifact_path ?? "Results/json/formal_pdf_candidate_review.json"}</code>
+                          </div>
+                          <div>
+                            <small>审阅文档</small>
+                            <code>{task.pdf_candidate_review?.review_path ?? "Reviews/formal_pdf_candidate_review.md"}</code>
+                          </div>
+                          <div>
+                            <small>最终写回预检</small>
+                            <code>{task.pdf_candidate_review?.final_preflight_path ?? "Results/json/formal_pdf_final_writeback_preflight.json"}</code>
+                          </div>
+                          <div>
+                            <small>候选 QMD</small>
+                            <code>{task.pdf_candidate_review?.candidate_qmd ?? "Submissions/formal_package/manuscript/paper_candidate.qmd"}</code>
+                          </div>
+                          <div>
+                            <small>正式层写入</small>
+                            <strong>{task.pdf_candidate_review?.writes_formal_layer ? "会写入" : "不写入"}</strong>
+                          </div>
+                          <div>
+                            <small>最终输出</small>
+                            <strong>{task.pdf_candidate_review?.wrote_final_outputs ? "已写出" : "未写出"}</strong>
+                          </div>
+                        </div>
+                        <p className="agent-task-queue-pdf-candidate__note">
+                          最终写回预检只说明候选稿是否可进入人工批准，不会写入 paper.pdf / paper.docx。
+                        </p>
                       </div>
                     ) : null}
 

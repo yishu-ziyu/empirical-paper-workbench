@@ -1858,6 +1858,87 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertIn("PDF 候选稿审阅", review_text)
         self.assertIn("不覆盖终稿", review_text)
 
+    def test_bdd_56_pdf_candidate_review_generates_final_writeback_preflight(self) -> None:
+        """行为 56：PDF 候选稿审阅后，队列生成最终写回预检，但不直接写入终稿。"""
+        self._approve_formal_writeback()
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "正式章节已写入，准备候选稿导出。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+        export_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-export",
+            json={"note": "生成 PDF 候选稿供人工审阅。"},
+        )
+        self.assertEqual(export_response.status_code, 200, msg=export_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-review",
+            json={"note": "检查候选稿能否进入最终写回批准。"},
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        review = task["pdf_candidate_review"]
+        self.assertEqual(task["status"], "pdf_candidate_reviewed")
+        self.assertEqual(task["next_action"], "human_review_pdf_candidate")
+        self.assertEqual(task["primary_action"]["id"], "human_review_pdf_candidate")
+        self.assertEqual(task["primary_action"]["target"], "pdf_candidate_human_review")
+        self.assertEqual(task["audit_log"][-1]["event"], "pdf_candidate_reviewed")
+        self.assertEqual(review["schema_version"], "p5.formal_pdf_candidate_review.v1")
+        self.assertEqual(review["status"], "ready_for_final_approval_review")
+        self.assertTrue(review["can_request_final_approval"])
+        self.assertFalse(review["writes_formal_layer"])
+        self.assertFalse(review["wrote_final_outputs"])
+        self.assertEqual(review["next_action"], "human_review_pdf_candidate")
+
+        candidate_report_path = self.project_root / review["source_candidate_report"]
+        review_report_path = self.project_root / review["artifact_path"]
+        review_doc_path = self.project_root / review["review_path"]
+        final_preflight_path = self.project_root / review["final_preflight_path"]
+        candidate_qmd_path = self.project_root / review["candidate_qmd"]
+        self.assertTrue(candidate_report_path.exists())
+        self.assertTrue(review_report_path.exists())
+        self.assertTrue(review_doc_path.exists())
+        self.assertTrue(final_preflight_path.exists())
+        self.assertTrue(candidate_qmd_path.exists())
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.pdf").exists())
+        self.assertFalse((self.project_root / "Submissions" / "formal_package" / "paper.docx").exists())
+
+        final_preflight = json.loads(final_preflight_path.read_text(encoding="utf-8"))
+        self.assertEqual(final_preflight["schema_version"], "p5.formal_pdf_final_writeback_preflight.v1")
+        self.assertEqual(final_preflight["source_review"], review["artifact_path"])
+        self.assertFalse(final_preflight["final_writeback_allowed"])
+        self.assertIn("human_review_pdf_candidate", final_preflight["required_before_final_writeback"])
+        review_text = review_doc_path.read_text(encoding="utf-8")
+        self.assertIn("PDF 候选稿机器审阅", review_text)
+        self.assertIn("最终写回预检", review_text)
+
+    def test_bdd_57_pdf_candidate_review_is_blocked_before_candidate_export(self) -> None:
+        """行为 57：没有 PDF 候选稿时，队列不能生成候选稿审阅或最终写回预检。"""
+        self._approve_formal_writeback()
+        preflight_response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/formal-export-preflight",
+            json={"note": "正式章节已写入，但还没有生成 PDF 候选稿。"},
+        )
+        self.assertEqual(preflight_response.status_code, 200, msg=preflight_response.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/pdf-candidate-review",
+            json={"note": "不能跳过候选稿生成。"},
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"]["code"], "pdf_candidate_export_required")
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_pdf_candidate_review.json").exists())
+        self.assertFalse((self.project_root / "Reviews" / "formal_pdf_candidate_review.md").exists())
+        self.assertFalse((self.project_root / "Results" / "json" / "formal_pdf_final_writeback_preflight.json").exists())
+        queue_state = json.loads((self.project_root / "state" / "product" / "agent_task_queue.json").read_text(encoding="utf-8"))
+        task = queue_state["tasks"][0]
+        self.assertEqual(task["status"], "formal_export_preflight_ready")
+        self.assertEqual(task["next_action"], "run_pdf_export_preflight")
+
     def _generate_draft_literature_review_task(self) -> None:
         self._execute_reference_seed_package_task()
         reviewed = self.client.put(
@@ -2646,6 +2727,10 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("PDF 候选稿", self.react_agent_task_queue)
         self.assertIn("pdf_candidate_export", self.react_agent_task_queue)
         self.assertIn("agent-task-queue-pdf-candidate", self.react_styles_css)
+        self.assertIn("generatePdfCandidateReview", self.react_agent_task_queue)
+        self.assertIn("pdf-candidate-review", self.react_agent_task_queue)
+        self.assertIn("pdf_candidate_review", self.react_agent_task_queue)
+        self.assertIn("最终写回预检", self.react_agent_task_queue)
 
     def test_bdd_35_plan_fetch_error_explains_api_base_and_local_recovery(self) -> None:
         """行为 35：计划服务连不上时，前端必须说明当前后端地址，并提供本地服务恢复动作。"""

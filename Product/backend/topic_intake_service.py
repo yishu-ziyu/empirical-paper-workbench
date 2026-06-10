@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,7 @@ from Product.backend.supervisor_plan_service import (
 
 
 TOPIC_WORKSPACE_ROOT = Path("workspaces")
+TOPIC_INTAKE_LLM_TIMEOUT_SECONDS = int(os.getenv("EMPIRICAL_TOPIC_INTAKE_LLM_TIMEOUT_SECONDS", "30"))
 
 
 class TopicIntakeLLMUnavailableError(RuntimeError):
@@ -70,7 +72,11 @@ def ensure_topic_supervisor_plan(
         note,
     )
     try:
-        raw_text, provider = llm_client.chat_completion_with_fallback(messages, temperature=0.2)
+        raw_text, provider = llm_client.chat_completion_with_fallback(
+            messages,
+            temperature=0.2,
+            timeout_seconds=TOPIC_INTAKE_LLM_TIMEOUT_SECONDS,
+        )
         generated = parse_supervisor_plan_output(raw_text)
     except llm_client.LLMError as exc:
         raise TopicIntakeLLMUnavailableError(

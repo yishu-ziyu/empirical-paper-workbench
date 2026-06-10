@@ -164,6 +164,10 @@ interface LlmExecutionPreflight {
   task_id?: string;
   backend_id?: string;
   method_id?: string;
+  status?: string;
+  error_code?: string;
+  message?: string;
+  next_action?: string;
   provider?: {
     provider_id?: string;
     model?: string;
@@ -1952,8 +1956,13 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const executionFailed =
               task.status === "failed" || task.execution_result?.status === "failed" || Boolean(task.error) || Boolean(localExecutionFailure);
             const hasExecutionResult =
-              Boolean(task.execution_result) || task.status === "succeeded" || task.status === "failed" || Boolean(localExecutionFailure);
+              Boolean(task.execution_result) ||
+              task.status === "succeeded" ||
+              task.status === "failed" ||
+              Boolean(task.error) ||
+              Boolean(localExecutionFailure);
             const llmExecutionPreflight = task.execution_result?.llm_execution_preflight ?? task.llm_execution_preflight;
+            const llmPreflightBlocked = llmExecutionPreflight?.status === "blocked";
             const executionResultReviewReady =
               task.execution_result?.execution_kind === "reference_chain_seed_package" &&
               (task.next_action === "review_literature_seed_package" ||
@@ -2211,11 +2220,21 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         </div>
 
                         {llmExecutionPreflight ? (
-                          <div className="agent-task-llm-preflight" data-testid="agent-task-llm-preflight">
+                          <div
+                            className={cn(
+                              "agent-task-llm-preflight",
+                              llmPreflightBlocked && "agent-task-llm-preflight--blocked",
+                            )}
+                            data-testid="agent-task-llm-preflight"
+                          >
                             <div className="agent-task-llm-preflight__head">
                               <div>
                                 <span className="eyebrow">LLM 实验预检</span>
-                                <h4>{llmExecutionPreflight.summary ?? "模型已完成执行前判断"}</h4>
+                                <h4>
+                                  {llmPreflightBlocked
+                                    ? "预检阻断"
+                                    : llmExecutionPreflight.summary ?? "模型已完成执行前判断"}
+                                </h4>
                               </div>
                               <span>
                                 模型：
@@ -2224,6 +2243,12 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                                   "local-supervisor"}
                               </span>
                             </div>
+                            {llmPreflightBlocked ? (
+                              <p className="agent-task-llm-preflight__blocked">
+                                {llmExecutionPreflight.message || "LLM Supervisor 暂时不可用。"}
+                                {" "}恢复 LLM Supervisor 后重试。
+                              </p>
+                            ) : null}
                             <div className="agent-task-llm-preflight__grid">
                               <div>
                                 <small>放行理由</small>

@@ -779,6 +779,19 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         task = queue["tasks"][1]
         self.assertEqual(task["status"], "backend_selected")
         self.assertNotIn("execution_result", task)
+        self.assertEqual(task["error"]["code"], "llm_intervention_handoff_required")
+        self.assertIn("LLM Supervisor 交接未完成", task["error"]["student_message"])
+        handoff = task["llm_intervention_handoff"]
+        self.assertTrue(handoff["execution_blocked"])
+        self.assertEqual(handoff["next_action"], "regenerate_or_confirm_supervisor_plan")
+        self.assertIn("LLM Supervisor decision", handoff["block_reason"])
+        self.assertTrue(
+            any(
+                event.get("event") == "llm_intervention_handoff_blocked"
+                and event.get("error_code") == "llm_intervention_handoff_required"
+                for event in task.get("audit_log", [])
+            )
+        )
 
     def test_bdd_13b_execution_blocks_when_llm_preflight_is_unavailable(self) -> None:
         """行为 13b：LLM 实验预检不可用时，执行保持可恢复阻断，不启动后端。"""
@@ -813,6 +826,21 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         task = queue["tasks"][1]
         self.assertEqual(task["status"], "backend_selected")
         self.assertNotIn("execution_result", task)
+        preflight = task.get("llm_execution_preflight")
+        self.assertIsInstance(preflight, dict)
+        self.assertEqual(preflight["status"], "blocked")
+        self.assertEqual(preflight["error_code"], "llm_execution_preflight_required")
+        self.assertIn("no configured LLM provider", preflight["message"])
+        self.assertEqual(preflight["next_action"], "configure_llm_provider_or_retry")
+        self.assertFalse(preflight["formal_write_allowed"])
+        self.assertTrue(preflight["required_for_execution"])
+        self.assertTrue(
+            any(
+                event.get("event") == "llm_execution_preflight_blocked"
+                and event.get("error_code") == "llm_execution_preflight_required"
+                for event in task.get("audit_log", [])
+            )
+        )
         self.assertFalse((self.project_root / "Program" / "generated").exists())
 
     def test_bdd_14_queue_exposes_llm_intervention_handoff_contract(self) -> None:
@@ -2545,6 +2573,38 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertGreaterEqual(task_queue["summary"]["internal_skill_count"], 1)
         self.assertTrue((project_root / "state" / "product" / "agent_task_queue.json").exists())
 
+    def test_bdd_44a_topic_intake_uses_bounded_llm_wait(self) -> None:
+        """行为 44a：题目登记调用真实 LLM Supervisor，但等待必须有产品级上限。"""
+        topic = "数字经济对劳动收入份额的影响"
+
+        with patch.object(
+            llm_client,
+            "chat_completion_with_fallback",
+            return_value=(
+                _topic_intake_llm_response(topic),
+                {
+                    "provider_id": "stepfun",
+                    "provider_name": "StepFun",
+                    "model": "step-3.7-flash",
+                    "api_type": "openai-compatible",
+                    "input_tokens": 640,
+                    "output_tokens": 360,
+                },
+            ),
+        ) as completion:
+            intake = self.client.post(
+                "/api/v1/topic-intake/supervisor-plan",
+                json={
+                    "topic": topic,
+                    "slug": "digital-economy-labor-share",
+                    "note": "验证 LLM 预检等待上限。",
+                },
+            )
+
+        self.assertEqual(intake.status_code, 201, msg=intake.text)
+        self.assertEqual(completion.call_count, 1)
+        self.assertEqual(completion.call_args.kwargs["timeout_seconds"], 30)
+
     def _write_literature_internal_skill_supervisor_plan(self) -> None:
         self._write_supervisor_plan(
             status="approved",
@@ -3232,6 +3292,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("方法风险", self.react_agent_task_queue)
         self.assertIn("证据要求", self.react_agent_task_queue)
         self.assertIn("人工审阅提示", self.react_agent_task_queue)
+        self.assertIn("预检阻断", self.react_agent_task_queue)
+        self.assertIn("恢复 LLM Supervisor 后重试", self.react_agent_task_queue)
+        self.assertIn(
+            'const hasExecutionResult =\n'
+            '              Boolean(task.execution_result) ||\n'
+            '              task.status === "succeeded" ||\n'
+            '              task.status === "failed" ||\n'
+            '              Boolean(task.error) ||',
+            self.react_agent_task_queue,
+        )
         self.assertIn("data-testid=\"agent-task-llm-preflight\"", self.react_agent_task_queue)
         self.assertIn("agent-task-llm-preflight", self.react_styles_css)
 
@@ -3358,6 +3428,16 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("重新登记并创建队列", self.react_supervisor_plan_review)
         self.assertIn("supervisor-plan__intake-status", self.react_styles_css)
         self.assertIn("supervisor-plan__empty-state", self.react_styles_css)
+
+    def test_bdd_45a_topic_intake_timeout_is_visible_and_retriable(self) -> None:
+        """行为 45a：LLM Supervisor 生成计划卡住时，页面必须退出等待并给重试动作。"""
+        self.assertIn("TOPIC_INTAKE_TIMEOUT_MS", self.react_app)
+        self.assertIn("AbortController", self.react_app)
+        self.assertIn("topicIntakeTimeoutId", self.react_app)
+        self.assertIn("LLM Supervisor 生成计划超时", self.react_app)
+        self.assertIn("当前主模型可能仍在后台处理", self.react_app)
+        self.assertIn("setPlanIntakeStatus(\"failed\")", self.react_app)
+        self.assertIn("重新登记并创建队列", self.react_supervisor_plan_review)
 
     def test_bdd_46_service_disconnect_state_is_actionable_and_reusable(self) -> None:
         """行为 46：本地研究服务断开时，UI 必须给出可恢复步骤，而不是一句空泛报错。"""

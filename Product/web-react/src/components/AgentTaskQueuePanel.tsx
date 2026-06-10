@@ -329,6 +329,13 @@ interface TraceLearningBadCaseResponse {
   };
 }
 
+interface TraceLearningRegressionProposalResponse {
+  regression_proposal?: {
+    id?: string;
+    status?: string;
+  };
+}
+
 interface AgentTaskQueuePanelProps {
   projectId: string;
 }
@@ -810,6 +817,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [traceFeedback, setTraceFeedback] = useState("");
   const [traceSaving, setTraceSaving] = useState(false);
+  const [traceProposalGenerating, setTraceProposalGenerating] = useState(false);
   const [traceMessage, setTraceMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -1126,6 +1134,22 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
     }
   };
 
+  const generateTraceLearningRegressionProposal = async () => {
+    setTraceProposalGenerating(true);
+    try {
+      const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/trace-learning/regression-proposals`), {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const data = (await response.json()) as TraceLearningRegressionProposalResponse;
+      setTraceMessage(`已生成回归建议：${data.regression_proposal?.id ?? "等待人工审阅"}`);
+    } catch {
+      setTraceMessage("还没有可生成建议的坏案例，先写入一个问题。");
+    } finally {
+      setTraceProposalGenerating(false);
+    }
+  };
+
   return (
     <section className="agent-task-queue-panel" data-testid="agent-task-queue-panel" aria-label="Agent 任务队列">
       <div className="agent-task-queue-panel__header">
@@ -1226,8 +1250,19 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             {traceSaving ? <Loader2 size={15} className="spin" /> : <Pencil size={15} />}
             <span>{traceSaving ? "写入中" : "写入改进账本"}</span>
           </button>
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-testid="trace-learning-regression-proposal"
+            onClick={() => void generateTraceLearningRegressionProposal()}
+            disabled={traceProposalGenerating}
+          >
+            {traceProposalGenerating ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
+            <span>{traceProposalGenerating ? "生成中" : "生成回归建议"}</span>
+          </button>
           {traceMessage ? <small>{traceMessage}</small> : null}
         </div>
+        <small className="trace-learning-feedback__hint">回归建议会进入等待人工审阅，不会自动改正式论文或规则库。</small>
       </details>
 
       {tasks.length === 0 ? (

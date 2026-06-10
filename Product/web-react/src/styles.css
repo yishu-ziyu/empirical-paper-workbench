@@ -1720,6 +1720,125 @@ button {
   padding-top: 11px;
 }
 
+.agent-task-execution-review {
+  display: grid;
+  gap: 13px;
+  border: 1px solid rgba(230, 230, 230, 0.16);
+  border-radius: var(--radius-lg);
+  background: rgba(230, 230, 230, 0.048);
+  padding: 15px;
+}
+
+.agent-task-execution-review--done {
+  background: rgba(230, 230, 230, 0.035);
+}
+
+.agent-task-execution-review__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.agent-task-execution-review__head h3 {
+  margin: 6px 0 6px;
+  color: var(--color-strong);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.agent-task-execution-review__head p,
+.agent-task-execution-review--done p,
+.agent-task-execution-review__focus p,
+.agent-task-execution-review__focus li {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.agent-task-execution-review__head > span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(230, 230, 230, 0.13);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.065);
+  color: #d0d0d0;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-task-execution-review__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agent-task-execution-review__grid > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.22);
+  padding: 10px;
+}
+
+.agent-task-execution-review__grid small {
+  color: var(--color-subtle);
+  font-size: 12px;
+}
+
+.agent-task-execution-review__grid strong,
+.agent-task-execution-review__grid code {
+  overflow-wrap: anywhere;
+  color: var(--color-strong);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.agent-task-execution-review__grid code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 500;
+}
+
+.agent-task-execution-review__focus {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.2);
+  padding: 11px 12px;
+}
+
+.agent-task-execution-review__focus strong {
+  color: var(--color-strong);
+  font-size: 13px;
+}
+
+.agent-task-execution-review__focus ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.agent-task-execution-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  border-top: 1px solid rgba(230, 230, 230, 0.08);
+  padding-top: 12px;
+}
+
+.agent-task-execution-review__actions .btn {
+  min-width: 132px;
+}
+
 .agent-task-queue-review {
   display: grid;
   gap: 14px;
@@ -2111,6 +2230,10 @@ button {
     display: grid;
   }
 
+  .agent-task-execution-review__head {
+    display: grid;
+  }
+
   .agent-task-queue-export-preflight__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2125,7 +2248,8 @@ button {
 
   .agent-task-backend-selection__grid,
   .agent-task-backend-selection__summary,
-  .agent-task-execution-console__grid {
+  .agent-task-execution-console__grid,
+  .agent-task-execution-review__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2139,7 +2263,8 @@ button {
   .agent-task-skill-review__grid,
   .agent-task-backend-selection__grid,
   .agent-task-backend-selection__summary,
-  .agent-task-execution-console__grid {
+  .agent-task-execution-console__grid,
+  .agent-task-execution-review__grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2335,6 +2460,11 @@ button {
 
 .btn:active {
   transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 1px solid rgba(230, 230, 230, 0.44);
+  outline-offset: 2px;
 }
 
 .btn--primary {

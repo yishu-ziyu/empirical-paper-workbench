@@ -20,6 +20,7 @@ type FormalWritebackPreflightReviewAction = "approve_formal_writeback" | "needs_
 type ReferenceSeedReviewAction = "approve_for_draft" | "needs_revision" | "reject";
 type DispatchReviewAction = "approve" | "reject";
 type ExecutionBackendId = "statspai" | "python_ols_adapter" | "stata_mcp" | "codex";
+type TraceLearningProposalReviewDecision = "approve" | "request_revision" | "reject";
 type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction | FormalWritebackPreflightReviewAction;
 
 interface QueueSummary {
@@ -333,6 +334,14 @@ interface TraceLearningRegressionProposalResponse {
   regression_proposal?: {
     id?: string;
     status?: string;
+  };
+}
+
+interface TraceLearningRegressionProposalReviewResponse {
+  regression_proposal_review?: {
+    id?: string;
+    status?: string;
+    next_action?: string;
   };
 }
 
@@ -818,6 +827,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [traceFeedback, setTraceFeedback] = useState("");
   const [traceSaving, setTraceSaving] = useState(false);
   const [traceProposalGenerating, setTraceProposalGenerating] = useState(false);
+  const [traceProposalReviewing, setTraceProposalReviewing] = useState(false);
+  const [latestTraceProposalId, setLatestTraceProposalId] = useState<string | null>(null);
+  const [traceProposalReviewDecision, setTraceProposalReviewDecision] =
+    useState<TraceLearningProposalReviewDecision>("request_revision");
   const [traceMessage, setTraceMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -1142,11 +1155,43 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       });
       if (!response.ok) throw new Error(await response.text());
       const data = (await response.json()) as TraceLearningRegressionProposalResponse;
-      setTraceMessage(`已生成回归建议：${data.regression_proposal?.id ?? "等待人工审阅"}`);
+      const proposalId = data.regression_proposal?.id ?? null;
+      setLatestTraceProposalId(proposalId);
+      setTraceMessage(`已生成回归建议：${proposalId ?? "等待人工审阅"}`);
     } catch {
       setTraceMessage("还没有可生成建议的坏案例，先写入一个问题。");
     } finally {
       setTraceProposalGenerating(false);
+    }
+  };
+
+  const reviewTraceLearningRegressionProposal = async () => {
+    if (!latestTraceProposalId) {
+      setTraceMessage("先生成一个回归建议，再审阅。");
+      return;
+    }
+
+    setTraceProposalReviewing(true);
+    try {
+      const response = await fetch(
+        apiUrl(`/api/v1/projects/${projectId}/trace-learning/regression-proposals/${latestTraceProposalId}/review`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            decision: traceProposalReviewDecision,
+            reviewer: "human",
+            note: "从任务队列页记录人工审阅；不会自动写测试文件或规则库。",
+          }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      const data = (await response.json()) as TraceLearningRegressionProposalReviewResponse;
+      setTraceMessage(`已记录审阅：${data.regression_proposal_review?.status ?? "已审阅"}`);
+    } catch {
+      setTraceMessage("审阅记录暂时没写入成功，请稍后再试。");
+    } finally {
+      setTraceProposalReviewing(false);
     }
   };
 
@@ -1260,9 +1305,30 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             {traceProposalGenerating ? <Loader2 size={15} className="spin" /> : <FileCheck2 size={15} />}
             <span>{traceProposalGenerating ? "生成中" : "生成回归建议"}</span>
           </button>
+          <select
+            aria-label="回归建议审阅决定"
+            value={traceProposalReviewDecision}
+            onChange={(event) => setTraceProposalReviewDecision(event.target.value as TraceLearningProposalReviewDecision)}
+          >
+            <option value="request_revision">需要修订</option>
+            <option value="approve">批准准备补丁</option>
+            <option value="reject">关闭建议</option>
+          </select>
+          <button
+            className="btn btn--secondary"
+            type="button"
+            data-testid="trace-learning-regression-proposal-review"
+            onClick={() => void reviewTraceLearningRegressionProposal()}
+            disabled={!latestTraceProposalId || traceProposalReviewing}
+          >
+            {traceProposalReviewing ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
+            <span>{traceProposalReviewing ? "审阅中" : "审阅回归建议"}</span>
+          </button>
           {traceMessage ? <small>{traceMessage}</small> : null}
         </div>
-        <small className="trace-learning-feedback__hint">回归建议会进入等待人工审阅，不会自动改正式论文或规则库。</small>
+        <small className="trace-learning-feedback__hint">
+          回归建议会进入等待人工审阅，不会自动写测试文件、改正式论文或规则库。
+        </small>
       </details>
 
       {tasks.length === 0 ? (

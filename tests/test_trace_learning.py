@@ -820,6 +820,10 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         self.assertEqual(len(packages), 1)
         self.assertEqual(packages[0]["id"], package_id)
         self.assertEqual(packages[0]["patch_proposal_id"], patch["id"])
+        self.assertEqual(packages[0]["target_files"][0]["path"], "tests/test_trace_learning.py")
+        self.assertGreaterEqual(len(packages[0]["manual_steps"]), 3)
+        self.assertEqual(packages[0]["target_command"], "python3 -m unittest tests.test_trace_learning -v")
+        self.assertEqual(packages[0]["next_action"], "human_apply_patch_to_test_suite")
         self.assertEqual(trace_learning["regression_test_patch_apply_package_count"], 1)
         self.assertEqual(
             trace_learning["regression_test_patch_apply_package_status_by_proposal_id"][patch["id"]],
@@ -1013,6 +1017,18 @@ class TraceLearningFrontendContractTests(unittest.TestCase):
         self.assertIn("生成测试落地包", self.agent_task_queue)
         self.assertIn("只生成落地包", self.agent_task_queue)
         self.assertIn("不会自动改测试文件", self.agent_task_queue)
+
+    def test_bdd_12_agent_queue_shows_test_patch_apply_package_details(self) -> None:
+        """Given 测试落地包已生成；When 用户回到队列页；Then 页面展示人工应用所需的文件、步骤和命令。"""
+        self.assertIn("latestTraceApplyPackage", self.agent_task_queue)
+        self.assertIn("trace-learning-test-patch-apply-package-summary", self.agent_task_queue)
+        self.assertIn("人工应用步骤", self.agent_task_queue)
+        self.assertIn("目标测试文件", self.agent_task_queue)
+        self.assertIn("验证命令", self.agent_task_queue)
+        self.assertIn("target_files", self.agent_task_queue)
+        self.assertIn("manual_steps", self.agent_task_queue)
+        self.assertIn("target_command", self.agent_task_queue)
+        self.assertIn("human_apply_patch_to_test_suite", self.agent_task_queue)
 
 
 if __name__ == "__main__":

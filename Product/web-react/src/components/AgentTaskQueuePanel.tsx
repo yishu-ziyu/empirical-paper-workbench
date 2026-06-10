@@ -19,6 +19,7 @@ type SectionDraftsReviewAction = "approve_for_formal_writeback_preflight" | "nee
 type FormalWritebackPreflightReviewAction = "approve_formal_writeback" | "needs_revision" | "reject";
 type ReferenceSeedReviewAction = "approve_for_draft" | "needs_revision" | "reject";
 type DispatchReviewAction = "approve" | "reject";
+type FinalPdfWritebackAction = "approve" | "needs_revision" | "reject";
 type ExecutionBackendId = "statspai" | "python_ols_adapter" | "stata_mcp" | "codex";
 type TraceLearningProposalReviewDecision = "approve" | "request_revision" | "reject";
 type ReviewAction = DraftSectionTasksReviewAction | SectionDraftsReviewAction | FormalWritebackPreflightReviewAction;
@@ -314,6 +315,40 @@ interface AgentTask {
     wrote_final_outputs?: boolean;
     next_action?: string;
   };
+  pdf_final_approval?: {
+    status?: string;
+    action?: string;
+    artifact_path?: string;
+    review_path?: string;
+    approval_path?: string;
+    candidate_pdf?: string;
+    candidate_qmd?: string;
+    can_enter_p6?: boolean;
+    final_writeback_authorized?: boolean;
+    blocking_reason_count?: number;
+    writes_formal_layer?: boolean;
+    wrote_final_outputs?: boolean;
+    next_action?: string;
+  };
+  pdf_final_writeback?: {
+    status?: string;
+    artifact_path?: string;
+    review_path?: string;
+    source_candidate_report?: string;
+    source_final_preflight?: string;
+    source_approval_report?: string;
+    source_candidate_pdf?: string;
+    final_pdf?: string;
+    final_pdf_exists?: boolean;
+    source_candidate_pdf_sha256?: string;
+    final_pdf_sha256?: string;
+    final_writeback_authorized?: boolean;
+    blocking_reason_count?: number;
+    wrote_final_pdf?: boolean;
+    wrote_docx?: boolean;
+    writes_formal_layer?: boolean;
+    next_action?: string;
+  };
   export_preflight_followups?: Array<{
     owner_agent?: string;
     title?: string;
@@ -480,6 +515,12 @@ function statusLabel(status?: string): string {
     pdf_candidate_exported: "PDF 候选稿已生成",
     pdf_candidate_reviewed: "PDF 候选稿已审阅",
     pdf_candidate_review_blocked: "PDF 候选稿需修复",
+    pdf_candidate_final_approval_needs_revision: "PDF 候选稿需修订",
+    pdf_candidate_final_approval_rejected: "PDF 候选稿已拒绝",
+    final_pdf_writeback_blocked: "最终 PDF 写回受阻",
+    final_pdf_written: "最终 PDF 已写入",
+    final_pdf_already_written: "最终 PDF 已存在",
+    approved_for_final_writeback: "已批准最终写回",
     ready_for_final_approval_review: "可进入最终批准审阅",
     blocked_by_pdf_candidate_review: "候选稿审阅有阻断项",
     draft_execution_packet_ready: "草案层执行包已生成",
@@ -508,6 +549,8 @@ function actionLabel(action?: string): string {
     run_pdf_export_preflight: "运行 PDF 导出预检",
     review_pdf_candidate: "审阅 PDF 候选稿",
     human_review_pdf_candidate: "人工确认 PDF 候选稿",
+    repair_final_pdf_writeback_inputs: "修复最终 PDF 写回输入",
+    docx_export_preflight: "进入 docx 导出预检",
     repair_pdf_candidate: "修复 PDF 候选稿",
     resolve_export_preflight_blockers: "处理导出阻断项",
     revise_draft_section_tasks: "修订章节任务包",
@@ -725,6 +768,10 @@ function selectFocusTask(tasks: AgentTask[]): AgentTask | null {
     "prepare_export_preflight",
     "run_pdf_export_preflight",
     "review_pdf_candidate",
+    "human_review_pdf_candidate",
+    "repair_pdf_candidate",
+    "repair_final_pdf_writeback_inputs",
+    "docx_export_preflight",
     "resolve_export_preflight_blockers",
   ]);
   return (
@@ -939,6 +986,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
   const [generatingFormalExportPreflightTaskId, setGeneratingFormalExportPreflightTaskId] = useState<string | null>(null);
   const [generatingPdfCandidateExportTaskId, setGeneratingPdfCandidateExportTaskId] = useState<string | null>(null);
   const [generatingPdfCandidateReviewTaskId, setGeneratingPdfCandidateReviewTaskId] = useState<string | null>(null);
+  const [finalPdfReviewing, setFinalPdfReviewing] = useState<{
+    taskId: string;
+    action: FinalPdfWritebackAction;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [traceFeedback, setTraceFeedback] = useState("");
   const [traceSaving, setTraceSaving] = useState(false);
@@ -1314,6 +1365,33 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
       setError("PDF 候选稿审阅没有生成成功，请先确认候选稿已经生成。");
     } finally {
       setGeneratingPdfCandidateReviewTaskId(null);
+    }
+  };
+
+  const reviewFinalPdfWriteback = async (taskId: string, action: FinalPdfWritebackAction) => {
+    setFinalPdfReviewing({ taskId, action });
+    try {
+      const data = await fetchJson(
+        `/api/v1/projects/${projectId}/agent-task-queue/tasks/${taskId}/final-pdf-writeback`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            action,
+            note:
+              action === "approve"
+                ? "人工批准候选 PDF 写入最终包。"
+                : action === "needs_revision"
+                  ? "候选 PDF 需要修订后再进入最终写回。"
+                  : "本轮候选 PDF 不进入最终写回。",
+          }),
+        },
+      );
+      setQueue(data.agent_task_queue);
+      setError(null);
+    } catch {
+      setError("最终 PDF 写回没有完成。请先确认候选稿审阅和最终写回预检都已通过。");
+    } finally {
+      setFinalPdfReviewing(null);
     }
   };
 
@@ -1822,6 +1900,10 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const hasExportPreflight = !!task.formal_export_preflight;
             const hasPdfCandidateExport = !!task.pdf_candidate_export;
             const hasPdfCandidateReview = !!task.pdf_candidate_review;
+            const hasPdfFinalApproval = !!task.pdf_final_approval;
+            const hasPdfFinalWriteback = !!task.pdf_final_writeback;
+            const finalPdfApprovalReady =
+              task.status === "pdf_candidate_reviewed" && task.pdf_candidate_review?.can_request_final_approval;
             const formalWritebackReviewReady = task.status === "formal_writeback_preflight_ready" && hasPreflight;
             const generatingDrafts = generatingSectionDrafts === task.id;
             const exportPreflightReady = hasFormalWriteback && task.status === "formal_sections_written";
@@ -1863,6 +1945,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
             const canGeneratePdfCandidateReview =
               task.status === "pdf_candidate_exported" && task.pdf_candidate_export?.status === "pdf_candidate_exported";
             const generatingPdfCandidateReview = generatingPdfCandidateReviewTaskId === task.id;
+            const finalPdfBusy = finalPdfReviewing?.taskId === task.id;
             return (
               <article
                 key={task.id}
@@ -2654,6 +2737,146 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                         <p className="agent-task-queue-pdf-candidate__note">
                           最终写回预检只说明候选稿是否可进入人工批准，不会写入 paper.pdf / paper.docx。
                         </p>
+                        {finalPdfApprovalReady ? (
+                          <div className="agent-task-card__actions" data-testid="agent-task-queue-final-pdf-actions">
+                            <button
+                              className="btn btn--primary"
+                              type="button"
+                              data-final-pdf-writeback-action="approve"
+                              onClick={() => void reviewFinalPdfWriteback(task.id, "approve")}
+                              disabled={finalPdfBusy}
+                            >
+                              {finalPdfBusy && finalPdfReviewing?.action === "approve" ? (
+                                <Loader2 size={15} className="spin" />
+                              ) : (
+                                <CheckCircle2 size={15} />
+                              )}
+                              <span>
+                                {finalPdfBusy && finalPdfReviewing?.action === "approve" ? "写入中" : "批准写入最终 PDF"}
+                              </span>
+                            </button>
+                            <button
+                              className="btn btn--secondary"
+                              type="button"
+                              data-final-pdf-writeback-action="needs_revision"
+                              onClick={() => void reviewFinalPdfWriteback(task.id, "needs_revision")}
+                              disabled={finalPdfBusy}
+                            >
+                              {finalPdfBusy && finalPdfReviewing?.action === "needs_revision" ? (
+                                <Loader2 size={15} className="spin" />
+                              ) : (
+                                <Pencil size={15} />
+                              )}
+                              <span>要求修订</span>
+                            </button>
+                            <button
+                              className="btn btn--secondary"
+                              type="button"
+                              data-final-pdf-writeback-action="reject"
+                              onClick={() => void reviewFinalPdfWriteback(task.id, "reject")}
+                              disabled={finalPdfBusy}
+                            >
+                              {finalPdfBusy && finalPdfReviewing?.action === "reject" ? (
+                                <Loader2 size={15} className="spin" />
+                              ) : (
+                                <XCircle size={15} />
+                              )}
+                              <span>拒绝本轮</span>
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {hasPdfFinalApproval ? (
+                      <div
+                        className="agent-task-queue-pdf-candidate agent-task-queue-pdf-candidate--approval"
+                        data-testid="agent-task-queue-final-pdf-approval"
+                      >
+                        <div className="agent-task-queue-pdf-candidate__head">
+                          <div>
+                            <span className="eyebrow">最终 PDF 人工决定</span>
+                            <h3>{statusLabel(task.pdf_final_approval?.status)}</h3>
+                            <p>
+                              {task.pdf_final_approval?.final_writeback_authorized
+                                ? "候选 PDF 已获人工授权，可以进入最终 PDF 写回。"
+                                : "本轮决定已记录，正式最终包仍保持不变。"}
+                            </p>
+                          </div>
+                          <span className="agent-task-queue-pdf-candidate__pill">
+                            {actionLabel(task.pdf_final_approval?.next_action ?? task.next_action)}
+                          </span>
+                        </div>
+                        <div className="agent-task-queue-pdf-candidate__grid">
+                          <div>
+                            <small>审批报告</small>
+                            <code>{task.pdf_final_approval?.artifact_path ?? "Results/json/formal_pdf_final_approval.json"}</code>
+                          </div>
+                          <div>
+                            <small>审批文档</small>
+                            <code>{task.pdf_final_approval?.review_path ?? "Reviews/formal_pdf_final_approval.md"}</code>
+                          </div>
+                          <div>
+                            <small>审批账本</small>
+                            <code>{task.pdf_final_approval?.approval_path ?? "state/product/writeback_approvals.json"}</code>
+                          </div>
+                          <div>
+                            <small>可进入 P6</small>
+                            <strong>{task.pdf_final_approval?.can_enter_p6 ? "是" : "否"}</strong>
+                          </div>
+                          <div>
+                            <small>写最终产物</small>
+                            <strong>{task.pdf_final_approval?.wrote_final_outputs ? "已写" : "未写"}</strong>
+                          </div>
+                          <div>
+                            <small>正式层写入</small>
+                            <strong>{task.pdf_final_approval?.writes_formal_layer ? "会写入" : "不写入"}</strong>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {hasPdfFinalWriteback ? (
+                      <div
+                        className="agent-task-queue-pdf-candidate agent-task-queue-pdf-candidate--final"
+                        data-testid="agent-task-queue-final-pdf-writeback"
+                      >
+                        <div className="agent-task-queue-pdf-candidate__head">
+                          <div>
+                            <span className="eyebrow">最终 PDF 写回</span>
+                            <h3>{statusLabel(task.pdf_final_writeback?.status)}</h3>
+                            <p>候选 PDF 已复制到最终包；docx 仍交给后续导出预检处理。</p>
+                          </div>
+                          <span className="agent-task-queue-pdf-candidate__pill">
+                            {actionLabel(task.pdf_final_writeback?.next_action ?? task.next_action)}
+                          </span>
+                        </div>
+                        <div className="agent-task-queue-pdf-candidate__grid">
+                          <div>
+                            <small>最终 PDF</small>
+                            <code>{task.pdf_final_writeback?.final_pdf ?? "Submissions/formal_package/paper.pdf"}</code>
+                          </div>
+                          <div>
+                            <small>写回报告</small>
+                            <code>{task.pdf_final_writeback?.artifact_path ?? "Results/json/formal_pdf_final_writeback.json"}</code>
+                          </div>
+                          <div>
+                            <small>写回文档</small>
+                            <code>{task.pdf_final_writeback?.review_path ?? "Reviews/formal_pdf_final_writeback.md"}</code>
+                          </div>
+                          <div>
+                            <small>最终 PDF</small>
+                            <strong>{task.pdf_final_writeback?.final_pdf_exists ? "已存在" : "未写出"}</strong>
+                          </div>
+                          <div>
+                            <small>docx</small>
+                            <strong>{task.pdf_final_writeback?.wrote_docx ? "已写出" : "未写出"}</strong>
+                          </div>
+                          <div>
+                            <small>正式状态</small>
+                            <strong>{task.pdf_final_writeback?.writes_formal_layer ? "已变更" : "未变更"}</strong>
+                          </div>
+                        </div>
                       </div>
                     ) : null}
 

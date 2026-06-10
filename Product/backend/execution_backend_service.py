@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from . import llm_client
 from .project_service import (
     build_empirical_execution_contract,
     execute_run_plan_method_tasks,
@@ -19,6 +20,12 @@ from .reference_chain_seed_runner import (
 
 
 class ExecutionBackendSelectionError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class LLMExecutionPreflightError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
@@ -249,44 +256,250 @@ def execute_agent_task_with_backend(
 
     # Determine method from task or run_plan
     method_id = task.get("method_id") or _infer_method_from_task(task)
+    try:
+        llm_preflight = run_llm_execution_preflight(
+            task=task,
+            project_root=project_root,
+            design_spec=design_spec,
+            run_plan=run_plan,
+            dataset_source=dataset_source,
+            method_id=method_id,
+            backend_id=backend_id,
+            timestamp=timestamp,
+        )
+    except Exception as exc:
+        if isinstance(exc, LLMExecutionPreflightError):
+            raise
+        raise LLMExecutionPreflightError(
+            "llm_execution_preflight_required",
+            f"LLM 实验预检未完成，暂不启动执行后端。请检查模型配置后重试：{exc}",
+        ) from exc
 
     try:
         if backend_id == "statspai":
-            return _execute_with_statspai(
+            result = _execute_with_statspai(
                 task, project_root, run_id, design_spec, run_plan,
                 dataset_source, method_id, timestamp,
             )
         elif backend_id == "python_ols_adapter":
-            return _execute_with_python_adapter(
+            result = _execute_with_python_adapter(
                 task, project_root, run_id, design_spec, run_plan,
                 dataset_source, method_id, timestamp,
             )
         elif backend_id == "stata_mcp":
-            return _execute_with_stata(
+            result = _execute_with_stata(
                 task, project_root, run_id, design_spec, run_plan,
                 dataset_source, method_id, timestamp,
             )
         elif backend_id == "codex":
-            return _execute_with_codex(
+            result = _execute_with_codex(
                 task, project_root, run_id, design_spec, run_plan,
                 dataset_source, method_id, timestamp,
             )
         else:
-            return _fail_execution(task, run_id, {
+            result = _fail_execution(task, run_id, {
                 "code": "unsupported_backend",
                 "message": f"Backend '{backend_id}' execution not yet implemented.",
             }, f"后端 '{backend_id}' 尚未支持执行。")
+        attach_llm_execution_preflight(task, result, llm_preflight)
+        return result
 
     except FileNotFoundError as exc:
-        return _fail_execution(task, run_id, {
+        result = _fail_execution(task, run_id, {
             "code": "dataset_not_found",
             "message": str(exc),
         }, "数据文件未找到，请检查数据集路径。")
+        attach_llm_execution_preflight(task, result, llm_preflight)
+        return result
     except Exception as exc:
-        return _fail_execution(task, run_id, {
+        result = _fail_execution(task, run_id, {
             "code": "execution_failed",
             "message": str(exc),
         }, f"执行失败：{exc}")
+        attach_llm_execution_preflight(task, result, llm_preflight)
+        return result
+
+
+def run_llm_execution_preflight(
+    *,
+    task: dict[str, Any],
+    project_root: Path,
+    design_spec: dict[str, Any] | None,
+    run_plan: dict[str, Any] | None,
+    dataset_source: dict[str, Any] | None,
+    method_id: str,
+    backend_id: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    """Ask the LLM Supervisor to review the experiment before backend execution."""
+    messages = build_llm_execution_preflight_messages(
+        task=task,
+        design_spec=design_spec,
+        run_plan=run_plan,
+        dataset_source=dataset_source,
+        method_id=method_id,
+        backend_id=backend_id,
+    )
+    try:
+        raw_text, provider = llm_client.chat_completion_with_fallback(messages, temperature=0.1)
+    except llm_client.LLMError as exc:
+        raise LLMExecutionPreflightError(
+            "llm_execution_preflight_required",
+            f"LLM 实验预检未完成，暂不启动执行后端。请检查模型配置后重试：{exc}",
+        ) from exc
+
+    parsed = parse_llm_execution_preflight_output(raw_text)
+    compact_task_id = str(task.get("id") or "agent_task")
+    artifact_path = (
+        Path("state")
+        / "product"
+        / "llm_execution_preflights"
+        / f"{compact_task_id}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}.json"
+    )
+    preflight = {
+        "schema_version": "p6.llm_execution_preflight.v1",
+        "task_id": compact_task_id,
+        "backend_id": backend_id,
+        "method_id": method_id,
+        "created_at": timestamp,
+        "provider": provider,
+        "summary": str(parsed.get("summary") or "LLM 已完成执行前预检。"),
+        "backend_reason": str(parsed.get("backend_reason") or ""),
+        "method_risk": _as_string_list(parsed.get("method_risk")),
+        "evidence_requirements": _as_string_list(parsed.get("evidence_requirements")),
+        "handoff_to_backend": str(parsed.get("handoff_to_backend") or ""),
+        "human_review_note": str(parsed.get("human_review_note") or ""),
+        "artifact_path": artifact_path.as_posix(),
+        "formal_write_allowed": False,
+        "required_for_execution": True,
+        "evidence_level": "llm_supervisor",
+        "raw_output": raw_text,
+    }
+    output_path = project_root / artifact_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(preflight, ensure_ascii=False, indent=2), encoding="utf-8")
+    task["llm_execution_preflight"] = compact_llm_execution_preflight(preflight)
+    task.setdefault("audit_log", []).append({
+        "event": "llm_execution_preflight_generated",
+        "actor": "llm_supervisor",
+        "timestamp": timestamp,
+        "backend_id": backend_id,
+        "method_id": method_id,
+        "provider_id": provider.get("provider_id"),
+        "model": provider.get("model"),
+        "artifact_path": artifact_path.as_posix(),
+    })
+    return preflight
+
+
+def build_llm_execution_preflight_messages(
+    *,
+    task: dict[str, Any],
+    design_spec: dict[str, Any] | None,
+    run_plan: dict[str, Any] | None,
+    dataset_source: dict[str, Any] | None,
+    method_id: str,
+    backend_id: str,
+) -> list[dict[str, str]]:
+    context = {
+        "task": {
+            "id": task.get("id"),
+            "title": task.get("title"),
+            "summary": task.get("summary"),
+            "owner_agent": task.get("owner_agent"),
+            "role": task.get("role"),
+            "selected_backend": task.get("selected_backend"),
+            "risk_flags": task.get("risk_flags", []),
+            "output_requirements": task.get("output_requirements", []),
+        },
+        "method_id": method_id,
+        "backend_id": backend_id,
+        "dataset_source": dataset_source or {},
+        "design_spec": design_spec or {},
+        "run_plan": run_plan or {},
+    }
+    return [
+        {
+            "role": "system",
+            "content": (
+                "你是实证研究 OS 的 LLM Supervisor。你的任务是在执行后端启动前做实验预检。"
+                "必须判断为什么选择该后端、当前方法风险、需要保留的证据和人工审阅提示。"
+                "只返回 JSON，不要输出 Markdown。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "请基于以下任务上下文生成执行前预检 JSON。字段必须包含："
+                "summary, backend_reason, method_risk, evidence_requirements, "
+                "handoff_to_backend, human_review_note。\n"
+                f"{json.dumps(context, ensure_ascii=False, indent=2)}"
+            ),
+        },
+    ]
+
+
+def parse_llm_execution_preflight_output(raw_text: str) -> dict[str, Any]:
+    text = (raw_text or "").strip()
+    if text.startswith("```"):
+        lines = [line for line in text.splitlines() if not line.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise LLMExecutionPreflightError(
+                "llm_execution_preflight_invalid",
+                "LLM 实验预检没有返回可解析 JSON。",
+            )
+        parsed = json.loads(text[start : end + 1])
+    if not isinstance(parsed, dict):
+        raise LLMExecutionPreflightError(
+            "llm_execution_preflight_invalid",
+            "LLM 实验预检必须返回 JSON object。",
+        )
+    return parsed
+
+
+def compact_llm_execution_preflight(preflight: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": str(preflight.get("schema_version") or "p6.llm_execution_preflight.v1"),
+        "task_id": str(preflight.get("task_id") or ""),
+        "backend_id": str(preflight.get("backend_id") or ""),
+        "method_id": str(preflight.get("method_id") or ""),
+        "provider": preflight.get("provider") if isinstance(preflight.get("provider"), dict) else {},
+        "summary": str(preflight.get("summary") or ""),
+        "backend_reason": str(preflight.get("backend_reason") or ""),
+        "method_risk": _as_string_list(preflight.get("method_risk")),
+        "evidence_requirements": _as_string_list(preflight.get("evidence_requirements")),
+        "human_review_note": str(preflight.get("human_review_note") or ""),
+        "artifact_path": str(preflight.get("artifact_path") or ""),
+        "formal_write_allowed": bool(preflight.get("formal_write_allowed")),
+        "required_for_execution": bool(preflight.get("required_for_execution")),
+        "evidence_level": str(preflight.get("evidence_level") or "llm_supervisor"),
+    }
+
+
+def attach_llm_execution_preflight(
+    task: dict[str, Any],
+    result: dict[str, Any],
+    preflight: dict[str, Any],
+) -> None:
+    compact = compact_llm_execution_preflight(preflight)
+    result["llm_execution_preflight"] = compact
+    if isinstance(task.get("execution_result"), dict):
+        task["execution_result"]["llm_execution_preflight"] = compact
+    task["llm_execution_preflight"] = compact
+
+
+def _as_string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item)]
+    if value in (None, ""):
+        return []
+    return [str(value)]
 
 
 def _execute_with_statspai(

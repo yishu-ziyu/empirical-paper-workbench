@@ -2043,6 +2043,77 @@ button {
   line-height: 1.5;
 }
 
+.agent-task-llm-preflight {
+  display: grid;
+  gap: 11px;
+  border: 1px solid rgba(230, 230, 230, 0.13);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.26);
+  padding: 12px;
+}
+
+.agent-task-llm-preflight__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agent-task-llm-preflight__head h4 {
+  margin: 5px 0 0;
+  color: var(--color-strong);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.agent-task-llm-preflight__head > span {
+  flex: 0 0 auto;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: 999px;
+  background: rgba(230, 230, 230, 0.055);
+  color: var(--color-muted);
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-task-llm-preflight__grid,
+.agent-task-llm-preflight__lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-task-llm-preflight__grid > div,
+.agent-task-llm-preflight__lists > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.agent-task-llm-preflight small,
+.agent-task-llm-preflight__lists strong {
+  color: var(--color-subtle);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.agent-task-llm-preflight p,
+.agent-task-llm-preflight li {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.agent-task-llm-preflight ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+}
+
 .agent-task-execution-console__actions {
   display: flex;
   align-items: center;

@@ -159,6 +159,27 @@ interface AgentTaskAuditEvent {
   note?: string;
 }
 
+interface LlmExecutionPreflight {
+  schema_version?: string;
+  task_id?: string;
+  backend_id?: string;
+  method_id?: string;
+  provider?: {
+    provider_id?: string;
+    model?: string;
+    fallback_used?: boolean;
+  };
+  summary?: string;
+  backend_reason?: string;
+  method_risk?: string[];
+  evidence_requirements?: string[];
+  human_review_note?: string;
+  artifact_path?: string;
+  formal_write_allowed?: boolean;
+  required_for_execution?: boolean;
+  evidence_level?: string;
+}
+
 interface ExecutionResult {
   status?: string;
   run_id?: string;
@@ -172,6 +193,7 @@ interface ExecutionResult {
   student_message?: string;
   note?: string;
   error?: AgentTaskError;
+  llm_execution_preflight?: LlmExecutionPreflight;
   result_review?: {
     status?: string;
     title?: string;
@@ -221,6 +243,7 @@ interface AgentTask {
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
   llm_intervention_handoff?: LlmInterventionHandoff;
+  llm_execution_preflight?: LlmExecutionPreflight;
   selected_backend?: SelectedExecutionBackend;
   backend_blocker?: ExecutionBackendBlocker;
   draft_section_tasks?: {
@@ -1930,6 +1953,7 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
               task.status === "failed" || task.execution_result?.status === "failed" || Boolean(task.error) || Boolean(localExecutionFailure);
             const hasExecutionResult =
               Boolean(task.execution_result) || task.status === "succeeded" || task.status === "failed" || Boolean(localExecutionFailure);
+            const llmExecutionPreflight = task.execution_result?.llm_execution_preflight ?? task.llm_execution_preflight;
             const executionResultReviewReady =
               task.execution_result?.execution_kind === "reference_chain_seed_package" &&
               (task.next_action === "review_literature_seed_package" ||
@@ -2185,6 +2209,53 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                             <strong>{executionLogTrace(task)}</strong>
                           </div>
                         </div>
+
+                        {llmExecutionPreflight ? (
+                          <div className="agent-task-llm-preflight" data-testid="agent-task-llm-preflight">
+                            <div className="agent-task-llm-preflight__head">
+                              <div>
+                                <span className="eyebrow">LLM 实验预检</span>
+                                <h4>{llmExecutionPreflight.summary ?? "模型已完成执行前判断"}</h4>
+                              </div>
+                              <span>
+                                模型：
+                                {llmExecutionPreflight.provider?.model ??
+                                  llmExecutionPreflight.provider?.provider_id ??
+                                  "local-supervisor"}
+                              </span>
+                            </div>
+                            <div className="agent-task-llm-preflight__grid">
+                              <div>
+                                <small>放行理由</small>
+                                <p>{llmExecutionPreflight.backend_reason || "已确认当前后端适合承接本轮草案层实验。"}</p>
+                              </div>
+                              <div>
+                                <small>人工审阅提示</small>
+                                <p>{llmExecutionPreflight.human_review_note || "执行结果进入人工审阅后再决定是否推进正式层。"}</p>
+                              </div>
+                            </div>
+                            {(llmExecutionPreflight.method_risk?.length || llmExecutionPreflight.evidence_requirements?.length) ? (
+                              <div className="agent-task-llm-preflight__lists">
+                                <div>
+                                  <strong>方法风险</strong>
+                                  <ul>
+                                    {(llmExecutionPreflight.method_risk ?? []).slice(0, 3).map((item) => (
+                                      <li key={`${task.id}-llm-risk-${item}`}>{item}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                                <div>
+                                  <strong>证据要求</strong>
+                                  <ul>
+                                    {(llmExecutionPreflight.evidence_requirements ?? []).slice(0, 3).map((item) => (
+                                      <li key={`${task.id}-llm-evidence-${item}`}>{item}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
 
                         {executionFailed ? (
                           <div className="agent-task-execution-console__failure">

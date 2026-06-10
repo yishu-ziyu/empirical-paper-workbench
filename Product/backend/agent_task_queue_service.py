@@ -1608,7 +1608,10 @@ def execute_project_agent_task(
     project_id: str,
     task_id: str,
 ) -> dict[str, Any]:
-    from Product.backend.execution_backend_service import execute_agent_task_with_backend
+    from Product.backend.execution_backend_service import (
+        LLMExecutionPreflightError,
+        execute_agent_task_with_backend,
+    )
 
     project = get_project_by_id(product_root, repo_root, project_id)
     project_root = Path(project.get("project_root") or project["root"]).resolve()
@@ -1621,7 +1624,10 @@ def execute_project_agent_task(
             "Select an execution backend before executing this agent task.",
         )
     llm_handoff = require_llm_intervention_handoff_before_execution(task)
-    result = execute_agent_task_with_backend(task, project_root)
+    try:
+        result = execute_agent_task_with_backend(task, project_root)
+    except LLMExecutionPreflightError as exc:
+        raise AgentTaskQueueBlockedError(exc.code, str(exc)) from exc
     attach_llm_intervention_handoff_to_execution_result(task, result, llm_handoff)
     queue["summary"] = build_agent_task_queue_summary(queue.get("tasks", []))
     queue["updated_at"] = utc_now()

@@ -51,6 +51,29 @@ interface LlmSupervisorStatus {
     api_key_env: string;
     configured: boolean;
   }>;
+  model_choices?: Array<{
+    provider_id: string;
+    provider_name: string;
+    default_model: string;
+    api_key_env: string;
+    configured: boolean;
+    current: boolean;
+    activation_hint: string;
+  }>;
+  selection?: {
+    current_provider_id: string;
+    current_model: string;
+    source: string;
+    change_hint: string;
+  };
+  local_codex?: {
+    label: string;
+    available: boolean;
+    version?: string | null;
+    execution_enabled: boolean;
+    execution_env: string;
+    activation_hint: string;
+  };
   primary_action?: {
     id: string;
     label: string;
@@ -108,6 +131,14 @@ function llmCompactLabel(status: LlmSupervisorStatus | null): string {
 
 function llmConfiguredAttempts(status: LlmSupervisorStatus | null): LlmSupervisorStatus["attempts"] {
   return (status?.attempts ?? []).filter((attempt) => attempt.configured);
+}
+
+function llmVisibleModelChoices(status: LlmSupervisorStatus | null): NonNullable<LlmSupervisorStatus["model_choices"]> {
+  const choices = status?.model_choices ?? [];
+  const current = choices.filter((choice) => choice.current);
+  const openai = choices.filter((choice) => choice.provider_id === "openai" && !choice.current);
+  const configured = choices.filter((choice) => choice.configured && !choice.current && choice.provider_id !== "openai");
+  return [...current, ...openai, ...configured].slice(0, 5);
 }
 
 export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }: SystemStatusBarProps) {
@@ -279,6 +310,9 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
             <p className="system-status-bar__obs">
               主模型：<strong>{llmModelLabel(llmStatus)}</strong>
             </p>
+            {llmStatus?.selection?.change_hint ? (
+              <p className="system-status-bar__obs">{llmStatus.selection.change_hint}</p>
+            ) : null}
             {llmConfiguredAttempts(llmStatus).length > 1 ? (
               <div className="system-status-bar__obs">
                 <span>备用链：</span>
@@ -293,6 +327,38 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
                     ))}
                 </ul>
               </div>
+            ) : null}
+            {llmVisibleModelChoices(llmStatus).length > 0 ? (
+              <div className="system-status-bar__obs">
+                <span>可选模型：</span>
+                <ul className="system-status-bar__list system-status-bar__list--compact">
+                  {llmVisibleModelChoices(llmStatus).map((choice) => (
+                    <li key={`${choice.provider_id}-${choice.default_model}`}>
+                      <code>{choice.provider_name || choice.provider_id}</code>
+                      <span>
+                        {choice.default_model || "默认模型"}
+                        {choice.current ? " · 当前" : choice.configured ? " · 已配置" : ` · 需 ${choice.api_key_env}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {llmStatus?.local_codex ? (
+              <p className="system-status-bar__obs">
+                本地 Codex：
+                <strong>
+                  {llmStatus.local_codex.available
+                    ? llmStatus.local_codex.execution_enabled
+                      ? "已启用"
+                      : "已安装，未启用"
+                    : "未安装"}
+                </strong>
+                {llmStatus.local_codex.version ? ` · ${llmStatus.local_codex.version}` : ""}
+              </p>
+            ) : null}
+            {llmStatus?.local_codex?.activation_hint ? (
+              <p className="system-status-bar__obs">{llmStatus.local_codex.activation_hint}</p>
             ) : null}
             <p className="system-status-bar__obs">
               探测入口：<code>/api/v1/providers/llm-supervisor/probe</code>

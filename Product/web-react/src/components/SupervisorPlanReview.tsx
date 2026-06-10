@@ -20,81 +20,6 @@ interface SupervisorPlanInspector {
   formal_boundary?: string[];
 }
 
-const DEFAULT_STAGES: StageNode[] = [
-  {
-    id: "literature-search",
-    title: "1. 文献检索与理论构建",
-    owner: "LiteratureAgent",
-    status: "ready",
-    reason: "先确认题目进入哪条文献脉络，再抽取机制假说和可能的识别路线。",
-    inputs: ["研究题目", "中英文文献来源"],
-    outputs: ["候选理论框架", "待核验文献线索"],
-  },
-  {
-    id: "data-variables",
-    title: "2. 数据检索与变量画像",
-    owner: "DataAgent",
-    status: "ready",
-    reason: "读取可用数据和变量，判断题目是否能被当前样本、字段和时间范围支撑。",
-    inputs: ["数据线索", "变量字典"],
-    outputs: ["VariableRoleSet 草案", "字段质量报告"],
-  },
-  {
-    id: "method-design",
-    title: "3. 因果识别与方法设计",
-    owner: "MethodAgent",
-    status: "draft",
-    reason: "根据变量角色、样本结构和文献规范，提出可执行的方法路线和前置检验。",
-    inputs: ["变量角色草案", "数据结构画像"],
-    outputs: ["DesignSpec 草案", "方法前置条件"],
-  },
-  {
-    id: "preflight-check",
-    title: "4. 执行预检与沙盒模拟",
-    owner: "Supervisor",
-    status: "empty",
-    reason: "在真实跑码前检查环境、依赖、数据路径和产物写入边界。",
-    inputs: ["DesignSpec", "本地环境配置"],
-    outputs: ["PreflightReport", "依赖检查结果"],
-  },
-  {
-    id: "experiment-run",
-    title: "5. 实证跑码与实验运行",
-    owner: "ExecutionAgent",
-    status: "empty",
-    reason: "执行回归、稳健性检验和诊断，并保留日志、表格和图形证据。",
-    inputs: ["approved RunPlan", "本地计算沙盒"],
-    outputs: ["回归结果", "运行日志"],
-  },
-  {
-    id: "findings-review",
-    title: "6. 结果解释与证据审核",
-    owner: "ReviewerAgent",
-    status: "empty",
-    reason: "把结果、论断和证据等级拆开审阅，确认哪些内容可以进入草稿。",
-    inputs: ["回归结果", "稳健性结果"],
-    outputs: ["Finding 草案", "证据绑定记录"],
-  },
-  {
-    id: "manuscript-draft",
-    title: "7. 论文草稿与学术表述",
-    owner: "ManuscriptAgent",
-    status: "empty",
-    reason: "根据已审阅的 finding 生成论文段落、表格说明和参考文献占位。",
-    inputs: ["approved Finding", "论文模板"],
-    outputs: ["论文草稿段落", "表格说明"],
-  },
-  {
-    id: "export-reproducibility",
-    title: "8. 导出审计与可复现包",
-    owner: "Supervisor",
-    status: "empty",
-    reason: "整理数据、代码、日志、论文候选稿和审计轨迹，形成可复现交付包。",
-    inputs: ["Manuscript", "完整执行 Trace"],
-    outputs: ["可复现包", "导出预检报告"],
-  },
-];
-
 const DEFAULT_INSPECTOR_DETAILS: Required<SupervisorPlanInspector> = {
   inputs_used: ["研究题目和用户补充材料。"],
   assumptions: ["识别假定会在变量角色和方法方案确认后固定。"],
@@ -117,6 +42,9 @@ interface SupervisorPlanReviewProps {
   evidenceLevel?: string | null;
   approving?: boolean;
   approvalError?: string | null;
+  intakeStatus?: "idle" | "registering" | "ready" | "failed";
+  intakeMessage?: string | null;
+  projectId?: string;
   onApprove?: () => void;
   onReject?: () => void;
 }
@@ -150,15 +78,20 @@ export function SupervisorPlanReview({
   evidenceLevel,
   approving = false,
   approvalError,
+  intakeStatus = "idle",
+  intakeMessage,
+  projectId,
   onApprove,
   onReject,
 }: SupervisorPlanReviewProps) {
-  const stagesToRender = stages?.length ? stages : DEFAULT_STAGES;
-  const firstStageId = stagesToRender[0]?.id ?? "literature-search";
+  const hasStages = Boolean(stages?.length);
+  const stagesToRender = stages ?? [];
+  const firstStageId = stagesToRender[0]?.id ?? "empty";
   const activeStage =
     stagesToRender.find((stage) => stage.status === "running") ??
     stagesToRender.find((stage) => stage.status === "ready") ??
-    stagesToRender[0];
+    stagesToRender[0] ??
+    null;
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({
     [activeStage?.id ?? firstStageId]: true,
   });
@@ -189,6 +122,21 @@ export function SupervisorPlanReview({
     setNote("");
   };
 
+  const intakeLabel =
+    intakeStatus === "registering"
+      ? "正在登记题目和任务路线"
+      : intakeStatus === "ready"
+        ? "已登记项目"
+        : intakeStatus === "failed"
+          ? "登记失败"
+          : "等待确认路线";
+  const approveLabel =
+    intakeStatus === "failed"
+      ? "重新登记并创建队列"
+      : approving
+        ? "正在创建队列"
+        : "批准路线并创建队列";
+
   return (
     <div className="task-brief supervisor-plan">
       <section className="task-brief__main supervisor-plan__canvas">
@@ -202,16 +150,28 @@ export function SupervisorPlanReview({
           <div className="route-header">
             <span className="badge badge--recommended">研究题目：{topic || "待确认"}</span>
             <span className="badge badge--readiness">证据等级：{evidenceLevel || "draft"}</span>
-            <span className="badge badge--readiness">阶段数：{stagesToRender.length}</span>
+            <span className="badge badge--readiness">阶段数：{hasStages ? stagesToRender.length : 0}</span>
           </div>
           <h3>当前路线理由</h3>
           <p>{activeStage?.reason || "Supervisor 已生成可审阅路线，等待确认后再进入任务队列。"}</p>
         </div>
 
+        <div
+          className={cn("supervisor-plan__intake-status", `supervisor-plan__intake-status--${intakeStatus}`)}
+          data-testid="plan-intake-status"
+        >
+          <strong>{intakeLabel}</strong>
+          <span>
+            {intakeStatus === "ready"
+              ? projectId || intakeMessage
+              : intakeMessage || "点击批准后会先登记题目，再创建 Agent 任务队列。"}
+          </span>
+        </div>
+
         <div className="supervisor-plan__tree-wrapper">
           <h3 className="tree-title">阶段规划任务树</h3>
           <div className="supervisor-plan__tree">
-            {stagesToRender.map((stage) => {
+            {hasStages ? stagesToRender.map((stage) => {
               const isExpanded = !!expandedStages[stage.id];
               return (
                 <div
@@ -256,7 +216,12 @@ export function SupervisorPlanReview({
                   )}
                 </div>
               );
-            })}
+            }) : (
+              <div className="supervisor-plan__empty-state" data-testid="supervisor-plan-empty-state">
+                <strong>等待题目登记后的真实路线</strong>
+                <p>点击下方按钮后，系统会先保存研究题目和 SupervisorPlan，再展示可派发的阶段任务树。</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -283,7 +248,7 @@ export function SupervisorPlanReview({
           </button>
           <button className="btn btn--primary" type="button" disabled={approving} onClick={onApprove}>
             <Check size={16} />
-            <span>{approving ? "正在批准并创建队列" : "批准路线并创建队列"}</span>
+            <span>{approveLabel}</span>
           </button>
         </div>
       </section>

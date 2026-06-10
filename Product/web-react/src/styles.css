@@ -6,9 +6,9 @@
    * ────────────────────────────────────────────────────────────── */
 
   /* === 暗色主题色板 === */
-  --color-bg: #303030;
-  --color-panel: #343434;
-  --color-panel-soft: #3d3d3d;
+  --color-bg: #242424;
+  --color-panel: #2b2b2b;
+  --color-panel-soft: #323232;
   --color-ink: #c8c8c8;
   --color-strong: #d8d8d8;
   --color-muted: #a6a6a6;
@@ -32,14 +32,14 @@
   --color-info-soft: rgba(90, 138, 196, 0.18);
   --color-inverse: #161616;
   --color-tab-active: #c8c8c8;
-  --color-button-primary-bg: #c2c2c2;
-  --color-button-primary-bg-hover: #cdcdcd;
-  --color-button-primary-ink: #202020;
+  --color-button-primary-bg: #b8b8b8;
+  --color-button-primary-bg-hover: #c4c4c4;
+  --color-button-primary-ink: #242424;
   --color-button-secondary-bg: rgba(230, 230, 230, 0.065);
   --color-button-secondary-bg-hover: rgba(230, 230, 230, 0.12);
   --color-button-secondary-text: #d2d2d2;
-  --color-button-disabled-bg: rgba(190, 190, 190, 0.1);
-  --color-button-disabled-text: #a6a6a6;
+  --color-button-disabled-bg: rgba(230, 230, 230, 0.075);
+  --color-button-disabled-text: #8f8f8f;
   --color-button-disabled-border: rgba(230, 230, 230, 0.16);
 
   /* === Kami 排版 token (新增, 不影响色板) === */
@@ -73,7 +73,7 @@ body,
 }
 
 body {
-  background: radial-gradient(ellipse at top, #303030 0%, #292929 100%);
+  background: radial-gradient(ellipse at top, #2d2d2d 0%, #242424 100%);
   color: var(--color-ink);
   /* 排版细节 (Kami) */
   line-height: 1.55;
@@ -121,7 +121,7 @@ button {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.06;
 }
 
 .dotted-surface canvas {
@@ -1850,13 +1850,16 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 40px;
-  padding: 0 18px;
+  min-height: 40px;
+  height: auto;
+  padding: 9px 18px;
   border-radius: 12px;
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
   border: 1px solid var(--color-line);
   background: var(--color-button-secondary-bg);
   color: var(--color-button-secondary-text);
@@ -2015,6 +2018,46 @@ button {
   line-height: 1.65;
 }
 
+.supervisor-plan__intake-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: 14px;
+  background: rgba(230, 230, 230, 0.035);
+  padding: 12px 14px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.supervisor-plan__intake-status strong {
+  color: var(--color-strong);
+  font-size: 13.5px;
+}
+
+.supervisor-plan__intake-status span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.supervisor-plan__intake-status--registering {
+  border-color: rgba(230, 230, 230, 0.2);
+  background: rgba(230, 230, 230, 0.055);
+}
+
+.supervisor-plan__intake-status--ready {
+  border-color: rgba(230, 230, 230, 0.24);
+  background: rgba(230, 230, 230, 0.06);
+}
+
+.supervisor-plan__intake-status--failed {
+  border-color: rgba(230, 230, 230, 0.26);
+  background: rgba(230, 230, 230, 0.07);
+}
+
 .supervisor-plan__tree-wrapper {
   display: grid;
   gap: 12px;
@@ -2034,6 +2077,27 @@ button {
 .supervisor-plan__tree {
   display: grid;
   gap: 8px;
+}
+
+.supervisor-plan__empty-state {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed rgba(230, 230, 230, 0.18);
+  border-radius: 14px;
+  background: rgba(230, 230, 230, 0.025);
+  padding: 18px;
+  color: var(--color-muted);
+}
+
+.supervisor-plan__empty-state strong {
+  color: var(--color-strong);
+  font-size: 14px;
+}
+
+.supervisor-plan__empty-state p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .supervisor-plan__stage-node {
@@ -2167,6 +2231,7 @@ button {
 
 .supervisor-plan__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
   border-top: 1px solid var(--color-line);

@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { Play, FileText, CheckCircle2, AlertCircle, Loader2, Activity } from "lucide-react";
+import { Play, FileText, CheckCircle2, Loader2, Activity } from "lucide-react";
 import { cn } from "../lib/cn";
 import { apiUrl } from "../lib/apiBase";
 import { ReasoningChainView } from "./ReasoningChainView";
 import { FormalPackageAcceptancePanel } from "./FormalPackageAcceptancePanel";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 /** ExecuteEvent 6 种类型 + 必要字段（与 Product/types/research.py 一致）
  *  推理链字段（D2）：prompt/raw_output/parsed_output —— 由 section_done 事件携带
@@ -238,7 +239,7 @@ export function ExecutionPanel({
 
       {error && (
         <div className="execution-panel__error" data-testid="execute-error">
-          <AlertCircle size={16} /> {error}
+          <ServiceConnectionRecovery message={error} onRetry={handleStart} />
         </div>
       )}
 

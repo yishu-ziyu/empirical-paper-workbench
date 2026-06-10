@@ -2311,6 +2311,18 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         cls.react_service_connection_recovery = (
             root / "Product" / "web-react" / "src" / "components" / "ServiceConnectionRecovery.tsx"
         ).read_text(encoding="utf-8")
+        cls.react_search_panel = (
+            root / "Product" / "web-react" / "src" / "components" / "SearchPanel.tsx"
+        ).read_text(encoding="utf-8")
+        cls.react_variables_panel = (
+            root / "Product" / "web-react" / "src" / "components" / "VariablesPanel.tsx"
+        ).read_text(encoding="utf-8")
+        cls.react_design_panel = (
+            root / "Product" / "web-react" / "src" / "components" / "DesignPanel.tsx"
+        ).read_text(encoding="utf-8")
+        cls.react_execution_panel = (
+            root / "Product" / "web-react" / "src" / "components" / "ExecutionPanel.tsx"
+        ).read_text(encoding="utf-8")
         cls.react_styles_css = (root / "Product" / "web-react" / "src" / "styles.css").read_text(encoding="utf-8")
 
     def test_bdd_5_frontend_contains_summary_first_queue_surface(self) -> None:
@@ -2896,6 +2908,24 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("onRetry={handleStart}", auto_research)
         self.assertIn(".service-connection-recovery", self.react_styles_css)
         self.assertIn(".service-connection-recovery__command", self.react_styles_css)
+
+    def test_bdd_47_stage_panels_reuse_service_connection_recovery(self) -> None:
+        """行为 47：后续阶段服务断开时，也必须给出同一种可恢复交互。"""
+        stage_contracts = [
+            (self.react_search_panel, 'data-testid="search-error"', "onRetry={triggerSearch}"),
+            (self.react_variables_panel, 'data-testid="variables-error"', "onRetry={() => void run()}"),
+            (self.react_design_panel, 'data-testid="design-error"', "onRetry={handleDesign}"),
+            (self.react_execution_panel, 'data-testid="execute-error"', "onRetry={handleStart}"),
+        ]
+
+        for source, test_id, retry_action in stage_contracts:
+            with self.subTest(test_id=test_id):
+                self.assertIn("ServiceConnectionRecovery", source)
+                self.assertIn(test_id, source)
+                self.assertIn(retry_action, source)
+
+        self.assertIn("不会丢失已保存的研究材料", self.react_service_connection_recovery)
+        self.assertIn("当前后端地址", self.react_service_connection_recovery)
 
 
 if __name__ == "__main__":

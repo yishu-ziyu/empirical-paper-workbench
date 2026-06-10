@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { cn } from "../lib/cn";
-import { Search, FileText, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { Search, FileText, Check, X, Loader2 } from "lucide-react";
 import { apiUrl } from "../lib/apiBase";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 export interface Paper {
   title: string;
@@ -128,11 +129,7 @@ export function SearchPanel({ briefPath, topicSlug, onComplete }: SearchPanelPro
 
       {state.error && (
         <div className="search-panel__error" data-testid="search-error" role="alert">
-          <AlertCircle size={16} />
-          <span>{state.error}</span>
-          <button className="btn btn--ghost" type="button" onClick={triggerSearch}>
-            稍后重试
-          </button>
+          <ServiceConnectionRecovery message={state.error} onRetry={triggerSearch} />
         </div>
       )}
 

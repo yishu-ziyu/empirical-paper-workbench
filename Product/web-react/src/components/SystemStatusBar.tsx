@@ -148,6 +148,10 @@ function llmVisibleModelChoices(status: LlmSupervisorStatus | null): NonNullable
   return [...current, ...openai, ...configured].slice(0, 5);
 }
 
+function llmOpenAiChoice(status: LlmSupervisorStatus | null) {
+  return (status?.model_choices ?? []).find((choice) => choice.provider_id === "openai") ?? null;
+}
+
 export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }: SystemStatusBarProps) {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [llmStatus, setLlmStatus] = useState<LlmSupervisorStatus | null>(null);
@@ -156,6 +160,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const [llmProbeResult, setLlmProbeResult] = useState<LlmProbeResult | null>(null);
   const [llmProbeRunning, setLlmProbeRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const openAiChoice = llmOpenAiChoice(llmStatus);
 
   const fetchStatus = useCallback(async () => {
     abortRef.current?.abort();
@@ -349,6 +354,24 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
             icon={<Brain size={14} />}
             empty={!llmStatus}
           >
+            <div className="system-status-bar__llm-current" data-testid="status-detail-llm-current-provider">
+              <span>当前接入</span>
+              <strong>{llmModelLabel(llmStatus)}</strong>
+              {llmStatus?.selection?.source ? <code>{llmStatus.selection.source}</code> : null}
+            </div>
+            {openAiChoice ? (
+              <div className="system-status-bar__llm-current" data-testid="status-detail-llm-openai-gpt55">
+                <span>GPT-5.5 状态</span>
+                <strong>
+                  {openAiChoice.configured
+                    ? openAiChoice.current
+                      ? "当前使用"
+                      : "已配置，可切换"
+                    : `未启用 · 需要 ${openAiChoice.api_key_env || "OPENAI_API_KEY"}`}
+                </strong>
+                {openAiChoice.activation_hint ? <small>{openAiChoice.activation_hint}</small> : null}
+              </div>
+            ) : null}
             <p className="system-status-bar__obs">
               主模型：<strong>{llmModelLabel(llmStatus)}</strong>
             </p>

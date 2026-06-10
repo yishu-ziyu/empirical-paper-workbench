@@ -2692,6 +2692,20 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("派工批准条件已满足", self.react_agent_task_queue)
         self.assertIn("agent-task-skill-review__gate", self.react_styles_css)
 
+    def test_bdd_37c_react_task_queue_can_review_dispatch_after_skill_packet_gate(self) -> None:
+        """行为 37c：React 队列必须把派工审阅接到真实接口，并在 Skill 执行包前阻止批准。"""
+        self.assertIn("reviewAgentTaskDispatch", self.react_agent_task_queue)
+        self.assertIn("/dispatch-review", self.react_agent_task_queue)
+        self.assertIn("DispatchReviewAction", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"agent-task-dispatch-review\"", self.react_agent_task_queue)
+        self.assertIn("data-dispatch-review-action=\"approve\"", self.react_agent_task_queue)
+        self.assertIn("data-dispatch-review-action=\"reject\"", self.react_agent_task_queue)
+        self.assertIn("批准派工", self.react_agent_task_queue)
+        self.assertIn("退回修订", self.react_agent_task_queue)
+        self.assertIn("先生成 Skill 执行包后再批准派工", self.react_agent_task_queue)
+        self.assertIn("dispatchApproveDisabled", self.react_agent_task_queue)
+        self.assertIn("agent-task-dispatch-review", self.react_styles_css)
+
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""
         self.assertIn("data-testid=\"supervisor-plan-loading\"", self.react_app)

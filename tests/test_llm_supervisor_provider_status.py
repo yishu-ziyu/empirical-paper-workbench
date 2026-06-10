@@ -209,6 +209,24 @@ class LlmSupervisorProviderFrontendTests(unittest.TestCase):
         self.assertIn("测试失败", source)
         self.assertIn("system-status-bar__probe-result", styles)
 
+    def test_bdd_system_status_bar_makes_current_llm_and_gpt55_state_directly_readable(self) -> None:
+        """行为 8：状态栏展开后，用户必须一眼看见当前接入模型和 GPT-5.5 未启用原因。"""
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "Product"
+            / "web-react"
+            / "src"
+            / "components"
+            / "SystemStatusBar.tsx"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("status-detail-llm-current-provider", source)
+        self.assertIn("status-detail-llm-openai-gpt55", source)
+        self.assertIn("当前接入", source)
+        self.assertIn("GPT-5.5 状态", source)
+        self.assertIn("未启用", source)
+        self.assertIn("OPENAI_API_KEY", source)
+
 
 if __name__ == "__main__":
     unittest.main()

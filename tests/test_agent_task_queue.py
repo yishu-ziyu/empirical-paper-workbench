@@ -383,6 +383,116 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(binding["skill_sources"][0]["name"], "Auto-Empirical-Research-Skills")
         self.assertFalse(binding["can_execute_without_human_review"])
 
+    def test_bdd_11a_internal_skill_task_generates_draft_execution_packet_without_formal_writeback(
+        self,
+    ) -> None:
+        """行为 11a：绑定 internal skill 的任务可以生成草案层执行包，但不能写正式层。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "递归检索文献、数据线索和变量证据",
+                },
+            ],
+            recommended_internal_skills=[
+                {
+                    "id": "cap_internal_skill_recursive_research_search",
+                    "skill_id": "recursive_research_search",
+                    "name": "递归研究搜索",
+                    "owner_agent": "LiteratureAgent",
+                    "allowed_agents": ["Supervisor", "LiteratureAgent", "ReviewerAgent"],
+                    "stage": "recursive_search",
+                    "risk_level": "medium",
+                    "status": "checklist",
+                    "dispatch_targets": ["pipeline_literature"],
+                    "selection_source": "registry_and_llm_semantic_judgment",
+                    "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
+                    "llm_semantic_judgment": {
+                        "reason": "用户题目依赖文献、变量和数据线索的递归互证。",
+                        "evidence_fit": "需要先产出可审阅的检索链路。",
+                        "confidence": "medium",
+                    },
+                    "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "verification_queue"],
+                    "execution_boundary": "review_only_until_dispatch_approved",
+                    "skill_sources": [
+                        {
+                            "name": "Auto-Empirical-Research-Skills",
+                            "url": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills",
+                            "license": "CC-BY-SA-4.0",
+                        }
+                    ],
+                    "quality_gates": {
+                        "machine_checkable": ["aers:eval:citation-hygiene-no-fake-refs"],
+                        "manual_review": ["source_relevance_review"],
+                    },
+                    "human_confirmation": {
+                        "required_before": ["formal_literature_review_writeback"],
+                        "approver_role": "human_researcher",
+                    },
+                    "formal_write_targets": [],
+                    "canonical_policy": {
+                        "auto_mode": {
+                            "can_generate_patch_proposal": True,
+                            "can_write_canonical": False,
+                            "proposal_status": "needs_human_review",
+                        }
+                    },
+                },
+            ],
+        )
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/internal-skill-execution-packet"
+        )
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        packet = response.json()["internal_skill_execution_packet"]
+        self.assertEqual(packet["status"], "draft_execution_packet_ready")
+        self.assertEqual(packet["skill_id"], "recursive_research_search")
+        self.assertEqual(packet["draft_layer"], "exploratory")
+        self.assertFalse(packet["writes_formal_layer"])
+        self.assertFalse(packet["formal_write_allowed"])
+        self.assertEqual(packet["next_action"], "dispatch_review_required")
+        self.assertEqual(
+            packet["artifact_path"],
+            "state/product/internal_skill_execution_packets/agent_task_01.json",
+        )
+
+        saved_packet_path = self.project_root / packet["artifact_path"]
+        self.assertTrue(saved_packet_path.exists())
+        saved_packet = json.loads(saved_packet_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved_packet["selected_skill"]["skill_id"], "recursive_research_search")
+        self.assertEqual(saved_packet["llm_semantic_judgment"]["confidence"], "medium")
+        self.assertIn("run_skill_in_draft_layer", [step["id"] for step in saved_packet["execution_steps"]])
+        self.assertEqual(saved_packet["formal_boundary"], "draft_only_until_human_review")
+        self.assertFalse(saved_packet["writes_formal_layer"])
+
+        task = response.json()["agent_task_queue"]["tasks"][0]
+        self.assertEqual(task["status"], "queued")
+        self.assertEqual(task["internal_skill_execution_packet"]["artifact_path"], packet["artifact_path"])
+        self.assertEqual(task["next_action"], "dispatch_review_required")
+
+    def test_bdd_11b_internal_skill_packet_requires_skill_binding(self) -> None:
+        """边界 11b：没有 internal skill 绑定时，执行包按钮不能生成空壳。"""
+        self._write_supervisor_plan(status="approved", can_dispatch=True)
+        created = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+        self.assertEqual(created.status_code, 201, msg=created.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/internal-skill-execution-packet"
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "internal_skill_binding_required")
+        self.assertFalse(
+            (self.project_root / "state" / "product" / "internal_skill_execution_packets").exists()
+        )
+
     def test_bdd_12_execute_endpoint_requires_selected_backend_without_mutating_task(self) -> None:
         """行为 12：执行 API 必须先要求后端选择，不能把未选后端任务写成失败。"""
         self._write_supervisor_plan(status="approved", can_dispatch=True)
@@ -2465,6 +2575,19 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("agent-task-skill-review", self.react_styles_css)
         self.assertIn("agent-task-skill-review__grid", self.react_styles_css)
         self.assertIn("agent-task-skill-review__sources", self.react_styles_css)
+
+    def test_bdd_37a_react_task_queue_can_generate_internal_skill_execution_packet(self) -> None:
+        """行为 37a：React Skill 审阅台必须有生成执行包入口，并能显示草案层执行包结果。"""
+        self.assertIn("InternalSkillExecutionPacket", self.react_agent_task_queue)
+        self.assertIn("internal_skill_execution_packet", self.react_agent_task_queue)
+        self.assertIn("generateInternalSkillExecutionPacket", self.react_agent_task_queue)
+        self.assertIn("internal-skill-execution-packet", self.react_agent_task_queue)
+        self.assertIn("data-internal-skill-execution-packet-action", self.react_agent_task_queue)
+        self.assertIn("data-testid=\"internal-skill-execution-packet\"", self.react_agent_task_queue)
+        self.assertIn("生成 Skill 执行包", self.react_agent_task_queue)
+        self.assertIn("草案层执行包", self.react_agent_task_queue)
+        self.assertIn("agent-task-skill-review__actions", self.react_styles_css)
+        self.assertIn("agent-task-skill-review__packet", self.react_styles_css)
 
     def test_bdd_38_plan_fetch_error_blocks_mock_supervisor_approval(self) -> None:
         """行为 38：计划服务未响应时，前端不能继续展示可批准的静态 SupervisorPlan。"""

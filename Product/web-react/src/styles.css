@@ -1270,6 +1270,62 @@ button {
   padding-top: 10px;
 }
 
+.agent-task-skill-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(230, 230, 230, 0.08);
+  padding-top: 12px;
+}
+
+.agent-task-skill-review__actions p {
+  flex: 1 1 240px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.agent-task-skill-review__actions .btn {
+  color: #e1e1e1;
+}
+
+.agent-task-skill-review__packet {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(230, 230, 230, 0.06);
+  padding: 12px;
+}
+
+.agent-task-skill-review__packet strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-strong);
+  font-size: 14px;
+}
+
+.agent-task-skill-review__packet p,
+.agent-task-skill-review__packet small {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.agent-task-skill-review__packet code {
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(230, 230, 230, 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(18, 18, 18, 0.24);
+  color: #d8d8d8;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .agent-task-queue-review {
   display: grid;
   gap: 14px;

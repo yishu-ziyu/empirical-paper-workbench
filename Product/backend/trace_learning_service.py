@@ -20,6 +20,9 @@ TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSALS_PATH = Path(
 TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH = Path(
     "state/product/trace_learning_regression_test_patch_proposal_reviews.jsonl"
 )
+TRACE_LEARNING_REGRESSION_TEST_PATCH_APPLY_PACKAGES_PATH = Path(
+    "state/product/trace_learning_regression_test_patch_apply_packages.jsonl"
+)
 ALLOWED_TRACE_LEARNING_FIX_LAYERS = [
     "prompt",
     "skill_playbook",
@@ -59,6 +62,10 @@ def trace_learning_regression_test_patch_proposals_path(project_root: Path) -> P
 
 def trace_learning_regression_test_patch_proposal_reviews_path(project_root: Path) -> Path:
     return project_root / TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH
+
+
+def trace_learning_regression_test_patch_apply_packages_path(project_root: Path) -> Path:
+    return project_root / TRACE_LEARNING_REGRESSION_TEST_PATCH_APPLY_PACKAGES_PATH
 
 
 def capture_project_trace_learning_bad_case(
@@ -196,6 +203,7 @@ def get_project_trace_learning_regression_proposals(product_root: Path, repo_roo
     reviews_path = trace_learning_regression_proposal_reviews_path(project_root)
     patch_proposals_path = trace_learning_regression_test_patch_proposals_path(project_root)
     patch_reviews_path = trace_learning_regression_test_patch_proposal_reviews_path(project_root)
+    apply_packages_path = trace_learning_regression_test_patch_apply_packages_path(project_root)
     proposals = load_trace_learning_regression_proposals(path)
     reviews = load_trace_learning_regression_proposal_reviews(reviews_path)
     proposal_ids = {str(proposal.get("id")) for proposal in proposals}
@@ -211,6 +219,11 @@ def get_project_trace_learning_regression_proposals(product_root: Path, repo_roo
         for review in load_trace_learning_regression_test_patch_proposal_reviews(patch_reviews_path)
         if str(review.get("proposal_id")) in patch_proposal_ids
     ]
+    apply_packages = [
+        package
+        for package in load_trace_learning_regression_test_patch_apply_packages(apply_packages_path)
+        if str(package.get("patch_proposal_id")) in patch_proposal_ids
+    ]
     summary = build_trace_learning_regression_proposal_summary(path, len(proposals), proposal_reviews)
     summary["regression_proposals"] = enrich_regression_proposals_with_review_status(proposals, proposal_reviews)
     summary["proposal_reviews"] = proposal_reviews
@@ -223,6 +236,11 @@ def get_project_trace_learning_regression_proposals(product_root: Path, repo_roo
     summary["regression_test_patch_proposal_review_count"] = len(patch_reviews)
     summary["regression_test_patch_proposal_review_status_by_proposal_id"] = latest_review_status_by_proposal_id(
         patch_reviews
+    )
+    summary["regression_test_patch_apply_packages"] = apply_packages
+    summary["regression_test_patch_apply_package_count"] = len(apply_packages)
+    summary["regression_test_patch_apply_package_status_by_proposal_id"] = (
+        latest_apply_package_status_by_patch_proposal_id(apply_packages)
     )
     return {"project_id": project["id"], "trace_learning": summary}
 
@@ -450,6 +468,108 @@ def review_project_trace_learning_regression_test_patch_proposal(
     }
 
 
+def prepare_project_trace_learning_regression_test_patch_apply_package(
+    product_root: Path,
+    repo_root: Path,
+    project_id: str,
+    patch_proposal_id: str,
+) -> dict[str, Any]:
+    project = get_project_by_id(product_root, repo_root, project_id)
+    project_root = Path(project.get("project_root") or project["root"]).resolve()
+    patch_proposals_path = trace_learning_regression_test_patch_proposals_path(project_root)
+    patch_reviews_path = trace_learning_regression_test_patch_proposal_reviews_path(project_root)
+    apply_packages_path = trace_learning_regression_test_patch_apply_packages_path(project_root)
+    patch_proposals = load_trace_learning_regression_test_patch_proposals(patch_proposals_path)
+    patch_proposal = next((item for item in patch_proposals if str(item.get("id")) == patch_proposal_id), None)
+    if patch_proposal is None:
+        raise TraceLearningProposalBlockedError(
+            "trace_learning_test_patch_proposal_not_found",
+            f"Trace Learning test patch proposal {patch_proposal_id} does not exist.",
+        )
+
+    patch_reviews = load_trace_learning_regression_test_patch_proposal_reviews(patch_reviews_path)
+    latest_review = latest_review_by_proposal_id(patch_reviews).get(patch_proposal_id)
+    if latest_review is None or latest_review.get("status") != "approved":
+        raise TraceLearningProposalBlockedError(
+            "trace_learning_test_patch_proposal_approval_required",
+            "Trace Learning test patch proposal must be approved before preparing an apply package.",
+        )
+
+    existing_apply_packages = load_trace_learning_regression_test_patch_apply_packages(apply_packages_path)
+    existing_for_patch = [
+        item for item in existing_apply_packages if str(item.get("patch_proposal_id") or "") == patch_proposal_id
+    ]
+    if existing_for_patch:
+        apply_package = existing_for_patch[-1]
+        summary = build_trace_learning_regression_test_patch_apply_package_summary(
+            apply_packages_path,
+            len(existing_apply_packages),
+        )
+        summary["latest_apply_package"] = apply_package
+        summary["regression_test_patch_apply_packages"] = existing_apply_packages
+        return {
+            "project_id": project["id"],
+            "regression_test_patch_apply_package": apply_package,
+            "trace_learning": summary,
+        }
+
+    apply_package = {
+        "id": build_regression_test_patch_apply_package_id(existing_apply_packages, patch_proposal_id),
+        "trace_learning_version": 1,
+        "status": "ready_for_manual_apply",
+        "created_at": utc_now(),
+        "project_id": project["id"],
+        "patch_proposal_id": patch_proposal_id,
+        "source_review_id": latest_review.get("id"),
+        "source_regression_proposal_id": patch_proposal.get("proposal_id"),
+        "source_bad_case_ids": normalize_string_list(patch_proposal.get("source_bad_case_ids")),
+        "patch_layer": normalize_fix_layer(patch_proposal.get("patch_layer")),
+        "proposed_test_cases": (
+            patch_proposal.get("proposed_test_cases")
+            if isinstance(patch_proposal.get("proposed_test_cases"), list)
+            else []
+        ),
+        "target_files": [
+            {
+                "path": "tests/test_trace_learning.py",
+                "operation": "manual_patch_required",
+                "write_now": False,
+            }
+        ],
+        "target_command": "python3 -m unittest tests.test_trace_learning -v",
+        "manual_steps": [
+            "Open the proposed test cases in this package.",
+            "Translate each BDD case into a failing test in tests/test_trace_learning.py.",
+            "Run python3 -m unittest tests.test_trace_learning -v and confirm the new test fails before implementation.",
+            "Only after the failing test is reviewed should production behavior be changed.",
+        ],
+        "requires_human_review": True,
+        "writes_formal_layer": False,
+        "applies_test_file_now": False,
+        "test_file_write_allowed": False,
+        "canonical_rule_write_allowed": False,
+        "artifact_path": TRACE_LEARNING_REGRESSION_TEST_PATCH_APPLY_PACKAGES_PATH.as_posix(),
+        "next_action": "human_apply_patch_to_test_suite",
+    }
+
+    apply_packages_path.parent.mkdir(parents=True, exist_ok=True)
+    with apply_packages_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(apply_package, ensure_ascii=False, sort_keys=True) + "\n")
+
+    apply_packages = existing_apply_packages + [apply_package]
+    summary = build_trace_learning_regression_test_patch_apply_package_summary(
+        apply_packages_path,
+        len(apply_packages),
+    )
+    summary["latest_apply_package"] = apply_package
+    summary["regression_test_patch_apply_packages"] = apply_packages
+    return {
+        "project_id": project["id"],
+        "regression_test_patch_apply_package": apply_package,
+        "trace_learning": summary,
+    }
+
+
 def load_trace_learning_bad_cases(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -500,6 +620,16 @@ def load_trace_learning_regression_test_patch_proposal_reviews(path: Path) -> li
     return reviews
 
 
+def load_trace_learning_regression_test_patch_apply_packages(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    apply_packages: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            apply_packages.append(json.loads(line))
+    return apply_packages
+
+
 def build_trace_learning_summary(path: Path, case_count: int) -> dict[str, Any]:
     return {
         "path": TRACE_LEARNING_BAD_CASES_PATH.as_posix(),
@@ -540,6 +670,18 @@ def build_trace_learning_regression_test_patch_proposal_summary(
         "review_path": TRACE_LEARNING_REGRESSION_TEST_PATCH_PROPOSAL_REVIEWS_PATH.as_posix(),
         "review_count": len(review_records),
         "review_status_by_proposal_id": latest_review_status_by_proposal_id(review_records),
+    }
+
+
+def build_trace_learning_regression_test_patch_apply_package_summary(
+    path: Path,
+    apply_package_count: int,
+) -> dict[str, Any]:
+    return {
+        "path": TRACE_LEARNING_REGRESSION_TEST_PATCH_APPLY_PACKAGES_PATH.as_posix(),
+        "apply_package_count": apply_package_count,
+        "absolute_path": str(path),
+        "apply_package_status": "ready_for_manual_apply",
     }
 
 
@@ -675,6 +817,15 @@ def latest_review_status_by_proposal_id(reviews: list[dict[str, Any]]) -> dict[s
     }
 
 
+def latest_apply_package_status_by_patch_proposal_id(apply_packages: list[dict[str, Any]]) -> dict[str, str]:
+    latest: dict[str, str] = {}
+    for apply_package in apply_packages:
+        patch_proposal_id = str(apply_package.get("patch_proposal_id") or "")
+        if patch_proposal_id:
+            latest[patch_proposal_id] = str(apply_package.get("status") or "unknown")
+    return latest
+
+
 def latest_review_by_proposal_id(reviews: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     for review in reviews:
@@ -702,6 +853,10 @@ def build_regression_test_patch_proposal_id(existing_patch_proposals: list[dict[
 
 def build_regression_test_patch_proposal_review_id(existing_reviews: list[dict[str, Any]], proposal_id: Any) -> str:
     return f"regression_test_patch_proposal_review_{len(existing_reviews) + 1:04d}_{slugify(proposal_id or 'unknown')}"
+
+
+def build_regression_test_patch_apply_package_id(existing_apply_packages: list[dict[str, Any]], proposal_id: Any) -> str:
+    return f"regression_test_patch_apply_package_{len(existing_apply_packages) + 1:04d}_{slugify(proposal_id or 'unknown')}"
 
 
 def slugify(value: Any) -> str:

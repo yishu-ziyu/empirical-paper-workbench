@@ -689,6 +689,143 @@ class TraceLearningBadCaseApiTests(unittest.TestCase):
         self.assertEqual(trace_learning["review_count"], 1)
         self.assertEqual(trace_learning["latest_patch_proposal"]["current_review_status"], "needs_revision")
 
+    def test_bdd_6o_approved_test_patch_proposal_generates_manual_apply_package(self) -> None:
+        """Given 测试补丁建议已被人工批准；When 生成落地包；Then 系统写入可检查的测试资产包。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "批准进入测试资产落地包。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+        review_id = reviewed.json()["regression_test_patch_proposal_review"]["id"]
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        package = response.json()["regression_test_patch_apply_package"]
+        self.assertEqual(package["patch_proposal_id"], patch["id"])
+        self.assertEqual(package["source_review_id"], review_id)
+        self.assertEqual(package["status"], "ready_for_manual_apply")
+        self.assertEqual(package["artifact_path"], "state/product/trace_learning_regression_test_patch_apply_packages.jsonl")
+        self.assertEqual(package["next_action"], "human_apply_patch_to_test_suite")
+        self.assertEqual(package["target_command"], "python3 -m unittest tests.test_trace_learning -v")
+        self.assertFalse(package["writes_formal_layer"])
+        self.assertFalse(package["applies_test_file_now"])
+        self.assertFalse(package["test_file_write_allowed"])
+        self.assertFalse(package["canonical_rule_write_allowed"])
+        self.assertEqual(package["target_files"][0]["path"], "tests/test_trace_learning.py")
+        self.assertGreaterEqual(len(package["manual_steps"]), 3)
+
+        package_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_apply_packages.jsonl"
+        self.assertTrue(package_path.exists())
+        saved = json.loads(package_path.read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(saved["id"], package["id"])
+
+    def test_bdd_6p_apply_package_requires_approved_test_patch_review(self) -> None:
+        """Given 测试补丁建议尚未批准；When 生成落地包；Then API 阻止越过人工确认。"""
+        patch = self._create_reviewable_test_patch_proposal()
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+
+        self.assertEqual(response.status_code, 409, msg=response.text)
+        self.assertEqual(response.json()["error"]["code"], "trace_learning_test_patch_proposal_approval_required")
+        package_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_apply_packages.jsonl"
+        self.assertFalse(package_path.exists())
+
+    def test_bdd_6q_apply_package_is_idempotent_for_same_test_patch_proposal(self) -> None:
+        """Given 测试补丁建议已生成落地包；When 再次点击；Then 返回同一落地包且不重复追加。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "批准进入测试资产落地包。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+
+        first = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+        second = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+
+        self.assertEqual(first.status_code, 201, msg=first.text)
+        self.assertEqual(second.status_code, 201, msg=second.text)
+        self.assertEqual(
+            first.json()["regression_test_patch_apply_package"]["id"],
+            second.json()["regression_test_patch_apply_package"]["id"],
+        )
+        package_path = self.project_root / "state" / "product" / "trace_learning_regression_test_patch_apply_packages.jsonl"
+        self.assertEqual(len(package_path.read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_bdd_6r_apply_package_does_not_mutate_formal_states_or_test_files(self) -> None:
+        """Given 正式状态和测试文件已存在；When 生成落地包；Then 只写落地包账本。"""
+        state_dir = self.project_root / "state" / "product"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        protected_states = {
+            "research_question.json": {"question": "父母教育水平对子女工资水平的影响"},
+            "variable_roles.json": {"roles": {"outcome": ["wage"], "treatment": ["parent_edu"]}},
+            "design_spec.json": {"model": {"estimator": "ols"}},
+            "run_plan.json": {"tasks": [{"id": "baseline"}]},
+            "supervisor_plan.json": {"status": "approved", "can_dispatch": True},
+            "agent_task_queue.json": {"status": "ready_for_dispatch", "tasks": []},
+            "canonical_rules.json": {"rules": [{"id": "existing_rule"}]},
+        }
+        for name, payload in protected_states.items():
+            (state_dir / name).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        tests_dir = self.repo_root / "tests"
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        test_file = tests_dir / "test_trace_learning.py"
+        test_file.write_text("# existing tests stay unchanged\n", encoding="utf-8")
+        before_states = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+        before_test_file = test_file.read_text(encoding="utf-8")
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "批准进入测试资产落地包。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+
+        response = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        after_states = {name: (state_dir / name).read_text(encoding="utf-8") for name in protected_states}
+        self.assertEqual(before_states, after_states)
+        self.assertEqual(before_test_file, test_file.read_text(encoding="utf-8"))
+
+    def test_bdd_6s_get_regression_proposals_restores_test_patch_apply_packages(self) -> None:
+        """Given 测试补丁落地包已生成；When 刷新读取建议；Then 返回落地包和状态索引。"""
+        patch = self._create_reviewable_test_patch_proposal()
+        reviewed = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/review",
+            json={"decision": "approve", "reviewer": "mahaoxuan", "note": "批准进入测试资产落地包。"},
+        )
+        self.assertEqual(reviewed.status_code, 201, msg=reviewed.text)
+        prepared = self.client.post(
+            f"/api/v1/projects/{self.project_id}/trace-learning/regression-test-patch-proposals/{patch['id']}/apply-package"
+        )
+        self.assertEqual(prepared.status_code, 201, msg=prepared.text)
+        package_id = prepared.json()["regression_test_patch_apply_package"]["id"]
+
+        response = self.client.get(f"/api/v1/projects/{self.project_id}/trace-learning/regression-proposals")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        trace_learning = response.json()["trace_learning"]
+        packages = trace_learning["regression_test_patch_apply_packages"]
+        self.assertEqual(len(packages), 1)
+        self.assertEqual(packages[0]["id"], package_id)
+        self.assertEqual(packages[0]["patch_proposal_id"], patch["id"])
+        self.assertEqual(trace_learning["regression_test_patch_apply_package_count"], 1)
+        self.assertEqual(
+            trace_learning["regression_test_patch_apply_package_status_by_proposal_id"][patch["id"]],
+            "ready_for_manual_apply",
+        )
+
     def test_bdd_7_missing_user_feedback_is_rejected_without_creating_ledger(self) -> None:
         """Given 没有用户反馈正文；When 试图记录；Then API 拒绝且不创建账本。"""
         response = self.client.post(
@@ -867,6 +1004,15 @@ class TraceLearningFrontendContractTests(unittest.TestCase):
         self.assertIn("不会自动写测试文件", self.agent_task_queue)
         self.assertIn("不会改正式论文", self.agent_task_queue)
         self.assertIn("canonical 规则库", self.agent_task_queue)
+
+    def test_bdd_11_agent_queue_exposes_explicit_test_patch_apply_package_action(self) -> None:
+        """Given 测试补丁建议已人工批准；When 用户查看队列页；Then 页面提供显式落地包动作。"""
+        self.assertIn("regression_test_patch_apply_packages", self.agent_task_queue)
+        self.assertIn("trace-learning-test-patch-apply-package", self.agent_task_queue)
+        self.assertIn("/apply-package", self.agent_task_queue)
+        self.assertIn("生成测试落地包", self.agent_task_queue)
+        self.assertIn("只生成落地包", self.agent_task_queue)
+        self.assertIn("不会自动改测试文件", self.agent_task_queue)
 
 
 if __name__ == "__main__":

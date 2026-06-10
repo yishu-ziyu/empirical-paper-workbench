@@ -1437,6 +1437,24 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           </div>
                         </div>
 
+                        <div className="agent-task-execution-review__decision" aria-label="执行结果审阅判断">
+                          <div>
+                            <span>你现在要判断三件事</span>
+                            <strong>产物能否作为草稿综述素材</strong>
+                            <p>先看候选来源、检索式和缺口；通过后进入草稿综述。</p>
+                          </div>
+                          <div>
+                            <span>补证路径</span>
+                            <strong>还要补哪些来源或检索式</strong>
+                            <p>缺 CNKI、Scholar、Zotero 或本地笔记时，用“要求修订”。</p>
+                          </div>
+                          <div>
+                            <span>层级边界</span>
+                            <strong>正式层保持锁定</strong>
+                            <p>本轮只把材料送到草稿层，后续引用核验再决定正式写入。</p>
+                          </div>
+                        </div>
+
                         <div className="agent-task-execution-review__focus">
                           <strong>审阅重点</strong>
                           {referenceSeedReviewFocus.length ? (
@@ -1448,6 +1466,12 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                           ) : (
                             <p>当前结果没有审阅摘要。请先查看产物路径和日志，再决定是否继续。</p>
                           )}
+                        </div>
+
+                        <div className="agent-task-execution-review__next-step">
+                          <small>推荐动作</small>
+                          <strong>先批准进入草稿综述</strong>
+                          <p>如果候选来源能覆盖题目，就先进入草稿综述；需要补证时再要求修订。</p>
                         </div>
 
                         <div className="agent-task-execution-review__actions">

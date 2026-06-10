@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { apiUrl } from "../lib/apiBase";
+import { ServiceConnectionRecovery } from "./ServiceConnectionRecovery";
 
 /**
  * 6th tab — Identification Audit.
@@ -80,33 +81,37 @@ export function IdentificationAuditPanel({
 }: IdentificationAuditPanelProps) {
   const [state, setState] = useState<FetchState>({ kind: "loading" });
 
-  useEffect(() => {
-    const ctrl = new AbortController();
-    setState({ kind: "loading" });
-    fetch(apiUrl(API_PATH), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ results_path: resultsPath, design_path: designPath }),
-      signal: ctrl.signal,
-    })
-      .then(async (res) => {
+  const runAudit = useCallback(
+    async (signal?: AbortSignal) => {
+      setState({ kind: "loading" });
+      try {
+        const res = await fetch(apiUrl(API_PATH), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ results_path: resultsPath, design_path: designPath }),
+          signal,
+        });
         if (!res.ok) {
           throw new Error("audit_service_unavailable");
         }
-        return res.json() as Promise<IdentificationAuditPayload>;
-      })
-      .then((data) => {
+        const data = (await res.json()) as IdentificationAuditPayload;
         setState({ kind: "ok", data });
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
         setState({ kind: "error", message: SERVICE_ERROR_MESSAGE });
-      });
+      }
+    },
+    [resultsPath, designPath],
+  );
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    void runAudit(ctrl.signal);
 
     return () => ctrl.abort();
-  }, [resultsPath, designPath]);
+  }, [runAudit]);
 
   return (
     <div className="identification-audit" data-testid="identification-audit-panel">
@@ -119,7 +124,7 @@ export function IdentificationAuditPanel({
       </header>
 
       {state.kind === "loading" ? <LoadingSkeleton /> : null}
-      {state.kind === "error" ? <ErrorCard message={state.message} /> : null}
+      {state.kind === "error" ? <ErrorCard message={state.message} onRetry={runAudit} /> : null}
       {state.kind === "ok" ? (
         <OkContent payload={state.data} paths={{ resultsPath, designPath }} />
       ) : null}
@@ -323,19 +328,10 @@ function LoadingSkeleton() {
   );
 }
 
-function ErrorCard({ message }: { message: string }) {
+function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="identification-audit__error" data-testid="audit-error">
-      <XCircle size={16} />
-      <div>
-        <strong>审计服务暂时未连接。</strong>
-        <div style={{ marginTop: "0.2rem" }}>
-          <code>{message}</code>
-        </div>
-        <div style={{ marginTop: "0.3rem", fontSize: "0.78rem" }}>
-          当前无法读取识别审计结果。请刷新页面，或重新启动本地服务后再试。
-        </div>
-      </div>
+      <ServiceConnectionRecovery message={message} onRetry={onRetry} retryLabel="重新审计" />
     </div>
   );
 }

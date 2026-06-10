@@ -2323,6 +2323,9 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         cls.react_execution_panel = (
             root / "Product" / "web-react" / "src" / "components" / "ExecutionPanel.tsx"
         ).read_text(encoding="utf-8")
+        cls.react_identification_audit_panel = (
+            root / "Product" / "web-react" / "src" / "components" / "IdentificationAuditPanel.tsx"
+        ).read_text(encoding="utf-8")
         cls.react_styles_css = (root / "Product" / "web-react" / "src" / "styles.css").read_text(encoding="utf-8")
 
     def test_bdd_5_frontend_contains_summary_first_queue_surface(self) -> None:
@@ -2926,6 +2929,14 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
 
         self.assertIn("不会丢失已保存的研究材料", self.react_service_connection_recovery)
         self.assertIn("当前后端地址", self.react_service_connection_recovery)
+
+    def test_bdd_48_identification_audit_reuses_service_connection_recovery(self) -> None:
+        """行为 48：识别审计服务断开时，也必须可以原地重新审计。"""
+        self.assertIn("ServiceConnectionRecovery", self.react_identification_audit_panel)
+        self.assertIn('data-testid="audit-error"', self.react_identification_audit_panel)
+        self.assertIn("runAudit", self.react_identification_audit_panel)
+        self.assertIn("onRetry={runAudit}", self.react_identification_audit_panel)
+        self.assertNotIn("请刷新页面，或重新启动本地服务后再试", self.react_identification_audit_panel)
 
 
 if __name__ == "__main__":

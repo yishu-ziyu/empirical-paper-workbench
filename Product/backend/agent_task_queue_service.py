@@ -3191,6 +3191,10 @@ def generate_project_formal_export_preflight(
         "created_at": timestamp,
         "evidence_level": preflight["evidence_level"],
     }
+    if preflight.get("llm_provider_snapshot"):
+        summary["llm_provider_snapshot"] = preflight["llm_provider_snapshot"]
+        summary["llm_preflight_summary"] = preflight.get("llm_preflight_summary", "")
+        summary["llm_preflight_human_review_note"] = preflight.get("llm_preflight_human_review_note", "")
     task["formal_export_preflight"] = summary
     task["export_preflight_followups"] = preflight["agent_followups"]
     task["status"] = preflight["status"]
@@ -4694,7 +4698,7 @@ def build_formal_export_preflight_record(
     status = "formal_export_preflight_blocked" if blockers else "formal_export_preflight_ready"
     next_action = "resolve_export_preflight_blockers" if blockers else "run_pdf_export_preflight"
     pandoc_path = shutil.which("pandoc") or ""
-    return {
+    preflight = {
         "schema_version": "p1.agent_task_export_preflight.v1",
         "status": status,
         "source_task_id": str(task.get("id") or manifest.get("source_task_id") or ""),
@@ -4736,6 +4740,29 @@ def build_formal_export_preflight_record(
         "created_at": timestamp,
         "evidence_level": "verified_source_record",
     }
+    preflight.update(build_export_llm_preflight_provenance(task))
+    return preflight
+
+
+def build_export_llm_preflight_provenance(task: dict[str, Any]) -> dict[str, Any]:
+    execution_result = task.get("execution_result") if isinstance(task.get("execution_result"), dict) else {}
+    llm_preflight = execution_result.get("llm_execution_preflight")
+    if not isinstance(llm_preflight, dict):
+        llm_preflight = task.get("llm_execution_preflight")
+    if not isinstance(llm_preflight, dict):
+        return {}
+
+    provider_snapshot = llm_preflight.get("provider_snapshot")
+    if not isinstance(provider_snapshot, dict) or not provider_snapshot:
+        return {}
+
+    return {
+        "llm_provider_snapshot": provider_snapshot,
+        "llm_preflight_summary": str(llm_preflight.get("summary") or ""),
+        "llm_preflight_backend_reason": str(llm_preflight.get("backend_reason") or ""),
+        "llm_preflight_human_review_note": str(llm_preflight.get("human_review_note") or ""),
+        "llm_preflight_artifact_path": str(llm_preflight.get("artifact_path") or ""),
+    }
 
 
 def build_formal_export_section_check(target: dict[str, Any], index: int, project_root: Path) -> dict[str, Any]:
@@ -4757,6 +4784,15 @@ def build_formal_export_section_check(target: dict[str, Any], index: int, projec
 def format_formal_export_preflight_review(preflight: dict[str, Any]) -> str:
     blockers = normalize_list(preflight.get("blockers"))
     section_checks = normalize_list(preflight.get("section_checks"))
+    llm_provider_snapshot = (
+        preflight.get("llm_provider_snapshot") if isinstance(preflight.get("llm_provider_snapshot"), dict) else {}
+    )
+    primary_provider = (
+        llm_provider_snapshot.get("primary_provider")
+        if isinstance(llm_provider_snapshot.get("primary_provider"), dict)
+        else {}
+    )
+    selection = llm_provider_snapshot.get("selection") if isinstance(llm_provider_snapshot.get("selection"), dict) else {}
     lines = [
         "# 导出预检台",
         "",
@@ -4772,8 +4808,20 @@ def format_formal_export_preflight_review(preflight: dict[str, Any]) -> str:
         f"- PDF 终稿：{preflight.get('targets', {}).get('pdf_final')}",
         f"- DOCX：{preflight.get('targets', {}).get('docx')}",
         "",
-        "## 正式章节检查",
     ]
+    if primary_provider:
+        lines.extend(
+            [
+                "## LLM 判断来源",
+                f"- Provider：{primary_provider.get('provider_name') or primary_provider.get('provider_id')}",
+                f"- Model：{primary_provider.get('model')}",
+                f"- 选择来源：{selection.get('source') or 'unknown'}",
+                f"- 预检摘要：{preflight.get('llm_preflight_summary') or '未记录'}",
+                f"- 人工审阅提示：{preflight.get('llm_preflight_human_review_note') or '未记录'}",
+                "",
+            ]
+        )
+    lines.append("## 正式章节检查")
     for check in section_checks:
         if not isinstance(check, dict):
             continue

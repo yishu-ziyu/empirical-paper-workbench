@@ -2663,6 +2663,29 @@ button {
   line-height: 1.6;
 }
 
+.agent-task-queue-export-preflight__llm {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(230, 230, 230, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(18, 18, 18, 0.3);
+  color: var(--color-muted);
+  padding: 12px;
+}
+
+.agent-task-queue-export-preflight__llm strong {
+  color: var(--color-strong);
+  font-size: 14px;
+}
+
+.agent-task-queue-export-preflight__llm p,
+.agent-task-queue-export-preflight__llm small {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .agent-task-queue-export-preflight__blockers,
 .agent-task-queue-export-preflight__followups {
   display: grid;

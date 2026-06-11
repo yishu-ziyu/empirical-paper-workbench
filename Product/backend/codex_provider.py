@@ -11,7 +11,8 @@ CODEX_EXEC_ENV = "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"
 
 
 def local_codex_status() -> dict[str, Any]:
-    path = shutil.which("codex")
+    configured_path = os.environ.get("CODEX_BIN", "").strip()
+    path = configured_path or shutil.which("codex")
     status: dict[str, Any] = {
         "provider": "local_codex",
         "available": bool(path),

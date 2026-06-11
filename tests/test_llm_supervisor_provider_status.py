@@ -27,6 +27,9 @@ LLM_ENV_KEYS = (
     "OPENROUTER_API_KEY",
     "OPENROUTER_MODEL",
     "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
+    "CODEX_BIN",
+    "CODEX_LOCAL_MODEL",
+    "CODEX_LOCAL_PROJECT_ROOT",
 )
 
 
@@ -157,6 +160,85 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["error"]["code"], "llm_supervisor_unavailable")
         self.assertIn("LLM Supervisor", body["error"]["message"])
+
+    def test_bdd_llm_supervisor_status_lists_codex_cli_as_local_gpt55_choice(self) -> None:
+        """行为 7：Codex CLI 要作为本地 GPT-5.5 选择展示，并说明开启方式。"""
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.backend.llm_client._codex_bin",
+            return_value="/opt/homebrew/bin/codex",
+        ):
+            response = self.client.get("/api/v1/providers/llm-supervisor")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        body = response.json()
+        codex_choice = next(item for item in body["model_choices"] if item["provider_id"] == "codex-cli")
+        self.assertEqual(codex_choice["provider_name"], "Codex CLI")
+        self.assertEqual(codex_choice["default_model"], "gpt-5.5")
+        self.assertFalse(codex_choice["configured"])
+        self.assertIn("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1", codex_choice["activation_hint"])
+        self.assertIn("EMPIRICAL_LLM_PROVIDER=codex-cli", codex_choice["activation_hint"])
+
+    def test_bdd_codex_cli_provider_requires_execution_gate_before_fallback(self) -> None:
+        """行为 8：本地 Codex 只有显式打开执行门后，才会进入 LLM fallback。"""
+        os.environ["EMPIRICAL_LLM_PROVIDER"] = "codex-cli"
+        os.environ["CODEX_LOCAL_MODEL"] = "gpt-5.5"
+
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.backend.llm_client._codex_bin",
+            return_value="/opt/homebrew/bin/codex",
+        ):
+            attempts_without_gate = llm_client.build_default_llm_attempts()
+            configured_without_gate = llm_client._provider_has_key("codex-cli", llm_client.resolve_provider("codex-cli"))
+            os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+            attempts_with_gate = llm_client.build_default_llm_attempts()
+            configured_with_gate = llm_client._provider_has_key("codex-cli", llm_client.resolve_provider("codex-cli"))
+
+        self.assertEqual(attempts_without_gate[0]["provider_id"], "codex-cli")
+        self.assertEqual(attempts_without_gate[0]["env"], "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC")
+        self.assertFalse(configured_without_gate)
+        self.assertEqual(attempts_with_gate[0]["provider_id"], "codex-cli")
+        self.assertEqual(attempts_with_gate[0]["model"], "gpt-5.5")
+        self.assertTrue(configured_with_gate)
+
+    def test_bdd_codex_cli_call_uses_read_only_ephemeral_exec_contract(self) -> None:
+        """行为 9：真实调用 Codex CLI 时必须走只读、临时、无规则注入的受控命令。"""
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+        os.environ["CODEX_LOCAL_PROJECT_ROOT"] = "/tmp/empirical-codex-project"
+
+        class Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        def fake_run(command, *, input, check, capture_output, text, timeout):
+            output_path = command[command.index("--output-last-message") + 1]
+            Path(output_path).write_text('{"status":"ok"}', encoding="utf-8")
+            self.assertEqual(input.startswith("[user]"), True)
+            return Completed()
+
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.backend.llm_client._codex_bin",
+            return_value="/opt/homebrew/bin/codex",
+        ), patch("Product.backend.llm_client.subprocess.run", side_effect=fake_run) as mocked_run:
+            text, usage = llm_client.chat_completion(
+                [{"role": "user", "content": "连通性测试"}],
+                provider_id="codex-cli",
+                model="gpt-5.5",
+                temperature=0,
+            )
+
+        command = mocked_run.call_args.args[0]
+        self.assertEqual(text, '{"status":"ok"}')
+        self.assertIn("-a", command)
+        self.assertIn("never", command)
+        self.assertIn("--skip-git-repo-check", command)
+        self.assertIn("--ephemeral", command)
+        self.assertIn("--ignore-rules", command)
+        self.assertIn("--sandbox", command)
+        self.assertIn("read-only", command)
+        self.assertIn("--model", command)
+        self.assertIn("gpt-5.5", command)
+        self.assertGreater(usage["input_tokens"], 0)
 
 
 class LlmSupervisorProviderFrontendTests(unittest.TestCase):

@@ -651,7 +651,7 @@ def _llm_attempt_api_view(attempt: dict) -> dict:
     }
 
 
-LLM_MODEL_CHOICE_PROVIDER_IDS = ("openai", "stepfun", "mimo", "deepseek", "minimax", "openrouter")
+LLM_MODEL_CHOICE_PROVIDER_IDS = ("codex-cli", "openai", "stepfun", "mimo", "deepseek", "minimax", "openrouter")
 
 
 def _llm_model_choice_api_view(provider_id: str, current_provider_id: str = "") -> dict:
@@ -664,6 +664,11 @@ def _llm_model_choice_api_view(provider_id: str, current_provider_id: str = "") 
         activation_hint = f"已配置。设置 {provider_hint}{model_hint} 可设为主模型。"
     elif preset.api_key_env:
         activation_hint = f"配置 {preset.api_key_env}，并设置 {provider_hint}{model_hint} 后可切换。"
+    elif preset.id == "codex-cli":
+        activation_hint = (
+            "设置 EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1、"
+            f"{provider_hint}{model_hint} 后，可用本机 Codex 登录态做本地 LLM 测试。"
+        )
     else:
         activation_hint = f"设置 {provider_hint} 后可切换。"
     return {
@@ -726,7 +731,7 @@ def api_v1_llm_supervisor_provider() -> dict:
         else {
             "id": "configure_llm_provider",
             "label": "配置 LLM Supervisor",
-            "hint": "配置 OPENAI_API_KEY / OPENAI_MODEL，或配置 STEPFUN、MIMO、DEEPSEEK、MINIMAX 等本地可用 provider。",
+            "hint": "配置 OPENAI_API_KEY / OPENAI_MODEL，或设置 EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1 + EMPIRICAL_LLM_PROVIDER=codex-cli 使用本机 Codex。",
         },
     }
 

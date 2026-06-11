@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,7 +30,7 @@ DEFAULT_TIMEOUT = 120
 class ProviderPreset:
     id: str
     name: str
-    api_type: str  # "openai-compatible" | "anthropic-compatible"
+    api_type: str  # "openai-compatible" | "anthropic-compatible" | "codex-cli"
     base_url: str
     default_model: str
     models: tuple[str, ...]
@@ -136,6 +139,17 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
         requires_api_key=False,
         doc="Custom endpoint",
     ),
+    "codex-cli": ProviderPreset(
+        id="codex-cli",
+        name="Codex CLI",
+        api_type="codex-cli",
+        base_url="",
+        default_model=os.getenv("CODEX_LOCAL_MODEL", "gpt-5.5"),
+        models=("gpt-5.5", "gpt-5.4", "gpt-5.4-mini"),
+        api_key_env="",
+        requires_api_key=False,
+        doc="Local Codex CLI login session via codex exec",
+    ),
     "minimax": ProviderPreset(
         id="minimax",
         name="MiniMax Token Plan",
@@ -174,6 +188,7 @@ MODEL_ENV_BY_PROVIDER = {
     "moonshot-kimi": "MOONSHOT_MODEL",
     "kimi-code": "KIMI_CODE_MODEL",
     "kimi-code-anthropic-token": "KIMI_CODE_MODEL",
+    "codex-cli": "CODEX_LOCAL_MODEL",
 }
 
 BASE_URL_ENV_BY_PROVIDER = {
@@ -189,6 +204,7 @@ BASE_URL_ENV_BY_PROVIDER = {
 }
 
 PROVIDER_ATTEMPT_ORDER = (
+    "codex-cli",
     "openai",
     "stepfun",
     "mimo",
@@ -260,11 +276,23 @@ def _provider_default_base_url(preset: ProviderPreset) -> str:
 
 
 def _provider_has_key(provider_id: str, preset: ProviderPreset) -> bool:
+    if provider_id == "codex-cli":
+        return os.getenv("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC") == "1" and bool(_codex_bin())
     if not preset.requires_api_key:
         return True
     if preset.api_key_env and os.getenv(preset.api_key_env, "").strip():
         return True
     return provider_id == "minimax" and bool(os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip())
+
+
+def _codex_bin() -> str:
+    return os.getenv("CODEX_BIN", "").strip() or shutil.which("codex") or ""
+
+
+def _provider_attempt_env(preset: ProviderPreset) -> str | None:
+    if preset.id == "codex-cli":
+        return "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"
+    return preset.api_key_env or None
 
 
 def build_default_llm_attempts() -> tuple[dict[str, Any], ...]:
@@ -284,7 +312,7 @@ def build_default_llm_attempts() -> tuple[dict[str, Any], ...]:
             {
                 "provider_id": preferred.id,
                 "model": os.getenv("EMPIRICAL_LLM_MODEL", "").strip() or _provider_default_model(preferred) or None,
-                "env": preferred.api_key_env or None,
+                "env": _provider_attempt_env(preferred),
             }
         )
 
@@ -295,7 +323,7 @@ def build_default_llm_attempts() -> tuple[dict[str, Any], ...]:
         attempt = {
             "provider_id": provider_id,
             "model": _provider_default_model(preset) or None,
-            "env": preset.api_key_env or None,
+            "env": _provider_attempt_env(preset),
         }
         if attempt not in attempts:
             attempts.append(attempt)
@@ -625,6 +653,86 @@ def _stream_openai_compatible(req: request.Request) -> Iterator[str]:
                 yield content
 
 
+def _format_codex_prompt(messages: list[dict[str, str]]) -> str:
+    parts: list[str] = []
+    for message in messages:
+        role = str(message.get("role") or "user").strip() or "user"
+        content = str(message.get("content") or "").strip()
+        if content:
+            parts.append(f"[{role}]\n{content}")
+    return "\n\n".join(parts).strip() or "请返回 JSON：{\"status\":\"ok\"}"
+
+
+def _call_codex_cli(
+    *,
+    model: str,
+    messages: list[dict[str, str]],
+    timeout_seconds: int = DEFAULT_TIMEOUT,
+) -> tuple[str, dict[str, int]]:
+    if os.getenv("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC") != "1":
+        raise LLMError("codex_exec_disabled", "Set EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1 to allow Codex CLI execution.")
+
+    codex_bin = _codex_bin()
+    if not codex_bin:
+        raise LLMError("codex_cli_not_found", "Codex CLI executable was not found. Set CODEX_BIN or install codex.")
+
+    project_root = Path(os.getenv("CODEX_LOCAL_PROJECT_ROOT", "") or Path.cwd()).resolve()
+    prompt = _format_codex_prompt(messages)
+
+    with tempfile.NamedTemporaryFile(prefix="empirical-codex-", suffix=".md", delete=False) as output_file:
+        output_path = Path(output_file.name)
+
+    command = [
+        codex_bin,
+        "-a",
+        "never",
+        "exec",
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--ignore-rules",
+        "--sandbox",
+        "read-only",
+        "--output-last-message",
+        str(output_path),
+        "--model",
+        model,
+        "-C",
+        str(project_root),
+        "-",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            input=prompt,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise LLMError("codex_cli_timeout", f"Codex CLI timed out after {timeout_seconds}s.") from exc
+    except OSError as exc:
+        raise LLMError("codex_cli_error", f"Cannot start Codex CLI: {exc}") from exc
+
+    output_text = output_path.read_text(encoding="utf-8").strip() if output_path.exists() else ""
+    try:
+        output_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "Codex CLI failed.").strip()
+        raise LLMError("codex_cli_failed", detail[:1000])
+    if not output_text:
+        output_text = (result.stdout or "").strip()
+    if not output_text:
+        raise LLMError("codex_cli_empty_response", "Codex CLI returned no final response.")
+
+    return output_text, {
+        "input_tokens": max(1, len(prompt) // 4),
+        "output_tokens": max(1, len(output_text) // 4),
+    }
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 
@@ -705,6 +813,13 @@ def chat_completion(
             messages=messages,
             temperature=temperature,
             provider_name=preset.name,
+            timeout_seconds=timeout_seconds,
+        )
+
+    if preset.api_type == "codex-cli":
+        return _call_codex_cli(
+            model=selected_model,
+            messages=messages,
             timeout_seconds=timeout_seconds,
         )
 

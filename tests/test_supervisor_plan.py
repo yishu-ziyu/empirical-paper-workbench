@@ -550,6 +550,12 @@ class SupervisorPlanFrontendTests(unittest.TestCase):
             "default_run_plan_inclusion",
             by_skill_id["did_staggered_identification_gate"]["human_confirmation"]["required_before"],
         )
+        recursive = by_skill_id["recursive_research_search"]
+        self.assertIn("research_question", recursive["required_inputs"])
+        self.assertIn("web_search", recursive["allowed_adapters"])
+        self.assertIn("formal_literature_review_writeback", recursive["human_confirmation"]["required_before"])
+        self.assertIn("Auto-Empirical-Research-Skills", recursive["source_external_names"])
+        self.assertIn("CC-BY-SA-4.0", recursive["source_licenses"])
 
     def test_bdd_16_supervisor_plan_keeps_llm_semantic_skill_judgment(self) -> None:
         """行为 16：LLM Supervisor 选择 internal skill 时，必须保存可审阅的语义理由。"""

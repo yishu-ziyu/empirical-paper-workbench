@@ -436,6 +436,12 @@ class AgentTaskQueueApiTests(unittest.TestCase):
                     "selection_source": "registry_and_llm_semantic_judgment",
                     "semantic_selection_reason": "题目需要先从文献、数据和变量证据形成递归搜索图。",
                     "expected_artifacts": ["LiteratureSeedPackage", "search_query_graph", "verification_queue"],
+                    "required_inputs": ["research_question", "boundary_terms"],
+                    "optional_inputs": ["seed_literature", "dataset_hints"],
+                    "allowed_adapters": ["web_search", "cnki_manual_assist", "zotero_optional"],
+                    "forbidden_actions": ["write_formal_literature_review_without_verified_citations"],
+                    "source_external_names": ["Auto-Empirical-Research-Skills"],
+                    "source_licenses": ["CC-BY-SA-4.0"],
                     "execution_boundary": "review_only_until_dispatch_approved",
                     "skill_sources": [
                         {
@@ -477,6 +483,14 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             binding["expected_artifacts"],
             ["LiteratureSeedPackage", "search_query_graph", "verification_queue"],
         )
+        self.assertEqual(binding["required_inputs"], ["research_question", "boundary_terms"])
+        self.assertIn("web_search", binding["allowed_adapters"])
+        self.assertIn(
+            "write_formal_literature_review_without_verified_citations",
+            binding["forbidden_actions"],
+        )
+        self.assertEqual(binding["source_external_names"], ["Auto-Empirical-Research-Skills"])
+        self.assertEqual(binding["source_licenses"], ["CC-BY-SA-4.0"])
         self.assertEqual(binding["execution_boundary"], "review_only_until_dispatch_approved")
         self.assertEqual(binding["skill_sources"][0]["name"], "Auto-Empirical-Research-Skills")
         self.assertFalse(binding["can_execute_without_human_review"])
@@ -2840,9 +2854,29 @@ class AgentTaskQueueApiTests(unittest.TestCase):
             json={"backend_id": "codex"},
         )
         self.assertEqual(selected.status_code, 200, msg=selected.text)
-        executed = self.client.post(
-            f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/execute"
-        )
+        with patch(
+            "Product.backend.execution_backend_service.run_llm_execution_preflight",
+            create=True,
+            return_value={
+                "schema_version": "p6.llm_execution_preflight.v1",
+                "task_id": "agent_task_01",
+                "backend_id": "codex",
+                "method_id": "literature_seed_package",
+                "provider": {"provider_id": "codex", "model": "gpt-5.5"},
+                "summary": "LLM 已确认候选来源种子包只进入草案层。",
+                "backend_reason": "Codex 后端适合先生成可审阅候选来源包。",
+                "method_risk": ["候选引用需要人工核验。"],
+                "evidence_requirements": ["保留检索词、候选来源和引用核验队列。"],
+                "human_review_note": "正式文献综述写回前必须人工确认。",
+                "artifact_path": "state/product/llm_execution_preflights/agent_task_01.json",
+                "formal_write_allowed": False,
+                "required_for_execution": True,
+                "evidence_level": "llm_supervisor",
+            },
+        ):
+            executed = self.client.post(
+                f"/api/v1/projects/{self.project_id}/agent-task-queue/tasks/agent_task_01/execute"
+            )
         self.assertEqual(executed.status_code, 200, msg=executed.text)
 
     def test_bdd_44_topic_intake_registers_project_persists_plan_and_creates_queue_after_review(self) -> None:

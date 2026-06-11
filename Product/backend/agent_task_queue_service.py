@@ -1229,6 +1229,12 @@ def compact_task_internal_skill_binding(skill: dict[str, Any]) -> dict[str, Any]
         "why_this_skill": semantic_reason,
         "llm_semantic_judgment": skill.get("llm_semantic_judgment") or {},
         "expected_artifacts": normalize_list(skill.get("expected_artifacts")),
+        "required_inputs": normalize_list(skill.get("required_inputs")),
+        "optional_inputs": normalize_list(skill.get("optional_inputs")),
+        "allowed_adapters": normalize_list(skill.get("allowed_adapters")),
+        "forbidden_actions": normalize_list(skill.get("forbidden_actions")),
+        "source_external_names": normalize_list(skill.get("source_external_names")),
+        "source_licenses": normalize_list(skill.get("source_licenses")),
         "execution_boundary": skill.get("execution_boundary") or "review_before_execution",
         "skill_sources": [
             source for source in normalize_list(skill.get("skill_sources")) if isinstance(source, dict)
@@ -1547,6 +1553,8 @@ def build_internal_skill_execution_packet(
                 or ""
             ),
             "source_policy": skill.get("source_policy", ""),
+            "source_external_names": normalize_list(skill.get("source_external_names")),
+            "source_licenses": normalize_list(skill.get("source_licenses")),
             "skill_sources": normalize_list(skill.get("skill_sources")),
         },
         "llm_semantic_judgment": skill.get("llm_semantic_judgment") or {},
@@ -1558,6 +1566,10 @@ def build_internal_skill_execution_packet(
         or ["review_internal_skill_before_execution"],
         "review_gate": "review_internal_skill_before_execution",
         "expected_artifacts": expected_artifacts,
+        "required_inputs": normalize_list(skill.get("required_inputs")),
+        "optional_inputs": normalize_list(skill.get("optional_inputs")),
+        "allowed_adapters": normalize_list(skill.get("allowed_adapters")),
+        "forbidden_actions": normalize_list(skill.get("forbidden_actions")),
         "quality_gates": skill.get("quality_gates") or {},
         "canonical_policy": skill.get("canonical_policy") or {},
         "reference_chain_policy": (

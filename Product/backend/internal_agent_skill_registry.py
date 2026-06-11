@@ -188,6 +188,7 @@ def index_internal_agent_skill_capabilities(registry_path: Path | None = None) -
         applies_when = skill.get("applies_when") if isinstance(skill.get("applies_when"), dict) else {}
         inputs = skill.get("inputs") if isinstance(skill.get("inputs"), dict) else {}
         outputs = skill.get("outputs") if isinstance(skill.get("outputs"), dict) else {}
+        tools = skill.get("tools") if isinstance(skill.get("tools"), dict) else {}
         quality_gates = (
             skill.get("quality_gates") if isinstance(skill.get("quality_gates"), dict) else {}
         )
@@ -253,6 +254,11 @@ def index_internal_agent_skill_capabilities(registry_path: Path | None = None) -
                     "quality_gates": quality_gates,
                     "human_confirmation": human_confirmation,
                     "benchmark": benchmark,
+                    "required_inputs": required_inputs,
+                    "optional_inputs": optional_inputs,
+                    "expected_artifacts": artifacts,
+                    "allowed_adapters": list(tools.get("allowed_adapters") or []),
+                    "forbidden_actions": list(tools.get("forbidden_actions") or []),
                     "external_sources": list(provenance.get("external_sources") or []),
                     "transformation_log": list(provenance.get("transformation_log") or []),
                 },
@@ -359,9 +365,15 @@ def build_internal_agent_skill_recommendation_bundle(
                 "quality_gates": skill.get("quality_gates") or {},
                 "human_confirmation": skill.get("human_confirmation") or {},
                 "benchmark": skill.get("benchmark") or {},
+                "required_inputs": list(skill.get("required_inputs") or []),
+                "optional_inputs": list(skill.get("optional_inputs") or []),
+                "allowed_adapters": list(skill.get("allowed_adapters") or []),
+                "forbidden_actions": list(skill.get("forbidden_actions") or []),
                 "expected_artifacts": _capability_expected_artifacts(capability),
                 "execution_boundary": _skill_execution_boundary(skill, capability),
                 "skill_sources": _skill_sources(skill),
+                "source_external_names": _source_external_names(skill),
+                "source_licenses": _source_licenses(skill),
                 "can_execute_without_human_review": False,
                 "formal_write_targets": list(skill.get("formal_write_targets") or []),
                 "source_policy": skill.get("source_policy", ""),
@@ -414,27 +426,36 @@ def normalize_llm_internal_skill_judgments(context: dict[str, Any]) -> list[dict
 
 
 def compact_internal_agent_skills_for_prompt() -> dict[str, Any]:
+    def compact_skill(cap: dict[str, Any]) -> dict[str, Any]:
+        skill = cap.get("internal_skill") if isinstance(cap.get("internal_skill"), dict) else {}
+        return {
+            "id": cap.get("id"),
+            "skill_id": skill.get("id", ""),
+            "name": cap.get("name"),
+            "description": cap.get("description", ""),
+            "owner_agent": skill.get("owner_agent", ""),
+            "allowed_agents": cap.get("allowed_roles", []),
+            "stage": skill.get("stage", ""),
+            "domain": skill.get("domain", ""),
+            "risk_level": cap.get("risk_level"),
+            "status": cap.get("status"),
+            "source_policy": skill.get("source_policy", ""),
+            "evidence_level": skill.get("evidence_level", ""),
+            "required_inputs": list(skill.get("required_inputs") or []),
+            "optional_inputs": list(skill.get("optional_inputs") or []),
+            "expected_artifacts": _capability_expected_artifacts(cap),
+            "quality_gates": skill.get("quality_gates") or {},
+            "human_confirmation": skill.get("human_confirmation") or {},
+            "allowed_adapters": list(skill.get("allowed_adapters") or []),
+            "forbidden_actions": list(skill.get("forbidden_actions") or []),
+            "external_source_names": _source_external_names(skill),
+            "source_licenses": _source_licenses(skill),
+            "formal_write_targets": list(skill.get("formal_write_targets") or []),
+        }
+
     return {
         "policy": build_internal_agent_skill_policy(),
-        "skills": [
-            {
-                "id": cap.get("id"),
-                "skill_id": (cap.get("internal_skill") or {}).get("id")
-                if isinstance(cap.get("internal_skill"), dict)
-                else "",
-                "name": cap.get("name"),
-                "owner_agent": (cap.get("internal_skill") or {}).get("owner_agent")
-                if isinstance(cap.get("internal_skill"), dict)
-                else "",
-                "allowed_agents": cap.get("allowed_roles", []),
-                "stage": (cap.get("internal_skill") or {}).get("stage")
-                if isinstance(cap.get("internal_skill"), dict)
-                else "",
-                "risk_level": cap.get("risk_level"),
-                "status": cap.get("status"),
-            }
-            for cap in index_internal_agent_skill_capabilities()
-        ],
+        "skills": [compact_skill(cap) for cap in index_internal_agent_skill_capabilities()],
     }
 
 
@@ -504,6 +525,24 @@ def _capability_expected_artifacts(capability: dict[str, Any]) -> list[Any]:
 
 def _skill_sources(skill: dict[str, Any]) -> list[dict[str, Any]]:
     return [source for source in _as_list(skill.get("external_sources")) if isinstance(source, dict)]
+
+
+def _source_external_names(skill: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    for source in _skill_sources(skill):
+        name = str(source.get("name") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _source_licenses(skill: dict[str, Any]) -> list[str]:
+    licenses: list[str] = []
+    for source in _skill_sources(skill):
+        license_name = str(source.get("license") or "").strip()
+        if license_name and license_name not in licenses:
+            licenses.append(license_name)
+    return licenses
 
 
 def _skill_execution_boundary(skill: dict[str, Any], capability: dict[str, Any]) -> str:

@@ -235,6 +235,26 @@ class InternalAgentSkillRegistryContractTests(unittest.TestCase):
         self.assertTrue(all(cap["namespace"] == "internal_agent_skill" for cap in capabilities))
         self.assertTrue(all(cap["status"] != "executable" for cap in capabilities))
 
+    def test_bdd_7_prompt_registry_exposes_aers_evidence_and_license_context(self) -> None:
+        """Given LLM Supervisor selects skills, When prompt registry is compacted, Then AERS context is still auditable."""
+        from Product.backend.internal_agent_skill_registry import compact_internal_agent_skills_for_prompt
+
+        prompt_registry = compact_internal_agent_skills_for_prompt()
+        by_skill_id = {skill["skill_id"]: skill for skill in prompt_registry["skills"]}
+
+        recursive = by_skill_id["recursive_research_search"]
+        self.assertIn("Auto-Empirical-Research-Skills", recursive["external_source_names"])
+        self.assertIn("CC-BY-SA-4.0", recursive["source_licenses"])
+        self.assertIn("research_question", recursive["required_inputs"])
+        self.assertIn("LiteratureSeedPackage", recursive["expected_artifacts"])
+        self.assertIn("aers:eval:citation-hygiene-no-fake-refs", recursive["quality_gates"]["machine_checkable"])
+        self.assertIn("formal_literature_review_writeback", recursive["human_confirmation"]["required_before"])
+        self.assertIn("web_search", recursive["allowed_adapters"])
+        self.assertIn(
+            "write_formal_literature_review_without_verified_citations",
+            recursive["forbidden_actions"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

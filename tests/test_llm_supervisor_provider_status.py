@@ -178,6 +178,27 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         self.assertIn("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1", codex_choice["activation_hint"])
         self.assertIn("EMPIRICAL_LLM_PROVIDER=codex-cli", codex_choice["activation_hint"])
 
+    def test_bdd_llm_supervisor_status_explains_why_codex_gpt55_is_selected(self) -> None:
+        """行为 7b：当本地 Codex/GPT-5.5 被选中时，状态接口必须解释选择依据。"""
+        os.environ["EMPIRICAL_LLM_PROVIDER"] = "codex-cli"
+        os.environ["CODEX_LOCAL_MODEL"] = "gpt-5.5"
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.backend.llm_client._codex_bin",
+            return_value="/opt/homebrew/bin/codex",
+        ):
+            response = self.client.get("/api/v1/providers/llm-supervisor")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        body = response.json()
+        self.assertTrue(body["ready"])
+        self.assertEqual(body["primary_provider"]["provider_id"], "codex-cli")
+        self.assertEqual(body["primary_provider"]["model"], "gpt-5.5")
+        self.assertEqual(body["selection"]["source"], "env_preference")
+        self.assertIn("EMPIRICAL_LLM_PROVIDER=codex-cli", body["selection"]["reason"])
+        self.assertIn("GPT-5.5", body["selection"]["reason"])
+
     def test_bdd_codex_cli_provider_requires_execution_gate_before_fallback(self) -> None:
         """行为 8：本地 Codex 只有显式打开执行门后，才会进入 LLM fallback。"""
         os.environ["EMPIRICAL_LLM_PROVIDER"] = "codex-cli"

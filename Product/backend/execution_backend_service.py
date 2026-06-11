@@ -496,8 +496,18 @@ def build_llm_preflight_provider_snapshot(provider: dict[str, Any]) -> dict[str,
             "current_model": str(runtime_provider.get("model") or ""),
             "source": "runtime_preflight_call",
             "fallback_chain_active": len(attempts) > 1,
+            "reason": _llm_runtime_selection_reason(runtime_provider),
         },
     }
+
+
+def _llm_runtime_selection_reason(runtime_provider: dict[str, Any]) -> str:
+    provider_id = str(runtime_provider.get("provider_id") or "")
+    provider_name = str(runtime_provider.get("provider_name") or provider_id or "未记录 provider")
+    model = str(runtime_provider.get("model") or "未记录模型")
+    if provider_id == "codex-cli":
+        return f"执行前由本地 Codex CLI / {model} 完成 LLM Supervisor 预检。"
+    return f"执行前由 {provider_name} / {model} 完成模型预检。"
 
 
 def compact_llm_execution_preflight(preflight: dict[str, Any]) -> dict[str, Any]:

@@ -4932,6 +4932,7 @@ def format_formal_export_preflight_review(preflight: dict[str, Any]) -> str:
                 f"- Provider：{primary_provider.get('provider_name') or primary_provider.get('provider_id')}",
                 f"- Model：{primary_provider.get('model')}",
                 f"- 选择来源：{selection.get('source') or 'unknown'}",
+                f"- 选择理由：{selection.get('reason') or '未记录'}",
                 f"- 预检摘要：{preflight.get('llm_preflight_summary') or '未记录'}",
                 f"- 人工审阅提示：{preflight.get('llm_preflight_human_review_note') or '未记录'}",
                 "",

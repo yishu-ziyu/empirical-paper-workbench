@@ -700,6 +700,25 @@ def _local_codex_api_view() -> dict:
     }
 
 
+def _format_llm_model_label(model: str) -> str:
+    return model.upper().replace("GPT-", "GPT-") if model.lower().startswith("gpt-") else model
+
+
+def _llm_selection_reason(primary_provider: dict, source: str, preferred_provider: str = "") -> str:
+    provider_id = str(primary_provider.get("provider_id") or "")
+    provider_name = str(primary_provider.get("provider_name") or provider_id or "未选择")
+    model = str(primary_provider.get("model") or "未记录模型")
+    model_label = _format_llm_model_label(model)
+    if not provider_id:
+        return "当前没有可用 LLM Supervisor；需要先配置本地 Codex 或云端模型。"
+    if source == "env_preference":
+        return (
+            f"当前主模型来自 EMPIRICAL_LLM_PROVIDER={preferred_provider or provider_id}，"
+            f"实际执行为 {provider_name} / {model_label}。"
+        )
+    return f"当前主模型来自已配置 provider fallback，实际执行为 {provider_name} / {model_label}。"
+
+
 @app.get("/api/v1/providers/llm-supervisor")
 def api_v1_llm_supervisor_provider() -> dict:
     attempts = [_llm_attempt_api_view(attempt) for attempt in llm_client.build_default_llm_attempts()]
@@ -708,6 +727,7 @@ def api_v1_llm_supervisor_provider() -> dict:
     current_provider_id = str(primary_provider.get("provider_id") or "")
     preferred_provider = os.getenv("EMPIRICAL_LLM_PROVIDER", "").strip()
     preferred_model = os.getenv("EMPIRICAL_LLM_MODEL", "").strip()
+    selection_source = "env_preference" if preferred_provider else "configured_fallback"
     return {
         "label": "LLM Supervisor",
         "ready": bool(primary_provider),
@@ -722,7 +742,8 @@ def api_v1_llm_supervisor_provider() -> dict:
             "current_model": str(primary_provider.get("model") or ""),
             "preferred_provider_id": preferred_provider,
             "preferred_model": preferred_model,
-            "source": "env_preference" if preferred_provider else "configured_fallback",
+            "source": selection_source,
+            "reason": _llm_selection_reason(primary_provider, selection_source, preferred_provider),
             "change_hint": "切换主模型：设置 EMPIRICAL_LLM_PROVIDER 和 EMPIRICAL_LLM_MODEL，再重启本地服务。",
         },
         "local_codex": _local_codex_api_view(),

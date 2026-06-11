@@ -866,10 +866,16 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertEqual(preflight["provider"]["provider_id"], "openai")
         self.assertEqual(preflight["provider_snapshot"]["primary_provider"]["model"], "gpt-5.5")
         self.assertEqual(preflight["provider_snapshot"]["selection"]["source"], "runtime_preflight_call")
+        self.assertIn("OpenAI", preflight["provider_snapshot"]["selection"]["reason"])
+        self.assertIn("gpt-5.5", preflight["provider_snapshot"]["selection"]["reason"])
         self.assertTrue(preflight["provider_snapshot"]["ready"])
         self.assertGreaterEqual(preflight["provider_snapshot"]["attempt_count"], 1)
         saved = json.loads((self.project_root / preflight["artifact_path"]).read_text(encoding="utf-8"))
         self.assertEqual(saved["provider_snapshot"]["primary_provider"]["provider_id"], "openai")
+        self.assertEqual(
+            saved["provider_snapshot"]["selection"]["reason"],
+            preflight["provider_snapshot"]["selection"]["reason"],
+        )
 
     def test_bdd_13a_execution_requires_llm_supervisor_handoff_before_running(self) -> None:
         """行为 13a：执行实验前必须有 LLM Supervisor 交接，不能只靠工程后端直接跑。"""
@@ -2156,7 +2162,10 @@ class AgentTaskQueueApiTests(unittest.TestCase):
                         "provider_name": "OpenAI",
                         "model": "gpt-5.5",
                     },
-                    "selection": {"source": "runtime_preflight_call"},
+                    "selection": {
+                        "source": "runtime_preflight_call",
+                        "reason": "执行前由 OpenAI / gpt-5.5 完成模型预检。",
+                    },
                     "attempt_count": 2,
                 },
                 "formal_write_allowed": False,
@@ -2182,6 +2191,7 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertIn("LLM 判断来源", review_text)
         self.assertIn("OpenAI", review_text)
         self.assertIn("gpt-5.5", review_text)
+        self.assertIn("执行前由 OpenAI / gpt-5.5 完成模型预检。", review_text)
 
     def test_bdd_53_export_preflight_turns_missing_sections_into_agent_followups(self) -> None:
         """行为 53：导出预检发现正式章节缺失时，必须转成后续 Agent 任务，不只显示错误。"""

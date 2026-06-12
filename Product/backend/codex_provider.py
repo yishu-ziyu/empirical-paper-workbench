@@ -6,37 +6,28 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from Product.backend.llm_client import probe_codex_login
+
 
 CODEX_EXEC_ENV = "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"
 
 
 def local_codex_status() -> dict[str, Any]:
-    configured_path = os.environ.get("CODEX_BIN", "").strip()
-    path = configured_path or shutil.which("codex")
+    probe = probe_codex_login()
+    path = probe.get("path") or os.environ.get("CODEX_BIN", "").strip() or shutil.which("codex")
     status: dict[str, Any] = {
         "provider": "local_codex",
         "available": bool(path),
         "path": path,
-        "version": None,
+        "version": probe.get("version"),
+        "auth_path": probe.get("auth_path"),
+        "auth_ready": probe.get("auth_ready", False),
+        "ready": probe.get("ready", False),
+        "reason": probe.get("reason", ""),
+        "action": probe.get("action", ""),
         "execution_enabled": os.environ.get(CODEX_EXEC_ENV) == "1",
         "execution_env": CODEX_EXEC_ENV,
     }
-    if not path:
-        return status
-
-    try:
-        result = subprocess.run(
-            [path, "--version"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return status
-
-    output = (result.stdout or result.stderr).strip()
-    status["version"] = output.splitlines()[-1] if output else None
     return status
 
 
@@ -89,17 +80,23 @@ def run_local_codex_prompt(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     command = [
         status["path"],
+        "-a",
+        "never",
         "exec",
-        "--cd",
-        str(project_root),
+        "--skip-git-repo-check",
+        "--ephemeral",
+        "--ignore-rules",
         "--sandbox",
         "read-only",
         "--output-last-message",
         str(output_path),
-        prompt,
+        "-C",
+        str(project_root),
+        "-",
     ]
     result = subprocess.run(
         command,
+        input=prompt,
         check=False,
         capture_output=True,
         text=True,

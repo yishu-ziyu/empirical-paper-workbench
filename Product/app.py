@@ -709,7 +709,9 @@ def _llm_model_choice_api_view(provider_id: str, current_provider_id: str = "") 
     elif preset.api_key_env:
         activation_hint = f"配置 {preset.api_key_env}，并设置 {provider_hint}{model_hint} 后可切换。"
     elif preset.id == "codex-cli":
-        activation_hint = (
+        codex_status = local_codex_status()
+        codex_blocker = str(codex_status.get("reason") or codex_status.get("action") or "").strip()
+        activation_hint = codex_blocker or (
             "设置 EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1、"
             f"{provider_hint}{model_hint} 后，可用本机 Codex 登录态做本地 LLM 测试。"
         )
@@ -731,10 +733,12 @@ def _llm_model_choice_api_view(provider_id: str, current_provider_id: str = "") 
 
 def _local_codex_api_view() -> dict:
     status = local_codex_status()
-    if status.get("available") and status.get("execution_enabled"):
-        activation_hint = "本地 Codex CLI 已启用，可承担本地执行型 Supervisor 或子 Agent。"
+    if status.get("ready") and status.get("execution_enabled"):
+        activation_hint = "本地 Codex CLI 已登录并启用，可承担本地执行型 Supervisor 或子 Agent。"
+    elif status.get("ready"):
+        activation_hint = f"Codex CLI 已安装且已登录；设置 {status.get('execution_env')}=1 后可进入本地执行链路。"
     elif status.get("available"):
-        activation_hint = f"Codex CLI 已安装；设置 {status.get('execution_env')}=1 后可进入本地执行链路。"
+        activation_hint = status.get("action") or status.get("reason") or "Codex CLI 已安装；完成 codex login 后可进入本地执行链路。"
     else:
         activation_hint = "未找到本地 Codex CLI；安装并完成登录后可作为本地执行型 Supervisor。"
     return {

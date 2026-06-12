@@ -277,7 +277,7 @@ def _provider_default_base_url(preset: ProviderPreset) -> str:
 
 def _provider_has_key(provider_id: str, preset: ProviderPreset) -> bool:
     if provider_id == "codex-cli":
-        return os.getenv("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC") == "1" and bool(_codex_bin())
+        return os.getenv("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC") == "1" and bool(probe_codex_login().get("ready"))
     if not preset.requires_api_key:
         return True
     if preset.api_key_env and os.getenv(preset.api_key_env, "").strip():
@@ -287,6 +287,56 @@ def _provider_has_key(provider_id: str, preset: ProviderPreset) -> bool:
 
 def _codex_bin() -> str:
     return os.getenv("CODEX_BIN", "").strip() or shutil.which("codex") or ""
+
+
+def _codex_auth_path() -> Path:
+    return Path(os.getenv("CODEX_AUTH_PATH", "").strip() or Path.home() / ".codex" / "auth.json").expanduser()
+
+
+def probe_codex_login() -> dict[str, Any]:
+    """Probe local Codex CLI without reading or exposing auth contents."""
+    codex_bin = _codex_bin()
+    auth_path = _codex_auth_path()
+    status: dict[str, Any] = {
+        "provider_id": "codex-cli",
+        "available": bool(codex_bin),
+        "path": codex_bin,
+        "auth_path": str(auth_path),
+        "auth_ready": auth_path.exists(),
+        "version": None,
+        "ready": False,
+        "reason": "",
+        "action": "",
+    }
+    if not codex_bin:
+        status["reason"] = "未找到 codex CLI。"
+        status["action"] = "安装 codex CLI，或设置 CODEX_BIN 指向本机 codex 可执行文件。"
+        return status
+    if not status["auth_ready"]:
+        status["reason"] = "codex CLI 尚未登录。"
+        status["action"] = "在终端运行 codex login，完成 OAuth 后重启本地服务。"
+        return status
+    try:
+        result = subprocess.run(
+            [codex_bin, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        status["reason"] = f"codex CLI 无法执行：{exc}"
+        status["action"] = "检查 CODEX_BIN、PATH 和本机 codex 安装状态。"
+        return status
+
+    output = (result.stdout or result.stderr).strip()
+    status["version"] = output.splitlines()[-1] if output else None
+    if result.returncode != 0:
+        status["reason"] = f"codex --version 退出码 {result.returncode}。"
+        status["action"] = "先在终端确认 codex --version 可以正常运行。"
+        return status
+    status["ready"] = True
+    return status
 
 
 def _provider_attempt_env(preset: ProviderPreset) -> str | None:

@@ -351,7 +351,7 @@ if "--version" in sys.argv:
     raise SystemExit(0)
 
 output_path = Path(sys.argv[sys.argv.index("--output-last-message") + 1])
-prompt = sys.argv[-1]
+prompt = sys.stdin.read() if sys.argv[-1] == "-" else sys.argv[-1]
 if "confirmed_research_question" not in prompt or "topic_session_v1" not in prompt:
     print("prompt missing confirmed research question context", file=sys.stderr)
     raise SystemExit(7)

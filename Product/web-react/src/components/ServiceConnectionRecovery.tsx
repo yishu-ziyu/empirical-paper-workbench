@@ -3,6 +3,7 @@ import { DEFAULT_LOCAL_API_BASE, apiBase, setBrowserApiBase } from "../lib/apiBa
 interface ServiceConnectionRecoveryProps {
   message?: string | null;
   currentApiBase?: string;
+  preflight?: string;
   onRetry?: () => void | Promise<void>;
   onUseLocalBackend?: () => void | Promise<void>;
   retryLabel?: string;
@@ -19,6 +20,7 @@ function isLocalApiBase(value: string): boolean {
 export function ServiceConnectionRecovery({
   message,
   currentApiBase,
+  preflight = "连接预检会先确认端口、服务类型和模型状态。",
   onRetry,
   onUseLocalBackend,
   retryLabel = "重新连接",
@@ -52,6 +54,7 @@ export function ServiceConnectionRecovery({
         <span className="eyebrow">连接本地研究服务</span>
         <h3>研究服务还没有响应</h3>
         <p>{message || "当前页面没有连到本地 FastAPI 服务，先恢复连接再继续下一步。"}</p>
+        <p>{preflight}</p>
       </div>
 
       <dl className="service-connection-recovery__facts">

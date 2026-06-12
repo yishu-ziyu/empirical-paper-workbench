@@ -4131,6 +4131,19 @@ button {
   font-weight: 600;
 }
 
+.system-status-bar__error {
+  width: fit-content;
+  max-width: min(100%, 720px);
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: rgba(230, 230, 230, 0.045);
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .system-status-bar__details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

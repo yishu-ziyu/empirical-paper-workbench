@@ -630,6 +630,50 @@ def api_v1_health() -> dict:
     }
 
 
+@app.get("/api/v1/service-preflight")
+def api_v1_service_preflight() -> dict:
+    llm_status = api_v1_llm_supervisor_provider()
+    primary_provider = llm_status.get("primary_provider") or {}
+    llm_ready = bool(llm_status.get("ready"))
+    if llm_ready:
+        status = "ready"
+        recommended_action = {
+            "id": "continue",
+            "label": "继续研究流程",
+            "hint": "本地研究服务和 LLM Supervisor 都已准备好。",
+        }
+    else:
+        status = "needs_llm"
+        recommended_action = {
+            "id": "configure_llm_supervisor",
+            "label": "配置 LLM Supervisor",
+            "hint": (llm_status.get("primary_action") or {}).get(
+                "hint",
+                "配置本地 Codex 或云端模型后，再启动真实 Agent 流程。",
+            ),
+        }
+    return {
+        "status": status,
+        "service": {
+            "kind": "fastapi",
+            "name": "econ-paper-product-api",
+            "health_endpoint": "/api/v1/health",
+            "system_status_endpoint": "/api/system/status",
+        },
+        "llm_supervisor": {
+            "ready": llm_ready,
+            "provider_id": primary_provider.get("provider_id", ""),
+            "provider_name": primary_provider.get("provider_name", ""),
+            "model": primary_provider.get("model", ""),
+            "reason": (llm_status.get("selection") or {}).get(
+                "reason",
+                "当前没有可用 LLM Supervisor；需要先配置本地 Codex 或云端模型。",
+            ),
+        },
+        "recommended_action": recommended_action,
+    }
+
+
 @app.get("/api/v1/providers/local-codex")
 def api_v1_local_codex_provider() -> dict:
     return local_codex_status()

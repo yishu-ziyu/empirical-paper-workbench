@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -88,12 +90,14 @@ class ServicePreflightContractTests(unittest.TestCase):
             "probeLocalServiceReachability",
             "backend_unreachable",
             "wrong_service",
+            "cors_blocked",
             "llm_not_configured",
             "status === 501",
             "status === 405",
             "text/html",
             'mode: "no-cors"',
             "当前端口不是研究后端",
+            "服务有响应，但浏览器预检失败",
             "后端在线，模型还没准备好",
         ]:
             self.assertIn(token, helper)
@@ -103,6 +107,60 @@ class ServicePreflightContractTests(unittest.TestCase):
         self.assertIn("system-status-bar__error", system_status)
         self.assertIn("preflight", recovery)
         self.assertNotIn("状态暂时没连上，稍后会自动重试。不会影响已保存的研究材料。", system_status)
+
+    def test_bdd_frontend_preflight_classifier_executes_runtime_branches(self) -> None:
+        """行为 4：前端预检分类要可执行，覆盖断网、错端口、跨域和模型门。"""
+        web_root = ROOT / "Product" / "web-react"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_path = Path(temp_dir) / "servicePreflight.mjs"
+            bundle = subprocess.run(
+                [
+                    "node_modules/.bin/esbuild",
+                    "src/lib/servicePreflight.ts",
+                    "--bundle",
+                    "--format=esm",
+                    f"--outfile={bundle_path}",
+                ],
+                cwd=web_root,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(bundle.returncode, 0, msg=bundle.stderr)
+
+            probe = subprocess.run(
+                [
+                    "node",
+                    "--input-type=module",
+                    "-e",
+                    f"""
+                    import {{
+                      classifyServicePreflightFailure,
+                      servicePreflightMessage
+                    }} from {str(bundle_path)!r};
+                    const cases = [
+                      classifyServicePreflightFailure({{}}),
+                      classifyServicePreflightFailure({{ status: 501 }}),
+                      classifyServicePreflightFailure({{ contentType: "text/html; charset=utf-8" }}),
+                      classifyServicePreflightFailure({{ serviceRespondedWithoutCors: true }}),
+                      servicePreflightMessage({{
+                        status: "needs_llm",
+                        llm_supervisor: {{ ready: false, reason: "missing model" }},
+                        recommended_action: {{ hint: "configure model" }}
+                      }})
+                    ].map((item) => [item.kind, item.title]);
+                    console.log(JSON.stringify(cases));
+                    """,
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+        self.assertIn('"backend_unreachable"', probe.stdout)
+        self.assertIn('"wrong_service"', probe.stdout)
+        self.assertIn('"cors_blocked"', probe.stdout)
+        self.assertIn('"llm_not_configured"', probe.stdout)
 
 
 if __name__ == "__main__":

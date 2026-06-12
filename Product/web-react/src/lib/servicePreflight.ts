@@ -1,6 +1,7 @@
 export type ServicePreflightFailureKind =
   | "backend_unreachable"
   | "wrong_service"
+  | "cors_blocked"
   | "llm_not_configured"
   | "backend_error";
 
@@ -25,6 +26,7 @@ export interface ServicePreflightFailureInput {
   status?: number;
   contentType?: string | null;
   message?: string;
+  serviceRespondedWithoutCors?: boolean;
 }
 
 export interface ServicePreflightMessage {
@@ -36,7 +38,16 @@ export interface ServicePreflightMessage {
 export function classifyServicePreflightFailure({
   status,
   contentType,
+  serviceRespondedWithoutCors,
 }: ServicePreflightFailureInput): ServicePreflightMessage {
+  if (serviceRespondedWithoutCors) {
+    return {
+      kind: "cors_blocked",
+      title: "服务有响应，但浏览器预检失败",
+      message: "这个地址有服务响应，但页面无法读取它。请确认它是 FastAPI 研究后端，并允许当前页面访问。",
+    };
+  }
+
   if (status === 501 || status === 405 || contentType?.includes("text/html")) {
     return {
       kind: "wrong_service",

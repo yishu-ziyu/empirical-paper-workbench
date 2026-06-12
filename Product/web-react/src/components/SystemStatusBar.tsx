@@ -142,7 +142,7 @@ function llmCompactLabel(status: LlmSupervisorStatus | null): string {
   return provider || model || "已连接";
 }
 
-function llmConfiguredAttempts(status: LlmSupervisorStatus | null): LlmSupervisorStatus["attempts"] {
+function llmConfiguredAttempts(status: LlmSupervisorStatus | null): NonNullable<LlmSupervisorStatus["attempts"]> {
   return (status?.attempts ?? []).filter((attempt) => attempt.configured);
 }
 
@@ -167,6 +167,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const [llmProbeRunning, setLlmProbeRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const openAiChoice = llmOpenAiChoice(llmStatus);
+  const configuredLlmAttempts = llmConfiguredAttempts(llmStatus);
 
   const updateServicePreflightMessage = useCallback(async (signal?: AbortSignal) => {
     const preflightUrl = apiUrl(SERVICE_PREFLIGHT_PATH);
@@ -193,7 +194,9 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       const serviceResponded = await probeLocalServiceReachability(preflightUrl, signal);
-      const classified = classifyServicePreflightFailure(serviceResponded ? { status: 405 } : {});
+      const classified = classifyServicePreflightFailure(
+        serviceResponded ? { serviceRespondedWithoutCors: true } : {},
+      );
       setFetchError(`${classified.title}：${classified.message}`);
     }
   }, []);
@@ -421,11 +424,11 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
             {llmStatus?.selection?.change_hint ? (
               <p className="system-status-bar__obs">{llmStatus.selection.change_hint}</p>
             ) : null}
-            {llmConfiguredAttempts(llmStatus).length > 1 ? (
+            {configuredLlmAttempts.length > 1 ? (
               <div className="system-status-bar__obs">
                 <span>备用链：</span>
                 <ul className="system-status-bar__list system-status-bar__list--compact">
-                  {llmConfiguredAttempts(llmStatus)
+                  {configuredLlmAttempts
                     .slice(1, 5)
                     .map((attempt) => (
                       <li key={`${attempt.provider_id}-${attempt.model}`}>

@@ -559,6 +559,79 @@ class AgentTaskQueueApiTests(unittest.TestCase):
         self.assertFalse(orchestration["formal_write_allowed"])
         self.assertEqual(orchestration["deterministic_owner"], "internal_skill_registry")
 
+    def test_bdd_11f_queue_binds_llm_provider_to_every_agent_step(self) -> None:
+        """行为 11f：真实 Agent Queue 的每一步都必须继承 SupervisorPlan 的 LLM provider。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            provider={
+                "provider": "local_codex",
+                "provider_id": "codex-cli",
+                "provider_name": "Codex CLI",
+                "api_type": "codex-cli",
+                "model": "gpt-5.5",
+                "ready": True,
+                "execution_enabled": True,
+            },
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "提炼题目并生成文献检索计划",
+                },
+                {
+                    "agent_id": "pipeline_data",
+                    "role": "DataAgent",
+                    "task": "读取数据字典并生成变量候选",
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        queue = response.json()["agent_task_queue"]
+        self.assertEqual(queue["llm_provider_binding"]["provider_id"], "codex-cli")
+        self.assertEqual(queue["llm_provider_binding"]["provider_name"], "Codex CLI")
+        self.assertEqual(queue["llm_provider_binding"]["model"], "gpt-5.5")
+        self.assertEqual(queue["summary"]["llm_provider_ids"], ["codex-cli"])
+
+        for task in queue["tasks"]:
+            with self.subTest(task=task["id"]):
+                binding = task["llm_provider_binding"]
+                self.assertEqual(binding["provider_id"], "codex-cli")
+                self.assertEqual(binding["provider_name"], "Codex CLI")
+                self.assertEqual(binding["model"], "gpt-5.5")
+                self.assertEqual(task["llm_orchestration"]["current_provider"]["provider_id"], "codex-cli")
+                self.assertEqual(task["llm_intervention_handoff"]["source_provider"]["provider_id"], "codex-cli")
+                self.assertEqual(task["audit_log"][0]["llm_provider_binding"]["provider_id"], "codex-cli")
+
+    def test_bdd_11g_queue_does_not_invent_llm_provider_without_plan_provider(self) -> None:
+        """边界 11g：SupervisorPlan 没有 provider 证据时，队列不能凭空显示 Codex 或其他模型。"""
+        self._write_supervisor_plan(
+            status="approved",
+            can_dispatch=True,
+            provider={},
+            subagent_dispatch=[
+                {
+                    "agent_id": "pipeline_literature",
+                    "role": "LiteratureAgent",
+                    "task": "提炼题目并生成文献检索计划",
+                },
+            ],
+        )
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/agent-task-queue")
+
+        self.assertEqual(response.status_code, 201, msg=response.text)
+        queue = response.json()["agent_task_queue"]
+        task = queue["tasks"][0]
+        self.assertEqual(queue["llm_provider_binding"], {})
+        self.assertEqual(queue["summary"]["llm_provider_ids"], [])
+        self.assertEqual(task["llm_provider_binding"], {})
+        self.assertEqual(task["llm_orchestration"]["current_provider"], {})
+        self.assertEqual(task["llm_intervention_handoff"]["source_provider"], {})
+
     def test_bdd_11a_internal_skill_task_generates_draft_execution_packet_without_formal_writeback(
         self,
     ) -> None:
@@ -3709,6 +3782,15 @@ class AgentTaskQueueFrontendTests(unittest.TestCase):
         self.assertIn("输出边界", self.react_agent_task_queue)
         self.assertIn("当前模型", self.react_agent_task_queue)
         self.assertIn("agent-task-llm-orchestration", self.react_styles_css)
+
+    def test_bdd_37ab_react_task_card_shows_llm_provider_binding(self) -> None:
+        """行为 37ab：React 任务卡必须直接显示每一步继承的 LLM provider。"""
+        self.assertIn("LlmProviderBinding", self.react_agent_task_queue)
+        self.assertIn("llm_provider_binding", self.react_agent_task_queue)
+        self.assertIn("taskProviderLabel", self.react_agent_task_queue)
+        self.assertIn('data-testid="agent-task-provider-binding"', self.react_agent_task_queue)
+        self.assertIn("LLM：", self.react_agent_task_queue)
+        self.assertIn("agent-task-provider-binding", self.react_styles_css)
 
     def test_bdd_37a_react_task_queue_can_generate_internal_skill_execution_packet(self) -> None:
         """行为 37a：React Skill 审阅台必须有生成执行包入口，并能显示草案层执行包结果。"""

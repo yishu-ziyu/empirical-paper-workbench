@@ -14,6 +14,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Brain, ChevronDown, ChevronUp, Cpu, DollarSign, FileText, ShieldCheck } from "lucide-react";
 import { apiUrl } from "../lib/apiBase";
 import { cn } from "../lib/cn";
+import {
+  classifyServicePreflightFailure,
+  probeLocalServiceReachability,
+  servicePreflightMessage,
+  type ServicePreflightMessage,
+  type ServicePreflightPayload,
+} from "../lib/servicePreflight";
 
 interface SystemStatus {
   cap_count: number | null;
@@ -94,8 +101,7 @@ interface LlmProbeResult {
   model?: string;
 }
 
-const SERVICE_ERROR_MESSAGE =
-  "状态暂时没连上，稍后会自动重试。不会影响已保存的研究材料。";
+const SERVICE_PREFLIGHT_PATH = "/api/v1/service-preflight";
 
 function formatUsd(value: number | null): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
@@ -162,6 +168,36 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
   const abortRef = useRef<AbortController | null>(null);
   const openAiChoice = llmOpenAiChoice(llmStatus);
 
+  const updateServicePreflightMessage = useCallback(async (signal?: AbortSignal) => {
+    const preflightUrl = apiUrl(SERVICE_PREFLIGHT_PATH);
+    try {
+      const preflightResp = await fetch(preflightUrl, {
+        method: "GET",
+        signal,
+      });
+      if (!preflightResp.ok) {
+        const classified = classifyServicePreflightFailure({
+          status: preflightResp.status,
+          contentType: preflightResp.headers.get("content-type"),
+        });
+        setFetchError(`${classified.title}：${classified.message}`);
+        return;
+      }
+      const payload = (await preflightResp.json()) as ServicePreflightPayload;
+      if (payload.status === "ready") {
+        setFetchError("本地研究服务在线，但状态聚合暂时不可用。");
+        return;
+      }
+      const message = servicePreflightMessage(payload);
+      setFetchError(`${message.title}：${message.message}`);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      const serviceResponded = await probeLocalServiceReachability(preflightUrl, signal);
+      const classified = classifyServicePreflightFailure(serviceResponded ? { status: 405 } : {});
+      setFetchError(`${classified.title}：${classified.message}`);
+    }
+  }, []);
+
   const fetchStatus = useCallback(async () => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -174,7 +210,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         signal: controller.signal,
       });
       if (!resp.ok) {
-        setFetchError(SERVICE_ERROR_MESSAGE);
+        await updateServicePreflightMessage(controller.signal);
         return;
       }
       const data: SystemStatus = await resp.json();
@@ -182,7 +218,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
       setFetchError(null);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setFetchError(SERVICE_ERROR_MESSAGE);
+      await updateServicePreflightMessage(controller.signal);
     }
 
     try {
@@ -199,7 +235,7 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         setLlmStatus(null);
       }
     }
-  }, [projectId, topicSlug]);
+  }, [projectId, topicSlug, updateServicePreflightMessage]);
 
   useEffect(() => {
     void fetchStatus();
@@ -236,9 +272,10 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         model,
       });
     } catch {
+      const classified: ServicePreflightMessage = classifyServicePreflightFailure({});
       setLlmProbeResult({
         status: "error",
-        message: "测试失败：服务暂时没连上。",
+        message: `测试失败：${classified.message}`,
       });
     } finally {
       setLlmProbeRunning(false);
@@ -285,6 +322,12 @@ export function SystemStatusBar({ projectId, topicSlug, pollIntervalMs = 30000 }
         </span>
         {expanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
       </button>
+
+      {fetchError ? (
+        <p className="system-status-bar__error" data-testid="system-status-bar-error" role="status">
+          {fetchError}
+        </p>
+      ) : null}
 
       {expanded ? (
         <div className="system-status-bar__details" data-testid="system-status-bar-details">

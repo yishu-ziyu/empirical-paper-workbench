@@ -106,6 +106,8 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
                 "available": True,
                 "path": "/opt/homebrew/bin/codex",
                 "version": "codex-cli 0.137.0",
+                "auth_ready": True,
+                "ready": True,
                 "execution_enabled": False,
                 "execution_env": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
             },
@@ -164,8 +166,28 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
     def test_bdd_llm_supervisor_status_lists_codex_cli_as_local_gpt55_choice(self) -> None:
         """行为 7：Codex CLI 要作为本地 GPT-5.5 选择展示，并说明开启方式。"""
         with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
-            "Product.backend.llm_client._codex_bin",
-            return_value="/opt/homebrew/bin/codex",
+            "Product.backend.llm_client.probe_codex_login",
+            return_value={
+                "ready": True,
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "auth_ready": True,
+                "version": "codex-cli 0.139.0",
+                "reason": "",
+                "action": "",
+            },
+        ), patch(
+            "Product.app.local_codex_status",
+            return_value={
+                "provider": "local_codex",
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "version": "codex-cli 0.139.0",
+                "auth_ready": True,
+                "ready": True,
+                "execution_enabled": False,
+                "execution_env": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
+            },
         ):
             response = self.client.get("/api/v1/providers/llm-supervisor")
 
@@ -178,6 +200,46 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         self.assertIn("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC=1", codex_choice["activation_hint"])
         self.assertIn("EMPIRICAL_LLM_PROVIDER=codex-cli", codex_choice["activation_hint"])
 
+    def test_bdd_llm_supervisor_status_blocks_codex_cli_when_login_is_missing(self) -> None:
+        """行为 7a：本机装了 Codex 但未登录时，产品必须提示 codex login，而不是显示已配置。"""
+        os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
+
+        with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
+            "Product.backend.llm_client.probe_codex_login",
+            return_value={
+                "ready": False,
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "auth_path": "/Users/test/.codex/auth.json",
+                "auth_ready": False,
+                "version": None,
+                "reason": "codex CLI 尚未登录。",
+                "action": "在终端运行 codex login，完成 OAuth 后重启本地服务。",
+            },
+        ), patch(
+            "Product.app.local_codex_status",
+            return_value={
+                "provider": "local_codex",
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "auth_path": "/Users/test/.codex/auth.json",
+                "auth_ready": False,
+                "ready": False,
+                "reason": "codex CLI 尚未登录。",
+                "action": "在终端运行 codex login，完成 OAuth 后重启本地服务。",
+                "execution_enabled": True,
+                "execution_env": "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC",
+            },
+        ):
+            response = self.client.get("/api/v1/providers/llm-supervisor")
+
+        self.assertEqual(response.status_code, 200, msg=response.text)
+        body = response.json()
+        codex_choice = next(item for item in body["model_choices"] if item["provider_id"] == "codex-cli")
+        self.assertFalse(codex_choice["configured"])
+        self.assertFalse(body["local_codex"]["ready"])
+        self.assertIn("codex login", body["local_codex"]["activation_hint"])
+
     def test_bdd_llm_supervisor_status_explains_why_codex_gpt55_is_selected(self) -> None:
         """行为 7b：当本地 Codex/GPT-5.5 被选中时，状态接口必须解释选择依据。"""
         os.environ["EMPIRICAL_LLM_PROVIDER"] = "codex-cli"
@@ -185,8 +247,16 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         os.environ["EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"] = "1"
 
         with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
-            "Product.backend.llm_client._codex_bin",
-            return_value="/opt/homebrew/bin/codex",
+            "Product.backend.llm_client.probe_codex_login",
+            return_value={
+                "ready": True,
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "auth_ready": True,
+                "version": "codex-cli 0.139.0",
+                "reason": "",
+                "action": "",
+            },
         ):
             response = self.client.get("/api/v1/providers/llm-supervisor")
 
@@ -205,8 +275,16 @@ class LlmSupervisorProviderStatusTests(unittest.TestCase):
         os.environ["CODEX_LOCAL_MODEL"] = "gpt-5.5"
 
         with patch.object(llm_client, "load_local_env_if_present", return_value=None), patch(
-            "Product.backend.llm_client._codex_bin",
-            return_value="/opt/homebrew/bin/codex",
+            "Product.backend.llm_client.probe_codex_login",
+            return_value={
+                "ready": True,
+                "available": True,
+                "path": "/opt/homebrew/bin/codex",
+                "auth_ready": True,
+                "version": "codex-cli 0.139.0",
+                "reason": "",
+                "action": "",
+            },
         ):
             attempts_without_gate = llm_client.build_default_llm_attempts()
             configured_without_gate = llm_client._provider_has_key("codex-cli", llm_client.resolve_provider("codex-cli"))

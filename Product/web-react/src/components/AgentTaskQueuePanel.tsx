@@ -101,6 +101,17 @@ interface InternalSkillExecutionPacket {
   created_at?: string;
 }
 
+interface LlmProviderBinding {
+  provider_id?: string;
+  provider_name?: string;
+  api_type?: string;
+  model?: string;
+  source?: string;
+  selection_reason?: string;
+  ready?: boolean;
+  execution_enabled?: boolean;
+}
+
 interface LlmInterventionHandoff {
   stage?: string;
   llm_role?: string;
@@ -112,6 +123,7 @@ interface LlmInterventionHandoff {
   selected_skill_name?: string;
   selected_skill_reason?: string;
   selection_source?: string;
+  source_provider?: LlmProviderBinding;
 }
 
 interface LlmOrchestration {
@@ -287,6 +299,7 @@ interface AgentTask {
   };
   internal_skill_bindings?: InternalSkillBinding[];
   internal_skill_execution_packet?: InternalSkillExecutionPacket;
+  llm_provider_binding?: LlmProviderBinding;
   llm_intervention_handoff?: LlmInterventionHandoff;
   llm_orchestration?: LlmOrchestration;
   llm_execution_preflight?: LlmExecutionPreflight;
@@ -888,6 +901,23 @@ function focusTaskReason(task: AgentTask): string {
   if (action === "execute") return "后端已选，可以启动一次真实执行并写回日志。";
   if (action.startsWith("review_")) return "这里需要人工判断，确认后才进入下一层。";
   return task.primary_action?.reason ?? "这是当前队列中最靠前的可处理任务。";
+}
+
+function taskProviderBinding(task: AgentTask): LlmProviderBinding {
+  return (
+    task.llm_provider_binding ??
+    task.llm_orchestration?.current_provider ??
+    task.llm_intervention_handoff?.source_provider ??
+    {}
+  );
+}
+
+function taskProviderLabel(task: AgentTask): string {
+  const provider = taskProviderBinding(task);
+  const name = provider.provider_name ?? provider.provider_id;
+  const model = provider.model;
+  if (name && model) return `${name} · ${model}`;
+  return name ?? model ?? "LLM provider 待确认";
 }
 
 function renderTaskSkillReview(
@@ -2083,6 +2113,9 @@ export function AgentTaskQueuePanel({ projectId }: AgentTaskQueuePanelProps) {
                   <span>
                     <strong>{task.title ?? task.id}</strong>
                     <small>{task.role ?? task.owner_agent ?? "Agent"}</small>
+                    <small className="agent-task-provider-binding" data-testid="agent-task-provider-binding">
+                      LLM：{taskProviderLabel(task)}
+                    </small>
                   </span>
                   <span className="agent-task-card__state">
                     {statusLabel(task.status)}

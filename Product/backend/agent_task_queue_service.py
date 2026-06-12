@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from Product.backend.internal_agent_skill_registry import normalize_agent_role_name
+from Product.backend.llm_client import resolve_provider
 from Product.backend.project_service import utc_now
 from Product.backend.registry import get_project_by_id
 from Product.backend.supervisor_plan_service import load_saved_supervisor_plan
@@ -213,6 +214,7 @@ def agent_task_queue_blockers(plan: dict[str, Any] | None) -> list[dict[str, str
 def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], timestamp: str) -> dict[str, Any]:
     llm_intervention_contract = build_llm_intervention_contract(plan)
     reference_chain_policy = build_reference_chain_policy(plan)
+    llm_provider_binding = normalize_llm_provider_binding(plan.get("provider"))
     tasks = [
         build_agent_task(index, dispatch, plan, timestamp, llm_intervention_contract, reference_chain_policy)
         for index, dispatch in enumerate(dispatch_items, start=1)
@@ -228,6 +230,7 @@ def build_agent_task_queue(plan: dict[str, Any], dispatch_items: list[Any], time
         "summary": build_agent_task_queue_summary(tasks),
         "tasks": tasks,
         "blockers": [],
+        "llm_provider_binding": llm_provider_binding,
         "llm_intervention_contract": llm_intervention_contract,
         "reference_chain_policy": reference_chain_policy,
         "ui_contract": build_queue_ui_contract(),
@@ -258,6 +261,7 @@ def build_agent_task(
         llm_intervention_contract,
         internal_skill_bindings,
     )
+    llm_provider_binding = normalize_llm_provider_binding(llm_intervention_handoff.get("source_provider"))
     task_reference_chain_policy = build_task_reference_chain_policy(
         reference_chain_policy,
         internal_skill_bindings,
@@ -286,6 +290,7 @@ def build_agent_task(
         "input_evidence": build_task_input_evidence(plan),
         "output_requirements": build_output_requirements(plan, dispatch_item),
         "internal_skill_bindings": internal_skill_bindings,
+        "llm_provider_binding": llm_provider_binding,
         "llm_intervention_handoff": llm_intervention_handoff,
         "llm_orchestration": build_task_llm_orchestration(
             llm_intervention_handoff,
@@ -299,6 +304,7 @@ def build_agent_task(
                 "actor": "product_workbench",
                 "timestamp": timestamp,
                 "source_supervisor_plan_version": plan.get("version", 0),
+                "llm_provider_binding": llm_provider_binding,
             }
         ],
     }
@@ -840,7 +846,7 @@ def build_llm_supervisor_source(plan: dict[str, Any] | None) -> dict[str, Any]:
         if str(event.get("actor") or "") in LLM_SUPERVISOR_ACTORS
     ]
     source_event = llm_events[-1] if llm_events else (decision_events[-1] if decision_events else {})
-    provider = plan.get("provider") if isinstance(plan.get("provider"), dict) else {}
+    provider = normalize_llm_provider_binding(plan.get("provider"))
     evidence_level = str(plan.get("evidence_level") or "none")
     has_llm_supervisor_decision = bool(llm_events) and evidence_level in {
         "llm_supervisor",
@@ -850,13 +856,48 @@ def build_llm_supervisor_source(plan: dict[str, Any] | None) -> dict[str, Any]:
         "source_actor": str(source_event.get("actor") or ""),
         "source_action": str(source_event.get("action") or ""),
         "source_evidence_level": evidence_level,
-        "provider": {
-            key: provider.get(key)
-            for key in ("provider_id", "provider_name", "provider", "model", "version")
-            if provider.get(key)
-        },
+        "provider": provider,
         "has_llm_supervisor_decision": has_llm_supervisor_decision,
     }
+
+
+def normalize_llm_provider_binding(provider: Any) -> dict[str, Any]:
+    if not isinstance(provider, dict) or not provider:
+        return {}
+    raw_provider_id = str(provider.get("provider_id") or provider.get("provider") or "").strip()
+    has_provider_evidence = bool(
+        raw_provider_id
+        or provider.get("provider_name")
+        or provider.get("model")
+        or provider.get("api_type")
+    )
+    if not has_provider_evidence:
+        return {}
+    if raw_provider_id == "local_codex":
+        raw_provider_id = "codex-cli"
+    preset = resolve_provider(raw_provider_id or "codex-cli")
+    provider_id = str(provider.get("provider_id") or preset.id)
+    if provider_id == "local_codex":
+        provider_id = "codex-cli"
+    provider_name = str(provider.get("provider_name") or preset.name)
+    model = str(provider.get("model") or preset.default_model)
+    binding = {
+        "provider_id": provider_id,
+        "provider_name": provider_name,
+        "api_type": str(provider.get("api_type") or preset.api_type),
+        "model": model,
+        "source": str(provider.get("source") or "supervisor_plan.provider"),
+        "selection_reason": str(
+            provider.get("selection_reason")
+            or "SupervisorPlan 由该 provider 生成，后续 Agent 任务沿用同一模型上下文。"
+        ),
+        "ready": bool(provider.get("ready") is True or provider.get("auth_ready") is True),
+        "execution_enabled": bool(provider.get("execution_enabled") is True),
+    }
+    for key in ("provider", "version", "path", "execution_env"):
+        if provider.get(key):
+            binding[key] = provider[key]
+    return binding
 
 
 def merge_llm_stage_handoffs(
@@ -945,9 +986,7 @@ def build_task_llm_orchestration(
     internal_skill_bindings: list[dict[str, Any]],
 ) -> dict[str, Any]:
     first_skill = internal_skill_bindings[0] if internal_skill_bindings else {}
-    provider = llm_intervention_handoff.get("source_provider")
-    if not isinstance(provider, dict):
-        provider = {}
+    provider = normalize_llm_provider_binding(llm_intervention_handoff.get("source_provider"))
     selected_skill: dict[str, Any] = {}
     if first_skill:
         selected_skill = {
@@ -1371,6 +1410,10 @@ def ensure_task_dispatch_audit_fields(
             internal_skill_bindings,
         ),
     )
+    task.setdefault(
+        "llm_provider_binding",
+        normalize_llm_provider_binding(task["llm_intervention_handoff"].get("source_provider")),
+    )
     task_reference_chain_policy = build_task_reference_chain_policy(
         reference_chain_policy,
         internal_skill_bindings,
@@ -1419,6 +1462,14 @@ def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:
         for binding in normalize_list(task.get("internal_skill_bindings"))
         if isinstance(binding, dict)
     ]
+    provider_ids = unique_preserve_order(
+        [
+            str((task.get("llm_provider_binding") or {}).get("provider_id") or "")
+            for task in task_dicts
+            if isinstance(task.get("llm_provider_binding"), dict)
+            and (task.get("llm_provider_binding") or {}).get("provider_id")
+        ]
+    )
     return {
         "total_tasks": len(task_dicts),
         "queued_count": len([task for task in task_dicts if task.get("status") == "queued"]),
@@ -1429,6 +1480,7 @@ def build_agent_task_queue_summary(tasks: list[Any]) -> dict[str, Any]:
         "needs_revision_count": len([task for task in task_dicts if task.get("status") == "needs_revision"]),
         "owner_agents": unique_preserve_order([str(task.get("owner_agent", "")) for task in task_dicts]),
         "internal_skill_count": len(skill_bindings),
+        "llm_provider_ids": provider_ids,
         "high_risk_internal_skill_count": len(
             [binding for binding in skill_bindings if binding.get("risk_level") == "high"]
         ),

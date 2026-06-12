@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from Product.backend.llm_client import probe_codex_login
+from Product.backend.llm_client import probe_codex_login, resolve_provider
 
 
 CODEX_EXEC_ENV = "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"
@@ -14,9 +14,14 @@ CODEX_EXEC_ENV = "EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC"
 
 def local_codex_status() -> dict[str, Any]:
     probe = probe_codex_login()
+    preset = resolve_provider("codex-cli")
     path = probe.get("path") or os.environ.get("CODEX_BIN", "").strip() or shutil.which("codex")
     status: dict[str, Any] = {
         "provider": "local_codex",
+        "provider_id": preset.id,
+        "provider_name": preset.name,
+        "api_type": preset.api_type,
+        "model": preset.default_model,
         "available": bool(path),
         "path": path,
         "version": probe.get("version"),

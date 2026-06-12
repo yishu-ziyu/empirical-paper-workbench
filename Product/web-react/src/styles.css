@@ -1474,6 +1474,11 @@ button {
   font-size: 12px;
 }
 
+.agent-task-provider-binding {
+  color: rgba(220, 220, 220, 0.72) !important;
+  font-family: var(--font-mono);
+}
+
 .agent-task-card__state {
   display: inline-flex;
   align-items: center;

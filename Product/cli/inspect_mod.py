@@ -10,6 +10,7 @@ from Product.cli._common import (
     list_runs,
     load_checkpoints,
 )
+from Product.backend.workbench_paths import runs_base, stage_dir
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
@@ -18,7 +19,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     if args.target == "runs":
         runs = list_runs(workspace_root)
         if not runs:
-            print(f"[inspect] no runs found at {workspace_root}/workspace/runs")
+            print(f"[inspect] no runs found at {runs_base(workspace_root)}")
             return 0
         print(f"[inspect] {len(runs)} run(s):")
         for r in runs:
@@ -29,7 +30,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         if not args.run:
             print("[inspect] --run <run_id> required for `inspect agents`")
             return 2
-        run_dir = workspace_root / "workspace" / "runs" / args.run
+        run_dir = runs_base(workspace_root) / args.run
         if not run_dir.exists():
             print(f"[inspect] run not found: {run_dir}")
             return 1
@@ -45,7 +46,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         if not args.run:
             print("[inspect] --run <run_id> required for `inspect checkpoints`")
             return 2
-        run_dir = workspace_root / "workspace" / "runs" / args.run
+        run_dir = runs_base(workspace_root) / args.run
         if not run_dir.exists():
             print(f"[inspect] run not found: {run_dir}")
             return 1
@@ -67,8 +68,11 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         if not args.run:
             print("[inspect] --run <run_id> required for `inspect paper`")
             return 2
-        run_dir = workspace_root / "workspace" / "runs" / args.run
-        for candidate in (run_dir / "06_writing" / "paper_draft.md",):
+        run_dir = runs_base(workspace_root) / args.run
+        for candidate in (
+            run_dir / stage_dir("06_writing") / "paper_draft.md",
+            run_dir / "06_writing" / "paper_draft.md",
+        ):
             if candidate.exists():
                 text = candidate.read_text(encoding="utf-8")
                 lines = text.splitlines()
@@ -80,7 +84,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                 for ln in lines[-10:]:
                     print(ln)
                 return 0
-        print(f"[inspect] no paper_draft.md in {run_dir}/06_writing/")
+        print(f"[inspect] no paper_draft.md in {run_dir}/{stage_dir('06_writing')}/ or {run_dir}/06_writing/")
         return 1
 
     print(f"[inspect] unknown --target {args.target}")

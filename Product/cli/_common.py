@@ -12,6 +12,12 @@ from Product.backend.orchestrator import (  # noqa: E402
     save_checkpoint,
     utc_now,
 )
+from Product.backend.workbench_paths import (
+    STAGE_DISPLAY,
+    runs_base,
+    stage_dir,
+    stage_key_from_dirname,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -57,7 +63,7 @@ def save_checkpoint_from_input(project_root: Path, stage: str, status_str: str, 
 
 # ── workspace listing helpers ──────────────────────────────────────────────
 def list_runs(workspace_root: Path) -> list[Path]:
-    runs_dir = workspace_root / "workspace" / "runs"
+    runs_dir = runs_base(workspace_root)
     if not runs_dir.exists():
         return []
     return sorted([p for p in runs_dir.iterdir() if p.is_dir()], key=lambda p: p.name)
@@ -65,21 +71,11 @@ def list_runs(workspace_root: Path) -> list[Path]:
 
 def list_agents_in_run(run_dir: Path) -> list[tuple[str, Path]]:
     """Map (display_name, dir) for each agent subdir under a run (per workbench 8-segment convention)."""
-    mapping = {
-        "00_intake": "Supervisor",
-        "01_sources": "Data",
-        "02_literature": "Literature",
-        "03_strategy": "Design",
-        "04_modeling": "Execution",
-        "05_results": "Manuscript-results",
-        "06_writing": "Manuscript-draft",
-        "07_review": "Verifier",
-        "08_final": "Manuscript-final",
-    }
     out = []
     for sub in sorted(run_dir.iterdir()):
-        if sub.is_dir() and sub.name in mapping:
-            out.append((mapping[sub.name], sub))
+        stage_key = stage_key_from_dirname(sub.name)
+        if sub.is_dir() and stage_key:
+            out.append((STAGE_DISPLAY[stage_key], sub))
     return out
 
 
@@ -94,7 +90,10 @@ def default_output_files_for_agent(project_root: Path, agent_role: str) -> list[
         "manuscript": "06_writing",
         "verifier": "07_review",
     }[agent_role]
-    seg_dir = project_root / seg
+    seg_dir = project_root / stage_dir(seg)
+    if not seg_dir.exists():
+        legacy_dir = project_root / seg
+        seg_dir = legacy_dir if legacy_dir.exists() else seg_dir
     if not seg_dir.exists():
         return []
     return sorted([p for p in seg_dir.iterdir() if p.is_file() and (p.suffix in (".md", ".json", ".tex"))])

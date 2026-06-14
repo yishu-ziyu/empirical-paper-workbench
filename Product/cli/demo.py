@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from Product.cli._common import REPO_ROOT, list_runs
+from Product.backend.workbench_paths import runs_base, stage_dir
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
@@ -13,7 +14,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
     workspace_root = Path(args.workspace_root or REPO_ROOT).resolve()
     runs = list_runs(workspace_root)
     if not runs:
-        print(f"[demo] no runs found at {workspace_root}/workspace/runs")
+        print(f"[demo] no runs found at {runs_base(workspace_root)}")
         return 0
 
     run_id = args.run
@@ -22,7 +23,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
         run_id = runs[-1].name
         print(f"[demo] no --run given, using latest: {run_id}")
 
-    run_dir = workspace_root / "workspace" / "runs" / run_id
+    run_dir = runs_base(workspace_root) / run_id
     if not run_dir.exists():
         print(f"[demo] run not found: {run_dir}")
         return 1
@@ -47,7 +48,9 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print()
 
     # 3) inspect paper head
-    paper = run_dir / "06_writing" / "paper_draft.md"
+    paper = run_dir / stage_dir("06_writing") / "paper_draft.md"
+    if not paper.exists():
+        paper = run_dir / "06_writing" / "paper_draft.md"
     if paper.exists():
         text = paper.read_text(encoding="utf-8")
         lines = text.splitlines()

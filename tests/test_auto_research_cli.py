@@ -7,6 +7,13 @@ from pathlib import Path
 
 
 REPO_ROOT = Path("/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板")
+STAGE_DIR = {
+    "00_intake": "00_收件",
+    "01_sources": "01_数据源",
+    "02_literature": "02_文献",
+    "03_strategy": "03_策略",
+    "06_writing": "06_写作",
+}
 
 
 class AutoResearchCliTests(unittest.TestCase):
@@ -63,15 +70,15 @@ class AutoResearchCliTests(unittest.TestCase):
         run_root = Path(payload["run_root"])
         self.assertTrue(run_root.exists())
         expected_paths = [
-            "00_intake/research_intent.json",
-            "01_sources/recursive_search_plan.json",
-            "01_sources/literature_inventory.json",
-            "02_literature/literature_clues.jsonl",
-            "03_strategy/variable_candidates.json",
-            "03_strategy/method_candidates.json",
-            "03_strategy/evidence_gaps.json",
-            "06_writing/research_report.md",
-            "06_writing/paper_draft_exploratory.md",
+            f"{STAGE_DIR['00_intake']}/research_intent.json",
+            f"{STAGE_DIR['01_sources']}/recursive_search_plan.json",
+            f"{STAGE_DIR['01_sources']}/literature_inventory.json",
+            f"{STAGE_DIR['02_literature']}/literature_clues.jsonl",
+            f"{STAGE_DIR['03_strategy']}/variable_candidates.json",
+            f"{STAGE_DIR['03_strategy']}/method_candidates.json",
+            f"{STAGE_DIR['03_strategy']}/evidence_gaps.json",
+            f"{STAGE_DIR['06_writing']}/research_report.md",
+            f"{STAGE_DIR['06_writing']}/paper_draft_exploratory.md",
             "run_manifest.json",
         ]
         for rel in expected_paths:
@@ -118,7 +125,7 @@ class AutoResearchCliTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         run_root = Path(payload["run_root"])
         variable_candidates = json.loads(
-            (run_root / "03_strategy" / "variable_candidates.json").read_text(encoding="utf-8")
+            (run_root / STAGE_DIR["03_strategy"] / "variable_candidates.json").read_text(encoding="utf-8")
         )
 
         self.assertEqual(

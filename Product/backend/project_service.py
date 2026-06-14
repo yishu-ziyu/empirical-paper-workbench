@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .workbench_paths import stage_dir
+
 import yaml
 
 from .registry import add_project, get_project, get_project_by_id, list_projects
@@ -146,8 +148,12 @@ def latest_orchestration_snapshot(root: Path) -> dict[str, Any] | None:
         return None
     manifest_path = manifests[0]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    revised_path = manifest_path.parent / "06_writing" / "paper_draft.md"
-    review_path = manifest_path.parent / "07_review" / "reviewer_decision.json"
+    revised_path = manifest_path.parent / stage_dir("06_writing") / "paper_draft.md"
+    review_path = manifest_path.parent / stage_dir("07_review") / "reviewer_decision.json"
+    if not revised_path.exists():
+        revised_path = manifest_path.parent / "06_writing" / "paper_draft.md"
+    if not review_path.exists():
+        review_path = manifest_path.parent / "07_review" / "reviewer_decision.json"
     if not revised_path.exists():
         revised_path = manifest_path.parent / "outputs" / "paper_draft_revised.md"
     if not review_path.exists():

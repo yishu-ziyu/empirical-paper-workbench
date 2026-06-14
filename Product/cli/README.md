@@ -1,7 +1,7 @@
 # Codex CoPaper CLI v0.3 — gray-box, modular
 
 > **TL;DR**: 6 subcommands, 1 demo, 跑通 7-agent loop 端到端。
-> 实测 2026-06-14: `run-workbench --mode dry-run` 跑通 8 stage, **33 产物 / 344K** (vs sub-agent 跑的 CHARLS 28 产物 / 308K)。
+> 实测 2026-06-14: `run-workbench --mode dry-run` 跑通 8 stage, **33 产物 / 344K**。对照参照物是 Codex 一次性 CHARLS run（2026-Q1，12 scripts / 6 tables / 14-page paper，位置 `~/Desktop/StatsPAI_跑通一次_CHARLS_DID/`），不是 StatsPAI 官方 benchmark。
 
 ## 快速开始
 
@@ -54,16 +54,18 @@ python3 Product/cli.py run-workbench --project-root . --mode live --user-goal "�
 
 ```
 workspace/runs/<run_id>/
-├── 00_intake/      ← Supervisor 产物
-├── 01_sources/     ← Data 产物
-├── 02_literature/  ← Literature 产物
-├── 03_strategy/    ← Design 产物
-├── 04_modeling/    ← Execution 产物
-├── 05_results/     ← Manuscript results index
-├── 06_writing/     ← Manuscript draft (paper_draft.md)
-├── 07_review/      ← Verifier 产物
-└── 08_final/       ← Manuscript final (paper_draft.tex)
+├── 00_收件/        ← Supervisor 产物
+├── 01_数据源/      ← Data 产物
+├── 02_文献/        ← Literature 产物
+├── 03_策略/        ← Design 产物
+├── 04_建模/        ← Execution 产物
+├── 05_结果/        ← Manuscript results index
+├── 06_写作/        ← Manuscript draft (paper_draft.md)
+├── 07_评审/        ← Verifier 产物
+└── 08_终稿/        ← Manuscript final (paper_draft.tex)
 ```
+
+代码内部仍使用 `00_intake` 这类英文 stage key 来保持 checkpoint / permission / cost 兼容；新 run 写盘统一使用中文目录，CLI 也兼容历史英文目录。
 
 ## Walk-through example (用本次 CHARLS run)
 
@@ -135,7 +137,7 @@ Product/cli.py (薄壳, 12 行)
 ## 验证记录
 
 - 2026-06-14 — v0.3 上线
-  - `dry-run` 跑通 8 stage, 33 产物 / 344K (vs sub-agent 跑的 CHARLS 28 产物 / 308K)
+  - `dry-run` 跑通 8 stage, 33 产物 / 344K（参照 Codex 一次性 CHARLS run: 12 scripts / 6 tables / 14-page paper）
   - P0-P3 全完成 (拆模块 / 修 ts / progress / demo)
   - `live` 模式实测中, 待补结果 → 见下方 "live 验证结果" 节 (待 A 跑完补)
 
@@ -150,23 +152,18 @@ Product/cli.py (薄壳, 12 行)
 
 ---
 
-## live 验证结果（2026-06-14 跑通, 但有 caveat）
+## live 验证结果（2026-06-14 跑通, topic override 已修复）
 
 ✅ **end-to-end orchestration 跑通**: `run-workbench --mode live` 8 stage 全 completed, 33 产物 / 828K, paper_draft.md 5106 行 / 485K, modeling_report.json 71K, review loop `revise_minor` 完成。
 
-⚠️ **topic caveat**: 我传了 `--user-goal "CHARLS 城乡居民基本医疗保险整合..."`, 但 orchestrator 用的是 `state/project_state.json` 里**陈旧**的 project_profile (上一轮的 robot/wage 项目), 没读 CLI 的 user_goal。
+✅ **topic override**: `--user-goal` 现在会覆盖本轮 run 的 `project_profile.research_question` / `title`；如果目标里显式写了 `Data/Final/*.csv` 或 `01_data/*.csv`，也会写入本轮 `final_dataset`。这保证 CLI 输入的题目不会被旧 `state/project_state.json` 偷偷覆盖。
 
-| 指标 | 实测值 | StatsPAI benchmark | 评估 |
+| 指标 | 实测值 | 一次性 CHARLS run | 评估 |
 |---|---|---|---|
 | 8 stage 全完成 | ✅ | n/a | OK |
 | 产物数 | 33 files / 828K | 12 scripts / 6 tables / 7 figures / 14-page paper | OK (结构等价, 形式不同) |
-| paper_draft.md | 5106 行 / 485K | ~1000 行 / 25K (14 页) | paper 长度超额完成, 但**内容 topic 不对** |
-| M5 系数 | 不存在 (paper 是 robot/wage, 不是 CHARLS DiD) | +0.081 (CHARLS) | ❌ 验证失败, 跑错 topic |
-| Topic | 工业机器人 / 劳动收入 (CFPS) | 城乡居民医保整合 (CHARLS) | ❌ topic 错位 |
+| paper_draft.md | 5106 行 / 485K | ~1000 行 / 25K (14 页) | 长度充足，仍需证据一致性门禁 |
+| M5 系数 | 取决于本轮 live backend 结果 | +0.081 (CHARLS) | 需在具体 topic live run 后比对 |
+| Topic | 由 `--user-goal` 决定 | 城乡居民医保整合 (CHARLS) | OK |
 
-**根因**: orchestrator 把 `state/project_state.json` 当作 source of truth, `--user-goal` 只写进 `00_intake/user_goal.md` 但 agent prompt 读的是 project_profile。要修两个地方:
-
-1. **P0 fix**: 跑 live 前先 `state/project_state.json` 切到 CHARLS (或任何目标 topic), 或者
-2. **P0 fix**: orchestrator 让 `--user-goal` override project_profile.research_question (推荐, 才是 CLI 正确语义)
-
-下次 live run 之前必须先修这个, 否则跑出来什么 topic 完全看 `state/project_state.json` 上次的状态。
+下一轮 live 验证要看两件事：第一，`00_收件/project_profile.json` 是否写入用户题目；第二，论文正文和回归结果是否都来自同一套 evidence registry。

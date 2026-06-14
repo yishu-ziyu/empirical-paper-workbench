@@ -6,6 +6,12 @@ from pathlib import Path
 
 
 REPO_ROOT = Path("/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板")
+STAGE_DIR = {
+    "00_intake": "00_收件",
+    "02_literature": "02_文献",
+    "06_writing": "06_写作",
+    "07_review": "07_评审",
+}
 
 
 class MultiAgentOrchestrationTests(unittest.TestCase):
@@ -62,10 +68,10 @@ class MultiAgentOrchestrationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(manifest["review_loop"]["status"], "completed")
-        self.assertTrue((run_dir / "00_intake" / "preparation_handoff.json").exists())
-        self.assertTrue((run_dir / "02_literature" / "literature_handoff.json").exists())
-        self.assertTrue((run_dir / "06_writing" / "writing_handoff.json").exists())
-        self.assertTrue((run_dir / "07_review" / "reviewer_decision.json").exists())
+        self.assertTrue((run_dir / STAGE_DIR["00_intake"] / "preparation_handoff.json").exists())
+        self.assertTrue((run_dir / STAGE_DIR["02_literature"] / "literature_handoff.json").exists())
+        self.assertTrue((run_dir / STAGE_DIR["06_writing"] / "writing_handoff.json").exists())
+        self.assertTrue((run_dir / STAGE_DIR["07_review"] / "reviewer_decision.json").exists())
 
     def test_review_loop_creates_draft_and_reviewer_decision(self) -> None:
         from Product.backend.orchestrator import orchestrate_project
@@ -73,8 +79,8 @@ class MultiAgentOrchestrationTests(unittest.TestCase):
         result = orchestrate_project(self.project_root, run_live=False)
 
         run_dir = Path(result["run_root"])
-        draft = run_dir / "06_writing" / "paper_draft.md"
-        reviewer_packet = run_dir / "07_review" / "reviewer_decision.json"
+        draft = run_dir / STAGE_DIR["06_writing"] / "paper_draft.md"
+        reviewer_packet = run_dir / STAGE_DIR["07_review"] / "reviewer_decision.json"
 
         self.assertTrue(draft.exists())
         self.assertTrue(reviewer_packet.exists())
@@ -83,9 +89,10 @@ class MultiAgentOrchestrationTests(unittest.TestCase):
         self.assertIn("revision_requests", review)
         self.assertGreaterEqual(len(review["revision_requests"]), 1)
         self.assertNotEqual(review["reviewer"], "WritingAgent")
-        self.assertIn("matching-efficiency boundary", draft.read_text(encoding="utf-8"))
+        draft_text = draft.read_text(encoding="utf-8")
+        self.assertIn("## 当前证据状态", draft_text)
+        self.assertIn("## 写作边界", draft_text)
 
 
 if __name__ == "__main__":
     unittest.main()
-

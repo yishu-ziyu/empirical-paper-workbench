@@ -16,7 +16,7 @@ from urllib.request import urlopen
 from .evidence import build_evidence_inventory
 from .orchestrator import artifact_rel, write_json, write_text
 from .project_adapter import detect_project_profile
-from .workbench_paths import create_run_workspace
+from .workbench_paths import create_run_workspace, stage_dir
 
 
 CAPABILITY_IDS = [
@@ -96,18 +96,18 @@ def run_auto_research(
         "formal_state_write_policy": "do_not_overwrite_variable_roles_design_spec_or_run_plan",
     }
 
-    write_json(record(run_root / "00_intake" / "research_intent.json"), research_intent)
-    write_json(record(run_root / "01_sources" / "source_inventory.json"), inventory)
-    write_json(record(run_root / "01_sources" / "dataset_inventory.json"), {"items": inventory["datasets"]})
-    write_json(record(run_root / "01_sources" / "literature_inventory.json"), {"items": literature_clues})
-    write_json(record(run_root / "01_sources" / "recursive_search_plan.json"), recursive_search_plan)
-    write_json(record(run_root / "03_strategy" / "variable_candidates.json"), variable_candidates)
-    write_json(record(run_root / "03_strategy" / "method_candidates.json"), {"items": method_candidates})
-    write_json(record(run_root / "03_strategy" / "evidence_gaps.json"), {"items": evidence_gaps})
-    write_jsonl(record(run_root / "02_literature" / "literature_clues.jsonl"), literature_clues)
+    write_json(record(run_root / stage_dir("00_intake") / "research_intent.json"), research_intent)
+    write_json(record(run_root / stage_dir("01_sources") / "source_inventory.json"), inventory)
+    write_json(record(run_root / stage_dir("01_sources") / "dataset_inventory.json"), {"items": inventory["datasets"]})
+    write_json(record(run_root / stage_dir("01_sources") / "literature_inventory.json"), {"items": literature_clues})
+    write_json(record(run_root / stage_dir("01_sources") / "recursive_search_plan.json"), recursive_search_plan)
+    write_json(record(run_root / stage_dir("03_strategy") / "variable_candidates.json"), variable_candidates)
+    write_json(record(run_root / stage_dir("03_strategy") / "method_candidates.json"), {"items": method_candidates})
+    write_json(record(run_root / stage_dir("03_strategy") / "evidence_gaps.json"), {"items": evidence_gaps})
+    write_jsonl(record(run_root / stage_dir("02_literature") / "literature_clues.jsonl"), literature_clues)
     write_jsonl(project_root / "state" / "orchestration" / "literature_clues.jsonl", literature_clues, append=True)
-    write_text(record(run_root / "06_writing" / "research_report.md"), render_research_report(topic, capability_status, variable_candidates, method_candidates, evidence_gaps))
-    write_text(record(run_root / "06_writing" / "paper_draft_exploratory.md"), render_exploratory_draft(topic, variable_candidates, method_candidates))
+    write_text(record(run_root / stage_dir("06_writing") / "research_report.md"), render_research_report(topic, capability_status, variable_candidates, method_candidates, evidence_gaps))
+    write_text(record(run_root / stage_dir("06_writing") / "paper_draft_exploratory.md"), render_exploratory_draft(topic, variable_candidates, method_candidates))
 
     manifest = {
         "run_id": run_id,

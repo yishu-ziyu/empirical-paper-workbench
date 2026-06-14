@@ -17,7 +17,7 @@ from .evidence import build_evidence_inventory
 from .orchestration_schema import HandoffPacket, OrchestrationManifest, ReviewPacket
 from .project_adapter import detect_project_profile
 from .run_event_bus import drop_queue, emit_event
-from .workbench_paths import create_run_workspace
+from .workbench_paths import create_run_workspace, stage_dir
 
 
 # ── Checkpoint data models ───────────────────────────────────────────────────
@@ -148,6 +148,27 @@ def _resolve_project_id(profile: dict[str, Any]) -> str:
         if safe_title:
             return f"proj_{safe_title}"
     return "proj_undergraduate_thesis"
+
+
+def _extract_dataset_from_user_goal(user_goal: str) -> str | None:
+    """Pick an explicit project-relative dataset path from the current run goal."""
+    match = re.search(r"(?:Data|01_data)/[^\s，。；;]+?\.(?:csv|dta|xlsx|xls|parquet|json)", user_goal)
+    return match.group(0) if match else None
+
+
+def _profile_for_run(profile: dict[str, Any], user_goal: str) -> dict[str, Any]:
+    """Let a non-empty CLI goal become the run-local project profile."""
+    goal = user_goal.strip()
+    if not goal:
+        return profile
+    run_profile = dict(profile)
+    run_profile["title"] = goal
+    run_profile["research_question"] = goal
+    run_profile["user_goal_override"] = True
+    dataset = _extract_dataset_from_user_goal(goal)
+    if dataset:
+        run_profile["final_dataset"] = dataset
+    return run_profile
 
 
 def _resolve_agent_id(agent_role: str) -> str:
@@ -604,7 +625,7 @@ def write_handoff(
         metadata=metadata or {},
     )
     safe_name = agent.replace("Agent", "").lower()
-    write_json(run_root / stage / f"{safe_name}_handoff.json", packet.to_dict())
+    write_json(run_root / stage_dir(stage) / f"{safe_name}_handoff.json", packet.to_dict())
     return packet
 
 
@@ -667,6 +688,39 @@ def normalize_markdown_for_run(text: str, project_root: Path) -> str:
         return match.group(0)
 
     return re.sub(r"!\[(?P<alt>[^\]]*)\]\((?P<path>[^)]+)\)(?P<suffix>\{[^}]*\})?", replace_image, text)
+
+
+def render_run_scoped_draft(profile: dict[str, Any], manuscript_source_rel: str | None, inventory: dict[str, Any]) -> str:
+    question = profile.get("research_question") or profile.get("title") or "未命名研究问题"
+    dataset = profile.get("final_dataset") or "尚未绑定最终数据集"
+    source_note = (
+        f"检测到既有手稿 `{manuscript_source_rel}`，但本轮由 CLI 输入了新题目，旧稿不会自动并入正文。"
+        if manuscript_source_rel
+        else "未检测到可复用的正式手稿源。"
+    )
+    result_count = len(inventory.get("results_files", []))
+    literature_count = len(inventory.get("literature_files", []))
+    return "\n".join(
+        [
+            "# Paper Draft",
+            "",
+            "## 本轮研究题目",
+            "",
+            str(question),
+            "",
+            "## 当前证据状态",
+            "",
+            f"- 数据集：{dataset}",
+            f"- 已索引结果文件：{result_count} 个",
+            f"- 已索引文献材料：{literature_count} 个",
+            f"- 旧稿处理：{source_note}",
+            "",
+            "## 写作边界",
+            "",
+            "本轮草稿只保留当前题目、数据路径和证据状态。主结果、稳健性、文献综述和结论必须等对应表格、代码输出与引用证据绑定后再进入正文。",
+            "",
+        ]
+    )
 
 
 def build_review_payload(draft_text: str, mode: str, source_markdown: str | None) -> dict[str, Any]:
@@ -903,7 +957,7 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:6]}"
     workspace = create_run_workspace(project_root, run_id)
     run_root = workspace.root
-    profile = detect_project_profile(project_root)
+    profile = _profile_for_run(detect_project_profile(project_root), user_goal)
     inventory = build_evidence_inventory(project_root, profile)
     artifacts: list[str] = []
     handoffs: list[HandoffPacket] = []
@@ -931,8 +985,8 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 00_intake ──────────────────────────────────────────────────────────
     def _stage_00_intake() -> None:
         nonlocal project_profile_path, user_goal_path
-        project_profile_path = record(run_root / "00_intake" / "project_profile.json")
-        user_goal_path = record(run_root / "00_intake" / "user_goal.md")
+        project_profile_path = record(run_root / stage_dir("00_intake") / "project_profile.json")
+        user_goal_path = record(run_root / stage_dir("00_intake") / "user_goal.md")
         write_json(project_profile_path, profile)
         write_text(user_goal_path, user_goal or "No explicit user goal provided.")
         handoffs.append(
@@ -958,9 +1012,9 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 01_sources ─────────────────────────────────────────────────────────
     def _stage_01_sources() -> None:
         nonlocal source_inventory_path, dataset_inventory_path, literature_inventory_path
-        source_inventory_path = record(run_root / "01_sources" / "source_inventory.json")
-        dataset_inventory_path = record(run_root / "01_sources" / "dataset_inventory.json")
-        literature_inventory_path = record(run_root / "01_sources" / "literature_inventory.json")
+        source_inventory_path = record(run_root / stage_dir("01_sources") / "source_inventory.json")
+        dataset_inventory_path = record(run_root / stage_dir("01_sources") / "dataset_inventory.json")
+        literature_inventory_path = record(run_root / stage_dir("01_sources") / "literature_inventory.json")
         write_json(source_inventory_path, inventory)
         write_json(dataset_inventory_path, {"items": inventory["datasets"]})
         write_json(literature_inventory_path, {"items": inventory["literature_files"]})
@@ -974,17 +1028,20 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     def _stage_02_literature() -> None:
         nonlocal clusters, literature_clusters_path, literature_brief_path, claim_map_path
         clusters = build_literature_clusters(inventory)
-        literature_clusters_path = record(run_root / "02_literature" / "literature_clusters.json")
-        literature_brief_path = record(run_root / "02_literature" / "core_literature_brief.md")
-        claim_map_path = record(run_root / "02_literature" / "claim_evidence_map.json")
+        literature_clusters_path = record(run_root / stage_dir("02_literature") / "literature_clusters.json")
+        literature_brief_path = record(run_root / stage_dir("02_literature") / "core_literature_brief.md")
+        claim_map_path = record(run_root / stage_dir("02_literature") / "claim_evidence_map.json")
         write_json(literature_clusters_path, clusters)
+        question = profile.get("research_question") or profile.get("title") or "未命名研究问题"
         write_text(
             literature_brief_path,
             "\n".join(
                 [
                     "# Core Literature Brief",
                     "",
-                    "The first thesis run treats robot labor reallocation, matching-quality proxies, and skill-post mismatch as separate evidence layers.",
+                    f"Current run question: {question}",
+                    "",
+                    "Literature evidence is first grouped from local files, then reviewed before it can support manuscript claims.",
                     "",
                     "## Detected Literature Clusters",
                     "",
@@ -1033,20 +1090,18 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 03_strategy ────────────────────────────────────────────────────────
     def _stage_03_strategy() -> None:
         nonlocal research_plan_path, identification_plan_path, empirical_plan_path
-        research_plan_path = record(run_root / "03_strategy" / "research_plan.md")
-        identification_plan_path = record(run_root / "03_strategy" / "identification_plan.md")
-        empirical_plan_path = record(run_root / "03_strategy" / "empirical_plan.md")
-        write_text(
-            research_plan_path,
-            "# Research Plan\n\nPrimary question: how industrial robot exposure affects worker allocation outcomes, job-search frictions, and skill-post mismatch.\n",
-        )
+        research_plan_path = record(run_root / stage_dir("03_strategy") / "research_plan.md")
+        identification_plan_path = record(run_root / stage_dir("03_strategy") / "identification_plan.md")
+        empirical_plan_path = record(run_root / stage_dir("03_strategy") / "empirical_plan.md")
+        question = profile.get("research_question") or profile.get("title") or "未命名研究问题"
+        write_text(research_plan_path, f"# Research Plan\n\nPrimary question: {question}\n")
         write_text(
             identification_plan_path,
-            "# Identification Plan\n\nUse Bartik IV as the main identification strategy and keep weak-IV caveats explicit.\n",
+            "# Identification Plan\n\nUse the project profile, data inventory, and confirmed method requirements to select the identification strategy. Do not reuse a stale topic-specific strategy without human review.\n",
         )
         write_text(
             empirical_plan_path,
-            "# Empirical Plan\n\nUse CFPS for outcome-layer results, CLDS for mechanism-layer checks, and CGSS for concept calibration.\n",
+            "# Empirical Plan\n\nBind the execution plan to the current run question and available dataset evidence before live statistical execution.\n",
         )
         handoffs.append(
             write_handoff(
@@ -1057,8 +1112,8 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
                 "03_strategy",
                 [project_profile_path, literature_brief_path, claim_map_path],
                 [research_plan_path, identification_plan_path, empirical_plan_path],
-                ["Bartik IV remains the main identification path for the first thesis run."],
-                ["Weak-IV language must stay cautious in draft and handoff files."],
+                ["The strategy plan is scoped to the current run question rather than a stale project-state topic."],
+                ["Method choice still requires confirmed data schema and design review before live execution."],
                 "ModelingAgent",
             )
         )
@@ -1074,8 +1129,8 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
 
         nonlocal modeling_report_path, diagnostics_report_path
         nonlocal design_spec, run_plan, llm_report, llm_metadata, backend_result
-        modeling_report_path = record(run_root / "04_modeling" / "modeling_report.json")
-        diagnostics_report_path = record(run_root / "04_modeling" / "diagnostics_report.md")
+        modeling_report_path = record(run_root / stage_dir("04_modeling") / "modeling_report.json")
+        diagnostics_report_path = record(run_root / stage_dir("04_modeling") / "diagnostics_report.md")
 
         # Load design spec and run plan from state
         design_spec = _load_state_json(project_root, "design_spec.json")
@@ -1247,9 +1302,9 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 05_results ─────────────────────────────────────────────────────────
     def _stage_05_results() -> None:
         nonlocal results_index_path, table_plan_path, figure_plan_path
-        results_index_path = record(run_root / "05_results" / "results_index.json")
-        table_plan_path = record(run_root / "05_results" / "table_plan.md")
-        figure_plan_path = record(run_root / "05_results" / "figure_plan.md")
+        results_index_path = record(run_root / stage_dir("05_results") / "results_index.json")
+        table_plan_path = record(run_root / stage_dir("05_results") / "table_plan.md")
+        figure_plan_path = record(run_root / stage_dir("05_results") / "figure_plan.md")
         write_json(results_index_path, {"items": inventory["results_files"]})
         write_text(table_plan_path, "# Table Plan\n\nUse existing indexed thesis tables before generating new tables.\n")
         write_text(figure_plan_path, "# Figure Plan\n\nUse existing thesis figures and figure scripts as first-class artifacts.\n")
@@ -1275,31 +1330,23 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
 
     # ── 06_writing ─────────────────────────────────────────────────────────
     def _stage_06_writing() -> None:
-        nonlocal manuscript_source, manuscript_source_rel, paper_draft_path, section_status_path
+        nonlocal manuscript_source, manuscript_source_rel, manuscript_source_reused, paper_draft_path, section_status_path
         manuscript_source, manuscript_source_rel = read_manuscript_source(project_root, inventory)
-        paper_draft_path = record(run_root / "06_writing" / "paper_draft.md")
-        section_status_path = record(run_root / "06_writing" / "section_status.json")
-        if mode == "live" and manuscript_source:
+        paper_draft_path = record(run_root / stage_dir("06_writing") / "paper_draft.md")
+        section_status_path = record(run_root / stage_dir("06_writing") / "section_status.json")
+        source_reused = bool(manuscript_source and not profile.get("user_goal_override"))
+        manuscript_source_reused = source_reused
+        if mode == "live" and source_reused:
             write_text(paper_draft_path, normalize_markdown_for_run(manuscript_source, project_root))
         else:
-            write_text(
-                paper_draft_path,
-                "\n".join(
-                    [
-                        "# Paper Draft",
-                        "",
-                        "This draft is generated from inspected sources and preserves the matching-efficiency boundary.",
-                        "",
-                        "## Source Snapshot",
-                        manuscript_source[:6000] if manuscript_source else "No manuscript source detected.",
-                    ]
-                ),
-            )
+            write_text(paper_draft_path, render_run_scoped_draft(profile, manuscript_source_rel, inventory))
         write_json(
             section_status_path,
             {
                 "sections_detected": [item["path"] for item in inventory["manuscript_sections"]],
                 "source_markdown": manuscript_source_rel,
+                "source_reused": source_reused,
+                "source_policy": "blocked_for_user_goal_override" if profile.get("user_goal_override") else "eligible",
                 "status": "drafted",
             },
         )
@@ -1320,6 +1367,7 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
 
     manuscript_source: str = ""
     manuscript_source_rel: str | None = None
+    manuscript_source_reused = False
     paper_draft_path: Path = Path()
     section_status_path: Path = Path()
     run_stage("06_writing", "WritingAgent", _stage_06_writing)
@@ -1327,10 +1375,11 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 07_review ──────────────────────────────────────────────────────────
     def _stage_07_review() -> None:
         nonlocal review_report_path, revision_plan_path, reviewer_decision_path, review_payload, review
-        review_report_path = record(run_root / "07_review" / "review_report.md")
-        revision_plan_path = record(run_root / "07_review" / "revision_plan.md")
-        reviewer_decision_path = record(run_root / "07_review" / "reviewer_decision.json")
-        review_payload = build_review_payload(read_text(paper_draft_path), mode, manuscript_source_rel)
+        review_report_path = record(run_root / stage_dir("07_review") / "review_report.md")
+        revision_plan_path = record(run_root / stage_dir("07_review") / "revision_plan.md")
+        reviewer_decision_path = record(run_root / stage_dir("07_review") / "reviewer_decision.json")
+        review_source = manuscript_source_rel if manuscript_source_reused else None
+        review_payload = build_review_payload(read_text(paper_draft_path), mode, review_source)
         review_payload["mode"] = mode
         review = ReviewPacket(
             run_id=run_id,
@@ -1373,9 +1422,9 @@ def run_workbench(project_root: Path, mode: str = "dry-run", user_goal: str = ""
     # ── 08_final ───────────────────────────────────────────────────────────
     def _stage_08_final() -> None:
         nonlocal tex_path, docx_path, formatting_report_path, formatting_result
-        tex_path = record(run_root / "08_final" / "paper_draft.tex")
-        docx_path = record(run_root / "08_final" / "paper_draft.docx")
-        formatting_report_path = record(run_root / "08_final" / "formatting_report.md")
+        tex_path = record(run_root / stage_dir("08_final") / "paper_draft.tex")
+        docx_path = record(run_root / stage_dir("08_final") / "paper_draft.docx")
+        formatting_report_path = record(run_root / stage_dir("08_final") / "formatting_report.md")
         write_text(tex_path, "\\section{Draft}\nGenerated draft placeholder for TeX export.\n")
         if mode == "live":
             formatting_result = build_hqu_docx(project_root, paper_draft_path, docx_path, formatting_report_path)

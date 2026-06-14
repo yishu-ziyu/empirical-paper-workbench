@@ -1,0 +1,12 @@
+{
+  "topic": "parent_education_wage",
+  "topic_slug": "parent-education-wage",
+  "method": "IV",
+  "n_variables": 14,
+  "n_sections": 9,
+  "provenance": {
+    "model": "MiniMax-M3",
+    "prompt_version": "v1"
+  },
+  "generated_at": "2026-06-11T06:18:06.302571+00:00"
+}

@@ -1,0 +1,344 @@
+\documentclass[UTF8, zihao=-4, a4paper, openany, fontset=none]{ctexrep}
+
+% 华侨大学经济与金融学院本科毕业论文 LaTeX 模板校准版
+% 依据：
+% 1. 华侨大学本科毕业设计（论文）撰写要求及格式规范.pdf
+% 2. 经济与金融学院本科毕业论文格式模板.docx
+
+\usepackage[
+  a4paper,
+  top=3.80cm,
+  bottom=3.80cm,
+  left=3.20cm,
+  right=3.20cm,
+  headheight=18pt,
+  headsep=0.80cm,
+  footskip=1.00cm
+]{geometry}
+
+\usepackage{fontspec}
+\setCJKmainfont{Songti SC}
+\setCJKsansfont{Heiti SC}
+\setCJKmonofont{Songti SC}
+\setCJKfamilyfont{song}{Songti SC}
+\setCJKfamilyfont{hei}{Heiti SC}
+\newcommand{\songti}{\CJKfamily{song}}
+\newcommand{\heiti}{\CJKfamily{hei}}
+\setmainfont{Times New Roman}
+
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
+\usepackage[hidelinks]{hyperref}
+
+% 学校规范：正文宋体小四；学院模板“段落”样式为 12pt、固定 21pt 行距、首行缩进约 2 字符。
+\newcommand{\hqubodyfont}{\songti\fontsize{12pt}{21pt}\selectfont}
+\AtBeginDocument{\hqubodyfont}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+
+% 章节编号与公式/图表编号。
+\renewcommand{\thechapter}{\arabic{chapter}}
+\renewcommand{\thesection}{\thechapter.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+\setcounter{secnumdepth}{3}
+\numberwithin{equation}{chapter}
+\renewcommand{\theequation}{\thechapter-\arabic{equation}}
+\renewcommand{\thetable}{\thechapter-\arabic{table}}
+\renewcommand{\thefigure}{\thechapter-\arabic{figure}}
+
+% 学院模板正文一级标题为 16pt 加粗居中，正文二级/三级标题按示例保持左对齐加粗。
+\ctexset{
+  chapter = {
+    name = {},
+    number = \arabic{chapter},
+    aftername = \quad,
+    format = \centering\bfseries\songti\fontsize{16pt}{21pt}\selectfont,
+    beforeskip = 24pt,
+    afterskip = 18pt
+  },
+  section = {
+    format = \bfseries\songti\fontsize{14pt}{21pt}\selectfont,
+    beforeskip = 18pt,
+    afterskip = 6pt
+  },
+  subsection = {
+    format = \bfseries\songti\fontsize{12pt}{21pt}\selectfont,
+    beforeskip = 12pt,
+    afterskip = 6pt
+  },
+  subsubsection = {
+    format = \songti\fontsize{12pt}{21pt}\selectfont,
+    beforeskip = 6pt,
+    afterskip = 0pt
+  }
+}
+
+% 目录：学院模板 toc 1/2/3 为宋体/Times New Roman 小四，固定 20pt 行距。
+\setcounter{tocdepth}{2}
+\renewcommand{\cftchapfont}{\songti\fontsize{12pt}{20pt}\selectfont\bfseries}
+\renewcommand{\cftchappagefont}{\songti\fontsize{12pt}{20pt}\selectfont\bfseries}
+\renewcommand{\cftsecfont}{\songti\fontsize{12pt}{20pt}\selectfont}
+\renewcommand{\cftsecpagefont}{\songti\fontsize{12pt}{20pt}\selectfont}
+\renewcommand{\cftsubsecfont}{\songti\fontsize{12pt}{20pt}\selectfont}
+\renewcommand{\cftsubsecpagefont}{\songti\fontsize{12pt}{20pt}\selectfont}
+\setlength{\cftbeforechapskip}{6pt}
+
+% 图表标题：表号在表上，图号在图下，均按章编号。
+\DeclareCaptionLabelFormat{hqulabel}{#1#2}
+\DeclareCaptionLabelSeparator{hququad}{\quad}
+\captionsetup{
+  font={small},
+  labelfont={bf},
+  labelformat=hqulabel,
+  labelsep=hququad,
+  justification=centering
+}
+\captionsetup[table]{position=top}
+\captionsetup[figure]{position=bottom}
+
+\newcommand{\thesistitle}{工业机器人与劳动者重新配置}
+\newcommand{\thesissubtitle}{来自中国微观数据的证据}
+\newcommand{\thesiscollege}{经济与金融学院}
+\newcommand{\thesismajor}{经济学}
+\newcommand{\thesisgrade}{2022级}
+\newcommand{\thesisstudentid}{20224105022}
+\newcommand{\thesisauthor}{马浩宣}
+\newcommand{\thesisadvisor}{杜宇洪 副教授}
+\newcommand{\thesisdate}{2026年5月}
+\newcommand{\thesisfulltitle}{\thesistitle —— \thesissubtitle}
+
+\fancypagestyle{hqufront}{%
+  \fancyhf{}
+  \fancyhead[C]{\zihao{-5}\leftmark}
+  \fancyfoot[C]{\zihao{-5}\thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0pt}
+}
+
+\fancypagestyle{hqumain}{%
+  \fancyhf{}
+  \fancyhead[L]{\zihao{-5}\thesistitle}
+  \fancyhead[R]{\zihao{-5}华侨大学本科毕业论文}
+  \fancyfoot[C]{\zihao{-5}\thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0pt}
+}
+
+\newcommand{\makehqucover}{%
+  \clearpage
+  \begingroup
+  \newgeometry{top=2.50cm,bottom=2.50cm,left=3.00cm,right=2.50cm}
+  \thispagestyle{empty}
+  \centering
+  \includegraphics[width=2.6cm]{assets/hqu-emblem.png}\par
+  \vspace{0.2cm}
+  \includegraphics[width=5.8cm]{assets/hqu-wordmark.png}\par
+  \vspace{0.8cm}
+  {\heiti\fontsize{20pt}{26pt}\selectfont 本科毕业论文（设计）\par}
+  \vspace{1.2cm}
+  {\heiti\fontsize{22pt}{30pt}\selectfont \thesistitle\par}
+  \vspace{0.25cm}
+  {\heiti\fontsize{18pt}{26pt}\selectfont —— \thesissubtitle\par}
+  \vspace{1.5cm}
+  {\zihao{3}
+  \renewcommand{\arraystretch}{1.55}
+  \begin{tabular}{|>{\centering\arraybackslash}p{3.2cm}|>{\centering\arraybackslash}p{8.5cm}|}
+    \hline
+    学\quad 院 & \thesiscollege \\
+    \hline
+    专\quad 业 & \thesismajor \\
+    \hline
+    年\quad 级 & \thesisgrade \\
+    \hline
+    学\quad 号 & \thesisstudentid \\
+    \hline
+    姓\quad 名 & \thesisauthor \\
+    \hline
+    指导老师 & \thesisadvisor \\
+    \hline
+  \end{tabular}\par}
+  \vfill
+  {\songti\zihao{-4}华侨大学教务处印制\par}
+  \vspace{0.3cm}
+  {\bfseries\zihao{-4}\thesisdate\par}
+  \restoregeometry
+  \endgroup
+  \clearpage
+}
+
+\newcommand{\makeintegritypage}{%
+  \clearpage
+  \thispagestyle{empty}
+  \begin{center}
+    {\heiti\fontsize{16pt}{24pt}\selectfont 华侨大学本科毕业论文（设计）诚信承诺书}
+  \end{center}
+  \vspace{1.0cm}
+  本人（姓名）\underline{\makebox[3.0cm]{\thesisauthor}}\quad
+  学号\underline{\makebox[3.0cm]{\thesisstudentid}}\quad
+  专业\underline{\makebox[3.0cm]{\thesismajor}}\par
+  \vspace{0.5cm}
+  郑重承诺：所呈交的毕业论文（设计）是在指导教师指导下自主完成。\par
+  \vspace{0.3cm}
+  论文题目：\underline{\makebox[8.6cm]{\thesisfulltitle}}\par
+  \vspace{0.3cm}
+  毕业论文（设计）选题和研究内容中不存在不正当引用、抄袭、伪造、篡改、代写、买卖等行为，如有违规行为，本人愿意承担一切责任。
+
+  \vspace{2.0cm}
+  \begin{flushright}
+    承诺人（签名）：\underline{\makebox[4cm]{}}\\[1.2cm]
+    年\quad 月\quad 日
+  \end{flushright}
+  \clearpage
+}
+
+\newenvironment{abstractzh}{%
+  \clearpage
+  \pagenumbering{Roman}
+  \pagestyle{hqufront}
+  \markboth{摘要}{摘要}
+  \chapter*{\texorpdfstring{\heiti 摘\quad 要}{摘要}}
+  \addcontentsline{toc}{chapter}{摘要}
+}{\par}
+
+\newcommand{\keywordszh}[1]{%
+  \par\noindent\textbf{关键词：}#1\par
+}
+
+\newenvironment{abstracten}{%
+  \clearpage
+  \markboth{Abstract}{Abstract}
+  \chapter*{Abstract}
+  \addcontentsline{toc}{chapter}{Abstract}
+}{\par}
+
+\newcommand{\keywordsen}[1]{%
+  \par\noindent\textbf{Keywords:} #1\par
+}
+
+\newcommand{\hqufronttoc}{%
+  \clearpage
+  \markboth{目录}{目录}
+  \renewcommand{\contentsname}{\texorpdfstring{目\quad 录}{目录}}
+  \tableofcontents
+  \clearpage
+  \pagenumbering{arabic}
+  \pagestyle{hqumain}
+}
+
+\newcommand{\tablenote}[1]{%
+  \par\vspace{2pt}\begingroup\zihao{5}\noindent #1\par\endgroup
+}
+
+\begin{document}
+
+\makehqucover
+\makeintegritypage
+
+\begin{abstractzh}
+工业机器人扩散不仅改变企业任务组织，也改变劳动者在收入、行业、职业层级和岗位适配关系中的位置。本文关注中国制造业智能化转型中，省级机器人暴露是否对应劳动者重新配置，并进一步观察这种配置变化是否伴随求职、岗位技能掌握和证书---岗位适配等调整。
+
+本文匹配 CFPS 2020、2022 年个体数据、IFR 行业机器人数据和省级产业结构资料，构造省级工业机器人密度对数，并利用 2008 年省级行业就业份额与美国行业机器人运行存量构造 Bartik 工具变量。基准分析采用工具变量两阶段方法，估计机器人暴露与工资、制造业就业、职业层级和兼职就业之间的关系。
+
+\keywordszh{工业机器人；劳动者重新配置；Bartik 工具变量；职业地位}
+\end{abstractzh}
+
+\begin{abstracten}
+The diffusion of industrial robots changes not only firms' task organization but also workers' positions in income distribution, industry allocation, occupational hierarchy, and job fit. This template page is used to verify the English abstract title, paragraph spacing, font, and keyword style.
+
+\keywordsen{Industrial Robots; Labor Reallocation; Bartik Instrumental Variable; Occupational Status}
+\end{abstracten}
+
+\hqufronttoc
+
+\chapter{\texorpdfstring{绪\quad 论}{绪论}}
+
+这里开始正文。正文按学校规范和学院模板校准为宋体与 Times New Roman、小四号、固定约 21pt 行距、首行缩进两个字符。后续把 Word 正文迁移进来时，应该只保留结构命令，不保留 Pandoc 生成的临时格式命令。
+
+\section{选题背景和意义}
+
+中国制造业正处于由规模扩张转向质量提升、由传统要素投入转向智能化改造的阶段。工业机器人由此成为制造业智能化转型中的重要技术载体。学校规范允许学院统一选择标题层级格式，本模板采用学院 Word 模板中的阿拉伯数字层级格式。
+
+\subsection{选题背景}
+
+工业机器人扩散已经不只是企业设备更新问题，还关系到制造业组织方式和岗位需求结构的变化。三级标题采用左对齐、加粗、小四号，并保持固定行距。
+
+\subsubsection{研制历史}
+
+四级标题在学院示例中以 `1.1.1.1` 形式出现，本模板保留编号能力，但目录默认只显示到三级标题。
+
+\chapter{理论基础与研究假设}
+
+由劳动者工资方程可得：
+
+\begin{equation}
+\ln wage_i = \alpha + \beta Robot_{pt} + X_i'\gamma + \mu_p + \lambda_t + \varepsilon_i
+\end{equation}
+
+其中，$\ln wage_i$ 表示劳动者工资对数，$Robot_{pt}$ 表示省级机器人暴露水平。公式编号按章编号，形如 `2-1`。
+
+\chapter{研究设计}
+
+\section{变量构造}
+
+\begin{table}[htbp]
+  \centering
+  \caption{核心解释变量与工具变量构造}
+  \begin{tabular}{p{0.22\textwidth}p{0.24\textwidth}p{0.42\textwidth}}
+    \toprule
+    变量代码 & 变量名称 & 基本构造 \\
+    \midrule
+    robot density & 省级机器人密度 & 机器人运行存量与就业规模之比 \\
+    ln\_robot & 机器人暴露变量 & 省级机器人密度取对数 \\
+    bartik\_iv & Bartik 工具变量 & 基期行业就业份额与美国行业机器人存量加权 \\
+    \bottomrule
+  \end{tabular}
+  \tablenote{数据来源：工业机器人安装密度数据、IFR 工业机器人数据和 2008 年省级行业就业份额资料。}
+  \tablenote{注：本表用于测试学校规范中的表题、三线表和表注样式。}
+\end{table}
+
+\section{图形示例}
+
+\begin{figure}[htbp]
+  \centering
+  \fbox{\parbox[c][4cm][c]{0.72\textwidth}{\centering 图形占位：后续替换为 figures/ 中的正式图片}}
+  \caption{核心变量分布与第一阶段关系}
+\end{figure}
+
+\chapter{实证结果}
+
+\section{基准回归结果}
+
+本章用于测试较长标题、页眉页脚、页码和图表浮动。实证表格正式迁移时，应优先使用 `booktabs` 重排，不直接保留 Word 表格的网格线。
+
+\chapter{研究结论、政策建议与研究不足}
+
+\section{研究结论}
+
+本模板校准版的目标是先把学校 PDF 和学院 Word 模板中的页面、字体、标题、段落、目录、页眉页脚、图表和公式规则编码出来。之后通过 PDF 与 Word 模板逐页对照，再微调边距和间距。
+
+\chapter*{参考文献}
+\addcontentsline{toc}{chapter}{参考文献}
+
+\noindent[1] Acemoglu, D., and Restrepo, P. Robots and Jobs: Evidence from US Labor Markets[J]. Journal of Political Economy, 2020, 128(6): 2188-2244.
+
+\noindent[2] Autor, D. H. Why Are There Still So Many Jobs? The History and Future of Workplace Automation[J]. Journal of Economic Perspectives, 2015, 29(3): 3-30.
+
+\appendix
+\chapter*{附录A}
+\addcontentsline{toc}{chapter}{附录A}
+
+\section*{附录表A 多年机器人暴露的行业来源诊断}
+这里放置附录表和补充诊断材料。
+
+\chapter*{致谢}
+\addcontentsline{toc}{chapter}{致谢}
+
+感谢所有在论文写作和模板整理过程中提供帮助的人。
+
+\end{document}

@@ -1,0 +1,6 @@
+source,relation,x,y,weighted_slope,province_year_cells,weight_sum
+province_year_descriptive,first_stage_descriptive,bartik_iv,ln_robot,0.7833046841220506,60.0,34315
+province_year_descriptive,reduced_form_descriptive_wage,bartik_iv,ln_wage_mean,0.14488966368017725,60.0,17621
+province_year_descriptive,reduced_form_descriptive_manu,bartik_iv,manu_share,0.054858779081852646,60.0,19395
+table5_2_reduced_form,ln_wage,bartik_iv,工资对数,0.1399839,,15697
+table5_2_reduced_form,manu_dummy,bartik_iv,制造业就业,0.0567022,,18231

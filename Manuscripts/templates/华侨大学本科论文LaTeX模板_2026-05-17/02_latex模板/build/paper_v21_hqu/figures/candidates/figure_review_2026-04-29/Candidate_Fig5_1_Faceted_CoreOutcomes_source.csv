@@ -1,0 +1,5 @@
+outcome,outcome_label,variable,variable_label,coef,se,ci_lower_95,ci_upper_95,pvalue,stars,nobs,r2,first_stage_f,dwh_p,source_csv
+ln_wage,工资对数,ln_robot,机器人暴露对数,0.1993843,0.0779975,0.0465092,0.3522594,0.0106,**,15697,0.1916,14.0339,0.00073,03_results/panel_main/table5_1_baseline_iv.csv
+manu_dummy,制造业就业,ln_robot,机器人暴露对数,0.0798431,0.0219199,0.036880096,0.122806104,0.0003,***,18231,0.0358,14.2926,0.002204,03_results/panel_main/table5_1_baseline_iv.csv
+ISEI_score,ISEI 得分,ln_robot,机器人暴露对数,0.9994911,0.2745518,0.46136957199999995,1.537612628,0.0003,***,28974,0.44,15.5486,0.007737,03_results/panel_main/table5_1_baseline_iv.csv
+part_time,兼职就业,ln_robot,机器人暴露对数,-0.0161695,0.0093711,-0.034536856000000005,0.0021978560000000015,0.0844,*,28646,0.0831,15.3816,0.000459,03_results/panel_main/table5_1_baseline_iv.csv

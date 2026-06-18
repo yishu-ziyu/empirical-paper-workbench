@@ -1,5 +1,1083 @@
 # Review
 
+## 2026-06-18 P13-P16 Demo Closure
+
+### 行为覆盖
+
+- [x] 行为 1：P13 归档旧机器人题目的活跃方法规格和运行计划，避免污染父母教育工资 Demo 线。
+- [x] 行为 2：P13 用真实 CSV 表头校验 P12 公式，缺 `parent_education` 和 `experience` 时阻断运行计划。
+- [x] 行为 3：P14 在 P13 阻断时不创建运行编号，不运行模型，只写执行证据账本。
+- [x] 行为 4：P15 交付半成品论文路径和红标问题清单。
+- [x] 行为 5：P16 生成用户验收包，并明确 `can_claim_complete_paper=false`。
+- [x] 行为 6：仪表盘首屏先回答“现在能交付什么 / 还缺什么 / 下一步做什么”。
+- [x] 行为 7：GET 在 P13-P16 未执行前不能凭空宣称 P16 已完成。
+- [x] 行为 8：旧机器人题目的 P12 预检不能被改名成父母教育工资闭环。
+- [x] 行为 9：字段齐全时，P14 必须先实际执行最小 OLS，才允许返回 run id。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p13-p16-demo-closure-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py -q` 首次 3 failed，原因是 P13-P16 API 不存在，仪表盘没有三句话摘要。
+- 防误报 RED：新增 GET-before-POST、stale P12、字段齐全必须真跑 OLS 三个边界测试后，`python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py -q` 曾 3 failed，原因是旧实现会合成 P16、接收旧 P12、创建未执行 run id。
+- 目标测试：`PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_workflow_dashboard_artifact.py -q -p no:cacheprovider`，13 passed。
+- 阶段回归：`PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py tests/test_parent_education_wage_p12_design_tree.py tests/test_parent_education_wage_p12_design_spec_preflight.py tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_workflow_dashboard_artifact.py -q -p no:cacheprovider`，45 passed。
+- Python 编译：P13-P16 service、workbench、`Product/app.py` 和 dashboard service 通过。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- 浏览器 QA：`http://127.0.0.1:8780/workflow-dashboard` 桌面 1440px 和 390px 移动端均可见三句话结论、P16 当前门禁、P13 中文分支和“不伪造回归结果”；无横向溢出。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_p13_p16_demo_closure.py`：新增 P13-P16 闭环器、P12 污染校验、GET not-run 状态和最小 OLS 执行器。
+- `Product/backend/product_control_p13_p16_demo_closure_service.py`：新增 Product API 服务层。
+- `Product/app.py`：新增 P13-P16 GET/POST 路由，并提供 `/workflow-dashboard-state.json` 作为仪表盘 JSON 兜底。
+- `Results/json/parent_education_wage_p13_run_plan_approval.json`、`parent_education_wage_p14_execution_evidence_ledger.json`、`parent_education_wage_p15_draft_export_package.json`、`parent_education_wage_p16_user_acceptance_packet.json`：真实闭环产物。
+- `Manuscripts/generated/parent_education_wage_p15_issue_list.md`：红标问题清单。
+- `docs/product-control/workflow-dashboard.html`、`docs/product-control/workflow-dashboard-state.json`：控制台改为 P16 阻断交付视图，分支标题中文化。
+- `tests/test_parent_education_wage_p13_p16_demo_closure.py`、`tests/test_parent_education_wage_p12_design_tree.py`、`tests/test_workflow_dashboard_artifact.py`：新增和更新 P13-P16 契约测试。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步当前阶段。
+
+### 剩余风险
+
+- 当前是 P16 阻断交付分支，不是完整论文成功分支。
+- 真实 CSV 缺 `parent_education` 和 `experience`，补齐前不能运行父母教育工资模型。
+- 当前本地服务为 `http://127.0.0.1:8780`；如重启服务，需要重新确认 API 和仪表盘状态。
+
+## 2026-06-18 P12 DesignSpec Preflight
+
+### 行为覆盖
+
+- [x] 行为 1：没有 approved `state/product/variable_roles.json` 时，P12 阻断并要求先完成 P9-Human。
+- [x] 行为 2：P9 已保存后，P12 生成可审阅候选 DesignSpec，包含研究问题、变量角色、baseline OLS 和公式。
+- [x] 行为 3：方法清单区分 OLS 可预检、DID/IV/RDD 阻断、PSM/DML 候选预检。
+- [x] 行为 4：P12 只写预检 JSON 和 Review，不写正式 DesignSpec/RunPlan，不创建 run id，不跑模型。
+- [x] 行为 5：Product API 暴露 P12 GET/POST 当前状态和 no-model 边界。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p12-design-spec-preflight-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p12_design_spec_preflight.py -q` 首次失败 4 项，原因是 P12 API/服务尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p12_design_spec_preflight.py -q`，4 passed。
+- P12/dashboard 最小回归：`python3 -m pytest tests/test_parent_education_wage_p12_design_spec_preflight.py tests/test_parent_education_wage_p12_design_tree.py tests/test_workflow_dashboard_artifact.py -q`，14 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py tests/test_parent_education_wage_p12_design_tree.py tests/test_parent_education_wage_p12_design_spec_preflight.py tests/test_workflow_dashboard_artifact.py -q`，39 passed。
+- Python 编译：P9/P12 services、P12 workbench、`Product/app.py` 和 dashboard service 编译通过。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8779 当前代码服务下，P12 GET/POST 返回 `design_spec_preflight_ready_for_review`，并保持 `can_write_design_spec=false`、`can_create_run_id=false`、`can_execute_model=false`。
+- 浏览器 QA：Browser plugin required `node_repl js` 入口未暴露，本轮回退普通 Playwright；8779 `/workflow-dashboard` 桌面 1440px 和移动端 390px 均无横向溢出、无 offscreen 元素、无相关 console error，截图为 `Product/output/playwright/workflow-dashboard-p12-design-spec-preflight-desktop.png`、`Product/output/playwright/workflow-dashboard-p12-design-spec-preflight-mobile.png`。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_design_spec_preflight.py`：新增 P12 预检生成器。
+- `Product/backend/product_control_p12_design_spec_preflight_service.py`：新增 Product API 服务层。
+- `Product/app.py`：新增 P12 GET/POST 路由。
+- `Results/json/parent_education_wage_p12_design_spec_preflight.json`：真实项目预检 JSON。
+- `Reviews/parent_education_wage_p12_design_spec_preflight.md`：真实项目人工审阅报告。
+- `docs/product-control/workflow-dashboard-state.json`、`docs/product-control/workflow-dashboard.html`、`Tasks/workflow-dashboard-bdd.md`：仪表盘推进到 P12 预检完成态。
+
+### 剩余风险
+
+- P12 预检不是正式 DesignSpec；下一步仍需 P13 RunPlan Approval。
+- 不能创建 run id，不能运行模型，不能把预检草案冒充最终论文证据。
+
+## 2026-06-18 P12-0 Design Tree / Pre-PRD
+
+### 行为覆盖
+
+- [x] 行为 1：P12-0 承接 P9 已保存状态，并只打开 P12 DesignSpec Preflight。
+- [x] 行为 2：设计树覆盖 P12-P16，并写清验收标准、回退路径和停机条件。
+- [x] 行为 3：仪表盘显示 `P12-0 设计树已完成`，并继续禁止 run id 和模型执行。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p12-0-design-tree-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p12_design_tree.py -q`，3 failed；原因是 `docs/product-control/p12-p16-design-tree.md` 不存在，仪表盘状态仍为 `formal_variable_role_save_ready`。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p12_design_tree.py tests/test_workflow_dashboard_artifact.py -q`，10 passed。
+
+### 实现范围
+
+- `docs/product-control/p12-p16-design-tree.md`：新增 P12-P16 设计树、验收、回退、停机条件和不允许改动范围。
+- `docs/product-control/workflow-dashboard-state.json`：当前状态更新为 `p12_design_tree_ready`。
+- `docs/product-control/workflow-dashboard.html`：静态 fallback 同步到 P12-0。
+- `tests/test_parent_education_wage_p12_design_tree.py`：新增 P12-0 行为测试。
+- `tests/test_workflow_dashboard_artifact.py`、`Tasks/workflow-dashboard-bdd.md`：仪表盘期望切到 P12-0。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步当前阶段。
+
+### 剩余风险
+
+- P12-0 不是 DesignSpec；下一阶段仍必须按 SDD/BDD/TDD 做 P12 DesignSpec Preflight。
+- 当前仍不得创建 run id 或运行模型。
+
+## 2026-06-18 P9H/P10 Mobile Gate Summary QA
+
+### 行为覆盖
+
+- [x] 行为 1：P9H 保存完成后，产品页当前门禁摘要在 390px 移动端不再重叠。
+- [x] 行为 2：移动端仍显示 P9 已保存、不能进入正式论文、不能运行模型的边界。
+- [x] 行为 3：该修复只改布局，不改 P9/P12 状态机，不创建 run id，不运行模型。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p10_product_control_ia.py -q` 新增移动端单列契约后先失败 1 项，原因是 `.product-control-gate-summary` 在移动端仍保持多列。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p10_product_control_ia.py -q`，5 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py tests/test_parent_education_wage_p12_design_tree.py tests/test_workflow_dashboard_artifact.py -q`，35 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- 浏览器 QA：`http://127.0.0.1:8777` 下，仪表盘和产品页的桌面 1440px、移动端 390px 均无横向溢出、无相关 console error；产品页移动端 `.product-control-gate-summary` 为单列且无重叠。
+
+### 实现范围
+
+- `Product/web-react/src/styles.css`：在 720px 以下把 `.product-control-gate-summary` 和阶段历史 summary 切到单列，避免状态清单挤压标题区。
+- `tests/test_parent_education_wage_p10_product_control_ia.py`：新增 P9H/P10 移动端当前门禁布局契约。
+- `Product/output/playwright/`：更新 P12-0 仪表盘和 P9H 产品页桌面/移动端截图。
+
+### 剩余风险
+
+- 产品页仍是工程工作台，不是 CEO 仪表盘；给管理层看的主入口是 `/workflow-dashboard`。
+- Browser 插件 JS 运行入口当前不可用，本轮使用本地 Playwright 作为可视化 QA 回退路径。
+
+## 2026-06-18 P9H Formal Save Completion
+
+### 行为覆盖
+
+- [x] 行为 1：P9-Human 把已批准、已签收 source contract 的角色写入正式 `state/product/variable_roles.json`。
+- [x] 行为 2：P9 POST 成功后，后续 GET 显示 `formal_variable_roles_saved`，不再提示重复保存。
+- [x] 行为 3：P9H 解锁 P12 DesignSpec Preflight，但仍禁止创建 run id 和模型执行。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p9h-formal-save-completion-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py -q` 新增 P9H 完成态回归后先失败 1 项，原因是 GET 仍返回 `formal_variable_role_save_ready`。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py -q`，7 passed。
+- 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py tests/test_workflow_dashboard_artifact.py -q`，31 passed。
+
+### 实现范围
+
+- `Product/backend/product_control_p9_variable_role_save_service.py`：新增 formal role set 完成态识别，避免保存后继续提示 ready。
+- `tests/test_parent_education_wage_p9_formal_variable_role_save.py`：新增 POST 后 re-GET 完成态断言。
+- `Tasks/parent-education-wage-p9h-formal-save-completion-bdd.md`：记录 P9H 完成态行为。
+- `state/product/variable_roles.json`：真实项目正式变量角色已保存。
+
+### 剩余风险
+
+- P9H 只保存正式变量角色；没有写 DesignSpec/RunPlan，没有创建 run id，没有运行模型。
+- 8776 旧服务进程可能仍加载旧代码；当前代码验收应使用 8777 或重启服务。
+
+## 2026-06-18 P11H Source Contract Saved Next-Step
+
+### 行为覆盖
+
+- [x] 行为 1：P11-Human 真实保存 source contract 后，页面显示 `P11 已签收` 和 `已解锁 P9 正式变量表保存`。
+- [x] 行为 2：页面把下一步限定为 `下一步：回到 P9 正式保存`，不引导进入 P12。
+- [x] 行为 3：页面继续显示 `仍不能进入 P12`、`仍不能创建 run id`、`仍不能运行模型`。
+- [x] 行为 4：P11H 不写正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型结果。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11h-source-contract-saved-next-step-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11H React 契约后先失败 1 项，原因是 React 尚未暴露 `sourceContractSaved` 和 saved next-step panel。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，13 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，24 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- 真实保存验收：8776 真实页面已保存 `Data/Final/cfps_robot_reallocation.csv`、reviewer/note、9 个字段来源、逐行 human confirmation 和 `max(father_education, mother_education)` construction。
+- API smoke：P11 返回 `source_metadata_contract_ready_for_p9_save`、missing fields 为空、`can_return_to_p9_formal_save=true`、`can_execute_model=false`；P9 返回 `formal_variable_role_save_ready`、`can_save_formal_variable_roles=true`、`can_enter_design_spec_preflight=false`、`can_create_run_id=false`、`can_execute_model=false`。
+- 浏览器 smoke：8776 真实入口桌面和 390px 移动端均显示 P11 已签收、P9 已解锁、9/9 fields、missing none、no P12/run/model；horizontalOverflow=false、offscreenCount=0、console messages=0。截图为 `Product/output/playwright/product-control-p11h-saved-next-step-final2-desktop.png`、`Product/output/playwright/product-control-p11h-saved-next-step-final2-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11h-source-contract-saved-next-step-bdd.md`：P11H SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11H React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 saved source contract 状态、review rehydrate、9/9 source row 状态和 P9 next-step panel。
+- `Product/web-react/src/styles.css`：新增 P11 saved next-step panel 样式，并修复移动端 locked tab strip 横向溢出。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`、`docs/product-control/workflow-dashboard-state.json`：同步 P11H 完成和 P9 当前门禁。
+
+### 剩余风险
+
+- P11H 只完成 source contract 签收，不等于已写正式变量表。
+- 当前下一步是 P9-Human 正式保存；P9 成功前不能开始 P12-0、P12、RunPlan、run id 或模型执行。
+
+## 2026-06-18 Workflow Dashboard
+
+### 行为覆盖
+
+- [x] 行为 1：仪表盘显示 `追问 -> 调研 -> 原型 -> 规格 -> 拆任务 -> 实现 -> 复核` 七阶段，并标注当前 `实现 / 复核` 与下一步 `P9 / 设计树`。
+- [x] 行为 2：仪表盘首屏提供 CEO 摘要，显示 `老板先看这里`、项目目标、当前结论、需要老板判断和下一步动作。
+- [x] 行为 3：仪表盘显示 `P11 已签收`、`P9 正式变量表保存`、`需要人工保存正式变量表`、`P12 暂停` 和 `不运行模型`；机器错误码只保留在状态 JSON，不作为主界面文案。
+- [x] 行为 4：仪表盘显示 P9 正式保存 -> P12-0 设计树 -> P16 用户验收的分支树，并明确回退路径和禁止跳到运行编号。
+- [x] 行为 5：仪表盘提供中文人工验收清单，并从 `docs/product-control/README.md` 可发现。
+- [x] 行为 6：仪表盘从 `docs/product-control/workflow-dashboard-state.json` 轮询渲染，HTML 不再是唯一状态源。
+- [x] 行为 7：FastAPI 提供 `/workflow-dashboard` 和 `/api/v1/workflow-dashboard/state`，状态 API 禁用缓存。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/workflow-dashboard-bdd.md`。
+- RED：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q` 新增动态状态测试后先失败 6 项，原因是 `docs/product-control/workflow-dashboard-state.json` 尚不存在，FastAPI 动态入口也未实现。
+- 目标测试：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q`，6 passed。
+- 中文化 RED：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q` 在旧英文 fallback 和旧状态 JSON 下失败 6 项；随后把用户可见文案改为中文，机器错误码只保留在状态 JSON。
+- 中文化目标测试：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q`，6 passed。
+- CEO 摘要 RED：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q` 先失败 1 项，原因是页面和状态 JSON 还没有 `老板先看这里` 摘要层；实现后目标测试扩展为 7 passed。
+- 浏览器 smoke：`http://127.0.0.1:8788/workflow-dashboard` 桌面和 390px 移动端均请求 `/api/v1/workflow-dashboard/state`，状态响应 200 且 `Cache-Control: no-store`；页面 H1 为 `论文生产流水线控制台`，CEO 摘要可见，旧英文状态未出现，offscreen elements=0，移动端 bodyScrollWidth=390。截图为 `Product/output/playwright/workflow-dashboard-desktop-ceo.png`、`Product/output/playwright/workflow-dashboard-mobile-ceo.png`。
+
+### 实现范围
+
+- `docs/product-control/workflow-dashboard.html`：改为动态轮询渲染的项目控制仪表盘，保留静态 fallback。
+- `docs/product-control/workflow-dashboard-state.json`：新增仪表盘机器可读状态源。
+- `Product/backend/workflow_dashboard_service.py`：新增状态 JSON 读取服务。
+- `Product/app.py`：新增 `/workflow-dashboard` 页面路由和 `/api/v1/workflow-dashboard/state` 状态 API。
+- `docs/product-control/README.md`：把工作流仪表盘加入产品控制文档阅读顺序。
+- `tests/test_workflow_dashboard_artifact.py`：新增仪表盘契约测试。
+- `Tasks/workflow-dashboard-bdd.md`：新增仪表盘 BDD。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/handoff.md`：同步控制面状态。
+
+### 剩余风险
+
+- 当前仪表盘采用短轮询，不是 WebSocket/SSE push；阶段变化时仍需要更新 `workflow-dashboard-state.json`。
+- 该仪表盘不替用户完成 P9-Human，也不解锁 P12/RunPlan/model。
+
+## 2026-06-18 P11G Source Contract Signoff Workspace
+
+### 行为覆盖
+
+- [x] 行为 1：P11 当前门禁详情显示 `Source Contract Signoff` 工作台，而不是直接把用户丢进长表单。
+- [x] 行为 2：工作台把 `Review queue` 和 `Source contract form` 分成左右两栏；用户先看字段队列，再填写 source contract。
+- [x] 行为 3：底部 action bar 明确 `No model run`，保存按钮在 source metadata 缺口存在时继续 disabled。
+- [x] 行为 4：P11G 不新增正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型执行入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11g-source-contract-signoff-workspace-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11G React 契约测试后先失败 1 项，原因是 `Source Contract Signoff` workspace 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，12 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，23 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，61 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- 浏览器 smoke：8776 真实入口桌面和 390px 移动端均有 `Source Contract Signoff`、`Review queue`、`Source contract form`、9 个 queue items、9 个 source rows、9 个 checkbox、disabled 保存按钮和 `No model run`；P11G 自身 horizontal overflow=false，action bar 不遮挡字段行。截图为 `Product/output/playwright/product-control-p11g-signoff-workspace-final-desktop.png`、`Product/output/playwright/product-control-p11g-signoff-workspace-final-mobile.png`。
+- 独立审查：code-reviewer Agent `Socrates` PASS；未发现 P11-Human/P9/P12 绕过、保存门禁绕过、CSS 全局污染或文档状态误报。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11g-source-contract-signoff-workspace-bdd.md`：P11G SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11G React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：重组 P11 为状态条、review queue、source contract form、折叠 review kit 和 action bar。
+- `Product/web-react/src/styles.css`：新增 P11G 工作台、两栏布局、状态条、form pane、review pane、action bar 和移动端样式。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11G 阶段状态。
+
+### 剩余风险
+
+- P11G 只把 P11-Human 做成可用 UI，不替用户判断真实 CFPS 波次、父母教育构造、hukou 角色或控制变量口径。
+- 真实 source contract 仍未保存；P9 继续阻断是正确状态。
+- P11G 目标测试仍偏静态字符串契约；当前用浏览器 smoke 弥补，后续可补 Playwright/DOM 自动断言，把 disabled save、no-model 和 390px 无横向溢出纳入自动测试。
+- 390px 移动端 P11G 自身无横向溢出，但页面下方旧 locked tab strip 仍被浏览器检测为 offscreen；不影响本阶段工作台使用，后续应作为全局移动端清理项。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11F Human Signoff Review Queue
+
+### 行为覆盖
+
+- [x] 行为 1：P11 source metadata 表单前显示 `Human signoff review queue`，用户先看到审核队列，再进入长表单。
+- [x] 行为 2：队列覆盖 9 个 required source fields，并逐项显示字段名、status、missing items 和 action。
+- [x] 行为 3：预填候选值不会自动变成人工签收；未勾选 human confirmation 的行仍显示 `ready_for_human_confirmation`，而不是 `confirmed_source_row`。
+- [x] 行为 4：P11F 不新增正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型执行入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11f-human-signoff-review-queue-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11F React 契约测试后先失败 1 项，原因是 review queue 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，11 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，22 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，60 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8776 当前代码服务上，P11 返回 `source_metadata_contract_required`；正式层边界仍为 `can_save_formal_variable_roles=false`、`can_enter_design_spec_preflight=false`、`can_create_run_id=false`、`can_execute_model=false`。
+- 浏览器 smoke：8776 真实入口桌面和 390px 移动端均有 review queue；queue items=9、source rows=9、row fields=36、checkboxes=9、保存按钮 disabled、readiness 包含 `human_confirmation`；页面级 horizontal overflow=false；console errors=0；截图为 `Product/output/playwright/product-control-p11f-review-queue-desktop.png`、`Product/output/playwright/product-control-p11f-review-queue-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11f-human-signoff-review-queue-bdd.md`：P11F SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11F React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 source row review item/status/missing/action 计算，并在 P11 长表单前渲染审核队列。
+- `Product/web-react/src/styles.css`：新增审核队列桌面/移动端样式。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11F 阶段状态。
+
+### 剩余风险
+
+- P11F 只是签收体验改进，不替用户判断 CFPS 波次、父母教育构造、hukou 角色或控制变量口径。
+- 真实 source contract 仍未保存；P9 继续阻断是正确状态。
+- 本轮尝试派出独立 code-reviewer Agent，但当前会话 subagent thread 已满，未能启动；后续进入 P11-Human/P9 前应再次做独立审查。
+- P11 页面仍是长表单；后续 P11-Human 需要真实人工签收，之后才能回到 P9。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11E Human Signoff Readable Rows
+
+### 行为覆盖
+
+- [x] 行为 1：每个 P11 source row 的四个输入框都有可见标签：`dataset column`、`source field`、`source path`、`evidence level`。
+- [x] 行为 2：390px 移动端隐藏表头后，字段行仍能靠行内标签读懂，不需要横向滚动页面。
+- [x] 行为 3：行内标签不会替代人工确认；9 个 source rows 仍各自需要 human confirmation checkbox。
+- [x] 行为 4：P11E 不新增正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型执行入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11e-human-signoff-readable-rows-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11E React 契约测试后先失败 1 项，原因是 row field labels 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，10 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，21 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，59 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8776 当前代码服务上，P11 返回 `source_metadata_contract_required`；P9 仍返回 `blocked_missing_dataset_source_metadata`，`can_enter_design_spec_preflight=false`，`can_create_run_id=false`，`can_execute_model=false`。
+- 浏览器 smoke：8776 真实入口桌面和 390px 移动端均有 9 个 source rows、36 个可见字段标签、9 个 row human confirmation checkbox、disabled 保存按钮和 `human_confirmation` readiness 缺口；页面级 horizontal overflow=false；console errors=0；截图为 `Product/output/playwright/product-control-p11e-readable-rows-desktop.png`、`Product/output/playwright/product-control-p11e-readable-rows-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11e-human-signoff-readable-rows-bdd.md`：P11E SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11E React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：给 P11 row inputs 增加可见 label wrapper，并保留原 checkbox 门禁。
+- `Product/web-react/src/styles.css`：新增 P11 row label 样式，修复 P11 移动端单列布局和阶段 tab 页面级横向溢出。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11E 阶段状态。
+
+### 剩余风险
+
+- P11E 只解决“看得懂字段行”和移动端不溢出，不替用户判断 CFPS 波次、父母教育构造、hukou 角色或控制变量口径。
+- P11 页面仍偏长；后续应把 P11-Human/P12 前的签收体验拆成更像审核队列的步骤。
+- 本轮尝试派出独立 code-reviewer Agent，但当前会话 subagent thread 已满，未能启动；后续进入 P11-Human/P9 前应再次做独立审查。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11D Row Human Confirmation Gate
+
+### 行为覆盖
+
+- [x] 行为 1：P11 逐字段来源行显示人工确认 checkbox，候选预填不会自动算作已签收。
+- [x] 行为 2：`Source contract readiness` 把未勾选的字段行列为 `<field>:human_confirmation` 缺口。
+- [x] 行为 3：只要 reviewer、note、dataset/source 字段或逐行确认缺口仍存在，`保存 source contract` 按钮保持禁用。
+- [x] 行为 4：P11D 不新增正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型执行入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11d-row-human-confirmation-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11D React 契约测试后先失败 1 项，原因是 row human confirmation 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，9 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，20 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，61 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8774 当前代码服务上，P11 返回 `source_metadata_contract_required`；P9 仍返回 `blocked_missing_dataset_source_metadata`，`can_enter_design_spec_preflight=false`，`can_create_run_id=false`，`can_execute_model=false`。
+- 浏览器 smoke：8774 真实入口桌面和 390px 移动端均有 9 个 source rows、9 个 row human confirmation checkbox、disabled 保存按钮和 `human_confirmation` readiness 缺口；console errors=0；截图为 `Product/output/playwright/product-control-p11d-row-confirmation-desktop.png`、`Product/output/playwright/product-control-p11d-row-confirmation-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11d-row-human-confirmation-bdd.md`：P11D SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11D React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 `confirmed` row state、`handleP11SourceFieldRowConfirmChange`、`confirmedSourceFieldRows`、`human_confirmation` readiness 缺口和 checkbox UI。
+- `Product/web-react/src/styles.css`：扩展 P11 字段表格列和 checkbox 样式。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11D 阶段状态。
+
+### 剩余风险
+
+- P11D 只是前端显式确认门禁，不替用户判断字段口径是否学术上正确。
+- 桌面和移动端没有重叠，但 P11 表单仍偏长；后续 UX 阶段应继续收敛字段确认体验。
+- 本轮尝试派出独立 code-reviewer Agent，但当前会话 subagent thread 已满，未能启动；后续进入 P11-Human/P9 前应再次做独立审查。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11C Source Contract Readiness Check
+
+### 行为覆盖
+
+- [x] 行为 1：P11 表单显示 `Source contract readiness`，并给出 `needs_source_metadata_review` 或 `ready_to_save_source_contract`。
+- [x] 行为 2：readiness check 会列出具体缺口，包括 reviewer、note、confirmation、dataset path、parent education construction，以及每个 source row 的 dataset/source/path/evidence 缺口。
+- [x] 行为 3：缺口存在时 `保存 source contract` 按钮禁用，避免把明显不完整的 source contract 交给后端 409。
+- [x] 行为 4：P11C 不新增正式 VariableRoleSet、DesignSpec、RunPlan、run id 或模型执行入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11c-source-contract-readiness-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11C React 契约测试后先失败 1 项，原因是 readiness check 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，8 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，19 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，60 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8773 当前代码服务上，P11 返回 `source_metadata_contract_required`；P9 仍返回 `blocked_missing_dataset_source_metadata`，`can_create_run_id=false`，`can_execute_model=false`。
+- 浏览器 smoke：8773 真实入口桌面和 390px 移动端均可见 `Source contract readiness`、`needs_source_metadata_review` 和 9 个 source rows；保存按钮 disabled；console errors=0；截图为 `Product/output/playwright/product-control-p11c-readiness-desktop.png`、`Product/output/playwright/product-control-p11c-readiness-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11c-source-contract-readiness-bdd.md`：P11C SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11C React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 `p11SourceContractMissingItems`、`p11ReadinessMissingItems`、`p11SourceContractReady` 和 readiness 状态区；保存按钮改由 readiness 统一门禁。
+- `Product/web-react/src/styles.css`：新增 readiness 状态区桌面/移动端样式。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11C 阶段状态。
+
+### 剩余风险
+
+- P11C 只做前端保存前自检，不替用户决定真实字段来源或保存真实 source contract。
+- 当前真实项目仍缺人工 reviewer/note 签收，P9 仍应阻断在 `blocked_missing_dataset_source_metadata`。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11B Per-Field Source Confirmation Editor
+
+### 行为覆盖
+
+- [x] 行为 1：P11 页面从 `source_contract_review_kit.field_review_items` 和 required source fields 生成 9 个可编辑 source rows。
+- [x] 行为 2：用户编辑 dataset column、source field、source path、evidence level 后，保存时由 `sourceFieldRows` 构造原有 P11 `field_bindings` payload。
+- [x] 行为 3：`field_bindings JSON preview` 只作为预览和兜底，不再是本科生用户的主操作入口。
+- [x] 行为 4：P11B 不新增模型执行、正式 VariableRoleSet 写入、DesignSpec、RunPlan 或 run id 入口。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11b-per-field-source-confirmation-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11B React 契约测试后先失败 1 项，原因是 per-field editor 尚不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，7 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，18 passed。
+- P2-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，59 passed。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- API smoke：8772 当前代码服务上，P11 返回 `source_metadata_contract_required`；P9 仍返回 `blocked_missing_dataset_source_metadata`，`can_create_run_id=false`，`can_execute_model=false`。
+- 浏览器 smoke：8772 真实入口桌面和 390px 移动端均可见 `Per-field source confirmation`、`field_bindings JSON preview` 和 9 个 source rows，console errors=0；截图为 `Product/output/playwright/product-control-p11b-field-editor-desktop.png`、`Product/output/playwright/product-control-p11b-field-editor-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11b-per-field-source-confirmation-bdd.md`：P11B SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11B React 契约测试。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 `sourceFieldRows`、逐字段 row editor、row-to-`field_bindings` payload 构造和 JSON preview。
+- `Product/web-react/src/styles.css`：新增 P11B 字段表桌面/移动端布局。
+- `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/current-stage.md`、`Tasks/handoff.md`：同步 P11B 阶段状态。
+
+### 剩余风险
+
+- P11B 仍未替用户保存真实 source contract；下一步必须由 P11-Human 完成真实签收。
+- 移动端可读但页面较长；后续可考虑按字段分组或折叠，但本轮无重叠遮挡。
+- 本轮尝试派出独立 code-reviewer Agent，但当前会话 subagent thread 已满，未能启动；后续进入 P11-Human/P9 前应再次做独立审查。
+- P12 仍必须等 P11-Human 和 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P11A Source Contract Review Kit
+
+### 行为覆盖
+
+- [x] 行为 1：P11 GET 返回 `source_contract_review_kit`，包含 required fields、recommended dataset path、dataset path candidates、field review items 和 no-model boundary。
+- [x] 行为 2：字段候选来自 P5/P4 证据；`father_education`、`mother_education` 能显示 preferred candidate、source path 和 evidence level，但仍标记为 `needs_human_confirmation`。
+- [x] 行为 3：缺少候选的字段仍出现在 field review items 中，并标记为 `missing_recommended_source`，不会被隐藏。
+- [x] 行为 4：React P11 面板展示 `Source review kit`、recommended dataset path 和 field review items，用户不再只面对 `field_bindings` JSON。
+- [x] 边界：P11A 不保存 source contract，不写正式 VariableRoleSet，不写 DesignSpec/RunPlan，不创建 run id，不执行模型。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p11a-source-contract-review-kit-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 新增 P11A 测试后先失败 2 项，原因是 API 和 React 尚未暴露 review kit。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，6 passed。
+- P9/P10/P11/P11A 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，17 passed。
+- P1-P11 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，73 passed。
+- Python 编译：`python3 -m py_compile Product/backend/product_control_p11_source_metadata_service.py Product/app.py tests/test_parent_education_wage_p11_source_metadata_contract.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：8771 当前代码服务上，P11 返回 `source_metadata_contract_required`、`source_contract_review_kit.status=needs_human_source_contract_review`、`field_item_count=9`、`can_execute_model=false`；P9 仍返回 `blocked_missing_dataset_source_metadata`。
+- 浏览器 smoke：8771 真实入口桌面和 390px 移动端均可见 `Source review kit` 和 `recommended dataset path`，console errors=0；截图为 `Product/output/playwright/product-control-p11a-review-kit-desktop.png`、`Product/output/playwright/product-control-p11a-review-kit-mobile.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11a-source-contract-review-kit-bdd.md`：P11A SDD/BDD。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：新增 P11A API 和 React 契约测试。
+- `Product/backend/product_control_p11_source_metadata_service.py`：新增 source contract review kit 构造逻辑。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 P11 review kit 类型、默认值预填和展示区。
+- `Product/web-react/src/styles.css`：新增 P11 review kit 桌面/移动端布局。
+
+### 剩余风险
+
+- P11A 只是签收辅助，不是人工签收本身；真实 source contract 仍未保存。
+- `field_bindings` 仍是 JSON textarea，P11A 只把候选摊开；更理想的本科生体验应进一步拆成逐字段确认控件。
+- P12 仍必须等 P11-Human 和 P9 正式变量表保存成功后再开始。
+
+## 2026-06-18 P11 Source Metadata Completion Path
+
+### 行为覆盖
+
+- [x] 行为 1：P11 GET 展示最新 editable draft、P8 approval 后仍缺的 source metadata 字段，包含 dataset path、`ln_wage`、`parent_education`、controls 和父母教育 source fields。
+- [x] 行为 2：P11 POST 不完整 source contract 返回 `source_metadata_contract_incomplete`，P9 仍为 `blocked_missing_dataset_source_metadata`。
+- [x] 行为 3：完整 source contract 只更新最新 editable draft 的 `source_contract.status=complete`，并让 P9 GET 变成 `formal_variable_role_save_ready`。
+- [x] 行为 4：React Product Control 提供 `P11 Source Metadata` 表单，用户能填写 dataset path、field_bindings、reviewer、note、confirmation 和 `parent_education construction`。
+- [x] 边界：P11 不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不执行模型；P9 仍需单独保存正式变量表。
+
+### 测试覆盖
+
+- BDD：`Tasks/parent-education-wage-p11-source-metadata-contract-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q` 首次失败 4 项，原因是 P11 API、服务和 React 表单不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，4 passed。
+- P9/P10/P11 邻近回归：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py -q`，15 passed。
+- Python 编译：`python3 -m py_compile Product/backend/product_control_p11_source_metadata_service.py Product/backend/product_control_p9_variable_role_save_service.py Product/app.py tests/test_parent_education_wage_p11_source_metadata_contract.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p11-source-metadata-contract-bdd.md`：P11 行为契约。
+- `tests/test_parent_education_wage_p11_source_metadata_contract.py`：P11 API、draft-only 写入、P9 解锁和 React 契约测试。
+- `Product/backend/product_control_p11_source_metadata_service.py`：P11 source contract packet、保存门禁和 latest draft 写回。
+- `Product/app.py`：新增 P11 GET/POST API 和 payload。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：P11 source metadata 表单和 P9 联动刷新。
+- `Product/web-react/src/styles.css`：P11 表单和移动端布局。
+
+### 剩余风险
+
+- 真实项目 source contract 尚未由用户填写；当前 P9 仍应阻断。
+- P11 当前用 JSON textarea 承载 `field_bindings`，比最终本科生体验偏技术；后续可把它拆成字段表格，但不阻断当前功能闭环。
+- P12 仍必须等 P9 正式 VariableRoleSet 保存成功后再开始。
+
+## 2026-06-18 P10 Product Control Current Gate IA
+
+### 行为覆盖
+
+- [x] 行为 1：Product Control 顶部先显示当前门禁摘要，而不是让用户从 P0-P9 线性历史里找状态。
+- [x] 行为 2：P0-P8 默认折叠为 `产品控制 P0-P8 阶段历史`，摘要说明 P7 已完成、P8 已审批、P9 等待 source metadata。
+- [x] 行为 3：P9 当前阻断详情仍保留，保存按钮禁用，缺失字段和 `blocked_missing_dataset_source_metadata` 可见。
+- [x] 行为 4：页面继续明确 `不写 DesignSpec；不写 RunPlan；不跑模型`，且没有“运行模型”入口。
+- [x] 审查闭环：修复了当前门禁摘要硬编码为等待态的问题；摘要现在从 P9 API 状态动态读取，避免将来 P9 变 ready 后页面仍误报 blocked。
+
+### 测试覆盖
+
+- SDD：`Tasks/north-star-product-plan.md`。
+- BDD：`Tasks/parent-education-wage-p10-product-control-ia-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p10_product_control_ia.py -q` 首次失败 3 项，原因是当前门禁摘要、历史折叠和 Product Control 优先级尚未实现。
+- 目标/契约回归：`python3 -m pytest tests/test_parent_education_wage_p10_product_control_ia.py tests/test_product_control_p0_stage_panel.py tests/test_web_react_api_base_contract.py -q`，15 passed, 11 subtests passed。
+- P1-P10 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py -q`，67 passed。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：P9 GET 仍返回 `blocked_missing_dataset_source_metadata`，`can_save_formal_variable_roles=false`、`can_create_run_id=false`、`can_execute_model=false`。
+- 浏览器 smoke：8769 真实入口桌面和 390px 移动端均可见当前门禁摘要、折叠历史、P9 阻断和禁用保存状态，且无“运行模型”入口；截图为 `output/playwright/product-control-p10-current-gate.png`、`output/playwright/product-control-p10-mobile.png`。
+- 独立审查：本轮未能派出新的独立 Agent 复核，因为当前会话可用 thread 已满；已做手动窄范围审查并修复动态摘要问题。
+
+### 实现范围
+
+- `Tasks/north-star-product-plan.md`：北极星目标、P10-P16 阶段路线、SDD/BDD/TDD 规则、停机条件和禁改范围。
+- `Tasks/parent-education-wage-p10-product-control-ia-bdd.md`：P10 行为契约。
+- `tests/test_parent_education_wage_p10_product_control_ia.py`：P10 React 信息架构和边界测试。
+- `Product/web-react/src/App.tsx`：Product Control 在阶段导航前渲染。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：当前门禁摘要、历史折叠和 P9 当前详情。
+- `Product/web-react/src/styles.css`：P10 当前门禁、历史折叠和移动端样式。
+
+### 剩余风险
+
+- P10 没有补齐 source metadata；真实项目仍应停在 P9 的 `blocked_missing_dataset_source_metadata`。
+- 下一阶段 P11 需要把 dataset path、`ln_wage`、`parent_education`、controls 的字段来源做成人工确认路径。
+- Vite chunk size warning 仍存在，属于既有前端体积问题，不阻断 P10。
+
+## 2026-06-18 P9 Formal Variable Role Save Gate
+
+### 行为覆盖
+
+- [x] 行为 1：没有 P8 approval 时，P9 返回 `blocked_missing_p8_formal_approval`，不能保存正式变量表。
+- [x] 行为 2：有 P8 approval 但 dataset/source metadata 不完整时，P9 返回 `blocked_missing_dataset_source_metadata`。
+- [x] 行为 3：P9 save 缺 reviewer、note、确认码、source draft、dataset 或 roles 时返回 409，不写正式状态。
+- [x] 行为 4：P9 save 只从 P8 已批准的 draft 写正式 `state/product/variable_roles.json`，不写 DesignSpec、RunPlan、run id 或模型结果。
+- [x] 行为 5：POST payload 不能替换已批准 roles 或 dataset path。
+- [x] 行为 6：React Product Control 显示 P9 保存面板、缺失 source metadata、确认码和“不写 DesignSpec；不写 RunPlan；不跑模型”。
+- [x] 审查闭环：只有 `dataset_column` 的弱字段绑定不能通过 P9；字段绑定必须有可审计 `source_path` 和 `evidence_level`，派生变量的 source fields 也要满足同样要求。
+
+### 测试覆盖
+
+- BDD：`Tasks/parent-education-wage-p9-formal-variable-role-save-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py -q` 先失败 6 项，原因是 P9 API 和 React 面板不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py -q`，7 passed。
+- P6/P7/P8/P9 回归：`python3 -m pytest tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py -q`，26 passed。
+- P1-P9 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py tests/test_parent_education_wage_p9_formal_variable_role_save.py -q`，63 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_product_control_p0_phase.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_demo_topic_binding_audit.py -q`，14 passed。
+- Python 编译：`python3 -m py_compile Product/backend/product_control_p9_variable_role_save_service.py Product/app.py tests/test_parent_education_wage_p9_formal_variable_role_save.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：8769 新服务上 P8 返回 `formal_variable_role_approval_recorded`；P9 返回 `blocked_missing_dataset_source_metadata`，完整响应显示 `source_contract.status=incomplete`、`dataset_path=""`、`analysis_dataset_available=false`、`field_bindings={}`、`derived_variables={}`，因此正式保存、run id 和模型执行都保持关闭。
+- 浏览器 smoke：`http://127.0.0.1:8769/?topic=empirical-paper-template-main&mode=human-review&api_base=http://127.0.0.1:8769` 桌面和 390px 移动端均可见 P9 面板、缺失字段、禁用保存状态，且无“运行模型”入口；截图为 `output/playwright/product-control-p9-desktop.png`、`output/playwright/product-control-p9-mobile.png`。
+- 恢复后 Playwright CLI 快照：同一 8769 页面可打开，P9 面板、`blocked_missing_dataset_source_metadata`、字段缺口和禁用保存按钮可见。
+- 独立审查：code-reviewer Agent `Kierkegaard` 初审 request changes；指出 source metadata 完整性门禁过弱，以及 React 保存失败丢失具体阻断原因。已补强后端审计字段要求、弱绑定回归测试和前端错误信息展示。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p9-formal-variable-role-save-bdd.md`：P9 行为契约。
+- `tests/test_parent_education_wage_p9_formal_variable_role_save.py`：P9 API、source metadata、payload mismatch、React 契约测试。
+- `Product/backend/product_control_p9_variable_role_save_service.py`：P9 保存门禁和正式变量表写入合同。
+- `Product/app.py`：新增 P9 GET/POST API 和 payload。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React P9 保存面板。
+- `Product/web-react/src/styles.css`：P9 表单和移动端样式。
+
+### 剩余风险
+
+- 真实项目 P9 被 source metadata 阻断；这是正确状态，不是失败。
+- Product Control 页面混乱问题已由 P10 当前门禁中心收口；下一阶段应做 P11 source metadata 补齐路径。
+- P9 不是 DesignSpec/RunPlan/model 入口；source metadata 补齐并正式保存通过后，才进入 DesignSpec preflight。
+
+## 2026-06-18 P8 Formal Variable Role Approval Gate
+
+### 行为覆盖
+
+- [x] 行为 1：没有 P7/P6 editable draft 时，P8 返回 `blocked_missing_p7_variable_role_draft`，不能批准正式变量角色。
+- [x] 行为 2：P7 editable draft 存在时，P8 GET 暴露待审 draft，但仍不写正式 `variable_roles.json`。
+- [x] 行为 3：P8 POST 缺 reviewer、note 或确认码时返回 409，不写 approval，不解锁正式保存。
+- [x] 行为 4：P8 approve 只记录 `state/product/variable_role_formal_approvals.json`；随后旧 `PUT /variable-roles` 只有在 approval 对当前最新 draft 生效、且 latest draft roles、approval `source_draft_roles`、PUT roles 三者一致时才可写正式 VariableRoleSet。
+- [x] 行为 5：React Product Control 显示 P8 审批面板、reviewer/note/confirmation、确认码和“不写 RunPlan；不跑模型”。
+- [x] 审查闭环：P8 approval 绑定当前最新 `source_draft_id` 和审批当刻的 roles 快照，旧 approval 不能解锁新 draft，审批 A 不能写入不同 roles，同一 draft id 的 roles 被篡改后原 approval 失效；P8 不写 DesignSpec、RunPlan、run id 或模型结果。
+
+### 测试覆盖
+
+- BDD：`Tasks/parent-education-wage-p8-formal-variable-role-approval-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p8_formal_variable_role_approval.py -q` 先失败 5 项，原因是 P8 API 和 React 面板不存在；独立审查后新增 stale approval、roles mismatch、same-draft-id role mutation 三条绕过测试，均先复现失败。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p8_formal_variable_role_approval.py -q`，8 passed。
+- P6/P7/P8 回归：`python3 -m pytest tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py -q`，19 passed。
+- P1-P8 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_parent_education_wage_p8_formal_variable_role_approval.py -q`，56 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_product_control_demo_topic_binding_audit.py tests/test_product_control_p0_phase.py tests/test_product_control_p0_stage_panel.py -q`，14 passed。
+- Python 编译：`python3 -m py_compile Product/backend/product_control_p8_variable_role_approval_service.py Product/backend/product_control_p6_variable_role_signoff_service.py Product/app.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：`GET http://127.0.0.1:8768/api/v1/projects/proj_empirical_paper_template_main/product-control/p8-variable-role-approval` 返回 200，状态为 `blocked_missing_p7_variable_role_draft`，所有 DesignSpec/RunPlan/run/model 写入能力均为 false。
+- 浏览器 smoke：`http://127.0.0.1:8768/?topic=empirical-paper-template-main&mode=human-review&api_base=http://127.0.0.1:8768` 可见 P8 面板、阻断状态和“不写 RunPlan；不跑模型”；桌面与 390px 移动端截图为 `artifacts/ui-checks/product-control-p8-variable-role-approval-desktop.png`、`artifacts/ui-checks/product-control-p8-variable-role-approval-mobile.png`。
+- 独立审查：code-reviewer Agent `Mendel` 初审为 request changes；指出旧 P8 approval 可解锁新 draft、且 approval 未绑定正式 PUT roles。code-reviewer Agent `Bernoulli` 复审为 request changes；指出同一 draft id 的 roles 被篡改后旧逻辑仍可放行。已补回归并修复为：正式保存前必须验证 approval 对当前最新 draft 生效，且 latest draft roles、approval `source_draft_roles`、PUT roles 三者完全一致。code-reviewer Agent `Ampere` 最终窄范围复核 PASS。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p8-formal-variable-role-approval-bdd.md`：P8 行为契约。
+- `tests/test_parent_education_wage_p8_formal_variable_role_approval.py`：P8 API、正式保存门禁、React 契约测试。
+- `Product/backend/product_control_p8_variable_role_approval_service.py`：P8 审批包和 approval ledger。
+- `Product/backend/product_control_p6_variable_role_signoff_service.py`：正式 VariableRoleSet 保存门禁改为必须存在对当前最新 draft 生效的 P8 approval，且 latest draft roles、approval `source_draft_roles`、PUT roles 三者必须一致。
+- `Product/app.py`：新增 P8 GET/POST API 和 payload。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React P8 审批面板。
+- `Product/web-react/src/styles.css`：P8 表单和移动端样式。
+
+### 剩余风险
+
+- 真实项目仍没有用户点击 P7 promotion 生成的 editable draft，因此 P8 在真实项目上正确阻断；我没有替用户提交 P7 或 P8。
+- P8 是正式保存前的审批门禁，不是 DesignSpec/RunPlan/model 入口；下一步应做 P9 正式 VariableRoleSet editor/save 验收。
+- 当前 Vite bundle size warning 仍存在，属于既有前端体积问题，不阻断 P8。
+
+## 2026-06-18 P7 Variable Role Signoff UI
+
+### 行为覆盖
+
+- [x] 行为 1：P6 signoff packet 给 React 页面返回五项 `recommended_decisions`，用户不用猜 JSON payload。
+- [x] 行为 2：React Product Control P6 面板显示五项可编辑确认输入、默认值、`draft_only_no_formal_write` 和“确认并生成可编辑草稿”按钮。
+- [x] 行为 3：完整页面签收只调用 editable draft promotion；测试验证会写 `state/product/variable_roles_drafts.json`，不会改写正式 `state/product/variable_roles.json`。
+- [x] 审查闭环：P7 promoted draft 之后，旧 `PUT /variable-roles` 仍必须 409 阻断，不能把 editable draft 误当正式写入批准。
+- [x] 移动端闭环：390px 视口下 Product Control 和 P6 表单无横向溢出。
+
+### 测试覆盖
+
+- BDD：`Tasks/parent-education-wage-p7-variable-role-signoff-ui-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p7_variable_role_signoff_ui.py -q` 先失败 3 项，原因是缺少 `recommended_decisions`、React 表单和用默认值 promotion 的能力。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p7_variable_role_signoff_ui.py -q`，3 passed。
+- P6+P7 回归：`python3 -m pytest tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py -q`，11 passed。
+- P2-P7 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py -q`，33 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，71 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_variable_role_signoff.py Program/parent_education_wage_variable_role_signoff.py Product/backend/product_control_p6_variable_role_signoff_service.py Product/app.py tests/test_parent_education_wage_p7_variable_role_signoff_ui.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：P6 GET/POST 返回 `variable_role_signoff_required` 和五项 `recommended_decisions`；旧正式保存口仍返回 409 `p6_variable_role_draft_required`。未对真实项目调用 `/promote`。
+- 浏览器 smoke：真实入口桌面和 390px 移动端均显示五项输入、默认值、草稿按钮和“不写正式 VariableRoleSet；不跑模型”；横向溢出 false，console errors=0；截图为 `artifacts/ui-checks/product-control-p7-variable-role-signoff-desktop.png` 与 `artifacts/ui-checks/product-control-p7-variable-role-signoff-mobile.png`。
+- 独立审查：code-reviewer Agent `Herschel` 初审为 request changes；指出 P7 promotion 后旧正式保存口会误开正式 `variable_roles.json` 写入。已补回归测试并修复后端门禁：P7 draft 之后仍需 P8 单独正式批准，否则正式保存口返回 409，且 `variable_roles.json`、`design_spec.json`、`run_plan.json` 哈希保持不变。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p7-variable-role-signoff-ui-bdd.md`：P7 行为契约。
+- `tests/test_parent_education_wage_p7_variable_role_signoff_ui.py`：P7 后端默认值、React 契约和 editable draft promotion 测试。
+- `Product/backend/product_control_p6_variable_role_signoff_service.py`：P7 后继续阻断正式 VariableRoleSet 保存，直到 P8 正式批准文件存在。
+- `Program/workbench/parent_education_wage_variable_role_signoff.py`：补 `recommended_decisions` 和 Review 默认值输出。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：P6 五项签收表单、promotion 调用、成功/错误反馈。
+- `Product/web-react/src/styles.css`：P6 表单样式和移动端主工作区/Product Control 横向溢出修复。
+- `Results/json/parent_education_wage_p6_variable_role_signoff.json`、`Reviews/parent_education_wage_p6_variable_role_signoff.md`：真实 P6/P7 签收材料刷新。
+
+### 剩余风险
+
+- 真实项目尚未由我代替用户执行 `/promote`；用户需要在页面确认五项口径后点击“确认并生成可编辑草稿”。
+- P7 只生成 editable draft；即使 draft 已生成，正式 VariableRoleSet 仍需要 P8 审批/编辑路径，旧正式保存口不会因此解锁。
+- 当前仍不能创建 run id、写 RunPlan 或执行模型。
+
+## 2026-06-17 P6 Human Signoff And Promotion Path
+
+### 行为覆盖
+
+- [x] 行为 1：P6 读取 P5 草案并生成待签收清单，不写正式变量角色。
+- [x] 行为 2：签收项不完整时不能提升，也不能写草稿或正式状态。
+- [x] 行为 3：完整签收后只写可编辑 draft，不覆盖正式 VariableRoleSet。
+- [x] 行为 4：请求正式写回但没有更强授权时会被阻断。
+- [x] 行为 5：Product Control 暴露 P6 GET/POST/promotion endpoint。
+- [x] 行为 6：React 主入口显示 P6 签收状态、`editable_draft` 和 `formal write=false`。
+- [x] 审查闭环 1：旧 `PUT /variable-roles` 不能绕过 P6 直接写正式变量角色。
+- [x] 审查闭环 2：`formal_variable_roles` target 即使带 `allow_formal_write=true` 也稳定阻断。
+- [x] 审查闭环 3：重复 P6 promotion 不用固定 id 覆盖旧 draft。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p6_variable_role_signoff.py -q` 先失败 6 项，原因是 P6 module/API/React 状态不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p6_variable_role_signoff.py -q`，8 passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_variable_role_signoff.py Program/parent_education_wage_variable_role_signoff.py Product/backend/product_control_p6_variable_role_signoff_service.py Product/app.py tests/test_parent_education_wage_p6_variable_role_signoff.py` 通过。
+- 真实项目生成：`python3 Program/parent_education_wage_variable_role_signoff.py --project-root .` 通过，输出 `variable_role_signoff_required`。
+- P2-P6 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py -q`，30 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_parent_education_wage_p6_variable_role_signoff.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，68 passed, 11 subtests passed。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：P6 GET/POST 返回 `variable_role_signoff_required`；旧正式保存口返回 409 `p6_variable_role_draft_required`。
+- 浏览器 smoke：P6 签收状态可见，`editable_draft` 可见，`formal write=false` 可见，无横向溢出，console errors=0；截图 `artifacts/ui-checks/product-control-p6-variable-role-signoff.png`。
+- 独立审查：code-reviewer Agent `Feynman` 初审为 request changes；指出的 1 high、2 medium、1 low 已分别通过守卫、稳定阻断、唯一 draft id 和 React 文案修正闭环。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p6-variable-role-signoff-bdd.md`：P6 行为契约和边界。
+- `Program/workbench/parent_education_wage_variable_role_signoff.py`：P6 签收包与 promotion 逻辑。
+- `Program/parent_education_wage_variable_role_signoff.py`：P6 CLI。
+- `Product/backend/product_control_p6_variable_role_signoff_service.py`：P6 Product Control 服务。
+- `Product/app.py`：新增 P6 GET/POST/promotion API，并对父母教育工资链路的正式变量角色保存增加 P6 draft 门禁。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`、`Product/web-react/src/styles.css`：React 产品控制面显示 P6。
+- `Results/json/parent_education_wage_p6_variable_role_signoff.json`、`Reviews/parent_education_wage_p6_variable_role_signoff.md`：真实 P6 审阅层产物。
+
+### 剩余风险
+
+- 真实项目尚未执行 promotion，因为签收项需要用户确认。
+- P6 只允许进入可编辑 draft；正式 VariableRoleSet 仍需单独审批。
+- 当前仍不能创建 run id 或执行模型。
+
+## 2026-06-17 P5 VariableRoleSet Draft Preflight
+
+### 行为覆盖
+
+- [x] 行为 1：P5 消费 P4 字段候选并生成可审阅 VariableRoleSet draft preflight。
+- [x] 行为 2：`parent_education` 只进入构造草案，`decision_status=requires_human_confirmation`。
+- [x] 行为 3：不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不执行回归。
+- [x] 行为 4：Product Control 暴露 P5 状态，GET 只读，POST 才显式生成。
+- [x] 行为 5：React 主入口显示 `P5 VariableRoleSet`、`parent_education` 和 `requires_human_confirmation`。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p5_variable_role_preflight.py -q` 先失败，原因是 P5 module/API/React 状态不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p5_variable_role_preflight.py -q`，6 passed。
+- 真实项目生成：`python3 Program/parent_education_wage_variable_role_preflight.py --project-root .` 通过，输出 `variable_role_preflight_ready_for_review`。
+- P2/P3/P4/P5 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py -q`，22 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_parent_education_wage_p5_variable_role_preflight.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，60 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_variable_role_preflight.py Program/parent_education_wage_variable_role_preflight.py Product/backend/product_control_p5_variable_role_preflight_service.py Product/app.py tests/test_parent_education_wage_p5_variable_role_preflight.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- API smoke：`GET/POST http://127.0.0.1:8766/api/v1/projects/proj_empirical_paper_template_main/product-control/p5-variable-role-preflight` 均返回 `variable_role_preflight_ready_for_review`。
+- 浏览器 smoke：`http://127.0.0.1:8766/?topic=empirical-paper-template-main&mode=human-review&api_base=http://127.0.0.1:8766` 可见 P5 面板；`parent_education=requires_human_confirmation`、`formal write=false`、无横向溢出、console errors=0；截图 `artifacts/ui-checks/product-control-p5-variable-role-preflight.png`。
+- Scoped diff check：`git diff --check -- Product/app.py Product/web-react/src/components/ProductControlP0Panel.tsx Product/web-react/src/styles.css WORKFLOW_STATUS.md Tasks/todo.md Tasks/current-stage.md Tasks/handoff.md Tasks/review.md` 通过。
+- 独立审查：code-reviewer Agent `Newton` 返回 no blocking findings；非阻断缺口为 React 自动化测试偏静态、缺少 P1-B/P2 输入缺失场景。已补缺失输入 `input_warnings` 和 `test_bdd_p5d_missing_data_context_is_explicit_warning_not_silent_default`，并重新跑上述回归/API/浏览器验证。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p5-variable-role-preflight-bdd.md`：P5 行为契约。
+- `outputs/parent_education_wage_p5_resource_research.md` 与 `.provenance.md`：P5 资源调研记录。
+- `Program/workbench/parent_education_wage_variable_role_preflight.py`：P5 草案预检生成器。
+- `Program/parent_education_wage_variable_role_preflight.py`：P5 CLI。
+- `Product/backend/product_control_p5_variable_role_preflight_service.py`：P5 Product Control 服务。
+- `Product/app.py`：新增 `GET/POST /product-control/p5-variable-role-preflight`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React 产品控制面显示 P5。
+- `Product/web-react/src/styles.css`：P5 状态块纳入当前产品控制面样式。
+- `Results/json/parent_education_wage_p5_variable_role_preflight.json`、`Reviews/parent_education_wage_p5_variable_role_preflight.md`：真实 P5 审阅层产物。
+
+### 剩余风险
+
+- P5 是草案预检，不是正式 VariableRoleSet。
+- `parent_education` 构造、优先 CFPS 波次、`hukou` 角色和 outcome/control 仍需人工确认。
+- 当前仍不能创建 run id 或写完整实证结果章节。
+
+## 2026-06-17 P4 Field Source Candidates
+
+### 行为覆盖
+
+- [x] 行为 1：P4 使用当前存在的 CFPS 数据根目录，并把旧 `/Users/mahaoxuan/Desktop/实证数据库/...` 路径记录为 stale source。
+- [x] 行为 2：只读扫描 Stata 变量标签，为 `father_education` 和 `mother_education` 生成候选字段。
+- [x] 行为 3：`parent_education` 只标为 `constructable_needs_review`，不自动确定构造口径。
+- [x] 行为 4：不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不执行回归。
+- [x] 行为 5：Product Control 暴露 P4 状态，GET 只读，POST 才显式生成；React 主入口显示 P4 字段来源。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p4_field_source_candidates.py -q` 先失败，原因是 P4 module/API/React 状态不存在；修正测试夹具后得到目标 RED。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p4_field_source_candidates.py -q`，5 passed。
+- P2/P3/P4 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py -q`，16 passed。
+- 产品控制 scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_parent_education_wage_p4_field_source_candidates.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，54 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_field_source_candidates.py Program/parent_education_wage_field_source_candidates.py Product/backend/product_control_p4_field_source_service.py Product/app.py tests/test_parent_education_wage_p4_field_source_candidates.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- 真实项目生成：`python3 Program/parent_education_wage_field_source_candidates.py --project-root . --data-root "/Users/mahaoxuan/Desktop/论文核心素材库/01_原始数据/实证数据库/A001CFPS中国家庭追踪调查"` 通过，输出 `field_source_candidates_ready_for_review`、`candidate_count=52`。
+- API smoke：`GET/POST http://127.0.0.1:8766/api/v1/projects/proj_empirical_paper_template_main/product-control/p4-field-source-candidates` 均返回 `field_source_candidates_ready_for_review`。
+- 浏览器 smoke：`http://127.0.0.1:8766/?topic=empirical-paper-template-main&mode=human-review&api_base=http://127.0.0.1:8766` 可见 P4 面板；`father_education=candidate_found`、`mother_education=candidate_found`、候选数 52；截图 `artifacts/ui-checks/product-control-p4-field-source.png`。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p4-field-source-bdd.md`：P4 行为契约。
+- `Program/workbench/parent_education_wage_field_source_candidates.py`：metadata-only CFPS 字段来源候选生成器。
+- `Program/parent_education_wage_field_source_candidates.py`：P4 CLI。
+- `Product/backend/product_control_p4_field_source_service.py`：P4 Product Control 服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p4-field-source-candidates`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React 产品控制面显示 P4 字段来源。
+- `Product/web-react/src/styles.css`：P3/P4 阶段块纳入当前产品控制面样式。
+- `Results/json/parent_education_wage_p4_field_source_candidates.json`、`Reviews/parent_education_wage_p4_field_source_candidates.md`：真实 P4 审阅层产物。
+
+### 剩余风险
+
+- P4 找到的是候选字段，不是正式 VariableRoleSet。
+- 需要人工确认优先波次、`parent_education` 构造口径和 `hukou` 角色。
+- 当前仍不能创建 run id 或写完整实证结果章节。
+
+## 2026-06-17 P3 DraftPackage Blocked Branch
+
+### 行为覆盖
+
+- [x] 行为 1：P2 阻断态生成 `blocked_draft_package_ready`，不是只停在执行准入诊断。
+- [x] 行为 2：生成用户可打开的 `Submissions/parent_education_wage_paper_draft.docx`。
+- [x] 行为 3：同步生成 Markdown 源、问题清单和审计报告。
+- [x] 行为 4：不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不执行回归。
+- [x] 行为 5：Product Control 暴露 P3 状态，GET 只读，POST 才显式生成。
+- [x] 行为 6：React 产品控制面展示 `P3 DraftPackage`、`paper_draft.docx`、半成品状态和 issue 数。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p3_draft_package.py -q` 首次失败，原因是 P3 module/API/React 状态不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p3_draft_package.py -q`，5 passed。
+- P2/P3 回归：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py -q`，11 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_parent_education_wage_p3_draft_package.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，49 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_draft_package.py Program/parent_education_wage_draft_package.py Product/backend/product_control_p3_draft_package_service.py Product/app.py tests/test_parent_education_wage_p3_draft_package.py` 通过。
+- 真实项目生成：`python3 Program/parent_education_wage_draft_package.py --project-root .` 通过，输出 `blocked_draft_package_ready`。
+- docx 可读性：用 `python-docx` 打开 `Submissions/parent_education_wage_paper_draft.docx`，确认包含题目和 `【红标】父母教育字段尚未绑定`。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- Scoped diff check：P3 相关文件 `git diff --check` 通过。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p3-draft-package-bdd.md`：P3 行为契约。
+- `Program/workbench/parent_education_wage_draft_package.py`：P3 DraftPackage 生成器。
+- `Program/parent_education_wage_draft_package.py`：P3 CLI。
+- `Product/backend/product_control_p3_draft_package_service.py`：P3 Product Control 服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p3-draft-package`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React 产品控制面显示 P3 DraftPackage。
+- `Results/json/parent_education_wage_p3_draft_package.json`、`Manuscripts/generated/parent_education_wage_paper_draft.md`、`Submissions/parent_education_wage_paper_draft.docx`、`Manuscripts/generated/parent_education_wage_issue_list.md`、`Reviews/parent_education_wage_draft_audit_report.md`：真实 P3 交付物。
+
+### 剩余风险
+
+- 当前是半成品论文包，不是完整论文；父母教育字段缺失仍阻断真实回归和完整结果章节。
+- `hukou` 候选仍需人工绑定。
+- 下一阶段应进入 P4 字段来源补证和正式变量角色草案预检。
+
+## 2026-06-17 P2 Execution Readiness
+
+### 行为覆盖
+
+- [x] 行为 1：字段补证只生成候选，不直接写正式 `state/product/variable_roles.json`。
+- [x] 行为 2：变量口径只进入 draft；父母教育合成规则必须等待人工确认。
+- [x] 行为 3：`Tasks/parent-education-wage/design.json` 旧 robot code stub 已修复，但不写正式 DesignSpec。
+- [x] 行为 4：字段仍缺失时，P2 输出 blocked execution-readiness ledger，不创建 run id。
+- [x] 行为 5：Product Control 暴露 P2 状态，GET 只读，POST 才显式刷新。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py -q` 首次失败，原因是 P2 module/API/React 状态不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p2_execution_readiness.py -q`，6 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_parent_education_wage_p2_execution_readiness.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，44 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_execution_readiness.py Program/parent_education_wage_execution_readiness.py Product/backend/product_control_p2_execution_readiness_service.py Product/app.py` 通过。
+- 真实项目生成：`python3 Program/parent_education_wage_execution_readiness.py --project-root .` 通过，输出 `blocked_missing_parent_education_fields`。
+- P1-C refresh：`python3 Program/parent_education_wage_method_execution_ledger.py --project-root .` 通过，P1-C 阻断原因收敛为 `missing_required_fields`。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- 设计污染复验：`rg -n "robot_exposure|bartik_iv|robot_density|ln_robot|行业机器人" Tasks/parent-education-wage/design.json || true` 无输出。
+- Scoped diff check：P2 相关文件 `git diff --check` 通过。
+
+### 实现范围
+
+- `Tasks/parent-education-wage-p2-execution-readiness-bdd.md`：P2 行为契约。
+- `Program/workbench/parent_education_wage_execution_readiness.py`：P2 执行准入账本生成器。
+- `Program/parent_education_wage_execution_readiness.py`：P2 CLI。
+- `Product/backend/product_control_p2_execution_readiness_service.py`：P2 Product Control 服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p2-execution-readiness`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：React 产品控制面显示 P2 执行准入。
+- `Product/web-react/src/styles.css`：P2 状态块样式。
+- `Results/json/parent_education_wage_p2_execution_readiness.json`、`Reviews/parent_education_wage_p2_execution_readiness.md`：真实 P2 审阅层产物。
+
+### 剩余风险
+
+- `father_education`、`mother_education`、`parent_education` 仍缺真实字段来源。
+- `hukou` 只是候选字段命中，尚未人工绑定。
+- 当前不能进入正式 VariableRoleSet、DesignSpec、RunPlan 或方法执行。
+
+## 2026-06-17 P0/P1 Acceptance Package
+
+### 行为覆盖
+
+- [x] React 主入口、P0 控制面、P1-A 文献证据、P1-B 字段绑定和 P1-C 方法执行 blocked ledger 已收拢成一个验收包。
+- [x] 固定 Demo 题目被记录为产品链路压力测试样例，不被写成最终产品范围。
+- [x] legacy 运行入口已从验收路径移除；`/legacy` 重定向到 `/`，`Product/web` 只保留为历史源码。
+- [x] 正式层边界清楚：当前不写 bibliography、VariableRoleSet、RunPlan、manuscript，也不伪造 run id。
+
+### 测试覆盖
+
+- 验收包文件：`Reviews/parent_education_wage_p0_p1_acceptance_package.md`
+- Scoped 回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，38 passed, 11 subtests passed。
+- Python 编译：P1-A/P1-B/P1-C Program、backend service 和 `Product/app.py` 编译通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+
+### 剩余风险
+
+- 旧 `Product/web` 物理文件未删除；本轮只从运行和验收路径移除。
+- 下一阶段必须先补真实父母教育字段并审阅 `hukou` 候选，不能直接跑方法。
+
+## 2026-06-17 P1-C Method Execution Ledger
+
+### 行为覆盖
+
+- [x] 行为 1：核心字段缺失时不能创建 run id 或伪造回归结果。
+- [x] 行为 2：方法账本记录旧 `robot_exposure` code_stub 污染和 StatsPAI 使用边界。
+- [x] 行为 3：即使不能执行，也写出 blocked/failure ledger。
+- [x] 行为 4：Product API 的 GET 只读返回已有账本或 missing 状态，POST 才显式生成账本。
+- [x] 行为 5：React 当前产品控制面展示 `P1-C 方法执行`、run id、方法数和缺失字段数。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_method_execution_ledger.py -q` 首次失败，原因是 P1-C method execution ledger 模块不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_method_execution_ledger.py -q`，5 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_parent_education_wage_method_execution_ledger.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，38 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_literature_evidence_ledger.py Program/parent_education_wage_literature_evidence_ledger.py Product/backend/product_control_p1_literature_service.py Program/workbench/parent_education_wage_data_field_binding_ledger.py Program/parent_education_wage_data_field_binding_ledger.py Product/backend/product_control_p1_data_field_service.py Program/workbench/parent_education_wage_method_execution_ledger.py Program/parent_education_wage_method_execution_ledger.py Product/backend/product_control_p1_method_service.py Product/app.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- 真实项目生成：`python3 Program/parent_education_wage_method_execution_ledger.py --project-root .` 通过。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_method_execution_ledger.py`：新增 P1-C 方法执行账本生成器。
+- `Program/parent_education_wage_method_execution_ledger.py`：新增 CLI。
+- `Product/backend/product_control_p1_method_service.py`：新增 Product Control P1-C 读/刷新服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p1-method-execution`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：在当前 React 产品控制面显示 P1-C 方法执行状态。
+- `Product/web-react/src/styles.css`：复用 P1 状态块样式。
+- `Results/json/parent_education_wage_method_execution_ledger.json`、`Reviews/parent_education_wage_method_execution_ledger.md`：真实项目 P1-C blocked ledger。
+
+### 剩余风险
+
+- 当前 `execution_allowed=false`、`run_id=null`，没有真实方法执行结果。
+- IV/DID/DML 全部 blocked；缺失字段为 `father_education`、`mother_education`、`parent_education`、`hukou`。
+- `Tasks/parent-education-wage/design.json` 仍有旧 robot code_stub 污染，必须先修正设计草案。
+
+## 2026-06-17 P1-B Data Field Binding Ledger
+
+### 行为覆盖
+
+- [x] 行为 1：从当前 `Tasks/parent-education-wage/variables.yaml` 读取候选变量，并和真实字段来源对账。
+- [x] 行为 2：字段绑定证据只能进入审阅层，不能覆盖正式 `state/product/variable_roles.json`、DesignSpec 或 RunPlan。
+- [x] 行为 3：P1-B 同时输出机器可读 JSON 和人工审阅 Markdown。
+- [x] 行为 4：Product API 的 GET 只读返回已有账本或 missing 状态，POST 才显式生成账本。
+- [x] 行为 5：React 当前产品控制面展示 `P1-B 数据字段`、候选变量数、matched/missing 数和字段缺口状态。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_data_field_binding_ledger.py -q` 首次失败，原因是 P1-B data field binding 模块不存在。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_data_field_binding_ledger.py -q`，5 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_parent_education_wage_data_field_binding_ledger.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，33 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_literature_evidence_ledger.py Program/parent_education_wage_literature_evidence_ledger.py Product/backend/product_control_p1_literature_service.py Program/workbench/parent_education_wage_data_field_binding_ledger.py Program/parent_education_wage_data_field_binding_ledger.py Product/backend/product_control_p1_data_field_service.py Product/app.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- 真实项目生成：`python3 Program/parent_education_wage_data_field_binding_ledger.py --project-root .` 通过。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_data_field_binding_ledger.py`：新增 P1-B 数据字段绑定账本生成器。
+- `Program/parent_education_wage_data_field_binding_ledger.py`：新增 CLI。
+- `Product/backend/product_control_p1_data_field_service.py`：新增 Product Control P1-B 读/刷新服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p1-data-field-binding`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：在当前 React 产品控制面显示 P1-B 数据字段绑定状态。
+- `Product/web-react/src/styles.css`：复用 P1 状态块样式。
+- `Results/json/parent_education_wage_data_field_binding_ledger.json`、`Reviews/parent_education_wage_data_field_binding_ledger.md`：真实项目 P1-B 审阅层产物。
+
+### 剩余风险
+
+- 当前 12 个候选变量中 8 个 matched、4 个 missing；缺失字段为 `father_education`、`mother_education`、`parent_education`、`hukou`。
+- 因核心解释变量缺失，不能进入正式变量角色确认，也不能强跑方法执行。
+- `state/product/variable_roles.json` 仍是旧 training/wage 示例；本轮刻意未覆盖。
+
+## 2026-06-17 P1-A Literature Evidence Ledger
+
+### 行为覆盖
+
+- [x] 行为 1：从当前 `Tasks/parent-education-wage/literature.md` 生成 seed/candidate/verified 分层账本。
+- [x] 行为 2：未核验文献不能写入正式 bibliography、正式论文或 processed verified bibliography。
+- [x] 行为 3：P1-A 同时输出机器可读 JSON 和人工审阅 Markdown。
+- [x] 行为 4：Product API 的 GET 只读返回已有账本或 missing 状态，POST 才显式生成账本。
+- [x] 行为 5：React 当前产品控制面展示 `P1-A 文献证据`、真实文献候选数、verified 数和外部核验缺口。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py -q` 首次失败，原因是 P1-A ledger 模块不存在。
+- 回归红灯：真实项目生成时发现 parser 把 frontmatter/downstream consumers 误识别为检索 seed；补充测试后失败复现，再修复为只读取 `## 待检索方向` 段落。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py -q`，5 passed。
+- 阶段回归：`python3 -m pytest tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，28 passed, 11 subtests passed。
+- Python 编译：`python3 -m py_compile Program/workbench/parent_education_wage_literature_evidence_ledger.py Program/parent_education_wage_literature_evidence_ledger.py Product/backend/product_control_p1_literature_service.py Product/app.py Product/backend/product_control_phase_service.py tests/test_parent_education_wage_literature_evidence_ledger.py tests/test_product_control_p0_stage_panel.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，仍有既有 Vite chunk size warning。
+- 真实项目生成：`python3 Program/parent_education_wage_literature_evidence_ledger.py --project-root .` 通过。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_literature_evidence_ledger.py`：新增 P1-A 文献证据账本生成器。
+- `Program/parent_education_wage_literature_evidence_ledger.py`：新增 CLI。
+- `Product/backend/product_control_p1_literature_service.py`：新增 Product Control P1-A 读/刷新服务。
+- `Product/app.py`：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p1-literature-ledger`。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：在当前 React 产品控制面显示 P1-A 文献证据状态。
+- `Product/web-react/src/styles.css`：新增 P1-A 状态块样式。
+- `Results/json/parent_education_wage_literature_evidence_ledger.json`、`Reviews/parent_education_wage_literature_evidence_ledger.md`：真实项目 P1-A 审阅层产物。
+
+### 剩余风险
+
+- 当前只有 4 个检索 seed，`verified_count=0`；尚未访问外部数据库、DOI、Google Scholar、CNKI、OpenAlex 或用户本地 Zotero/PDF。
+- P1-A 产物不能支持正式论文 claim，也不能写正式 bibliography。
+- 下一阶段应进入 P1-B 数据字段绑定和变量角色证据；文献外部核验需要单独授权或人工材料。
+
+## 2026-06-17 React Main Entry P0 Correction
+
+### 行为覆盖
+
+- [x] 行为 1：P0 前端验收目标从 `Product/web` 旧静态工作台切换到 `Product/web-react` 当前主入口。
+- [x] 行为 2：React 主入口新增 `ProductControlP0Panel`，展示 P0 状态、Agent task、Evidence Audit、`needs_evidence` 和正式层边界。
+- [x] 行为 3：刷新按钮显式调用 `POST /api/v1/projects/{project_id}/product-control/p0-phase`，普通加载只读 `GET`。
+- [x] 行为 4：P0 面板只显示 `待派工审阅` / `dispatch_review_required`，不提供自动执行入口。
+- [x] 行为 5：`/legacy` 运行时重定向到 `/`，旧工作台不再作为产品验收入口。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_product_control_p0_stage_panel.py -q` 首次 4 项 React P0 测试失败，原因是 `ProductControlP0Panel` 不存在、App 未挂载、React 样式缺失。
+- 目标测试：`python3 -m pytest tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py -q`，9 passed。
+- React 基线：`python3 -m pytest tests/test_web_react_api_base_contract.py tests/test_p3_react_input_tabs.py -q`，14 passed, 11 subtests passed。
+- React build：`cd Product/web-react && npm run build` 通过，输出到 `Product/web-dist`。
+- Python 编译：`python3 -m py_compile Product/app.py Product/backend/product_control_phase_service.py tests/test_product_control_p0_stage_panel.py` 通过。
+
+### 实现范围
+
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：新增 React P0 控制面板。
+- `Product/web-react/src/App.tsx`：在当前主工作台挂载 P0 控制面板。
+- `Product/web-react/src/styles.css`：新增 P0 面板样式，并恢复 React 契约要求的软灰主题 token。
+- `Product/app.py`：`/legacy` 改为 307 重定向到 `/`。
+- `tests/test_product_control_p0_stage_panel.py`：前端验收从 legacy 改为 React 主入口，并新增 legacy redirect 回归。
+
+### 剩余风险
+
+- `Product/web` 文件仍保留为历史源码，但运行时入口已移除；若后续确认无引用，可以单独做归档/删除阶段。
+- 本轮未扩大到 P1 真实文献、变量和方法执行证据链。
+- 全量 pytest 未重跑，本轮只跑当前阶段 scoped 验收。
+
+## 2026-06-17 P0 Stage Control Panel
+
+### 行为覆盖
+
+- [x] 行为 1：`GET /api/v1/projects/{project_id}/product-control/p0-phase` 只读返回已有 P0 report，不刷新阶段产物。
+- [x] 行为 2：没有 P0 report 时返回 `p0_phase_report_missing`，并提供显式刷新入口。
+- [x] 行为 3：React 主入口新增 `产品控制 P0` 面板，展示 topic、P0 状态、Agent 任务数、Evidence Audit 和作品集脚本路径。
+- [x] 行为 4：面板展示 `needs_evidence` 缺口和“不能进入正式论文”的正式层边界。
+- [x] 行为 5：刷新按钮显式调用 POST，并更新 `state.productControlP0Data`。
+- [x] 行为 6：P0 面板只显示 `待派工审阅`，不提供自动执行入口。
+
+### 测试覆盖
+
+- RED：`python3 -m pytest tests/test_product_control_p0_stage_panel.py -q` 首次 6 项失败，原因是 GET 返回 405、前端没有 P0 面板/刷新函数/证据缺口展示。
+- 目标测试：`python3 -m pytest tests/test_product_control_p0_stage_panel.py -q`，6 passed。
+- 相关回归：`python3 -m pytest tests/test_product_control_p0_stage_panel.py tests/test_product_control_p0_phase.py tests/test_product_control_demo_topic_binding_audit.py tests/test_research_question_topic_session.py tests/test_frontend_chinese_copy.py -q`，23 passed。
+- 语法检查：`python3 -m py_compile Product/backend/product_control_phase_service.py Product/backend/product_control_demo_audit_service.py Product/app.py tests/test_product_control_p0_stage_panel.py` 通过；React build 在后续纠偏阶段通过。
+- Runtime preflight：`python3 scripts/25_agent_runtime_preflight.py` 输出 `PASS report=artifacts/agent_runtime_preflight_report.md`。
+- Scoped diff check：本轮相关文件 `git diff --check` 通过。
+- 全量 pytest：`python3 -m pytest tests -q` 输出 1457 passed、31 failed、3 skipped；失败集中在 LLM provider 配置、旧 React/P3 视觉契约、main-results 审计和 wrapper 设计接口，未作为本轮通过标准。
+
+### 实现范围
+
+- `Product/backend/product_control_phase_service.py`：新增只读 P0 report 服务；P0 report 增加 `agent_tasks`、`evidence_checks` 和 `formal_boundary`。
+- `Product/app.py`：新增 `GET /api/v1/projects/{project_id}/product-control/p0-phase`。
+- 旧记录：最初 P0 面板误落在 `Product/web` legacy 工作台；该入口已在 React Main Entry P0 Correction 中纠偏。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`：当前主入口 P0 API client、面板渲染和刷新处理。
+- `Product/web-react/src/styles.css`：当前主入口 `product-control-p0-*` 样式。
+- `Tests/Tasks`：新增 BDD、目标测试，并更新 todo/current-stage/handoff/manifest/round-log。
+
+### 手动/API 验收
+
+1. 启动服务：`python3 -m uvicorn Product.app:app --host 127.0.0.1 --port 8891`。
+2. 打开 React 主入口：`http://127.0.0.1:8891/?topic=父母受教育水平对子女工资收入的影响&mode=codex-supervisor`。
+3. 产品 API 主仓库项目：`proj_empirical_paper_template_main` 已注册到本地产品壳，指向 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
+4. API 验收：`GET /api/v1/projects/proj_empirical_paper_template_main/product-control/p0-phase` 返回 `p0_phase_ready_for_review`、topic 为“父母受教育水平对子女工资收入的影响”、6 个 Agent tasks、3 个 `needs_evidence`。
+5. React 静态契约验收：`ProductControlP0Panel.tsx` 包含 `product-control-p0-panel`、`handleRefreshProductControlP0`、`needs_evidence`、`待派工审阅`、`不能进入正式论文`；`/legacy` 307 重定向到 `/`。
+
+### 剩余风险
+
+- Playwright 截图级浏览器验收仍需在运行服务后补。
+- FastAPI 根路径 `/` 当前服务 React build；`/legacy` 不再作为工作台入口。
+- P0 CLI 摘要尚未实现，但前端/API 已满足当前验收。
+- 全量 pytest 仍有 31 个历史/环境相关失败；本轮没有扩大范围修复。
+
 ## 2026-05-25 P3-B React Workbench Design Contract
 
 ### 行为覆盖

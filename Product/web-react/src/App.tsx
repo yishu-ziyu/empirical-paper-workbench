@@ -12,6 +12,7 @@ import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
+import { ProductControlP0Panel } from "./components/ProductControlP0Panel";
 import { ServiceConnectionRecovery } from "./components/ServiceConnectionRecovery";
 import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
@@ -638,6 +639,10 @@ export function App() {
             <span className="toast-icon">🔒</span>
             <span>{toastMessage}</span>
           </div>
+        ) : null}
+
+        {effectiveProjectId ? (
+          <ProductControlP0Panel projectId={effectiveProjectId} />
         ) : null}
 
         <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />

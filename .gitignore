@@ -65,6 +65,7 @@ docs/workflows/
 # Local agent runtime/worktree state
 .claude/settings.json
 .claude/worktrees/
+.agent-memory/local/
 
 # Local verification and generated review outputs
 Product/artifacts/

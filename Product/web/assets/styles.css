@@ -145,6 +145,7 @@ textarea {
 
 .product-next-action,
 .workflow-spine-panel,
+.product-control-p0-panel,
 .llm-supervisor-panel,
 .supervisor-plan-panel,
 .variable-role-workflow-card,
@@ -159,6 +160,7 @@ textarea {
 
 .product-next-action-body,
 .llm-supervisor-body,
+.product-control-p0-body,
 .supervisor-plan-body,
 .variable-role-workflow-body,
 .variable-role-candidate-body,
@@ -343,6 +345,92 @@ textarea {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.72);
   min-width: 0;
+}
+
+.product-control-p0-body {
+  display: grid;
+  gap: 12px;
+}
+
+.product-control-p0-header,
+.product-control-p0-empty,
+.product-control-p0-section-head,
+.product-control-p0-check,
+.product-control-p0-task {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.product-control-p0-header,
+.product-control-p0-empty {
+  padding: 14px;
+  border: 1px solid rgba(30, 111, 98, 0.16);
+  border-radius: 10px;
+  background: rgba(236, 249, 246, 0.68);
+}
+
+.product-control-p0-header h4,
+.product-control-p0-empty h4 {
+  margin: 3px 0 6px;
+}
+
+.product-control-p0-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.product-control-p0-grid > div,
+.product-control-p0-boundary,
+.product-control-p0-check,
+.product-control-p0-task {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.76);
+  min-width: 0;
+}
+
+.product-control-p0-grid strong,
+.product-control-p0-check strong,
+.product-control-p0-task strong,
+.product-control-p0-check code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.product-control-p0-boundary {
+  border-color: rgba(161, 74, 24, 0.24);
+  background: rgba(255, 248, 237, 0.82);
+}
+
+.product-control-p0-boundary p {
+  margin: 6px 0 0;
+}
+
+.product-control-p0-list {
+  display: grid;
+  gap: 8px;
+}
+
+.product-control-p0-check.is-needs_evidence {
+  border-color: rgba(161, 74, 24, 0.24);
+  background: rgba(255, 248, 237, 0.72);
+}
+
+.product-control-p0-check.is-passed {
+  border-color: rgba(30, 111, 98, 0.22);
+  background: rgba(236, 249, 246, 0.62);
+}
+
+.product-control-p0-check code {
+  max-width: 240px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
 }
 
 .supervisor-plan-body,

@@ -1,0 +1,23 @@
+{
+  "name": "statspai-empirical-workflow-runtime",
+  "version": "0.1.0",
+  "description": "Portable StatspAI empirical workflow runtime registration package.",
+  "author": {
+    "name": "StatspAI local workflow"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "StatspAI Empirical Workflow Runtime",
+    "shortDescription": "Install StatspAI workflow skills and native subagent registry.",
+    "longDescription": "Packages the StatspAI ten-step empirical-paper workflow skill, native subagent specs, registry schema, and validation scripts so the registration layer can be migrated into another local research project.",
+    "developerName": "StatspAI local workflow",
+    "category": "Productivity",
+    "capabilities": [
+      "skills",
+      "subagent-specs",
+      "workflow-registry",
+      "local-validation"
+    ],
+    "defaultPrompt": "Use $statspai-empirical-workflow to inspect this project's empirical-paper workflow state before planning changes."
+  }
+}

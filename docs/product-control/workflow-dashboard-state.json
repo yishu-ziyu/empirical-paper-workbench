@@ -1,0 +1,205 @@
+{
+  "schema_version": "workflow_dashboard_state.v1",
+  "updated_at": "2026-06-18T18:12:00+08:00",
+  "poll_interval_ms": 3000,
+  "current_step": "交付 / 验收",
+  "next_step": "补齐真实字段后重跑",
+  "current_gate": "P16 半成品交付包已生成",
+  "blocker": "真实 CSV 缺少 parent_education 和 experience，不能运行父母教育工资模型",
+  "blocked_branch": "P16 阻断交付分支",
+  "status_code": "p16_blocked_branch_ready",
+  "forbidden_output": "不运行模型",
+  "guardrail": "已推到 P16 阻断分支 · 交付半成品论文和红标问题清单 · 不伪造回归结果",
+  "headline": {
+    "eyebrow": "项目工作流仪表盘 · 管理层视图",
+    "title": "论文生产流水线控制台",
+    "copy": "让项目负责人先看清产品目标、真实卡点、下一步动作和禁止越级的边界。"
+  },
+  "executive_summary": {
+    "title": "老板先看这里",
+    "goal": "给本科生交付可审计的论文初稿",
+    "current_truth": "Demo 线已走到 P16 阻断交付：能交付半成品论文，不能声称完整实证结果",
+    "decision_needed": "是否补齐真实字段并重跑 P13-P16",
+    "next_action": "补齐 parent_education 和 experience 后重跑 P13-P16 闭环"
+  },
+  "plain_summary": [
+    {
+      "label": "现在能交付什么",
+      "value": "半成品论文和红标问题清单",
+      "description": "当前不能报告回归结果，但可以交付已生成的 paper_draft.docx 与缺口清单。"
+    },
+    {
+      "label": "还缺什么",
+      "value": "真实 CSV 缺少两个字段",
+      "description": "parent_education 和 experience 不在当前分析数据表里，不能跑父母教育工资模型。"
+    },
+    {
+      "label": "下一步做什么",
+      "value": "补齐字段后重跑 P13-P16",
+      "description": "补齐或合并真实字段后，再进入完整论文和模型结果分支。"
+    }
+  ],
+  "phases": [
+    {
+      "label": "追问",
+      "status": "done",
+      "description": "已问清产品目标、用户、替代方案和停机条件。"
+    },
+    {
+      "label": "调研",
+      "status": "done",
+      "description": "已读取项目证据、产品文档、真实数据来源和现有约束。"
+    },
+    {
+      "label": "原型",
+      "status": "done",
+      "description": "P11 签收工作台、P9 保存状态和 P12-0 设计树已经可视化。"
+    },
+    {
+      "label": "规格",
+      "status": "done",
+      "description": "P12-P16 设计树、P12 预检草案、验收标准、回退路径和 no-model 边界已有 BDD/TDD 覆盖。"
+    },
+    {
+      "label": "拆任务",
+      "status": "done",
+      "description": "P13-P16 已拆成运行计划校验、执行账本、半成品交付和用户验收包。"
+    },
+    {
+      "label": "实现",
+      "status": "done",
+      "description": "P13-P16 阻断分支已实现并写出 JSON、Review 和红标问题清单。"
+    },
+    {
+      "label": "复核",
+      "status": "current",
+      "description": "当前复核 P16 半成品交付包、仪表盘和 API 状态。"
+    }
+  ],
+  "gate_cards": [
+    {
+      "label": "已完成门禁",
+      "title": "P12 预检已完成",
+      "description": "父母教育工资题目的方法规格草案已经生成。"
+    },
+    {
+      "label": "当前门禁",
+      "title": "P16 半成品交付包已生成",
+      "description": "已交付半成品论文、红标问题清单和用户验收包。"
+    },
+    {
+      "label": "当前阻断",
+      "title": "真实 CSV 缺字段",
+      "description": "缺少 parent_education 和 experience，不能运行父母教育工资模型。"
+    },
+    {
+      "label": "禁止动作",
+      "title": "不伪造结果",
+      "description": "不能复用旧机器人题目的方法规格、运行计划或回归结果。"
+    }
+  ],
+  "branches": [
+    {
+      "title": "P12 方法规格预检",
+      "description": "已把正式变量表转成可审阅的方法规格预检。"
+    },
+    {
+      "title": "P13 运行计划校验",
+      "description": "已校验真实 CSV 表头；字段不齐，运行计划不批准。"
+    },
+    {
+      "title": "P14 执行账本",
+      "description": "因 P13 阻断，没有创建运行编号，也没有运行模型。"
+    },
+    {
+      "title": "P15 半成品交付",
+      "description": "已生成半成品论文交付路径和红标问题清单。"
+    },
+    {
+      "title": "P16 用户验收",
+      "description": "已生成用户验收包：可验收半成品，不能声称完整论文。"
+    }
+  ],
+  "side_rules": [
+    {
+      "id": "return-to-p12-design-tree",
+      "label": "回退路径",
+      "title": "回到 P12-0",
+      "description": "方法口径、任务拆分或验收标准不清时，回到设计树重画；预检草案不自动升为正式方法规格。"
+    },
+    {
+      "id": "do-not-jump-to-run-id",
+      "label": "禁止路径",
+      "title": "不能跳到运行编号",
+      "description": "不能从当前阶段直接跳到运行编号或模型执行；P13 批准前也不能写运行计划。"
+    }
+  ],
+  "qa_items": [
+    {
+      "title": "打开页面",
+      "description": "打开仪表盘，先确认三句话结论可见。"
+    },
+    {
+      "title": "当前面板",
+      "description": "确认当前门禁是 P16 半成品交付包已生成。"
+    },
+    {
+      "title": "预检产物",
+      "description": "确认 P13、P14、P15、P16 JSON 和 Review 报告已生成。"
+    },
+    {
+      "title": "禁止入口",
+      "description": "页面不能暗示已经跑出父母教育工资回归。"
+    },
+    {
+      "title": "截图证据",
+      "description": "桌面和移动端截图必须能证明面板无重叠、无误导入口。"
+    }
+  ],
+  "source_links": [
+    {
+      "label": "状态总表",
+      "href": "../../WORKFLOW_STATUS.md"
+    },
+    {
+      "label": "任务清单",
+      "href": "../../Tasks/todo.md"
+    },
+    {
+      "label": "北极星计划",
+      "href": "../../Tasks/north-star-product-plan.md"
+    },
+    {
+      "label": "P12-0 设计树",
+      "href": "p12-p16-design-tree.md"
+    },
+    {
+      "label": "P12 预检 JSON",
+      "href": "../../Results/json/parent_education_wage_p12_design_spec_preflight.json"
+    },
+    {
+      "label": "P12 预检 Review",
+      "href": "../../Reviews/parent_education_wage_p12_design_spec_preflight.md"
+    },
+    {
+      "label": "P13 运行计划校验",
+      "href": "../../Results/json/parent_education_wage_p13_run_plan_approval.json"
+    },
+    {
+      "label": "P15 红标问题清单",
+      "href": "../../Manuscripts/generated/parent_education_wage_p15_issue_list.md"
+    },
+    {
+      "label": "P16 用户验收包",
+      "href": "../../Results/json/parent_education_wage_p16_user_acceptance_packet.json"
+    },
+    {
+      "label": "桌面截图",
+      "href": "../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-desktop.png"
+    },
+    {
+      "label": "手机截图",
+      "href": "../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-mobile.png"
+    }
+  ]
+}

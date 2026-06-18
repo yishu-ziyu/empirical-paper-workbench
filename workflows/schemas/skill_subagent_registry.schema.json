@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Skill Subagent Registry",
+  "type": "object",
+  "required": [
+    "version",
+    "layer",
+    "purpose",
+    "skill_root",
+    "native_agent_root",
+    "skill_packages",
+    "native_subagents",
+    "workflow_bindings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "string"},
+    "layer": {"type": "string", "enum": ["second"]},
+    "purpose": {"type": "string"},
+    "skill_root": {"type": "string"},
+    "native_agent_root": {"type": "string"},
+    "skill_packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "skill_file", "openai_metadata", "references", "covers_workflows", "entry_commands", "safety_policy", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "path": {"type": "string"},
+          "skill_file": {"type": "string"},
+          "openai_metadata": {"type": "string"},
+          "references": {"type": "array", "items": {"type": "string"}},
+          "covers_workflows": {"type": "array", "items": {"type": "string"}},
+          "entry_commands": {"type": "array", "items": {"type": "string"}},
+          "safety_policy": {"type": "string"},
+          "status": {"type": "string", "enum": ["registered", "draft", "blocked"]}
+        }
+      }
+    },
+    "native_subagents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "role", "covers_workflows", "allowed_adapters", "blocked_adapters", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "path": {"type": "string"},
+          "role": {"type": "string"},
+          "covers_workflows": {"type": "array", "items": {"type": "string"}},
+          "allowed_adapters": {"type": "array", "items": {"type": "string"}},
+          "blocked_adapters": {"type": "array", "items": {"type": "string"}},
+          "status": {"type": "string", "enum": ["registered", "draft", "blocked"]}
+        }
+      }
+    },
+    "workflow_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["workflow_id", "skill", "subagents", "default_adapters", "human_gate"],
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {"type": "string"},
+          "skill": {"type": "string"},
+          "subagents": {"type": "array", "items": {"type": "string"}},
+          "default_adapters": {"type": "array", "items": {"type": "string"}},
+          "human_gate": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

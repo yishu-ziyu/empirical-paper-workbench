@@ -18,6 +18,7 @@ const state = {
   journeyData: null,
   journeyPrimaryAction: null,
   researchQuestionData: null,
+  productControlP0Data: null,
   supervisorPlanData: null,
   agentTaskQueueData: null,
   datasetsData: null,
@@ -73,6 +74,7 @@ const state = {
   runningVerifierChecks: false,
   acceptingReviewerTaskSuggestionId: null,
   generatingSupervisorPlan: false,
+  refreshingProductControlP0: false,
   reviewingSupervisorPlanAction: null,
   creatingAgentTaskQueue: false,
   reviewingAgentTaskId: null,
@@ -359,6 +361,18 @@ const v2api = {
   overview: {
     async get(projectId) {
       return fetchJson(`/api/v1/projects/${projectId}/overview`);
+    },
+  },
+  productControlP0: {
+    async get(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/product-control/p0-phase`);
+    },
+    async refresh(projectId) {
+      return fetchJson(`/api/v1/projects/${projectId}/product-control/p0-phase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
     },
   },
   journey: {
@@ -1183,6 +1197,102 @@ function renderWorkflowContract(contract) {
   renderIntelligenceLayer(contract.intelligence_layer);
 }
 
+function renderProductControlP0Panel() {
+  const container = document.getElementById("product-control-p0-body");
+  if (!container) return;
+
+  const data = state.productControlP0Data;
+  if (!data) {
+    container.innerHTML = "<p class='muted'>正在读取 P0 阶段报告...</p>";
+    return;
+  }
+
+  if (data.status === "p0_phase_report_missing") {
+    container.innerHTML = `
+      <div class="product-control-p0-empty">
+        <div>
+          <span class="meta-label">P0 阶段报告</span>
+          <h4>尚未生成</h4>
+          <p class="muted">${escapeHtml(data.next_action || "点击刷新 P0 阶段包；读取操作不会自动改写阶段产物。")}</p>
+          <p class="muted">报告路径：${escapeHtml(data.p0_phase_report_path || "Results/json/product_control_p0_phase.json")}</p>
+        </div>
+        <button class="primary-button" type="button" data-product-control-p0-refresh ${state.refreshingProductControlP0 ? "disabled" : ""}>
+          ${state.refreshingProductControlP0 ? "刷新中..." : "生成 P0 阶段包"}
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  const topic = data.topic_binding?.expected_topic || data.project?.title || "未绑定题目";
+  const summary = data.summary || {};
+  const evidenceChecks = Array.isArray(data.evidence_checks) ? data.evidence_checks : [];
+  const tasks = Array.isArray(data.agent_tasks) ? data.agent_tasks : [];
+  const needsEvidence = evidenceChecks.filter((check) => check.status === "needs_evidence");
+  const boundary = data.formal_boundary || "不能进入正式论文；P0 只生成审阅层产物，真实文献、数据与变量、方法执行证据仍需补齐。";
+  const waitingReviewLabel = "待派工审阅";
+
+  container.innerHTML = `
+    <div class="product-control-p0-header">
+      <div>
+        <span class="meta-label">当前阶段</span>
+        <h4>${escapeHtml(productTermLabel(data.status || "p0_phase_ready_for_review"))}</h4>
+        <p class="muted">${escapeHtml(boundary)}</p>
+      </div>
+      <button class="ghost-button" type="button" data-product-control-p0-refresh ${state.refreshingProductControlP0 ? "disabled" : ""}>
+        ${state.refreshingProductControlP0 ? "刷新中..." : "刷新 P0 阶段包"}
+      </button>
+    </div>
+    <div class="product-control-p0-grid">
+      <div><span class="meta-label">当前题目</span><strong>${escapeHtml(topic)}</strong></div>
+      <div><span class="meta-label">P0 状态</span><strong>${escapeHtml(productTermLabel(data.status || "-"))}</strong></div>
+      <div><span class="meta-label">Agent 任务</span><strong>${escapeHtml(String(summary.task_count ?? tasks.length ?? 0))}</strong></div>
+      <div><span class="meta-label">证据审计</span><strong>${escapeHtml(productTermLabel(summary.evidence_audit_status || "-"))}</strong></div>
+    </div>
+    <section class="product-control-p0-boundary">
+      <strong>不能进入正式论文</strong>
+      <p>当前 P0 只验证产品工作流；真实文献、数据与变量、方法执行证据补齐前，不能写入正式研究结论。</p>
+    </section>
+    <section>
+      <div class="product-control-p0-section-head">
+        <span class="meta-label">证据缺口</span>
+        <span class="pill">needs_evidence ${needsEvidence.length}</span>
+      </div>
+      <div class="product-control-p0-list">
+        ${evidenceChecks.length ? evidenceChecks.map((check) => `
+          <article class="product-control-p0-check is-${escapeHtml(check.status || "unknown")}">
+            <div>
+              <strong>${escapeHtml(check.label || check.id || "证据项")}</strong>
+              <p class="muted">${escapeHtml(check.detail || "")}</p>
+            </div>
+            <span>${escapeHtml(productTermLabel(check.status || "-"))}</span>
+            <code>${escapeHtml(check.artifact_path || "")}</code>
+          </article>
+        `).join("") : "<p class='muted'>等待证据审计报告。</p>"}
+      </div>
+    </section>
+    <section>
+      <div class="product-control-p0-section-head">
+        <span class="meta-label">派工状态</span>
+        <span class="pill">${escapeHtml(waitingReviewLabel)}</span>
+      </div>
+      <div class="product-control-p0-list">
+        ${tasks.length ? tasks.map((task) => `
+          <article class="product-control-p0-task">
+            <div>
+              <strong>${escapeHtml(task.role || task.id || "Agent")}</strong>
+              <p class="muted">${escapeHtml(task.task || "")}</p>
+            </div>
+            <span>${escapeHtml(task.can_execute ? "可执行" : waitingReviewLabel)}</span>
+            <span>${escapeHtml(productTermLabel(task.next_action || task.status || "-"))}</span>
+          </article>
+        `).join("") : "<p class='muted'>等待 Agent Task Queue。</p>"}
+      </div>
+    </section>
+    <p class="muted">作品集脚本：${escapeHtml(data.portfolio_script_path || "docs/product-control/07_作品集Demo脚本.md")}</p>
+  `;
+}
+
 function renderIntelligenceLayer(intelligence_layer) {
   const container = document.getElementById("llm-supervisor-body");
   if (!container) return;
@@ -1686,7 +1796,7 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
   const candidateQueryCount = Number.isFinite(Number(review.candidate_query_count))
     ? Number(review.candidate_query_count)
     : 0;
-  const isReviewing = state.reviewingAgentTaskId === task.id;
+  const isReviewPending = state.reviewingAgentTaskId === task.id;
   const isApprovedForDraft = seedReview.status === "approved_for_draft";
   const isDrafting = state.draftingLiteratureReviewTaskId === task.id;
   return `
@@ -1733,13 +1843,13 @@ function renderReferenceSeedPackageResultReview(executionResult, task = {}) {
               ${isDrafting ? "生成中..." : "生成草稿层文献综述"}
             </button>
           ` : ""}
-          <button class="secondary-button" data-reference-seed-review-action="approve_for_draft" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
-            ${isReviewing && state.reviewingAgentTaskAction === "approve_for_draft" ? "处理中..." : "进入草稿综述"}
+          <button class="secondary-button" data-reference-seed-review-action="approve_for_draft" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
+            ${isReviewPending && state.reviewingAgentTaskAction === "approve_for_draft" ? "处理中..." : "进入草稿综述"}
           </button>
-          <button class="secondary-button" data-reference-seed-review-action="needs_revision" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+          <button class="secondary-button" data-reference-seed-review-action="needs_revision" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
             要求修订
           </button>
-          <button class="secondary-button" data-reference-seed-review-action="reject" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
+          <button class="secondary-button" data-reference-seed-review-action="reject" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
             拒绝种子包
           </button>
         </div>
@@ -1752,7 +1862,7 @@ function renderDraftLiteratureReview(task = {}) {
   const draft = task.draft_literature_review || {};
   if (draft.status !== "draft_ready") return "";
   const review = task.draft_literature_review_review || {};
-  const isReviewingDraft = state.reviewingDraftLiteratureReviewTaskId === task.id;
+  const isReviewPendingDraft = state.reviewingDraftLiteratureReviewTaskId === task.id;
   return `
     <div class="agent-task-literature-draft">
       <div>
@@ -1785,8 +1895,8 @@ function renderDraftLiteratureReview(task = {}) {
         </div>
         <div class="agent-task-literature-draft__buttons">
           ${["approve_for_citation_verification", "needs_revision", "reject"].map((action) => `
-            <button class="${action === "approve_for_citation_verification" ? "primary-button" : "secondary-button"}" data-draft-literature-review-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewingDraft ? "disabled" : ""}>
-              ${isReviewingDraft && state.reviewingDraftLiteratureReviewAction === action ? "写回中..." : escapeHtml(draftLiteratureReviewReviewActionLabel(action))}
+            <button class="${action === "approve_for_citation_verification" ? "primary-button" : "secondary-button"}" data-draft-literature-review-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPendingDraft ? "disabled" : ""}>
+              ${isReviewPendingDraft && state.reviewingDraftLiteratureReviewAction === action ? "写回中..." : escapeHtml(draftLiteratureReviewReviewActionLabel(action))}
             </button>
           `).join("")}
         </div>
@@ -1870,7 +1980,7 @@ function renderVerifiedLiteraturePackage(task = {}) {
   if (!literaturePackage.status) return "";
   const review = task.verified_literature_package_review || {};
   const canReview = task.status === "verified_literature_package_ready";
-  const isReviewing = state.reviewingVerifiedLiteraturePackageTaskId === task.id;
+  const isReviewPending = state.reviewingVerifiedLiteraturePackageTaskId === task.id;
   return `
     <div class="agent-task-verified-literature-package">
       <div>
@@ -1905,8 +2015,8 @@ function renderVerifiedLiteraturePackage(task = {}) {
         ${canReview ? `
           <div class="action-row">
             ${["approve_for_manuscript_citations", "needs_revision", "reject"].map((action) => `
-              <button class="${action === "approve_for_manuscript_citations" ? "primary-button" : "secondary-button"}" data-verified-literature-package-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
-                ${isReviewing && state.reviewingVerifiedLiteraturePackageAction === action ? "保存中..." : verifiedLiteraturePackageReviewActionLabel(action)}
+              <button class="${action === "approve_for_manuscript_citations" ? "primary-button" : "secondary-button"}" data-verified-literature-package-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
+                ${isReviewPending && state.reviewingVerifiedLiteraturePackageAction === action ? "保存中..." : verifiedLiteraturePackageReviewActionLabel(action)}
               </button>
             `).join("")}
           </div>
@@ -1922,7 +2032,7 @@ function renderManuscriptCitationPlan(task = {}) {
   const canGenerate = task.status === "verified_literature_package_approved";
   const isGenerating = state.generatingManuscriptCitationPlanTaskId === task.id;
   const canReview = task.status === "manuscript_citation_plan_ready";
-  const isReviewing = state.reviewingManuscriptCitationPlanTaskId === task.id;
+  const isReviewPending = state.reviewingManuscriptCitationPlanTaskId === task.id;
   if (!plan.status && !canGenerate) return "";
 
   return `
@@ -1971,8 +2081,8 @@ function renderManuscriptCitationPlan(task = {}) {
           ${canReview ? `
             <div class="action-row">
               ${["approve_for_draft_sections", "needs_revision", "reject"].map((action) => `
-                <button class="${action === "approve_for_draft_sections" ? "primary-button" : "secondary-button"}" data-manuscript-citation-plan-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
-                  ${isReviewing && state.reviewingManuscriptCitationPlanAction === action ? "保存中..." : manuscriptCitationPlanReviewActionLabel(action)}
+                <button class="${action === "approve_for_draft_sections" ? "primary-button" : "secondary-button"}" data-manuscript-citation-plan-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
+                  ${isReviewPending && state.reviewingManuscriptCitationPlanAction === action ? "保存中..." : manuscriptCitationPlanReviewActionLabel(action)}
                 </button>
               `).join("")}
             </div>
@@ -1989,7 +2099,7 @@ function renderDraftSectionPlan(task = {}) {
   const canGenerate = task.status === "manuscript_citation_plan_approved";
   const isGenerating = state.generatingDraftSectionPlanTaskId === task.id;
   const canReview = task.status === "draft_section_plan_ready";
-  const isReviewing = state.reviewingDraftSectionPlanTaskId === task.id;
+  const isReviewPending = state.reviewingDraftSectionPlanTaskId === task.id;
   if (!plan.status && !canGenerate) return "";
 
   return `
@@ -2042,8 +2152,8 @@ function renderDraftSectionPlan(task = {}) {
           ${canReview ? `
             <div class="action-row">
               ${["approve_for_section_tasks", "needs_revision", "reject"].map((action) => `
-                <button class="${action === "approve_for_section_tasks" ? "primary-button" : "secondary-button"}" data-draft-section-plan-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
-                  ${isReviewing && state.reviewingDraftSectionPlanAction === action ? "保存中..." : draftSectionPlanReviewActionLabel(action)}
+                <button class="${action === "approve_for_section_tasks" ? "primary-button" : "secondary-button"}" data-draft-section-plan-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
+                  ${isReviewPending && state.reviewingDraftSectionPlanAction === action ? "保存中..." : draftSectionPlanReviewActionLabel(action)}
                 </button>
               `).join("")}
             </div>
@@ -2060,7 +2170,7 @@ function renderDraftSectionTasks(task = {}) {
   const canGenerate = task.status === "draft_section_plan_approved";
   const isGenerating = state.generatingDraftSectionTasksTaskId === task.id;
   const canReview = task.status === "draft_section_tasks_ready";
-  const isReviewing = state.reviewingDraftSectionTasksTaskId === task.id;
+  const isReviewPending = state.reviewingDraftSectionTasksTaskId === task.id;
   if (!sectionTasks.status && !canGenerate) return "";
 
   return `
@@ -2130,8 +2240,8 @@ function renderDraftSectionTasks(task = {}) {
           ${canReview ? `
             <div class="action-row">
               ${["approve_for_writer_agent", "needs_revision", "reject"].map((action) => `
-                <button class="${action === "approve_for_writer_agent" ? "primary-button" : "secondary-button"}" data-draft-section-tasks-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewing ? "disabled" : ""}>
-                  ${isReviewing && state.reviewingDraftSectionTasksAction === action ? "保存中..." : draftSectionTasksReviewActionLabel(action)}
+                <button class="${action === "approve_for_writer_agent" ? "primary-button" : "secondary-button"}" data-draft-section-tasks-review-action="${action}" data-agent-task-id="${escapeHtml(task.id || "")}" ${isReviewPending ? "disabled" : ""}>
+                  ${isReviewPending && state.reviewingDraftSectionTasksAction === action ? "保存中..." : draftSectionTasksReviewActionLabel(action)}
                 </button>
               `).join("")}
             </div>
@@ -2154,10 +2264,10 @@ function renderSectionDrafts(task = {}) {
   const canGenerate = task.status === "draft_section_tasks_approved";
   const isGenerating = state.generatingSectionDraftsTaskId === task.id;
   const canReview = task.status === "section_drafts_ready" && Boolean(drafts.status);
-  const isReviewing = state.reviewingSectionDraftsTaskId === task.id;
+  const isReviewPending = state.reviewingSectionDraftsTaskId === task.id;
   const hasPreflight = Boolean(preflight.status || preflight.artifact_path);
   const canReviewPreflight = task.status === "formal_writeback_preflight_ready" && hasPreflight;
-  const isReviewingPreflight = state.reviewingFormalWritebackPreflightTaskId === task.id;
+  const isReviewPendingPreflight = state.reviewingFormalWritebackPreflightTaskId === task.id;
   const hasFormalWriteback = Boolean(manifest.status || manifest.artifact_path);
   const hasExportPreflight = Boolean(exportPreflight.status || exportPreflight.artifact_path);
   const hasPdfCandidateExport = Boolean(pdfCandidateExport.status || pdfCandidateExport.pdf_candidate_path);
@@ -2234,9 +2344,9 @@ function renderSectionDrafts(task = {}) {
                   class="${action === "approve_for_formal_writeback_preflight" ? "primary-button" : "secondary-button"}"
                   data-section-drafts-review-action="${action}"
                   data-agent-task-id="${escapeHtml(task.id || "")}"
-                  ${isReviewing ? "disabled" : ""}
+                  ${isReviewPending ? "disabled" : ""}
                 >
-                  ${isReviewing && state.reviewingSectionDraftsAction === action ? "保存中..." : sectionDraftsReviewActionLabel(action)}
+                  ${isReviewPending && state.reviewingSectionDraftsAction === action ? "保存中..." : sectionDraftsReviewActionLabel(action)}
                 </button>
               `).join("")}
             </div>
@@ -2285,9 +2395,9 @@ function renderSectionDrafts(task = {}) {
                     class="${action === "approve_formal_writeback" ? "primary-button" : "secondary-button"}"
                     data-formal-writeback-preflight-review-action="${action}"
                     data-agent-task-id="${escapeHtml(task.id || "")}"
-                    ${isReviewingPreflight ? "disabled" : ""}
+                    ${isReviewPendingPreflight ? "disabled" : ""}
                   >
-                    ${isReviewingPreflight && state.reviewingFormalWritebackPreflightAction === action ? "保存中..." : formalWritebackPreflightReviewActionLabel(action)}
+                    ${isReviewPendingPreflight && state.reviewingFormalWritebackPreflightAction === action ? "保存中..." : formalWritebackPreflightReviewActionLabel(action)}
                   </button>
                 `).join("")}
               </div>
@@ -3602,6 +3712,26 @@ async function handleExecuteAgentTask(taskId) {
   }
 }
 
+async function handleRefreshProductControlP0() {
+  if (!state.selectedProjectId) return;
+  clearV2Error("journey");
+  state.refreshingProductControlP0 = true;
+  renderProductControlP0Panel();
+  try {
+    state.productControlP0Data = await v2api.productControlP0.refresh(state.selectedProjectId);
+    state.supervisorPlanData = await v2api.supervisorPlan.get(state.selectedProjectId);
+    state.agentTaskQueueData = await v2api.agentTaskQueue.get(state.selectedProjectId);
+    renderProductControlP0Panel();
+    renderSupervisorPlan();
+    renderAgentTaskQueue();
+  } catch (error) {
+    showV2Error("journey", `刷新 P0 阶段包失败：${error.message}`);
+  } finally {
+    state.refreshingProductControlP0 = false;
+    renderProductControlP0Panel();
+  }
+}
+
 async function handleGenerateSupervisorPlan() {
   if (!state.selectedProjectId) return;
   clearV2Error("overview");
@@ -4823,6 +4953,7 @@ function renderJourney() {
 
   intake.style.display = "none";
   pipeline.style.display = "block";
+  renderProductControlP0Panel();
   renderSupervisorPlan();
   renderAgentTaskQueue();
 
@@ -8208,6 +8339,7 @@ async function loadV2Data(viewName) {
         state.overviewData = await v2api.overview.get(projectId);
         state.journeyData = await v2api.journey.get(projectId);
         state.researchQuestionData = await v2api.researchQuestion.get(projectId);
+        state.productControlP0Data = await v2api.productControlP0.get(projectId);
         state.supervisorPlanData = await v2api.supervisorPlan.get(projectId);
         state.agentTaskQueueData = await v2api.agentTaskQueue.get(projectId);
         renderJourney();
@@ -8518,6 +8650,10 @@ async function boot() {
     }
     if (target.closest("[data-topic-start-action]")) {
       switchView("data-variables");
+      return;
+    }
+    if (target.closest("[data-product-control-p0-refresh]")) {
+      void handleRefreshProductControlP0();
       return;
     }
     const supervisorButton = target.closest("[data-supervisor-plan-generate]");

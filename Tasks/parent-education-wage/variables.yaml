@@ -1,0 +1,79 @@
+---
+topic: parent_education_wage
+topic_slug: parent-education-wage
+generated_by: p0a-topic-binding-repair
+timestamp: '2026-06-17T11:51:20+00:00'
+evidence_status: needs_dataset_binding_review
+roles:
+- X
+- Y
+- control
+- moderator
+upstream:
+- brief.md
+downstream_consumers:
+- design.json
+- execution
+---
+
+variables:
+- role: Y
+  dataset_column: ln_wage
+  semantic_label: 对数工资收入
+  description: 子女工资收入的自然对数；最终口径需要在数据绑定后确认。
+  review_status: candidate_needs_dataset_check
+- role: Y
+  dataset_column: wage
+  semantic_label: 工资收入
+  description: 子女工资收入原始口径；可作为对数工资的来源变量或稳健性结果。
+  review_status: candidate_needs_dataset_check
+- role: X
+  dataset_column: father_education
+  semantic_label: 父亲受教育水平
+  description: 父亲最高受教育水平或受教育年限；需按实际数据字典映射。
+  review_status: candidate_needs_dataset_check
+- role: X
+  dataset_column: mother_education
+  semantic_label: 母亲受教育水平
+  description: 母亲最高受教育水平或受教育年限；需按实际数据字典映射。
+  review_status: candidate_needs_dataset_check
+- role: X
+  dataset_column: parent_education
+  semantic_label: 父母受教育水平
+  description: 父亲和母亲教育变量的合成指标；合成规则需要人工确认。
+  review_status: candidate_needs_dataset_check
+- role: control
+  dataset_column: edu_last
+  semantic_label: 子女受教育年限
+  description: 子女最高学历或受教育年限，用于区分家庭背景影响和自身教育回报。
+  review_status: candidate_needs_dataset_check
+- role: control
+  dataset_column: age
+  semantic_label: 年龄
+  description: 子女调查时年龄。
+  review_status: candidate_needs_dataset_check
+- role: control
+  dataset_column: female
+  semantic_label: 性别
+  description: 子女性别虚拟变量。
+  review_status: candidate_needs_dataset_check
+- role: control
+  dataset_column: urban
+  semantic_label: 城乡户籍或居住地
+  description: 城乡差异控制变量。
+  review_status: candidate_needs_dataset_check
+- role: control
+  dataset_column: experience
+  semantic_label: 工作经验
+  description: 潜在或实际工作经验；口径需由数据字典确认。
+  review_status: candidate_needs_dataset_check
+- role: moderator
+  dataset_column: hukou
+  semantic_label: 户口状态
+  description: 用于考察家庭教育背景影响的制度环境异质性。
+  review_status: candidate_needs_dataset_check
+- role: moderator
+  dataset_column: province
+  semantic_label: 省份
+  description: 可用于地区固定效应或地区异质性分析。
+  review_status: candidate_needs_dataset_check

@@ -1,8 +1,8 @@
 ---
 topic: '## 研究问题'
 topic_slug: smoke-shape
-generated_by: variables-llm-m3
-timestamp: '2026-06-04T08:42:43.318900+00:00'
+generated_by: variables-llm-minimax
+timestamp: '2026-06-17T12:40:02.681386+00:00'
 model: MiniMax-M3
 prompt_version: v1
 n_variables: 3

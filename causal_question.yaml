@@ -1,0 +1,48 @@
+topic_slug: parent-education-wage
+research_question: 父母受教育水平是否提高子女工资收入
+population: CFPS 父母-子女配对样本中已进入劳动力市场并报告工资收入的成年子女
+data_source: CFPS
+unit: child_parent_pair
+time_structure: repeated_cross_section_or_panel_pending_data_gate
+
+treatment:
+  name: parental_education_years
+  label: 父母受教育年限
+  preferred_measure: 父母最高受教育年限
+  role: endogenous_exposure
+
+outcome:
+  name: ln_wage
+  label: 子女工资收入自然对数
+  raw_measure_pending: 工资收入口径、小时工资或月工资在 04 数据门禁确认
+
+candidate_mediators:
+  - child_education_years
+
+baseline_controls:
+  - age
+  - gender
+  - hukou
+  - region
+  - year
+
+primary_design:
+  method: IV
+  estimator: 2SLS
+  instrument_candidate: compulsory_education_policy_exposure
+  estimand: LATE
+  interpretation: 受政策影响而增加父母教育年限的家庭中，父母教育对子女工资的局部平均影响
+
+secondary_designs:
+  - method: OLS
+    role: descriptive_baseline
+  - method: DID_or_event_study
+    role: only_if_policy_timing_and_cohort_exposure_are_verified
+
+identification_assumptions:
+  - 政策暴露必须显著影响父母受教育年限
+  - 政策暴露不能通过父母教育以外的路径直接影响子女工资
+  - 出生 cohort、地区和年份趋势需要被充分控制
+  - 样本选择进入工资劳动市场不能完全由不可观测家庭因素驱动
+
+next_workflow: 02_literature

@@ -1,0 +1,241 @@
+{
+  "version": "0.1",
+  "date": "2026-06-15",
+  "layer": "second",
+  "status": "contract-only",
+  "workflows": [
+    {
+      "id": "01_design",
+      "step": "01",
+      "name": "选题与研究设计",
+      "purpose": "把 idea 变成可检验的研究问题、识别口径和风险清单。",
+      "agents": ["ResearchDesignAgent", "DesignAuditor"],
+      "inputs": ["idea", "data_clue", "policy_or_treatment_clue"],
+      "required_outputs": [
+        {"artifact": "research_design.md", "path_hint": "research_design.md"},
+        {"artifact": "causal_question.yaml", "path_hint": "causal_question.yaml"},
+        {"artifact": "design_risk.md", "path_hint": "design_risk.md"}
+      ],
+      "gates": [
+        {"name": "one_sentence_design", "type": "human"},
+        {"name": "artifact_presence", "type": "automated", "command": "python3 scripts/21_route_next_workflow.py"}
+      ],
+      "human_checkpoints": ["题目是否值得继续", "贡献是否足以成文", "识别假设是否可以接受"],
+      "stop_conditions": ["treatment 不清楚", "outcome 不清楚", "数据不能回答问题", "贡献弱到不值得继续"],
+      "rollback_to": null,
+      "skills": ["aer-topic-selection"]
+    },
+    {
+      "id": "02_literature",
+      "step": "02",
+      "name": "文献检索与综述",
+      "purpose": "建立检索计划、候选池、closest papers 和贡献矩阵。",
+      "agents": ["LiteratureSearchAgent", "MetadataVerifier", "PDFFetchAgent"],
+      "inputs": ["research_design.md", "concept_families", "method_keywords"],
+      "required_outputs": [
+        {"artifact": "query_plan.json", "path_hint": "litreview/query_plan.json"},
+        {"artifact": "literature_candidates.csv", "path_hint": "litreview/literature_candidates.csv"},
+        {"artifact": "references.bib", "path_hint": "references.bib"},
+        {"artifact": "contribution_matrix.md", "path_hint": "litreview/contribution_matrix.md"}
+      ],
+      "gates": [
+        {"name": "metadata_verified", "type": "automated", "command": "python3 scripts/15_verify_bibliography.py"},
+        {"name": "closest_papers_selected", "type": "human"}
+      ],
+      "human_checkpoints": ["closest papers 是否选对", "本文真正 gap 是什么"],
+      "stop_conditions": ["找不到最近文献", "引用无法核验", "综述只是罗列"],
+      "rollback_to": "01_design",
+      "skills": ["literature-review", "citation-management"]
+    },
+    {
+      "id": "03_paper_reading",
+      "step": "03",
+      "name": "论文阅读与拆解",
+      "purpose": "把核心文献读到表格、方法、局限和可引用证据位置。",
+      "agents": ["PaperReadingAgent", "EvidenceAuditor"],
+      "inputs": ["literature_candidates.csv", "pdf_or_html_files"],
+      "required_outputs": [
+        {"artifact": "lit_reading_notes/", "path_hint": "litreview/notes/compressed/"},
+        {"artifact": "span_index.json", "path_hint": "litreview/notes/span_index.json"},
+        {"artifact": "reading_state.md", "path_hint": "litreview/notes/reading_state.md"}
+      ],
+      "gates": [
+        {"name": "source_spans_bound", "type": "automated"},
+        {"name": "literature_role_confirmed", "type": "human"}
+      ],
+      "human_checkpoints": ["每篇核心文献在本文里承担什么角色"],
+      "stop_conditions": ["核心文献没有全文", "只有摘要级笔记", "claim 没有证据位置"],
+      "rollback_to": "02_literature",
+      "skills": ["pdf", "paper-lookup", "literature-review"]
+    },
+    {
+      "id": "04_data_gate",
+      "step": "04",
+      "name": "数据获取与清洗",
+      "purpose": "证明数据能支撑研究问题，并留下可复现的数据口径。",
+      "agents": ["DataPreparationAgent", "DataGateAuditor"],
+      "inputs": ["raw_data", "research_design.md", "variable_definitions_from_literature"],
+      "required_outputs": [
+        {"artifact": "data_contract.md", "path_hint": "artifacts/data_contract.md"},
+        {"artifact": "sample_attrition.csv", "path_hint": "artifacts/sample_attrition.csv"},
+        {"artifact": "variable_dictionary.csv", "path_hint": "artifacts/variable_dictionary.csv"},
+        {"artifact": "analysis_ready.*", "path_hint": "artifacts/did_sample.pkl"},
+        {"artifact": "data_gate_report.md", "path_hint": "artifacts/data_gate_report.md"}
+      ],
+      "gates": [
+        {"name": "data_gate_script", "type": "automated", "command": "python3 scripts/04_data_gate.py"},
+        {"name": "variable_mapping_confirmed", "type": "human"}
+      ],
+      "human_checkpoints": ["变量替代是否合理", "数据限制是否要求改题"],
+      "stop_conditions": ["处理组或对照组缺失", "样本流失无法解释", "文献口径映射不上"],
+      "rollback_to": "01_design",
+      "skills": ["StatsPAI_skill", "polars", "spreadsheets:Spreadsheets"]
+    },
+    {
+      "id": "05_causal_analysis",
+      "step": "05",
+      "name": "统计分析与因果推断",
+      "purpose": "跑主模型、识别诊断、稳健性和失败风险记录。",
+      "agents": ["CausalAnalysisAgent", "IdentificationAuditor", "RobustnessAuditor"],
+      "inputs": ["analysis_ready.*", "causal_question.yaml", "contribution_matrix.md"],
+      "required_outputs": [
+        {"artifact": "tables/", "path_hint": "tables/"},
+        {"artifact": "figures/", "path_hint": "figures/"},
+        {"artifact": "model_log.md", "path_hint": "model_log.md"},
+        {"artifact": "robustness_report.md", "path_hint": "robustness_report.md"}
+      ],
+      "gates": [
+        {"name": "rerun_core_models", "type": "automated", "command": "python3 scripts/05_event_study.py && python3 scripts/06_table2.py && python3 scripts/08_robustness.py"},
+        {"name": "claim_strength_confirmed", "type": "human"}
+      ],
+      "human_checkpoints": ["结果是否足以支撑主张", "是否回退改设计"],
+      "stop_conditions": ["placebo 明显失败", "结果高度敏感", "识别假设站不住"],
+      "rollback_to": "01_design",
+      "skills": ["StatsPAI_skill", "aer-identification", "aer-robustness", "pyfixest"]
+    },
+    {
+      "id": "06_writing",
+      "step": "06",
+      "name": "论文写作",
+      "purpose": "把研究设计、文献、数据和结果组织成证据约束下的草稿。",
+      "agents": ["WritingAgent", "ClaimBinder"],
+      "inputs": ["research_design.md", "contribution_matrix.md", "data_gate_report.md", "tables/", "figures/"],
+      "required_outputs": [
+        {"artifact": "paper.tex", "path_hint": "paper.tex"},
+        {"artifact": "paper.pdf", "path_hint": "paper.pdf"}
+      ],
+      "gates": [
+        {"name": "latex_compile", "type": "automated", "command": "xelatex -interaction=nonstopmode paper.tex"},
+        {"name": "main_claim_confirmed", "type": "human"}
+      ],
+      "human_checkpoints": ["论文主线", "贡献表述", "结论保守程度"],
+      "stop_conditions": ["结果解释超过证据", "贡献句说不清", "章节互相不一致"],
+      "rollback_to": "05_causal_analysis",
+      "skills": ["paper-writing", "aer-introduction", "scientific-writing"]
+    },
+    {
+      "id": "07_revision",
+      "step": "07",
+      "name": "论文修改与润色",
+      "purpose": "先修审稿风险和论证结构，再做语言润色。",
+      "agents": ["ReviewerAgent", "RevisionPlanner", "PolishAgent"],
+      "inputs": ["paper.tex", "paper.pdf", "tables/", "figures/"],
+      "required_outputs": [
+        {"artifact": "review_report.md", "path_hint": "review_report.md"},
+        {"artifact": "revision_plan.md", "path_hint": "revision_plan.md"},
+        {"artifact": "draft_revised.*", "path_hint": "draft_revised.*"}
+      ],
+      "gates": [
+        {"name": "major_concerns_resolved", "type": "human"},
+        {"name": "paper_compile_after_revision", "type": "automated", "command": "xelatex -interaction=nonstopmode paper.tex"}
+      ],
+      "human_checkpoints": ["哪些问题接受", "哪些风险写成局限", "是否需要新增分析"],
+      "stop_conditions": ["只改语言不改论证", "修改后和结果不一致"],
+      "rollback_to": "06_writing",
+      "skills": ["peer-review", "edit-article", "aer-robustness"]
+    },
+    {
+      "id": "08_format_citation",
+      "step": "08",
+      "name": "引用管理与排版",
+      "purpose": "把论文整理成引用、表图、排版一致的可提交文件。",
+      "agents": ["CitationFormatAgent", "ReferenceVerifier", "LayoutAgent"],
+      "inputs": ["paper.tex", "references.bib", "paper_tables/", "figures/"],
+      "required_outputs": [
+        {"artifact": "verified_bibliography.csv", "path_hint": "verified_bibliography.csv"},
+        {"artifact": "paper.pdf", "path_hint": "paper.pdf"}
+      ],
+      "gates": [
+        {"name": "bibliography_verified", "type": "automated", "command": "python3 scripts/15_verify_bibliography.py"},
+        {"name": "layout_clean", "type": "automated"}
+      ],
+      "human_checkpoints": ["目标期刊或学校格式是否接受"],
+      "stop_conditions": ["假引用", "漏引用", "表图编号不一致", "表格不可读"],
+      "rollback_to": "07_revision",
+      "skills": ["citation-management", "aer-tables-figures", "latex:latex-compile"]
+    },
+    {
+      "id": "09_replication",
+      "step": "09",
+      "name": "论文复现与可复现研究",
+      "purpose": "确认代码、数据入口、环境和论文数字能追溯。",
+      "agents": ["ReproAgent", "EnvironmentAgent", "ArtifactAuditor"],
+      "inputs": ["scripts/", "run_manifest.json", "paper.tex", "tables/", "figures/"],
+      "required_outputs": [
+        {"artifact": "run_manifest.json", "path_hint": "run_manifest.json"},
+        {"artifact": "repro_report.md", "path_hint": "repro_report.md"},
+        {"artifact": "replication/README.md", "path_hint": "replication/README.md"}
+      ],
+      "gates": [
+        {"name": "repro_hash_check", "type": "automated", "command": "python3 verify_repro.py"},
+        {"name": "data_release_boundary", "type": "human"}
+      ],
+      "human_checkpoints": ["哪些数据能公开", "哪些只能写访问说明"],
+      "stop_conditions": ["路径不可复现", "结果和论文不一致", "数据权限边界不清"],
+      "rollback_to": "05_causal_analysis",
+      "skills": ["aer-replication"]
+    },
+    {
+      "id": "10_defense",
+      "step": "10",
+      "name": "审稿回复与学术答辩",
+      "purpose": "把审稿意见变成有证据、有改动位置的回应矩阵。",
+      "agents": ["DefenseAgent", "EvidenceRouter", "ResponseWriter"],
+      "inputs": ["review_comments", "paper.tex", "revision_log.md", "tables/", "figures/"],
+      "required_outputs": [
+        {"artifact": "response_matrix.md", "path_hint": "response_matrix.md"},
+        {"artifact": "defense_qa.md", "path_hint": "defense_qa.md"},
+        {"artifact": "revision_log.md", "path_hint": "revision_log.md"}
+      ],
+      "gates": [
+        {"name": "all_comments_answered", "type": "human"},
+        {"name": "evidence_paths_exist", "type": "automated"}
+      ],
+      "human_checkpoints": ["哪些让步", "哪些坚持", "最终答辩口径"],
+      "stop_conditions": ["漏回意见", "只解释不修改", "新增分析无法复现"],
+      "rollback_to": "07_revision",
+      "skills": ["aer-rebuttal", "aer-submission"]
+    },
+    {
+      "id": "05x_policy_rollout_data_layer",
+      "step": "05x",
+      "name": "政策 rollout 数据层",
+      "purpose": "为未来省级 rollout ATT 升级准备政策时点数据，不改变当前结论。",
+      "agents": ["PolicyDataAgent", "SourceVerifier", "MergeAuditor"],
+      "inputs": ["policy_rollout_feasibility.md", "official_policy_sources", "province_crosswalk"],
+      "required_outputs": [
+        {"artifact": "urbmi_ncms_rollout_sources.csv", "path_hint": "data/policy/urbmi_ncms_rollout_sources.csv"},
+        {"artifact": "policy_rollout_clean.csv", "path_hint": "data/policy/policy_rollout_clean.csv"},
+        {"artifact": "policy_rollout_merge_report.md", "path_hint": "artifacts/policy_rollout_merge_report.md"}
+      ],
+      "gates": [
+        {"name": "official_sources_verified", "type": "human"},
+        {"name": "merge_key_audited", "type": "automated"}
+      ],
+      "human_checkpoints": ["是否允许把识别设计升级为省级 rollout ATT"],
+      "stop_conditions": ["省级实施时点无法核验", "跨省口径不一致", "不能和 CHARLS 省份字段稳定合并"],
+      "rollback_to": "05_causal_analysis",
+      "skills": ["source-comparison", "aer-identification"]
+    }
+  ]
+}

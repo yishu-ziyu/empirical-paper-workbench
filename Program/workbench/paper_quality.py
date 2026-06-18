@@ -117,6 +117,7 @@ def build_paper_quality_report(
     literature = find_literature_package(project_root)
     citation_checks = build_citation_checks(literature)
     method_gate_checks = build_method_gate_checks(project_root)
+    evidence_integrity_checks = build_evidence_integrity_checks(project_root, draft_text, draft)
     revision_checks = build_revision_checks(project_root)
     verdict = build_verdict(
         word_count,
@@ -125,6 +126,7 @@ def build_paper_quality_report(
         section_length_checks,
         citation_checks,
         method_gate_checks,
+        evidence_integrity_checks,
         revision_checks,
     )
     recommended_next_tasks = build_recommended_next_tasks(
@@ -134,6 +136,7 @@ def build_paper_quality_report(
         section_length_checks,
         citation_checks,
         method_gate_checks,
+        evidence_integrity_checks,
         revision_checks,
     )
 
@@ -148,6 +151,7 @@ def build_paper_quality_report(
         "section_length_checks": section_length_checks,
         "citation_checks": citation_checks,
         "method_gate_checks": method_gate_checks,
+        "evidence_integrity_checks": evidence_integrity_checks,
         "revision_checks": revision_checks,
         "verdict": verdict,
         "recommended_next_tasks": recommended_next_tasks,
@@ -492,6 +496,220 @@ def build_revision_checks(project_root: Path) -> dict[str, Any]:
     }
 
 
+def build_evidence_integrity_checks(
+    project_root: Path,
+    draft_text: str,
+    draft_path: Path | None = None,
+) -> dict[str, Any]:
+    results_path, results_payload = find_results_payload(project_root, draft_path)
+    design_path, design_payload = find_design_payload(project_root, draft_path)
+    issues: list[dict[str, Any]] = []
+
+    placeholders = sorted(set(re.findall(r"\{[A-Za-z_][A-Za-z0-9_]*\}", draft_text)))
+    if placeholders:
+        issues.append(
+            {
+                "severity": "Critical",
+                "rule_id": "placeholder_in_manuscript",
+                "message": "论文正文仍含未回填占位符，不能生成论文式结论。",
+                "evidence": placeholders[:20],
+                "fix": "回到数据 schema、变量字典和样本流，先补齐真实字段与统计量。",
+            }
+        )
+
+    evidence_ids = extract_evidence_ids(draft_text)
+    artifact_ids = collect_artifact_ids(results_payload)
+    unresolved_ids = sorted(eid for eid in evidence_ids if eid not in artifact_ids)
+    if unresolved_ids:
+        issues.append(
+            {
+                "severity": "Critical",
+                "rule_id": "unresolved_evidence_id",
+                "message": "正文引用了 evidence_id，但结果注册表里找不到对应表格、代码输出或证据对象。",
+                "evidence": unresolved_ids[:30],
+                "fix": "为每个 evidence_id 绑定真实表格、图、代码输出或删除该引用。",
+            }
+        )
+
+    if main_results_claimed(draft_text) and not has_main_result_table(results_payload):
+        issues.append(
+            {
+                "severity": "Critical",
+                "rule_id": "missing_main_result_table",
+                "message": "正文写了主结果，但 results.json 没有主回归表或 approved findings。",
+                "evidence": {
+                    "results_path": str(results_path) if results_path else None,
+                    "available_top_level_keys": sorted(results_payload.keys()),
+                },
+                "fix": "先执行模型并写入 main_regression_table / regression_tables / approved_findings。",
+            }
+        )
+
+    method = str(
+        results_payload.get("method")
+        or design_payload.get("method")
+        or design_payload.get("recommended")
+        or ""
+    ).upper()
+    if method == "IV" and not has_iv_diagnostics(results_payload):
+        issues.append(
+            {
+                "severity": "Critical",
+                "rule_id": "missing_iv_diagnostics",
+                "message": "IV 设计缺少第一阶段或弱工具诊断，不能写 2SLS 因果结论。",
+                "evidence": {
+                    "results_path": str(results_path) if results_path else None,
+                    "design_path": str(design_path) if design_path else None,
+                },
+                "fix": "补充 first_stage / weak_iv / Anderson-Rubin 或明确降级为设计草案。",
+            }
+        )
+
+    if method == "IV" and not defines_iv_strategy(design_payload):
+        issues.append(
+            {
+                "severity": "Major",
+                "rule_id": "undefined_iv_strategy",
+                "message": "IV 识别策略没有清楚登记处理变量、工具变量、样本单位或因果图。",
+                "evidence": {
+                    "design_path": str(design_path) if design_path else None,
+                    "available_top_level_keys": sorted(design_payload.keys()),
+                },
+                "fix": "在 DesignSpec 中补齐 treatment / outcome / instrument / unit_of_analysis / causal_graph。",
+            }
+        )
+
+    status = "blocked" if any(issue["severity"] == "Critical" for issue in issues) else (
+        "needs_review" if issues else "passed"
+    )
+    return {
+        "status": status,
+        "can_write_formal_conclusions": status == "passed",
+        "results_path": str(results_path) if results_path else None,
+        "design_path": str(design_path) if design_path else None,
+        "placeholders": placeholders,
+        "evidence_ids": sorted(evidence_ids),
+        "resolved_evidence_ids": sorted(evidence_ids & artifact_ids),
+        "unresolved_evidence_ids": unresolved_ids,
+        "issues": issues,
+        "repair_checklist": [issue["fix"] for issue in issues],
+    }
+
+
+def find_results_payload(project_root: Path, draft_path: Path | None = None) -> tuple[Path | None, dict[str, Any]]:
+    candidates = [
+        *topic_scoped_candidates(project_root, draft_path, "Results", "results.json"),
+        project_root / "Results" / "json" / "results.json",
+        project_root / "Results" / "json" / "method_execution_result.json",
+        project_root / "Results" / "json" / "regression_tables.json",
+    ]
+    candidates.extend(sorted((project_root / "Results").glob("*/results.json")))
+    for path in candidates:
+        payload = load_optional_json(path)
+        if payload:
+            return path, payload
+    return None, {}
+
+
+def find_design_payload(project_root: Path, draft_path: Path | None = None) -> tuple[Path | None, dict[str, Any]]:
+    candidates = [
+        *topic_scoped_candidates(project_root, draft_path, "Tasks", "design.json"),
+        project_root / "state" / "product" / "design_spec.json",
+        project_root / "Tasks" / "design.json",
+    ]
+    candidates.extend(sorted((project_root / "Tasks").glob("*/design.json")))
+    for path in candidates:
+        payload = load_optional_json(path)
+        if payload:
+            return path, payload
+    return None, {}
+
+
+def topic_scoped_candidates(
+    project_root: Path,
+    draft_path: Path | None,
+    top_level_dir: str,
+    filename: str,
+) -> list[Path]:
+    """Prefer artifacts that share the task slug with the manuscript draft."""
+    if draft_path is None:
+        return []
+    try:
+        relative = draft_path.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        return []
+    parts = relative.parts
+    if len(parts) < 2 or parts[0] != "Manuscripts":
+        return []
+    topic_slug = parts[1]
+    return [project_root / top_level_dir / topic_slug / filename]
+
+
+def extract_evidence_ids(text: str) -> set[str]:
+    ids: set[str] = set()
+    patterns = [
+        r"evidence_id\s*[=：:]\s*`?([A-Za-z0-9_.-]+)`?",
+        r"`([A-Za-z][A-Za-z0-9_.-]*(?:reg|table|robust|finding|stage|result)[A-Za-z0-9_.-]*)`",
+    ]
+    for pattern in patterns:
+        ids.update(match.group(1) for match in re.finditer(pattern, text, flags=re.IGNORECASE))
+    return ids
+
+
+def collect_artifact_ids(payload: Any) -> set[str]:
+    ids: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if key in {"id", "evidence_id", "table_id", "finding_id", "artifact_id"} and isinstance(value, str):
+                ids.add(value)
+            if isinstance(key, str):
+                ids.add(key)
+            ids.update(collect_artifact_ids(value))
+    elif isinstance(payload, list):
+        for item in payload:
+            ids.update(collect_artifact_ids(item))
+    return ids
+
+
+def main_results_claimed(text: str) -> bool:
+    return bool(re.search(r"(主结果|Main Results|2SLS|IV 系数|回归表|main_reg)", text, flags=re.IGNORECASE))
+
+
+def has_main_result_table(payload: dict[str, Any]) -> bool:
+    if not payload:
+        return False
+    keys = {
+        "main_regression_table",
+        "regression_tables",
+        "tables",
+        "approved_findings",
+        "findings",
+    }
+    return any(key in payload and bool(payload.get(key)) for key in keys)
+
+
+def has_iv_diagnostics(payload: dict[str, Any]) -> bool:
+    diagnostics = payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
+    return any(
+        bool(payload.get(key)) or bool(diagnostics.get(key))
+        for key in ("first_stage", "weak_iv", "anderson_rubin", "ar_test")
+    )
+
+
+def defines_iv_strategy(payload: dict[str, Any]) -> bool:
+    if not payload:
+        return False
+    text = json.dumps(payload, ensure_ascii=False).lower()
+    required_any = [
+        ("instrument", "工具"),
+        ("treatment", "处理"),
+        ("outcome", "被解释"),
+        ("unit_of_analysis", "样本单位"),
+        ("causal_graph", "dag"),
+    ]
+    return all(any(term in text for term in group) for group in required_any)
+
+
 def load_optional_json(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {}
@@ -508,6 +726,7 @@ def build_verdict(
     section_length_checks: dict[str, Any],
     citation_checks: dict[str, Any],
     method_gate_checks: dict[str, Any],
+    evidence_integrity_checks: dict[str, Any],
     revision_checks: dict[str, Any],
 ) -> list[str]:
     verdict: list[str] = []
@@ -523,6 +742,10 @@ def build_verdict(
         verdict.append("needs_literature_review")
     if method_gate_checks["status"] != "found":
         verdict.append("method_gate_required")
+    if evidence_integrity_checks["status"] == "blocked":
+        verdict.append("evidence_integrity_blocked")
+    elif evidence_integrity_checks["status"] == "needs_review":
+        verdict.append("evidence_integrity_needs_review")
     if revision_checks["status"] != "passed":
         verdict.append("needs_review_loop")
     return verdict or ["ready_for_review"]
@@ -535,6 +758,7 @@ def build_recommended_next_tasks(
     section_length_checks: dict[str, Any],
     citation_checks: dict[str, Any],
     method_gate_checks: dict[str, Any],
+    evidence_integrity_checks: dict[str, Any],
     revision_checks: dict[str, Any],
 ) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
@@ -590,6 +814,21 @@ def build_recommended_next_tasks(
                 "agent": "MethodAgent",
                 "reason": "在正式估计和论文导出前生成方法规范门报告。",
                 "inputs": ["DesignSpec", "RunPlan", "method_family"],
+            }
+        )
+    if evidence_integrity_checks["status"] != "passed":
+        tasks.append(
+            {
+                "id": "audit_and_repair_evidence_chain",
+                "agent": "VerifierAgent",
+                "reason": "正文、结果表、变量和识别策略之间还没有形成可追溯闭环。",
+                "inputs": [
+                    evidence_integrity_checks.get("results_path"),
+                    evidence_integrity_checks.get("design_path"),
+                    "paper_draft",
+                ],
+                "blocking_issues": evidence_integrity_checks.get("issues", []),
+                "output": "evidence_integrity_repair_checklist",
             }
         )
     if revision_checks["status"] != "passed":

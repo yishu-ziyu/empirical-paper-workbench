@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Memory Index",
+  "type": "object",
+  "required": [
+    "version",
+    "layer",
+    "purpose",
+    "memory_classes",
+    "load_profiles",
+    "write_targets",
+    "forbidden_memory",
+    "context_budget",
+    "validators"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "string"},
+    "layer": {"type": "string", "enum": ["second"]},
+    "purpose": {"type": "string"},
+    "memory_classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "scope",
+          "shared",
+          "default_load",
+          "paths",
+          "update_policy"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "kind": {
+            "type": "string",
+            "enum": [
+              "instruction",
+              "procedural",
+              "episodic",
+              "semantic",
+              "local",
+              "learning",
+              "role"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["system", "project", "local", "user", "agent"]
+          },
+          "shared": {"type": "boolean"},
+          "default_load": {"type": "boolean"},
+          "paths": {"type": "array", "items": {"type": "string"}},
+          "update_policy": {"type": "string"}
+        }
+      }
+    },
+    "load_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "always", "conditional", "never_default"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "always": {"type": "array", "items": {"type": "string"}},
+          "conditional": {"type": "array", "items": {"type": "string"}},
+          "never_default": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "write_targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "paths", "allowed_content"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "paths": {"type": "array", "items": {"type": "string"}},
+          "allowed_content": {"type": "string"}
+        }
+      }
+    },
+    "forbidden_memory": {"type": "array", "items": {"type": "string"}},
+    "context_budget": {
+      "type": "object",
+      "required": [
+        "max_project_instruction_lines",
+        "load_current_agent_spec_only",
+        "load_raw_pdf_by_default",
+        "load_raw_data_by_default",
+        "prefer_summary_artifacts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_project_instruction_lines": {"type": "integer"},
+        "load_current_agent_spec_only": {"type": "boolean"},
+        "load_raw_pdf_by_default": {"type": "boolean"},
+        "load_raw_data_by_default": {"type": "boolean"},
+        "prefer_summary_artifacts": {"type": "boolean"}
+      }
+    },
+    "validators": {"type": "array", "items": {"type": "string"}}
+  }
+}

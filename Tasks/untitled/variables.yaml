@@ -1,0 +1,70 @@
+---
+topic: '---'
+topic_slug: untitled
+generated_by: variables-llm-minimax
+timestamp: '2026-06-05T11:02:58.957664+00:00'
+model: MiniMax-M3
+prompt_version: v1
+n_variables: 8
+roles:
+- X
+- Y
+- control
+upstream:
+- brief.md
+downstream_consumers:
+- design.json
+- execution
+---
+
+variables:
+- role: X
+  dataset_column: robot_density
+  semantic_label: 工业机器人渗透率
+  description: Bartik 构造的工业机器人行业渗透率（台/百名工人，按 IFR 行业-年份加权构建）
+  reference_papers:
+  - Acemoglu and Restrepo 2020
+  - Dauth et al. 2021
+- role: Y
+  dataset_column: ln_wage
+  semantic_label: 对数小时工资（匹配效率）
+  description: 对数小时工资，作为劳动力市场匹配效率的代理变量（匹配质量越高则工资越高）
+  reference_papers:
+  - Borjas 2014
+  - Cahuc and Carcillo 2014
+- role: control
+  dataset_column: edu_last
+  semantic_label: 受教育年限
+  description: 个体受教育年限，控制人力资本水平（Mincer 工资方程核心变量）
+  reference_papers:
+  - Mincer 1974
+- role: control
+  dataset_column: age
+  semantic_label: 年龄
+  description: 个体年龄及其平方项，控制生命周期工资效应与工作经验回报
+  reference_papers:
+  - Mincer 1974
+- role: control
+  dataset_column: female
+  semantic_label: 性别虚拟变量
+  description: 女性=1，控制性别工资差异与劳动力市场分割
+  reference_papers:
+  - Oaxaca 1973
+- role: control
+  dataset_column: urban
+  semantic_label: 城乡虚拟变量
+  description: 城镇=1，控制城乡户籍分割与地区间匹配市场差异
+  reference_papers:
+  - Lu et al. 2017
+- role: control
+  dataset_column: manu_dummy
+  semantic_label: 制造业虚拟变量
+  description: 是否在制造业就业，控制行业暴露于自动化技术的差异
+  reference_papers:
+  - Krueger 1993
+- role: control
+  dataset_column: part_time
+  semantic_label: 是否兼职
+  description: 兼职=1，控制非全日制就业对工资与匹配水平的影响
+  reference_papers:
+  - Houseman and Osawa 2003

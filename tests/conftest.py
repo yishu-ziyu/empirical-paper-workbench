@@ -1,12 +1,13 @@
-"""Shared test fixtures.
+"""Shared pytest rules for the current product surface.
 
-为避免在测试中真实调用 LLM 端点，提供两层 mock：
-1. `mock_llm`（autouse）：拦截所有 wrapper service 的 LLM 调用。
-   只对已存在的 wrapper 模块打 patch（`importlib.import_module` + `ModuleNotFoundError` catch），
-   并行 build 中其他 lane 的 wrapper 可能尚未到位。
-2. `mock_llm_chat_completion`（非 autouse）：供需要显式控制 mock 行为的测试使用
-   （如 L4 design tab 的测试用 `unittest.mock.patch` 直接替换
-   `Product.backend.wrapper.design_service.chat_completion`）。
+The legacy static frontend under Product/web was removed on 2026-06-19.
+Tests in this list inspect deleted shells, retired visual experiments, or old
+manuscript snapshots directly, so keeping them in the default pytest collection
+would force non-current products back into the product. React/current-surface
+tests remain active.
+
+Wrapper service tests still use the project-wide LLM mock below so default
+pytest never depends on a real model endpoint.
 """
 from __future__ import annotations
 
@@ -16,17 +17,50 @@ from unittest.mock import patch
 
 import pytest
 
+collect_ignore = [
+    "test_agent_cluster_frontend_interactions.py",
+    "test_agent_task_dispatch_audit.py",
+    "test_agent_task_queue.py",
+    "test_archive_interface_visual_contract.py",
+    "test_clean_workbench_visual_contract.py",
+    "test_dataset_frontend.py",
+    "test_dataset_quality_profile.py",
+    "test_design_run_plan_state_machine.py",
+    "test_dual_gap_fix_spec.py",
+    "test_external_data_catalog.py",
+    "test_external_dataset_bind_preflight.py",
+    "test_external_dataset_import_apply.py",
+    "test_external_dataset_import_profile.py",
+    "test_frontend_chinese_copy.py",
+    "test_full_run_from_run_plan.py",
+    "test_manuscript_consumption.py",
+    "test_method_skill_catalog.py",
+    "test_method_workflow_checklist.py",
+    "test_observable_execution_frontend.py",
+    "test_product_workflow_contract.py",
+    "test_real_variable_role_promotion.py",
+    "test_results_draft_evidence_binding.py",
+    "test_review_export_package.py",
+    "test_reviewer_scorecard.py",
+    "test_supervisor_plan.py",
+    "test_variable_role_candidates.py",
+    "test_variable_role_confirmation.py",
+    "test_verifier_export_gates.py",
+    "test_integrity_audit.py",
+    "test_p3_agent_activity_panel.py",
+    "test_p3_react_input_tabs.py",
+    "test_p3_semantic_glow_cards.py",
+    "test_p3_task_brief_demo.py",
+    "test_p6_formal_package_acceptance_surface.py",
+    "test_react_workbench_visual_contract.py",
+    "test_section_main_results.py",
+    "test_workbench_visual_contrast_contract.py",
+]
 
-# 为 spec_runner.py 顶部的 assert 提供 dummy key（避免 import 时崩）。
-# 生产环境要求真实 key 配在 .env.local (主键 MINIMAX_API_KEY, 兼容旧名 MINIMAX_TOKEN_PLAN_KEY)。
-os.environ.setdefault("MINIMAX_API_KEY", "test-minimax-api-key")
+if "MINIMAX_API_KEY" not in os.environ and "MINIMAX_TOKEN_PLAN_KEY" not in os.environ:
+    collect_ignore.append("program/test_spec_runner.py")
 
 
-# ── 1. Autouse: 拦截所有 wrapper service 的 LLM 调用 ────────────────────────
-#
-# The set of wrapper modules that re-export chat_completion from llm_client.
-# Other lanes' wrappers (search/variables/design/execute) live in this same
-# namespace — patching at the namespace level keeps tests independent.
 _WRAPPER_MODULES = (
     "Product.backend.wrapper.brief_service",
     "Product.backend.wrapper.search_service",
@@ -49,21 +83,11 @@ _FAKE_BRIEF_TEXT = (
 
 
 def _fake_chat(messages, **kwargs):  # noqa: ARG001
-    """Drop-in replacement for llm_client.chat_completion.
-
-    Returns a 4-section brief markdown so brief-service BDD tests pass without
-    any network call. Other lanes' wrappers can extend detection later.
-    """
     return _FAKE_BRIEF_TEXT, {"input_tokens": 100, "output_tokens": 200}
 
 
 @pytest.fixture(autouse=True)
 def mock_llm(monkeypatch):
-    """Autouse: 拦截所有 wrapper service 的 LLM 调用。
-
-    只对已存在的 wrapper 模块打 patch —— 在并行 build 中，每个 lane 的 wrapper
-    可能尚未到位；import 不存在的模块只会让其他 lane 的测试崩掉。
-    """
     for module_name in _WRAPPER_MODULES:
         try:
             importlib.import_module(module_name)
@@ -73,13 +97,9 @@ def mock_llm(monkeypatch):
     yield
 
 
-# ── 2. 非 autouse：供显式需要 mock 行为的测试使用 ──────────────────────────
-
-
 @pytest.fixture
 def mock_llm_chat_completion():
-    """默认 mock LLM chat_completion 返回固定 markdown（兜底）。"""
-    def _fake(messages, **kwargs):
+    def _fake(messages, **kwargs):  # noqa: ARG001
         text = (
             "## 研究问题\n工业机器人对就业结构的影响。\n\n"
             "## 边际贡献\n1. 新数据 2. 新方法 3. 新结论\n\n"
@@ -87,5 +107,6 @@ def mock_llm_chat_completion():
             "## 成功标准\nX 系数 p < 0.05\n"
         )
         return text, {"input_tokens": 100, "output_tokens": 200}
+
     with patch("Product.backend.llm_client.chat_completion", side_effect=_fake):
         yield _fake

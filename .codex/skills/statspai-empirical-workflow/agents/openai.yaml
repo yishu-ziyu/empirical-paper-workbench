@@ -1,0 +1,7 @@
+interface:
+  display_name: "StatspAI Empirical Workflow"
+  short_description: "Route and verify empirical paper workflows"
+  default_prompt: "Use $statspai-empirical-workflow to inspect the current empirical paper state, route the next workflow step, run safe local checks, and report gates, artifacts, and risks."
+
+policy:
+  allow_implicit_invocation: true

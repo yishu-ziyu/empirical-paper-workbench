@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Workflow Runbook State",
+  "type": "object",
+  "required": [
+    "version",
+    "layer",
+    "status",
+    "source_registry",
+    "source_artifact_registry",
+    "api_contract",
+    "current_route",
+    "artifact_status",
+    "spec_coverage",
+    "workflows"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "string"},
+    "layer": {"type": "string", "enum": ["second"]},
+    "status": {"type": "string", "enum": ["pass", "partial"]},
+    "source_registry": {"type": "string"},
+    "source_artifact_registry": {"type": "string"},
+    "api_contract": {"type": "string"},
+    "current_route": {
+      "type": "object",
+      "required": ["next_workflow_id", "next_workflow_name", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "next_workflow_id": {"type": ["string", "null"]},
+        "next_workflow_name": {"type": ["string", "null"]},
+        "reason": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "artifact_status": {
+      "type": "object",
+      "required": ["present", "partial", "missing", "external"],
+      "additionalProperties": false,
+      "properties": {
+        "present": {"type": "integer"},
+        "partial": {"type": "integer"},
+        "missing": {"type": "integer"},
+        "external": {"type": "integer"}
+      }
+    },
+    "spec_coverage": {
+      "type": "object",
+      "required": ["core_workflows", "missing_specs"],
+      "additionalProperties": false,
+      "properties": {
+        "core_workflows": {"type": "integer"},
+        "missing_specs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "step",
+          "name",
+          "purpose",
+          "agents",
+          "inputs",
+          "required_outputs",
+          "gates",
+          "human_checkpoints",
+          "stop_conditions",
+          "rollback_to",
+          "skills",
+          "failure_codes",
+          "current_issues",
+          "spec_path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "step": {"type": "string"},
+          "name": {"type": "string"},
+          "purpose": {"type": "string"},
+          "agents": {"type": "array", "items": {"type": "string"}},
+          "inputs": {"type": "array", "items": {"type": "string"}},
+          "required_outputs": {"type": "array"},
+          "gates": {"type": "array"},
+          "human_checkpoints": {"type": "array", "items": {"type": "string"}},
+          "stop_conditions": {"type": "array", "items": {"type": "string"}},
+          "rollback_to": {"type": ["string", "null"]},
+          "skills": {"type": "array", "items": {"type": "string"}},
+          "failure_codes": {"type": "array", "items": {"type": "string"}},
+          "current_issues": {"type": "array", "items": {"type": "string"}},
+          "spec_path": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

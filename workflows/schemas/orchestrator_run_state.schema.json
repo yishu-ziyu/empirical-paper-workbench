@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Orchestrator Run State",
+  "type": "object",
+  "required": [
+    "version",
+    "run_id",
+    "mode",
+    "status",
+    "generated_at",
+    "selected_adapters",
+    "executed_commands",
+    "blocked_adapters",
+    "events",
+    "report_path",
+    "trace_path"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "string"},
+    "run_id": {"type": "string"},
+    "mode": {"type": "string", "enum": ["dry-run", "execute"]},
+    "status": {"type": "string", "enum": ["pass", "fail", "blocked"]},
+    "generated_at": {"type": "string"},
+    "selected_adapters": {"type": "array", "items": {"type": "string"}},
+    "executed_commands": {"type": "array", "items": {"type": "string"}},
+    "blocked_adapters": {"type": "array", "items": {"type": "string"}},
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "adapter_id",
+          "decision",
+          "status",
+          "reason",
+          "failure_code",
+          "commands",
+          "command_results",
+          "inputs",
+          "outputs",
+          "verification"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "adapter_id": {"type": "string"},
+          "decision": {"type": "string", "enum": ["planned", "executed", "blocked", "failed"]},
+          "status": {"type": "string", "enum": ["planned", "pass", "fail", "blocked"]},
+          "reason": {"type": "array", "items": {"type": "string"}},
+          "failure_code": {"type": ["string", "null"]},
+          "commands": {"type": "array", "items": {"type": "string"}},
+          "command_results": {"type": "array"},
+          "inputs": {"type": "array", "items": {"type": "string"}},
+          "outputs": {"type": "array", "items": {"type": "string"}},
+          "verification": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "report_path": {"type": "string"},
+    "trace_path": {"type": "string"}
+  }
+}

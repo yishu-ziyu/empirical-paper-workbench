@@ -27,7 +27,7 @@ def build_reproducible_research_skill_contract() -> dict[str, Any]:
         "evidence_level": "local_file",
         "source_material": {
             "name": "论文复现与可复现研究",
-            "product_meaning": "把 CoPaper-like 复现能力放进执行完成后的质量门，而不是只作为教程材料。",
+            "product_meaning": "把 CoPaper-like 复现能力放进执行完成后的复现检查，而不是只作为教程材料。",
             "borrowed_patterns": [
                 "复现 Skill：论文 PDF + 复现包 -> 复现报告",
                 "标准化输出：save_table/save_figure 和结构化 sidecar",

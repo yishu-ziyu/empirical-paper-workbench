@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Agent Trace Event",
+  "type": "object",
+  "required": [
+    "run_id",
+    "event_id",
+    "timestamp",
+    "mode",
+    "actor",
+    "workflow_id",
+    "adapter_id",
+    "decision",
+    "action",
+    "status",
+    "reason",
+    "failure_code",
+    "commands",
+    "command_results",
+    "inputs",
+    "outputs",
+    "verification",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {"type": "string"},
+    "event_id": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "mode": {"type": "string", "enum": ["dry-run", "execute", "record"]},
+    "actor": {"type": "string"},
+    "workflow_id": {"type": "string"},
+    "adapter_id": {"type": "string"},
+    "decision": {"type": "string", "enum": ["planned", "executed", "blocked", "failed", "recorded"]},
+    "action": {"type": "string"},
+    "status": {"type": "string", "enum": ["pass", "fail", "blocked", "recorded"]},
+    "reason": {"type": "array", "items": {"type": "string"}},
+    "failure_code": {"type": ["string", "null"]},
+    "commands": {"type": "array", "items": {"type": "string"}},
+    "command_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "argv", "returncode", "started_at", "ended_at", "stdout_summary", "stderr_summary"],
+        "additionalProperties": false,
+        "properties": {
+          "command": {"type": "string"},
+          "argv": {"type": "array", "items": {"type": "string"}},
+          "returncode": {"type": "integer"},
+          "started_at": {"type": "string"},
+          "ended_at": {"type": "string"},
+          "stdout_summary": {"type": "string"},
+          "stderr_summary": {"type": "string"}
+        }
+      }
+    },
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "outputs": {"type": "array", "items": {"type": "string"}},
+    "verification": {"type": "array", "items": {"type": "string"}},
+    "evidence": {"type": "array", "items": {"type": "string"}}
+  }
+}

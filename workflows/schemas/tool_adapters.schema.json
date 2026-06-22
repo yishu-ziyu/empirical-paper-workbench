@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StatspAI Tool Adapter Registry",
+  "type": "object",
+  "required": ["version", "layer", "purpose", "adapters"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "string"},
+    "layer": {"type": "string", "enum": ["second"]},
+    "purpose": {"type": "string"},
+    "adapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "description",
+          "workflows",
+          "owner_agents",
+          "commands",
+          "inputs",
+          "outputs",
+          "network_required",
+          "human_auth_required",
+          "side_effect_level",
+          "allowed_in_orchestrator",
+          "risks",
+          "verification",
+          "trace_required"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string"},
+          "category": {"type": "string"},
+          "description": {"type": "string"},
+          "workflows": {"type": "array", "items": {"type": "string"}},
+          "owner_agents": {"type": "array", "items": {"type": "string"}},
+          "commands": {"type": "array", "items": {"type": "string"}},
+          "inputs": {"type": "array", "items": {"type": "string"}},
+          "outputs": {"type": "array", "items": {"type": "string"}},
+          "network_required": {"type": "boolean"},
+          "human_auth_required": {"type": "boolean"},
+          "side_effect_level": {"type": "string"},
+          "allowed_in_orchestrator": {"type": "boolean"},
+          "risks": {"type": "array", "items": {"type": "string"}},
+          "verification": {"type": "array", "items": {"type": "string"}},
+          "trace_required": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

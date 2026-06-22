@@ -1,6 +1,6 @@
 # 当前产品地图
 
-本文档记录当前实证研究 OS 已经长出来的产品骨架。它不是愿景稿，而是给后续 P0/P1/P2 开发使用的落地地图：用户从哪里进入、每个页面负责什么、哪些内容可以直接展示、哪些内容必须进入审计或人工确认。
+本文档记录当前实证研究 OS 已经长出来的产品骨架。它不是愿景稿，而是给后续开发使用的落地地图：用户从哪里进入、每个页面负责什么、哪些内容可以直接展示、哪些内容必须进入审计或人工确认。
 
 ## 1. 产品主线
 
@@ -16,10 +16,10 @@
 
 ## 2. 当前入口边界
 
-当前仓库里同时存在三个入口，验收前必须先分清：
+当前仓库只有一个用户可见产品入口：
 
-- React shell：`Product/web-react/src/main.tsx` 挂载 `Product/web-react/src/App.tsx`。这是当前主要产品壳，包含阶段状态机、topic intake、SupervisorPlan 审批和 Agent Task Queue。
-- Legacy shell：`Product/web/index.html` 与 `Product/web/assets/app.js`，由 `/legacy` 服务。它可以作为旧工作台参考，但不应继续承载新交互。
+- React shell：`Product/web-react/src/main.tsx` 挂载 `Product/web-react/src/App.tsx`。这是唯一当前产品壳，包含论文生产状态、阶段状态机、topic intake、SupervisorPlan 审批和 Agent Task Queue。
+- Product/web 已移除：旧静态工作台源码不再作为运行入口或验收入口保留。`/legacy` 只重定向到 `/`，历史解释留在 docs/Tasks 记录里。
 - FastAPI server：`Product/app.py` 是主应用和 API 入口。`demo_server.py` 只是启动 `uvicorn Product.app:app` 的薄启动器。
 
 React 当前的主要阶段组件包括 `BriefPanel`、`SearchPanel`、`VariablesPanel`、`DesignPanel`、`ExecutionPanel`、`IdentificationAuditPanel`、`SupervisorPlanReview`、`AgentTaskQueuePanel` 和 `SystemStatusBar`。如果页面看起来“不知道下一步做什么”，优先检查 `App.tsx` 的阶段状态机和当前阶段的 Next Action，而不是在单个卡片上继续堆文案。
@@ -88,7 +88,7 @@ Agent 面板应该默认折叠技术细节，只展示状态、Next Action 和�
 
 ## 7. 当前开发落点
 
-P0-A 的目标不是继续堆功能，而是把“产品地图、API 地图、状态契约”固定下来。后续每个节点都要能回答：
+当前开发落点不是继续堆 P 阶段，而是把 CGSS 论文生产链做成可验收产品路径：浏览器内生成审阅报告、展示用户可读修订清单、把下一步动作回写到 headless state。后续每个节点都要能回答：
 
 - 它属于哪个页面？
 - 它读写哪个状态对象？

@@ -1,8 +1,8 @@
 """
 runtime/adapters/method_adapter.py
 
-Unified interface for IV, RDD, PSM, and DML causal-inference methods,
-wrapping StatsPAI (``sp``).
+Unified interface for IV, RDD, PSM, DML, panel, GLM, and Bartik-IV
+causal-inference methods, wrapping StatsPAI (``sp``).
 
 Also re-exports :func:`run_did_analysis` from :mod:`did_adapter` so callers
 can import everything from one place::
@@ -782,6 +782,306 @@ def _plot_dml_coef(
         return None
 
 
+# ── Panel Regression ───────────────────────────────────────────────────────────
+
+def _run_panel(
+    df: pd.DataFrame,
+    y: str,
+    treatment: str,
+    covariates: list[str],
+    unit_fe: str,
+    time_fe: str | None,
+    cluster: str,
+    buf: io.StringIO,
+    max_sample: int = 10000,
+) -> tuple[dict[str, Any] | None, Path | None]:
+    """Run within (FE) panel regression via ``sp.panel``.
+
+    Returns (model_row_dict, figure_path_or_None).
+    """
+    row: dict[str, Any] | None = None
+    fig_path: Path | None = None
+
+    if not unit_fe or not time_fe:
+        buf.write("  Panel skipped — both unit_fe and time_fe required\n")
+        return None, None
+
+    df = _maybe_sample(df, max_sample, buf, "Panel")
+    covar_str = " + ".join(covariates) if covariates else ""
+    formula = f"{y} ~ {treatment}"
+    if covar_str:
+        formula += f" + {covar_str}"
+
+    buf.write(f"[Panel] formula={formula}, entity={unit_fe}, time={time_fe}, cluster={cluster or 'none'}\n")
+
+    if HAS_STATSPAI:
+        try:
+            result = sp.panel(
+                df,
+                formula=formula,
+                entity=unit_fe,
+                time=time_fe,
+                method="fe",
+                cluster=cluster or None,
+            )
+
+            # Extract treatment coefficient by name from tidy table
+            tidy_df = result.tidy()
+            treatment_row = tidy_df[tidy_df["term"] == treatment]
+            if treatment_row.empty:
+                buf.write(f"  Panel FAILED: treatment '{treatment}' not found in results "
+                          f"(available: {tidy_df['term'].tolist()})\n")
+                return None, None
+
+            coef = _safe_float(treatment_row["estimate"].iloc[0])
+            se = _safe_float(treatment_row["std_error"].iloc[0])
+            pval = _safe_float(treatment_row["p_value"].iloc[0])
+            ci_low = _safe_float(treatment_row["conf_low"].iloc[0])
+            ci_high = _safe_float(treatment_row["conf_high"].iloc[0])
+
+            nobs = 0
+            r2 = float("nan")
+            f_stat = float("nan")
+            try:
+                g = result.glance()
+                nobs = int(g["nobs"].iloc[0]) if "nobs" in g.columns else 0
+                r2 = _safe_float(g["r_squared"].iloc[0]) if "r_squared" in g.columns else float("nan")
+                f_stat = _safe_float(g["f_statistic"].iloc[0]) if "f_statistic" in g.columns else float("nan")
+            except Exception:
+                pass
+            if nobs == 0:
+                try:
+                    nobs = int(result.to_dict().get("n_obs", 0))
+                except Exception:
+                    pass
+
+            sig = _sig_stars(pval)
+            r2_str = f"R²={r2:.4f}" if not np.isnan(r2) else "R²=?"
+            f_str = f"F={f_stat:.2f}" if not np.isnan(f_stat) else ""
+            buf.write(f"  Panel_FE: β={coef:+.4f}{sig}  SE={se:.4f}  p={pval:.4f}  "
+                      f"CI=[{ci_low:+.4f}, {ci_high:+.4f}]  N={nobs:,}  {r2_str}  {f_str}\n")
+
+            row = {
+                "model": "Panel_FE",
+                "coef": round(coef, 6),
+                "se": round(se, 6),
+                "pvalue": round(pval, 6),
+                "ci_lower": round(ci_low, 6),
+                "ci_upper": round(ci_high, 6),
+                "nobs": nobs,
+                "r2": round(r2, 4) if not np.isnan(r2) else "",
+                "f_stat": round(f_stat, 3) if not np.isnan(f_stat) else "",
+            }
+        except Exception as exc:
+            buf.write(f"  Panel FAILED: {exc}\n")
+            logger.warning("Panel regression failed: %s", exc)
+    else:
+        buf.write("  statspai unavailable — Panel skipped\n")
+
+    return row, fig_path
+
+
+# ── GLM Regression ─────────────────────────────────────────────────────────────
+
+def _run_glm(
+    df: pd.DataFrame,
+    y: str,
+    treatment: str,
+    covariates: list[str],
+    cluster: str,
+    buf: io.StringIO,
+    family: str = "gaussian",
+    link: str | None = None,
+    max_sample: int = 10000,
+) -> tuple[dict[str, Any] | None, Path | None]:
+    """Run GLM via StatsPAI ``GLMRegression``.
+
+    Returns (model_row_dict, figure_path_or_None).
+    """
+    row: dict[str, Any] | None = None
+    fig_path: Path | None = None
+
+    df = _maybe_sample(df, max_sample, buf, "GLM")
+    covar_str = " + ".join(covariates) if covariates else ""
+    formula = f"{y} ~ {treatment}"
+    if covar_str:
+        formula += f" + {covar_str}"
+
+    buf.write(f"[GLM] formula={formula}, family={family}, link={link or 'canonical'}, "
+              f"cluster={cluster or 'none'}\n")
+
+    if HAS_STATSPAI:
+        try:
+            model = sp.GLMRegression(formula=formula, data=df, family=family, link=link)
+            results = model.fit(cluster=cluster or None)
+
+            # Extract treatment coefficient by name
+            tidy_df = results.tidy()
+            treatment_row = tidy_df[tidy_df["term"] == treatment]
+            if treatment_row.empty:
+                # Fall back to first non-intercept row
+                non_intercept = tidy_df[tidy_df["term"] != "Intercept"]
+                if non_intercept.empty:
+                    buf.write(f"  GLM FAILED: no coefficient rows available\n")
+                    return None, None
+                treatment_row = non_intercept.iloc[[0]]
+                buf.write(f"  [GLM] treatment '{treatment}' not found, using "
+                          f"'{treatment_row['term'].iloc[0]}'\n")
+
+            coef = _safe_float(treatment_row["estimate"].iloc[0])
+            se = _safe_float(treatment_row["std_error"].iloc[0])
+            pval = _safe_float(treatment_row["p_value"].iloc[0])
+            ci_low = _safe_float(treatment_row["conf_low"].iloc[0])
+            ci_high = _safe_float(treatment_row["conf_high"].iloc[0])
+
+            nobs = 0
+            try:
+                nobs = int(results.to_dict().get("n_obs", 0))
+            except Exception:
+                pass
+            if nobs == 0:
+                try:
+                    nobs = int(results.glance()["nobs"].iloc[0])
+                except Exception:
+                    pass
+
+            sig = _sig_stars(pval)
+            buf.write(f"  GLM_{family}: β={coef:+.4f}{sig}  SE={se:.4f}  p={pval:.4f}  "
+                      f"CI=[{ci_low:+.4f}, {ci_high:+.4f}]  N={nobs:,}\n")
+
+            row = {
+                "model": f"GLM_{family}",
+                "coef": round(coef, 6),
+                "se": round(se, 6),
+                "pvalue": round(pval, 6),
+                "ci_lower": round(ci_low, 6),
+                "ci_upper": round(ci_high, 6),
+                "nobs": nobs,
+                "family": family,
+                "link": link or "canonical",
+            }
+            try:
+                diag = results.to_dict().get("diagnostics", {})
+                if "AIC" in diag:
+                    row["aic"] = round(_safe_float(diag["AIC"]), 3)
+                if "Pseudo R-squared" in diag:
+                    row["pseudo_r2"] = round(_safe_float(diag["Pseudo R-squared"]), 4)
+            except Exception:
+                pass
+        except Exception as exc:
+            buf.write(f"  GLM FAILED: {exc}\n")
+            logger.warning("GLM failed: %s", exc)
+    else:
+        buf.write("  statspai unavailable — GLM skipped\n")
+
+    return row, fig_path
+
+
+# ── Bartik Shift-Share IV ──────────────────────────────────────────────────────
+
+def _run_bartik_iv(
+    df: pd.DataFrame,
+    y: str,
+    treatment: str,
+    covariates: list[str],
+    shares: pd.DataFrame | None,
+    shocks: pd.Series | None,
+    cluster: str,
+    buf: io.StringIO,
+    max_sample: int = 10000,
+) -> tuple[dict[str, Any] | None, Path | None]:
+    """Run Bartik shift-share IV via StatsPAI ``BartikIV``.
+
+    ``shares`` (n_obs x n_industries DataFrame) and ``shocks`` (n_industries
+    Series) are required.  They are not derived from a single instrument
+    column — shift-share instruments need industry-level structure.
+
+    Returns (model_row_dict, figure_path_or_None).
+    """
+    row: dict[str, Any] | None = None
+    fig_path: Path | None = None
+
+    if shares is None or shocks is None:
+        buf.write("  BartikIV skipped — 'shares' (DataFrame) and 'shocks' (Series) "
+                  "are required for shift-share IV\n")
+        return None, None
+
+    # shares must align with data rows; downsample together if needed
+    if len(df) > max_sample:
+        sampled = df.sample(n=max_sample, random_state=42)
+        shares = shares.reindex(sampled.index).reset_index(drop=True)
+        df = sampled.reset_index(drop=True)
+        buf.write(f'  [BartikIV] downsampling {len(df):,} → {max_sample:,} rows (shares aligned)\n')
+    elif len(shares) != len(df):
+        buf.write(f"  BartikIV FAILED: shares has {len(shares)} rows but data has {len(df)} rows\n")
+        return None, None
+
+    covar_str = ", ".join(covariates) if covariates else "none"
+    buf.write(f"[BartikIV] y={y}, endog={treatment}, shares={shares.shape}, "
+              f"shocks={len(shocks)}, covariates=[{covar_str}], cluster={cluster or 'none'}\n")
+
+    if HAS_STATSPAI:
+        try:
+            est = sp.BartikIV(
+                data=df,
+                y=y,
+                endog=treatment,
+                shares=shares,
+                shocks=shocks,
+                covariates=covariates or [],
+                leave_one_out=False,
+                robust="hc1",
+            )
+            result = est.fit()
+
+            coef = _safe_float(result.tidy()[result.tidy()["term"] == treatment]["estimate"].iloc[0])
+            se = _safe_float(result.tidy()[result.tidy()["term"] == treatment]["std_error"].iloc[0])
+            pval = _safe_float(result.tidy()[result.tidy()["term"] == treatment]["p_value"].iloc[0])
+            ci_raw = result.conf_int()
+            ci_low = _safe_float(ci_raw.loc[treatment, 0.025])
+            ci_high = _safe_float(ci_raw.loc[treatment, 0.975])
+
+            nobs = 0
+            f_stat = float("nan")
+            f_pvalue = float("nan")
+            n_ind = 0
+            try:
+                d = result.to_dict()
+                nobs = int(d.get("n_obs", 0))
+                diag = d.get("diagnostics", {})
+                f_stat = _safe_float(diag.get("First-stage F", float("nan")))
+                f_pvalue = _safe_float(diag.get("First-stage F p-value", float("nan")))
+                n_ind = int(diag.get("N industries", 0))
+            except Exception:
+                pass
+
+            sig = _sig_stars(pval)
+            f_sig = _sig_stars(f_pvalue) if not np.isnan(f_pvalue) else ""
+            buf.write(f"  BartikIV: β={coef:+.4f}{sig}  SE={se:.4f}  p={pval:.4f}  "
+                      f"CI=[{ci_low:+.4f}, {ci_high:+.4f}]  N={nobs:,}  "
+                      f"F1={f_stat:.2f}{f_sig}  industries={n_ind}\n")
+
+            row = {
+                "model": "BartikIV",
+                "coef": round(coef, 6),
+                "se": round(se, 6),
+                "pvalue": round(pval, 6),
+                "ci_lower": round(ci_low, 6),
+                "ci_upper": round(ci_high, 6),
+                "nobs": nobs,
+                "f_stat": round(f_stat, 3) if not np.isnan(f_stat) else "",
+                "f_pvalue": round(f_pvalue, 4) if not np.isnan(f_pvalue) else "",
+                "n_industries": n_ind,
+            }
+        except Exception as exc:
+            buf.write(f"  BartikIV FAILED: {exc}\n")
+            logger.warning("BartikIV failed: %s", exc)
+    else:
+        buf.write("  statspai unavailable — BartikIV skipped\n")
+
+    return row, fig_path
+
+
 # ── public API ────────────────────────────────────────────────────────────────
 
 def run_analysis(
@@ -794,10 +1094,13 @@ def run_analysis(
     instrument: str | None = None,        # IV
     running: str | None = None,           # RDD
     cutoff: float | None = None,          # RDD
-    covariates: list[str] | None = None,  # IV / PSM / DML
-    unit_fe: str | None = None,           # DML
-    time_fe: str | None = None,           # DML
+    covariates: list[str] | None = None,  # IV / PSM / DML / GLM / Panel / BartikIV
+    unit_fe: str | None = None,           # DML / Panel
+    time_fe: str | None = None,           # DML / Panel
     cluster: str | None = None,
+    # BartikIV
+    shares: pd.DataFrame | None = None,   # BartikIV: region x industry share matrix
+    shocks: pd.Series | None = None,      # BartikIV: industry-level shock vector
     # DID (reuse existing adapter)
     time: str | None = None,              # DID
     post: str | None = None,              # DID
@@ -811,7 +1114,8 @@ def run_analysis(
     Parameters
     ----------
     method : str
-        One of ``"iv"``, ``"rdd"``, ``"psm"``, ``"dml"``, or ``"did"``.
+        One of ``"iv"``, ``"rdd"``, ``"psm"``, ``"dml"``, ``"panel"``,
+        ``"glm"``, ``"bartik"``, or ``"did"``.
     data_path : str | Path
         Path to input data (CSV, parquet, or pickle).
     y : str
@@ -827,13 +1131,17 @@ def run_analysis(
     cutoff : float | None
         Discontinuity threshold (RDD only).
     covariates : list[str] | None
-        Control variables (IV / PSM / DML).
+        Control variables (IV / PSM / DML / GLM / Panel / BartikIV).
     unit_fe : str | None
-        Unit fixed-effects column (DML only).
+        Unit fixed-effects column (DML / Panel).
     time_fe : str | None
-        Time fixed-effects column (DML only).
+        Time fixed-effects column (DML / Panel).
     cluster : str | None
         Clustering variable for standard errors.
+    shares : pd.DataFrame | None
+        Region-by-industry share matrix (BartikIV only, required).
+    shocks : pd.Series | None
+        Industry-level shock vector (BartikIV only, required).
     time : str | None
         Time variable (DID only).
     post : str | None
@@ -849,7 +1157,7 @@ def run_analysis(
     ``statspai_used``.
     """
     method = method.lower().strip()
-    valid_methods = {"iv", "rdd", "psm", "dml", "did"}
+    valid_methods = {"iv", "rdd", "psm", "dml", "panel", "glm", "bartik", "did"}
     if method not in valid_methods:
         raise ValueError(f"Unknown method '{method}'. Choose from: {sorted(valid_methods)}")
 
@@ -948,6 +1256,28 @@ def run_analysis(
         if not unit_fe:
             raise ValueError("DML method requires 'unit_fe' for panel fixed effects")
         model_row, fig_path = _run_dml(df, y, treatment, covariates, unit_fe, time_fe or "", cluster, buf)
+
+    elif method == "panel":
+        if not unit_fe or not time_fe:
+            raise ValueError("Panel method requires 'unit_fe' and 'time_fe'")
+        model_row, fig_path = _run_panel(
+            df, y, treatment, covariates, unit_fe, time_fe, cluster, buf,
+            max_sample=max_sample,
+        )
+
+    elif method == "glm":
+        if not covariates:
+            raise ValueError("GLM method requires 'covariates'")
+        model_row, fig_path = _run_glm(
+            df, y, treatment, covariates, cluster, buf,
+            max_sample=max_sample,
+        )
+
+    elif method == "bartik":
+        model_row, fig_path = _run_bartik_iv(
+            df, y, treatment, covariates or [], shares, shocks, cluster, buf,
+            max_sample=max_sample,
+        )
 
     # ── write table ───────────────────────────────────────────────────────
     if model_row is not None:

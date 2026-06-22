@@ -18,7 +18,8 @@ class ProductMapDocsContractTest(unittest.TestCase):
 
         required_terms = [
             "Product/web-react/src/App.tsx",
-            "Product/web/index.html",
+            "唯一当前产品壳",
+            "Product/web 已移除",
             "Product/app.py",
             "demo_server.py",
             "SystemStatusBar",

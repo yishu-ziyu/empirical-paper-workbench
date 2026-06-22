@@ -2,14 +2,14 @@
   "schema_version": "workflow_dashboard_state.v1",
   "updated_at": "2026-06-18T18:12:00+08:00",
   "poll_interval_ms": 3000,
-  "current_step": "交付 / 验收",
-  "next_step": "补齐真实字段后重跑",
-  "current_gate": "P16 半成品交付包已生成",
-  "blocker": "真实 CSV 缺少 parent_education 和 experience，不能运行父母教育工资模型",
-  "blocked_branch": "P16 阻断交付分支",
-  "status_code": "p16_blocked_branch_ready",
+  "current_step": "数据修复预检",
+  "next_step": "P18 应用修复候选",
+  "current_gate": "P17 数据修复预检已生成",
+  "blocker": "真实 CSV 缺少 parent_education 和 experience；experience 还需要确认 education_years 映射",
+  "blocked_branch": "P17 修复候选审阅分支",
+  "status_code": "p17_data_repair_preflight_ready",
   "forbidden_output": "不运行模型",
-  "guardrail": "已推到 P16 阻断分支 · 交付半成品论文和红标问题清单 · 不伪造回归结果",
+  "guardrail": "已推到 P17 修复预检 · 交付半成品论文、红标问题清单和修复候选账本 · 不覆盖正式数据，不运行模型",
   "headline": {
     "eyebrow": "项目工作流仪表盘 · 管理层视图",
     "title": "论文生产流水线控制台",
@@ -18,25 +18,112 @@
   "executive_summary": {
     "title": "老板先看这里",
     "goal": "给本科生交付可审计的论文初稿",
-    "current_truth": "Demo 线已走到 P16 阻断交付：能交付半成品论文，不能声称完整实证结果",
-    "decision_needed": "是否补齐真实字段并重跑 P13-P16",
-    "next_action": "补齐 parent_education 和 experience 后重跑 P13-P16 闭环"
+    "current_truth": "Demo 线已走到 P17 修复预检：能在 UI 审阅字段修复候选，不能声称完整实证结果",
+    "decision_needed": "是否按 P17 候选进入 P18 数据修复应用门禁",
+    "next_action": "审阅 famconf 父母教育来源和 experience 学历年限映射，再写新的 Interim 修复数据"
+  },
+  "visual_tree": {
+    "title": "工作流树状路线图",
+    "subtitle": "先看图：绿色是已经确认的路径，红色是阻断或禁止动作，蓝色是下一步。",
+    "current_node": "P17",
+    "next_node": "P18",
+    "nodes": [
+      {
+        "id": "P12",
+        "title": "方法规格预检",
+        "description": "变量、方法和审阅口径已写成可检查草案。",
+        "status": "done",
+        "column": 1,
+        "row": 2
+      },
+      {
+        "id": "P13",
+        "title": "运行计划校验",
+        "description": "真实 CSV 字段不齐，不能批准运行计划。",
+        "status": "blocked",
+        "column": 2,
+        "row": 2
+      },
+      {
+        "id": "P14",
+        "title": "执行账本暂停",
+        "description": "不创建 run id，不运行模型。",
+        "status": "forbidden",
+        "column": 3,
+        "row": 1
+      },
+      {
+        "id": "P15",
+        "title": "半成品交付",
+        "description": "交付初稿、红标问题和证据边界。",
+        "status": "done",
+        "column": 3,
+        "row": 3
+      },
+      {
+        "id": "P16",
+        "title": "用户验收包",
+        "description": "确认半成品可验收，但不是完整实证论文。",
+        "status": "done",
+        "column": 4,
+        "row": 3
+      },
+      {
+        "id": "P17",
+        "title": "数据修复预检",
+        "description": "推荐 famconf 父母教育来源；experience 仍需确认映射。",
+        "status": "current",
+        "column": 5,
+        "row": 3
+      },
+      {
+        "id": "P18",
+        "title": "应用修复候选",
+        "description": "写新的 Interim 数据，再回到 P13-P16。",
+        "status": "next",
+        "column": 6,
+        "row": 3
+      },
+      {
+        "id": "回退",
+        "title": "回到 P12-0",
+        "description": "方法口径不清时重画设计树。",
+        "status": "fallback",
+        "column": 2,
+        "row": 4
+      },
+      {
+        "id": "禁止",
+        "title": "不运行模型",
+        "description": "字段没补齐前，不声称已有回归结果。",
+        "status": "forbidden",
+        "column": 4,
+        "row": 1
+      }
+    ],
+    "legend": [
+      "绿色：已确认路径",
+      "深绿：当前位置 P17",
+      "蓝色：下一步 P18",
+      "红色：阻断 / 禁止",
+      "黄色：回退路径"
+    ]
   },
   "plain_summary": [
     {
       "label": "现在能交付什么",
-      "value": "半成品论文和红标问题清单",
-      "description": "当前不能报告回归结果，但可以交付已生成的 paper_draft.docx 与缺口清单。"
+      "value": "半成品论文、红标问题清单和 P17 修复候选",
+      "description": "当前不能报告回归结果，但可以交付已生成的 paper_draft.docx、缺口清单和可审阅数据修复账本。"
     },
     {
       "label": "还缺什么",
-      "value": "真实 CSV 缺少两个字段",
-      "description": "parent_education 和 experience 不在当前分析数据表里，不能跑父母教育工资模型。"
+      "value": "正式分析 CSV 仍缺两个字段",
+      "description": "P17 推荐 famconf 父母教育来源；experience 需要先确认 edu_last 到 education_years 的映射。"
     },
     {
       "label": "下一步做什么",
-      "value": "补齐字段后重跑 P13-P16",
-      "description": "补齐或合并真实字段后，再进入完整论文和模型结果分支。"
+      "value": "进入 P18 应用修复候选",
+      "description": "用户审阅 P17 后，写新的 Data/Interim 修复数据，再重跑 P13-P16。"
     }
   ],
   "phases": [
@@ -68,12 +155,12 @@
     {
       "label": "实现",
       "status": "done",
-      "description": "P13-P16 阻断分支已实现并写出 JSON、Review 和红标问题清单。"
+      "description": "P13-P17 阻断和修复预检分支已实现并写出 JSON、Review 和红标问题清单。"
     },
     {
       "label": "复核",
       "status": "current",
-      "description": "当前复核 P16 半成品交付包、仪表盘和 API 状态。"
+      "description": "当前复核 P17 修复候选账本、产品控制台和 API 状态。"
     }
   ],
   "gate_cards": [
@@ -84,18 +171,18 @@
     },
     {
       "label": "当前门禁",
-      "title": "P16 半成品交付包已生成",
-      "description": "已交付半成品论文、红标问题清单和用户验收包。"
+      "title": "P17 数据修复预检已生成",
+      "description": "已交付 parent_education 和 experience 的可审阅修复候选。"
     },
     {
       "label": "当前阻断",
-      "title": "真实 CSV 缺字段",
-      "description": "缺少 parent_education 和 experience，不能运行父母教育工资模型。"
+      "title": "等待 P18 应用修复",
+      "description": "不能覆盖正式 CSV；必须写新的 Interim 数据并确认 experience 映射。"
     },
     {
       "label": "禁止动作",
-      "title": "不伪造结果",
-      "description": "不能复用旧机器人题目的方法规格、运行计划或回归结果。"
+      "title": "不越权应用修复",
+      "description": "P17 只做预检，不写修复后 CSV，不创建 run id，不运行模型。"
     }
   ],
   "branches": [
@@ -118,6 +205,10 @@
     {
       "title": "P16 用户验收",
       "description": "已生成用户验收包：可验收半成品，不能声称完整论文。"
+    },
+    {
+      "title": "P17 数据修复预检",
+      "description": "已推荐 famconf 父母教育来源，并标出 experience 映射确认缺口。"
     }
   ],
   "side_rules": [
@@ -141,11 +232,11 @@
     },
     {
       "title": "当前面板",
-      "description": "确认当前门禁是 P16 半成品交付包已生成。"
+      "description": "确认当前门禁是 P17 数据修复预检已生成。"
     },
     {
       "title": "预检产物",
-      "description": "确认 P13、P14、P15、P16 JSON 和 Review 报告已生成。"
+      "description": "确认 P13、P14、P15、P16、P17 JSON 和 Review 报告已生成。"
     },
     {
       "title": "禁止入口",
@@ -194,12 +285,16 @@
       "href": "../../Results/json/parent_education_wage_p16_user_acceptance_packet.json"
     },
     {
+      "label": "P17 修复预检",
+      "href": "../../Results/json/parent_education_wage_p17_data_repair_preflight.json"
+    },
+    {
       "label": "桌面截图",
-      "href": "../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-desktop.png"
+      "href": "../../Product/output/playwright/workflow-dashboard-tree-desktop.png"
     },
     {
       "label": "手机截图",
-      "href": "../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-mobile.png"
+      "href": "../../Product/output/playwright/workflow-dashboard-tree-mobile.png"
     }
   ]
 }

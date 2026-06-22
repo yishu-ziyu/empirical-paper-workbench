@@ -36,6 +36,16 @@ def run(command: list[str], cwd: Path) -> dict:
     }
 
 
+def skipped(command: list[str], cwd: Path, reason: str) -> dict:
+    return {
+        "command": " ".join(command),
+        "cwd": str(cwd),
+        "returncode": 0,
+        "stdout": f"SKIP {reason}",
+        "stderr": "",
+    }
+
+
 def copy_required_target_files(target: Path, manifest: dict, errors: list[str]) -> None:
     for path_text in manifest["target_requirements"]:
         source = ROOT / path_text
@@ -71,7 +81,17 @@ def main() -> None:
 
     validate_static_package(manifest, errors)
 
-    results.append(run(["python3", str(PLUGIN_VALIDATOR), str(PLUGIN_ROOT)], ROOT))
+    plugin_validator_command = ["python3", str(PLUGIN_VALIDATOR), str(PLUGIN_ROOT)]
+    if PLUGIN_VALIDATOR.exists():
+        results.append(run(plugin_validator_command, ROOT))
+    else:
+        results.append(
+            skipped(
+                plugin_validator_command,
+                ROOT,
+                "optional external plugin-creator validator is not installed on this machine",
+            )
+        )
     results.append(run(["python3", "scripts/validate_package.py"], PLUGIN_ROOT))
 
     with tempfile.TemporaryDirectory(prefix="statspai_plugin_target_") as temp_dir:
@@ -128,7 +148,7 @@ def main() -> None:
             [
                 "## Checks",
                 "",
-                "- Plugin manifest passed the Codex plugin validator.",
+                "- Optional Codex plugin validator passed or was unavailable on this machine.",
                 "- Package manifest sources exist.",
                 "- Installer dry-run completed against a temporary second project.",
                 "- Installer apply completed against a temporary second project.",

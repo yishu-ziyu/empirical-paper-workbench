@@ -332,6 +332,41 @@ interface ProductControlP11SourceMetadataReport {
   p9_status_after_update?: string;
 }
 
+interface ProductControlP17DataRepairPreflightReport {
+  status: string;
+  artifact_exists?: boolean;
+  missing_fields?: string[];
+  source_root?: string | null;
+  recommended_parent_education_source?: string | null;
+  recommended_parent_education_construction?: string;
+  suggested_repaired_dataset_path?: string;
+  can_modify_final_dataset?: boolean;
+  can_create_run_id?: boolean;
+  can_execute_model?: boolean;
+  parent_education_candidates?: Array<{
+    id?: string;
+    status?: string;
+    parent_constructable_rows?: number;
+    target_rows?: number;
+    parent_constructable_rate?: number;
+  }>;
+  experience_candidate?: {
+    status?: string;
+    formula?: string;
+    candidate_usable_rows?: number;
+    target_rows?: number;
+    requires_education_years_mapping?: boolean;
+    review_note?: string;
+  };
+  product_control_signal?: {
+    phase?: string;
+    label?: string;
+    status?: string;
+    next_action?: string;
+  };
+  next_action?: string;
+}
+
 interface ProductControlP0PanelProps {
   projectId: string;
 }
@@ -457,6 +492,17 @@ function topicLabel(report: ProductControlP0Report | null): string {
 function evidenceNeedLabel(check: ProductControlP0EvidenceCheck): string {
   const raw = check.id || check.need || check.label || check.description || "";
   return NEED_LABELS[raw] || check.label || check.description || raw || "needs_evidence";
+}
+
+function userFieldLabel(field: string): string {
+  if (field === "parent_education") return "父母教育信息";
+  if (field === "experience") return "工作经验";
+  if (field === "ln_wage") return "工资收入";
+  if (field === "edu_last") return "本人教育年限";
+  if (field === "age") return "年龄";
+  if (field === "female") return "性别";
+  if (field === "urban") return "城乡信息";
+  return field.replace(/_/g, " ");
 }
 
 function isNeedsEvidence(check: ProductControlP0EvidenceCheck): boolean {
@@ -936,6 +982,26 @@ async function saveProductControlP11SourceMetadataContract(
   return body;
 }
 
+async function requestProductControlP17DataRepairPreflight(projectId: string) {
+  const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/product-control/p17-data-repair-preflight`), {
+    method: "GET",
+  });
+  if (!response.ok) {
+    throw new Error("product_control_p17_data_repair_preflight_get_failed");
+  }
+  return (await response.json()) as ProductControlP17DataRepairPreflightReport;
+}
+
+async function refreshProductControlP17DataRepairPreflight(projectId: string) {
+  const response = await fetch(apiUrl(`/api/v1/projects/${projectId}/product-control/p17-data-repair-preflight`), {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("product_control_p17_data_repair_preflight_post_failed");
+  }
+  return (await response.json()) as ProductControlP17DataRepairPreflightReport;
+}
+
 export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps) {
   const [report, setReport] = useState<ProductControlP0Report | null>(null);
   const [literatureReport, setLiteratureReport] = useState<ProductControlP1LiteratureReport | null>(null);
@@ -953,6 +1019,8 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
   const [formalVariableRoleSaveReport, setFormalVariableRoleSaveReport] =
     useState<ProductControlP9FormalSaveReport | null>(null);
   const [sourceMetadataReport, setSourceMetadataReport] = useState<ProductControlP11SourceMetadataReport | null>(null);
+  const [dataRepairPreflightReport, setDataRepairPreflightReport] =
+    useState<ProductControlP17DataRepairPreflightReport | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [literatureState, setLiteratureState] = useState<LoadState>("idle");
   const [dataFieldState, setDataFieldState] = useState<LoadState>("idle");
@@ -969,6 +1037,7 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
   const [formalVariableRoleSaveSubmitState, setFormalVariableRoleSaveSubmitState] = useState<LoadState>("idle");
   const [sourceMetadataState, setSourceMetadataState] = useState<LoadState>("idle");
   const [sourceMetadataSubmitState, setSourceMetadataSubmitState] = useState<LoadState>("idle");
+  const [dataRepairPreflightState, setDataRepairPreflightState] = useState<LoadState>("idle");
   const [variableRoleSignoffDecisions, setVariableRoleSignoffDecisions] =
     useState<Record<VariableRoleDecisionId, string>>(P6_FALLBACK_DECISIONS);
   const [variableRoleApprovalForm, setVariableRoleApprovalForm] = useState<P8ApprovalForm>(P8_APPROVAL_DEFAULTS);
@@ -991,6 +1060,7 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
   const [formalVariableRoleSaveMessage, setFormalVariableRoleSaveMessage] = useState<string | null>(null);
   const [sourceMetadataError, setSourceMetadataError] = useState<string | null>(null);
   const [sourceMetadataMessage, setSourceMetadataMessage] = useState<string | null>(null);
+  const [dataRepairPreflightError, setDataRepairPreflightError] = useState<string | null>(null);
 
   const loadProductControlP0 = useCallback(async () => {
     if (!projectId) return;
@@ -1344,6 +1414,32 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
     }
   }, [loadProductControlP9FormalVariableRoles, projectId, sourceMetadataForm]);
 
+  const loadProductControlP17DataRepairPreflight = useCallback(async () => {
+    if (!projectId) return;
+    setDataRepairPreflightState("loading");
+    setDataRepairPreflightError(null);
+    try {
+      setDataRepairPreflightReport(await requestProductControlP17DataRepairPreflight(projectId));
+      setDataRepairPreflightState("ready");
+    } catch {
+      setDataRepairPreflightError("P17 数据修复预检状态未读取。");
+      setDataRepairPreflightState("failed");
+    }
+  }, [projectId]);
+
+  const handleRefreshProductControlP17DataRepairPreflight = useCallback(async () => {
+    if (!projectId) return;
+    setDataRepairPreflightState("refreshing");
+    setDataRepairPreflightError(null);
+    try {
+      setDataRepairPreflightReport(await refreshProductControlP17DataRepairPreflight(projectId));
+      setDataRepairPreflightState("ready");
+    } catch {
+      setDataRepairPreflightError("P17 数据修复预检刷新失败。");
+      setDataRepairPreflightState("failed");
+    }
+  }, [projectId]);
+
   const handleRefreshProductControlP9FormalVariableRoles = useCallback(async () => {
     if (!projectId) return;
     setFormalVariableRoleSaveState("refreshing");
@@ -1494,6 +1590,10 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
     void loadProductControlP9FormalVariableRoles();
   }, [loadProductControlP9FormalVariableRoles]);
 
+  useEffect(() => {
+    void loadProductControlP17DataRepairPreflight();
+  }, [loadProductControlP17DataRepairPreflight]);
+
   const tasks = report?.agent_tasks ?? [];
   const checks = report?.evidence_checks ?? [];
   const needsEvidence = checks.filter(isNeedsEvidence);
@@ -1569,16 +1669,34 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
     formalVariableRoleSaveSubmitState !== "refreshing" &&
     Boolean(formalVariableRoleSaveForm.reviewer.trim()) &&
     Boolean(formalVariableRoleSaveForm.note.trim()) &&
-    formalVariableRoleSaveForm.confirmation.trim() === P9_FORMAL_SAVE_CONFIRMATION;
-  const currentGateStatus = formalVariableRoleSaveReport?.status || "blocked_missing_dataset_source_metadata";
+      formalVariableRoleSaveForm.confirmation.trim() === P9_FORMAL_SAVE_CONFIRMATION;
+  const p17MissingFields = dataRepairPreflightReport?.missing_fields?.join(", ") || "parent_education, experience";
+  const p17RecommendedSource = dataRepairPreflightReport?.recommended_parent_education_source || "待刷新";
+  const p17ParentCandidate = dataRepairPreflightReport?.parent_education_candidates?.find(
+    (item) => item.id === dataRepairPreflightReport.recommended_parent_education_source,
+  ) || dataRepairPreflightReport?.parent_education_candidates?.[0];
+  const p17ExperienceStatus = dataRepairPreflightReport?.experience_candidate?.status || "待刷新";
+  const p17Boundary = dataRepairPreflightReport
+    ? `No model run；不改正式 CSV；suggested：${dataRepairPreflightReport.suggested_repaired_dataset_path || "Data/Interim/parent_education_wage_repaired.csv"}`
+    : "No model run；等待 P17 数据修复预检";
+  const currentGateStatus = dataRepairPreflightReport?.status || formalVariableRoleSaveReport?.status || "blocked_missing_dataset_source_metadata";
   const currentGateSummary =
-    currentGateStatus === "formal_variable_roles_saved"
+    dataRepairPreflightReport
+      ? "P16 已完成阻断交付；当前需要审阅 parent_education 与 experience 的数据修复候选。"
+      : currentGateStatus === "formal_variable_roles_saved"
       ? "正式变量表已保存；下一步进入 DesignSpec preflight，仍不能创建 run id。"
       : formalVariableRoleSaveReport?.can_save_formal_variable_roles
         ? "P7 已完成，P8 已审批，P9 source metadata 已满足，可人工保存正式变量表。"
         : "P7 已完成，P8 已审批，P9 等待 source metadata。";
   const currentGateBlockers =
-    currentGateStatus === "formal_variable_roles_saved"
+    dataRepairPreflightReport
+      ? [
+          `缺失字段：${p17MissingFields}`,
+          `推荐父母教育来源：${p17RecommendedSource}`,
+          "不能创建 run id：P17 只生成修复候选账本",
+          "不能跑模型：等待 P18 应用修复门禁",
+        ]
+      : currentGateStatus === "formal_variable_roles_saved"
       ? [
           "正式变量表已保存：等待 DesignSpec preflight",
           "不能创建 run id：RunPlan 尚未进入审批",
@@ -1596,12 +1714,91 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
             "不能跑模型：正式变量表和 DesignSpec 尚未通过",
           ];
 
+  const userMissingFieldLabels = (
+    dataRepairPreflightReport?.missing_fields?.length
+      ? dataRepairPreflightReport.missing_fields
+      : ["parent_education", "experience"]
+  ).map(userFieldLabel);
+  const userProgressTitle = dataRepairPreflightReport ? "补齐数据字段后再继续分析" : "补齐数据来源说明后再继续分析";
+  const userProgressSummary = dataRepairPreflightReport
+    ? `还差 ${userMissingFieldLabels.join("、")}。确认来源和口径后，才能进入正式分析。`
+    : "当前还没有读到完整的数据修复状态。先刷新状态；如果仍缺失，再打开技术详情补充数据来源。";
+  const userNextSteps = dataRepairPreflightReport
+    ? [
+        `确认${userMissingFieldLabels[0] || "父母教育信息"}的可用来源`,
+        `确认${userMissingFieldLabels[1] || "工作经验"}的计算口径`,
+        "生成修复后的分析数据，再进入正式模型步骤",
+      ]
+    : ["刷新当前状态", "补齐数据来源说明", "确认后再进入正式分析"];
+  const userProgressButtonLabel = dataRepairPreflightReport ? "刷新修复建议" : "刷新状态";
+  const isUserProgressRefreshing = dataRepairPreflightReport
+    ? dataRepairPreflightState === "refreshing"
+    : state === "refreshing";
+
+  const dataRepairPreflightSection = (
+    <div
+      className="product-control-p0-panel__p17 product-control-current-gate-detail"
+      data-testid="product-control-p17-data-repair-preflight"
+    >
+      <div>
+        <span>P17 Data Repair Preflight</span>
+        <strong>
+          {dataRepairPreflightReport?.status ||
+            (dataRepairPreflightState === "loading" ? "读取中" : "p17_data_repair_preflight_missing")}
+        </strong>
+        <p>
+          missing：{p17MissingFields}；recommended source：{p17RecommendedSource}
+        </p>
+        <small>{p17Boundary}</small>
+      </div>
+      <div className="product-control-p0-panel__p17-grid" aria-label="p17 data repair review summary">
+        <div>
+          <span>parent_education</span>
+          <strong>
+            {p17ParentCandidate?.parent_constructable_rows ?? 0}/{p17ParentCandidate?.target_rows ?? 0}
+          </strong>
+          <small>
+            {p17ParentCandidate?.id || "candidate missing"}；rate：
+            {p17ParentCandidate?.parent_constructable_rate ?? 0}
+          </small>
+        </div>
+        <div>
+          <span>experience</span>
+          <strong>{p17ExperienceStatus}</strong>
+          <small>{dataRepairPreflightReport?.experience_candidate?.review_note || "等待 education_years 映射确认"}</small>
+        </div>
+        <div>
+          <span>boundary</span>
+          <strong>No model run</strong>
+          <small>
+            can_create_run_id：{dataRepairPreflightReport?.can_create_run_id ? "true" : "false"}；
+            can_execute_model：{dataRepairPreflightReport?.can_execute_model ? "true" : "false"}
+          </small>
+        </div>
+      </div>
+      <button
+        className="btn btn--ghost product-control-p0-panel__refresh"
+        type="button"
+        onClick={handleRefreshProductControlP17DataRepairPreflight}
+        disabled={!projectId || dataRepairPreflightState === "refreshing"}
+      >
+        <RefreshCcw size={15} aria-hidden="true" />
+        <span>{dataRepairPreflightState === "refreshing" ? "刷新中" : "刷新 P17"}</span>
+      </button>
+      {dataRepairPreflightError ? (
+        <p className="product-control-p0-panel__error" role="alert">
+          {dataRepairPreflightError}
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
-    <section className="product-control-p0-panel" data-testid="product-control-p0-panel">
+    <section className="product-control-p0-panel product-control-p0-panel--clean" data-testid="product-control-p0-panel">
       <header className="product-control-p0-panel__header">
         <div>
-          <span className="eyebrow">Product Control</span>
-          <h2>产品控制</h2>
+          <span className="eyebrow">论文工作流</span>
+          <h2>当前卡点</h2>
         </div>
         <button
           className="btn btn--ghost product-control-p0-panel__refresh"
@@ -1610,11 +1807,45 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
           disabled={!projectId || state === "refreshing"}
         >
           <RefreshCcw size={15} aria-hidden="true" />
-          <span>{state === "refreshing" ? "刷新中" : "刷新 P0"}</span>
+          <span>{state === "refreshing" ? "刷新中" : "刷新状态"}</span>
         </button>
       </header>
 
       <div className="product-control-p0-panel__body" data-testid="product-control-p0-body">
+        <section className="research-progress-card" data-testid="research-progress-card">
+          <div className="research-progress-card__main">
+            <span>研究进度</span>
+            <h3>{userProgressTitle}</h3>
+            <p>{userProgressSummary}</p>
+          </div>
+          <div className="research-progress-card__next">
+            <strong>下一步</strong>
+            <ol>
+              {userNextSteps.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ol>
+            <button
+              className="btn btn--primary"
+              type="button"
+              onClick={
+                dataRepairPreflightReport
+                  ? handleRefreshProductControlP17DataRepairPreflight
+                  : handleRefreshProductControlP0
+              }
+              disabled={
+                !projectId ||
+                isUserProgressRefreshing
+              }
+            >
+              <RefreshCcw size={15} aria-hidden="true" />
+              <span>{isUserProgressRefreshing ? "刷新中" : userProgressButtonLabel}</span>
+            </button>
+          </div>
+        </section>
+
+        <details className="product-control-technical-details" data-testid="product-control-technical-details">
+          <summary>技术详情</summary>
         <div className="product-control-p0-panel__status">
           <ShieldCheck size={18} aria-hidden="true" />
           <div>
@@ -1632,7 +1863,7 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
         <section className="product-control-gate-summary" data-testid="product-control-gate-summary">
           <div>
             <span>当前门禁</span>
-            <strong>P9 正式变量表保存</strong>
+            <strong>{dataRepairPreflightReport ? "P17 数据修复预检" : "P9 正式变量表保存"}</strong>
             <p>{currentGateStatus}；{currentGateSummary}</p>
           </div>
           <ul>
@@ -1641,6 +1872,8 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
             ))}
           </ul>
         </section>
+
+        {dataRepairPreflightSection}
 
         <details className="product-control-stage-history">
           <summary>
@@ -2051,10 +2284,15 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
         </div>
         </details>
 
-        <div
-          className="product-control-p0-panel__p11 product-control-current-gate-detail"
-          data-testid="product-control-p11-source-metadata-contract"
-        >
+        <details className="product-control-secondary-workspace product-control-secondary-workspace--p11">
+          <summary>
+            <span>P11 Source Metadata</span>
+            <strong>{sourceMetadataReport?.status || "source contract 复查"}</strong>
+          </summary>
+          <div
+            className="product-control-p0-panel__p11 product-control-current-gate-detail"
+            data-testid="product-control-p11-source-metadata-contract"
+          >
           <section className="product-control-p0-panel__p11-workspace" aria-label="p11 source contract signoff workspace">
             <header className="product-control-p0-panel__p11-workspace-header">
               <div>
@@ -2344,12 +2582,18 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
               </p>
             ) : null}
           </section>
-        </div>
+          </div>
+        </details>
 
-        <div
-          className="product-control-p0-panel__p9 product-control-current-gate-detail"
-          data-testid="product-control-p9-variable-role-formal-save"
-        >
+        <details className="product-control-secondary-workspace product-control-secondary-workspace--p9">
+          <summary>
+            <span>P9 正式变量表保存</span>
+            <strong>{formalVariableRoleSaveReport?.status || "旧门禁复查"}</strong>
+          </summary>
+          <div
+            className="product-control-p0-panel__p9 product-control-current-gate-detail"
+            data-testid="product-control-p9-variable-role-formal-save"
+          >
           <div>
             <span>P9 正式变量表保存</span>
             <strong>
@@ -2421,11 +2665,13 @@ export function ProductControlP0Panel({ projectId }: ProductControlP0PanelProps)
               {formalVariableRoleSaveMessage}
             </p>
           ) : null}
-        </div>
+          </div>
+        </details>
 
         <p className="product-control-p0-panel__boundary">
           {report?.formal_boundary || "不能进入正式论文；P0 只生成审阅层产物，真实文献、数据与变量、方法执行证据仍需补齐。"}
         </p>
+        </details>
       </div>
     </section>
   );

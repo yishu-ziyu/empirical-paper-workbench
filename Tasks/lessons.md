@@ -1,5 +1,17 @@
 # Lessons
 
+## 2026-06-18：产品化必须复用 CLI 成功论文链路，不能用 PDF 导出冒充论文完成
+
+用户反馈：四周前第一层 CLI 已经能把医保 CHARLS DID 样例跑成接近课程论文级的 `paper.pdf`，包含数据 contract、样本构造、描述统计、DID/event-study、主表、稳健性、异质性、文献核验、claim audit 和复现门禁。后续第二层 Agent 和第三层 UI 的目标本应是产品化这条成功路径，而不是堆门禁、看板和状态卡后输出一份两三页 PDF。
+
+后续规则：
+
+- `final_pdf_ready` 只能表示 PDF 文件生成成功，不能表示课程论文级交付，也不能自动设置 `submission_ready`。
+- 任意题目交付必须对齐 `Tasks/charls-proofcase-to-agent-product-correction.md`：至少有论文结构、文献闭环、数据构造、方法门、表图、稳健性、claim audit 和复现门。
+- 第二层 Agent 必须调度 CLI proof case 中已经成功的研究流水线；不能绕过 `StatsPAI_skill`、方法门、论文质量门和 AER/Journal skill 路由。
+- UI 只是第三层消费 headless 状态，不是产品核心能力；如果 headless pipeline 没有产出课程论文级初稿，UI 再完整也不能声称产品闭环完成。
+- 父母教育工资当前 PDF 只能标记为 `pdf_export_smoke_only`，下一步必须建立 course-paper quality gate，而不是继续包装现有 PDF。
+
 ## 2026-06-18：P12 以后必须先走 Grill / Design Tree，再进入 SDD/BDD/TDD
 
 用户反馈：为了避免再次陷入混乱，后续开发要持续用 Matt Pocock 式的 AI-powered development phase 提醒团队：先把 pre-PRD 阶段结构化，先看清设计树，再沿着设计树进入更高保真原型、规格、任务和实现。不能一边想产品、一边直接堆代码或 UI。

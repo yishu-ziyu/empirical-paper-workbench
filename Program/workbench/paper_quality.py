@@ -116,7 +116,7 @@ def build_paper_quality_report(
     section_length_checks = build_section_length_checks(draft_text, profile)
     literature = find_literature_package(project_root)
     citation_checks = build_citation_checks(literature)
-    method_gate_checks = build_method_gate_checks(project_root)
+    method_gate_checks = build_method_gate_checks(project_root, draft)
     evidence_integrity_checks = build_evidence_integrity_checks(project_root, draft_text, draft)
     revision_checks = build_revision_checks(project_root)
     verdict = build_verdict(
@@ -429,8 +429,9 @@ def build_citation_checks(literature: LiteraturePackage) -> dict[str, Any]:
     }
 
 
-def build_method_gate_checks(project_root: Path) -> dict[str, Any]:
+def build_method_gate_checks(project_root: Path, draft_path: Path | None = None) -> dict[str, Any]:
     candidates = [
+        *method_gate_candidates(project_root, draft_path),
         project_root / "Results" / "json" / "method_gate_report.json",
         project_root / "state" / "product" / "method_gate.json",
     ]
@@ -598,6 +599,7 @@ def build_evidence_integrity_checks(
 
 def find_results_payload(project_root: Path, draft_path: Path | None = None) -> tuple[Path | None, dict[str, Any]]:
     candidates = [
+        *prefixed_results_candidates(project_root, draft_path),
         *topic_scoped_candidates(project_root, draft_path, "Results", "results.json"),
         project_root / "Results" / "json" / "results.json",
         project_root / "Results" / "json" / "method_execution_result.json",
@@ -613,6 +615,7 @@ def find_results_payload(project_root: Path, draft_path: Path | None = None) -> 
 
 def find_design_payload(project_root: Path, draft_path: Path | None = None) -> tuple[Path | None, dict[str, Any]]:
     candidates = [
+        *prefixed_design_candidates(project_root, draft_path),
         *topic_scoped_candidates(project_root, draft_path, "Tasks", "design.json"),
         project_root / "state" / "product" / "design_spec.json",
         project_root / "Tasks" / "design.json",
@@ -642,7 +645,103 @@ def topic_scoped_candidates(
     if len(parts) < 2 or parts[0] != "Manuscripts":
         return []
     topic_slug = parts[1]
+    if topic_slug == "generated":
+        return []
     return [project_root / top_level_dir / topic_slug / filename]
+
+
+def artifact_prefixes_for_draft(project_root: Path, draft_path: Path | None) -> list[str]:
+    if draft_path is None:
+        return []
+    prefixes: list[str] = []
+    try:
+        relative = draft_path.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        relative = draft_path
+    parts = relative.parts
+    if len(parts) >= 2 and parts[0] == "Manuscripts" and parts[1] != "generated":
+        prefixes.append(parts[1])
+    stem = draft_path.stem
+    suffixes = [
+        "_paper_draft",
+        "_working_paper",
+        "_manuscript",
+        "_paper",
+        "_draft",
+    ]
+    for suffix in suffixes:
+        if stem.endswith(suffix):
+            prefixes.append(stem[: -len(suffix)])
+            break
+    prefixes.append(stem)
+    return unique_nonempty(prefixes)
+
+
+def prefixed_results_candidates(project_root: Path, draft_path: Path | None) -> list[Path]:
+    candidates: list[Path] = []
+    for prefix in artifact_prefixes_for_draft(project_root, draft_path):
+        candidates.extend(
+            [
+                project_root / "Results" / "json" / f"{prefix}_results_evidence_package.json",
+                project_root / "Results" / "json" / f"{prefix}_method_execution_result.json",
+                project_root / "Results" / "json" / f"{prefix}_regression_tables.json",
+                project_root / "Results" / "json" / f"{prefix}_minimal_model.json",
+                project_root / "Results" / "json" / f"{prefix}_ordered_robustness.json",
+                project_root / "Results" / "json" / f"{prefix}_results.json",
+            ]
+        )
+    return unique_paths(candidates)
+
+
+def prefixed_design_candidates(project_root: Path, draft_path: Path | None) -> list[Path]:
+    candidates: list[Path] = []
+    for prefix in artifact_prefixes_for_draft(project_root, draft_path):
+        candidates.extend(
+            [
+                project_root / "Results" / "json" / f"{prefix}_method_gate.json",
+                project_root / "Results" / "json" / f"{prefix}_method_structure_gate_packet.json",
+                project_root / "Results" / "json" / f"{prefix}_design_spec_draft.json",
+                project_root / "Results" / "json" / f"{prefix}_run_plan_seed_approved.json",
+                project_root / "Tasks" / prefix / "design.json",
+            ]
+        )
+    return unique_paths(candidates)
+
+
+def method_gate_candidates(project_root: Path, draft_path: Path | None) -> list[Path]:
+    candidates: list[Path] = []
+    for prefix in artifact_prefixes_for_draft(project_root, draft_path):
+        candidates.extend(
+            [
+                project_root / "Results" / "json" / f"{prefix}_method_gate.json",
+                project_root / "Results" / "json" / f"{prefix}_method_structure_gate_packet.json",
+            ]
+        )
+    return unique_paths(candidates)
+
+
+def unique_nonempty(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
+def unique_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    result: list[Path] = []
+    for path in paths:
+        key = path.as_posix()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(path)
+    return result
 
 
 def extract_evidence_ids(text: str) -> set[str]:
@@ -684,6 +783,9 @@ def has_main_result_table(payload: dict[str, Any]) -> bool:
         "tables",
         "approved_findings",
         "findings",
+        "primary_result",
+        "result_number_bindings",
+        "source_artifacts",
     }
     return any(key in payload and bool(payload.get(key)) for key in keys)
 

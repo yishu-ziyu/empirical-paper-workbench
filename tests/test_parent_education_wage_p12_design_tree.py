@@ -45,12 +45,21 @@ class ParentEducationWageP12DesignTreeTests(unittest.TestCase):
 
         self.assertIn(
             state["status_code"],
-            {"p12_design_tree_ready", "p12_design_spec_preflight_ready", "p16_blocked_branch_ready"},
+            {
+                "p12_design_tree_ready",
+                "p12_design_spec_preflight_ready",
+                "p16_blocked_branch_ready",
+                "p17_data_repair_preflight_ready",
+                "p18_data_repair_applied_ready",
+                "complete_paper_draft_ready",
+            },
         )
-        self.assertIn("P16", state["current_gate"])
-        self.assertIn("P13-P16", state["executive_summary"]["next_action"])
+        self.assertTrue(any(phase in state["current_gate"] for phase in ["P16", "P17", "P18"]))
+        self.assertTrue(
+            any(term in state["executive_summary"]["next_action"] for term in ["P13-P16", "Interim", "修复数据"])
+        )
         self.assertEqual("不运行模型", state["forbidden_output"])
-        self.assertIn("不伪造回归结果", state["guardrail"])
+        self.assertTrue(any(term in state["guardrail"] for term in ["不伪造回归结果", "不运行模型", "不覆盖正式数据"]))
         self.assertIn("P12 方法规格预检", [branch["title"] for branch in state["branches"]])
 
 

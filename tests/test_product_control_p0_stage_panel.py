@@ -112,7 +112,7 @@ class ProductControlP0StagePanelApiTests(unittest.TestCase):
 
 
 class ProductControlP0StagePanelReactTests(unittest.TestCase):
-    """BDD: React main workbench renders P0 phase status as a decision panel."""
+    """BDD: P0 phase panel remains historical source but is no longer a main workbench surface."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -123,12 +123,12 @@ class ProductControlP0StagePanelReactTests(unittest.TestCase):
         cls.component = cls.component_path.read_text(encoding="utf-8") if cls.component_path.exists() else ""
         cls.styles = (cls.react_root / "styles.css").read_text(encoding="utf-8")
 
-    def test_bdd_3_react_main_entry_contains_p0_stage_panel(self) -> None:
-        """行为 3：当前 React 主入口必须挂载 P0 控制面板，legacy 不再作为成功标准。"""
+    def test_bdd_3_react_main_entry_does_not_mount_p0_stage_panel(self) -> None:
+        """行为 3：当前 React 主入口不能再挂载 P0 控制面板。"""
         self.assertTrue(self.component_path.exists(), "React ProductControlP0Panel component is missing.")
-        self.assertIn("ProductControlP0Panel", self.app_tsx)
-        self.assertIn("<ProductControlP0Panel", self.app_tsx)
-        self.assertIn("projectId={effectiveProjectId}", self.app_tsx)
+        self.assertNotIn("ProductControlP0Panel", self.app_tsx)
+        self.assertNotIn("<ProductControlP0Panel", self.app_tsx)
+        self.assertIn("PaperProductionStatusPanel", self.app_tsx)
         self.assertIn("product-control-p0-panel", self.component)
         self.assertIn("产品控制 P0", self.component)
 

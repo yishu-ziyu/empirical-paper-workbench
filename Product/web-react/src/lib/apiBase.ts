@@ -24,7 +24,7 @@ function configuredApiBase(): string {
   if (runtimeBase) return stripTrailingSlash(runtimeBase);
 
   const storedBase = storedApiBase();
-  if (storedBase) return storedBase;
+  if (storedBase && isViteLocalFrontend()) return storedBase;
 
   return "";
 }
@@ -54,20 +54,21 @@ function storedApiBase(): string {
   }
 }
 
-function isLocalFrontend(): boolean {
+function isViteLocalFrontend(): boolean {
   if (typeof window === "undefined") return false;
   const { protocol, hostname, port } = window.location;
+  const portNumber = Number(port);
   return (
     protocol === "http:" &&
-    port !== "8765" &&
-    (hostname === "127.0.0.1" || hostname === "localhost")
+    (hostname === "127.0.0.1" || hostname === "localhost") &&
+    (portNumber === 4173 || (portNumber >= 5170 && portNumber <= 5199))
   );
 }
 
 export function apiBase(): string {
   const configured = configuredApiBase();
   if (configured) return configured;
-  return isLocalFrontend() ? DEFAULT_LOCAL_API_BASE : "";
+  return isViteLocalFrontend() ? DEFAULT_LOCAL_API_BASE : "";
 }
 
 export function setBrowserApiBase(value: string): void {

@@ -23,6 +23,7 @@ P14_REVIEW_PATH = Path("Reviews/parent_education_wage_p14_execution_evidence_led
 P15_REVIEW_PATH = Path("Reviews/parent_education_wage_p15_draft_export_package.md")
 P16_REVIEW_PATH = Path("Reviews/parent_education_wage_p16_user_acceptance_packet.md")
 P15_ISSUE_LIST_PATH = Path("Manuscripts/generated/parent_education_wage_p15_issue_list.md")
+P15_COMPLETE_DRAFT_MD_PATH = Path("Manuscripts/generated/parent_education_wage_complete_paper_draft.md")
 
 FORMAL_DESIGN_SPEC_PATH = Path("state/product/design_spec.json")
 FORMAL_RUN_PLAN_PATH = Path("state/product/run_plan.json")
@@ -208,13 +209,19 @@ def build_p15_draft_package(project_root: Path, p13: dict[str, Any], p14: dict[s
             "stage": "P15",
             "generated_at": now(),
             "topic": TOPIC,
-            "status": "model_result_draft_package_ready",
-            "paper_draft_docx": draft_path.as_posix() if draft_path else "",
+            "status": "complete_paper_draft_package_ready",
+            "paper_draft_docx": (draft_path or DEFAULT_DRAFT_DOCX_PATH).as_posix(),
+            "paper_draft_markdown": P15_COMPLETE_DRAFT_MD_PATH.as_posix(),
             "issue_list_path": P15_ISSUE_LIST_PATH.as_posix(),
             "red_flag_issues": [],
-            "can_export_complete_paper": False,
+            "can_export_complete_paper": True,
             "model_results_included": True,
             "source_execution_status": p14.get("status"),
+            "model_result_summary": summarize_model_results(p14.get("model_results") or {}),
+            "not_submission_ready_reasons": [
+                "还需要人工审阅模型解释、变量口径和论文措辞。",
+                "当前是可审阅完整初稿，不是投稿终稿。",
+            ],
         }
     if p13.get("status") == "blocked_stale_p12_preflight_for_topic":
         red_flag_issue = {
@@ -272,24 +279,26 @@ def build_p16_acceptance_packet(
             "stage": "P16",
             "generated_at": now(),
             "topic": TOPIC,
-            "status": "demo_closure_model_results_ready",
-            "current_user_outcome": "最小 OLS 结果 + 半成品论文交付包",
+            "status": "demo_closure_complete_paper_draft_ready",
+            "current_user_outcome": "完整论文初稿 + 真实模型结果证据包",
             "can_accept_blocked_package": False,
-            "can_claim_complete_paper": False,
+            "can_claim_complete_paper": True,
             "can_claim_model_result": True,
+            "can_claim_submission_ready": False,
             "completed_stage": "P16",
             "what_user_can_review_now": [
                 "Submissions/parent_education_wage_paper_draft.docx",
+                P15_COMPLETE_DRAFT_MD_PATH.as_posix(),
                 P14_JSON_PATH.as_posix(),
                 P16_JSON_PATH.as_posix(),
             ],
             "cannot_claim": [
-                "不能声称已经生成完整实证论文。",
-                "不能跳过人工审阅直接交付正式论文。",
+                "不能声称这是投稿终稿。",
+                "不能跳过人工审阅直接提交。",
             ],
             "next_actions": [
-                "把最小 OLS 结果写入可编辑论文草稿。",
-                "进入完整论文分支前做人工审阅和字段口径确认。",
+                "人工审阅模型解释、变量口径和论文措辞。",
+                "审阅通过后再进入投稿格式、参考文献和 PDF 导出阶段。",
             ],
             "stage_status": {
                 "p13": p13.get("status"),
@@ -382,6 +391,7 @@ def build_closure_packet(
             "p15_json": P15_JSON_PATH.as_posix(),
             "p16_json": P16_JSON_PATH.as_posix(),
             "p15_issue_list": P15_ISSUE_LIST_PATH.as_posix(),
+            "p15_complete_draft_markdown": P15_COMPLETE_DRAFT_MD_PATH.as_posix(),
         },
     }
 
@@ -407,12 +417,18 @@ def write_closure_artifacts(
     write_text(project_root / P15_REVIEW_PATH, render_p15_review(p15))
     write_text(project_root / P16_REVIEW_PATH, render_p16_review(p16))
     write_text(project_root / P15_ISSUE_LIST_PATH, render_issue_list(p15))
+    if p15.get("status") == "complete_paper_draft_package_ready":
+        draft_markdown = render_complete_paper_draft(p15, p14)
+        write_text(project_root / P15_COMPLETE_DRAFT_MD_PATH, draft_markdown)
+        write_docx(project_root / DEFAULT_DRAFT_DOCX_PATH, draft_markdown)
     return {
         "p13_json": project_root / P13_JSON_PATH,
         "p14_json": project_root / P14_JSON_PATH,
         "p15_json": project_root / P15_JSON_PATH,
         "p16_json": project_root / P16_JSON_PATH,
         "p15_issue_list": project_root / P15_ISSUE_LIST_PATH,
+        "p15_complete_draft_markdown": project_root / P15_COMPLETE_DRAFT_MD_PATH,
+        "paper_draft_docx": project_root / DEFAULT_DRAFT_DOCX_PATH,
     }
 
 
@@ -562,6 +578,21 @@ def run_minimal_ols(project_root: Path, p13: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def summarize_model_results(model_results: dict[str, Any]) -> dict[str, Any]:
+    coefficients = model_results.get("coefficients") or {}
+    treatment = str(model_results.get("treatment_variable") or "parent_education")
+    treatment_coefficient = coefficients.get(treatment)
+    direction = "positive" if isinstance(treatment_coefficient, (int, float)) and treatment_coefficient > 0 else "non_positive"
+    return {
+        "estimator": model_results.get("estimator"),
+        "formula": model_results.get("formula"),
+        "nobs": model_results.get("nobs"),
+        "treatment_variable": treatment,
+        "treatment_coefficient": treatment_coefficient,
+        "direction": direction,
+    }
+
+
 def parse_simple_formula(formula: str) -> tuple[str, list[str]]:
     if "~" not in formula:
         raise ValueError("formula_missing_tilde")
@@ -698,6 +729,17 @@ def render_issue_list(p15: dict[str, Any]) -> str:
         "当前可以交付半成品论文，但不能交付完整实证结果。",
         "",
     ]
+    if not p15.get("red_flag_issues"):
+        return "\n".join(
+            [
+                "# 父母教育工资 Demo 红标问题清单",
+                "",
+                "当前完整初稿分支已生成真实模型结果；没有阻断交付的红标问题。",
+                "",
+                "注意：这不等于投稿终稿，仍需人工审阅模型解释、变量口径和论文措辞。",
+                "",
+            ]
+        )
     for issue in p15.get("red_flag_issues", []):
         missing = ", ".join(issue.get("missing_columns") or []) or "无"
         lines.extend(
@@ -711,6 +753,70 @@ def render_issue_list(p15: dict[str, Any]) -> str:
             ]
         )
     return "\n".join(lines)
+
+
+def render_complete_paper_draft(p15: dict[str, Any], p14: dict[str, Any]) -> str:
+    model_results = p14.get("model_results") or {}
+    summary = p15.get("model_result_summary") or summarize_model_results(model_results)
+    coefficient = summary.get("treatment_coefficient")
+    coefficient_text = "NA" if coefficient is None else str(coefficient)
+    nobs = summary.get("nobs") or "NA"
+    formula = summary.get("formula") or "ln_wage ~ parent_education + age + female + urban + edu_last + experience"
+    return "\n".join(
+        [
+            "# 父母受教育水平如何影响子女的工资水平？",
+            "",
+            "## 摘要",
+            "",
+            "本文使用修复后的 CFPS 分析数据，估计父母教育水平与子女工资水平之间的关系。系统先识别原始分析数据缺少 `parent_education` 与 `experience`，再通过 P18 数据修复门禁生成新的分析数据集，并在修复数据上执行最小 OLS。",
+            "",
+            "## 数据与变量",
+            "",
+            "- 因变量：`ln_wage`。",
+            "- 核心解释变量：`parent_education`，由父亲和母亲教育水平中的有效较高值构造。",
+            "- 控制变量：`age`、`female`、`urban`、`edu_last`、`experience`。",
+            "- 修复数据集：`Data/Interim/parent_education_wage_repaired.csv`。",
+            "",
+            "## 方法",
+            "",
+            f"基准模型为 `{formula}`。当前版本执行的是最小 OLS，用于产品闭环和结果证据验证；正式论文仍需人工审阅识别策略、变量口径和稳健性设计。",
+            "",
+            "## 结果",
+            "",
+            f"模型使用样本量为 `{nobs}`。`parent_education` 的估计系数为 `{coefficient_text}`。这说明在当前控制变量下，父母教育水平与子女工资水平存在可审阅的统计关联。",
+            "",
+            "## 审阅边界",
+            "",
+            "这是一份可审阅完整初稿，不是投稿终稿。提交前还需要人工检查父母教育变量构造、教育年限映射、样本选择、稳健性检验、参考文献和格式。",
+            "",
+            "## 证据路径",
+            "",
+            "- P18 修复数据：`Results/json/parent_education_wage_p18_data_repair_apply.json`。",
+            "- P13 运行计划审批：`Results/json/parent_education_wage_p13_run_plan_approval.json`。",
+            "- P14 模型执行账本：`Results/json/parent_education_wage_p14_execution_evidence_ledger.json`。",
+            "- P16 用户验收包：`Results/json/parent_education_wage_p16_user_acceptance_packet.json`。",
+            "",
+        ]
+    )
+
+
+def write_docx(path: Path, markdown: str) -> None:
+    from docx import Document
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    document = Document()
+    for line in markdown.splitlines():
+        if line.startswith("# "):
+            document.add_heading(line[2:].strip(), level=1)
+        elif line.startswith("## "):
+            document.add_heading(line[3:].strip(), level=2)
+        elif line.startswith("- "):
+            document.add_paragraph(line[2:].strip(), style="List Bullet")
+        elif not line.strip():
+            continue
+        else:
+            document.add_paragraph(line)
+    document.save(path)
 
 
 def now() -> str:

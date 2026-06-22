@@ -15,7 +15,7 @@ Last updated: 2026-06-18
 - 当前产品主入口：FastAPI 根路径 `/`、`/react`、`/react/` 服务 `Product/web-dist/index.html`，来源是 `Product/web-react`。
 - 旧工作台入口：`/legacy` 已改为 307 重定向到 `/`；`Product/web` 只作为历史源码保留，不再作为产品验收面。
 - 已完成的纠偏：P0 后端/API 和 React P0 控制面板已经对齐，`GET/POST /api/v1/projects/{project_id}/product-control/p0-phase` 可用；P0 面板不再依赖 legacy UI。
-- 当前阶段判断：P0/P1 验收包已收口；P2-P12 已完成到方法规格预检；P13-P16 已继续推进到阻断交付分支。P13 用真实 CSV 表头校验 P12 公式后发现 `parent_education`、`experience` 不存在；P14 因此没有创建运行编号、没有运行模型；P15 已交付半成品论文和红标问题清单；P16 已生成用户验收包。当前真实阻断是数据缺列，不是流程停在 P12。项目内动态工作流仪表盘为 `docs/product-control/workflow-dashboard.html`，状态源为 `docs/product-control/workflow-dashboard-state.json`。
+- 当前阶段判断：固定 demo 线已完成数据修复、最小 OLS 执行、交付包打包和 PDF 导出链路，但没有完成课程论文级产品闭环。P18 已把 P17 推荐修复方案应用到新的 `Data/Interim/parent_education_wage_repaired.csv`，没有覆盖 `Data/Final/cfps_robot_reallocation.csv`；随后 P13-P16 已用修复数据重跑，P14 真实执行最小 OLS，Delivery Package 已把论文初稿、修复数据、模型证据和审阅材料打成可审阅包，Final PDF Export 已写出 `Submissions/parent_education_wage_final_paper.pdf`。但当前 PDF 只有 `pdf_export_smoke_only` 资格，缺文献闭环、识别策略、表图、稳健性、claim audit 和复现门；不能声称课程论文级交付或 submission ready。下一步阻断不是 UI，而是把 CHARLS 医保 CLI proof case 的论文生产链路产品化为第二层 Agent pipeline。纠偏入口：`Tasks/charls-proofcase-to-agent-product-correction.md`。
 - 当前 Demo 题目：`父母受教育水平对子女工资收入的影响`。它是用于验证完整产品链路的固定样例，不代表产品最终只能服务这个题目。
 - 真实产品形态：面向本科生和初级研究者的可审计论文初稿生产流水线。它不是单题目脚本，也不是无证据的一次性论文生成器；正向用户承诺是生成 `paper_draft.pdf / .docx`，证据不足时生成半成品论文、红标缺口和问题清单。
 - 固定首交付物：`paper_draft.pdf / paper_draft.docx`。审计报告、问题清单、证据账本和运行日志是支撑物，不应替代论文初稿成为第一用户体验。
@@ -23,7 +23,7 @@ Last updated: 2026-06-18
 
 ## Phase Status
 
-Current phase: P16 blocked delivery branch is ready. Real project now has a P7 editable draft, P8 approval, a saved P11 source contract, an approved formal VariableRoleSet, a P12 preflight artifact, P13 dataset-column approval evidence, P14 blocked execution ledger, P15 draft export package, and P16 user acceptance packet. The demo line has been pushed forward; it cannot claim a complete empirical paper because the real CSV lacks `parent_education` and `experience`.
+Current phase: PDF export smoke is ready, but course-paper quality is blocked. Real project now has P18 repaired data, P13 approved RunPlan, P14 executed minimal OLS evidence, P15 draft package, P16 acceptance packet, a delivery manifest/readme/zip package, a final PDF export artifact, and a UI-agnostic headless state endpoint. It cannot claim course-paper readiness or submission readiness until a CHARLS-like paper quality gate passes.
 
 Completed phases:
 
@@ -60,16 +60,32 @@ Completed phases:
 - P14 - Execution Evidence Ledger: wrote a blocked execution ledger with `run_id=null` and `executed_regression=false`.
 - P15 - Draft Generation And Export: preserved the existing half-finished `Submissions/parent_education_wage_paper_draft.docx` path and wrote `Manuscripts/generated/parent_education_wage_p15_issue_list.md`.
 - P16 - User Acceptance And Satisfaction Loop: wrote a user acceptance packet that marks `can_claim_complete_paper=false` and `current_user_outcome=半成品论文 + 红标问题清单`.
+- P17 - Data Repair Preflight: wrote `Results/json/parent_education_wage_p17_data_repair_preflight.json` and `Reviews/parent_education_wage_p17_data_repair_preflight.md`; Product API `GET/POST /api/v1/projects/{project_id}/product-control/p17-data-repair-preflight` and React `P17 Data Repair Preflight` UI are usable. Recommended `parent_education` source is `famconf_parent_highest_education` with 24,401/34,315 constructable rows; `experience` is derivable only after confirming `edu_last -> education_years` mapping.
+- P18 - Data Repair Apply Gate: wrote `Data/Interim/parent_education_wage_repaired.csv` with 34,315 rows; `parent_education` is nonmissing for 24,401 rows and `experience` for 30,928 rows; original `Data/Final/cfps_robot_reallocation.csv` hash stayed unchanged.
+- P13-P16 complete draft rerun: reran the complete branch on `Data/Interim/parent_education_wage_repaired.csv`; P14 executed minimal OLS with `run_id=parent_education_wage_ols_20260618145856`, `nobs=12582`, treatment variable `parent_education`; P15 wrote `Manuscripts/generated/parent_education_wage_complete_paper_draft.md` and `Submissions/parent_education_wage_paper_draft.docx`; P16 now reports `can_claim_complete_paper=true`, `can_claim_submission_ready=false`.
+- Delivery Package: added `GET/POST /api/v1/projects/{project_id}/product-control/delivery-package`; real project wrote `Submissions/parent_education_wage_delivery_manifest.json`, `Submissions/parent_education_wage_delivery_README.md`, and `Submissions/parent_education_wage_delivery_package.zip`. The zip contains the complete draft docx, Markdown draft, repaired data, P13-P18 JSON evidence, P13-P18 review notes, manifest, and README.
+- Final PDF Export: added `GET/POST /api/v1/projects/{project_id}/product-control/final-pdf`; real project wrote `Submissions/parent_education_wage_final_paper.pdf`, `Submissions/parent_education_wage_final_paper.html`, `Results/json/parent_education_wage_final_pdf_export.json`, and `Reviews/parent_education_wage_final_pdf_export.md`. Live API returns `final_pdf_ready`.
+- Headless Product Control state: added `GET /api/v1/projects/{project_id}/product-control/headless-state`, returning UI-agnostic components `data_repair`, `execution_run`, `draft_package`, `delivery_package`, `final_pdf`, and `review_export`.
 
 Remaining phases:
 
-- Data repair for the complete-paper branch：补齐或合并 `parent_education` 与 `experience` 后，重新运行 P13-P16，才允许进入真实模型结果和完整论文分支。
+- Human review and submission packaging：人工审阅模型解释、变量口径、参考文献、格式和 PDF 投稿包；这属于投稿级完善，不是本轮非 UI 产品功能闭环的阻断。
 
-Current blocker: 真实数据集 `Data/Final/cfps_robot_reallocation.csv` 的表头没有 `parent_education` 和 `experience`。P12 baseline 公式为 `ln_wage ~ parent_education + age + female + urban + edu_last + experience`，所以 P13 正确阻断 RunPlan，P14 正确不运行模型。旧机器人题目的 `state/product/design_spec.json` 和 `state/product/run_plan.json` 已归档到 `state/product/archive/p13_p16_stale_formal_state/`，不能再作为当前题目证据。当前可交付物是半成品论文包和红标问题清单，不是完整实证结果。
+Current blocker: 固定 demo 线当前没有数据缺列、模型未执行、交付包缺失或 PDF 缺失阻断，但存在论文质量阻断。当前可交付物是 PDF 导出样稿、修复数据、最小 OLS 执行证据、headless 组件状态和可审阅 delivery package；还不能称为课程论文级初稿。下一层阻断是把 CHARLS 医保 CLI proof case 的论文生产链路抽成 Agent pipeline，并建立 course-paper quality gate。
 
 North Star control file: `Tasks/north-star-product-plan.md`。后续复杂阶段按 `追问 -> 调研 -> 原型 -> 规格 -> 拆任务 -> 实现 -> 复核` 执行；P12-P16 进入 SDD / BDD / TDD 前必须先过设计树门禁，先写清设计树、分支、阻断和 QA 计划，再写规格和行为、失败测试、最小实现和验证。
 
 Visual workflow dashboard: `docs/product-control/workflow-dashboard.html`。它是项目内动态中文控制面，通过 `/workflow-dashboard` 打开并每 3 秒轮询 `/api/v1/workflow-dashboard/state`；状态源为 `docs/product-control/workflow-dashboard-state.json`。当前 H1 为 `论文生产流水线控制台`，首屏先回答三句话：`现在能交付什么`、`还缺什么`、`下一步做什么`；当前门禁为 `P16 半成品交付包已生成`，阻断为真实 CSV 缺字段，禁止动作是不伪造结果。阶段变化后必须同步更新本文件、`Tasks/todo.md` 和该 JSON。
+
+## Latest P17 Verification
+
+- SDD/BDD：`Tasks/parent-education-wage-p17-data-repair-preflight-bdd.md`。
+- 核心功能：新增 P17 data repair preflight，基于 P13-P16 缺列阻断生成可审阅修复候选；不覆盖正式 CSV，不写 repaired dataset，不创建 run id，不运行模型。
+- 真实产物：`Results/json/parent_education_wage_p17_data_repair_preflight.json`、`Reviews/parent_education_wage_p17_data_repair_preflight.md`。
+- 真实结论：`missing_fields=["parent_education","experience"]`；推荐父母教育来源为 `famconf_parent_highest_education`，覆盖 `24401/34315`；`person_age14_parent_education` 覆盖 `4034/34315`；`experience` 状态为 `derivable_needs_review`，需要确认 `edu_last -> education_years` 映射。
+- Product API：`GET/POST /api/v1/projects/{project_id}/product-control/p17-data-repair-preflight` 已接入；真实主项目 POST 返回 201。
+- React UI：`ProductControlP0Panel` 已新增 `P17 Data Repair Preflight` 区块和 `刷新 P17` 按钮；本地 `http://127.0.0.1:8782/` 桌面和 390px 移动端 Playwright 验收通过，无 console error，无横向溢出；`/workflow-dashboard` 也已同步到 P17。截图为 `Product/output/playwright/product-control-p17-desktop.png`、`Product/output/playwright/product-control-p17-mobile.png`、`Product/output/playwright/workflow-dashboard-p17-desktop.png`、`Product/output/playwright/workflow-dashboard-p17-mobile.png`。
+- 测试：`python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_parent_education_wage_p17_data_repair_preflight.py -q`，10 passed；`npm run build` 通过，保留既有 Vite chunk size warning。
 
 ## Latest P13-P16 Verification
 

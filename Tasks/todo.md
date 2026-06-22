@@ -1,5 +1,40 @@
 # Todo
 
+## 2026-06-19 Product Pipeline Control Surface
+
+- [x] 产品定义收敛：新增 `Tasks/product-pipeline-artifact-map-2026-06-19.md`，按“题目和数据输入 -> 研究问题判断 -> 文献和变量 -> 方法预检 -> 模型执行或阻断 -> 论文初稿 -> 审阅修订 -> PDF/DOCX/证据包/复现说明”八步梳理现有产物。
+- [x] 主线纠偏：当前不再用 P0-P18、第一版/第二版、CHARLS/CGSS/父母教育样例名来定义产品；它们只作为工程证据和样例。
+- [x] 当前唯一推进线：CGSS 论文生产链，从现有 PDF 样稿和质量报告出发，生成浏览器内用户可读修订清单，并把下一步动作回写到 headless state。
+- [x] 产品入口清理：新增 `Tasks/product-surface-cleanup-bdd.md` 和 `tests/test_product_surface_cleanup.py`；React 主入口已摘掉旧 `ProductControlP0Panel`，FastAPI 不再挂旧静态 `/assets`，`Product/web` 静态工作台源码已删除。
+- [x] 全量审核清理：新增 `Tasks/full-product-cleanup-audit-2026-06-19.md` 和 `tests/test_full_product_cleanup_audit.py`；README、Product README、current-stage、handoff、product map 已纠偏到 React + FastAPI + CGSS 主线。
+- [x] 默认测试面收束：`tests/conftest.py` 保留 LLM mock，同时把已退役的 `Product/web` 静态测试、P3/P6 视觉实验测试和旧论文快照测试移出默认 pytest 收集。
+- [x] 预检阻断修复：`/api/design` 恢复 `_TASKS_ROOT` patch 点；LLM Supervisor/service preflight 无配置测试完整清理 provider 环境变量，避免本机真实密钥污染测试结论。
+- [x] Runtime 验证修复：`scripts/33_validate_plugin_package.py` 不再把缺失的本机外部 plugin validator 当硬失败；包内 validator、临时项目 dry-run/apply 和安装后 registry 验证仍为硬门。
+- [x] 全量验证：`python3 -m pytest -q -p no:cacheprovider` 通过 1214 项、skipped 3 项；`scripts/25_agent_runtime_preflight.py`、`scripts/33_validate_plugin_package.py`、Python 编译、React build、`git diff --check` 均通过。
+- [ ] 下一步执行入口：从 `Tasks/cgss-course-paper-review-revision-list-bdd.md` 写失败测试，覆盖 CGSS 审阅报告路径、用户可读修订清单、headless 回读、UI 默认展示和未通过质量门不得声称完成。
+- [ ] 停止事项：不新增平行 demo，不继续堆 P 阶段，不把 PDF ready 当论文完成，不把 workflow 合同或 Agent 日志当研究证据。
+
+## 2026-06-19 CGSS Paper Production UI Runtime Slice
+
+- [x] BDD/TDD：新增 React 与 CGSS headless 状态测试，锁定主工作台必须先展示论文生产状态，再折叠技术细节。
+- [x] CGSS 项目注册：新增 `proj_cgss_social_capital_happiness`，题目为 `互联网使用是否提升居民主观幸福感？来自 CGSS 2012-2023 的证据`，并从主工作台题目输入自动映射到该项目。
+- [x] 第二层 workflow 对齐：UI 论文生产链读取 `/api/v1/workflows`，启动后呈现 ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export 十个 Agent 节点。
+- [x] 第三层 headless 契约：新增 `PaperProductionStatusPanel`，只消费 UI-neutral component contract：`status`、`user_summary`、`primary_action`、`blockers`、`artifacts`、`evidence`、`audit`。
+- [x] CGSS 产物路径隔离：headless state 与论文审阅报告按 `artifact_prefix=cgss_social_capital_happiness` 读取 `Results/json/cgss_social_capital_happiness_*` 与 `Submissions/cgss_social_capital_happiness/paper.pdf`，不再串到 `parent_education_wage`。
+- [x] 浏览器验收：在 `http://127.0.0.1:8782/` 输入 CGSS 题目并点击 `开始研究`、`启动论文生产链` 后，页面显示 CGSS PDF、论文审阅组件、10 个 Agent 节点；旧研究简报默认不在首屏。
+- [x] 验证：Python 编译通过；`tests.test_cgss_product_headless_state`、`tests.test_react_paper_production_status`、`tests.test_main_workbench_clean_ui`、`tests.test_agent_cluster_workflow_api`、`tests.test_product_control_headless_state` 共 21 项通过；React build 通过。
+- [x] 下一步 BDD 草案：新增 `Tasks/cgss-course-paper-review-revision-list-bdd.md`，定义浏览器内一键生成 CGSS 论文审阅报告和用户可读修订清单的行为；等待用户确认后再写失败测试。
+- [ ] 下一步：把论文审阅从“可运行/受阻展示”推进到浏览器内一键生成用户可读修订清单；仍不做 UI 视觉重设计。
+
+## 2026-06-19 CLI Kernel -> Agent -> UI Transformation
+
+- [x] BDD 契约：新增 `Tasks/cli-kernel-agent-ui-transformation-bdd.md`，把第二层/第三层改造固定为“CLI 论文生产内核 -> Agent 调度 -> Headless UI 契约”。
+- [x] 第二层 workflow：`/api/v1/workflows` 的 10 个任务已从占位研究员改为 CHARLS-like paper pipeline 节点：ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export。
+- [x] 第二层产物边界：workflow artifact 现在是 `pipeline_node_contract` / `pipeline_contract`，默认 `not_promotable`，不能被提升为正式论文、结果或提交包。
+- [x] 第三层 headless：新增 `course_paper_quality` 独立组件；PDF ready 不再等同于课程论文 ready。
+- [x] 论文审阅 API：新增 `GET/POST /api/v1/projects/{project_id}/product-control/course-paper-quality`，运行时读取 final-pdf manifest 的 `source_markdown` 并写出 `Results/json/course_paper_quality_report.json`。
+- [x] 验证：`python3 -m unittest tests.test_agent_cluster_workflow_api tests.test_product_control_headless_state -v` 通过 5 项；`python3 -m unittest tests.test_parent_education_wage_p13_p16_demo_closure tests.test_product_control_headless_state tests.test_paper_package_quality -v` 通过 32 项。
+
 ## 2026-06-17 Project Management Reset
 
 - [x] 节点目标：把 CHARLS proof case、第二层 runtime、第三层产品工作台和固定 Demo 线重新收敛成一个可执行项目管理面。
@@ -82,8 +117,20 @@
 - [x] P15 Draft Generation And Export：已保留 `Submissions/parent_education_wage_paper_draft.docx` 半成品交付路径，并写出 `Manuscripts/generated/parent_education_wage_p15_issue_list.md` 红标问题清单。
 - [x] P16 User Acceptance And Satisfaction Loop：已生成 `Results/json/parent_education_wage_p16_user_acceptance_packet.json`，当前可验收内容为“半成品论文 + 红标问题清单”，`can_claim_complete_paper=false`。
 - [x] P13-P16 防误报硬化：GET 未执行前只返回 `p13_p16_closure_not_run`；旧机器人 P12 预检返回 409；字段齐全分支必须实际执行最小 OLS 后才返回 run id。
-- [ ] 完整论文分支：补齐或合并真实 `parent_education` 和 `experience` 字段后重跑 P13-P16，才允许进入模型结果和完整论文初稿分支。
-- [ ] 不做范围：本轮不追求完整云端上线、不重写全部 UI、不生成投稿级终稿、不把探索性草稿静默提升为正式论文。
+- [x] P17 Data Repair Preflight：基于 P13-P16 缺列阻断，生成 `parent_education` 与 `experience` 的可审阅数据修复候选账本；只读扫描当前 CSV 和本地 CFPS 源表，不覆盖正式数据，不解锁模型。
+- [x] 工作流仪表盘树图化：`/workflow-dashboard` 首屏改为 SVG/CSS 树状路线图，直接展示 P12-P18、P17 当前节点、P18 下一步、回退路径和禁止模型路径；旧文字分支默认折叠为节点明细。
+- [x] Headless 功能组件契约：新增 `docs/product-control/09_Headless功能组件契约.md`，明确当前不能声称全产品完成，并把后续 UI 自由重画的前提定义为稳定组件状态、动作、证据、阻断原因和审计契约。
+- [x] P18 Data Repair Apply Gate：已用 P17 推荐 `famconf_parent_highest_education` 和确认后的 `edu_last -> education_years` 映射写出 `Data/Interim/parent_education_wage_repaired.csv`；34,315 行，`parent_education` 24,401 行可用，`experience` 30,928 行可用；`Data/Final/cfps_robot_reallocation.csv` 哈希未变。
+- [x] 完整论文分支：已用修复数据重跑 P13-P16；P14 真实执行最小 OLS，`run_id=parent_education_wage_ols_20260618145856`，`nobs=12582`；P15/P16 生成完整论文初稿和真实模型结果证据包，仍明确不是投稿终稿。
+- [x] Headless 状态接口：新增 `GET /api/v1/projects/{project_id}/product-control/headless-state`，把 Product Control 当前状态收束为 UI 无关的组件 view model；返回组件状态、动作、证据、产物和阻断原因，不包含布局契约。
+- [x] Delivery Package：新增 `GET/POST /api/v1/projects/{project_id}/product-control/delivery-package`，生成 `Submissions/parent_education_wage_delivery_manifest.json`、`Submissions/parent_education_wage_delivery_README.md` 和 `Submissions/parent_education_wage_delivery_package.zip`；真实包包含 15 个业务文件和 2 个交付元文件，可供人工审阅，但不声称投稿终稿。
+- [x] Headless 交付组件：`headless-state` 现在包含 `delivery_package` 独立组件；当前 5 个核心组件为 `data_repair`、`execution_run`、`draft_package`、`delivery_package`、`review_export`。
+- [x] Final PDF Export：新增 `GET/POST /api/v1/projects/{project_id}/product-control/final-pdf`，从完整 Markdown 初稿生成 `Submissions/parent_education_wage_final_paper.pdf`、HTML 渲染源、JSON 导出账本和 Review；真实 PDF 已生成，大小 276,048 bytes，状态为 `final_pdf_ready`。
+- [x] Headless 最终 PDF 组件：`headless-state` 现在包含 `final_pdf` 独立组件；当前核心组件为 `data_repair`、`execution_run`、`draft_package`、`delivery_package`、`final_pdf`、`review_export`，总状态为 `final_pdf_ready`。
+- [x] 纠偏：已确认当前父母教育工资 PDF 只是 `pdf_export_smoke_only`，不能声称课程论文级交付或 submission ready；修正 Final PDF Export 口径，并新增 `Tasks/charls-proofcase-to-agent-product-correction.md` 作为下一步控制文件。
+- [ ] 下一步必须先做 Course Paper Quality Gate：对齐 CHARLS 医保 proof case，检查论文结构、文献闭环、数据构造、方法门、表图、稳健性、claim audit、复现门和篇幅密度。
+- [ ] 下一步必须建立 CHARLS-like Agent Pipeline Adapter：把题目和数据集路由到 ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export 十个 headless 节点。
+- [ ] 不做范围：本轮不追求完整云端上线、不重写全部 UI、不完成任意题目通用 adapter 抽象、不把未经证据链支持的探索性草稿静默提升为正式论文。
 
 ## 2026-06-16 parent-education-wage 01_design Runtime Smoke
 

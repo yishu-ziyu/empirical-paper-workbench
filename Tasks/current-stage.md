@@ -1,18 +1,30 @@
 # 当前阶段
 
+## 2026-06-19 产品流水线收敛
+
+- 当前产品定义：用户输入题目和数据，系统判断研究问题是否清楚，整理文献和变量，生成方法方案和执行预检，能跑就跑模型，不能跑就明确阻断原因，生成论文初稿或半成品论文，给出审阅报告和修订清单，最后交付 PDF/DOCX、证据包、复现说明。
+- 当前控制文件：`Tasks/product-pipeline-artifact-map-2026-06-19.md`。
+- 当前唯一推进线：CGSS 论文生产链。从现有 PDF 样稿和课程论文质量报告出发，生成浏览器内用户可读修订清单，并把下一步动作回写到 headless state。
+- 当前能力证据：CGSS 已覆盖题目、数据发现、变量候选、文献种子、方法门、模型结果、论文草稿、PDF 和质量报告；父母教育工资已覆盖数据修复、最小 OLS、完整初稿、PDF/DOCX 和交付包；CHARLS DID 只作为严格 proof case 和 runtime 来源。
+- 当前清理状态：React 主入口只挂论文生产状态，不再挂旧 P0 聚合面板；`Product/web` 静态工作台源码已删除，`/legacy` 只重定向到 `/`；旧 P 阶段后端和历史组件暂作为能力/历史源码留存，不再作为用户主路径。
+- 当前停止事项：不再用 P0-P18 或“第一版/第二版”定义产品；不新增平行 demo；不把 PDF ready 当论文完成；不把 workflow 合同、Agent 日志或 mock report 当研究证据。
+- 下一步入口：`Tasks/cgss-course-paper-review-revision-list-bdd.md`，先写失败测试，再做最小实现。
+
 ## 2026-06-17 项目管理重置
 
 - 当前主仓库：`/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
+- 2026-06-19 纠偏进展：第二层 workflow 已改成 CHARLS-like paper pipeline contract，不再默认生成 mock 研究员笔记；第三层 headless-state 新增 `course_paper_quality` 组件，PDF 样稿必须完成论文审阅后才能进入人工终审。
+- 2026-06-19 新接口：`GET/POST /api/v1/projects/{project_id}/product-control/course-paper-quality`；POST 使用 final-pdf manifest 的 `source_markdown` 生成论文审阅报告，输出 `Results/json/course_paper_quality_report.json`。
 - CHARLS DID 仓库定位：`/Users/mahaoxuan/Desktop/经济学论文/StatspAI_跑通一次_CHARLS_DID`，第一阶段 proof case + 第二层 runtime 来源样例；不再作为后续产品开发主仓库。
 - 桌面旧入口 `/Users/mahaoxuan/Desktop/StatspAI_跑通一次_CHARLS_DID` 已保留为符号链接。
-- 当前主线：`docs/product-control/` + `Tasks/product-control-demo-line.md` 的固定 Demo 线，题目为 `父母受教育水平对子女工资收入的影响`。
+- 历史能力证据：`docs/product-control/` + `Tasks/product-control-demo-line.md` 的固定 demo 线，题目为 `父母受教育水平对子女工资收入的影响`。它不再定义当前产品主线。
 - 产品交付标准已固定：第一用户体验围绕 `paper_draft.pdf / paper_draft.docx`，成功分支输出完整论文初稿，阻断分支输出半成品论文、红标缺口和问题清单；详见 `docs/product-control/08_Draft-first交付标准.md`。
 - 当前阶段入口：`Tasks/project-management-reset-2026-06-17.md`。
 - P0 已按长程阶段包完成后端/API 收口：P0-A topic audit、P0-B SupervisorPlan/Agent Task Queue、P0-C Evidence Audit、P0-D 作品集脚本与 package 已连续生成。
 - P0 阶段产品入口：`GET /api/v1/projects/{project_id}/product-control/p0-phase` 只读返回阶段报告；`POST /api/v1/projects/{project_id}/product-control/p0-phase` 显式刷新阶段包；直接服务函数为 `run_product_control_p0_phase(project_root)`。
 - P0 当前真实状态：`Results/json/product_control_p0_phase.json` 为 `p0_phase_ready_for_review`；`state/product/agent_task_queue.json` 有 6 个任务，默认 `can_execute=false`；报告内已有 `agent_tasks`、`evidence_checks` 和正式层边界。
-- P0 前端入口：当前主入口 React 工作台已新增 `ProductControlP0Panel`，展示 topic、P0 状态、Agent 任务数、Evidence Audit、`needs_evidence` 缺口、作品集脚本路径和 `待派工审阅` 状态；刷新按钮只调用 POST，不自动派工。
-- 旧工作台处理：`/legacy` 不再服务旧 UI，运行时重定向到 React 主入口；`Product/web` 仅作为历史源码保留，不再作为产品验收面。
+- P0 前端状态：`ProductControlP0Panel` 是历史聚合面板源码，当前主入口已经不再挂载。后续若还需要保留 P0-P18 证明链路，应进入 legacy/capability 命名空间，不得回到用户主路径。
+- 旧工作台处理：`/legacy` 不再服务旧 UI，运行时重定向到 React 主入口；`Product/web` 已删除，不再作为源码、回退入口或产品验收面。
 - P1-A 文献证据账本已完成：`Results/json/parent_education_wage_literature_evidence_ledger.json` 和 `Reviews/parent_education_wage_literature_evidence_ledger.md` 只记录 4 个当前题目的检索 seed，`verified_count=0`，不会写正式 bibliography 或正式论文；真实文献 metadata/DOI/全文来源仍需外部检索或人工核验。
 - P1-B 数据字段绑定账本已完成：`Results/json/parent_education_wage_data_field_binding_ledger.json` 和 `Reviews/parent_education_wage_data_field_binding_ledger.md` 显示 12 个候选变量中 8 个 matched、4 个 missing；`father_education`、`mother_education`、`parent_education` 和 `hukou` 尚缺真实字段绑定，因此不能写正式 VariableRoleSet。
 - P1-C 方法执行账本已完成：`Results/json/parent_education_wage_method_execution_ledger.json` 和 `Reviews/parent_education_wage_method_execution_ledger.md` 显示 `execution_allowed=false`、`run_id=null`，IV/DID/DML 全部 blocked；P2 修复后阻断原因已收敛为 required fields 缺失。

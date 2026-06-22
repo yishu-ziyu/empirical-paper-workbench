@@ -1,15 +1,52 @@
 # Handoff
 
+## 2026-06-19 CGSS 论文生产链浏览器验收切片
+
+当前主仓库仍是 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。本轮目标不是继续做 UI 视觉设计，而是把第二层 Agent workflow 和第三层产品工作台接到 CGSS 论文生产链，让用户能在浏览器里输入题目、启动论文生产链，并看到真实的 CGSS 交付状态。
+
+本轮已完成：
+
+- 新增注册项目 `proj_cgss_social_capital_happiness`，题目为 `互联网使用是否提升居民主观幸福感？来自 CGSS 2012-2023 的证据`。
+- React 主工作台会把包含 CGSS、互联网/社会资本、幸福感的题目映射到该项目。
+- 新增 `PaperProductionStatusPanel`，作为 UI 解耦的功能组件：读取 headless state、workflow list/detail、workflow start 和论文审阅报告。
+- 第二层 workflow 以 10 个 Agent 节点展示：ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export。
+- CGSS headless state 已按 `artifact_prefix=cgss_social_capital_happiness` 读取专属产物，不再复用父母教育工资路径。
+- 浏览器真实验收已完成：在 `http://127.0.0.1:8782/` 输入 CGSS 题目，点击 `开始研究` 和 `启动论文生产链` 后，页面展示 CGSS PDF、论文审阅组件、10 个 Agent 节点，旧研究简报默认折叠。
+
+当前真实状态：
+
+- `GET /api/v1/projects/proj_cgss_social_capital_happiness/product-control/headless-state` 返回 `status=pdf_export_smoke_ready`。
+- 用户摘要为 `PDF 导出样稿已生成，但论文审阅尚未完成。`
+- PDF 路径为 `Submissions/cgss_social_capital_happiness/paper.pdf`。
+- 论文审阅当前仍是下一步，不要声称已经通过课程论文验收。
+
+当前本地服务：
+
+```bash
+http://127.0.0.1:8782/
+```
+
+本轮验证：
+
+```bash
+python3 -m py_compile Product/backend/product_control_headless_state_service.py Product/backend/product_control_course_paper_quality_service.py
+python3 -m unittest tests.test_cgss_product_headless_state tests.test_react_paper_production_status tests.test_main_workbench_clean_ui tests.test_agent_cluster_workflow_api tests.test_product_control_headless_state -v
+cd Product/web-react && npm run build
+```
+
+下一步应推进论文审阅：从 UI 点击生成审阅报告，生成 CGSS 专属 `Results/json/cgss_social_capital_happiness_course_paper_quality_report.json`，把修订清单和是否可交付清楚呈现。不要回头做视觉美化；UI 后续交给设计师，当前优先保证功能组件边界清晰、可替换。
+
 ## 2026-06-18 重启前接手摘要
 
-当前主仓库仍是 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。本轮已经把 Demo 线推到 P16 阻断交付分支，并修掉控制台和 API 的三类误报：GET 未执行前不能声称 P16 完成；旧机器人 P12 预检不能改名冒充父母教育工资题目；字段齐全时必须实际执行最小 OLS 后才允许返回 run id。
+当前主仓库仍是 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。本轮已经把 Demo 线推到 P17 数据修复预检：P13-P16 阻断交付分支仍成立，P17 已把缺失的 `parent_education` 与 `experience` 转成可审阅修复候选，并接入 React 产品控制台，用户可以在 UI 里点击 `刷新 P17` 查看结果。
 
 当前真实产品状态：
 
-- 可交付：`Submissions/parent_education_wage_paper_draft.docx` 半成品论文路径、`Manuscripts/generated/parent_education_wage_p15_issue_list.md` 红标问题清单、P13-P16 JSON/Review 证据包。
+- 可交付：`Submissions/parent_education_wage_paper_draft.docx` 半成品论文路径、`Manuscripts/generated/parent_education_wage_p15_issue_list.md` 红标问题清单、P13-P17 JSON/Review 证据包。
 - 不可声称：不能说已经跑出父母教育工资模型，不能说已经生成完整实证论文。
-- 当前阻断：`Data/Final/cfps_robot_reallocation.csv` 缺 `parent_education` 和 `experience`，所以 P13 不批准 RunPlan，P14 `run_id=null`、`executed_regression=false`。
-- 下一步：数据修复分支。补齐或合并 `parent_education`，构造 `experience`，然后重跑 P13-P16，进入真实模型结果和完整论文初稿分支。
+- 当前阻断：`Data/Final/cfps_robot_reallocation.csv` 缺 `parent_education` 和 `experience`，所以 P13 不批准 RunPlan，P14 `run_id=null`、`executed_regression=false`。P17 推荐 `famconf_parent_highest_education`，覆盖 `24401/34315` 行；`experience` 仍需确认 `edu_last -> education_years` 映射。
+- 当前看板：`/workflow-dashboard` 首屏已经改成树状路线图，直接显示 P12-P18、P17 当前节点、P18 下一步、回退路径和 `不运行模型` 禁止路径；旧文字分支默认折叠为 `节点明细`。
+- 下一步：P18 Data Repair Apply Gate。用户审阅 P17 后，写新的 `Data/Interim/parent_education_wage_repaired.csv`，不得覆盖 `Data/Final/cfps_robot_reallocation.csv`；然后重跑 P13-P16，进入真实模型结果和完整论文初稿分支。
 
 重启后快速恢复：
 
@@ -23,6 +60,8 @@ uvicorn Product.app:app --host 127.0.0.1 --port 8781
 - 管理层仪表盘：`http://127.0.0.1:8781/workflow-dashboard`
 - 状态 API：`http://127.0.0.1:8781/api/v1/workflow-dashboard/state`
 - P13-P16 API：`http://127.0.0.1:8781/api/v1/projects/proj_empirical_paper_template_main/product-control/p13-p16-demo-closure`
+- P17 API：`http://127.0.0.1:8781/api/v1/projects/proj_empirical_paper_template_main/product-control/p17-data-repair-preflight`
+- React 产品控制台：`http://127.0.0.1:8781/`
 
 最近验证：
 
@@ -33,6 +72,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_parent_education_wage_p13
 PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_parent_education_wage_p9_formal_variable_role_save.py tests/test_parent_education_wage_p10_product_control_ia.py tests/test_parent_education_wage_p11_source_metadata_contract.py tests/test_parent_education_wage_p12_design_tree.py tests/test_parent_education_wage_p12_design_spec_preflight.py tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_workflow_dashboard_artifact.py -q -p no:cacheprovider
 # 45 passed
 
+python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_parent_education_wage_p17_data_repair_preflight.py -q
+# 10 passed
+
 cd Product/web-react && npm run build
 # pass; only existing Vite chunk-size warning
 ```
@@ -41,8 +83,12 @@ cd Product/web-react && npm run build
 
 - `Product/output/playwright/workflow-dashboard-p16-hardened-desktop.png`
 - `Product/output/playwright/workflow-dashboard-p16-hardened-mobile.png`
+- `Product/output/playwright/product-control-p17-desktop.png`
+- `Product/output/playwright/product-control-p17-mobile.png`
+- `Product/output/playwright/workflow-dashboard-tree-desktop.png`
+- `Product/output/playwright/workflow-dashboard-tree-mobile.png`
 
-已关闭本轮启动的 `uvicorn` 服务和已完成 sub agents。重启后不要从旧 P12 或旧机器人题目恢复；以 `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/review.md` 和本摘要为准。
+本轮当前 `uvicorn` 服务临时运行在 `http://127.0.0.1:8782`。重启后不要从旧 P12 或旧机器人题目恢复；以 `WORKFLOW_STATUS.md`、`Tasks/todo.md`、`Tasks/review.md` 和本摘要为准。
 
 ## 2026-06-17 项目管理重置
 
@@ -64,7 +110,7 @@ P0 已完成后端/API 长程阶段包：新增题目绑定 BDD、P0 阶段 BDD�
 4. 方法执行预检：只有 VariableRoleSet、DesignSpec、RunPlan 均通过后，才允许创建真实 run id。
 5. P1-A 外部/人工文献核验：只在拿到 metadata/DOI/全文来源和人工批准后，才能进入正式 bibliography。
 
-P0 前端控制面板已完成并迁入当前 React 主入口。`Product/web-react/src/components/ProductControlP0Panel.tsx` 读取 `GET /api/v1/projects/{project_id}/product-control/p0-phase`；刷新按钮显式调用 `POST /api/v1/projects/{project_id}/product-control/p0-phase`。面板展示 topic、P0 状态、Agent 任务数、Evidence Audit、`needs_evidence` 缺口、作品集脚本路径和 `待派工审阅`，不会出现自动执行入口。当前真实 `Results/json/product_control_p0_phase.json` 已刷新为新结构，包含 `agent_tasks`、`evidence_checks` 和 `formal_boundary`。
+P0 前端控制面板是历史能力证明，不再挂在当前 React 主入口。`Product/web-react/src/components/ProductControlP0Panel.tsx` 暂存为历史源码；后续要么删除，要么迁入 legacy/capability 命名空间。当前用户产品入口以 `PaperProductionStatusPanel` 和 CGSS 论文生产链为准。
 
 P1-A 文献证据账本已完成本地审阅层闭环：`GET /api/v1/projects/{project_id}/product-control/p1-literature-ledger` 只读返回已有账本或 missing 状态；`POST /api/v1/projects/{project_id}/product-control/p1-literature-ledger` 显式生成账本。真实项目产物为 `Results/json/parent_education_wage_literature_evidence_ledger.json` 和 `Reviews/parent_education_wage_literature_evidence_ledger.md`。当前只有 4 个检索 seed，`verified_count=0`，所有 citation records 均 `can_support_claims=false`；不得把它当成已核验文献包。
 
@@ -120,9 +166,11 @@ P12 DesignSpec Preflight 已完成：`GET/POST /api/v1/projects/{project_id}/pro
 
 P13-P16 阻断交付分支已完成：`GET/POST /api/v1/projects/{project_id}/product-control/p13-p16-demo-closure` 已接入。真实项目已写出 `Results/json/parent_education_wage_p13_run_plan_approval.json`、`Results/json/parent_education_wage_p14_execution_evidence_ledger.json`、`Results/json/parent_education_wage_p15_draft_export_package.json`、`Results/json/parent_education_wage_p16_user_acceptance_packet.json` 和 `Manuscripts/generated/parent_education_wage_p15_issue_list.md`。P13 校验真实 CSV 后发现缺 `parent_education`、`experience`；P14 `run_id=null`、`executed_regression=false`；P16 标记 `can_claim_complete_paper=false`。旧机器人题目的活跃 `state/product/design_spec.json` 和 `state/product/run_plan.json` 已归档到 `state/product/archive/p13_p16_stale_formal_state/`。
 
+P17 Data Repair Preflight 已完成：`GET/POST /api/v1/projects/{project_id}/product-control/p17-data-repair-preflight` 已接入，React Product Control 已新增 `P17 Data Repair Preflight` 和 `刷新 P17`。真实项目已写出 `Results/json/parent_education_wage_p17_data_repair_preflight.json` 和 `Reviews/parent_education_wage_p17_data_repair_preflight.md`。P17 推荐 `famconf_parent_highest_education`，覆盖 `24401/34315` 行；`person_age14_parent_education` 覆盖 `4034/34315` 行；`experience` 为 `derivable_needs_review`，需要先确认 `edu_last -> education_years` 映射。P17 不覆盖 `Data/Final/cfps_robot_reallocation.csv`，不写修复后 CSV，不创建 run id，不跑模型。浏览器验收截图为 `Product/output/playwright/product-control-p17-desktop.png`、`Product/output/playwright/product-control-p17-mobile.png`。
+
 项目内动态中文工作流仪表盘已新增并升级为 CEO 可读：`docs/product-control/workflow-dashboard.html`，状态源为 `docs/product-control/workflow-dashboard-state.json`。启动 FastAPI 后访问 `/workflow-dashboard`，页面会短轮询 `/api/v1/workflow-dashboard/state`；首屏 H1 为 `论文生产流水线控制台`，先显示 `老板先看这里` 和三句话结论：`现在能交付什么`、`还缺什么`、`下一步做什么`。当前门禁是 `P16 半成品交付包已生成`，阻断是真实 CSV 缺字段，禁止动作是不伪造结果。`docs/product-control/README.md` 已把它放在阅读顺序第 0 位。阶段变化后必须同步更新该 JSON、`WORKFLOW_STATUS.md` 和 `Tasks/todo.md`。
 
-下一阶段不是继续空转 P13，而是数据修复后重跑 P13-P16：补齐或合并 `parent_education`，构造 `experience`，然后再让 P13 批准运行计划。不要把当前 P16 阻断分支误报为完整论文完成，也不要复用旧机器人题目的方法规格、运行计划或结果。
+下一阶段不是继续空转 P13，而是 P18 数据修复应用门禁：用户审阅 P17 后，写新的 `Data/Interim/parent_education_wage_repaired.csv`，补齐或合并 `parent_education`，确认映射后构造 `experience`，然后再让 P13 批准运行计划。不要把当前 P16/P17 阻断分支误报为完整论文完成，也不要复用旧机器人题目的方法规格、运行计划或结果。
 
 Phase 6 验收包已完成：`Reviews/parent_education_wage_p0_p1_acceptance_package.md` 是本轮 P0/P1 接手入口。它明确当前 Demo 线是产品链路压力测试样例，不是最终产品范围；当前没有正式 bibliography、正式 VariableRoleSet、正式 RunPlan、正式 manuscript 或真实 run id。
 

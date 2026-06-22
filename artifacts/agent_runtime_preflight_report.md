@@ -1,7 +1,7 @@
 # Agent Runtime Preflight
 
 Status: PASS
-Generated: 2026-06-17T20:47:39
+Generated: 2026-06-22T20:09:30
 
 ## Commands
 
@@ -2680,10 +2680,10 @@ stdout:
 ```text
 {
     "version": "0.1",
-    "run_id": "p3-execute-20260617204737371641",
+    "run_id": "p3-execute-20260622200927934234",
     "mode": "execute",
     "status": "pass",
-    "generated_at": "2026-06-17T20:47:37+08:00",
+    "generated_at": "2026-06-22T20:09:27+08:00",
     "selected_adapters": [
         "reproduction_verify"
     ],
@@ -2709,8 +2709,8 @@ stdout:
                         "scripts/23_workflow_runbook.py"
                     ],
                     "returncode": 0,
-                    "started_at": "2026-06-17T20:47:37+08:00",
-                    "ended_at": "2026-06-17T20:47:37+08:00",
+                    "started_at": "2026-06-22T20:09:27+08:00",
+                    "ended_at": "2026-06-22T20:09:27+08:00",
                     "stdout_summary": "NEXT 02_literature: \u6587\u732e\u68c0\u7d22\u4e0e\u7efc\u8ff0 workflows=10 missing_specs=0 report=artifacts/workflow_runbook_report.md json=artifacts/workflow_runbook_state.json",
                     "stderr_summary": ""
                 }

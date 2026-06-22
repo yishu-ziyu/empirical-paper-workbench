@@ -6,11 +6,12 @@ from Product.backend.wrapper.design_service import run_design
 from Product.types.research import DesignRequest, DesignResponse
 
 router = APIRouter()
+_TASKS_ROOT = TASKS_ROOT
 
 
 @router.post("/api/design", response_model=DesignResponse)
 def post_design(req: DesignRequest) -> DesignResponse:
     try:
-        return run_design(req, TASKS_ROOT)
+        return run_design(req, _TASKS_ROOT)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"design failed: {exc}") from exc

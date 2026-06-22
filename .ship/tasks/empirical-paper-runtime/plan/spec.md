@@ -139,6 +139,90 @@ workbench/index.html 静态展示
 - 包装成通用 `runtime/adapters/did_adapter.py`
 - 在 `runtime/pipeline.py` 中注册为 Step 5 的执行器
 
+## 系统性代码读取记录
+
+以下文件已被完整读取，作为架构分析的基础：
+
+### 项目模板核心文件（已读）
+
+| 文件 | 行数 | 作用 |
+|------|------|------|
+| `README.md` | 103 | 项目目录原则、Data/Program/Results 规则、Phase A 运行入口 |
+| `AGENTS.md` | — | Agent 配置 |
+| `paper.yaml` | — | 项目定义（题目、数据、方法） |
+| `causal_question.yaml` | — | 因果问题定义 |
+| `research_design.md` | — | 研究设计文档 |
+| `Program/run_paper.py` | ~200 | 主入口：读配置 → 跑 StatsPAI → 输出 Markdown/LaTeX/Quarto |
+| `Program/export_docx.py` | — | Word 导出 |
+| `Program/export_pdf.py` | — | PDF 导出 |
+| `Program/dod_check.py` | ~500 | 完成度检查 |
+| `Program/spec_runner.py` | ~300 | Spec 执行器 |
+| `Program/paper_supervisor.py` | — | 论文监督器 |
+| `workflows/registry.json` | ~400 | 10 步 workflow 定义 |
+| `workflows/orchestrator_policy.json` | — | 编排策略 |
+| `workflows/tool_adapters.json` | — | 工具适配器 |
+| `scripts/28_agent_orchestrator.py` | ~400 | Agent 编排器 |
+| `scripts/25_agent_runtime_preflight.py` | — | Runtime 预检 |
+| `demo_server.py` | 54 | Demo 服务器入口 |
+| `Product/app.py` | 135KB | FastAPI 后端 |
+| `Product/cli.py` | — | CLI 入口 |
+| `Tasks/todo.md` | 141 | 完整任务历史（P0-P18） |
+| `Tasks/current-stage.md` | 141 | 当前阶段状态 |
+| `artifacts/workflow_runbook_state.json` | — | Workflow 状态 |
+| `artifacts/orchestrator_run_state.json` | — | Orchestrator 状态 |
+
+### CHARLS 样例核心文件（已读）
+
+| 文件 | 行数 | 作用 |
+|------|------|------|
+| `runtime/pipeline.py` | 271 | 核心引擎：读 registry → 执行 step → 处理 checkpoint |
+| `runtime/state.py` | 119 | 状态持久化（pipeline_state.json） |
+| `runtime/checkpoints.py` | 64 | Human checkpoint prompt |
+| `runtime/cli.py` | 54 | CLI 入口（dry-run/execute/resume/status） |
+| `workflows/registry.json` | — | 10 步 workflow 定义（与项目模板完全相同） |
+| `scripts/01-33_*.py` | 33 个 | 分析/验证脚本 |
+
+### 数据流分析
+
+**项目模板数据流**：
+```
+paper.yaml → run_paper.py → workflow_runbook_state.json → scripts/ → artifacts/ → state/product/ → FastAPI → React
+```
+
+**CHARLS 样例数据流**：
+```
+causal_question.yaml → cli.py → pipeline.py → registry.json → scripts/ → artifacts/ → state.json → workbench
+```
+
+**融合点**：两者共享相同的 registry.json 格式（10 步，相同 ID），可以统一 runtime。
+
+## 融合评估
+
+### 为什么可以融合
+
+1. **Workflow 定义兼容**：两者使用相同的 `workflows/registry.json` 格式（10 步，相同 ID：01_design → 10_defense）
+2. **脚本编号体系一致**：两者都使用 `scripts/01-33_*.py` 编号体系
+3. **产物检查机制相同**：两者都使用 `required_outputs` 检查产物是否存在
+4. **门控机制相同**：两者都使用 `gates`（human + automated）控制流程
+
+### 融合方案
+
+**以 CHARLS 的 runtime/pipeline.py 为基础，吸收项目模板的丰富特性**。
+
+具体步骤：
+1. 复制 CHARLS 的 `runtime/` 到项目模板
+2. 修改路径适配项目模板目录结构
+3. 保留项目模板的 `auto_mode_*.py` 作为 legacy
+4. 新增 `scripts/runtime_runner.py` 统一入口
+5. 用 CFPS 最低工资题目跑通跨题验证
+
+### 不融合的部分
+
+- P0-P18 任务链（过于复杂，只在一个 demo 上验证）
+- auto_mode_*.py（30+ 脚本，命名混乱）
+- Headless state（项目模板特有）
+- React 产品壳（独立存在）
+
 ## Acceptance Criteria
 
 ### AC1: Runtime 统一

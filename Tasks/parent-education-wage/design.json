@@ -1,0 +1,58 @@
+{
+  "topic": "parent_education_wage",
+  "topic_slug": "parent-education-wage",
+  "generated_by": "p2-execution-readiness-repair",
+  "timestamp": "2026-06-11T06:09:21.082012+00:00",
+  "model": "MiniMax-M3",
+  "prompt_version": "v1",
+  "upstream": [
+    "brief.md",
+    "variables.yaml"
+  ],
+  "candidates": [
+    {
+      "method": "IV",
+      "rationale": "父母教育存在明显的自选择与遗漏变量（家庭能力/偏好）内生性，而1986年义务教育法分省实施的外生冲击提供了 Bartik 型工具变量，可直接通过 2SLS 获得父母教育对子女工资的一致估计；CFPS 面板可轻松构造第一阶段，弱工具变量检验门槛与研究成功标准一致。",
+      "fits_data": true,
+      "sp_output": {
+        "estimator": "iv",
+        "n_variables": 14,
+        "source": "statspai",
+        "statspai_category": "regression",
+        "statspai_description": "Unified IV estimation: 2SLS, LIML, Fuller, GMM, JIVE. Includes first-stage F, Sargan/Hansen J, and Hausman diagnostics."
+      }
+    },
+    {
+      "method": "DID",
+      "rationale": "义务教育法分省分阶段实施构成天然的处理/对照分组与政策时点，可通过 Callaway-Sant'Anna 或 Sun-Abraham 交错 DID 在 CFPS 六期面板上识别父母教育提升对子女工资的代际效应，平行趋势检验满足成功标准；但因分组依据父母出生年份而非常规政策评估，组别定义需谨慎。",
+      "fits_data": true,
+      "sp_output": {
+        "estimator": "did",
+        "n_variables": 14,
+        "source": "statspai",
+        "statspai_category": "causal",
+        "statspai_description": "Difference-in-Differences. Supports 2x2, DDD, staggered (Callaway-Sant'Anna, Sun-Abraham), and Synthetic DID."
+      }
+    },
+    {
+      "method": "DML",
+      "rationale": "高维控制变量（含子女教育、年龄、性别、城乡和地区等）可能产生混杂与函数形式偏误，DML 用交叉拟合的机器学习方法（结合 PLIV 估计）可同时获得去偏的父母教育系数并提升效率；但其本质是半参数方法，识别仍依赖 IV 或条件独立假设，无法独立解决父母教育的内生选择。",
+      "fits_data": true,
+      "sp_output": {
+        "estimator": "dml",
+        "n_variables": 14,
+        "source": "statspai",
+        "statspai_category": "causal",
+        "statspai_description": "Double/Debiased Machine Learning for treatment effect estimation. Supports partially linear (PLR), interactive regression (IRM, binary D), partially linear IV (PLIV), and interactive IV (IIVM, binary D/binary Z → LATE)."
+      }
+    }
+  ],
+  "recommended": "IV",
+  "code_stub": "# P2 execution-preflight sketch only; do not run before fields are bound.\nrequired = [\"ln_wage\", \"father_education\", \"mother_education\", \"hukou\", \"age\", \"female\", \"urban\", \"edu_last\"]\nmissing = [name for name in required if name not in df.columns]\nif missing:\n    raise ValueError(f\"Missing execution fields: {missing}\")\ndf[\"parent_education\"] = df[[\"father_education\", \"mother_education\"]].max(axis=1)\nformula = \"ln_wage ~ parent_education + age + female + urban + edu_last\"\n# Next stage: approve VariableRoleSet draft, DesignSpec draft, and RunPlan draft before estimation.",
+  "contamination_repair": {
+    "repaired_at": "2026-06-17T14:39:43.796246+00:00",
+    "removed_old_topic_term_count": 0,
+    "modified_formal_design_spec": false,
+    "note": "Only the task-level design draft was repaired; formal state/product/design_spec.json was not modified."
+  }
+}

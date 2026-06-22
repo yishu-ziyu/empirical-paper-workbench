@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -124,6 +125,96 @@ from Product.backend.project_service import (
     run_pipeline,
 )
 from Product.backend.provenance_service import get_artifact_provenance
+from Product.backend.product_control_demo_audit_service import (
+    get_project_product_control_demo_topic_binding_audit,
+)
+from Product.backend.product_control_delivery_package_service import (
+    get_project_product_control_delivery_package,
+    run_project_product_control_delivery_package,
+)
+from Product.backend.product_control_final_pdf_service import (
+    get_project_product_control_final_pdf,
+    run_project_product_control_final_pdf,
+)
+from Product.backend.product_control_course_paper_quality_service import (
+    get_project_product_control_course_paper_quality,
+    run_project_product_control_course_paper_quality,
+)
+from Product.backend.product_control_headless_state_service import (
+    get_project_product_control_headless_state,
+)
+from Product.backend.product_control_phase_service import (
+    get_project_product_control_p0_phase,
+    run_project_product_control_p0_phase,
+)
+from Product.backend.product_control_p1_literature_service import (
+    get_project_product_control_p1_literature_ledger,
+    run_project_product_control_p1_literature_ledger,
+)
+from Product.backend.product_control_p1_data_field_service import (
+    get_project_product_control_p1_data_field_binding,
+    run_project_product_control_p1_data_field_binding,
+)
+from Product.backend.product_control_p1_method_service import (
+    get_project_product_control_p1_method_execution,
+    run_project_product_control_p1_method_execution,
+)
+from Product.backend.product_control_p2_execution_readiness_service import (
+    get_project_product_control_p2_execution_readiness,
+    run_project_product_control_p2_execution_readiness,
+)
+from Product.backend.product_control_p3_draft_package_service import (
+    get_project_product_control_p3_draft_package,
+    run_project_product_control_p3_draft_package,
+)
+from Product.backend.product_control_p4_field_source_service import (
+    get_project_product_control_p4_field_source_candidates,
+    run_project_product_control_p4_field_source_candidates,
+)
+from Product.backend.product_control_p5_variable_role_preflight_service import (
+    get_project_product_control_p5_variable_role_preflight,
+    run_project_product_control_p5_variable_role_preflight,
+)
+from Product.backend.product_control_p6_variable_role_signoff_service import (
+    VariableRoleFormalSaveRequiresP6DraftError,
+    assert_project_product_control_p6_formal_save_ready,
+    get_project_product_control_p6_variable_role_signoff,
+    promote_project_product_control_p6_variable_role_signoff,
+    run_project_product_control_p6_variable_role_signoff,
+)
+from Product.backend.product_control_p8_variable_role_approval_service import (
+    approve_project_product_control_p8_variable_role_approval,
+    get_project_product_control_p8_variable_role_approval,
+)
+from Product.backend.product_control_p9_variable_role_save_service import (
+    get_project_product_control_p9_variable_role_formal_save,
+    save_project_product_control_p9_variable_role_formal_save,
+)
+from Product.backend.product_control_p11_source_metadata_service import (
+    get_project_product_control_p11_source_metadata_contract,
+    save_project_product_control_p11_source_metadata_contract,
+)
+from Product.backend.product_control_p12_design_spec_preflight_service import (
+    get_project_product_control_p12_design_spec_preflight,
+    run_project_product_control_p12_design_spec_preflight,
+)
+from Product.backend.product_control_p13_p16_demo_closure_service import (
+    get_project_product_control_p13_p16_demo_closure,
+    run_project_product_control_p13_p16_demo_closure,
+)
+from Product.backend.product_control_p17_data_repair_preflight_service import (
+    get_project_product_control_p17_data_repair_preflight,
+    run_project_product_control_p17_data_repair_preflight,
+)
+from Product.backend.product_control_p18_data_repair_apply_service import (
+    get_project_product_control_p18_data_repair_apply,
+    run_project_product_control_p18_data_repair_apply,
+)
+from Product.backend.workflow_dashboard_service import (
+    load_workflow_dashboard_state,
+    workflow_dashboard_html_path,
+    workflow_dashboard_state_path,
+)
 from Product.backend.registry import ensure_registry, get_project_by_id
 from Product.backend.research_question_service import (
     InvalidResearchQuestionError,
@@ -231,7 +322,6 @@ from Product.api.auto_research import router as auto_research_router
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PRODUCT_ROOT = REPO_ROOT / "Product"
-WEB_ROOT = PRODUCT_ROOT / "web"
 WEB_DIST_ROOT = PRODUCT_ROOT / "web-dist"
 
 ensure_registry(PRODUCT_ROOT, REPO_ROOT)
@@ -261,7 +351,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-app.mount("/assets", StaticFiles(directory=WEB_ROOT / "assets"), name="assets")
 if (WEB_DIST_ROOT / "assets").exists():
     app.mount("/react/assets", StaticFiles(directory=WEB_DIST_ROOT / "assets"), name="react-assets")
 
@@ -397,6 +486,50 @@ class VariableRoleCandidateReviewPayload(BaseModel):
 
 class VariableRoleCandidatePromotePayload(BaseModel):
     note: str = ""
+
+
+class VariableRoleSignoffPromotePayload(BaseModel):
+    promotion_target: str = "editable_draft"
+    allow_formal_write: bool = False
+    decisions: dict[str, str] = Field(default_factory=dict)
+    note: str = ""
+
+
+class VariableRoleFormalApprovalPayload(BaseModel):
+    decision: str = ""
+    reviewer: str = ""
+    note: str = ""
+    confirmation: str = ""
+
+
+class VariableRoleFormalSavePayload(BaseModel):
+    decision: str = ""
+    reviewer: str = ""
+    note: str = ""
+    confirmation: str = ""
+    source_draft_id: str = ""
+    dataset_path: str = ""
+    roles: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class VariableRoleSourceMetadataContractPayload(BaseModel):
+    decision: str = ""
+    reviewer: str = ""
+    note: str = ""
+    confirmation: str = ""
+    dataset_path: str = ""
+    field_bindings: dict[str, dict[str, str]] = Field(default_factory=dict)
+    derived_variables: dict[str, dict[str, object]] = Field(default_factory=dict)
+
+
+class DataRepairApplyPayload(BaseModel):
+    reviewer: str = ""
+    note: str = ""
+    confirm_apply: bool = False
+    confirm_education_years_mapping: bool = False
+    parent_education_source: str = ""
+    output_path: str = ""
+    education_years_mapping: dict = Field(default_factory=dict)
 
 
 class FindingReviewPayload(BaseModel):
@@ -1051,6 +1184,410 @@ def api_v1_save_project_current_research_question(project_id: str, payload: Rese
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
 
 
+@app.get("/api/v1/projects/{project_id}/product-control-demo/topic-binding-audit")
+@app.get("/api/v1/projects/{project_id}/topic-binding-audit")
+def api_v1_product_control_demo_topic_binding_audit(project_id: str) -> dict:
+    try:
+        return get_project_product_control_demo_topic_binding_audit(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p0-phase", status_code=201)
+def api_v1_run_product_control_p0_phase(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p0_phase(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p0-phase")
+def api_v1_get_product_control_p0_phase(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p0_phase(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p1-literature-ledger", status_code=201)
+def api_v1_run_product_control_p1_literature_ledger(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p1_literature_ledger(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p1-literature-ledger")
+def api_v1_get_product_control_p1_literature_ledger(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p1_literature_ledger(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p1-data-field-binding", status_code=201)
+def api_v1_run_product_control_p1_data_field_binding(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p1_data_field_binding(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p1-data-field-binding")
+def api_v1_get_product_control_p1_data_field_binding(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p1_data_field_binding(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p1-method-execution", status_code=201)
+def api_v1_run_product_control_p1_method_execution(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p1_method_execution(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p1-method-execution")
+def api_v1_get_product_control_p1_method_execution(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p1_method_execution(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p2-execution-readiness", status_code=201)
+def api_v1_run_product_control_p2_execution_readiness(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p2_execution_readiness(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p2-execution-readiness")
+def api_v1_get_product_control_p2_execution_readiness(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p2_execution_readiness(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p3-draft-package", status_code=201)
+def api_v1_run_product_control_p3_draft_package(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p3_draft_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p3-draft-package")
+def api_v1_get_product_control_p3_draft_package(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p3_draft_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p4-field-source-candidates", status_code=201)
+def api_v1_run_product_control_p4_field_source_candidates(project_id: str, data_root: str | None = None) -> dict:
+    try:
+        return run_project_product_control_p4_field_source_candidates(PRODUCT_ROOT, REPO_ROOT, project_id, data_root=data_root)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p4-field-source-candidates")
+def api_v1_get_product_control_p4_field_source_candidates(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p4_field_source_candidates(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p5-variable-role-preflight", status_code=201)
+def api_v1_run_product_control_p5_variable_role_preflight(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p5_variable_role_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p5-variable-role-preflight")
+def api_v1_get_product_control_p5_variable_role_preflight(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p5_variable_role_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p6-variable-role-signoff", status_code=201)
+def api_v1_run_product_control_p6_variable_role_signoff(project_id: str) -> dict:
+    try:
+        return run_project_product_control_p6_variable_role_signoff(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p6-variable-role-signoff")
+def api_v1_get_product_control_p6_variable_role_signoff(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p6_variable_role_signoff(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p6-variable-role-signoff/promote")
+def api_v1_promote_product_control_p6_variable_role_signoff(
+    project_id: str,
+    payload: VariableRoleSignoffPromotePayload,
+) -> dict:
+    try:
+        result = promote_project_product_control_p6_variable_role_signoff(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.model_dump(),
+        )
+        status_code = 201 if result.get("status") == "variable_role_draft_promoted_for_editing" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p8-variable-role-approval")
+def api_v1_get_product_control_p8_variable_role_approval(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p8_variable_role_approval(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p8-variable-role-approval")
+def api_v1_approve_product_control_p8_variable_role_approval(
+    project_id: str,
+    payload: VariableRoleFormalApprovalPayload,
+) -> dict:
+    try:
+        result = approve_project_product_control_p8_variable_role_approval(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.model_dump(),
+        )
+        status_code = 201 if result.get("status") == "formal_variable_role_approval_recorded" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p9-variable-role-formal-save")
+def api_v1_get_product_control_p9_variable_role_formal_save(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p9_variable_role_formal_save(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p9-variable-role-formal-save")
+def api_v1_save_product_control_p9_variable_role_formal_save(
+    project_id: str,
+    payload: VariableRoleFormalSavePayload,
+) -> dict:
+    try:
+        result = save_project_product_control_p9_variable_role_formal_save(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.model_dump(),
+        )
+        status_code = 201 if result.get("status") == "formal_variable_roles_saved" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p11-source-metadata-contract")
+def api_v1_get_product_control_p11_source_metadata_contract(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p11_source_metadata_contract(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p11-source-metadata-contract")
+def api_v1_save_product_control_p11_source_metadata_contract(
+    project_id: str,
+    payload: VariableRoleSourceMetadataContractPayload,
+) -> dict:
+    try:
+        result = save_project_product_control_p11_source_metadata_contract(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.model_dump(),
+        )
+        status_code = 201 if result.get("status") == "source_metadata_contract_ready_for_p9_save" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p12-design-spec-preflight")
+def api_v1_get_product_control_p12_design_spec_preflight(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p12_design_spec_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p12-design-spec-preflight")
+def api_v1_run_product_control_p12_design_spec_preflight(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_p12_design_spec_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+        status_code = 201 if result.get("status") == "design_spec_preflight_ready_for_review" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p13-p16-demo-closure")
+def api_v1_get_product_control_p13_p16_demo_closure(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p13_p16_demo_closure(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p13-p16-demo-closure")
+def api_v1_run_product_control_p13_p16_demo_closure(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_p13_p16_demo_closure(PRODUCT_ROOT, REPO_ROOT, project_id)
+        success_statuses = {
+            "demo_closure_blocked_branch_ready",
+            "demo_closure_model_results_ready",
+            "demo_closure_complete_paper_draft_ready",
+        }
+        status_code = 201 if result.get("status") in success_statuses else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p17-data-repair-preflight")
+def api_v1_get_product_control_p17_data_repair_preflight(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p17_data_repair_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p17-data-repair-preflight")
+def api_v1_run_product_control_p17_data_repair_preflight(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_p17_data_repair_preflight(PRODUCT_ROOT, REPO_ROOT, project_id)
+        status_code = 201 if result.get("status") == "data_repair_preflight_ready_for_review" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/p18-data-repair-apply")
+def api_v1_get_product_control_p18_data_repair_apply(project_id: str) -> dict:
+    try:
+        return get_project_product_control_p18_data_repair_apply(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/p18-data-repair-apply")
+def api_v1_run_product_control_p18_data_repair_apply(project_id: str, payload: DataRepairApplyPayload) -> dict:
+    try:
+        result = run_project_product_control_p18_data_repair_apply(
+            PRODUCT_ROOT,
+            REPO_ROOT,
+            project_id,
+            payload.model_dump(),
+        )
+        status_code = 201 if result.get("status") == "data_repair_applied_ready_for_p13_p16" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/delivery-package")
+def api_v1_get_product_control_delivery_package(project_id: str) -> dict:
+    try:
+        return get_project_product_control_delivery_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/delivery-package")
+def api_v1_run_product_control_delivery_package(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_delivery_package(PRODUCT_ROOT, REPO_ROOT, project_id)
+        status_code = 201 if result.get("status") == "delivery_package_ready_for_human_review" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/final-pdf")
+def api_v1_get_product_control_final_pdf(project_id: str) -> dict:
+    try:
+        return get_project_product_control_final_pdf(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/final-pdf")
+def api_v1_run_product_control_final_pdf(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_final_pdf(PRODUCT_ROOT, REPO_ROOT, project_id)
+        status_code = 201 if result.get("status") == "final_pdf_ready" else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/course-paper-quality")
+def api_v1_get_product_control_course_paper_quality(project_id: str) -> dict:
+    try:
+        return get_project_product_control_course_paper_quality(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.post("/api/v1/projects/{project_id}/product-control/course-paper-quality")
+def api_v1_run_product_control_course_paper_quality(project_id: str) -> dict:
+    try:
+        result = run_project_product_control_course_paper_quality(PRODUCT_ROOT, REPO_ROOT, project_id)
+        status_code = 201 if result.get("can_claim_course_paper_ready") is True else 409
+        return JSONResponse(status_code=status_code, content=result)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/projects/{project_id}/product-control/headless-state")
+def api_v1_get_product_control_headless_state(project_id: str) -> dict:
+    try:
+        return get_project_product_control_headless_state(PRODUCT_ROOT, REPO_ROOT, project_id)
+    except KeyError as exc:
+        return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
+
+
+@app.get("/api/v1/workflow-dashboard/state")
+def api_v1_get_workflow_dashboard_state() -> JSONResponse:
+    try:
+        return JSONResponse(
+            content=load_workflow_dashboard_state(REPO_ROOT),
+            headers={"Cache-Control": "no-store"},
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Workflow dashboard state is missing.") from exc
+
+
 @app.get("/api/v1/projects/{project_id}/datasets")
 def api_v1_project_datasets(project_id: str) -> dict:
     try:
@@ -1242,6 +1779,7 @@ def api_v1_project_variable_roles(project_id: str) -> dict:
 @app.put("/api/v1/projects/{project_id}/variable-roles")
 def api_v1_save_project_variable_roles(project_id: str, payload: VariableRolePayload) -> dict:
     try:
+        assert_project_product_control_p6_formal_save_ready(PRODUCT_ROOT, REPO_ROOT, project_id, payload.roles)
         return save_project_variable_roles(
             PRODUCT_ROOT,
             REPO_ROOT,
@@ -1259,6 +1797,8 @@ def api_v1_save_project_variable_roles(project_id: str, payload: VariableRolePay
         )
     except VariableRoleCandidateNotFoundError as exc:
         return error_response(404, "variable_role_candidate_not_found", f"Variable role candidate does not exist: {payload.candidate_id}.")
+    except VariableRoleFormalSaveRequiresP6DraftError as exc:
+        return error_response(409, "p6_variable_role_draft_required", str(exc))
     except KeyError as exc:
         return error_response(404, "project_not_found", f"Project {project_id} does not exist.")
     except PermissionError as exc:
@@ -2884,8 +3424,25 @@ def index() -> FileResponse:
     return FileResponse(index_path)
 
 
+@app.get("/workflow-dashboard")
+@app.get("/workflow-dashboard/")
+def workflow_dashboard() -> FileResponse:
+    dashboard_path = workflow_dashboard_html_path(REPO_ROOT)
+    if not dashboard_path.exists():
+        raise HTTPException(status_code=404, detail="Workflow dashboard is missing.")
+    return FileResponse(dashboard_path, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/workflow-dashboard-state.json")
+def workflow_dashboard_state_json() -> FileResponse:
+    state_path = workflow_dashboard_state_path(REPO_ROOT)
+    if not state_path.exists():
+        raise HTTPException(status_code=404, detail="Workflow dashboard state is missing.")
+    return FileResponse(state_path, media_type="application/json", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/legacy")
 @app.get("/legacy/")
-def legacy_index() -> FileResponse:
-    # Old multi-nav workbench kept reachable in case anything depends on it.
-    return FileResponse(WEB_ROOT / "index.html")
+def legacy_index() -> RedirectResponse:
+    # Legacy is no longer a product acceptance surface.
+    return RedirectResponse(url="/", status_code=307)

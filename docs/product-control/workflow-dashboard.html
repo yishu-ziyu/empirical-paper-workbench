@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>项目工作流仪表盘</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171717;
+        --muted: #6f6f6f;
+        --line: #dedbd4;
+        --panel: #ffffff;
+        --paper: #f6f5f2;
+        --soft: #efede8;
+        --accent: #e84d2f;
+        --accent-dark: #9f2d1c;
+        --ok: #1c6f55;
+        --warn: #9b5c00;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(120deg, rgba(232, 77, 47, 0.05), transparent 34%),
+          repeating-linear-gradient(
+            135deg,
+            rgba(23, 23, 23, 0.035) 0,
+            rgba(23, 23, 23, 0.035) 1px,
+            transparent 1px,
+            transparent 8px
+          ),
+          var(--paper);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .dashboard-shell {
+        width: 100%;
+        max-width: 1212px;
+        margin: 0 auto;
+        padding: 34px 16px 64px;
+      }
+
+      .hero {
+        min-height: 0;
+      }
+
+      .hero > * {
+        min-width: 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 20px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin: 0;
+        font-size: clamp(34px, 3.5vw, 48px);
+        line-height: 1.08;
+        letter-spacing: 0;
+        overflow-wrap: break-word;
+      }
+
+      h1 span {
+        color: var(--accent);
+      }
+
+      .hero-copy {
+        max-width: 760px;
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.45;
+      }
+
+      .status-card,
+      .panel,
+      .phase,
+      .tree-node,
+      .qa-item {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .status-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 250px;
+        padding: 26px;
+        box-shadow: 0 20px 60px rgba(23, 23, 23, 0.08);
+      }
+
+      .status-card--compact {
+        min-height: 0;
+        margin-top: 18px;
+        padding: 20px;
+      }
+
+      .status-card--compact dl {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .status-card--compact dd {
+        font-size: 20px;
+      }
+
+      .status-card--compact .guardrail {
+        margin-top: 16px;
+      }
+
+      .status-card dl {
+        display: grid;
+        gap: 18px;
+        margin: 0;
+      }
+
+      .status-card dt {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .status-card dd {
+        margin: 6px 0 0;
+        font-size: 24px;
+        font-weight: 800;
+      }
+
+      .current-step {
+        color: var(--ok);
+      }
+
+      .next-step {
+        color: var(--accent-dark);
+      }
+
+      .guardrail {
+        margin: 24px 0 0;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        background: #fff5f1;
+        color: var(--accent-dark);
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .workflow-tree-map {
+        margin-top: 28px;
+        border: 1px solid #d8d4cc;
+        background: #fffefa;
+        box-shadow: 0 18px 48px rgba(23, 23, 23, 0.08);
+      }
+
+      .workflow-tree-map__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: end;
+        padding: 22px 24px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .workflow-tree-map__header h2 {
+        font-size: 30px;
+      }
+
+      .workflow-tree-map__hint {
+        max-width: 430px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      .tree-map-canvas {
+        position: relative;
+        min-height: 520px;
+        padding: 26px 24px 24px;
+        overflow-x: auto;
+      }
+
+      .tree-map-lines {
+        position: absolute;
+        inset: 26px 24px 24px;
+        width: calc(100% - 48px);
+        height: calc(100% - 50px);
+        min-width: 1020px;
+        pointer-events: none;
+      }
+
+      .tree-map-lines path {
+        fill: none;
+        stroke: #959083;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .tree-map-lines .line-current {
+        stroke: var(--ok);
+        stroke-width: 4;
+      }
+
+      .tree-map-lines .line-blocked,
+      .tree-map-lines .line-forbidden {
+        stroke: var(--accent);
+        stroke-dasharray: 12 8;
+      }
+
+      .tree-map-lines .line-fallback {
+        stroke: var(--warn);
+        stroke-dasharray: 8 7;
+      }
+
+      .tree-map-nodes {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(138px, 1fr));
+        grid-template-rows: repeat(4, minmax(98px, auto));
+        gap: 28px 18px;
+        min-width: 1020px;
+      }
+
+      .visual-node {
+        display: flex;
+        min-width: 0;
+        min-height: 104px;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 14px;
+        border: 2px solid #c9c3b8;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(23, 23, 23, 0.08);
+      }
+
+      .visual-node__id {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .visual-node strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 18px;
+        line-height: 1.18;
+        overflow-wrap: anywhere;
+      }
+
+      .visual-node span {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .visual-node[data-status="done"] {
+        border-color: rgba(28, 111, 85, 0.38);
+        background: #f4fbf7;
+      }
+
+      .visual-node[data-status="current"] {
+        border-color: var(--ok);
+        background: #eaf8f1;
+        box-shadow: 0 16px 34px rgba(28, 111, 85, 0.16);
+      }
+
+      .visual-node[data-status="next"] {
+        border-color: #255f9f;
+        background: #eef6ff;
+      }
+
+      .visual-node[data-status="blocked"],
+      .visual-node[data-status="forbidden"] {
+        border-color: var(--accent);
+        background: #fff3ef;
+      }
+
+      .visual-node[data-status="fallback"] {
+        border-color: var(--warn);
+        background: #fff8e8;
+      }
+
+      .tree-map-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 24px 22px;
+      }
+
+      .tree-map-legend span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .executive-panel {
+        margin-top: 26px;
+        border: 1px solid #d8d4cc;
+        background: #fffefa;
+        box-shadow: 0 18px 48px rgba(23, 23, 23, 0.08);
+      }
+
+      .executive-panel__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: end;
+        padding: 24px 26px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .executive-panel__header h2 {
+        font-size: 32px;
+      }
+
+      .executive-panel__hint {
+        max-width: 430px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .executive-grid {
+        display: grid;
+        grid-template-columns: 1.05fr 1fr 1fr 1fr;
+        margin: 0;
+      }
+
+      .executive-grid div {
+        min-width: 0;
+        min-height: 142px;
+        padding: 22px 24px;
+        border-right: 1px solid var(--line);
+      }
+
+      .executive-grid div:last-child {
+        border-right: 0;
+      }
+
+      .executive-grid dt {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .executive-grid dd {
+        margin: 0;
+        color: var(--ink);
+        font-size: 24px;
+        font-weight: 820;
+        line-height: 1.22;
+        overflow-wrap: anywhere;
+      }
+
+      .executive-grid .is-blocked dd {
+        color: var(--accent-dark);
+      }
+
+      .executive-grid .is-next dd {
+        color: var(--ok);
+      }
+
+      .plain-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .plain-card {
+        min-height: 154px;
+        padding: 22px;
+        border: 2px solid var(--ink);
+        background: #ffffff;
+        box-shadow: 0 14px 34px rgba(23, 23, 23, 0.07);
+      }
+
+      .plain-card strong {
+        display: block;
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 780;
+      }
+
+      .plain-card b {
+        display: block;
+        margin-top: 10px;
+        font-size: 28px;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+
+      .plain-card p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .section {
+        margin-top: 34px;
+      }
+
+      .branch-details {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.7);
+      }
+
+      .branch-details summary {
+        display: flex;
+        cursor: pointer;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        font-weight: 850;
+      }
+
+      .branch-details summary small {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .branch-details .tree-wrap {
+        padding: 0 18px 18px;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: end;
+        margin: 0 0 14px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .section-note {
+        max-width: 520px;
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .phase-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .phase {
+        min-height: 136px;
+        padding: 16px;
+      }
+
+      .phase strong {
+        display: block;
+        margin-bottom: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 18px;
+      }
+
+      .phase p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .phase.is-current {
+        border-color: rgba(28, 111, 85, 0.45);
+        background: #f1faf6;
+      }
+
+      .phase.is-next {
+        border-color: rgba(232, 77, 47, 0.45);
+        background: #fff6f1;
+      }
+
+      .gate-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .panel {
+        min-height: 168px;
+        padding: 18px;
+      }
+
+      .panel .label {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .panel strong {
+        display: block;
+        font-size: 22px;
+        line-height: 1.18;
+        overflow-wrap: anywhere;
+      }
+
+      .panel p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .tree-wrap {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .tree-lane {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(118px, 1fr));
+        gap: 10px;
+        min-width: 0;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .tree-node {
+        position: relative;
+        min-height: 138px;
+        padding: 16px;
+      }
+
+      .tree-node::after {
+        content: ">";
+        position: absolute;
+        top: 18px;
+        right: -9px;
+        width: 16px;
+        height: 16px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-weight: 800;
+      }
+
+      .tree-node:last-child::after {
+        content: "";
+      }
+
+      .tree-node strong {
+        display: block;
+        font-size: 17px;
+        line-height: 1.2;
+      }
+
+      .tree-node span {
+        display: block;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .side-rules {
+        display: grid;
+        gap: 12px;
+      }
+
+      .side-rules .panel {
+        min-height: auto;
+      }
+
+      #return-to-p12-design-tree {
+        border-color: rgba(155, 92, 0, 0.45);
+        background: #fff8e8;
+      }
+
+      #do-not-jump-to-run-id {
+        border-color: rgba(232, 77, 47, 0.45);
+        background: #fff3ef;
+      }
+
+      .qa-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .qa-item {
+        min-height: 116px;
+        padding: 16px;
+      }
+
+      .qa-item strong {
+        display: block;
+        margin-bottom: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .qa-item span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .source-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .source-list a,
+      .source-list span {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        min-width: 0;
+        min-height: 34px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      .footer-note {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .live-status {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        margin-top: 14px;
+        padding: 6px 10px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.75);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 980px) {
+        .hero,
+        .tree-wrap {
+          grid-template-columns: 1fr;
+        }
+
+        .executive-panel__header {
+          display: block;
+        }
+
+        .workflow-tree-map__header {
+          display: block;
+        }
+
+        .workflow-tree-map__hint {
+          margin-top: 8px;
+        }
+
+        .executive-panel__hint {
+          margin-top: 8px;
+        }
+
+        .executive-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .phase-grid,
+        .plain-summary,
+        .gate-grid,
+        .qa-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .status-card {
+          min-height: 0;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .dashboard-shell {
+          max-width: none;
+          padding-left: 12px;
+          padding-right: 12px;
+          padding-top: 28px;
+        }
+
+        h1 {
+          font-size: 30px;
+        }
+
+        .hero-copy {
+          display: none;
+        }
+
+        .section-header {
+          display: block;
+        }
+
+        .section-note {
+          margin-top: 8px;
+        }
+
+        .phase-grid,
+        .plain-summary,
+        .executive-grid,
+        .gate-grid,
+        .qa-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .executive-grid div {
+          min-height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .status-card--compact dl {
+          grid-template-columns: 1fr;
+        }
+
+        .executive-grid div:last-child {
+          border-bottom: 0;
+        }
+
+        .tree-lane {
+          grid-template-columns: 1fr;
+          overflow-x: visible;
+        }
+
+        .tree-map-canvas {
+          min-height: auto;
+          padding: 16px;
+          overflow-x: visible;
+        }
+
+        .tree-map-lines {
+          display: none;
+        }
+
+        .tree-map-nodes {
+          display: grid;
+          min-width: 0;
+          grid-template-columns: 1fr;
+          grid-template-rows: none;
+          gap: 12px;
+          padding-left: 14px;
+          border-left: 3px solid var(--line);
+        }
+
+        .visual-node {
+          grid-column: auto !important;
+          grid-row: auto !important;
+          min-height: auto;
+        }
+
+        .tree-map-legend {
+          padding: 0 16px 18px;
+        }
+
+        .tree-node {
+          min-height: auto;
+        }
+
+        .tree-node::after {
+          content: "v";
+          top: auto;
+          right: 18px;
+          bottom: -14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      class="dashboard-shell"
+      data-dashboard-state-endpoint="/api/v1/workflow-dashboard/state"
+      data-dashboard-state-fallback="/workflow-dashboard-state.json"
+    >
+      <section class="hero" aria-labelledby="dashboard-title">
+        <div>
+          <p class="eyebrow" data-field="headline_eyebrow">项目工作流仪表盘 · 管理层视图</p>
+          <h1 id="dashboard-title" data-field="headline_title">论文生产流水线控制台</h1>
+          <p class="hero-copy" data-field="headline_copy">
+            让项目负责人先看清产品目标、真实卡点、下一步动作和禁止越级的边界。
+          </p>
+          <div class="live-status" data-field="live_status" role="status">正在读取状态</div>
+        </div>
+      </section>
+
+      <section
+        class="workflow-tree-map"
+        aria-labelledby="visual-tree-title"
+        data-dashboard-section="visual_tree"
+      >
+        <div class="workflow-tree-map__header">
+          <h2 id="visual-tree-title" data-field="visual_tree_title">工作流树状路线图</h2>
+          <p class="workflow-tree-map__hint" data-field="visual_tree_subtitle">
+            先看图：绿色是已经确认的路径，红色是阻断或禁止动作，蓝色是下一步。
+          </p>
+        </div>
+        <div class="tree-map-canvas">
+          <svg class="tree-map-lines" viewBox="0 0 1180 500" preserveAspectRatio="none" aria-hidden="true">
+            <path class="line-current" d="M 90 230 L 270 230 L 450 360 L 640 360 L 820 360 L 1000 360" />
+            <path class="line-blocked" d="M 270 230 L 450 115 L 640 115" />
+            <path class="line-fallback" d="M 270 250 L 270 445 L 90 445 L 90 250" />
+            <path class="line-forbidden" d="M 640 115 L 820 115" />
+          </svg>
+          <div class="tree-map-nodes">
+            <article class="visual-node" data-status="done" style="grid-column: 1; grid-row: 2;">
+              <div class="visual-node__id">P12</div>
+              <strong>方法规格预检</strong>
+              <span>变量、方法和审阅口径已写成可检查草案。</span>
+            </article>
+            <article class="visual-node" data-status="blocked" style="grid-column: 2; grid-row: 2;">
+              <div class="visual-node__id">P13</div>
+              <strong>运行计划校验</strong>
+              <span>真实 CSV 字段不齐，不能批准运行计划。</span>
+            </article>
+            <article class="visual-node" data-status="forbidden" style="grid-column: 3; grid-row: 1;">
+              <div class="visual-node__id">P14</div>
+              <strong>执行账本暂停</strong>
+              <span>不创建 run id，不运行模型。</span>
+            </article>
+            <article class="visual-node" data-status="done" style="grid-column: 3; grid-row: 3;">
+              <div class="visual-node__id">P15</div>
+              <strong>半成品交付</strong>
+              <span>交付初稿、红标问题和证据边界。</span>
+            </article>
+            <article class="visual-node" data-status="done" style="grid-column: 4; grid-row: 3;">
+              <div class="visual-node__id">P16</div>
+              <strong>用户验收包</strong>
+              <span>确认半成品可验收，但不是完整实证论文。</span>
+            </article>
+            <article class="visual-node" data-status="current" style="grid-column: 5; grid-row: 3;">
+              <div class="visual-node__id">P17</div>
+              <strong>数据修复预检</strong>
+              <span>推荐 famconf 父母教育来源；experience 仍需确认映射。</span>
+            </article>
+            <article class="visual-node" data-status="next" style="grid-column: 6; grid-row: 3;">
+              <div class="visual-node__id">P18</div>
+              <strong>应用修复候选</strong>
+              <span>写新的 Interim 数据，再回到 P13-P16。</span>
+            </article>
+            <article class="visual-node" data-status="fallback" style="grid-column: 2; grid-row: 4;">
+              <div class="visual-node__id">回退</div>
+              <strong>回到 P12-0</strong>
+              <span>方法口径不清时重画设计树。</span>
+            </article>
+            <article class="visual-node" data-status="forbidden" style="grid-column: 4; grid-row: 1;">
+              <div class="visual-node__id">禁止</div>
+              <strong>不运行模型</strong>
+              <span>字段没补齐前，不声称已有回归结果。</span>
+            </article>
+          </div>
+        </div>
+        <div class="tree-map-legend">
+          <span>绿色：已确认路径</span>
+          <span>深绿：当前位置 P17</span>
+          <span>蓝色：下一步 P18</span>
+          <span>红色：阻断 / 禁止</span>
+          <span>黄色：回退路径</span>
+        </div>
+      </section>
+
+      <aside class="status-card status-card--compact" aria-label="当前工作流状态">
+        <dl>
+          <div>
+            <dt>当前步骤</dt>
+            <dd class="current-step" data-field="current_step">数据修复预检</dd>
+          </div>
+          <div>
+            <dt>下一步</dt>
+            <dd class="next-step" data-field="next_step">P18 应用修复候选</dd>
+          </div>
+          <div>
+            <dt>当前门禁</dt>
+            <dd data-field="current_gate">P17 数据修复预检已生成</dd>
+          </div>
+        </dl>
+        <div class="guardrail" data-field="guardrail">已推到 P17 修复预检 · 交付半成品论文、红标问题清单和修复候选账本 · 不覆盖正式数据，不运行模型</div>
+      </aside>
+
+      <section
+        class="executive-panel"
+        aria-labelledby="executive-title"
+        data-dashboard-section="executive_summary"
+      >
+        <div class="executive-panel__header">
+          <h2 id="executive-title" data-field="executive_title">老板先看这里</h2>
+          <p class="executive-panel__hint">
+            先看结论，再看阶段。这个区域只保留管理层必须知道的判断。
+          </p>
+        </div>
+        <dl class="executive-grid">
+          <div>
+            <dt>项目目标</dt>
+            <dd data-field="executive_goal">给本科生交付可审计的论文初稿</dd>
+          </div>
+          <div class="is-blocked">
+            <dt>当前结论</dt>
+            <dd data-field="executive_current_truth">Demo 线已走到 P17 修复预检：能在 UI 审阅字段修复候选，不能声称完整实证结果</dd>
+          </div>
+          <div>
+            <dt>需要老板判断</dt>
+            <dd data-field="executive_decision_needed">是否按 P17 候选进入 P18 数据修复应用门禁</dd>
+          </div>
+          <div class="is-next">
+            <dt>下一步动作</dt>
+            <dd data-field="executive_next_action">审阅 famconf 父母教育来源和 experience 学历年限映射，再写新的 Interim 修复数据</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="plain-summary" aria-label="项目三句话" data-dashboard-section="plain_summary">
+        <article class="plain-card">
+          <strong>现在能交付什么</strong>
+          <b>半成品论文、红标问题清单和 P17 修复候选</b>
+          <p>当前不能报告回归结果，但可以交付已生成的 paper_draft.docx、缺口清单和可审阅数据修复账本。</p>
+        </article>
+        <article class="plain-card">
+          <strong>还缺什么</strong>
+          <b>正式分析 CSV 仍缺两个字段</b>
+          <p>P17 推荐 famconf 父母教育来源；experience 需要先确认 edu_last 到 education_years 的映射。</p>
+        </article>
+        <article class="plain-card">
+          <strong>下一步做什么</strong>
+          <b>进入 P18 应用修复候选</b>
+          <p>用户审阅 P17 后，写新的 Data/Interim 修复数据，再重跑 P13-P16。</p>
+        </article>
+      </section>
+
+      <section class="section" aria-labelledby="phase-title">
+        <div class="section-header">
+          <h2 id="phase-title">开发阶段</h2>
+          <p class="section-note">
+            固定节奏：先问清楚，再调研，再做原型，再写规格、拆任务、实现和复核。
+          </p>
+        </div>
+        <div class="phase-grid" data-dashboard-section="phases">
+          <article class="phase is-next">
+            <strong>追问</strong>
+            <p>先问清目标、用户、替代方案和停机条件。</p>
+          </article>
+          <article class="phase is-next">
+            <strong>调研</strong>
+            <p>读取项目证据、产品文档、真实数据来源和现有约束。</p>
+          </article>
+          <article class="phase is-current">
+            <strong>原型</strong>
+            <p>先做低风险原型或控制面，让路径可见。</p>
+          </article>
+          <article class="phase">
+            <strong>规格</strong>
+            <p>把目标、行为、契约、停机条件写成可审查规格。</p>
+          </article>
+          <article class="phase">
+            <strong>拆任务</strong>
+            <p>拆成带阻塞关系的最小任务图。</p>
+          </article>
+          <article class="phase">
+            <strong>实现</strong>
+            <p>按 TDD 做最小实现，避免绕过门禁。</p>
+          </article>
+          <article class="phase is-current">
+            <strong>复核</strong>
+            <p>跑测试、浏览器验收、独立审查和交付总结。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="gate-title">
+        <div class="section-header">
+          <h2 id="gate-title">当前门禁与阻断</h2>
+          <p class="section-note">
+            这里回答“现在卡在哪里”。它优先于任何方法设计、运行计划或模型执行冲动。
+          </p>
+        </div>
+        <div class="gate-grid" data-dashboard-section="gate_cards">
+          <article class="panel">
+            <p class="label">当前门禁</p>
+            <strong>P12 预检已完成</strong>
+            <p>父母教育工资题目的方法规格草案已经生成。</p>
+          </article>
+          <article class="panel">
+            <p class="label">当前阻断</p>
+            <strong>P17 数据修复预检已生成</strong>
+            <p>已交付 parent_education 和 experience 的可审阅修复候选。</p>
+          </article>
+          <article class="panel">
+            <p class="label">当前阻断</p>
+            <strong>等待 P18 应用修复</strong>
+            <p>不能覆盖正式 CSV；必须写新的 Interim 数据并确认 experience 映射。</p>
+          </article>
+          <article class="panel">
+            <p class="label">禁止动作</p>
+            <strong>不越权应用修复</strong>
+            <p>P17 只做预检，不写修复后 CSV，不创建 run id，不运行模型。</p>
+          </article>
+        </div>
+      </section>
+
+      <details class="section branch-details">
+        <summary>
+          <span id="tree-title">节点明细</span>
+          <small>展开查看每个 P 节点的文字说明</small>
+        </summary>
+        <div class="tree-wrap">
+          <div class="tree-lane" aria-label="P12 到 P16 分支树" data-dashboard-section="branches">
+            <article class="tree-node">
+            <strong>P12 方法规格预检</strong>
+              <span>已把正式变量表转成可审阅的方法规格预检。</span>
+            </article>
+            <article class="tree-node">
+              <strong>P13 运行计划校验</strong>
+              <span>已校验真实 CSV 表头；字段不齐，运行计划不批准。</span>
+            </article>
+            <article class="tree-node">
+              <strong>P14 执行账本</strong>
+              <span>因 P13 阻断，没有创建运行编号，也没有运行模型。</span>
+            </article>
+            <article class="tree-node">
+              <strong>P15 半成品交付</strong>
+              <span>生成论文初稿，或生成半成品论文和红标问题清单。</span>
+            </article>
+            <article class="tree-node">
+              <strong>P16 用户验收</strong>
+              <span>用户签收、修改、导出或回到补证路径。</span>
+            </article>
+            <article class="tree-node">
+              <strong>P17 数据修复预检</strong>
+              <span>推荐 famconf 父母教育来源，并标出 experience 映射确认缺口。</span>
+            </article>
+          </div>
+
+          <aside class="side-rules" data-dashboard-section="side_rules">
+            <article class="panel" id="return-to-p12-design-tree">
+              <p class="label">回退路径</p>
+              <strong>回到 P12-0</strong>
+              <p>方法口径、任务拆分或验收标准不清时，回到设计树重画；预检草案不自动升为正式方法规格。</p>
+            </article>
+            <article class="panel" id="do-not-jump-to-run-id">
+              <p class="label">禁止路径</p>
+              <strong>不能跳到运行编号</strong>
+              <p>不能从当前阶段直接跳到运行编号或模型执行；P13 批准前也不能写运行计划。</p>
+            </article>
+          </aside>
+        </div>
+      </details>
+
+      <section class="section" aria-labelledby="qa-title">
+        <div class="section-header">
+          <h2 id="qa-title">人工验收清单</h2>
+          <p class="section-note">
+            当前人工验收要看真实页面状态，而不是只看代码或聊天记录。
+          </p>
+        </div>
+        <div class="qa-grid" data-dashboard-section="qa_items">
+          <article class="qa-item">
+            <strong>打开页面</strong>
+            <span>打开仪表盘，先确认三句话结论可见。</span>
+          </article>
+          <article class="qa-item">
+            <strong>当前面板</strong>
+            <span>确认当前门禁是 P17 数据修复预检已生成。</span>
+          </article>
+          <article class="qa-item">
+            <strong>预检产物</strong>
+            <span>确认 P13、P14、P15、P16、P17 JSON 和 Review 报告已生成。</span>
+          </article>
+          <article class="qa-item">
+            <strong>禁止入口</strong>
+            <span>页面不能暗示已经跑出父母教育工资回归。</span>
+          </article>
+          <article class="qa-item">
+            <strong>截图证据</strong>
+            <span>桌面和移动端截图必须能证明面板无重叠、无误导入口。</span>
+          </article>
+        </div>
+
+        <div class="source-list" aria-label="项目控制来源链接" data-dashboard-section="source_links">
+          <a href="../../WORKFLOW_STATUS.md">状态总表</a>
+          <a href="../../Tasks/todo.md">任务清单</a>
+          <a href="../../Tasks/north-star-product-plan.md">北极星计划</a>
+          <a href="p12-p16-design-tree.md">P12-0 设计树</a>
+          <a href="../../Results/json/parent_education_wage_p12_design_spec_preflight.json">P12 预检 JSON</a>
+          <a href="../../Reviews/parent_education_wage_p12_design_spec_preflight.md">P12 预检 Review</a>
+          <a href="../../Results/json/parent_education_wage_p13_run_plan_approval.json">P13 运行计划校验</a>
+          <a href="../../Manuscripts/generated/parent_education_wage_p15_issue_list.md">P15 红标问题清单</a>
+          <a href="../../Results/json/parent_education_wage_p16_user_acceptance_packet.json">P16 用户验收包</a>
+          <a href="../../Results/json/parent_education_wage_p17_data_repair_preflight.json">P17 修复预检</a>
+          <a href="../../Product/output/playwright/workflow-dashboard-tree-desktop.png">桌面截图</a>
+          <a href="../../Product/output/playwright/workflow-dashboard-tree-mobile.png">手机截图</a>
+        </div>
+      </section>
+
+      <p class="footer-note">
+        本仪表盘由状态文件动态渲染；阶段变化后必须同步更新状态总表、任务清单和仪表盘状态。
+      </p>
+    </main>
+    <script>
+      const dashboardRoot = document.querySelector("[data-dashboard-state-endpoint]");
+      const stateEndpoint = dashboardRoot.dataset.dashboardStateEndpoint;
+      const fallbackStateEndpoint = dashboardRoot.dataset.dashboardStateFallback;
+      let dashboardPollTimer = null;
+
+      function text(value, fallback = "") {
+        return value === undefined || value === null || value === "" ? fallback : String(value);
+      }
+
+      function html(value, fallback = "") {
+        return text(value, fallback)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function setText(selector, value) {
+        const node = document.querySelector(selector);
+        if (node) {
+          node.textContent = text(value, node.textContent);
+        }
+      }
+
+      function readableTime(value) {
+        return text(value, "更新时间未知")
+          .replace("T", " ")
+          .replace(/(\.\d+)?([+-]\d{2}:\d{2}|Z)$/u, "");
+      }
+
+      function renderExecutiveSummary(summary) {
+        if (!summary || typeof summary !== "object") return;
+        setText('[data-field="executive_title"]', summary.title);
+        setText('[data-field="executive_goal"]', summary.goal);
+        setText('[data-field="executive_current_truth"]', summary.current_truth);
+        setText('[data-field="executive_decision_needed"]', summary.decision_needed);
+        setText('[data-field="executive_next_action"]', summary.next_action);
+      }
+
+      function renderPlainSummary(items) {
+        const container = document.querySelector('[data-dashboard-section="plain_summary"]');
+        if (!container || !Array.isArray(items)) return;
+        container.innerHTML = items
+          .map(
+            (item) =>
+              `<article class="plain-card"><strong>${text(item.label)}</strong><b>${text(item.value)}</b><p>${text(item.description)}</p></article>`,
+          )
+          .join("");
+      }
+
+      function renderPhases(phases) {
+        const container = document.querySelector('[data-dashboard-section="phases"]');
+        if (!container || !Array.isArray(phases)) return;
+        container.innerHTML = phases
+          .map((phase) => {
+            const statusClass = phase.status === "current" ? " is-current" : phase.status === "next" ? " is-next" : "";
+            return `<article class="phase${statusClass}"><strong>${text(phase.label)}</strong><p>${text(phase.description)}</p></article>`;
+          })
+          .join("");
+      }
+
+      function renderCards(sectionName, cards) {
+        const container = document.querySelector(`[data-dashboard-section="${sectionName}"]`);
+        if (!container || !Array.isArray(cards)) return;
+        container.innerHTML = cards
+          .map((card) => {
+            const id = card.id ? ` id="${text(card.id)}"` : "";
+            return `<article class="panel"${id}><p class="label">${text(card.label)}</p><strong>${text(card.title)}</strong><p>${text(card.description)}</p></article>`;
+          })
+          .join("");
+      }
+
+      function renderBranches(branches) {
+        const container = document.querySelector('[data-dashboard-section="branches"]');
+        if (!container || !Array.isArray(branches)) return;
+        container.innerHTML = branches
+          .map((branch) => `<article class="tree-node"><strong>${text(branch.title)}</strong><span>${text(branch.description)}</span></article>`)
+          .join("");
+      }
+
+      function renderVisualTree(tree) {
+        const section = document.querySelector('[data-dashboard-section="visual_tree"]');
+        if (!section || !tree || typeof tree !== "object" || !Array.isArray(tree.nodes)) return;
+        setText('[data-field="visual_tree_title"]', tree.title);
+        setText('[data-field="visual_tree_subtitle"]', tree.subtitle);
+        const nodes = section.querySelector(".tree-map-nodes");
+        if (nodes) {
+          nodes.innerHTML = tree.nodes
+            .map((node) => {
+              const column = Number(node.column || 1);
+              const row = Number(node.row || 1);
+              return `<article class="visual-node" data-status="${html(node.status || "done")}" style="grid-column: ${column}; grid-row: ${row};"><div class="visual-node__id">${html(node.id)}</div><strong>${html(node.title)}</strong><span>${html(node.description)}</span></article>`;
+            })
+            .join("");
+        }
+        const legend = section.querySelector(".tree-map-legend");
+        if (legend && Array.isArray(tree.legend)) {
+          legend.innerHTML = tree.legend.map((item) => `<span>${html(item)}</span>`).join("");
+        }
+      }
+
+      function renderQaItems(items) {
+        const container = document.querySelector('[data-dashboard-section="qa_items"]');
+        if (!container || !Array.isArray(items)) return;
+        container.innerHTML = items
+          .map((item) => `<article class="qa-item"><strong>${text(item.title)}</strong><span>${text(item.description)}</span></article>`)
+          .join("");
+      }
+
+      function renderSourceLinks(links) {
+        const container = document.querySelector('[data-dashboard-section="source_links"]');
+        if (!container || !Array.isArray(links)) return;
+        container.innerHTML = links
+          .map((link) => {
+            const label = text(link.label || link.href);
+            return link.href ? `<a href="${text(link.href)}">${label}</a>` : `<span>${label}</span>`;
+          })
+          .join("");
+      }
+
+      function renderDashboardState(state) {
+        setText('[data-field="headline_eyebrow"]', state.headline?.eyebrow);
+        setText('[data-field="headline_title"]', state.headline?.title);
+        setText('[data-field="headline_copy"]', state.headline?.copy);
+        setText('[data-field="current_step"]', state.current_step);
+        setText('[data-field="next_step"]', state.next_step);
+        setText('[data-field="current_gate"]', state.current_gate);
+        setText('[data-field="guardrail"]', state.guardrail);
+        setText(
+          '[data-field="live_status"]',
+          `状态已更新 · ${readableTime(state.updated_at)}`,
+        );
+        renderExecutiveSummary(state.executive_summary);
+        renderPlainSummary(state.plain_summary);
+        renderPhases(state.phases);
+        renderCards("gate_cards", state.gate_cards);
+        renderVisualTree(state.visual_tree);
+        renderBranches(state.branches);
+        renderCards("side_rules", state.side_rules);
+        renderQaItems(state.qa_items);
+        renderSourceLinks(state.source_links);
+      }
+
+      async function loadDashboardState() {
+        const endpoints = window.location.protocol.startsWith("http")
+          ? [stateEndpoint, fallbackStateEndpoint]
+          : [fallbackStateEndpoint];
+        let lastError = null;
+        for (const endpoint of endpoints) {
+          try {
+            const separator = endpoint.includes("?") ? "&" : "?";
+            const response = await fetch(`${endpoint}${separator}t=${Date.now()}`, { cache: "no-store" });
+            if (!response.ok) {
+              throw new Error(`${endpoint} 返回 ${response.status}`);
+            }
+            return response.json();
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw new Error(`状态读取失败：${lastError?.message || "未知错误"}`);
+      }
+
+      async function refreshDashboardState() {
+        try {
+          const state = await loadDashboardState();
+          renderDashboardState(state);
+          const interval = Number(state.poll_interval_ms || 3000);
+          if (!dashboardPollTimer) {
+            dashboardPollTimer = setInterval(refreshDashboardState, interval);
+          }
+        } catch (error) {
+          setText('[data-field="live_status"]', `状态暂不可用 · ${error.message}`);
+        }
+      }
+
+      refreshDashboardState();
+    </script>
+  </body>
+</html>

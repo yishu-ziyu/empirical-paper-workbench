@@ -1,0 +1,53 @@
+{
+  "version": "0.1",
+  "run_id": "p3-execute-20260622200927934234",
+  "mode": "execute",
+  "status": "pass",
+  "generated_at": "2026-06-22T20:09:27+08:00",
+  "selected_adapters": [
+    "reproduction_verify"
+  ],
+  "executed_commands": [
+    "python3 scripts/23_workflow_runbook.py"
+  ],
+  "blocked_adapters": [],
+  "events": [
+    {
+      "adapter_id": "reproduction_verify",
+      "decision": "executed",
+      "status": "pass",
+      "reason": [],
+      "failure_code": null,
+      "commands": [
+        "python3 scripts/23_workflow_runbook.py"
+      ],
+      "command_results": [
+        {
+          "command": "python3 scripts/23_workflow_runbook.py",
+          "argv": [
+            "python3",
+            "scripts/23_workflow_runbook.py"
+          ],
+          "returncode": 0,
+          "started_at": "2026-06-22T20:09:27+08:00",
+          "ended_at": "2026-06-22T20:09:27+08:00",
+          "stdout_summary": "NEXT 02_literature: 文献检索与综述 workflows=10 missing_specs=0 report=artifacts/workflow_runbook_report.md json=artifacts/workflow_runbook_state.json",
+          "stderr_summary": ""
+        }
+      ],
+      "inputs": [
+        "workflows/registry.json",
+        "workflows/agents/"
+      ],
+      "outputs": [
+        "artifacts/workflow_runbook_report.md",
+        "artifacts/workflow_runbook_state.json"
+      ],
+      "verification": [
+        "workflow runbook command exits 0"
+      ]
+    }
+  ],
+  "report_path": "artifacts/orchestrator_report.md",
+  "trace_path": "artifacts/agent_trace_log.jsonl"
+}

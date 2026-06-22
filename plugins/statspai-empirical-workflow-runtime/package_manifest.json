@@ -1,0 +1,67 @@
+{
+  "name": "statspai-empirical-workflow-runtime",
+  "version": "0.1.0",
+  "purpose": "Move the StatspAI empirical workflow registration layer into another local project.",
+  "source_stage": "Runtime Gap P5",
+  "plugin_manifest": ".codex-plugin/plugin.json",
+  "install_script": "scripts/install_into_project.py",
+  "package_assets": {
+    "skill": "skills/statspai-empirical-workflow",
+    "native_agents": "assets/project/.codex/agents",
+    "registry": "assets/project/workflows/skill_subagent_registry.json",
+    "registry_schema": "assets/project/workflows/schemas/skill_subagent_registry.schema.json",
+    "validators": [
+      "assets/project/scripts/31_validate_skill_subagent_registry.py",
+      "assets/project/scripts/32_test_skill_subagent_negative.py"
+    ]
+  },
+  "target_requirements": [
+    "workflows/registry.json",
+    "workflows/tool_adapters.json",
+    "workflows/orchestrator_policy.json",
+    "scripts/23_workflow_runbook.py",
+    "scripts/24_validate_runbook_api.py",
+    "scripts/25_agent_runtime_preflight.py"
+  ],
+  "install_map": [
+    {
+      "source": "skills/statspai-empirical-workflow",
+      "target": ".codex/skills/statspai-empirical-workflow",
+      "kind": "directory"
+    },
+    {
+      "source": "assets/project/.codex/agents",
+      "target": ".codex/agents",
+      "kind": "directory"
+    },
+    {
+      "source": "assets/project/workflows/skill_subagent_registry.json",
+      "target": "workflows/skill_subagent_registry.json",
+      "kind": "file"
+    },
+    {
+      "source": "assets/project/workflows/schemas/skill_subagent_registry.schema.json",
+      "target": "workflows/schemas/skill_subagent_registry.schema.json",
+      "kind": "file"
+    },
+    {
+      "source": "assets/project/scripts/31_validate_skill_subagent_registry.py",
+      "target": "scripts/31_validate_skill_subagent_registry.py",
+      "kind": "file"
+    },
+    {
+      "source": "assets/project/scripts/32_test_skill_subagent_negative.py",
+      "target": "scripts/32_test_skill_subagent_negative.py",
+      "kind": "file"
+    }
+  ],
+  "validation_commands": [
+    "python3 scripts/31_validate_skill_subagent_registry.py",
+    "python3 scripts/32_test_skill_subagent_negative.py"
+  ],
+  "known_boundaries": [
+    "This package installs the registration layer only.",
+    "It expects the target project to already have the P0-P3 workflow registry, tool adapter registry, orchestrator policy, and runbook scripts.",
+    "It does not install external MCP servers, browser credentials, data files, or paper-specific outputs."
+  ]
+}

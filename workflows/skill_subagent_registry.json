@@ -1,0 +1,175 @@
+{
+  "version": "0.1",
+  "layer": "second",
+  "purpose": "Register reusable project skills and native subagent specs for the empirical paper workflow runtime.",
+  "skill_root": ".codex/skills",
+  "native_agent_root": ".codex/agents",
+  "skill_packages": [
+    {
+      "id": "statspai-empirical-workflow",
+      "path": ".codex/skills/statspai-empirical-workflow",
+      "skill_file": ".codex/skills/statspai-empirical-workflow/SKILL.md",
+      "openai_metadata": ".codex/skills/statspai-empirical-workflow/agents/openai.yaml",
+      "references": [
+        ".codex/skills/statspai-empirical-workflow/references/workflow-map.md",
+        ".codex/skills/statspai-empirical-workflow/references/orchestrator-policy.md"
+      ],
+      "covers_workflows": [
+        "01_design",
+        "02_literature",
+        "03_paper_reading",
+        "04_data_gate",
+        "05_causal_analysis",
+        "06_writing",
+        "07_revision",
+        "08_format_citation",
+        "09_replication",
+        "10_defense",
+        "05x_policy_rollout_data_layer"
+      ],
+      "entry_commands": [
+        "python3 scripts/23_workflow_runbook.py",
+        "python3 scripts/24_validate_runbook_api.py",
+        "python3 scripts/25_agent_runtime_preflight.py",
+        "python3 scripts/28_agent_orchestrator.py --mode dry-run --no-trace"
+      ],
+      "safety_policy": "workflows/orchestrator_policy.json",
+      "status": "registered"
+    }
+  ],
+  "native_subagents": [
+    {
+      "id": "statspai-router",
+      "path": ".codex/agents/statspai-router.toml",
+      "role": "router",
+      "covers_workflows": ["all"],
+      "allowed_adapters": ["workflow_runbook"],
+      "blocked_adapters": ["pdf_fetch_scansci", "cnki_browser_hqu", "causal_analysis_runner", "workflow_preflight"],
+      "status": "registered"
+    },
+    {
+      "id": "statspai-literature",
+      "path": ".codex/agents/statspai-literature.toml",
+      "role": "literature",
+      "covers_workflows": ["02_literature", "03_paper_reading"],
+      "allowed_adapters": ["literature_metadata_verifier"],
+      "blocked_adapters": ["pdf_fetch_scansci", "cnki_browser_hqu"],
+      "status": "registered"
+    },
+    {
+      "id": "statspai-data-gate",
+      "path": ".codex/agents/statspai-data-gate.toml",
+      "role": "data",
+      "covers_workflows": ["04_data_gate"],
+      "allowed_adapters": ["data_gate_runner"],
+      "blocked_adapters": [],
+      "status": "registered"
+    },
+    {
+      "id": "statspai-causal-analysis",
+      "path": ".codex/agents/statspai-causal-analysis.toml",
+      "role": "causal_analysis",
+      "covers_workflows": ["05_causal_analysis", "05x_policy_rollout_data_layer"],
+      "allowed_adapters": [],
+      "blocked_adapters": ["causal_analysis_runner", "policy_rollout_builder"],
+      "status": "registered"
+    },
+    {
+      "id": "statspai-writing-review",
+      "path": ".codex/agents/statspai-writing-review.toml",
+      "role": "writing_review",
+      "covers_workflows": ["06_writing", "07_revision", "08_format_citation", "10_defense"],
+      "allowed_adapters": ["literature_metadata_verifier"],
+      "blocked_adapters": ["latex_compile"],
+      "status": "registered"
+    },
+    {
+      "id": "statspai-replication-verifier",
+      "path": ".codex/agents/statspai-replication-verifier.toml",
+      "role": "replication_verifier",
+      "covers_workflows": ["09_replication"],
+      "allowed_adapters": ["reproduction_verify"],
+      "blocked_adapters": [],
+      "status": "registered"
+    }
+  ],
+  "workflow_bindings": [
+    {
+      "workflow_id": "01_design",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-router"],
+      "default_adapters": ["workflow_runbook"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "02_literature",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-literature"],
+      "default_adapters": ["literature_metadata_verifier"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "03_paper_reading",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-literature"],
+      "default_adapters": ["literature_metadata_verifier"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "04_data_gate",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-data-gate"],
+      "default_adapters": ["data_gate_runner"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "05_causal_analysis",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-causal-analysis"],
+      "default_adapters": [],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "06_writing",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-writing-review"],
+      "default_adapters": [],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "07_revision",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-writing-review"],
+      "default_adapters": [],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "08_format_citation",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-writing-review", "statspai-literature"],
+      "default_adapters": ["literature_metadata_verifier"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "09_replication",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-replication-verifier"],
+      "default_adapters": ["reproduction_verify"],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "10_defense",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-writing-review", "statspai-replication-verifier"],
+      "default_adapters": [],
+      "human_gate": true
+    },
+    {
+      "workflow_id": "05x_policy_rollout_data_layer",
+      "skill": "statspai-empirical-workflow",
+      "subagents": ["statspai-causal-analysis"],
+      "default_adapters": [],
+      "human_gate": true
+    }
+  ]
+}

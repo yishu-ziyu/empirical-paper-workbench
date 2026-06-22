@@ -47,8 +47,11 @@ def promote_artifact(product_root: Path, repo_root: Path, artifact_id: str, targ
     if target not in PROMOTE_TARGETS:
         raise ValueError(target)
     artifact = find_artifact(product_root, artifact_id)
-    if artifact.get("evidence_level") == "mock":
-        raise PermissionError("Mock evidence cannot be promoted into formal project outputs.")
+    if artifact.get("promotion_status") == "not_promotable" or artifact.get("evidence_level") in {
+        "mock",
+        "pipeline_contract",
+    }:
+        raise PermissionError("This artifact is not backed by executable paper outputs and cannot be promoted.")
 
     workflow = load_workflow(product_root, artifact["workflow_id"])
     project = get_project_by_id(product_root, repo_root, workflow["project_id"])
@@ -76,4 +79,3 @@ def promote_artifact(product_root: Path, repo_root: Path, artifact_id: str, targ
             break
     write_json(artifacts_path(product_root, workflow["id"]), artifacts)
     return {"artifact": artifact}
-

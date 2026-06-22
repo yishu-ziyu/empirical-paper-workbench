@@ -1,0 +1,256 @@
+{
+  "version": "0.1",
+  "layer": "second",
+  "purpose": "Define what memory is loaded, when it is loaded, and where new durable information is written.",
+  "memory_classes": [
+    {
+      "id": "system_instruction",
+      "kind": "instruction",
+      "scope": "system",
+      "shared": true,
+      "default_load": true,
+      "paths": [],
+      "update_policy": "Not editable from this project."
+    },
+    {
+      "id": "project_instruction",
+      "kind": "instruction",
+      "scope": "project",
+      "shared": true,
+      "default_load": true,
+      "paths": [
+        "AGENTS.md",
+        "tasks/agent-loop.md"
+      ],
+      "update_policy": "Stable project rules only."
+    },
+    {
+      "id": "workflow_procedure",
+      "kind": "procedural",
+      "scope": "project",
+      "shared": true,
+      "default_load": false,
+      "paths": [
+        "tasks/pipeline-contract.md",
+        "workflows/registry.json",
+        "workflows/agents/",
+        "workflows/api_contract.md"
+      ],
+      "update_policy": "Keep registry, agent specs, schemas, and validators in sync."
+    },
+    {
+      "id": "project_episode",
+      "kind": "episodic",
+      "scope": "project",
+      "shared": true,
+      "default_load": true,
+      "paths": [
+        "tasks/todo.md",
+        "tasks/lessons.md",
+        "artifacts/*_report.md"
+      ],
+      "update_policy": "Record completed work, verification evidence, and remaining risks."
+    },
+    {
+      "id": "domain_semantic",
+      "kind": "semantic",
+      "scope": "project",
+      "shared": true,
+      "default_load": false,
+      "paths": [
+        "litreview/",
+        "artifacts/",
+        "templates/aers/",
+        "tasks/aers-docs-skill-map.md"
+      ],
+      "update_policy": "Add evidence with source paths, spans, tables, or reports."
+    },
+    {
+      "id": "local_private",
+      "kind": "local",
+      "scope": "local",
+      "shared": false,
+      "default_load": false,
+      "paths": [
+        ".agent-memory/local/",
+        "*.local"
+      ],
+      "update_policy": "Local-only notes. Do not store secrets, cookies, or VPN sessions."
+    },
+    {
+      "id": "user_global_learning",
+      "kind": "learning",
+      "scope": "user",
+      "shared": false,
+      "default_load": false,
+      "paths": [
+        "Codex memory",
+        "Claude memory"
+      ],
+      "update_policy": "Use as retrieval hints; verify local project state before claiming current facts."
+    },
+    {
+      "id": "role_agent_memory",
+      "kind": "role",
+      "scope": "agent",
+      "shared": false,
+      "default_load": false,
+      "paths": [
+        ".codex/agents/",
+        "workflows/agents/"
+      ],
+      "update_policy": "Keep role memory isolated by task and return summarized results to the lead agent."
+    }
+  ],
+  "load_profiles": [
+    {
+      "id": "default_turn",
+      "always": [
+        "AGENTS.md",
+        "tasks/todo.md",
+        "tasks/agent-loop.md"
+      ],
+      "conditional": [
+        "recent relevant artifacts"
+      ],
+      "never_default": [
+        "raw data",
+        "all PDFs",
+        "all historical reports"
+      ]
+    },
+    {
+      "id": "workflow_task",
+      "always": [
+        "AGENTS.md",
+        "tasks/todo.md",
+        "tasks/agent-loop.md",
+        "tasks/pipeline-contract.md",
+        "workflows/registry.json"
+      ],
+      "conditional": [
+        "workflows/agents/<current_step>.agent.md",
+        "artifacts/workflow_runbook_state.json"
+      ],
+      "never_default": [
+        "all workflows/agents/*.agent.md at once"
+      ]
+    },
+    {
+      "id": "literature_task",
+      "always": [
+        "AGENTS.md",
+        "tasks/todo.md",
+        "tasks/literature-workflow.md"
+      ],
+      "conditional": [
+        "litreview/query_plan.json",
+        "litreview/literature_candidates.csv",
+        "litreview/contribution_matrix.md",
+        "litreview/notes/compressed/<paper>.md"
+      ],
+      "never_default": [
+        "unparsed PDFs"
+      ]
+    },
+    {
+      "id": "data_gate_task",
+      "always": [
+        "AGENTS.md",
+        "tasks/todo.md",
+        "tasks/data-workflow.md",
+        "artifacts/data_contract.md"
+      ],
+      "conditional": [
+        "artifacts/variable_dictionary.csv",
+        "artifacts/sample_attrition.csv",
+        "artifacts/panel_audit.csv",
+        "scripts/04_data_gate.py"
+      ],
+      "never_default": [
+        "raw data files"
+      ]
+    },
+    {
+      "id": "product_api_task",
+      "always": [
+        "AGENTS.md",
+        "tasks/todo.md",
+        "workflows/api_contract.md",
+        "artifacts/workflow_runbook_state.json"
+      ],
+      "conditional": [
+        "workflows/schemas/*.schema.json",
+        "artifacts/workflow_runbook_report.md"
+      ],
+      "never_default": [
+        "raw research data"
+      ]
+    }
+  ],
+  "write_targets": [
+    {
+      "id": "stable_rules",
+      "paths": [
+        "AGENTS.md",
+        "tasks/context-loading-strategy.md"
+      ],
+      "allowed_content": "Long-lived instructions and loading rules."
+    },
+    {
+      "id": "user_corrections",
+      "paths": [
+        "tasks/lessons.md"
+      ],
+      "allowed_content": "Durable lessons from explicit user corrections."
+    },
+    {
+      "id": "task_progress",
+      "paths": [
+        "tasks/todo.md"
+      ],
+      "allowed_content": "Status, evidence, next task, and remaining risk."
+    },
+    {
+      "id": "validation_reports",
+      "paths": [
+        "artifacts/*_report.md"
+      ],
+      "allowed_content": "Repeatable validation results."
+    },
+    {
+      "id": "machine_state",
+      "paths": [
+        "artifacts/*.json"
+      ],
+      "allowed_content": "Third-layer readable state, no secrets."
+    },
+    {
+      "id": "local_private_notes",
+      "paths": [
+        ".agent-memory/local/",
+        "*.local"
+      ],
+      "allowed_content": "Local non-secret notes that must not be committed."
+    }
+  ],
+  "forbidden_memory": [
+    "passwords",
+    "API keys",
+    "cookies",
+    "VPN sessions",
+    "CNKI session tokens",
+    "raw personal data extracts"
+  ],
+  "context_budget": {
+    "max_project_instruction_lines": 200,
+    "load_current_agent_spec_only": true,
+    "load_raw_pdf_by_default": false,
+    "load_raw_data_by_default": false,
+    "prefer_summary_artifacts": true
+  },
+  "validators": [
+    "scripts/26_validate_context_strategy.py",
+    "scripts/25_agent_runtime_preflight.py"
+  ]
+}

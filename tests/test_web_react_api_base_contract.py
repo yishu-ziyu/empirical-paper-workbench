@@ -30,6 +30,16 @@ class WebReactApiBaseContractTests(unittest.TestCase):
         self.assertLess(query_index, env_index)
         self.assertIn("if (queryBase) return queryBase;", helper)
 
+    def test_bdd_05_backend_served_page_uses_same_origin_api(self) -> None:
+        """Given FastAPI 直接服务页面 When 未显式指定 api_base Then 不回退旧端口。"""
+
+        helper = (WEB_REACT_SRC / "lib" / "apiBase.ts").read_text(encoding="utf-8")
+        self.assertIn("function isViteLocalFrontend()", helper)
+        self.assertIn("Number(port)", helper)
+        self.assertIn("portNumber >= 5170 && portNumber <= 5199", helper)
+        self.assertIn('return isViteLocalFrontend() ? DEFAULT_LOCAL_API_BASE : "";', helper)
+        self.assertNotIn('port !== "8765"', helper)
+
     def test_bdd_04_recovery_keeps_current_local_api_base_before_default(self) -> None:
         """Given 当前页已经绑定本地后端 When 用户点击恢复 Then 不能强制写回默认端口。"""
 

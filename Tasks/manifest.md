@@ -2,7 +2,12 @@
 
 ## 长程状态文件
 
+- `/Users/mahaoxuan/Desktop/经济学论文/项目入口.md`：桌面层面的经济学论文项目总索引，说明主线仓库、CHARLS 样例仓库和参考能力来源
+- `Tasks/project-management-reset-2026-06-17.md`：当前项目管理重置入口，固定主仓库、CHARLS 参考边界、三层关系、当前 Demo 主线和下一步开发顺序
 - `Tasks/todo.md`：当前任务状态机
+- `Tasks/product-control-demo-line.md`：产品控制台固定 Demo 线，定义作品集 MVP 的题目、用户验收故事、P0 拆分和证据审计验收口径
+- `Tasks/product-control-p0-phase-bdd.md`：P0-A/B/C/D 长程阶段包 BDD，定义 Agent Queue、Evidence Audit、作品集包和 API 入口行为
+- `Tasks/product-control-p0-stage-panel-bdd.md`：P0 首页控制面板 BDD，定义只读 GET、显式刷新、证据缺口展示和非自动执行边界
 - `Tasks/handoff.md`：跨 Session 接手说明
 - `Tasks/decision-log.md`：关键决策与不要重复探索的理由
 - `Tasks/manifest.md`：关键产物路径
@@ -21,6 +26,8 @@
 - `Product/backend/variable_role_service.py`
 - `Product/backend/design_spec_service.py`
 - `Product/backend/manuscript_candidate_service.py`
+- `Product/backend/product_control_demo_audit_service.py`
+- `Product/backend/product_control_phase_service.py`
 
 ## 关键测试文件
 
@@ -36,9 +43,21 @@
 - `tests/test_design_run_plan_state_machine.py`
 - `tests/test_full_run_from_run_plan.py`
 - `tests/test_manuscript_consumption.py`
+- `tests/test_product_control_demo_topic_binding_audit.py`
+- `tests/test_product_control_p0_phase.py`
+- `tests/test_product_control_p0_stage_panel.py`
 
 ## 新增设计/方法论文件
 
+- `docs/product-control/README.md`
+- `docs/product-control/00_产品愿景.md`
+- `docs/product-control/01_目标用户与痛点.md`
+- `docs/product-control/02_核心用户旅程.md`
+- `docs/product-control/03_功能地图.md`
+- `docs/product-control/04_产品原则.md`
+- `docs/product-control/05_MVP验收标准.md`
+- `docs/product-control/06_作品集叙事.md`
+- `docs/product-control/07_作品集Demo脚本.md`
 - `docs/architecture-v2/north-star-cli-first-research-os-plan-2026-05-26.md`
 - `docs/architecture-v2/journal-skill-registry-design-2026-05-26.md`
 - `docs/architecture-v2/codex-phase-p2-real-data-cli-full-run-bdd.md`
@@ -104,6 +123,10 @@
 - `GET /api/v1/projects/{project_id}/research-question/current` returns the current ResearchQuestion / TopicSession state, falling back to project seed without creating a state file.
 - `PUT /api/v1/projects/{project_id}/research-question/current` persists the confirmed ResearchQuestion to `state/product/research_question.json`.
 - `GET /api/v1/projects/{project_id}/overview` returns `research_question_state` and updates the ResearchQuestion canonical stage from that state.
+- `GET /api/v1/projects/{project_id}/topic-binding-audit` returns the current project topic binding audit and persists JSON/Review evidence.
+- `GET /api/v1/projects/{project_id}/product-control-demo/topic-binding-audit` remains as a compatibility alias for the same P0-A audit.
+- `GET /api/v1/projects/{project_id}/product-control/p0-phase` reads the existing P0 phase report without regenerating stage artifacts.
+- `POST /api/v1/projects/{project_id}/product-control/p0-phase` runs P0-A/B/C/D for the registered project and writes the P0 phase report, Agent Queue, Evidence Audit, and portfolio package.
 
 ## 新增/扩展前端能力
 
@@ -130,6 +153,9 @@
 - `Product/web/assets/app.js`：`v2api.variableRoles.get(projectId)` 和 `v2api.variableRoles.save(projectId, payload)` 读写产品级 VariableRoleSet。
 - `Product/web/assets/app.js`：`renderVariableRoleEditor()` 渲染 outcome/treatment/controls/instruments/fixed_effects/cluster_by/note 编辑器。
 - `Product/web/assets/app.js`：`handleSaveVariableRoles(event)` 保存变量角色后重新读取 VariableRoleSet 与 overview contract。
+- `Product/web/index.html`：Workspace Home 新增 `product-control-p0-panel`，把 P0 阶段报告放在 workflow spine 和 SupervisorPlan 之间。
+- `Product/web/assets/app.js`：`v2api.productControlP0.get/refresh`、`renderProductControlP0Panel()` 和 `handleRefreshProductControlP0()` 读取/刷新 P0 阶段包，并展示 `needs_evidence`、正式层边界和 `待派工审阅`。
+- `Product/web/assets/styles.css`：新增 `product-control-p0-*` 样式，支撑 P0 状态、证据缺口、任务审阅状态和正式层边界的紧凑展示。
 - `Product/web/index.html`：Data & Variables 新增 `variable-role-confirmation-form`。
 - `Product/web/index.html`：CSS/JS 静态资源版本更新到 `?v=20260513-p1e`。
 - `Product/web/assets/app.js`：`v2api.designSpec.get/save` 与 `v2api.runPlan.get/save` 读写产品级 DesignSpec/RunPlan。

@@ -425,6 +425,90 @@
       font-size: 14px;
     }
 
+    /* ─── Journey bar ──────────────────────────────────── */
+    .journey-bar {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 24px 0;
+    }
+
+    .journey-track {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .journey-stage {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: transparent;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+
+    .journey-stage:hover {
+      background: var(--bg);
+      border-color: var(--border);
+    }
+
+    .journey-stage.active {
+      background: var(--status-running-bg);
+      color: var(--status-running);
+      border-color: var(--status-running);
+    }
+
+    .journey-stage.done {
+      color: var(--status-done);
+    }
+
+    .journey-stage.blocked {
+      color: var(--status-blocked);
+    }
+
+    .journey-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .journey-stage.done .journey-dot { background: var(--status-done); }
+    .journey-stage.running .journey-dot { background: var(--status-running); animation: pulse 2s infinite; }
+    .journey-stage.blocked .journey-dot { background: var(--status-blocked); }
+    .journey-stage.active .journey-dot { background: var(--status-running); }
+
+    .journey-connector {
+      width: 24px;
+      height: 2px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .journey-connector.done { background: var(--status-done); }
+
+    .journey-filter-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: 8px;
+      font-weight: 400;
+    }
+
+    .journey-stage.active .journey-filter-hint {
+      color: var(--status-running);
+    }
+
     /* ─── Misc ────────────────────────────────────────── */
     .sr-only {
       position: absolute;
@@ -469,6 +553,11 @@
       </div>
     </div>
   </header>
+
+  <!-- ─── Research journey bar ──────────────────────────── -->
+  <div class="journey-bar" id="journeyBar" style="display:none;">
+    <div class="journey-track" id="journeyTrack"></div>
+  </div>
 
   <main class="container">
     <div class="loading" id="loading">正在加载工作台数据…</div>
@@ -712,6 +801,77 @@
         document.getElementById('failedCount').textContent = failedCount;
         document.getElementById('pendingCount').textContent = pendingCount;
         document.getElementById('progressBar').style.width = `${(doneCount / total) * 100}%`;
+
+        // ── Research journey bar ──────────────────────────
+        const JOURNEY_STAGES = [
+          { id: 'design',  label: '研究设计', stepIds: ['01_design','02_literature','03_paper_reading'] },
+          { id: 'data',    label: '数据',     stepIds: ['04_data_gate'] },
+          { id: 'model',   label: '模型',     stepIds: ['05_causal_analysis'] },
+          { id: 'draft',   label: '正文',     stepIds: ['06_writing','07_revision','08_format_citation'] },
+          { id: 'export',  label: '复现导出', stepIds: ['09_replication','10_defense'] },
+        ];
+
+        function stageStatus(stage) {
+          const stageViews = stage.stepIds.map(id => views.find(v => v.id === id)).filter(Boolean);
+          if (stageViews.some(v => v.status === 'blocked' || v.status === 'failed')) return 'blocked';
+          if (stageViews.some(v => v.status === 'running')) return 'running';
+          if (stageViews.every(v => v.status === 'done')) return 'done';
+          return 'pending';
+        }
+
+        function stageLabel(s) {
+          return { done: '已完成', running: '进行中', blocked: '阻塞', pending: '待处理' }[s] || s;
+        }
+
+        let activeFilter = null;
+
+        function renderJourneyBar() {
+          const track = document.getElementById('journeyTrack');
+          const bar = document.getElementById('journeyBar');
+          bar.style.display = 'block';
+
+          let html = '';
+          JOURNEY_STAGES.forEach((stage, i) => {
+            const s = stageStatus(stage);
+            const cls = activeFilter === stage.id ? 'active' : (s === 'done' ? 'done' : s === 'running' ? 'running' : s === 'blocked' ? 'blocked' : '');
+            const hint = activeFilter === stage.id ? ' · 点击清除筛选' : ' · 点击筛选';
+            html += `<div class="journey-stage ${cls}" data-filter="${stage.id}" title="${stageLabel(s)}">
+              <span class="journey-dot"></span>
+              <span>${stage.label}</span>
+              <span class="journey-filter-hint">${hint}</span>
+            </div>`;
+            if (i < JOURNEY_STAGES.length - 1) {
+              const connClass = s === 'done' && stageStatus(JOURNEY_STAGES[i+1]) === 'done' ? 'done' : '';
+              html += `<div class="journey-connector ${connClass}"></div>`;
+            }
+          });
+          track.innerHTML = html;
+
+          // Click handlers
+          track.querySelectorAll('.journey-stage').forEach(el => {
+            el.addEventListener('click', () => {
+              const filterId = el.dataset.filter;
+              activeFilter = activeFilter === filterId ? null : filterId;
+              renderJourneyBar();
+              filterCards();
+            });
+          });
+        }
+
+        function filterCards() {
+          const cards = document.querySelectorAll('.card');
+          cards.forEach(card => {
+            if (!activeFilter) {
+              card.style.display = '';
+              return;
+            }
+            const stage = JOURNEY_STAGES.find(s => s.id === activeFilter);
+            const match = stage && stage.stepIds.includes(card.dataset.id);
+            card.style.display = match ? '' : 'none';
+          });
+        }
+
+        renderJourneyBar();
 
         // Render grid
         loadingEl.style.display = 'none';

@@ -1,0 +1,66 @@
+{
+  "version": "0.1",
+  "layer": "second",
+  "purpose": "Policy for safe local orchestration of registered tool adapters.",
+  "default_mode": "dry-run",
+  "trace_path": "artifacts/agent_trace_log.jsonl",
+  "report_path": "artifacts/orchestrator_report.md",
+  "state_path": "artifacts/orchestrator_run_state.json",
+  "allow_execute_adapters": [
+    "workflow_runbook",
+    "literature_metadata_verifier",
+    "data_gate_runner",
+    "reproduction_verify"
+  ],
+  "dry_run_only_adapters": [
+    "workflow_preflight",
+    "latex_compile",
+    "browser_preview"
+  ],
+  "blocked_adapters": [
+    "pdf_fetch_scansci",
+    "cnki_browser_hqu",
+    "causal_analysis_runner",
+    "policy_rollout_builder"
+  ],
+  "allowed_side_effect_levels": [
+    "read_only",
+    "writes_reports",
+    "writes_state"
+  ],
+  "blocked_side_effect_levels": [
+    "external_download",
+    "browser_download",
+    "rewrites_results",
+    "build_artifacts",
+    "local_preview",
+    "writes_policy_data"
+  ],
+  "allow_network": false,
+  "allow_human_auth": false,
+  "allow_placeholder_commands": false,
+  "allow_recursive_preflight": false,
+  "command_allowlist": [
+    "python3 scripts/23_workflow_runbook.py",
+    "python3 scripts/24_validate_runbook_api.py",
+    "python3 scripts/15_verify_bibliography.py",
+    "python3 scripts/04_data_gate.py",
+    "python3 scripts/27_validate_tool_adapters.py"
+  ],
+  "required_inputs": [
+    "workflows/tool_adapters.json",
+    "workflows/orchestrator_policy.json",
+    "artifacts/workflow_runbook_state.json"
+  ],
+  "stop_conditions": [
+    "adapter_not_registered",
+    "adapter_not_allowed",
+    "network_required",
+    "human_auth_required",
+    "blocked_side_effect",
+    "command_not_allowlisted",
+    "placeholder_command",
+    "recursive_preflight",
+    "command_failed"
+  ]
+}

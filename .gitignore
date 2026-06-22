@@ -65,15 +65,20 @@ docs/workflows/
 # Local agent runtime/worktree state
 .claude/settings.json
 .claude/worktrees/
+.agent-memory/local/
+.playwright-cli/
 
 # Local verification and generated review outputs
 Product/artifacts/
+Product/output/
 Results/final-smoke/
 Results/smoke-execute-test/
 artifacts/ui-checks/*.png
 journey-*.png
 ui-checks/
 workspace/runs/
+output/
+outputs/
 
 # Temporary code / outputs
 Program/temp/*

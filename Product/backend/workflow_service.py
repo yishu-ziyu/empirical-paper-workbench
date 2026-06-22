@@ -12,68 +12,70 @@ from Product.backend.registry import get_project_by_id, list_projects
 from Product.backend.workflow_schema import Workflow, WorkflowArtifact, WorkflowTask
 
 
-RESEARCH_DIMENSIONS = [
+PAPER_PIPELINE_NODES = [
     {
-        "agent_name": "墨白",
-        "role": "政策语境研究员",
-        "dimension": "研究背景与政策语境",
-        "scope": ["政策背景", "制度变化", "研究问题边界"],
+        "agent_name": "ResearchIntentAgent",
+        "role": "研究意图与验收标准",
+        "dimension": "Research Intent",
+        "scope": ["研究问题", "数据边界", "交付标准"],
     },
     {
-        "agent_name": "知远",
-        "role": "文献综述研究员",
-        "dimension": "文献综述与研究缺口",
-        "scope": ["核心文献", "识别争议", "边际贡献"],
+        "agent_name": "LiteratureAgent",
+        "role": "文献与贡献矩阵",
+        "dimension": "Literature",
+        "scope": ["检索计划", "候选文献", "贡献矩阵"],
     },
     {
-        "agent_name": "数澜",
-        "role": "数据架构研究员",
-        "dimension": "数据源与变量可得性",
-        "scope": ["数据来源", "样本口径", "变量可得性"],
+        "agent_name": "DataAgent",
+        "role": "数据契约与样本构造",
+        "dimension": "Data Contract",
+        "scope": ["数据入口", "样本构造", "变量字典"],
     },
     {
-        "agent_name": "量衡",
-        "role": "测度设计研究员",
-        "dimension": "核心变量定义与测度",
-        "scope": ["被解释变量", "核心解释变量", "控制变量"],
+        "agent_name": "MethodAgent",
+        "role": "方法门与识别设计",
+        "dimension": "Method Gate",
+        "scope": ["识别策略", "方法准入", "诊断要求"],
     },
     {
-        "agent_name": "维农",
-        "role": "识别策略研究员",
-        "dimension": "识别策略与内生性处理",
-        "scope": ["识别假设", "内生性来源", "工具变量或准实验"],
+        "agent_name": "ExecutionAgent",
+        "role": "统计执行与结果表",
+        "dimension": "Execution",
+        "scope": ["RunPlan", "模型执行", "表格和日志"],
     },
     {
-        "agent_name": "建模",
-        "role": "计量建模研究员",
-        "dimension": "基准模型与估计方案",
-        "scope": ["基准回归", "固定效应", "标准误处理"],
+        "agent_name": "RobustnessAgent",
+        "role": "稳健性和异质性",
+        "dimension": "Robustness",
+        "scope": ["稳健性", "异质性", "机制或替代规格"],
     },
     {
-        "agent_name": "固盾",
-        "role": "稳健性研究员",
-        "dimension": "稳健性检验设计",
-        "scope": ["替代变量", "样本调整", "安慰剂检验"],
+        "agent_name": "ManuscriptAgent",
+        "role": "论文草稿生成",
+        "dimension": "Manuscript",
+        "scope": ["章节结构", "证据绑定", "完整草稿"],
     },
     {
-        "agent_name": "析微",
-        "role": "机制异质性研究员",
-        "dimension": "异质性与机制分析",
-        "scope": ["分组异质性", "作用机制", "边界条件"],
+        "agent_name": "ReviewerAgent",
+        "role": "论文审阅和 claim audit",
+        "dimension": "Review Gates",
+        "scope": ["审阅检查", "claim audit", "修订队列"],
     },
     {
-        "agent_name": "图灵",
-        "role": "结果呈现研究员",
-        "dimension": "表格图形与结果呈现",
-        "scope": ["主表结构", "机制表", "可视化呈现"],
+        "agent_name": "ReplicationAgent",
+        "role": "复现清单和哈希门",
+        "dimension": "Replication",
+        "scope": ["manifest", "hash baseline", "repro report"],
     },
     {
-        "agent_name": "文心",
-        "role": "论文写作研究员",
-        "dimension": "论文结构与写作路径",
-        "scope": ["章节结构", "写作顺序", "投稿材料"],
+        "agent_name": "ExportAgent",
+        "role": "交付包和 PDF 导出",
+        "dimension": "Export",
+        "scope": ["delivery package", "PDF", "人工验收"],
     },
 ]
+
+RESEARCH_DIMENSIONS = PAPER_PIPELINE_NODES
 
 TASK_STATUS_BY_PROGRESS = [
     (0.2, "planning"),
@@ -149,7 +151,7 @@ def create_workflow(product_root: Path, repo_root: Path, title: str, project_id:
         id=workflow_id,
         project_id=project["id"],
         title=title,
-        agent_count=len(RESEARCH_DIMENSIONS),
+        agent_count=len(PAPER_PIPELINE_NODES),
         provider_status=local_codex_status(),
         created_at=now,
         updated_at=now,
@@ -163,9 +165,9 @@ def create_workflow(product_root: Path, repo_root: Path, title: str, project_id:
             dimension=dimension["dimension"],
             dimension_number=index,
             research_scope=dimension["scope"],
-            evidence_gaps=["当前已选择 local_codex 作为第一执行 provider，但真实 Codex 子任务执行尚未默认开启。"],
+            evidence_gaps=["当前节点是 pipeline contract；只有接入 CLI 执行产物后才能升级为 local_execution。"],
         ).to_dict()
-        for index, dimension in enumerate(RESEARCH_DIMENSIONS, start=1)
+        for index, dimension in enumerate(PAPER_PIPELINE_NODES, start=1)
     ]
     write_json(workflow_path(product_root, workflow_id), workflow.to_dict())
     write_json(tasks_path(product_root, workflow_id), tasks)
@@ -320,8 +322,8 @@ def current_phase(tasks: list[dict[str, Any]]) -> str:
 
 def summarize_task(task: dict[str, Any]) -> str:
     if task["status"] == "completed":
-        return f"{task['agent_name']}已完成「{task['dimension']}」的占位研究产物。"
-    return f"{task['agent_name']}正在推进「{task['dimension']}」，当前阶段：{task['status']}。"
+        return f"{task['agent_name']}已完成「{task['dimension']}」节点契约。"
+    return f"{task['agent_name']}正在推进「{task['dimension']}」节点，当前阶段：{task['status']}。"
 
 
 def build_task_artifact(project_root: Path, workflow: dict[str, Any], task: dict[str, Any], created_at: str) -> dict[str, Any]:
@@ -331,11 +333,14 @@ def build_task_artifact(project_root: Path, workflow: dict[str, Any], task: dict
         id=f"art_{task['id']}",
         workflow_id=workflow["id"],
         task_id=task["id"],
-        kind="research_note",
+        kind="pipeline_node_contract",
         path=relative_path,
-        title=f"{task['dimension']}研究笔记",
+        title=f"{task['dimension']} pipeline contract",
         created_by=task["agent_name"],
+        status="contract_ready",
         created_at=created_at,
+        evidence_level="pipeline_contract",
+        promotion_status="not_promotable",
     ).to_dict()
     content = render_task_artifact(workflow, task)
     target = project_root / relative_path
@@ -348,16 +353,17 @@ def render_task_artifact(workflow: dict[str, Any], task: dict[str, Any]) -> str:
     scope = "\n".join(f"- {item}" for item in task["research_scope"])
     gaps = "\n".join(f"- {item}" for item in task["evidence_gaps"])
     return (
-        f"# {task['dimension']}研究笔记\n\n"
+        f"# {task['dimension']} Pipeline Contract\n\n"
         f"- Workflow: {workflow['id']}\n"
-        f"- Agent: {task['agent_name']}（{task['role']}）\n"
+        f"- Agent: {task['agent_name']} ({task['role']})\n"
         f"- Execution provider: {workflow.get('execution_provider', 'local_codex')}\n"
-        f"- Evidence level: mock\n\n"
+        "- Evidence level: pipeline_contract\n"
+        "- Promotion: not_promotable_without_cli_outputs\n\n"
         "## 研究范围\n"
         f"{scope}\n\n"
-        "## 当前结论\n"
+        "## 当前节点契约\n"
         f"{task['summary']}\n\n"
-        "## 证据缺口\n"
+        "## 升级为真实执行证据的条件\n"
         f"{gaps}\n"
     )
 
@@ -386,12 +392,12 @@ def render_final_report(workflow: dict[str, Any], tasks: list[dict[str, Any]], a
     )
     artifact_lines = "\n".join(f"- {artifact['title']}: `{artifact['path']}`" for artifact in artifacts)
     return (
-        f"# {workflow['title']} - Agent Cluster 研究报告\n\n"
-        "本报告由当前后端 API 框架生成，用于验证工作流、任务、产物和报告链路。"
-        "内容仍为 mock evidence，不应作为论文事实依据。\n\n"
-        "## 任务矩阵\n"
+        f"# {workflow['title']} - Paper Pipeline Contract\n\n"
+        "本报告只记录第二层 Agent 的论文生产节点契约。"
+        "它不是论文事实依据；只有 CLI 执行产物、论文审阅、claim audit 和复现检查完成后，才能进入交付。\n\n"
+        "## Pipeline 节点\n"
         f"{task_lines}\n\n"
-        "## 产物清单\n"
+        "## 契约产物清单\n"
         f"{artifact_lines}\n"
     )
 

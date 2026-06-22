@@ -1,0 +1,52 @@
+{
+  "topic": "工业机器人对匹配效率的影响",
+  "topic_slug": "untitled",
+  "generated_by": "design-llm-minimax",
+  "timestamp": "2026-06-05T11:04:35.103558+00:00",
+  "model": "MiniMax-M3",
+  "prompt_version": "v1",
+  "upstream": [
+    "brief.md",
+    "variables.yaml"
+  ],
+  "candidates": [
+    {
+      "method": "IV",
+      "rationale": "X 为 Bartik 构造的工业机器人渗透率，本身即 Acemoglu & Restrepo (2020) 范式的 shift-share 工具变量设定；2SLS 可进一步以外国（德/意/日）机器人渗透率对中国行业份额加权作为深层 IV，有效剥离‘行业自选择采用机器人→工资’反向因果与遗漏行业冲击；识别假设（行业份额外生于本地工资趋势）较平行趋势更可证伪且与 Dauth et al. 2021 文献一致，单期横截面即可执行。",
+      "fits_data": true,
+      "sp_output": {
+        "estimator": "iv",
+        "n_variables": 8,
+        "source": "statspai",
+        "statspai_category": "regression",
+        "statspai_description": "Unified IV estimation: 2SLS, LIML, Fuller, GMM, JIVE. Includes first-stage F, Sargan/Hansen J, and Hausman diagnostics."
+      }
+    },
+    {
+      "method": "DML",
+      "rationale": "若担心 Mincer 控制函数形式误设及高维控制（edu/age/female/urban/manu/part_time 与潜在交互）造成的偏误，可采用 DML-PLIV 部分线性 IV 框架，在机器人 IV 第一阶段与工资第二阶段同时用 ML（lasso/GBM）估计 nuisance，估计量仍保持 √n 根正态并对正则化稳健；30 分钟内可完成 cross-fitting，兼顾内生性与函数形式稳健性。",
+      "fits_data": true,
+      "sp_output": {
+        "estimator": "dml",
+        "n_variables": 8,
+        "source": "statspai",
+        "statspai_category": "causal",
+        "statspai_description": "Double/Debiased Machine Learning for treatment effect estimation. Supports partially linear (PLR), interactive regression (IRM, binary D), partially linear IV (PLIV), and interactive IV (IIVM, binary D/binary Z → LATE)."
+      }
+    },
+    {
+      "method": "DID",
+      "rationale": "可借助 Bartik 中 IFR 行业-年份维度构造‘高 vs 低机器人暴露行业’×‘机器人加速渗透年份前后’的交错 DID（Callaway-Sant'Anna 或 Sun-Abraham），用行业层面时变冲击作识别；但当前变量定义暗示为单期个体横截面，缺正式面板/重复截面与明确政策时点，平行趋势识别力较弱，仅作补充稳健性检验。",
+      "fits_data": false,
+      "sp_output": {
+        "estimator": "did",
+        "n_variables": 8,
+        "source": "statspai",
+        "statspai_category": "causal",
+        "statspai_description": "Difference-in-Differences. Supports 2x2, DDD, staggered (Callaway-Sant'Anna, Sun-Abraham), and Synthetic DID."
+      }
+    }
+  ],
+  "recommended": "IV",
+  "code_stub": "# IV 工具变量估计模板\nimport pandas as pd\nimport statsmodels.api as sm\n\ndf = pd.read_csv(\"data/cfps.csv\")\n# TODO: 替换为真实内生变量 / 工具变量\nendog = df[\"robot_exposure\"]\ninstruments = df[\"bartik_iv\"]\nexog = df[[\"age\", \"edu\"]]\nexog = sm.add_constant(exog)\n\nfrom linearmodels.iv import IV2SLS\nmodel = IV2SLS(df[\"ln_wage\"], exog, endog, instruments).fit(cov_type=\"robust\")\nprint(model.summary)\n"
+}

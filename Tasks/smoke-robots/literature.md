@@ -2,8 +2,8 @@
 topic: 工业机器人对就业的影响
 topic_slug: smoke-robots
 generated_by: search-llm-m3
-timestamp: '2026-06-04T08:42:43.259938+00:00'
-model: anthropic/claude-sonnet-4-6
+timestamp: '2026-06-22T12:03:36.081252+00:00'
+model: MiniMax-M3
 prompt_version: v1
 n_papers: 9
 upstream:

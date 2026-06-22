@@ -1,5 +1,154 @@
 # Todo
 
+## 2026-06-19 Product Pipeline Control Surface
+
+- [x] 产品定义收敛：新增 `Tasks/product-pipeline-artifact-map-2026-06-19.md`，按“题目和数据输入 -> 研究问题判断 -> 文献和变量 -> 方法预检 -> 模型执行或阻断 -> 论文初稿 -> 审阅修订 -> PDF/DOCX/证据包/复现说明”八步梳理现有产物。
+- [x] 主线纠偏：当前不再用 P0-P18、第一版/第二版、CHARLS/CGSS/父母教育样例名来定义产品；它们只作为工程证据和样例。
+- [x] 当前唯一推进线：CGSS 论文生产链，从现有 PDF 样稿和质量报告出发，生成浏览器内用户可读修订清单，并把下一步动作回写到 headless state。
+- [x] 产品入口清理：新增 `Tasks/product-surface-cleanup-bdd.md` 和 `tests/test_product_surface_cleanup.py`；React 主入口已摘掉旧 `ProductControlP0Panel`，FastAPI 不再挂旧静态 `/assets`，`Product/web` 静态工作台源码已删除。
+- [x] 全量审核清理：新增 `Tasks/full-product-cleanup-audit-2026-06-19.md` 和 `tests/test_full_product_cleanup_audit.py`；README、Product README、current-stage、handoff、product map 已纠偏到 React + FastAPI + CGSS 主线。
+- [x] 默认测试面收束：`tests/conftest.py` 保留 LLM mock，同时把已退役的 `Product/web` 静态测试、P3/P6 视觉实验测试和旧论文快照测试移出默认 pytest 收集。
+- [x] 预检阻断修复：`/api/design` 恢复 `_TASKS_ROOT` patch 点；LLM Supervisor/service preflight 无配置测试完整清理 provider 环境变量，避免本机真实密钥污染测试结论。
+- [x] Runtime 验证修复：`scripts/33_validate_plugin_package.py` 不再把缺失的本机外部 plugin validator 当硬失败；包内 validator、临时项目 dry-run/apply 和安装后 registry 验证仍为硬门。
+- [x] 全量验证：`python3 -m pytest -q -p no:cacheprovider` 通过 1214 项、skipped 3 项；`scripts/25_agent_runtime_preflight.py`、`scripts/33_validate_plugin_package.py`、Python 编译、React build、`git diff --check` 均通过。
+- [ ] 下一步执行入口：从 `Tasks/cgss-course-paper-review-revision-list-bdd.md` 写失败测试，覆盖 CGSS 审阅报告路径、用户可读修订清单、headless 回读、UI 默认展示和未通过质量门不得声称完成。
+- [ ] 停止事项：不新增平行 demo，不继续堆 P 阶段，不把 PDF ready 当论文完成，不把 workflow 合同或 Agent 日志当研究证据。
+
+## 2026-06-19 CGSS Paper Production UI Runtime Slice
+
+- [x] BDD/TDD：新增 React 与 CGSS headless 状态测试，锁定主工作台必须先展示论文生产状态，再折叠技术细节。
+- [x] CGSS 项目注册：新增 `proj_cgss_social_capital_happiness`，题目为 `互联网使用是否提升居民主观幸福感？来自 CGSS 2012-2023 的证据`，并从主工作台题目输入自动映射到该项目。
+- [x] 第二层 workflow 对齐：UI 论文生产链读取 `/api/v1/workflows`，启动后呈现 ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export 十个 Agent 节点。
+- [x] 第三层 headless 契约：新增 `PaperProductionStatusPanel`，只消费 UI-neutral component contract：`status`、`user_summary`、`primary_action`、`blockers`、`artifacts`、`evidence`、`audit`。
+- [x] CGSS 产物路径隔离：headless state 与论文审阅报告按 `artifact_prefix=cgss_social_capital_happiness` 读取 `Results/json/cgss_social_capital_happiness_*` 与 `Submissions/cgss_social_capital_happiness/paper.pdf`，不再串到 `parent_education_wage`。
+- [x] 浏览器验收：在 `http://127.0.0.1:8782/` 输入 CGSS 题目并点击 `开始研究`、`启动论文生产链` 后，页面显示 CGSS PDF、论文审阅组件、10 个 Agent 节点；旧研究简报默认不在首屏。
+- [x] 验证：Python 编译通过；`tests.test_cgss_product_headless_state`、`tests.test_react_paper_production_status`、`tests.test_main_workbench_clean_ui`、`tests.test_agent_cluster_workflow_api`、`tests.test_product_control_headless_state` 共 21 项通过；React build 通过。
+- [x] 下一步 BDD 草案：新增 `Tasks/cgss-course-paper-review-revision-list-bdd.md`，定义浏览器内一键生成 CGSS 论文审阅报告和用户可读修订清单的行为；等待用户确认后再写失败测试。
+- [ ] 下一步：把论文审阅从“可运行/受阻展示”推进到浏览器内一键生成用户可读修订清单；仍不做 UI 视觉重设计。
+
+## 2026-06-19 CLI Kernel -> Agent -> UI Transformation
+
+- [x] BDD 契约：新增 `Tasks/cli-kernel-agent-ui-transformation-bdd.md`，把第二层/第三层改造固定为“CLI 论文生产内核 -> Agent 调度 -> Headless UI 契约”。
+- [x] 第二层 workflow：`/api/v1/workflows` 的 10 个任务已从占位研究员改为 CHARLS-like paper pipeline 节点：ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export。
+- [x] 第二层产物边界：workflow artifact 现在是 `pipeline_node_contract` / `pipeline_contract`，默认 `not_promotable`，不能被提升为正式论文、结果或提交包。
+- [x] 第三层 headless：新增 `course_paper_quality` 独立组件；PDF ready 不再等同于课程论文 ready。
+- [x] 论文审阅 API：新增 `GET/POST /api/v1/projects/{project_id}/product-control/course-paper-quality`，运行时读取 final-pdf manifest 的 `source_markdown` 并写出 `Results/json/course_paper_quality_report.json`。
+- [x] 验证：`python3 -m unittest tests.test_agent_cluster_workflow_api tests.test_product_control_headless_state -v` 通过 5 项；`python3 -m unittest tests.test_parent_education_wage_p13_p16_demo_closure tests.test_product_control_headless_state tests.test_paper_package_quality -v` 通过 32 项。
+
+## 2026-06-17 Project Management Reset
+
+- [x] 节点目标：把 CHARLS proof case、第二层 runtime、第三层产品工作台和固定 Demo 线重新收敛成一个可执行项目管理面。
+- [x] 主仓库确认：后续主线在 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`；CHARLS DID 只作为 proof case 和 runtime 来源样例。
+- [x] 新增项目管理入口：`Tasks/project-management-reset-2026-06-17.md`。
+- [x] 当前主线确认：优先推进 `Product Control Console -> Portfolio MVP Demo Line`，固定题目为 `父母受教育水平对子女工资收入的影响`。
+- [x] 三层边界确认：第一层 CHARLS proof case；第二层 `workflows/` + runtime/preflight/plugin；第三层 `Product/` + `docs/product-control/` + Demo line。
+- [x] 当前开发入口确认：下一步从 P0-A `Product Control Demo topic binding audit` 开始，先 BDD/TDD，不直接写实现。
+- [x] 文件夹层面收拢：`StatspAI_跑通一次_CHARLS_DID` 已移动到 `/Users/mahaoxuan/Desktop/经济学论文/` 下，桌面旧路径保留为符号链接。
+- [x] 顶层入口补齐：新增 `/Users/mahaoxuan/Desktop/经济学论文/项目入口.md` 作为经济学论文相关项目总索引。
+- [x] 工作方法修正：复杂任务默认采用动态工作流和压力测试，已写入 `Tasks/lessons.md`、`Tasks/round-log.md` 和项目管理入口。
+- [x] P0-A：写题目绑定与旧题污染核验 BDD，先覆盖当前运行态、任务书目录、Agent Queue state 和 Review/Audit 产物边界；CLI/UI 消费入口留作后续小切片。
+- [x] P0-A：写失败测试，证明当前系统缺少统一 P0-A 审计服务和 API 入口。
+- [x] P0-A：实现最小审计闸门，新增 `product_control_demo_topic_binding_audit` JSON/Review 输出，并在真实项目上暴露 5 个 critical issue。
+- [x] P0-A 修复：处理真实项目 5 个 critical issue；旧 SupervisorPlan/Agent Queue 已归档，ResearchQuestion、literature、variables 已重绑到当前项目 topic。
+- [x] P0-A 通用化：新增 `state/product/topic_binding.json`，审计服务从项目 topic binding 读取 expected topic/slug，并用第二题目测试防止硬编码 demo。
+- [x] P0-A API 入口：新增通用别名 `GET /api/v1/projects/{project_id}/topic-binding-audit`，旧 demo 路径保留兼容。
+- [x] P0 长程阶段包：连续完成 P0-A/B/C/D，写出当前 topic 的 SupervisorPlan、Agent Task Queue、Evidence Audit、作品集脚本和产品 API 入口。
+- [x] P0 前端控制面板：Workspace Home 读取/刷新 P0 阶段报告，展示 topic、P0 状态、Agent 任务数、Evidence Audit、`needs_evidence` 缺口和正式层边界。
+- [ ] P0 CLI 补强：可选补一个命令行入口显示 topic-binding audit 与 P0 阶段报告；当前不阻断前端验收。
+
+## 2026-06-17 Product Control Console -> Portfolio MVP Demo Line
+
+- [x] 节点目标：把 `docs/product-control/` 从产品理解文档接入真实开发路线，形成一条可验收、可复盘、可用于作品集展示的固定 Demo 线。
+- [x] 固定 Demo 题目：`父母受教育水平对子女工资收入的影响`。选择原因：当前项目已有 `Tasks/parent-education-wage/` 与 `parent-education-wage-01-design` 运行痕迹，可最快验证“旧题污染清除、题目绑定、证据审计、草稿边界”这些核心能力。
+- [x] 产品控制台入口：`docs/product-control/README.md`；它定义产品愿景、目标用户、核心旅程、功能地图、产品原则、MVP 验收标准和作品集叙事。
+- [x] Demo 线任务包：`Tasks/product-control-demo-line.md`；它把题目输入、任务书确认、Agent Queue、数据变量、方法设计、执行证据、草稿边界、证据审计拆成可验收节点。
+- [x] P0-A：把当前项目 topic binding、ResearchQuestion 和 `Tasks/parent-education-wage/` 当前材料对齐；真实审计已转为 `ready_for_p0b`。
+- [x] P0 前端控制面板：页面已展示 P0 阶段报告、证据缺口、作品集脚本路径和 `待派工审阅` 状态。
+- [ ] P0 CLI 补强：命令行摘要仍可后续补；当前前端入口已足够支撑用户验收。
+- [x] P0-B：让 Agent Task Queue 直接显示本 Demo 线的 6 个研究任务：任务书、数据变量、方法设计、执行预检、证据审计、草稿边界。
+- [x] P0-C：给 Demo 线补一个 `Evidence Audit` 输出：列出每个结论是否有真实数据、真实表格、真实 run、真实 evidence_id。
+- [x] P0-D：形成作品集验收材料：3 分钟讲述脚本、流程图、Agent 分工图、证据链状态和当前不足清单。
+- [x] P0 产品入口：新增 `POST /api/v1/projects/{project_id}/product-control/p0-phase`，可按注册项目触发完整 P0 阶段包。
+- [x] 验收口径：用户能从一个固定题目进入系统，看到当前研究状态、下一步动作、证据等级、`needs_evidence` 缺口和不能写入正式层的原因；后端/API 与前端首页已满足。
+- [x] P1-A 文献证据账本：当前只生成 4 个检索 seed，`verified_count=0`，明确不能写正式 bibliography。
+- [x] P1-B 数据字段绑定账本：12 个候选变量中 8 个 matched、4 个 missing，缺口为父母教育字段和 hukou。
+- [x] P1-C 方法执行账本：因 required fields 缺失和 design code stub 旧题污染，IV/DID/DML 全部 blocked，`run_id=null`。
+- [x] Phase 6 验收包：新增 `Reviews/parent_education_wage_p0_p1_acceptance_package.md`，并同步 `WORKFLOW_STATUS.md`。
+- [x] P2 BDD/TDD：新增执行准入行为契约和目标测试，覆盖字段补证、变量口径草案、设计去污染、blocked ledger 和 Product Control 状态。
+- [x] P2 字段补证账本：`Results/json/parent_education_wage_p2_execution_readiness.json` 显示 `hukou` 有候选，父母教育字段仍缺。
+- [x] P2 设计去污染：`Tasks/parent-education-wage/design.json` 已清除旧 robot code stub；未写正式 DesignSpec。
+- [x] P2 Product API/React：新增 `GET/POST /product-control/p2-execution-readiness`，React 主入口显示 `P2 执行准入`。
+- [x] P2 真实运行状态：`execution_preflight_allowed=false`、`run_id=null`，阻断原因是父母教育字段缺失和变量口径需人工确认。
+- [x] 产品首交付物固定：新增 `docs/product-control/08_Draft-first交付标准.md`，明确第一用户体验围绕 `paper_draft.pdf / .docx`；成功分支输出完整初稿，阻断分支输出半成品论文、红标缺口和问题清单。
+- [x] P3 DraftPackage BDD/TDD：新增半成品论文交付包行为契约和目标测试。
+- [x] P3 半成品论文包：真实项目已生成 `Submissions/parent_education_wage_paper_draft.docx`、Markdown 源、问题清单、审计报告和 DraftPackage manifest。
+- [x] P3 Product API/React：新增 `GET/POST /product-control/p3-draft-package`，React 主入口显示 `P3 DraftPackage`、`paper_draft.docx`、半成品状态和 issue 数。
+- [x] P3 正式层边界：未写正式 VariableRoleSet、DesignSpec、RunPlan，未创建 run id，未执行回归。
+- [x] P4 父母教育字段来源补证：metadata-only 扫描真实 CFPS Stata 标签，定位 `father_education`、`mother_education` 候选；`parent_education` 标为可构造但需人工确认。
+- [x] P4 `hukou` 候选来源审计：生成 `hukou` 候选清单，但不把本人户口/父母户口/城乡派生变量直接绑定成正式控制变量。
+- [x] P4 Product API/React：新增 `GET/POST /product-control/p4-field-source-candidates`，React 主入口显示 `P4 字段来源`、父母教育候选状态和刷新按钮。
+- [x] P4 正式层边界：未写正式 VariableRoleSet、DesignSpec、RunPlan，未创建 run id，未执行回归。
+- [x] P5 正式变量角色草案预检：已把 P4 候选转成可审阅 VariableRoleSet draft preflight；不直接覆盖正式状态。
+- [x] P6 人工签收/提升路径：已生成 P5 preflight 的签收包、完整签收门禁、可编辑 draft promotion 服务、Product API 和 React 状态面；真实项目尚未执行 promotion。
+- [x] P7 页面签收台：把 P6 五项人工确认做成 React 表单，后端返回推荐默认值，页面按钮只 promotion 到 editable draft，不写正式 VariableRoleSet，不跑模型；审查发现的旧正式保存口绕过已修复，P7 draft 后仍需 P8 正式批准。
+- [x] P8 正式变量角色审批：已新增单独 P8 approval gate，用户在 P7 页面确认并生成可编辑 draft 后，必须再填写 reviewer/note/confirmation 才能允许正式 VariableRoleSet 保存；正式保存必须使用当前最新 draft 的有效 approval，且 latest draft roles、approval `source_draft_roles`、PUT roles 三者必须一致；仅有 P7 draft 时仍不能写正式 VariableRoleSet、创建 RunPlan 或跑模型。
+- [x] P9 正式 VariableRoleSet editor/save 验收：已新增正式变量表保存门禁和 React 面板；P9 必须同时满足 P8 approval、dataset path、source metadata、确认码和 payload 一致性才会写正式 `state/product/variable_roles.json`。真实项目当前正确阻断在 `blocked_missing_dataset_source_metadata`，缺 `dataset_path`、`ln_wage`、`parent_education`、`age`、`female`、`urban`、`edu_last`、`experience`；未写正式变量表、DesignSpec、RunPlan，也未创建 run id 或跑模型。
+- [x] 北极星计划：新增 `Tasks/north-star-product-plan.md`，把目标固定为本科生可用、可审计、可交付的论文生产流水线；后续 P10-P16 按 SDD/BDD/TDD、最小验证、状态更新和交付总结推进。
+- [x] P10 Product Control 当前门禁中心：Product Control 首屏改成当前门禁摘要，先回答“现在卡在哪、为什么卡、下一步补什么”；P0-P8 默认折叠为阶段历史，P9 当前阻断详情仍可见；桌面和移动端已验收，无“运行模型”入口。
+- [x] P11 source metadata 补齐路径：新增 P11 Product API 和 React 表单，把 dataset path、field_bindings 和 parent_education construction 保存到最新 editable draft 的 `source_contract`；完整后只解锁 P9 readiness，不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不跑模型。
+- [x] P11A source contract review kit：P11 GET 新增 `source_contract_review_kit`，把推荐 dataset path、P5/P4 字段候选、缺口状态和 no-model 边界展示到 React P11 面板；帮助用户签收，但不替用户保存 source contract。
+- [x] P11B per-field source confirmation editor：React P11 表单新增逐字段确认表，用户可编辑 9 个字段的 dataset column、source field、source path 和 evidence level；保存时生成原 P11 `field_bindings` payload，JSON 只作为预览。
+- [x] P11C source contract readiness check：React P11 表单新增保存前完整性自检，显示 `needs_source_metadata_review` / `ready_to_save_source_contract` 和具体缺口；缺口存在时禁用保存按钮，不改变 P9/P12 门禁。
+- [x] P11D row human confirmation gate：React P11 表单要求 9 个字段来源行逐行勾选人工确认；预填候选值不会自动算作已签收，未勾选时 readiness 显示 `human_confirmation` 并禁用保存按钮。
+- [x] P11E human signoff readable rows：React P11 字段来源行在桌面和移动端都显示 `dataset column`、`source field`、`source path`、`evidence level` 标签；修复移动端页面级横向溢出，保存门禁和正式层边界不变。
+- [x] P11F human signoff review queue：React P11 在长表单前新增 9 个字段的审核队列，逐项显示 status、missing 和 action；帮助用户按队列确认 source contract，但不保存真实 source contract，不解锁 P9。
+- [x] P11G source contract signoff workspace：React P11 升级为 `Source Contract Signoff` 两栏工作台，左侧审核队列、右侧填写表单、source review kit 默认折叠、action bar 不遮挡字段行；桌面和移动端已验收，保存和模型边界不变。
+- [x] 动态中文工作流仪表盘：新增 `docs/product-control/workflow-dashboard.html`、`docs/product-control/workflow-dashboard-state.json`、`/workflow-dashboard` 和 `/api/v1/workflow-dashboard/state`，把 CEO 摘要、追问、调研、原型、规格、拆任务、实现、复核七阶段、当前门禁、P11/P9/P12-P16 分支树、阻断点和人工验收清单做成可轮询更新的项目控制面；不替代 `WORKFLOW_STATUS.md`，阶段变化后需同步更新状态 JSON。
+- [x] P11-Human 真实 source contract 填写：已在真实 P11 表单保存项目内 dataset path `Data/Final/cfps_robot_reallocation.csv`、reviewer/note、`ln_wage`、`parent_education`、`age`、`female`、`urban`、`edu_last`、`experience`、`father_education`、`mother_education` 的字段来源和 evidence level，并逐行勾选 human confirmation；P11 状态已进入 `source_metadata_contract_ready_for_p9_save`。
+- [x] P11H source contract saved next-step state：React 已显示 `P11 已签收`、`已解锁 P9 正式变量表保存`、dataset path、`下一步：回到 P9 正式保存`，并继续显示不能进 P12、不能创建 run id、不能运行模型；桌面和 390px 移动端已验收。
+- [x] P9-Human 正式 VariableRoleSet 保存：已保存 `state/product/variable_roles.json`，P9 GET 现在返回 `formal_variable_roles_saved`；仍不写 DesignSpec/RunPlan，不创建 run id，不跑模型。
+- [x] P9H 完成态修复：P9 POST 成功后，后续 GET 不再继续提示可重复保存，而是显示 `can_enter_design_spec_preflight=true`、`can_create_run_id=false`、`can_execute_model=false`。
+- [x] P12-0 Design Tree / Pre-PRD：已新增 `docs/product-control/p12-p16-design-tree.md`，并把仪表盘状态更新为 `P12-0 设计树已完成`；P12-P16 的分支树、阻断路径、人工签收点、验收标准、回退路径和停机条件已写清。
+- [x] P9H/P10 移动端当前门禁视觉修复：P9H 保存后产品页当前门禁摘要在 390px 移动端改为单列，不再让右侧状态清单覆盖标题或正文；桌面/移动端 Playwright QA 已通过。
+- [x] P12-0 仪表盘浏览器验收：8777 当前代码服务下，`/workflow-dashboard` 桌面和移动端均显示 CEO 摘要、P12-0 当前门禁、P12 DesignSpec 下一步、P12-P16 分支树和 `不运行模型` 边界。
+- [x] P12 DesignSpec Preflight：已从正式 `state/product/variable_roles.json` 生成方法规格预检 JSON 和 Review；只写预检产物，不写正式 DesignSpec，不写 RunPlan，不创建 run id，不跑模型。
+- [x] P13 RunPlan Approval：已用真实 CSV 表头校验 P12 公式，发现缺 `parent_education` 和 `experience`；旧机器人题目的活跃 DesignSpec/RunPlan 已归档；RunPlan 不批准，不创建 run id。
+- [x] P14 Execution Evidence Ledger：已写出阻断执行账本，`run_id=null`、`executed_regression=false`，没有运行模型。
+- [x] P15 Draft Generation And Export：已保留 `Submissions/parent_education_wage_paper_draft.docx` 半成品交付路径，并写出 `Manuscripts/generated/parent_education_wage_p15_issue_list.md` 红标问题清单。
+- [x] P16 User Acceptance And Satisfaction Loop：已生成 `Results/json/parent_education_wage_p16_user_acceptance_packet.json`，当前可验收内容为“半成品论文 + 红标问题清单”，`can_claim_complete_paper=false`。
+- [x] P13-P16 防误报硬化：GET 未执行前只返回 `p13_p16_closure_not_run`；旧机器人 P12 预检返回 409；字段齐全分支必须实际执行最小 OLS 后才返回 run id。
+- [x] P17 Data Repair Preflight：基于 P13-P16 缺列阻断，生成 `parent_education` 与 `experience` 的可审阅数据修复候选账本；只读扫描当前 CSV 和本地 CFPS 源表，不覆盖正式数据，不解锁模型。
+- [x] 工作流仪表盘树图化：`/workflow-dashboard` 首屏改为 SVG/CSS 树状路线图，直接展示 P12-P18、P17 当前节点、P18 下一步、回退路径和禁止模型路径；旧文字分支默认折叠为节点明细。
+- [x] Headless 功能组件契约：新增 `docs/product-control/09_Headless功能组件契约.md`，明确当前不能声称全产品完成，并把后续 UI 自由重画的前提定义为稳定组件状态、动作、证据、阻断原因和审计契约。
+- [x] P18 Data Repair Apply Gate：已用 P17 推荐 `famconf_parent_highest_education` 和确认后的 `edu_last -> education_years` 映射写出 `Data/Interim/parent_education_wage_repaired.csv`；34,315 行，`parent_education` 24,401 行可用，`experience` 30,928 行可用；`Data/Final/cfps_robot_reallocation.csv` 哈希未变。
+- [x] 完整论文分支：已用修复数据重跑 P13-P16；P14 真实执行最小 OLS，`run_id=parent_education_wage_ols_20260618145856`，`nobs=12582`；P15/P16 生成完整论文初稿和真实模型结果证据包，仍明确不是投稿终稿。
+- [x] Headless 状态接口：新增 `GET /api/v1/projects/{project_id}/product-control/headless-state`，把 Product Control 当前状态收束为 UI 无关的组件 view model；返回组件状态、动作、证据、产物和阻断原因，不包含布局契约。
+- [x] Delivery Package：新增 `GET/POST /api/v1/projects/{project_id}/product-control/delivery-package`，生成 `Submissions/parent_education_wage_delivery_manifest.json`、`Submissions/parent_education_wage_delivery_README.md` 和 `Submissions/parent_education_wage_delivery_package.zip`；真实包包含 15 个业务文件和 2 个交付元文件，可供人工审阅，但不声称投稿终稿。
+- [x] Headless 交付组件：`headless-state` 现在包含 `delivery_package` 独立组件；当前 5 个核心组件为 `data_repair`、`execution_run`、`draft_package`、`delivery_package`、`review_export`。
+- [x] Final PDF Export：新增 `GET/POST /api/v1/projects/{project_id}/product-control/final-pdf`，从完整 Markdown 初稿生成 `Submissions/parent_education_wage_final_paper.pdf`、HTML 渲染源、JSON 导出账本和 Review；真实 PDF 已生成，大小 276,048 bytes，状态为 `final_pdf_ready`。
+- [x] Headless 最终 PDF 组件：`headless-state` 现在包含 `final_pdf` 独立组件；当前核心组件为 `data_repair`、`execution_run`、`draft_package`、`delivery_package`、`final_pdf`、`review_export`，总状态为 `final_pdf_ready`。
+- [x] 纠偏：已确认当前父母教育工资 PDF 只是 `pdf_export_smoke_only`，不能声称课程论文级交付或 submission ready；修正 Final PDF Export 口径，并新增 `Tasks/charls-proofcase-to-agent-product-correction.md` 作为下一步控制文件。
+- [ ] 下一步必须先做 Course Paper Quality Gate：对齐 CHARLS 医保 proof case，检查论文结构、文献闭环、数据构造、方法门、表图、稳健性、claim audit、复现门和篇幅密度。
+- [ ] 下一步必须建立 CHARLS-like Agent Pipeline Adapter：把题目和数据集路由到 ResearchIntent、Literature、Data、Method、Execution、Robustness、Manuscript、Reviewer、Replication、Export 十个 headless 节点。
+- [ ] 不做范围：本轮不追求完整云端上线、不重写全部 UI、不完成任意题目通用 adapter 抽象、不把未经证据链支持的探索性草稿静默提升为正式论文。
+
+## 2026-06-16 parent-education-wage 01_design Runtime Smoke
+
+- [x] 节点目标：把“父母受教育水平对子女工资收入的影响”接入第二层 runtime，完成 `01_design` 并让 router 进入 `02_literature`。
+- [x] BDD/TDD：新增 `tasks/parent-education-wage-01-design-bdd.md` 和 `tests/test_parent_education_wage_01_design_runtime.py`，覆盖三份入口文件、机器可读因果问题、清除旧题污染、artifact registry 登记、路由推进。
+- [x] RED 记录：首次运行 `python3 -m pytest tests/test_parent_education_wage_01_design_runtime.py -q` 失败 5 项，原因是 `research_design.md`、`causal_question.yaml`、`design_risk.md` 缺失，registry 未登记，router 停在 `01_design`。
+- [x] 实现范围：新增根目录 `research_design.md`、`causal_question.yaml`、`design_risk.md`；更新 `tasks/artifact-registry.md` 登记 01 三项产物为 `present`；不写文献矩阵、不跑数据、不跑估计。
+- [x] 验证：目标测试 5 项通过；`python3 scripts/21_route_next_workflow.py` 输出 `NEXT 02_literature`；`python3 scripts/25_agent_runtime_preflight.py` 输出 PASS。
+- [ ] 下一步：执行 `02_literature`，生成 `litreview/query_plan.json`、`litreview/literature_candidates.csv`、`references.bib`、`litreview/contribution_matrix.md`，并替换旧的 fallback/stub 文献。
+
+## 2026-06-16 StatspAI Runtime Bootstrap + P5 Install
+
+- [x] 节点目标：把 CHARLS 项目沉淀出的 P0-P3 runtime 底座迁移到本模板项目，并安装 P5 `statspai-empirical-workflow-runtime` package。
+- [x] BDD/TDD：新增 `tasks/statspai-runtime-bootstrap-bdd.md` 和 `tests/test_statspai_runtime_bootstrap.py`，覆盖 runtime 文件安装、P5 注册层安装、preflight PASS、禁止复制 CHARLS 论文产物。
+- [x] RED 记录：首次运行 `python3 -m pytest tests/test_statspai_runtime_bootstrap.py -q` 失败，原因是缺少 `workflows/registry.json`、`scripts/25_agent_runtime_preflight.py` 等 runtime 文件。
+- [x] 实现范围：新增 `workflows/`、`scripts/`、`.codex/`、`plugins/statspai-empirical-workflow-runtime/`、`tasks/artifact-registry.md`、`artifacts/agent_trace_log.jsonl`；模板项目将 `reproduction_verify` 适配为 runtime runbook smoke check，不复制 CHARLS `verify_repro.py`、`baseline_hashes.txt`、论文和数据产物。
+- [x] 验证：`python3 -m pytest tests/test_statspai_runtime_bootstrap.py -q` 通过 3 项。
+
 ## 2026-05-28 P7-A Dataset Motherlode Index
 
 - [x] 节点目标：把用户本地公开实证数据库母库接入 Empirical Research OS 的 DataAgent 起点，形成只读、可搜索、可人工审阅的数据源 manifest。

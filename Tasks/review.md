@@ -1,5 +1,68 @@
 # Review
 
+## 2026-06-18 Workflow Dashboard Visual Tree
+
+### 行为覆盖
+
+- [x] 行为 8：`/workflow-dashboard` 首屏优先显示 `工作流树状路线图`，而不是文字摘要堆叠。
+- [x] 树图直接显示 P12-P18、P17 当前节点、P18 下一步、回退路径和 `不运行模型` 禁止路径。
+- [x] 旧的文字分支默认折叠为 `节点明细`，需要时再展开查看。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/workflow-dashboard-bdd.md` 新增行为 8。
+- RED：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q` 首次 1 failed，原因是旧页面没有 `工作流树状路线图`、`workflow-tree-map` 和 `visual_tree` 状态源。
+- 目标测试：`python3 -m pytest tests/test_workflow_dashboard_artifact.py -q`，8 passed。
+- 相邻回归：`python3 -m pytest tests/test_workflow_dashboard_artifact.py tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_parent_education_wage_p17_data_repair_preflight.py -q`，18 passed。
+- 浏览器 QA：`http://127.0.0.1:8782/workflow-dashboard` 桌面和 390px 移动端均显示树图；节点明细默认折叠；无横向溢出、无 console error。截图为 `Product/output/playwright/workflow-dashboard-tree-desktop.png`、`Product/output/playwright/workflow-dashboard-tree-mobile.png`。
+
+### 实现范围
+
+- `docs/product-control/workflow-dashboard.html`：新增原生 SVG/CSS 树图、动态 `renderVisualTree`、紧凑首屏和折叠节点明细。
+- `docs/product-control/workflow-dashboard-state.json`：新增 `visual_tree` 状态源。
+- `tests/test_workflow_dashboard_artifact.py`：新增树图优先行为测试。
+
+### 剩余风险
+
+- 当前是静态几何树图，不是可拖拽画布；后续阶段增加很多分支时，需要再把节点坐标抽成更正式的数据结构。
+
+## 2026-06-18 P17 Data Repair Preflight
+
+### 行为覆盖
+
+- [x] 行为 1：P17 读取 P13-P16 缺列阻断，确认当前 CSV 缺 `parent_education` 和 `experience`。
+- [x] 行为 2：P17 扫描本地 CFPS 候选源，生成 `famconf_parent_highest_education` 和 `person_age14_parent_education` 覆盖账本。
+- [x] 行为 3：P17 只推荐 `parent_education=max(valid father, valid mother)` 候选，不覆盖正式数据。
+- [x] 行为 4：P17 给出 `experience=max(age - education_years - 6, 0)` 候选，并明确需要确认 `edu_last -> education_years` 映射。
+- [x] 行为 5：P17 不写 `Data/Interim/parent_education_wage_repaired.csv`，不改 `Data/Final/cfps_robot_reallocation.csv`，不创建 run id，不运行模型。
+- [x] 行为 6：React 产品控制台显示 `P17 Data Repair Preflight` 和 `刷新 P17`，用户可在 UI 直接刷新并查看结果。
+
+### 测试覆盖
+
+- SDD/BDD：`Tasks/parent-education-wage-p17-data-repair-preflight-bdd.md`。
+- RED：`python3 -m pytest tests/test_parent_education_wage_p17_data_repair_preflight.py -q` 首次 4 failed，原因是 P17 API 404、React 面板没有 P17 入口。
+- 目标测试：`python3 -m pytest tests/test_parent_education_wage_p17_data_repair_preflight.py -q`，4 passed。
+- 相邻回归：`python3 -m pytest tests/test_parent_education_wage_p13_p16_demo_closure.py tests/test_parent_education_wage_p17_data_repair_preflight.py -q`，10 passed。
+- Python 编译：P17 workbench、P17 service、`Product/app.py` 通过。
+- React build：`cd Product/web-react && npm run build` 通过，保留既有 Vite chunk size warning。
+- 真实 API smoke：主项目 `POST /api/v1/projects/proj_empirical_paper_template_main/product-control/p17-data-repair-preflight` 返回 201；`famconf_parent_highest_education` 覆盖 `24401/34315`，`person_age14_parent_education` 覆盖 `4034/34315`。
+- 浏览器 QA：`http://127.0.0.1:8782/` 桌面和 390px 移动端可见 P17 区块，点击 `刷新 P17` 后 POST 201，按钮恢复，无 console error，无横向溢出；`/workflow-dashboard` 也显示 P17 当前门禁。截图为 `Product/output/playwright/product-control-p17-desktop.png`、`Product/output/playwright/product-control-p17-mobile.png`、`Product/output/playwright/workflow-dashboard-p17-desktop.png`、`Product/output/playwright/workflow-dashboard-p17-mobile.png`。
+
+### 实现范围
+
+- `Program/workbench/parent_education_wage_p17_data_repair_preflight.py`：新增 P17 数据修复预检器。
+- `Product/backend/product_control_p17_data_repair_preflight_service.py`：新增 Product API 服务层。
+- `Product/app.py`：新增 P17 GET/POST 路由。
+- `Product/web-react/src/components/ProductControlP0Panel.tsx`、`Product/web-react/src/styles.css`：新增 P17 UI、刷新按钮和响应式布局。
+- `Results/json/parent_education_wage_p17_data_repair_preflight.json`、`Reviews/parent_education_wage_p17_data_repair_preflight.md`：真实项目 P17 产物。
+- `tests/test_parent_education_wage_p17_data_repair_preflight.py`：新增 P17 API 和 React 静态契约测试。
+
+### 剩余风险
+
+- P17 只是修复预检，不是数据修复应用；下一步 P18 才能写新的 `Data/Interim/parent_education_wage_repaired.csv`。
+- `experience` 仍需确认 `edu_last` 到教育年限的映射，不能直接跑模型。
+- 正式数据 `Data/Final/cfps_robot_reallocation.csv` 仍未被覆盖，这是本阶段的预期边界。
+
 ## 2026-06-18 P13-P16 Demo Closure
 
 ### 行为覆盖

@@ -12,7 +12,7 @@ import { SupervisorPlanReview } from "./components/SupervisorPlanReview";
 import { AutoResearchStream } from "./components/AutoResearchStream";
 import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
-import { ProductControlP0Panel } from "./components/ProductControlP0Panel";
+import { PaperProductionStatusPanel } from "./components/PaperProductionStatusPanel";
 import { ServiceConnectionRecovery } from "./components/ServiceConnectionRecovery";
 import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
@@ -76,6 +76,8 @@ const STAGE_ORDER: Stage[] = [
 ];
 
 const TOPIC_INTAKE_TIMEOUT_MS = 30000;
+const CANONICAL_PARENT_EDUCATION_PROJECT_ID = "proj_empirical_paper_template_main";
+const CANONICAL_CGSS_HAPPINESS_PROJECT_ID = "proj_cgss_social_capital_happiness";
 
 const STAGE_LABELS: Record<
   Stage,
@@ -177,6 +179,25 @@ function buildInitialTaskFromUrl(): SubmittedResearchTask | null {
 
 function initialTopicSlugFromUrl(): string {
   return slugify(buildInitialTaskFromUrl()?.message ?? "");
+}
+
+function canonicalProjectIdForTask(task: SubmittedResearchTask | null, topicSlug: string): string {
+  const topic = task?.message ?? "";
+  const isParentEducationWageDemo =
+    topic.includes("父母") &&
+    (topic.includes("教育水平") || topic.includes("受教育水平")) &&
+    (topic.includes("工资") || topic.includes("收入"));
+  if (isParentEducationWageDemo) {
+    return CANONICAL_PARENT_EDUCATION_PROJECT_ID;
+  }
+  const isCgssHappinessPaper =
+    topic.includes("CGSS") &&
+    (topic.includes("幸福感") || topic.toLowerCase().includes("happiness")) &&
+    (topic.includes("互联网") || topic.includes("社会资本") || topic.toLowerCase().includes("internet"));
+  if (isCgssHappinessPaper) {
+    return CANONICAL_CGSS_HAPPINESS_PROJECT_ID;
+  }
+  return topicSlug ? `proj_${topicSlug.replace(/-/g, "_")}` : "";
 }
 
 async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -465,7 +486,7 @@ export function App() {
   const currentStageIndex = STAGE_ORDER.indexOf(activeStage);
   const nextStage = STAGE_ORDER[currentStageIndex + 1] ?? null;
   const currentApiBase = apiBase() || "同源服务";
-  const candidateProjectId = topicSlug ? `proj_${topicSlug.replace(/-/g, "_")}` : "";
+  const candidateProjectId = canonicalProjectIdForTask(task, topicSlug);
   const effectiveProjectId = projectId || candidateProjectId;
   const handleResetApiBase = () => {
     const targetApiBase = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(currentApiBase)
@@ -603,7 +624,7 @@ export function App() {
   };
 
   return (
-    <main className="app-shell analysis-workspace">
+    <main className="app-shell analysis-workspace" data-effective-project-id={effectiveProjectId}>
       <DottedSurface />
       <section className="analysis-workspace__header">
         <button
@@ -626,10 +647,13 @@ export function App() {
             {" · "}文件 {task.fileCount} · 长文本 {task.pastedCount} · 任务编号：{" "}
             <code data-testid="topic-slug">{topicSlug}</code>
           </p>
-          <SystemStatusBar
-            projectId={effectiveProjectId}
-            topicSlug={topicSlug}
-          />
+          <details className="analysis-workspace__connection">
+            <summary>连接状态</summary>
+            <SystemStatusBar
+              projectId={effectiveProjectId}
+              topicSlug={topicSlug}
+            />
+          </details>
         </div>
       </section>
 
@@ -642,45 +666,51 @@ export function App() {
         ) : null}
 
         {effectiveProjectId ? (
-          <ProductControlP0Panel projectId={effectiveProjectId} />
+          <PaperProductionStatusPanel
+            projectId={effectiveProjectId}
+            fallbackProjectId={CANONICAL_PARENT_EDUCATION_PROJECT_ID}
+            topic={task.message}
+          />
         ) : null}
 
-        <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
+        <details className="analysis-workspace__flow-details">
+          <summary>研究流程</summary>
+          <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
 
-        <div className="stage-panel__current-action" data-testid="stage-current-action">
-          <span>现在只做</span>
-          <strong>{currentStageMeta.action}</strong>
-          <span>完成后进入：{currentStageMeta.next}</span>
-        </div>
-
-        <div className="stage-panel__guide" data-testid="stage-guide">
-          <div>
-            <span>当前交付</span>
+          <div className="stage-panel__current-action" data-testid="stage-current-action">
+            <span>现在只做</span>
             <strong>{currentStageMeta.action}</strong>
-            <p>{stageRequirement(activeStage)}</p>
+            <span>完成后进入：{currentStageMeta.next}</span>
           </div>
-          <div data-testid="stage-unlock-requirement">
-            <span>下一步门槛</span>
-            <strong>{nextStage ? STAGE_LABELS[nextStage].label : "已到最后阶段"}</strong>
-            <p>{nextStage ? stageRequirement(nextStage) : "完成识别审计后进入导出或修订。"}</p>
-          </div>
-        </div>
 
-        <ol className="stage-unlock-list" data-testid="stage-unlock-list" aria-label="阶段解锁条件">
-          {STAGE_ORDER.map((stage) => {
-            const unlocked = canEnter(stage);
-            return (
-              <li
-                className={stage === activeStage ? "stage-unlock-list__item stage-unlock-list__item--active" : "stage-unlock-list__item"}
-                key={stage}
-              >
-                <span>{stageStatusLabel(stage, activeStage, unlocked)}</span>
-                <strong>{STAGE_LABELS[stage].label}</strong>
-                <p>{unlocked ? STAGE_LABELS[stage].hint : stageRequirement(stage)}</p>
-              </li>
-            );
-          })}
-        </ol>
+          <div className="stage-panel__guide" data-testid="stage-guide">
+            <div>
+              <span>当前交付</span>
+              <strong>{currentStageMeta.action}</strong>
+              <p>{stageRequirement(activeStage)}</p>
+            </div>
+            <div data-testid="stage-unlock-requirement">
+              <span>下一步门槛</span>
+              <strong>{nextStage ? STAGE_LABELS[nextStage].label : "已到最后阶段"}</strong>
+              <p>{nextStage ? stageRequirement(nextStage) : "完成识别审计后进入导出或修订。"}</p>
+            </div>
+          </div>
+
+          <ol className="stage-unlock-list" data-testid="stage-unlock-list" aria-label="阶段解锁条件">
+            {STAGE_ORDER.map((stage) => {
+              const unlocked = canEnter(stage);
+              return (
+                <li
+                  className={stage === activeStage ? "stage-unlock-list__item stage-unlock-list__item--active" : "stage-unlock-list__item"}
+                  key={stage}
+                >
+                  <span>{stageStatusLabel(stage, activeStage, unlocked)}</span>
+                  <strong>{STAGE_LABELS[stage].label}</strong>
+                  <p>{unlocked ? STAGE_LABELS[stage].hint : stageRequirement(stage)}</p>
+                </li>
+              );
+            })}
+          </ol>
 
         {activeStage === "brief" ? (
           task.mode === "codex-supervisor" ? (
@@ -860,6 +890,7 @@ export function App() {
           <strong>{currentStageMeta.label}</strong>
           <p>{currentStageMeta.hint}</p>
         </div>
+        </details>
       </section>
     </main>
   );

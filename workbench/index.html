@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workbench · 论文流水线</title>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --text-primary: #1a1d23;
+      --text-secondary: #5a5f6b;
+      --text-muted: #8c919d;
+      --border: #e3e5e8;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --status-done: #10b981;
+      --status-done-bg: #ecfdf5;
+      --status-running: #3b82f6;
+      --status-running-bg: #eff6ff;
+      --status-blocked: #ef4444;
+      --status-blocked-bg: #fef2f2;
+      --status-pending: #6b7280;
+      --status-pending-bg: #f3f4f6;
+      --font-mono: 'SF Mono', Menlo, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Header ──────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .pipeline-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .pipeline-status.idle { background: var(--status-pending-bg); color: var(--status-pending); }
+    .pipeline-status.running { background: var(--status-running-bg); color: var(--status-running); }
+    .pipeline-status.blocked { background: var(--status-blocked-bg); color: var(--status-blocked); }
+    .pipeline-status.done { background: var(--status-done-bg); color: var(--status-done); }
+
+    .summary {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .summary-item {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    .summary-label {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .summary-value {
+      font-weight: 700;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-value.done { color: var(--status-done); }
+    .summary-value.failed { color: var(--status-blocked); }
+    .summary-value.total { color: var(--text-primary); }
+
+    /* ─── Progress bar ─────────────────────────────────── */
+    .progress-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--status-done);
+      border-radius: 2px;
+      transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* ─── Grid ────────────────────────────────────────── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .header { padding: 16px; }
+      .container { padding: 16px; }
+      .summary { gap: 16px; }
+    }
+
+    /* ─── Card ────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-1px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px 20px;
+    }
+
+    .step-number {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 700;
+      background: var(--bg);
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      flex-shrink: 0;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-top: 8px;
+    }
+
+    .status-dot.done { background: var(--status-done); box-shadow: 0 0 0 3px var(--status-done-bg); }
+    .status-dot.running { background: var(--status-running); box-shadow: 0 0 0 3px var(--status-running-bg); animation: pulse 2s infinite; }
+    .status-dot.blocked { background: var(--status-blocked); box-shadow: 0 0 0 3px var(--status-blocked-bg); }
+    .status-dot.pending { background: var(--status-pending); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .card-title-area { flex: 1; min-width: 0; }
+
+    .card-step-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 4px;
+    }
+
+    .card-purpose {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+
+    .card-meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .expand-hint {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .card:hover .expand-hint { opacity: 1; }
+
+    /* ─── Expandable details ───────────────────────────── */
+    .card-details {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .card.expanded .card-details {
+      max-height: 1200px;
+    }
+
+    .card.expanded .expand-icon { transform: rotate(180deg); }
+
+    .expand-icon {
+      transition: transform 0.25s ease;
+      display: inline-block;
+    }
+
+    .details-inner {
+      padding: 16px 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .detail-section {
+      margin-bottom: 16px;
+    }
+
+    .detail-section:last-child { margin-bottom: 0; }
+
+    .detail-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .artifact-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .artifact-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .artifact-tag.missing { color: var(--status-blocked); border-color: #fecaca; background: var(--status-blocked-bg); }
+    .artifact-tag.present { color: var(--status-done); border-color: #a7f3d0; background: var(--status-done-bg); }
+
+    .checkpoint-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .checkpoint-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      background: var(--bg);
+      border-radius: 6px;
+    }
+
+    .checkpoint-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .failure-code-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .failure-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 8px;
+      background: #fef3c7;
+      color: #92400e;
+      border-radius: 4px;
+      border: 1px solid #fde68a;
+    }
+
+    .gate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .gate-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 4px 0;
+    }
+
+    .gate-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.03em;
+    }
+
+    .gate-badge.automated { background: var(--status-running-bg); color: var(--status-running); }
+    .gate-badge.human { background: #fef3c7; color: #92400e; }
+
+    .gate-command {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+
+    /* ─── Loading & error states ───────────────────────── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .error-banner {
+      background: var(--status-blocked-bg);
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    /* ─── Misc ────────────────────────────────────────── */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header" id="header" style="display:none;">
+    <div class="header-inner">
+      <div class="header-top">
+        <div class="title">论文流水线</div>
+        <div class="pipeline-status" id="pipelineStatus">idle</div>
+      </div>
+      <div class="summary">
+        <div class="summary-item">
+          <span class="summary-label">进度</span>
+          <span class="summary-value total" id="progressText">0 / 10</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">完成</span>
+          <span class="summary-value done" id="doneCount">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">失败</span>
+          <span class="summary-value failed" id="failedCount">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">待处理</span>
+          <span class="summary-value" id="pendingCount">10</span>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressBar" style="width: 0%"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="loading" id="loading">正在加载工作台数据…</div>
+    <div class="error-banner" id="errorBanner" style="display:none;"></div>
+    <div class="grid" id="grid" style="display:none;"></div>
+  </main>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // ── Paths (relative to workbench/) ─────────────────
+      const REGISTRY_PATH = '../workflows/registry.json';
+      const STATE_PATH = '../artifacts/pipeline_state.json';
+      const RUNBOOK_PATH = '../artifacts/workflow_runbook_state.json';
+
+      // ── Status helpers ──────────────────────────────────
+      function statusClass(status) {
+        const map = { done: 'done', running: 'running', blocked: 'blocked', failed: 'blocked', stopped: 'blocked', idle: 'pending', pending: 'pending' };
+        return map[status] || 'pending';
+      }
+
+      function statusLabel(status) {
+        const map = { done: '完成', running: '进行中', blocked: '阻塞', failed: '失败', stopped: '停止', idle: '待处理', pending: '待处理' };
+        return map[status] || status;
+      }
+
+      // ── Fetch JSON with fallback ────────────────────────
+      async function fetchJSON(url) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`${url}: ${resp.status} ${resp.statusText}`);
+        return resp.json();
+      }
+
+      // ── Merge data sources ──────────────────────────────
+      function buildStepView(step, stateMap, failureCodesMap, issuesMap) {
+        const hist = stateMap[step.id];
+        let status = 'pending';
+        let note = '';
+
+        if (hist) {
+          status = hist.result === 'done' ? 'done' : (hist.result === 'blocked' || hist.result === 'failed' ? 'blocked' : 'pending');
+          note = hist.note || '';
+        }
+
+        const hasIssues = (issuesMap[step.id] || []).length > 0;
+        if (hasIssues && status === 'pending') status = 'blocked';
+
+        const failureCodes = failureCodesMap[step.id] || [];
+        const issues = issuesMap[step.id] || [];
+        const requiredOutputs = step.required_outputs || [];
+
+        // Gate commands (automated only)
+        const gateCommands = (step.gates || []).filter(g => g.type === 'automated' && g.command);
+
+        return {
+          id: step.id,
+          step: step.step,
+          name: step.name,
+          purpose: step.purpose,
+          status,
+          note,
+          statusClass: statusClass(status),
+          statusLabel: statusLabel(status),
+          requiredOutputs,
+          humanCheckpoints: step.human_checkpoints || [],
+          failureCodes,
+          issues,
+          gateCommands,
+          rollbackTo: step.rollback_to || null,
+        };
+      }
+
+      // ── Render a single card ────────────────────────────
+      function renderCard(view) {
+        const hasDetails = view.requiredOutputs.length > 0 || view.humanCheckpoints.length > 0 || view.failureCodes.length > 0 || view.gateCommands.length > 0;
+
+        const artifactsHTML = view.requiredOutputs.map(o => {
+          const isMissing = view.issues.some(i => i.includes(o.artifact));
+          const cls = isMissing ? 'artifact-tag missing' : 'artifact-tag present';
+          const icon = isMissing ? '✕' : '✓';
+          return `<span class="${cls}" title="${o.path_hint}">${icon} ${o.artifact}</span>`;
+        }).join('');
+
+        const checkpointsHTML = view.humanCheckpoints.map(cp =>
+          `<div class="checkpoint-item"><span class="checkpoint-icon">🔔</span><span>${cp}</span></div>`
+        ).join('');
+
+        const failuresHTML = view.failureCodes.map(fc =>
+          `<span class="failure-code">${fc}</span>`
+        ).join('');
+
+        const gatesHTML = view.gateCommands.map(g =>
+          `<div class="gate-item">
+            <span class="gate-badge automated">自动</span>
+            <span class="gate-command" title="${g.command}">${g.command}</span>
+          </div>`
+        ).join('');
+
+        const rollbackHTML = view.rollbackTo
+          ? `<div class="detail-section" style="margin-top:12px;">
+               <div class="detail-section-title">回退目标</div>
+               <div class="artifact-tag">${view.rollbackTo}</div>
+             </div>`
+          : '';
+
+        const detailsHTML = hasDetails ? `
+          <div class="card-details">
+            <div class="details-inner">
+              ${view.requiredOutputs.length ? `
+                <div class="detail-section">
+                  <div class="detail-section-title">产物要求</div>
+                  <div class="artifact-list">${artifactsHTML}</div>
+                </div>` : ''}
+              ${view.gateCommands.length ? `
+                <div class="detail-section">
+                  <div class="detail-section-title">自动门控</div>
+                  <div class="gate-list">${gatesHTML}</div>
+                </div>` : ''}
+              ${view.humanCheckpoints.length ? `
+                <div class="detail-section">
+                  <div class="detail-section-title">人工检查点</div>
+                  <div class="checkpoint-list">${checkpointsHTML}</div>
+                </div>` : ''}
+              ${view.failureCodes.length ? `
+                <div class="detail-section">
+                  <div class="detail-section-title">失败代码</div>
+                  <div class="failure-code-list">${failuresHTML}</div>
+                </div>` : ''}
+              ${rollbackHTML}
+            </div>
+          </div>` : '';
+
+        const noteHTML = view.note ? `<div class="card-meta" style="padding-top:6px;color:var(--status-blocked);font-size:12px;">⚠ ${view.note}</div>` : '';
+
+        return `
+          <div class="card" data-id="${view.id}" role="button" tabindex="0" aria-expanded="false">
+            <div class="card-header">
+              <div class="step-number">${view.step}</div>
+              <div class="status-dot ${view.statusClass}"></div>
+              <div class="card-title-area">
+                <div class="card-step-id">${view.id}</div>
+                <div class="card-title">${view.name}</div>
+                <div class="card-purpose">${view.purpose}</div>
+              </div>
+            </div>
+            ${noteHTML}
+            <div class="card-meta">
+              <span class="card-meta-item">
+                <span class="status-dot ${view.statusClass}" style="width:8px;height:8px;margin-top:0;"></span>
+                ${view.statusLabel}
+              </span>
+              ${hasDetails ? `<span class="card-meta-item">点击展开详情 <span class="expand-icon">▾</span></span>` : ''}
+            </div>
+            ${detailsHTML}
+          </div>
+        `;
+      }
+
+      // ── Main ────────────────────────────────────────────
+      async function init() {
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('errorBanner');
+        const gridEl = document.getElementById('grid');
+        const headerEl = document.getElementById('header');
+
+        let registry, state, runbook;
+        let errors = [];
+
+        // Load registry (required)
+        try {
+          registry = await fetchJSON(REGISTRY_PATH);
+        } catch (e) {
+          errors.push(`无法加载 workflows/registry.json: ${e.message}`);
+        }
+
+        // Load pipeline state (optional)
+        try {
+          state = await fetchJSON(STATE_PATH);
+        } catch (e) {
+          state = null;
+        }
+
+        // Load runbook state (for failure_codes, optional)
+        try {
+          runbook = await fetchJSON(RUNBOOK_PATH);
+        } catch (e) {
+          runbook = null;
+        }
+
+        if (errors.length > 0) {
+          loadingEl.style.display = 'none';
+          errorEl.textContent = errors.join('；');
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        // Build lookup maps
+        const workflows = registry.workflows || [];
+        // Filter to main 10 steps (01-10), drop 05x
+        const mainSteps = workflows.filter(w => /^0[1-9]_/.test(w.id) || /^10_/.test(w.id));
+        const stepOrder = ['01_design','02_literature','03_paper_reading','04_data_gate','05_causal_analysis','06_writing','07_revision','08_format_citation','09_replication','10_defense'];
+        const steps = stepOrder.map(id => mainSteps.find(w => w.id === id)).filter(Boolean);
+
+        // State map: step_id -> { result, note, timestamp }
+        const stateMap = {};
+        if (state && Array.isArray(state.history)) {
+          state.history.forEach(h => {
+            stateMap[h.step_id] = { result: h.result, note: h.note, timestamp: h.timestamp };
+          });
+        }
+
+        // Failure codes map from runbook
+        const failureCodesMap = {};
+        const issuesMap = {};
+        if (runbook && Array.isArray(runbook.workflows)) {
+          runbook.workflows.forEach(w => {
+            if (w.failure_codes) failureCodesMap[w.id] = w.failure_codes;
+            if (w.current_issues) issuesMap[w.id] = w.current_issues;
+          });
+        }
+
+        // Build views
+        const views = steps.map(s => buildStepView(s, stateMap, failureCodesMap, issuesMap));
+
+        // Compute summary stats
+        const doneCount = views.filter(v => v.status === 'done').length;
+        const failedCount = views.filter(v => v.status === 'blocked' || v.status === 'failed').length;
+        const pendingCount = views.filter(v => v.status === 'pending').length;
+        const total = views.length;
+        const overallStatus = state ? state.status : 'idle';
+
+        // Update header
+        headerEl.style.display = 'block';
+        const statusEl = document.getElementById('pipelineStatus');
+        statusEl.textContent = statusLabel(overallStatus);
+        statusEl.className = 'pipeline-status ' + statusClass(overallStatus);
+
+        document.getElementById('progressText').textContent = `${doneCount} / ${total}`;
+        document.getElementById('doneCount').textContent = doneCount;
+        document.getElementById('failedCount').textContent = failedCount;
+        document.getElementById('pendingCount').textContent = pendingCount;
+        document.getElementById('progressBar').style.width = `${(doneCount / total) * 100}%`;
+
+        // Render grid
+        loadingEl.style.display = 'none';
+        gridEl.style.display = 'grid';
+        gridEl.innerHTML = views.map(renderCard).join('');
+
+        // ── Expand/collapse logic ──────────────────────────
+        gridEl.addEventListener('click', (e) => {
+          const card = e.target.closest('.card');
+          if (!card) return;
+          // Prevent collapse when clicking a link/button inside
+          if (e.target.closest('a, button, input')) return;
+          const isExpanded = card.classList.contains('expanded');
+          // Collapse all
+          gridEl.querySelectorAll('.card.expanded').forEach(c => c.classList.remove('expanded'));
+          // Toggle clicked
+          if (!isExpanded) {
+            card.classList.add('expanded');
+            card.setAttribute('aria-expanded', 'true');
+          } else {
+            card.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        // Keyboard support
+        gridEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            const card = e.target.closest('.card');
+            if (!card) return;
+            e.preventDefault();
+            card.click();
+          }
+        });
+      }
+
+      // Boot
+      init().catch(err => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('errorBanner').textContent = '初始化失败: ' + err.message;
+        document.getElementById('errorBanner').style.display = 'block';
+      });
+    })();
+  </script>
+</body>
+</html>

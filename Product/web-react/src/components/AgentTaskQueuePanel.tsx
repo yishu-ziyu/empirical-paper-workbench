@@ -798,7 +798,7 @@ function skillQualityGateText(skill?: InternalSkillBinding): string {
   if (machine && manual) return `机器检查：${machine}；人工审阅：${manual}`;
   if (machine) return `机器检查：${machine}`;
   if (manual) return `人工审阅：${manual}`;
-  return "等待队列生成质量门。";
+  return "等待队列生成审阅检查。";
 }
 
 function backendOptionLabel(backendId?: string): string {
@@ -1014,7 +1014,7 @@ function renderTaskSkillReview(
           <strong>{expectedArtifacts}</strong>
         </div>
         <div>
-          <small>质量门</small>
+          <small>审阅检查</small>
           <strong>{skillQualityGateText(skill)}</strong>
         </div>
         <div>
@@ -1060,8 +1060,8 @@ function renderTaskSkillReview(
           <strong>{internalSkillPacketReady ? "派工批准条件已满足" : "先生成执行包，派工批准才会开放"}</strong>
           <p>
             {internalSkillPacketReady
-              ? "执行步骤、质量门和正式层边界已落盘，下一步可以进入派工审阅。"
-              : "系统会先把 Skill 的操作步骤、质量门和正式层边界写成可审阅文件。"}
+              ? "执行步骤、审阅检查和正式层边界已落盘，下一步可以进入派工审阅。"
+              : "系统会先把 Skill 的操作步骤、审阅检查和正式层边界写成可审阅文件。"}
           </p>
         </div>
       ) : null}
@@ -1091,7 +1091,7 @@ function renderTaskSkillReview(
             {options?.generatingSkillPacket ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
             <span>{options?.generatingSkillPacket ? "生成中" : "生成 Skill 执行包"}</span>
           </button>
-          <p>先把 Skill 的操作步骤、质量门和正式层边界落成本地文件，再进入派工审阅。</p>
+          <p>先把 Skill 的操作步骤、审阅检查和正式层边界落成本地文件，再进入派工审阅。</p>
         </div>
       ) : null}
     </div>

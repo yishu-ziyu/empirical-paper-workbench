@@ -40,6 +40,8 @@ class AgentClusterWorkflowApiTests(unittest.TestCase):
         self.assertEqual(workflow["execution_provider"], "local_codex")
         self.assertEqual(workflow["provider_status"]["provider"], "local_codex")
         self.assertEqual(len(created["tasks"]), 10)
+        self.assertEqual(created["tasks"][0]["agent_name"], "ResearchIntentAgent")
+        self.assertEqual(created["tasks"][-1]["agent_name"], "ExportAgent")
         self.assertEqual(created["artifacts"], [])
 
         response = self.client.post(f"/api/v1/workflows/{workflow_id}/start")
@@ -57,6 +59,21 @@ class AgentClusterWorkflowApiTests(unittest.TestCase):
         self.assertEqual(bundle["workflow"]["status"], "completed")
         self.assertEqual(len(bundle["tasks"]), 10)
         self.assertTrue(all(task["status"] == "completed" for task in bundle["tasks"]))
+        self.assertEqual(
+            [task["agent_name"] for task in bundle["tasks"]],
+            [
+                "ResearchIntentAgent",
+                "LiteratureAgent",
+                "DataAgent",
+                "MethodAgent",
+                "ExecutionAgent",
+                "RobustnessAgent",
+                "ManuscriptAgent",
+                "ReviewerAgent",
+                "ReplicationAgent",
+                "ExportAgent",
+            ],
+        )
         self.assertEqual(len(bundle["artifacts"]), 10)
 
         task_id = bundle["tasks"][0]["id"]
@@ -67,12 +84,13 @@ class AgentClusterWorkflowApiTests(unittest.TestCase):
         artifact_id = bundle["artifacts"][0]["id"]
         response = self.client.get(f"/api/v1/artifacts/{artifact_id}")
         self.assertEqual(response.status_code, 200, msg=response.text)
-        self.assertIn("Evidence level: mock", response.json()["content"])
+        self.assertEqual(response.json()["artifact"]["evidence_level"], "pipeline_contract")
+        self.assertIn("Evidence level: pipeline_contract", response.json()["content"])
 
         response = self.client.get(f"/api/v1/workflows/{workflow_id}/report")
         self.assertEqual(response.status_code, 200, msg=response.text)
         self.assertTrue(response.json()["path"].endswith("final_research_report.md"))
-        self.assertIn("mock evidence", response.json()["content"])
+        self.assertIn("Paper Pipeline Contract", response.json()["content"])
 
         response = self.client.post(
             f"/api/v1/artifacts/{artifact_id}/promote",

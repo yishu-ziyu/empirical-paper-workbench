@@ -138,13 +138,19 @@ class ParentEducationWageP13P16DemoClosureTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201, msg=response.text)
         body = response.json()
-        self.assertEqual(body["status"], "demo_closure_model_results_ready")
+        self.assertEqual(body["status"], "demo_closure_complete_paper_draft_ready")
         self.assertEqual(body["p13_run_plan_approval"]["status"], "run_plan_approved_for_baseline_ols")
         self.assertEqual(body["p14_execution_ledger"]["status"], "execution_completed_minimal_ols")
         self.assertIsNotNone(body["p14_execution_ledger"]["run_id"])
         self.assertTrue(body["p14_execution_ledger"]["executed_regression"])
         self.assertEqual(body["p14_execution_ledger"]["model_results"]["treatment_variable"], "parent_education")
+        self.assertEqual(body["p15_draft_package"]["status"], "complete_paper_draft_package_ready")
+        self.assertTrue(body["p15_draft_package"]["can_export_complete_paper"])
         self.assertTrue(body["p16_acceptance_packet"]["can_claim_model_result"])
+        self.assertTrue(body["p16_acceptance_packet"]["can_claim_complete_paper"])
+        self.assertFalse(body["p16_acceptance_packet"]["can_claim_submission_ready"])
+        self.assertTrue((self.project_root / "Manuscripts/generated/parent_education_wage_complete_paper_draft.md").exists())
+        self.assertTrue((self.project_root / "Submissions/parent_education_wage_paper_draft.docx").exists())
 
     def test_bdd_dashboard_speaks_plain_project_language(self) -> None:
         """行为 6：控制台必须先回答能交付什么、还缺什么、下一步做什么。"""

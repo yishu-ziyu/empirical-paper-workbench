@@ -57,9 +57,9 @@ class ParentEducationWageP10ProductControlIATests(unittest.TestCase):
         )
         self.assertIn("grid-template-columns: 1fr", self.styles)
 
-    def test_bdd_p10e_product_control_renders_before_generic_stage_tabs(self) -> None:
-        """行为 5：当前门禁必须出现在通用研究阶段导航之前。"""
-        product_control_index = self.app.index("<ProductControlP0Panel")
+    def test_bdd_p10e_paper_production_renders_before_generic_stage_tabs(self) -> None:
+        """行为 5：论文生产状态必须出现在通用研究阶段导航之前。"""
+        product_control_index = self.app.index("<PaperProductionStatusPanel")
         slide_tabs_index = self.app.index("<SlideTabs")
         self.assertLess(product_control_index, slide_tabs_index)
 

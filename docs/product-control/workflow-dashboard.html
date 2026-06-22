@@ -49,15 +49,11 @@
         width: 100%;
         max-width: 1212px;
         margin: 0 auto;
-        padding: 48px 16px 64px;
+        padding: 34px 16px 64px;
       }
 
       .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
-        gap: 28px;
-        align-items: stretch;
-        min-height: 250px;
+        min-height: 0;
       }
 
       .hero > * {
@@ -78,8 +74,8 @@
       h1 {
         max-width: 780px;
         margin: 0;
-        font-size: clamp(40px, 4.6vw, 64px);
-        line-height: 1.04;
+        font-size: clamp(34px, 3.5vw, 48px);
+        line-height: 1.08;
         letter-spacing: 0;
         overflow-wrap: break-word;
       }
@@ -90,9 +86,9 @@
 
       .hero-copy {
         max-width: 760px;
-        margin: 20px 0 0;
+        margin: 12px 0 0;
         color: var(--muted);
-        font-size: 22px;
+        font-size: 18px;
         line-height: 1.45;
       }
 
@@ -112,6 +108,24 @@
         min-height: 250px;
         padding: 26px;
         box-shadow: 0 20px 60px rgba(23, 23, 23, 0.08);
+      }
+
+      .status-card--compact {
+        min-height: 0;
+        margin-top: 18px;
+        padding: 20px;
+      }
+
+      .status-card--compact dl {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .status-card--compact dd {
+        font-size: 20px;
+      }
+
+      .status-card--compact .guardrail {
+        margin-top: 16px;
       }
 
       .status-card dl {
@@ -151,6 +165,170 @@
         color: var(--accent-dark);
         font-weight: 700;
         overflow-wrap: anywhere;
+      }
+
+      .workflow-tree-map {
+        margin-top: 28px;
+        border: 1px solid #d8d4cc;
+        background: #fffefa;
+        box-shadow: 0 18px 48px rgba(23, 23, 23, 0.08);
+      }
+
+      .workflow-tree-map__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: end;
+        padding: 22px 24px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .workflow-tree-map__header h2 {
+        font-size: 30px;
+      }
+
+      .workflow-tree-map__hint {
+        max-width: 430px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      .tree-map-canvas {
+        position: relative;
+        min-height: 520px;
+        padding: 26px 24px 24px;
+        overflow-x: auto;
+      }
+
+      .tree-map-lines {
+        position: absolute;
+        inset: 26px 24px 24px;
+        width: calc(100% - 48px);
+        height: calc(100% - 50px);
+        min-width: 1020px;
+        pointer-events: none;
+      }
+
+      .tree-map-lines path {
+        fill: none;
+        stroke: #959083;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .tree-map-lines .line-current {
+        stroke: var(--ok);
+        stroke-width: 4;
+      }
+
+      .tree-map-lines .line-blocked,
+      .tree-map-lines .line-forbidden {
+        stroke: var(--accent);
+        stroke-dasharray: 12 8;
+      }
+
+      .tree-map-lines .line-fallback {
+        stroke: var(--warn);
+        stroke-dasharray: 8 7;
+      }
+
+      .tree-map-nodes {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(138px, 1fr));
+        grid-template-rows: repeat(4, minmax(98px, auto));
+        gap: 28px 18px;
+        min-width: 1020px;
+      }
+
+      .visual-node {
+        display: flex;
+        min-width: 0;
+        min-height: 104px;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 14px;
+        border: 2px solid #c9c3b8;
+        background: #ffffff;
+        box-shadow: 0 12px 28px rgba(23, 23, 23, 0.08);
+      }
+
+      .visual-node__id {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .visual-node strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 18px;
+        line-height: 1.18;
+        overflow-wrap: anywhere;
+      }
+
+      .visual-node span {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      .visual-node[data-status="done"] {
+        border-color: rgba(28, 111, 85, 0.38);
+        background: #f4fbf7;
+      }
+
+      .visual-node[data-status="current"] {
+        border-color: var(--ok);
+        background: #eaf8f1;
+        box-shadow: 0 16px 34px rgba(28, 111, 85, 0.16);
+      }
+
+      .visual-node[data-status="next"] {
+        border-color: #255f9f;
+        background: #eef6ff;
+      }
+
+      .visual-node[data-status="blocked"],
+      .visual-node[data-status="forbidden"] {
+        border-color: var(--accent);
+        background: #fff3ef;
+      }
+
+      .visual-node[data-status="fallback"] {
+        border-color: var(--warn);
+        background: #fff8e8;
+      }
+
+      .tree-map-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 24px 22px;
+      }
+
+      .tree-map-legend span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", monospace;
+        font-size: 12px;
+        font-weight: 750;
       }
 
       .executive-panel {
@@ -260,6 +438,30 @@
 
       .section {
         margin-top: 34px;
+      }
+
+      .branch-details {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.7);
+      }
+
+      .branch-details summary {
+        display: flex;
+        cursor: pointer;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 18px;
+        font-weight: 850;
+      }
+
+      .branch-details summary small {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .branch-details .tree-wrap {
+        padding: 0 18px 18px;
       }
 
       .section-header {
@@ -507,6 +709,14 @@
           display: block;
         }
 
+        .workflow-tree-map__header {
+          display: block;
+        }
+
+        .workflow-tree-map__hint {
+          margin-top: 8px;
+        }
+
         .executive-panel__hint {
           margin-top: 8px;
         }
@@ -523,7 +733,7 @@
         }
 
         .status-card {
-          min-height: 240px;
+          min-height: 0;
         }
       }
 
@@ -536,11 +746,11 @@
         }
 
         h1 {
-          font-size: 34px;
+          font-size: 30px;
         }
 
         .hero-copy {
-          font-size: 18px;
+          display: none;
         }
 
         .section-header {
@@ -565,6 +775,10 @@
           border-bottom: 1px solid var(--line);
         }
 
+        .status-card--compact dl {
+          grid-template-columns: 1fr;
+        }
+
         .executive-grid div:last-child {
           border-bottom: 0;
         }
@@ -572,6 +786,36 @@
         .tree-lane {
           grid-template-columns: 1fr;
           overflow-x: visible;
+        }
+
+        .tree-map-canvas {
+          min-height: auto;
+          padding: 16px;
+          overflow-x: visible;
+        }
+
+        .tree-map-lines {
+          display: none;
+        }
+
+        .tree-map-nodes {
+          display: grid;
+          min-width: 0;
+          grid-template-columns: 1fr;
+          grid-template-rows: none;
+          gap: 12px;
+          padding-left: 14px;
+          border-left: 3px solid var(--line);
+        }
+
+        .visual-node {
+          grid-column: auto !important;
+          grid-row: auto !important;
+          min-height: auto;
+        }
+
+        .tree-map-legend {
+          padding: 0 16px 18px;
         }
 
         .tree-node {
@@ -602,25 +846,100 @@
           </p>
           <div class="live-status" data-field="live_status" role="status">正在读取状态</div>
         </div>
-
-        <aside class="status-card" aria-label="当前工作流状态">
-          <dl>
-            <div>
-              <dt>当前步骤</dt>
-              <dd class="current-step" data-field="current_step">交付 / 验收</dd>
-            </div>
-            <div>
-              <dt>下一步</dt>
-              <dd class="next-step" data-field="next_step">补齐真实字段后重跑</dd>
-            </div>
-            <div>
-              <dt>当前门禁</dt>
-              <dd data-field="current_gate">P16 半成品交付包已生成</dd>
-            </div>
-          </dl>
-          <div class="guardrail" data-field="guardrail">已推到 P16 阻断分支 · 交付半成品论文和红标问题清单 · 不运行模型，不伪造回归结果</div>
-        </aside>
       </section>
+
+      <section
+        class="workflow-tree-map"
+        aria-labelledby="visual-tree-title"
+        data-dashboard-section="visual_tree"
+      >
+        <div class="workflow-tree-map__header">
+          <h2 id="visual-tree-title" data-field="visual_tree_title">工作流树状路线图</h2>
+          <p class="workflow-tree-map__hint" data-field="visual_tree_subtitle">
+            先看图：绿色是已经确认的路径，红色是阻断或禁止动作，蓝色是下一步。
+          </p>
+        </div>
+        <div class="tree-map-canvas">
+          <svg class="tree-map-lines" viewBox="0 0 1180 500" preserveAspectRatio="none" aria-hidden="true">
+            <path class="line-current" d="M 90 230 L 270 230 L 450 360 L 640 360 L 820 360 L 1000 360" />
+            <path class="line-blocked" d="M 270 230 L 450 115 L 640 115" />
+            <path class="line-fallback" d="M 270 250 L 270 445 L 90 445 L 90 250" />
+            <path class="line-forbidden" d="M 640 115 L 820 115" />
+          </svg>
+          <div class="tree-map-nodes">
+            <article class="visual-node" data-status="done" style="grid-column: 1; grid-row: 2;">
+              <div class="visual-node__id">P12</div>
+              <strong>方法规格预检</strong>
+              <span>变量、方法和审阅口径已写成可检查草案。</span>
+            </article>
+            <article class="visual-node" data-status="blocked" style="grid-column: 2; grid-row: 2;">
+              <div class="visual-node__id">P13</div>
+              <strong>运行计划校验</strong>
+              <span>真实 CSV 字段不齐，不能批准运行计划。</span>
+            </article>
+            <article class="visual-node" data-status="forbidden" style="grid-column: 3; grid-row: 1;">
+              <div class="visual-node__id">P14</div>
+              <strong>执行账本暂停</strong>
+              <span>不创建 run id，不运行模型。</span>
+            </article>
+            <article class="visual-node" data-status="done" style="grid-column: 3; grid-row: 3;">
+              <div class="visual-node__id">P15</div>
+              <strong>半成品交付</strong>
+              <span>交付初稿、红标问题和证据边界。</span>
+            </article>
+            <article class="visual-node" data-status="done" style="grid-column: 4; grid-row: 3;">
+              <div class="visual-node__id">P16</div>
+              <strong>用户验收包</strong>
+              <span>确认半成品可验收，但不是完整实证论文。</span>
+            </article>
+            <article class="visual-node" data-status="current" style="grid-column: 5; grid-row: 3;">
+              <div class="visual-node__id">P17</div>
+              <strong>数据修复预检</strong>
+              <span>推荐 famconf 父母教育来源；experience 仍需确认映射。</span>
+            </article>
+            <article class="visual-node" data-status="next" style="grid-column: 6; grid-row: 3;">
+              <div class="visual-node__id">P18</div>
+              <strong>应用修复候选</strong>
+              <span>写新的 Interim 数据，再回到 P13-P16。</span>
+            </article>
+            <article class="visual-node" data-status="fallback" style="grid-column: 2; grid-row: 4;">
+              <div class="visual-node__id">回退</div>
+              <strong>回到 P12-0</strong>
+              <span>方法口径不清时重画设计树。</span>
+            </article>
+            <article class="visual-node" data-status="forbidden" style="grid-column: 4; grid-row: 1;">
+              <div class="visual-node__id">禁止</div>
+              <strong>不运行模型</strong>
+              <span>字段没补齐前，不声称已有回归结果。</span>
+            </article>
+          </div>
+        </div>
+        <div class="tree-map-legend">
+          <span>绿色：已确认路径</span>
+          <span>深绿：当前位置 P17</span>
+          <span>蓝色：下一步 P18</span>
+          <span>红色：阻断 / 禁止</span>
+          <span>黄色：回退路径</span>
+        </div>
+      </section>
+
+      <aside class="status-card status-card--compact" aria-label="当前工作流状态">
+        <dl>
+          <div>
+            <dt>当前步骤</dt>
+            <dd class="current-step" data-field="current_step">数据修复预检</dd>
+          </div>
+          <div>
+            <dt>下一步</dt>
+            <dd class="next-step" data-field="next_step">P18 应用修复候选</dd>
+          </div>
+          <div>
+            <dt>当前门禁</dt>
+            <dd data-field="current_gate">P17 数据修复预检已生成</dd>
+          </div>
+        </dl>
+        <div class="guardrail" data-field="guardrail">已推到 P17 修复预检 · 交付半成品论文、红标问题清单和修复候选账本 · 不覆盖正式数据，不运行模型</div>
+      </aside>
 
       <section
         class="executive-panel"
@@ -640,15 +959,15 @@
           </div>
           <div class="is-blocked">
             <dt>当前结论</dt>
-            <dd data-field="executive_current_truth">Demo 线已走到 P16 阻断交付：能交付半成品论文，不能声称完整实证结果</dd>
+            <dd data-field="executive_current_truth">Demo 线已走到 P17 修复预检：能在 UI 审阅字段修复候选，不能声称完整实证结果</dd>
           </div>
           <div>
             <dt>需要老板判断</dt>
-            <dd data-field="executive_decision_needed">是否补齐真实字段并重跑 P13-P16</dd>
+            <dd data-field="executive_decision_needed">是否按 P17 候选进入 P18 数据修复应用门禁</dd>
           </div>
           <div class="is-next">
             <dt>下一步动作</dt>
-            <dd data-field="executive_next_action">补齐 parent_education 和 experience 后重跑 P13-P16 闭环</dd>
+            <dd data-field="executive_next_action">审阅 famconf 父母教育来源和 experience 学历年限映射，再写新的 Interim 修复数据</dd>
           </div>
         </dl>
       </section>
@@ -656,18 +975,18 @@
       <section class="plain-summary" aria-label="项目三句话" data-dashboard-section="plain_summary">
         <article class="plain-card">
           <strong>现在能交付什么</strong>
-          <b>半成品论文和红标问题清单</b>
-          <p>当前不能报告回归结果，但可以交付已生成的 paper_draft.docx 和缺口清单。</p>
+          <b>半成品论文、红标问题清单和 P17 修复候选</b>
+          <p>当前不能报告回归结果，但可以交付已生成的 paper_draft.docx、缺口清单和可审阅数据修复账本。</p>
         </article>
         <article class="plain-card">
           <strong>还缺什么</strong>
-          <b>真实 CSV 缺少两个字段</b>
-          <p>parent_education 和 experience 不在当前分析数据表里，不能跑父母教育工资模型。</p>
+          <b>正式分析 CSV 仍缺两个字段</b>
+          <p>P17 推荐 famconf 父母教育来源；experience 需要先确认 edu_last 到 education_years 的映射。</p>
         </article>
         <article class="plain-card">
           <strong>下一步做什么</strong>
-          <b>补齐字段后重跑 P13-P16</b>
-          <p>先补齐或合并真实字段，再进入完整论文分支。</p>
+          <b>进入 P18 应用修复候选</b>
+          <p>用户审阅 P17 后，写新的 Data/Interim 修复数据，再重跑 P13-P16。</p>
         </article>
       </section>
 
@@ -725,29 +1044,27 @@
           </article>
           <article class="panel">
             <p class="label">当前阻断</p>
-            <strong>P16 半成品交付包已生成</strong>
-            <p>已交付半成品论文、红标问题清单和用户验收包。</p>
+            <strong>P17 数据修复预检已生成</strong>
+            <p>已交付 parent_education 和 experience 的可审阅修复候选。</p>
           </article>
           <article class="panel">
             <p class="label">当前阻断</p>
-            <strong>真实 CSV 缺字段</strong>
-            <p>缺少 parent_education 和 experience，不能运行父母教育工资模型。</p>
+            <strong>等待 P18 应用修复</strong>
+            <p>不能覆盖正式 CSV；必须写新的 Interim 数据并确认 experience 映射。</p>
           </article>
           <article class="panel">
             <p class="label">禁止动作</p>
-            <strong>不伪造结果</strong>
-            <p>不能复用旧机器人题目的方法规格、运行计划或回归结果。</p>
+            <strong>不越权应用修复</strong>
+            <p>P17 只做预检，不写修复后 CSV，不创建 run id，不运行模型。</p>
           </article>
         </div>
       </section>
 
-      <section class="section" aria-labelledby="tree-title">
-        <div class="section-header">
-          <h2 id="tree-title">设计树分支</h2>
-          <p class="section-note">
-            当前树枝已经走到 P16 阻断交付：可以验收半成品，但不能直接声称完整论文。
-          </p>
-        </div>
+      <details class="section branch-details">
+        <summary>
+          <span id="tree-title">节点明细</span>
+          <small>展开查看每个 P 节点的文字说明</small>
+        </summary>
         <div class="tree-wrap">
           <div class="tree-lane" aria-label="P12 到 P16 分支树" data-dashboard-section="branches">
             <article class="tree-node">
@@ -770,6 +1087,10 @@
               <strong>P16 用户验收</strong>
               <span>用户签收、修改、导出或回到补证路径。</span>
             </article>
+            <article class="tree-node">
+              <strong>P17 数据修复预检</strong>
+              <span>推荐 famconf 父母教育来源，并标出 experience 映射确认缺口。</span>
+            </article>
           </div>
 
           <aside class="side-rules" data-dashboard-section="side_rules">
@@ -785,7 +1106,7 @@
             </article>
           </aside>
         </div>
-      </section>
+      </details>
 
       <section class="section" aria-labelledby="qa-title">
         <div class="section-header">
@@ -801,11 +1122,11 @@
           </article>
           <article class="qa-item">
             <strong>当前面板</strong>
-            <span>确认当前门禁是 P16 半成品交付包已生成。</span>
+            <span>确认当前门禁是 P17 数据修复预检已生成。</span>
           </article>
           <article class="qa-item">
             <strong>预检产物</strong>
-            <span>确认 P13、P14、P15、P16 JSON 和 Review 报告已生成。</span>
+            <span>确认 P13、P14、P15、P16、P17 JSON 和 Review 报告已生成。</span>
           </article>
           <article class="qa-item">
             <strong>禁止入口</strong>
@@ -827,8 +1148,9 @@
           <a href="../../Results/json/parent_education_wage_p13_run_plan_approval.json">P13 运行计划校验</a>
           <a href="../../Manuscripts/generated/parent_education_wage_p15_issue_list.md">P15 红标问题清单</a>
           <a href="../../Results/json/parent_education_wage_p16_user_acceptance_packet.json">P16 用户验收包</a>
-          <a href="../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-desktop.png">桌面截图</a>
-          <a href="../../Product/output/playwright/workflow-dashboard-p16-blocked-closure-mobile.png">手机截图</a>
+          <a href="../../Results/json/parent_education_wage_p17_data_repair_preflight.json">P17 修复预检</a>
+          <a href="../../Product/output/playwright/workflow-dashboard-tree-desktop.png">桌面截图</a>
+          <a href="../../Product/output/playwright/workflow-dashboard-tree-mobile.png">手机截图</a>
         </div>
       </section>
 
@@ -844,6 +1166,14 @@
 
       function text(value, fallback = "") {
         return value === undefined || value === null || value === "" ? fallback : String(value);
+      }
+
+      function html(value, fallback = "") {
+        return text(value, fallback)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
       }
 
       function setText(selector, value) {
@@ -909,6 +1239,27 @@
           .join("");
       }
 
+      function renderVisualTree(tree) {
+        const section = document.querySelector('[data-dashboard-section="visual_tree"]');
+        if (!section || !tree || typeof tree !== "object" || !Array.isArray(tree.nodes)) return;
+        setText('[data-field="visual_tree_title"]', tree.title);
+        setText('[data-field="visual_tree_subtitle"]', tree.subtitle);
+        const nodes = section.querySelector(".tree-map-nodes");
+        if (nodes) {
+          nodes.innerHTML = tree.nodes
+            .map((node) => {
+              const column = Number(node.column || 1);
+              const row = Number(node.row || 1);
+              return `<article class="visual-node" data-status="${html(node.status || "done")}" style="grid-column: ${column}; grid-row: ${row};"><div class="visual-node__id">${html(node.id)}</div><strong>${html(node.title)}</strong><span>${html(node.description)}</span></article>`;
+            })
+            .join("");
+        }
+        const legend = section.querySelector(".tree-map-legend");
+        if (legend && Array.isArray(tree.legend)) {
+          legend.innerHTML = tree.legend.map((item) => `<span>${html(item)}</span>`).join("");
+        }
+      }
+
       function renderQaItems(items) {
         const container = document.querySelector('[data-dashboard-section="qa_items"]');
         if (!container || !Array.isArray(items)) return;
@@ -944,6 +1295,7 @@
         renderPlainSummary(state.plain_summary);
         renderPhases(state.phases);
         renderCards("gate_cards", state.gate_cards);
+        renderVisualTree(state.visual_tree);
         renderBranches(state.branches);
         renderCards("side_rules", state.side_rules);
         renderQaItems(state.qa_items);

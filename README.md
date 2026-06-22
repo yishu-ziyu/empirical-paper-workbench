@@ -84,7 +84,7 @@ Word 导出入口：
 
 ## Product Shell
 
-C 版本产品骨架位于 `Product/`。
+当前产品骨架位于 `Product/`。
 
 本地启动：
 
@@ -94,10 +94,9 @@ C 版本产品骨架位于 `Product/`。
 
 - `http://127.0.0.1:8765`
 
-当前已支持：
+当前运行入口：
 
-- 多项目注册表
-- 项目创建向导
-- Dashboard / Projects / Workflow / Artifacts / Drafts 五个视图
-- 调用 `run_paper.py` 执行 dry/live
-- 调用 `export_docx.py` 导出 Word
+- FastAPI：`Product/app.py`
+- React 产品壳：`Product/web-react/src/App.tsx`
+- 当前产品主线：论文生产流水线，覆盖题目/数据输入、研究问题判断、文献变量、方法预检、模型执行或阻断、论文草稿、审阅修订、PDF/DOCX/证据包/复现说明。
+- Product/web 已移除：旧静态工作台不再是源码、回退入口或验收入口。

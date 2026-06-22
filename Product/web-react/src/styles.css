@@ -6683,6 +6683,89 @@ body:has(.analysis-workspace) {
   font-size: 13px; line-height: 1.6;
 }
 
+/* ─── Journey bar ──────────────────────────────────── */
+.journey-bar {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+}
+
+.journey-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.journey-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.journey-stage:hover {
+  background: var(--color-panel);
+  border-color: var(--color-line);
+}
+
+.journey-stage.active {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.journey-stage.done {
+  color: var(--color-success);
+}
+
+.journey-stage.running {
+  color: var(--color-warning);
+}
+
+.journey-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-subtle);
+  flex-shrink: 0;
+}
+
+.journey-stage.done .journey-dot { background: var(--color-success); }
+.journey-stage.running .journey-dot { background: var(--color-warning); animation: journey-pulse 2s infinite; }
+.journey-stage.active .journey-dot { background: var(--color-warning); }
+
+.journey-connector {
+  width: 24px;
+  height: 2px;
+  background: var(--color-line);
+  flex-shrink: 0;
+}
+
+.journey-connector.done { background: var(--color-success); }
+
+@keyframes journey-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-stage.running .journey-dot {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .step-card--running,
   .step-card__phase-icon,

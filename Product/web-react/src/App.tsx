@@ -14,6 +14,7 @@ import { SystemStatusBar } from "./components/SystemStatusBar";
 import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
 import { PaperProductionStatusPanel } from "./components/PaperProductionStatusPanel";
 import { ServiceConnectionRecovery } from "./components/ServiceConnectionRecovery";
+import { ResearchJourneyBar } from "./components/ResearchJourneyBar";
 import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
 interface SupervisorPlanStage {
@@ -482,6 +483,13 @@ export function App() {
       disabled: !unlocked,
     };
   });
+  const completedStages: Stage[] = [
+    ...(briefResult ? (["brief"] as Stage[]) : []),
+    ...(literatureResult ? (["search"] as Stage[]) : []),
+    ...(variablesResult ? (["variables"] as Stage[]) : []),
+    ...(designResult ? (["design"] as Stage[]) : []),
+    ...(executionResult ? (["execution", "identification-audit"] as Stage[]) : []),
+  ];
   const currentStageMeta = STAGE_LABELS[activeStage];
   const currentStageIndex = STAGE_ORDER.indexOf(activeStage);
   const nextStage = STAGE_ORDER[currentStageIndex + 1] ?? null;
@@ -675,6 +683,11 @@ export function App() {
 
         <details className="analysis-workspace__flow-details">
           <summary>研究流程</summary>
+          <ResearchJourneyBar
+            activeStage={activeStage}
+            completedStages={completedStages}
+            onStageSelect={setActiveStage}
+          />
           <SlideTabs tabs={tabs} value={activeStage} onChange={handleStageChange} />
 
           <div className="stage-panel__current-action" data-testid="stage-current-action">

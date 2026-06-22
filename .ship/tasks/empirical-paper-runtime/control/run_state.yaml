@@ -1,5 +1,5 @@
-task_id: empirical-paper-runtime
 active: true
-current_phase: dev
-status: running
-updated_at: "2026-06-22T11:40:05Z"
+current_phase: handoff
+status: complete
+task_id: empirical-paper-runtime
+updated_at: '2026-06-22T17:00:00Z'

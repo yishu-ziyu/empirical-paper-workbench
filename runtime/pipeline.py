@@ -104,11 +104,12 @@ def _run_step_commands(step: dict) -> StepResult:
 class Pipeline:
     """Read registry → execute steps → handle checkpoints → persist state."""
 
-    def __init__(self, mode: str = "execute", start_step: str | None = None) -> None:
+    def __init__(self, mode: str = "execute", auto: bool = False, start_step: str | None = None) -> None:
         self.registry = _load_json(REGISTRY_PATH)
         self.policy = _load_json(POLICY_PATH) if POLICY_PATH.exists() else {}
         self.state = PipelineState()
-        self.mode = mode                    # execute | dry-run | resume
+        self.mode = mode
+        self.auto = auto
         self.start_step = start_step
         self.steps: list[dict] = self.registry["workflows"]
         self.report_lines: list[str] = []
@@ -156,13 +157,15 @@ class Pipeline:
                 return False
 
             # --- human checkpoint ---
-            if step.get("human_checkpoints"):
+            if step.get("human_checkpoints") and not self.auto:
                 try:
                     checkpoint(step_name, step["human_checkpoints"])
                 except SystemExit:
                     self.state.set_stopped("human stopped")
                     self._write_report()
                     raise
+            elif step.get("human_checkpoints") and self.auto:
+                print(f"  [auto] Skipping human checkpoint: {step_name}")
 
             # --- execute step commands ---
             exec_result = _run_step_commands(step)
@@ -225,11 +228,17 @@ class Pipeline:
         return 0
 
     def _banner(self) -> None:
-        mode_label = {"execute": "执行", "dry-run": "预演", "resume": "续跑"}.get(self.mode, self.mode)
+        label = "execute"
+        if self.mode == "dry-run":
+            label = "dry-run"
+        elif self.mode == "resume":
+            label = "resume"
+        if self.auto:
+            label += "/auto"
         total = len(self.steps)
         done = sum(1 for h in self.state.history if h["result"] == "done")
         print(f"\n{'=' * 50}")
-        print(f"  📊 论文流水线  [{mode_label}]")
+        print(f"  📊 论文流水线  [{label}]")
         print(f"  总步骤: {total}  |  已完成: {done}  |  模式: {self.mode}")
         print(f"{'=' * 50}\n")
 

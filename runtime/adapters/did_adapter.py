@@ -128,20 +128,14 @@ def _run_event_study_statspai(
     cluster: str,
     window: tuple[int, int],
     ref_period: int,
+    treatment_year: int,
     buf: io.StringIO,
 ) -> pd.DataFrame | None:
     """Run sp.event_study; return the coefficient DataFrame or None on failure."""
     try:
-        # Derive treat_time: treatment year for treated units, 0 for controls
         treat_time_col = "__treat_time"
-        # infer treatment year from data or use ref_period as proxy
-        # For a real panel: treat_time = treatment_year if treated else 0
-        # Here we use the treatment variable directly (assumed binary 0/1)
-        # If the data only has post-treatment observations, event study
-        # will have limited pre-period; we still run it and report honestly.
-        df[treat_time_col] = df[treatment]
-
-        buf.write(f"\n[event_study]  y={outcome}, window={window}, ref={ref_period}\n")
+        df[treat_time_col] = np.where(df[treatment] == 1, treatment_year, 0)
+        buf.write(f"\n[event_study]  y={outcome}, window={window}, ref={ref_period}, treat_year={treatment_year}\n")
         es = sp.event_study(
             df,
             y=outcome,
@@ -420,7 +414,8 @@ def run_did_analysis(
     if HAS_STATSPAI and unit_fe:
         valid_es = _run_event_study_statspai(
             df, main_outcome, treatment, time, unit_fe or treatment,
-            covariates, cluster, event_study_window, event_study_ref_period, buf,
+            covariates, cluster, event_study_window, event_study_ref_period,
+            treatment_year, buf,
         )
     else:
         buf.write("  Skipped (no unit identifier or statspai unavailable)\n")

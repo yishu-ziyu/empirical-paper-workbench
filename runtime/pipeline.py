@@ -178,6 +178,7 @@ class Pipeline:
 
             print(f"  ✅ {step_name} 完成")
             self.state.set_done(step_id)
+            self._write_report()
             self._append_report_step(step, exec_result)
 
         self.state._state["status"] = "done"

@@ -305,7 +305,8 @@ def course_paper_quality_component(artifacts: dict[str, dict[str, Any] | None], 
     final_pdf = artifacts["final_pdf"] or {}
     verdict = quality.get("verdict") or []
     review_summary = quality.get("review_summary") if isinstance(quality.get("review_summary"), dict) else {}
-    if verdict == ["ready_for_review"]:
+    review_decision = review_summary.get("decision")
+    if verdict == ["ready_for_review"] and review_decision != "needs_revision":
         status = "completed"
         summary = str(review_summary.get("headline") or "论文审阅已完成，可以进入人工终审。")
         primary_action = {"id": "human_review_course_paper", "label": "人工终审论文", "enabled": True}
@@ -344,8 +345,11 @@ def course_paper_quality_component(artifacts: dict[str, dict[str, Any] | None], 
         blockers,
         [paths["course_paper_quality"]],
     )
+    payload["quality_report_path"] = paths["course_paper_quality"].as_posix()
     if review_summary:
         payload["review_summary"] = review_summary
+        top_priorities = review_summary.get("top_priorities")
+        payload["top_priorities"] = top_priorities if isinstance(top_priorities, list) else []
     return payload
 
 

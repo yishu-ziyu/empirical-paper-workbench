@@ -5802,6 +5802,34 @@ body:has(.analysis-workspace) {
   line-height: 1.35;
 }
 
+.paper-production-status__review-summary dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.paper-production-status__review-summary dl div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.paper-production-status__review-summary dt,
+.paper-production-status__review-summary dd {
+  margin: 0;
+}
+
+.paper-production-status__review-summary dt {
+  color: #8f765c;
+  font-size: 12px;
+}
+
+.paper-production-status__review-summary dd {
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
 .paper-production-status__body {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);

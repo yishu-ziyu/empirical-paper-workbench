@@ -96,6 +96,13 @@ class ReactPaperProductionStatusTests(unittest.TestCase):
             "论文审阅",
             "生成论文审阅报告",
             "修订优先级",
+            "修订原因",
+            "建议负责人",
+            "关联章节",
+            "证据路径",
+            "正文修订",
+            "证据核验",
+            "审阅整理",
             "最终 PDF",
             "刷新状态",
         ):
@@ -107,6 +114,7 @@ class ReactPaperProductionStatusTests(unittest.TestCase):
             ".paper-production-status__review-summary",
         ):
             self.assertIn(selector, self.styles)
+        self.assertNotIn('priority.owner || "ReviewerAgent"', self.component)
 
 
 if __name__ == "__main__":

@@ -77,6 +77,28 @@ class CgssProductHeadlessStateTests(unittest.TestCase):
         self.assertIn("扩写核心章节", summary["top_priorities"][0]["title"])
         self.assertTrue(summary["section_gaps"])
 
+    def test_cgss_headless_state_exposes_review_report_contract_after_generation(self) -> None:
+        """BDD 行为 4：审阅报告生成后，headless 组件必须直接暴露可读修订合同。"""
+
+        response = self.client.post(f"/api/v1/projects/{self.project_id}/product-control/course-paper-quality")
+        self.assertIn(response.status_code, {200, 409}, msg=response.text)
+
+        headless_response = self.client.get(f"/api/v1/projects/{self.project_id}/product-control/headless-state")
+        self.assertEqual(headless_response.status_code, 200, msg=headless_response.text)
+        body = headless_response.json()
+        component = next(item for item in body["components"] if item["component_id"] == "course_paper_quality")
+
+        self.assertEqual(component["status"], "needs_revision")
+        self.assertEqual(
+            component["quality_report_path"],
+            "Results/json/cgss_social_capital_happiness_course_paper_quality_report.json",
+        )
+        self.assertEqual(component["review_summary"]["decision"], "needs_revision")
+        self.assertEqual(component["top_priorities"], component["review_summary"]["top_priorities"])
+        self.assertTrue(component["top_priorities"])
+        self.assertEqual(component["primary_action"]["id"], "route_quality_revisions")
+        self.assertNotIn("论文审阅尚未完成", component["user_summary"])
+
 
 def json_dumps(value: object) -> str:
     import json

@@ -94,6 +94,37 @@ class ProductControlHeadlessStateTests(unittest.TestCase):
         components = {item["component_id"]: item for item in headless["components"]}
         self.assertEqual(components["course_paper_quality"]["status"], "needs_revision")
 
+    def test_ready_verdict_with_revision_decision_fails_safe_to_needs_revision(self) -> None:
+        self._write_json(
+            "Results/json/course_paper_quality_report.json",
+            {
+                "status": "course_paper_quality_ready_for_review",
+                "draft_path": "Manuscripts/generated/parent_education_wage_complete_paper_draft.md",
+                "verdict": ["ready_for_review"],
+                "review_summary": {
+                    "decision": "needs_revision",
+                    "headline": "审阅摘要仍要求修订。",
+                    "top_priorities": [
+                        {
+                            "id": "repair_method_section",
+                            "title": "补齐方法说明",
+                            "detail": "ready verdict 与摘要冲突时，必须先回到修订队列。",
+                            "owner": "ReviewerAgent",
+                        }
+                    ],
+                },
+            },
+        )
+
+        headless = self.client.get(f"/api/v1/projects/{self.project_id}/product-control/headless-state")
+        self.assertEqual(headless.status_code, 200, msg=headless.text)
+        components = {item["component_id"]: item for item in headless.json()["components"]}
+        quality = components["course_paper_quality"]
+        self.assertEqual(quality["status"], "needs_revision")
+        self.assertEqual(quality["primary_action"]["id"], "route_quality_revisions")
+        self.assertEqual(quality["quality_report_path"], "Results/json/course_paper_quality_report.json")
+        self.assertEqual(quality["top_priorities"][0]["title"], "补齐方法说明")
+
     def _seed_project(self) -> None:
         (self.project_root / "Program").mkdir(parents=True)
         (self.project_root / "Program/run_paper.py").write_text("print('stub')\n", encoding="utf-8")

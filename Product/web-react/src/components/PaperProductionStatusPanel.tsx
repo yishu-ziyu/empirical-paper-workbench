@@ -22,6 +22,7 @@ interface HeadlessArtifact {
 interface ReviewPriority {
   id?: string;
   title?: string;
+  reason?: string;
   detail?: string;
   owner?: string;
 }
@@ -33,6 +34,12 @@ interface SectionGap {
   target_chinese_chars?: string;
 }
 
+interface ReviewSourcePaths {
+  draft?: string | null;
+  results?: string | null;
+  method?: string | null;
+}
+
 interface ReviewSummary {
   decision?: string;
   headline?: string;
@@ -40,6 +47,7 @@ interface ReviewSummary {
   target_chinese_chars?: string;
   top_priorities?: ReviewPriority[];
   section_gaps?: SectionGap[];
+  source_paths?: ReviewSourcePaths;
 }
 
 interface HeadlessComponent {
@@ -205,6 +213,38 @@ function userText(value?: string): string {
     .replaceAll("论文质量门", "论文审阅")
     .replaceAll("质量门", "审阅检查")
     .replaceAll("课程论文质量", "论文审阅");
+}
+
+function prioritySections(priority: ReviewPriority, reviewSummary: ReviewSummary): string {
+  if (priority.id === "expand_core_sections" && reviewSummary.section_gaps?.length) {
+    return reviewSummary.section_gaps
+      .slice(0, 3)
+      .map((gap) => gap.section)
+      .filter(Boolean)
+      .join("、");
+  }
+  return "全文";
+}
+
+function priorityEvidencePath(priority: ReviewPriority, reviewSummary: ReviewSummary): string {
+  if (priority.id === "repair_evidence_chain") {
+    return reviewSummary.source_paths?.results || reviewSummary.source_paths?.method || reviewSummary.source_paths?.draft || "等待绑定证据路径";
+  }
+  return reviewSummary.source_paths?.draft || reviewSummary.source_paths?.results || reviewSummary.source_paths?.method || "等待绑定证据路径";
+}
+
+function priorityOwnerLabel(owner?: string): string {
+  const labels: Record<string, string> = {
+    ManuscriptAgent: "正文修订",
+    VerifierAgent: "证据核验",
+    LiteratureAgent: "文献补齐",
+    ReviewerAgent: "审阅整理",
+  };
+  return labels[owner || ""] || owner || "审阅整理";
+}
+
+function priorityReason(priority: ReviewPriority): string {
+  return priority.reason || priority.detail || "等待补充修订原因";
 }
 
 export function PaperProductionStatusPanel({
@@ -390,7 +430,21 @@ export function PaperProductionStatusPanel({
               {reviewSummary.top_priorities.slice(0, 3).map((priority) => (
                 <li key={priority.id || priority.title}>
                   <strong>{userText(priority.title || "待修订")}</strong>
-                  <p>{userText(priority.detail || "")}</p>
+                  <p>修订原因：{userText(priorityReason(priority))}</p>
+                  <dl>
+                    <div>
+                      <dt>建议负责人</dt>
+                      <dd>{userText(priorityOwnerLabel(priority.owner))}</dd>
+                    </div>
+                    <div>
+                      <dt>关联章节</dt>
+                      <dd>{userText(prioritySections(priority, reviewSummary) || "全文")}</dd>
+                    </div>
+                    <div>
+                      <dt>证据路径</dt>
+                      <dd>{priorityEvidencePath(priority, reviewSummary)}</dd>
+                    </div>
+                  </dl>
                 </li>
               ))}
             </ol>

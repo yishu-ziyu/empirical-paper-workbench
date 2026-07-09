@@ -1,6 +1,7 @@
-type Stage = "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
+type Stage = "gate-dashboard" | "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
 
 const JOURNEY_STAGES = [
+  { id: "evidence", label: "证据链", stageIds: ["gate-dashboard"] as Stage[] },
   { id: "design", label: "研究设计", stageIds: ["brief"] as Stage[] },
   { id: "data", label: "数据", stageIds: ["search"] as Stage[] },
   { id: "model", label: "模型", stageIds: ["design"] as Stage[] },

@@ -15,6 +15,7 @@ import { AgentTaskQueuePanel } from "./components/AgentTaskQueuePanel";
 import { PaperProductionStatusPanel } from "./components/PaperProductionStatusPanel";
 import { ServiceConnectionRecovery } from "./components/ServiceConnectionRecovery";
 import { ResearchJourneyBar } from "./components/ResearchJourneyBar";
+import { CgssGateDashboard } from "./features/empiricalWorkspace/components/CgssGateDashboard";
 import { DEFAULT_LOCAL_API_BASE, apiBase, apiUrl, setBrowserApiBase } from "./lib/apiBase";
 
 interface SupervisorPlanStage {
@@ -45,7 +46,7 @@ interface SubmittedResearchTask {
 type TopicIntakeStatus = "idle" | "registering" | "ready" | "failed";
 
 /** Six end-to-end stages (BDD ref: spec §6.1 + §6.2 + D3 6th tab stub). */
-type Stage = "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
+type Stage = "gate-dashboard" | "brief" | "search" | "variables" | "design" | "execution" | "identification-audit";
 
 interface LiteratureResult {
   papers: Paper[];
@@ -68,6 +69,7 @@ interface ExecutionResult {
 }
 
 const STAGE_ORDER: Stage[] = [
+  "gate-dashboard",
   "brief",
   "search",
   "variables",
@@ -84,6 +86,12 @@ const STAGE_LABELS: Record<
   Stage,
   { label: string; hint: string; action: string; next: string }
 > = {
+  "gate-dashboard": {
+    label: "证据链总览",
+    hint: "查看 artifact、first failing gate、claim strength 和下一步补证动作",
+    action: "审计证据链状态",
+    next: "研究简报",
+  },
   brief: {
     label: "研究简报",
     hint: "确认研究问题、边界、贡献和成功标准",
@@ -123,6 +131,7 @@ const STAGE_LABELS: Record<
 };
 
 const STAGE_REQUIREMENTS: Record<Stage, string> = {
+  "gate-dashboard": "打开 CGSS gold path 后即可查看，只读展示，不执行写入或重跑。",
   brief: "输入题目后即可生成研究简报。",
   search: "先完成研究简报并保存 brief.md。",
   variables: "先完成文献检索并保存 literature_review.md。",
@@ -289,7 +298,7 @@ function normalizeSupervisorPlanInspector(
 export function App() {
   const [task, setTask] = useState<SubmittedResearchTask | null>(() => buildInitialTaskFromUrl());
   const [topicSlug, setTopicSlug] = useState<string>(() => initialTopicSlugFromUrl());
-  const [activeStage, setActiveStage] = useState<Stage>("brief");
+  const [activeStage, setActiveStage] = useState<Stage>("gate-dashboard");
   // codex-supervisor mode: 计划审核通过前, BriefPanel 不渲染
   const [planApproved, setPlanApproved] = useState<boolean>(false);
   const [planStages, setPlanStages] = useState<SupervisorPlanStage[] | null>(null);
@@ -324,6 +333,8 @@ export function App() {
   const canEnter = useCallback(
     (stage: Stage): boolean => {
       switch (stage) {
+        case "gate-dashboard":
+          return true;
         case "brief":
           return true;
         case "search":
@@ -369,7 +380,7 @@ export function App() {
   const resetAll = () => {
     setTask(null);
     setTopicSlug("");
-    setActiveStage("brief");
+    setActiveStage("gate-dashboard");
     setBriefResult(null);
     setBriefSnapshot(null);
     setLiteratureResult(null);
@@ -461,7 +472,7 @@ export function App() {
                 pastedCount: pastedContent.length,
               });
               setTopicSlug(slugify(message));
-              setActiveStage("brief");
+              setActiveStage("gate-dashboard");
               setProjectId("");
               setPlanIntakeStatus("idle");
               setPlanIntakeMessage(null);
@@ -673,12 +684,16 @@ export function App() {
           </div>
         ) : null}
 
-        {effectiveProjectId ? (
+        {effectiveProjectId && activeStage !== "gate-dashboard" ? (
           <PaperProductionStatusPanel
             projectId={effectiveProjectId}
             fallbackProjectId={CANONICAL_PARENT_EDUCATION_PROJECT_ID}
             topic={task.message}
           />
+        ) : null}
+
+        {activeStage === "gate-dashboard" ? (
+          <CgssGateDashboard workspaceId="cgss-internet-happiness" />
         ) : null}
 
         <details className="analysis-workspace__flow-details">

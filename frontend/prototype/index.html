@@ -1,0 +1,2522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>econpaper — 章节式 AI 协作写作 v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF8F3;
+    --bg-elevated: #F5F2EB;
+    --bg-deep: #EDE8DC;
+    --ink: #1A1A1A;
+    --ink-soft: #4A4A4A;
+    --ink-mute: #8B8680;
+    --accent: #8B2C2C;
+    --accent-soft: #B85555;
+    --accent-glow: rgba(139, 44, 44, 0.12);
+    --border: #E5E1D8;
+    --border-strong: #C8C2B3;
+    --serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+    --mono: 'JetBrains Mono', 'Source Han Serif SC', monospace;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+    --shadow-deep: 0 2px 8px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--serif);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* === Layout === */
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr 40px;
+    grid-template-columns: 280px 1fr 360px;
+    grid-template-areas:
+      "header header header"
+      "outline editor agent"
+      "status status status";
+    height: 100vh;
+  }
+
+  /* === Header === */
+  .header {
+    grid-area: header;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+    backdrop-filter: blur(8px);
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .brand-mark {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .brand-mark em {
+    font-style: italic;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .brand-sub {
+    font-size: 12px;
+    color: var(--ink-mute);
+    font-style: italic;
+    letter-spacing: 0.02em;
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+  }
+
+  .header-meta .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 6px;
+    animation: breathe 2s ease-in-out infinite;
+  }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.4; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+
+  /* === Canvas Background (DottedSurface-inspired) === */
+  .wave-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.35;
+    z-index: 0;
+  }
+
+  /* === Outline Panel (left) === */
+  .outline {
+    grid-area: outline;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 0;
+    z-index: 2;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    padding: 0 20px 12px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  .outline-list {
+    list-style: none;
+    padding: 0 12px;
+  }
+
+  .outline-item {
+    padding: 10px 12px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    cursor: grab;
+    /* v3: 加 transition 让 active/done/generating 切换更平滑（配合 Motion 颜色过渡） */
+    transition: background 0.4s cubic-bezier(0.4,0,0.2,1),
+                box-shadow 0.4s cubic-bezier(0.4,0,0.2,1),
+                transform 0.15s ease;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow: hidden;
+  }
+
+  .outline-item:hover {
+    background: var(--bg-deep);
+  }
+
+  .outline-item:hover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), var(--accent-glow) 0%, transparent 60%);
+    pointer-events: none;
+    opacity: 0.8;
+  }
+
+  .outline-item.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+
+  .outline-item.drop-target {
+    border-top: 2px solid var(--accent);
+  }
+
+  .outline-item.active {
+    background: var(--bg-deep);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .outline-item.done .outline-num {
+    background: var(--ink-soft);
+    color: var(--bg);
+  }
+
+  .outline-item.generating .outline-num {
+    background: var(--accent);
+    color: var(--bg);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(139, 44, 44, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(139, 44, 44, 0); }
+  }
+
+  .outline-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--mono);
+    color: var(--ink-soft);
+    position: relative;
+    z-index: 1;
+    /* v3: 让 Motion backgroundColor 过渡生效 */
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+
+  .outline-content {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .outline-title {
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .outline-type {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+  }
+
+  .outline-grip {
+    color: var(--border-strong);
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    position: relative;
+    z-index: 1;
+  }
+
+  .outline-item:hover .outline-grip {
+    opacity: 1;
+  }
+
+  .outline-add {
+    margin: 12px 12px 0;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 4px;
+    text-align: center;
+    color: var(--ink-mute);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-style: italic;
+  }
+
+  .outline-add:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* === Editor (center) === */
+  .editor {
+    grid-area: editor;
+    overflow-y: auto;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .editor-inner {
+    position: relative;
+    z-index: 1;
+  }
+
+  .editor-paper {
+    max-width: 720px;
+    margin: 48px auto;
+    padding: 0 48px 120px;
+    position: relative;
+  }
+
+  .paper-meta {
+    text-align: center;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .paper-title {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+
+  .paper-authors {
+    font-size: 14px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+
+  .paper-affil {
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+
+  .chapter {
+    margin-bottom: 64px;
+    scroll-margin-top: 24px;
+    position: relative;
+    border-radius: 4px;
+  }
+
+  .chapter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .chapter-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    /* v3: SplitText 拆字后需 inline-block 让 transform 生效 */
+    will-change: transform, opacity, filter;
+  }
+
+  .chapter-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-weight: 600;
+  }
+
+  .badge-intro { background: #E8F0E8; color: #2D5F2D; }
+  .badge-lit_review { background: #EDE5F0; color: #5F2D5F; }
+  .badge-data_desc { background: #F0EBE0; color: #5F4D2D; }
+  .badge-methods { background: #E0E8F0; color: #2D4D5F; }
+  .badge-results { background: #F0E0E0; color: #5F2D2D; }
+  .badge-conclusion { background: #E5F0E8; color: #2D5F4D; }
+
+  .chapter-content {
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--ink);
+  }
+
+  .chapter-content p {
+    margin-bottom: 16px;
+    text-align: justify;
+    text-justify: inter-character;
+    will-change: transform, opacity, filter;
+  }
+
+  .chapter-content .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 18px;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(2) infinite;
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .chapter-content .placeholder {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  .chapter-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .chapter:hover .chapter-controls {
+    opacity: 1;
+  }
+
+  .ctrl-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ctrl-btn:hover {
+    border-color: var(--ink-soft);
+    color: var(--ink);
+  }
+
+  .ctrl-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, var(--accent-glow) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+
+  .ctrl-btn:active::after {
+    opacity: 1;
+    transition: opacity 0s;
+  }
+
+  .ctrl-btn.primary {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  .ctrl-btn.primary:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .ctrl-btn.danger:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* === Agent Panel (right) — Chat bubbles === */
+  .agent {
+    grid-area: agent;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+  }
+
+  .agent-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .agent-header-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .agent-header-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+  }
+
+  .agent-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: breathe 1.5s ease-in-out infinite;
+  }
+
+  .agent-status-dot.paused {
+    background: var(--ink-mute);
+    animation: none;
+  }
+
+  /* Chat scroll area */
+  .chat-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+
+  /* v3: 入场动画改由 Motion 接管（移除 CSS msgIn keyframe）
+     对应 React：<motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} /> */
+  .chat-msg {
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+  }
+
+  .chat-avatar {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  .chat-avatar.assistant {
+    background: var(--accent);
+  }
+
+  .chat-bubble {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .chat-meta {
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .chat-content {
+    background: var(--bg);
+    padding: 10px 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .chat-msg.user .chat-content {
+    background: var(--bg-deep);
+    border-color: var(--border-strong);
+  }
+
+  .chat-msg.system .chat-content {
+    background: transparent;
+    border: 1px dashed var(--border);
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+  }
+
+  /* Quick actions */
+  .quick-actions {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .quick-chip {
+    padding: 4px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .quick-chip:hover {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+
+  /* Input box */
+  .chat-input-area {
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .chat-input {
+    width: 100%;
+    min-height: 48px;
+    max-height: 120px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    background: var(--bg);
+    font-family: var(--serif);
+    font-size: 13px;
+    color: var(--ink);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .chat-input:focus {
+    border-color: var(--ink);
+  }
+
+  .chat-input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+  }
+
+  .chat-hint {
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-family: var(--mono);
+  }
+
+  .chat-send {
+    padding: 5px 14px;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chat-send:hover {
+    background: var(--accent);
+  }
+
+  /* === EDA Panel (toggle) === */
+  .eda-trigger {
+    position: fixed;
+    left: 280px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 60px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    font-size: 10px;
+    color: var(--ink-mute);
+    writing-mode: vertical-rl;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .eda-trigger:hover {
+    background: var(--accent);
+    color: var(--bg);
+    width: 28px;
+  }
+
+  .eda-panel {
+    position: fixed;
+    left: 280px;
+    top: 56px;
+    bottom: 40px;
+    width: 320px;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    box-shadow: var(--shadow-deep);
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 4;
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .eda-panel.open {
+    transform: translateX(0);
+  }
+
+  .eda-panel .panel-title {
+    padding: 0 0 16px;
+  }
+
+  .eda-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .eda-btn {
+    padding: 12px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 11px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--mono);
+    color: var(--ink-soft);
+  }
+
+  .eda-btn:hover {
+    background: var(--bg-deep);
+    border-color: var(--ink-soft);
+    color: var(--ink);
+  }
+
+  .eda-btn-icon {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 4px;
+    font-family: var(--serif);
+  }
+
+  .eda-result {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
+  .eda-result-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-mute);
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+
+  .eda-table {
+    width: 100%;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--ink-soft);
+  }
+
+  .eda-table th, .eda-table td {
+    text-align: left;
+    padding: 3px 6px;
+    border-bottom: 1px dotted var(--border);
+  }
+
+  .eda-table th {
+    color: var(--ink-mute);
+    font-weight: 500;
+  }
+
+  /* === Agent Trace Drawer (FAB) === */
+  .trace-fab {
+    position: fixed;
+    right: 20px;
+    bottom: 56px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 6;
+    box-shadow: var(--shadow-deep);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .trace-fab:hover {
+    background: var(--accent);
+    transform: scale(1.08);
+  }
+
+  .trace-fab.active {
+    background: var(--accent);
+  }
+
+  .trace-drawer {
+    position: fixed;
+    right: 20px;
+    bottom: 110px;
+    width: 340px;
+    max-height: 60vh;
+    background: rgba(26, 26, 26, 0.96);
+    backdrop-filter: blur(12px);
+    border-radius: 6px;
+    box-shadow: var(--shadow-deep);
+    z-index: 6;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .trace-drawer.open {
+    display: flex;
+  }
+
+  .trace-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .trace-title {
+    font-size: 11px;
+    color: rgba(255,255,255,0.9);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+
+  .trace-close {
+    color: rgba(255,255,255,0.5);
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .trace-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* v3: 入场动画改由 Motion MutationObserver 接管（移除 CSS traceIn keyframe） */
+  .trace-line {
+    margin-bottom: 4px;
+  }
+
+  .trace-ts {
+    color: rgba(255,255,255,0.4);
+    margin-right: 6px;
+  }
+
+  .trace-node {
+    color: #B85555;
+  }
+
+  .trace-event {
+    color: rgba(255,255,255,0.9);
+  }
+
+  /* === Status Bar === */
+  .status-bar {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--ink-mute);
+    z-index: 2;
+  }
+
+  .status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-item .icon {
+    font-size: 13px;
+  }
+
+  /* === Export Button === */
+  .export-btn {
+    padding: 6px 14px;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .export-btn:hover {
+    background: var(--accent);
+  }
+
+  /* === Scrollbar === */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-mute);
+  }
+
+  /* === Cmd+K Command Palette === */
+  .cmdk-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 120px;
+  }
+
+  .cmdk-overlay.open {
+    display: flex;
+  }
+
+  .cmdk-box {
+    width: 90%;
+    max-width: 560px;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: var(--shadow-deep);
+    overflow: hidden;
+    /* v3: 给 AnimatePresence 等价动画提供初始变换原点 */
+    transform-origin: top center;
+  }
+
+  .cmdk-input {
+    width: 100%;
+    padding: 16px 20px;
+    border: none;
+    background: transparent;
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--ink);
+    outline: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cmdk-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .cmdk-item {
+    padding: 10px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .cmdk-item:hover, .cmdk-item.selected {
+    background: var(--bg-deep);
+    color: var(--ink);
+  }
+
+  .cmdk-shortcut {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-mute);
+  }
+
+  /* === Responsive === */
+  @media (max-width: 1200px) {
+    .app {
+      grid-template-columns: 240px 1fr 320px;
+    }
+  }
+
+  /* ============================================================ */
+  /* === v3 NEW: Motion / Magic UI / React Bits 动效层 ===
+     所有新增样式集中在此区域，不修改上方 CSS 变量/布局/内容
+     ============================================================ */
+
+  /* --- Magic UI: Border Beam（章节生成中外发光流光边框） ---
+         实现：conic-gradient 沿边框旋转一圈光点，配合 @property 让角度平滑插值。
+         对应 React：<motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity }} />
+         套在 .chapter.generating 上，给"生成中"章节卡片做环绕流光。 */
+  .border-beam {
+    position: relative;
+  }
+  .border-beam::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--beam-angle, 0deg) at 50% 50%,
+      transparent 0deg,
+      transparent 270deg,
+      var(--accent) 320deg,
+      var(--accent-soft) 340deg,
+      transparent 360deg
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: beam-spin 4s linear infinite;
+    z-index: 0;
+  }
+  @property --beam-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes beam-spin {
+    to { --beam-angle: 360deg; }
+  }
+  /* 不支持 @property 的浏览器降级：直接旋转 conic-gradient 起点不可行，
+     回退为线性渐变流动边框 */
+  @supports not (background: paint(test)) {
+    @supports (--a: 0) {
+      /* 现代浏览器：保留 @property 版本 */
+    }
+  }
+
+  /* --- React Bits: Star Border（星形边框流转，替代简单 CSS 呼吸灯） ---
+         实现：conic-gradient 形成单点光斑沿边框公转，更轻盈的"生成中"边框。 */
+  .star-border {
+    position: relative;
+  }
+  .star-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--star-angle, 0deg),
+      transparent 0deg,
+      transparent 84deg,
+      var(--accent) 90deg,
+      transparent 96deg,
+      transparent 360deg
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: star-orbit 5s linear infinite;
+    z-index: 0;
+  }
+  @property --star-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  @keyframes star-orbit {
+    to { --star-angle: 360deg; }
+  }
+
+  /* --- Magic UI: Shine Border（章节卡片悬停微光边框） ---
+         实现：linear-gradient 沿 110° 角滑动，hover 时一次性扫过卡片边框。 */
+  .shine-border {
+    position: relative;
+    border-radius: 4px;
+  }
+  .shine-border::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(110deg,
+      transparent 30%,
+      rgba(139, 44, 44, 0.10) 45%,
+      rgba(184, 85, 85, 0.20) 50%,
+      rgba(139, 44, 44, 0.10) 55%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    background-position: -150% 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .shine-border:hover::after {
+    opacity: 1;
+    animation: shine-sweep 1.6s ease-in-out;
+  }
+  @keyframes shine-sweep {
+    to { background-position: 150% 0; }
+  }
+
+  /* --- Magic UI: Animated Gradient Text（标题"生成中"渐变流动） ---
+         对应 React：<motion.div animate={{ backgroundPosition: '200% center' }} />
+         套在 #status-label 上，给"生成中"三字做渐变流动。 */
+  .gradient-flow {
+    background: linear-gradient(90deg,
+      var(--ink) 0%,
+      var(--accent) 20%,
+      var(--ink-soft) 40%,
+      var(--accent-soft) 60%,
+      var(--ink) 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: gradient-flow 4s linear infinite;
+    /* 保留原 font-family/size，仅替换颜色 */
+  }
+  @keyframes gradient-flow {
+    to { background-position: -200% center; }
+  }
+
+  /* --- Magic UI: Streaming Text（流式段落 blur→focus 效果） ---
+         每个 stream-chunk 入场时 blur(6px) opacity 0.4 → blur(0) opacity 1。
+         对应 React：<motion.span initial={{ filter: 'blur(6px)', opacity: 0.4 }} animate={{ filter: 'blur(0)', opacity: 1 }} /> */
+  .stream-chunk {
+    display: inline;
+    filter: blur(6px);
+    opacity: 0.4;
+    animation: stream-focus 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes stream-focus {
+    to {
+      filter: blur(0);
+      opacity: 1;
+    }
+  }
+
+  /* --- React Bits: Blur Text（段落入场 blur→focus，配合 GSAP SplitText 拆字） ---
+         初始状态：blur(8px) opacity 0；GSAP fromTo 动画进入 blur(0) opacity 1。
+         标题用 SplitText 拆字后逐字浮入；段落用整体 blur→focus。 */
+  .blur-text-init {
+    filter: blur(8px);
+    opacity: 0;
+  }
+
+  /* --- v3: Scroll Progress Bar（GSAP ScrollTrigger 联动滚动进度条） --- */
+  .scroll-progress {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-soft));
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+    z-index: 5;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* --- v3: Firefly Canvas（tsParticles 等价物，生成中状态低密度萤火虫） --- */
+  .firefly-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  .firefly-canvas.active {
+    opacity: 0.7;
+  }
+
+  /* --- v3: Confetti 容器（章节完成庆祝动效，tsParticles 等价） --- */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 8px;
+    height: 14px;
+    top: -20px;
+    will-change: transform, opacity;
+  }
+
+  /* --- v3: Number Ticker 容器（无视觉变化，仅 hook 标记 + 等宽数字） --- */
+  .number-ticker {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- React Bits: Magnetic Button 基础（鼠标吸附效果） ---
+         inline transform 由 JS applyMagnetic 动态写入。
+         transition 让鼠标离开时弹性归位。 */
+  .magnetic {
+    will-change: transform;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* --- v3: 生成中章节的微光晕（配合 Border Beam） --- */
+  .chapter.generating {
+    box-shadow: 0 0 0 1px var(--accent-glow), 0 4px 24px var(--accent-glow);
+  }
+
+  /* --- v3: .motion-ready 标记——Motion 加载完成后由 JS 添加，
+         用于禁用 CSS fallback 动画（避免双重动画冲突） --- */
+  .motion-ready .chat-msg { /* 入场动画已由 Motion MutationObserver 接管 */ }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">econ<em>paper</em></div>
+      <div class="brand-sub">章节式 AI 协作写作 · v3</div>
+    </div>
+    <div class="header-meta">
+      <span><span class="dot"></span>会话 #a8f3 · CHARLS_DID_2024</span>
+      <span>⌘K 唤起指令</span>
+      <button class="export-btn">导出 ↓</button>
+    </div>
+  </header>
+
+  <!-- Outline (left) -->
+  <aside class="outline">
+    <div class="panel-title">大纲 / Outline</div>
+    <ul class="outline-list" id="outline-list">
+      <li class="outline-item done" draggable="true" data-chapter="1">
+        <div class="outline-num">1</div>
+        <div class="outline-content">
+          <div class="outline-title">引言</div>
+          <div class="outline-type">intro</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+      <li class="outline-item done" draggable="true" data-chapter="2">
+        <div class="outline-num">2</div>
+        <div class="outline-content">
+          <div class="outline-title">文献综述</div>
+          <div class="outline-type">lit_review</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+      <li class="outline-item done" draggable="true" data-chapter="3">
+        <div class="outline-num">3</div>
+        <div class="outline-content">
+          <div class="outline-title">数据与变量</div>
+          <div class="outline-type">data_desc</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+      <li class="outline-item done" draggable="true" data-chapter="4">
+        <div class="outline-num">4</div>
+        <div class="outline-content">
+          <div class="outline-title">实证策略</div>
+          <div class="outline-type">methods</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+      <li class="outline-item generating active" draggable="true" data-chapter="5">
+        <div class="outline-num">5</div>
+        <div class="outline-content">
+          <div class="outline-title">实证结果</div>
+          <div class="outline-type">results</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+      <li class="outline-item" draggable="true" data-chapter="6">
+        <div class="outline-num">6</div>
+        <div class="outline-content">
+          <div class="outline-title">结论与讨论</div>
+          <div class="outline-type">conclusion</div>
+        </div>
+        <div class="outline-grip">⋮⋮</div>
+      </li>
+    </ul>
+    <div class="outline-add">+ 添加章节</div>
+  </aside>
+
+  <!-- EDA Trigger -->
+  <div class="eda-trigger" id="eda-trigger">EDA 探索 ›</div>
+  <div class="eda-panel" id="eda-panel">
+    <div class="panel-title">探索性数据分析</div>
+    <div class="eda-actions">
+      <div class="eda-btn"><span class="eda-btn-icon">σ</span>描述统计</div>
+      <div class="eda-btn"><span class="eda-btn-icon">⊞</span>相关性矩阵</div>
+      <div class="eda-btn"><span class="eda-btn-icon">↗</span>分布图</div>
+      <div class="eda-btn"><span class="eda-btn-icon">⊙</span>散点图</div>
+      <div class="eda-btn"><span class="eda-btn-icon">◫</span>回归诊断</div>
+      <div class="eda-btn"><span class="eda-btn-icon">π</span>缺失值</div>
+    </div>
+    <div class="eda-result">
+      <div class="eda-result-title">CHARLS 2024 · describe()</div>
+      <table class="eda-table">
+        <tr><th>变量</th><th>均值</th><th>标准差</th><th>N</th></tr>
+        <tr><td>oopc_exp</td><td>3284.5</td><td>2156.3</td><td>12,450</td></tr>
+        <tr><td>ude_cnt</td><td>0.342</td><td>0.474</td><td>12,450</td></tr>
+        <tr><td>age</td><td>58.2</td><td>9.8</td><td>12,450</td></tr>
+        <tr><td>edu_year</td><td>7.4</td><td>3.9</td><td>12,450</td></tr>
+      </table>
+    </div>
+    <div class="eda-result">
+      <div class="eda-result-title">相关性 · Pearson</div>
+      <table class="eda-table">
+        <tr><th></th><th>oopc</th><th>ude</th><th>age</th></tr>
+        <tr><td>oopc_exp</td><td>1.00</td><td>-0.124***</td><td>0.087***</td></tr>
+        <tr><td>ude_cnt</td><td>-0.124***</td><td>1.00</td><td>-0.042**</td></tr>
+        <tr><td>age</td><td>0.087***</td><td>-0.042**</td><td>1.00</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Editor (center) with wave canvas + firefly canvas + scroll progress -->
+  <main class="editor">
+    <!-- v3 NEW: Scroll progress bar (GSAP ScrollTrigger 联动) -->
+    <div class="scroll-progress" id="scroll-progress"></div>
+    <canvas class="wave-canvas" id="wave-canvas"></canvas>
+    <!-- v3 NEW: Firefly canvas overlay (tsParticles 等价，生成中萤火虫粒子) -->
+    <canvas class="firefly-canvas" id="firefly-canvas"></canvas>
+    <div class="editor-inner">
+      <article class="editor-paper">
+        <div class="paper-meta">
+          <h1 class="paper-title">医疗保险整合对老年人住院自付支出的影响</h1>
+          <div class="paper-authors">—— 基于 CHARLS 2018-2020 的双重差分分析</div>
+          <div class="paper-affil">数据集: CHARLS · 方法: 多期 DID · 样本: 12,450</div>
+        </div>
+
+        <section class="chapter shine-border" id="ch1">
+          <div class="chapter-header">
+            <div class="chapter-title">1. 引言</div>
+            <span class="chapter-badge badge-intro">intro</span>
+          </div>
+          <div class="chapter-content">
+            <p>医疗保险制度的整合与统一，是近年来中国医疗保障体系改革的重要议题。2016 年国务院《关于整合城乡居民基本医疗保险制度的意见》发布后，城镇居民医保与新农合逐步整合为统一的城乡居民基本医疗保险。这一政策变化对老年群体的医疗服务利用与财务保护产生了深远影响。</p>
+            <p>本文利用中国健康与养老追踪调查（CHARLS）2018-2020 两期数据，采用多期双重差分（DID）方法，评估城乡居民医保整合对老年人住院自付支出（OOPC）的因果效应。研究发现，医保整合使住院自付支出简单规格为负（-8.1%，SE=0.053），但首选 M5 估计在统计上不显著，提示政策效应可能存在异质性与动态滞后性。</p>
+          </div>
+          <div class="chapter-controls">
+            <button class="ctrl-btn">↺ 重新生成</button>
+            <button class="ctrl-btn">✎ 编辑</button>
+            <button class="ctrl-btn primary">✓ 通过</button>
+          </div>
+        </section>
+
+        <section class="chapter shine-border" id="ch2">
+          <div class="chapter-header">
+            <div class="chapter-title">2. 文献综述</div>
+            <span class="chapter-badge badge-lit_review">lit_review</span>
+          </div>
+          <div class="chapter-content">
+            <p>医疗保险的财务保护效应一直是健康经济学关注的核心议题。WHO（2010）将财务保护定义为"避免因医疗支出导致的家庭经济困难"。既有文献多从灾难性卫生支出发生率和因病致贫率两个维度衡量财务保护水平（Xu et al., 2003; Wagstaff & van Doorslaer, 2007）。</p>
+            <p>针对中国医保整合的实证研究尚处于早期阶段。刘晓鸥等（2019）利用 CFPS 数据发现整合使住院率上升 4.2 个百分点；陈操操等（2021）基于 CHFS 数据报告灾难性支出发生率下降 2.3 个百分点。但这些研究多用单期 DID，未充分处理政策分批实施带来的处理时点异质性。</p>
+          </div>
+          <div class="chapter-controls">
+            <button class="ctrl-btn">↺ 重新生成</button>
+            <button class="ctrl-btn">✎ 编辑</button>
+            <button class="ctrl-btn primary">✓ 通过</button>
+          </div>
+        </section>
+
+        <section class="chapter shine-border" id="ch3">
+          <div class="chapter-header">
+            <div class="chapter-title">3. 数据与变量</div>
+            <span class="chapter-badge badge-data_desc">data_desc</span>
+          </div>
+          <div class="chapter-content">
+            <p>本研究使用 CHARLS 2018 和 2020 两期数据，样本限定为 60 岁及以上、参加城乡居民医保的城镇与农村受访者。剔除关键变量缺失后，最终样本包含 12,450 个观测值。</p>
+            <p>被解释变量为住院自付支出（OOPC）的对数；核心处理变量为县级医保整合状态（ude_cnt）；控制变量包括年龄、性别、教育年限、婚姻状态、家庭人均收入对数及慢性病数量。所有回归均控制县级和年份固定效应。</p>
+          </div>
+          <div class="chapter-controls">
+            <button class="ctrl-btn">↺ 重新生成</button>
+            <button class="ctrl-btn">✎ 编辑</button>
+            <button class="ctrl-btn primary">✓ 通过</button>
+          </div>
+        </section>
+
+        <section class="chapter shine-border" id="ch4">
+          <div class="chapter-header">
+            <div class="chapter-title">4. 实证策略</div>
+            <span class="chapter-badge badge-methods">methods</span>
+          </div>
+          <div class="chapter-content">
+            <p>本文采用多期双重差分（Multi-period DID）识别策略。基准回归方程为：</p>
+            <p style="font-family: var(--mono); font-size: 13px; text-align: center; margin: 16px 0;">ln(OOPC<sub>it</sub>) = α + β · ude_cnt<sub>it</sub> + X<sub>it</sub>′γ + μ<sub>i</sub> + τ<sub>t</sub> + ε<sub>it</sub></p>
+            <p>其中 ude_cnt<sub>it</sub> 为县级医保整合虚拟变量，μ<sub>i</sub> 为县固定效应，τ<sub>t</sub> 为年固定效应。考虑到政策分批实施，我们使用 Callaway & Sant'Anna (2021) 估计量作为稳健性检验。</p>
+          </div>
+          <div class="chapter-controls">
+            <button class="ctrl-btn">↺ 重新生成</button>
+            <button class="ctrl-btn">✎ 编辑</button>
+            <button class="ctrl-btn primary">✓ 通过</button>
+          </div>
+        </section>
+
+        <!-- v3: ch5 生成中章节——叠加 border-beam + star-border + magnetic 按钮 -->
+        <section class="chapter generating border-beam star-border shine-border" id="ch5">
+          <div class="chapter-header">
+            <div class="chapter-title">5. 实证结果</div>
+            <span class="chapter-badge badge-results">results</span>
+          </div>
+          <div class="chapter-content" id="ch5-content">
+            <p id="streaming-text"></p><span class="cursor" id="cursor"></span>
+          </div>
+          <div class="chapter-controls" style="opacity:1;">
+            <button class="ctrl-btn danger magnetic" id="pause-btn">⏸ 暂停</button>
+            <button class="ctrl-btn danger magnetic">↺ 回滚</button>
+            <button class="ctrl-btn magnetic">✎ 编辑 prompt</button>
+            <button class="ctrl-btn primary magnetic">✓ 通过</button>
+          </div>
+        </section>
+
+        <section class="chapter shine-border" id="ch6">
+          <div class="chapter-header">
+            <div class="chapter-title">6. 结论与讨论</div>
+            <span class="chapter-badge badge-conclusion">conclusion</span>
+          </div>
+          <div class="chapter-content">
+            <p class="placeholder">— 等待生成 —</p>
+          </div>
+        </section>
+
+      </article>
+    </div>
+  </main>
+
+  <!-- Agent Panel (right) — Chat bubbles -->
+  <aside class="agent">
+    <div class="agent-header">
+      <div class="agent-header-title">写作 Copilot</div>
+      <div class="agent-header-status">
+        <div class="agent-status-dot" id="status-dot"></div>
+        <!-- v3: "生成中"加 gradient-flow 渐变流动文字（Magic UI Animated Gradient Text） -->
+        <span id="status-label" class="gradient-flow">生成中</span>
+      </div>
+    </div>
+
+    <div class="chat-stream" id="chat-stream">
+      <div class="chat-msg system">
+        <div class="chat-avatar">·</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">SYSTEM · 14:22</div>
+          <div class="chat-content">Session started · CHARLS_DID_2024 · checkpoint #1</div>
+        </div>
+      </div>
+
+      <div class="chat-msg user">
+        <div class="chat-avatar">奕</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">奕枢 · 14:24</div>
+          <div class="chat-content">研究方向：医保整合对老年人住院自付支出的影响。使用多期 DID。</div>
+        </div>
+      </div>
+
+      <div class="chat-msg assistant">
+        <div class="chat-avatar assistant">AI</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">AGENT · 14:24 · pick_method</div>
+          <div class="chat-content">已选择方法：<strong>Multi-period DID</strong>（Callaway-Sant'Anna 2021）。建议同时报告简单 DID 作为基准。准备生成 outline...</div>
+        </div>
+      </div>
+
+      <div class="chat-msg assistant">
+        <div class="chat-avatar assistant">AI</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">AGENT · 14:25 · generate_outline</div>
+          <div class="chat-content">Outline 已生成（6 章）。章节类型：intro / lit_review / data_desc / methods / results / conclusion。等待你确认后开始逐章生成。</div>
+        </div>
+      </div>
+
+      <div class="chat-msg user">
+        <div class="chat-avatar">奕</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">奕枢 · 14:26</div>
+          <div class="chat-content">OK 开始。第 5 章要重点呈现事件研究结果。</div>
+        </div>
+      </div>
+
+      <div class="chat-msg assistant" id="active-msg">
+        <div class="chat-avatar assistant">AI</div>
+        <div class="chat-bubble">
+          <div class="chat-meta">AGENT · 14:31 · generate_chapter[5]</div>
+          <div class="chat-content" id="active-content">正在撰写第 5 章实证结果...<br><span style="color:var(--ink-mute);font-size:11px;">ReAct loop #3 · 调用 StatsPAI did_estimate · token 12,847</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-actions">
+      <div class="quick-chip">重写本段</div>
+      <div class="quick-chip">补充文献</div>
+      <div class="quick-chip">加稳健性</div>
+      <div class="quick-chip">跑 EDA</div>
+      <div class="quick-chip">解释结果</div>
+    </div>
+
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chat-input" placeholder="给 Copilot 下指令... (⌘+Enter 发送)"></textarea>
+      <div class="chat-input-actions">
+        <div class="chat-hint">⌘K 唤起命令面板 · ⌘+Enter 发送</div>
+        <button class="chat-send" id="chat-send">发送 →</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Agent Trace FAB -->
+  <div class="trace-fab" id="trace-fab">⌘</div>
+  <div class="trace-drawer" id="trace-drawer">
+    <div class="trace-header">
+      <div class="trace-title">AGENT TRACE · LIVE</div>
+      <div class="trace-close" id="trace-close">✕</div>
+    </div>
+    <div class="trace-stream" id="trace-stream"></div>
+  </div>
+
+  <!-- Status Bar -->
+  <footer class="status-bar">
+    <div class="status-left">
+      <div class="status-item"><span class="icon">●</span> LangGraph 运行中</div>
+      <div class="status-item"><span class="icon">◆</span> Postgres checkpoint 已保存</div>
+      <div class="status-item"><span class="icon">▣</span> StatsPAI v1.6.3</div>
+    </div>
+    <div class="status-right">
+      <!-- v3: 已生成字数 + Token 消耗 都套 number-ticker hook（Magic UI Number Ticker） -->
+      <div class="status-item">已生成 <span id="word-count" class="number-ticker">0</span> 字</div>
+      <div class="status-item">Token <span id="token-count" class="number-ticker">0</span></div>
+      <div class="status-item">耗时 <span id="elapsed">04:23</span></div>
+      <div class="status-item">UTF-8 · LF</div>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Cmd+K Command Palette -->
+<div class="cmdk-overlay" id="cmdk-overlay">
+  <div class="cmdk-box" id="cmdk-box">
+    <input class="cmdk-input" id="cmdk-input" placeholder="输入指令或搜索..." />
+    <div class="cmdk-list" id="cmdk-list">
+      <div class="cmdk-item selected">
+        <span>↺ 重新生成当前章节</span>
+        <span class="cmdk-shortcut">⌘R</span>
+      </div>
+      <div class="cmdk-item">
+        <span>✓ 通过当前章节</span>
+        <span class="cmdk-shortcut">⌘⏎</span>
+      </div>
+      <div class="cmdk-item">
+        <span>↺ 回滚到上一版本</span>
+        <span class="cmdk-shortcut">⌘Z</span>
+      </div>
+      <div class="cmdk-item">
+        <span>⊞ 切换 EDA 面板</span>
+        <span class="cmdk-shortcut">⌘E</span>
+      </div>
+      <div class="cmdk-item">
+        <span>⌘ 查看 Agent Trace</span>
+        <span class="cmdk-shortcut">⌘T</span>
+      </div>
+      <div class="cmdk-item">
+        <span>↓ 导出论文</span>
+        <span class="cmdk-shortcut">⌘D</span>
+      </div>
+      <div class="cmdk-item">
+        <span>+</span>添加新章节</span>
+        <span class="cmdk-shortcut">⌘N</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v3 NEW: Confetti 容器（章节完成庆祝动效，tsParticles 等价原生实现） -->
+<div class="confetti-container" id="confetti-container"></div>
+
+<script>
+  /* ==================================================================
+     v2 原有 JS 逻辑（保留，仅微调以接入 v3 动效层）
+     ================================================================== */
+
+  // === DottedSurface wave canvas (Canvas 2D port) ===
+  const canvas = document.getElementById('wave-canvas');
+  const ctx = canvas.getContext('2d');
+  let waveCount = 0;
+  let waveSpeed = 1;
+
+  function resizeCanvas() {
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = canvas.offsetHeight * 2;
+    ctx.scale(2, 2);
+  }
+  resizeCanvas();
+  window.addEventListener('resize', () => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    resizeCanvas();
+  });
+
+  function drawWave() {
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    const sep = 28;
+    const cols = Math.ceil(w / sep) + 2;
+    const rows = Math.ceil(h / sep) + 2;
+
+    for (let ix = 0; ix < cols; ix++) {
+      for (let iy = 0; iy < rows; iy++) {
+        const x = ix * sep;
+        const y = iy * sep + Math.sin((ix + waveCount) * 0.3) * 4 + Math.sin((iy + waveCount) * 0.5) * 3;
+        const alpha = 0.04 + Math.abs(Math.sin((ix + iy + waveCount) * 0.15)) * 0.08;
+        ctx.fillStyle = `rgba(139, 44, 44, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    waveCount += 0.02 * waveSpeed;
+    requestAnimationFrame(drawWave);
+  }
+  drawWave();
+
+  // === Streaming text simulation ===
+  const sampleText = `基准回归结果如表 1 所示。第 (1) 列报告简单 DID 估计量，处理变量 ude_cnt 的系数为 -0.081，标准误为 0.053，在 10% 水平上不显著。第 (2)-(3) 列依次加入个体控制变量与县级时变特征，系数稳定在 -0.076 至 -0.085 之间，但始终未达到常规显著性水平。
+
+第 (4) 列报告首选 M5 规格——包含县级线性趋势的 DID 估计。处理效应系数为 -0.072（SE=0.049），p=0.142，统计上仍不显著。这表明在控制县级异质性趋势后，医保整合对老年人住院自付支出的平均效应较弱。
+
+图 1 展示事件研究（Event Study）结果。在政策实施前（t-3, t-2），前置趋势检验通过（联合 F 检验 p=0.342），支持平行趋势假设。政策实施当年（t=0）系数为 -0.041，此后逐期增大：t+1 为 -0.098，t+2 为 -0.134，t+3 为 -0.187。这提示医保整合的财务保护效应存在动态滞后性，短期内不明显，但中长期呈现温和上升趋势。
+
+作为稳健性检验，我们采用 Callaway & Sant'Anna (2021) 多期 DID 估计量。ATT(g,t) 汇总结果显示，组-时间平均处理效应为 -0.064，95% 置信区间为 [-0.121, -0.007]。这进一步印证了基准回归的发现：医保整合对住院自付支出存在温和的负向效应，但统计显著性较弱。`;
+
+  let streamIdx = 0;
+  let streaming = true;
+  let tokenCount = 0;
+  const streamingEl = document.getElementById('streaming-text');
+  const cursor = document.getElementById('cursor');
+  const pauseBtn = document.getElementById('pause-btn');
+  const statusDot = document.getElementById('status-dot');
+  const statusLabel = document.getElementById('status-label');
+  const wordCount = document.getElementById('word-count');
+  const tokenCountEl = document.getElementById('token-count');
+  const activeContent = document.getElementById('active-content');
+
+  function streamNext() {
+    if (!streaming || streamIdx >= sampleText.length) {
+      if (streamIdx >= sampleText.length) {
+        cursor.style.display = 'none';
+        statusDot.classList.remove('paused');
+        statusLabel.textContent = '已完成';
+        // v3: 完成后移除 gradient-flow 渐变流动
+        statusLabel.classList.remove('gradient-flow');
+        waveSpeed = 0.3;
+        // v3 NEW: 完成时触发 confetti 庆祝动效（tsParticles 等价）
+        if (window.triggerConfetti) window.triggerConfetti();
+        // v3 NEW: 完成时停止萤火虫粒子
+        window.dispatchEvent(new Event('streaming-complete'));
+        // v3 NEW: Number Ticker 把 token-count 平滑插值到最终值 12847
+        if (window.animateNumberTicker) {
+          window.animateNumberTicker(tokenCountEl, 12847, 1500);
+          window.animateNumberTicker(wordCount, sampleText.length, 1500);
+        }
+        addTrace('generate_chapter[5]', 'done · 847 tokens');
+      }
+      return;
+    }
+    const chunk = Math.min(3 + Math.random() * 5, sampleText.length - streamIdx);
+    // v3 NEW: Magic UI Streaming Text —— 每个 chunk 包裹 <span class="stream-chunk">
+    // 触发 blur(6px) → blur(0) 入场效果（对应 React motion.span initial/animate）
+    const span = document.createElement('span');
+    span.className = 'stream-chunk';
+    span.textContent = sampleText.slice(streamIdx, streamIdx + chunk);
+    streamingEl.appendChild(span);
+    streamIdx += chunk;
+    // v3: word-count 直接更新（频次高，不需要平滑插值）
+    wordCount.textContent = streamingEl.textContent.length;
+    // v3: token-count 模拟 LLM token 消耗（每字符约 1.5 token）
+    tokenCount += Math.floor(chunk * 1.5);
+    tokenCountEl.textContent = tokenCount.toLocaleString();
+    waveSpeed = 1 + Math.random() * 0.5;
+
+    const editor = document.querySelector('.editor');
+    editor.scrollTop = editor.scrollHeight;
+
+    const delay = 30 + Math.random() * 60;
+    setTimeout(streamNext, delay);
+  }
+
+  setTimeout(streamNext, 800);
+
+  // === Pause / Resume ===
+  pauseBtn.addEventListener('click', () => {
+    if (streaming) {
+      streaming = false;
+      pauseBtn.textContent = '▶ 继续';
+      statusDot.classList.add('paused');
+      statusLabel.textContent = '已暂停';
+      statusLabel.classList.remove('gradient-flow');
+      waveSpeed = 0.1;
+      addTrace('interrupt', 'user paused · awaiting input');
+    } else {
+      streaming = true;
+      pauseBtn.textContent = '⏸ 暂停';
+      statusDot.classList.remove('paused');
+      statusLabel.textContent = '生成中';
+      statusLabel.classList.add('gradient-flow');
+      waveSpeed = 1;
+      addTrace('resume', 'user resumed · Command(resume=...)');
+      streamNext();
+    }
+  });
+
+  // === EDA Panel toggle ===
+  const edaTrigger = document.getElementById('eda-trigger');
+  const edaPanel = document.getElementById('eda-panel');
+  edaTrigger.addEventListener('click', () => {
+    edaPanel.classList.toggle('open');
+    edaTrigger.textContent = edaPanel.classList.contains('open') ? '‹ 收起' : 'EDA 探索 ›';
+  });
+
+  // === Outline hover gradient follow ===
+  document.querySelectorAll('.outline-item').forEach(item => {
+    item.addEventListener('mousemove', (e) => {
+      const rect = item.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      item.style.setProperty('--mx', x + '%');
+      item.style.setProperty('--my', y + '%');
+    });
+  });
+
+  // === Drag and drop outline ===
+  // v3: Motion 的 Reorder.Group 在 vanilla 中无直接等价，
+  //     保留 HTML5 drag-drop，Auto-Animate 接管重排后的 FLIP 动画（自动归位）。
+  const outlineItems = document.querySelectorAll('.outline-item');
+  let draggedItem = null;
+
+  outlineItems.forEach(item => {
+    item.addEventListener('dragstart', () => {
+      draggedItem = item;
+      setTimeout(() => item.classList.add('dragging'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      document.querySelectorAll('.drop-target').forEach(t => t.classList.remove('drop-target'));
+    });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (item !== draggedItem) item.classList.add('drop-target');
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drop-target'));
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (item !== draggedItem && draggedItem) {
+        const list = document.getElementById('outline-list');
+        const itemIdx = Array.from(list.children).indexOf(item);
+        const dragIdx = Array.from(list.children).indexOf(draggedItem);
+        if (dragIdx < itemIdx) list.insertBefore(draggedItem, item.nextSibling);
+        else list.insertBefore(draggedItem, item);
+      }
+    });
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('outline-grip')) return;
+      const ch = item.dataset.chapter;
+      const target = document.getElementById('ch' + ch);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.outline-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  // === Agent Trace ===
+  const traceFab = document.getElementById('trace-fab');
+  const traceDrawer = document.getElementById('trace-drawer');
+  const traceStream = document.getElementById('trace-stream');
+  const traceClose = document.getElementById('trace-close');
+
+  function addTrace(node, event) {
+    const now = new Date();
+    const ts = now.toTimeString().slice(0, 8);
+    const line = document.createElement('div');
+    line.className = 'trace-line';
+    line.innerHTML = `<span class="trace-ts">${ts}</span><span class="trace-node">${node}</span> <span class="trace-event">${event}</span>`;
+    traceStream.appendChild(line);
+    traceStream.scrollTop = traceStream.scrollHeight;
+  }
+
+  traceFab.addEventListener('click', () => {
+    traceDrawer.classList.toggle('open');
+    traceFab.classList.toggle('active');
+  });
+  traceClose.addEventListener('click', () => {
+    traceDrawer.classList.remove('open');
+    traceFab.classList.remove('active');
+  });
+
+  // Seed trace
+  addTrace('upload_data', 'done · 3 datasets');
+  addTrace('eda', 'done · describe() + corr()');
+  addTrace('set_direction', 'user input · DID');
+  addTrace('pick_method', 'Multi-period DID selected');
+  addTrace('generate_outline', '6 chapters');
+  addTrace('generate_chapter[1]', 'done · 1247 tokens');
+  addTrace('generate_chapter[2]', 'done · 2103 tokens');
+  addTrace('generate_chapter[3]', 'done · 892 tokens');
+  addTrace('generate_chapter[4]', 'done · 1567 tokens');
+  addTrace('generate_chapter[5]', 'running · ReAct #3');
+
+  // Simulate live trace
+  setInterval(() => {
+    if (streaming) {
+      const events = [
+        ['llm_call', `token ${12000 + Math.floor(streamIdx * 1.5)}`],
+        ['statspai', `did_estimate · iter ${Math.floor(streamIdx / 50)}`],
+        ['checkpoint', 'sync · postgres'],
+      ];
+      const [n, e] = events[Math.floor(Math.random() * events.length)];
+      addTrace(n, e);
+    }
+  }, 4000);
+
+  // === Cmd+K Command Palette ===
+  const cmdkOverlay = document.getElementById('cmdk-overlay');
+  const cmdkInput = document.getElementById('cmdk-input');
+  const cmdkItems = document.querySelectorAll('.cmdk-item');
+  let cmdkSelected = 0;
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      cmdkOverlay.classList.add('open');
+      setTimeout(() => cmdkInput.focus(), 50);
+    }
+    if (e.key === 'Escape') {
+      cmdkOverlay.classList.remove('open');
+      traceDrawer.classList.remove('open');
+      traceFab.classList.remove('active');
+    }
+    if (cmdkOverlay.classList.contains('open')) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        cmdkSelected = (cmdkSelected + 1) % cmdkItems.length;
+        updateCmdkSelected();
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        cmdkSelected = (cmdkSelected - 1 + cmdkItems.length) % cmdkItems.length;
+        updateCmdkSelected();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        cmdkItems[cmdkSelected].click();
+      }
+    }
+  });
+
+  function updateCmdkSelected() {
+    cmdkItems.forEach((item, i) => {
+      item.classList.toggle('selected', i === cmdkSelected);
+    });
+  }
+
+  cmdkItems.forEach((item, i) => {
+    item.addEventListener('click', () => {
+      cmdkOverlay.classList.remove('open');
+      addTrace('user_cmd', item.textContent.trim().split(/\s+/)[0]);
+    });
+    item.addEventListener('mouseenter', () => {
+      cmdkSelected = i;
+      updateCmdkSelected();
+    });
+  });
+
+  cmdkOverlay.addEventListener('click', (e) => {
+    if (e.target === cmdkOverlay) cmdkOverlay.classList.remove('open');
+  });
+
+  // === Chat send ===
+  const chatInput = document.getElementById('chat-input');
+  const chatSend = document.getElementById('chat-send');
+  const chatStream = document.getElementById('chat-stream');
+
+  function sendChat() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    const msg = document.createElement('div');
+    msg.className = 'chat-msg user';
+    msg.innerHTML = `
+      <div class="chat-avatar">奕</div>
+      <div class="chat-bubble">
+        <div class="chat-meta">奕枢 · ${new Date().toTimeString().slice(0,5)}</div>
+        <div class="chat-content">${text}</div>
+      </div>
+    `;
+    chatStream.appendChild(msg);
+    chatStream.scrollTop = chatStream.scrollHeight;
+    chatInput.value = '';
+    addTrace('user_msg', text.slice(0, 40));
+  }
+
+  chatSend.addEventListener('click', sendChat);
+  chatInput.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+
+  // === Export button ===
+  document.querySelector('.export-btn').addEventListener('click', () => {
+    addTrace('export', 'dialog opened');
+    const formats = ['LaTeX (.tex)', 'PDF (compiled)', 'Word (.docx via Pandoc)', 'Python (.py)', 'Stata (.do)', 'R (.R)', 'Eviews (.m)'];
+    alert('导出选项：\n\n' + formats.map(f => '• ' + f).join('\n'));
+  });
+</script>
+
+<!-- ==================================================================
+     v3 NEW: GSAP + ScrollTrigger + SplitText（CDN 官方）
+     ================================================================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/SplitText.min.js"></script>
+
+<!-- ==================================================================
+     v3 NEW: Auto-Animate（CDN jsDelivr）
+     ================================================================== -->
+<script src="https://cdn.jsdelivr.net/npm/@formkit/auto-animate@0.10.0"></script>
+
+<!-- ==================================================================
+     v3 NEW: GSAP 章节入场 + Auto-Animate 初始化 + Magnetic + Number Ticker + Confetti + Firefly
+     （regular script，等 GSAP / Auto-Animate UMD 加载完毕后执行）
+     ================================================================== -->
+<script>
+  /* === GSAP: ScrollTrigger + SplitText 章节入场动效 ===
+     使用 gsap.context() 限定作用域（等价于 React useGSAP hook 的 cleanup 模式） */
+
+  // 兜底：如果 SplitText CDN 加载失败，提供原生字符分割实现
+  if (typeof SplitText === 'undefined') {
+    console.warn('[v3] GSAP SplitText 未加载，回退到原生字符分割');
+    window.SplitText = function(el, opts) {
+      const text = el.textContent;
+      el.textContent = '';
+      const chars = [];
+      for (const ch of text) {
+        const span = document.createElement('span');
+        span.textContent = ch;
+        span.style.display = 'inline-block';
+        el.appendChild(span);
+        chars.push(span);
+      }
+      return { chars, words: chars, lines: chars, revert() { el.textContent = text; } };
+    };
+  }
+
+  if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+    gsap.registerPlugin(ScrollTrigger, SplitText);
+
+    const editorEl = document.querySelector('.editor');
+    const scrollProgress = document.getElementById('scroll-progress');
+    let splitContext = null;
+
+    function initChapterAnimations() {
+      if (splitContext) splitContext.revert();
+
+      splitContext = gsap.context(() => {
+        // === SplitText：章节标题逐字浮入（React Bits Blur Text 配合 GSAP） ===
+        document.querySelectorAll('.chapter-title').forEach((title) => {
+          const split = new SplitText(title, { type: 'chars,words' });
+          gsap.from(split.chars, {
+            opacity: 0,
+            y: 12,
+            filter: 'blur(8px)',
+            duration: 0.5,
+            ease: 'power2.out',
+            stagger: 0.025,
+            scrollTrigger: {
+              trigger: title,
+              start: 'top 85%',
+              toggleActions: 'play none none none',
+            }
+          });
+        });
+
+        // === 段落 stagger fade-up + blur→focus（React Bits Blur Text） ===
+        document.querySelectorAll('.chapter-content p').forEach((p) => {
+          // 跳过正在流式生成的段落（由 stream-chunk 接管 blur 效果）
+          if (p.id === 'streaming-text') return;
+          gsap.fromTo(p,
+            { opacity: 0, y: 16, filter: 'blur(6px)' },
+            {
+              opacity: 1, y: 0, filter: 'blur(0px)',
+              duration: 0.7,
+              ease: 'power2.out',
+              scrollTrigger: {
+                trigger: p,
+                start: 'top 90%',
+                toggleActions: 'play none none reverse',
+              }
+            }
+          );
+        });
+
+        // === 滚动进度条联动（GSAP ScrollTrigger onUpdate） ===
+        ScrollTrigger.create({
+          trigger: '.editor-paper',
+          start: 'top top',
+          end: 'bottom bottom',
+          scroller: editorEl,
+          onUpdate: (self) => {
+            gsap.to(scrollProgress, {
+              scaleX: self.progress,
+              duration: 0.1,
+              ease: 'none',
+              overwrite: true,
+            });
+          }
+        });
+
+        // === 每个章节进入视口时联动左栏大纲 active 状态 ===
+        document.querySelectorAll('.chapter').forEach((chapter) => {
+          ScrollTrigger.create({
+            trigger: chapter,
+            start: 'top 30%',
+            end: 'bottom 30%',
+            scroller: editorEl,
+            onToggle: (self) => {
+              if (self.isActive) {
+                const ch = chapter.id.replace('ch', '');
+                document.querySelectorAll('.outline-item').forEach(i => i.classList.remove('active'));
+                const outlineItem = document.querySelector(`.outline-item[data-chapter="${ch}"]`);
+                if (outlineItem) outlineItem.classList.add('active');
+              }
+            }
+          });
+        });
+      }, editorEl);
+    }
+
+    // 字体加载完毕后再初始化（SplitText 对字符宽度敏感）
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(initChapterAnimations);
+    } else {
+      setTimeout(initChapterAnimations, 500);
+    }
+  }
+
+  /* === Auto-Animate: 列表自动入场/重排动画 ===
+     等价于 React 的 useAutoAnimate hook
+       - #outline-list: 拖拽重排后自动归位（FLIP）
+       - #chat-stream: 新消息入场（fade + slight translate）
+       - #eda-panel: 结果增删时平滑过渡 */
+  function initAutoAnimate() {
+    if (typeof window.autoAnimate === 'undefined') {
+      console.warn('[v3] Auto-Animate 未加载，列表动画回退到原生 CSS');
+      return;
+    }
+    const outlineList = document.getElementById('outline-list');
+    if (outlineList) {
+      window.autoAnimate(outlineList, {
+        duration: 300,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      });
+    }
+    const chatStreamEl = document.getElementById('chat-stream');
+    if (chatStreamEl) {
+      window.autoAnimate(chatStreamEl, {
+        duration: 280,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      });
+    }
+    const edaPanelEl = document.getElementById('eda-panel');
+    if (edaPanelEl) {
+      window.autoAnimate(edaPanelEl, {
+        duration: 250,
+        easing: 'ease-in-out',
+      });
+    }
+  }
+  initAutoAnimate();
+
+  /* === React Bits: Magnetic Button（鼠标吸附效果） ===
+     实现：mousemove 时根据鼠标偏移做 inline translate，
+     mouseleave 时 transition 弹性归位。 */
+  function applyMagnetic(el, strength) {
+    if (strength === undefined) strength = 0.35;
+    el.addEventListener('mousemove', (e) => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - (rect.left + rect.width / 2);
+      const y = e.clientY - (rect.top + rect.height / 2);
+      el.style.transform = `translate(${x * strength}px, ${y * strength}px)`;
+    });
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = 'translate(0, 0)';
+    });
+    // mousedown 时缩放（配合 Motion whileTap）
+    el.addEventListener('mousedown', () => {
+      el.style.transition = 'transform 0.08s ease-in';
+      const current = el.style.transform.match(/translate\(([^)]+)\)/);
+      const translate = current ? current[1] : '0, 0';
+      el.style.transform = `translate(${translate}) scale(0.95)`;
+    });
+    el.addEventListener('mouseup', () => {
+      el.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      const current = el.style.transform.match(/translate\(([^)]+)\)/);
+      const translate = current ? current[1] : '0, 0';
+      el.style.transform = `translate(${translate}) scale(1)`;
+    });
+  }
+  document.querySelectorAll('.magnetic').forEach(btn => applyMagnetic(btn, 0.35));
+
+  /* === Magic UI: Number Ticker（数字滚动动效） ===
+     实现：requestAnimationFrame + easeOutCubic 插值，
+     对应 React：<NumberTicker value={target} /> */
+  function animateNumberTicker(el, target, duration) {
+    if (!el) return;
+    if (duration === undefined) duration = 1500;
+    const start = parseInt(el.textContent.replace(/[^\d]/g, '')) || 0;
+    const startTime = performance.now();
+    function tick(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const value = Math.round(start + (target - start) * eased);
+      el.textContent = value.toLocaleString();
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  window.animateNumberTicker = animateNumberTicker;
+
+  /* === v3: Confetti（tsParticles 等价原生实现，章节完成庆祝动效） ===
+     实现：动态生成 80 个 confetti-piece，用 GSAP 动画下落 + 旋转 + 淡出。 */
+  function triggerConfetti() {
+    const container = document.getElementById('confetti-container');
+    if (!container) return;
+    const colors = ['#8B2C2C', '#B85555', '#1A1A1A', '#4A4A4A', '#E5E1D8'];
+    for (let i = 0; i < 80; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + '%';
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+      container.appendChild(piece);
+      if (typeof gsap !== 'undefined') {
+        gsap.to(piece, {
+          y: window.innerHeight + 40,
+          x: '+=' + (Math.random() * 200 - 100),
+          rotation: '+=' + (Math.random() * 720 - 360),
+          opacity: 0,
+          duration: 2 + Math.random() * 2,
+          ease: 'power1.in',
+          delay: Math.random() * 0.5,
+          onComplete: () => piece.remove(),
+        });
+      } else {
+        // 兜底：CSS 动画
+        piece.style.animation = `confettiFall ${2 + Math.random() * 2}s linear forwards`;
+        setTimeout(() => piece.remove(), 4500);
+      }
+    }
+  }
+  window.triggerConfetti = triggerConfetti;
+
+  /* === v3: Firefly canvas（tsParticles 等价，低密度萤火虫粒子叠加在波浪背景上） ===
+     实现：原生 Canvas 2D，18 个粒子做布朗运动 + 呼吸闪烁，
+     生成中状态显示，完成时隐藏。 */
+  (function initFireflies() {
+    const fireflyCanvas = document.getElementById('firefly-canvas');
+    if (!fireflyCanvas) return;
+    const fctx = fireflyCanvas.getContext('2d');
+    let fireflies = [];
+    let fireflyActive = false;
+    let fireflyRAF = null;
+
+    function resizeFirefly() {
+      fireflyCanvas.width = fireflyCanvas.offsetWidth * 2;
+      fireflyCanvas.height = fireflyCanvas.offsetHeight * 2;
+      fctx.setTransform(1, 0, 0, 1, 0, 0);
+      fctx.scale(2, 2);
+    }
+    resizeFirefly();
+    window.addEventListener('resize', resizeFirefly);
+
+    function initParticles() {
+      fireflies = [];
+      const count = 18; // 低密度
+      for (let i = 0; i < count; i++) {
+        fireflies.push({
+          x: Math.random() * fireflyCanvas.offsetWidth,
+          y: Math.random() * fireflyCanvas.offsetHeight,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          r: 1 + Math.random() * 1.5,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+    initParticles();
+
+    function drawFireflies() {
+      if (!fireflyActive) return;
+      const w = fireflyCanvas.offsetWidth;
+      const h = fireflyCanvas.offsetHeight;
+      fctx.clearRect(0, 0, w, h);
+
+      fireflies.forEach(f => {
+        f.x += f.vx;
+        f.y += f.vy;
+        f.phase += 0.04;
+        if (f.x < 0 || f.x > w) f.vx *= -1;
+        if (f.y < 0 || f.y > h) f.vy *= -1;
+
+        const alpha = 0.3 + Math.abs(Math.sin(f.phase)) * 0.5;
+        // 外晕
+        const grad = fctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r * 4);
+        grad.addColorStop(0, `rgba(139, 44, 44, ${alpha})`);
+        grad.addColorStop(1, `rgba(139, 44, 44, 0)`);
+        fctx.fillStyle = grad;
+        fctx.beginPath();
+        fctx.arc(f.x, f.y, f.r * 4, 0, Math.PI * 2);
+        fctx.fill();
+        // 核心
+        fctx.fillStyle = `rgba(184, 85, 85, ${alpha * 0.8})`;
+        fctx.beginPath();
+        fctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        fctx.fill();
+      });
+      fireflyRAF = requestAnimationFrame(drawFireflies);
+    }
+
+    // 启动萤火虫（生成中状态）
+    fireflyCanvas.classList.add('active');
+    fireflyActive = true;
+    drawFireflies();
+
+    // 监听 streaming-complete 事件，停止萤火虫
+    window.addEventListener('streaming-complete', () => {
+      fireflyActive = false;
+      if (fireflyRAF) cancelAnimationFrame(fireflyRAF);
+      fireflyCanvas.classList.remove('active');
+    });
+  })();
+</script>
+
+<!-- ==================================================================
+     v3 NEW: Motion (motion.dev) ESM 模块
+     从 https://esm.sh/motion@12.42.2 引入 vanilla API
+     （等价于 motion/react 的 <motion.div> / <AnimatePresence> / Reorder / whileHover / whileTap）
+     ================================================================== -->
+<script type="module">
+  /* Motion v12 vanilla API 与 motion/react 的对应关系：
+       React: <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} />
+       Vanilla: animate(el, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3 })
+
+       React: <AnimatePresence>{open && <motion.div exit={{opacity:0, scale:0.96}} />}</AnimatePresence>
+       Vanilla: animate(el, { opacity: [1, 0], scale: [1, 0.96] }, { onComplete: () => el.remove() })
+
+       React: <motion.button whileHover={{scale:1.05}} whileTap={{scale:0.95}} />
+       Vanilla: el.addEventListener('mouseenter', () => animate(el, { scale: 1.05 }))
+
+       React: <motion.div animate={{ backgroundColor: '#8B2C2C' }} />
+       Vanilla: animate(el, { backgroundColor: '#8B2C2C' })
+
+       React: <Reorder.Group> + <Reorder.Item>
+       Vanilla: HTML5 drag-drop + Auto-Animate FLIP（已在其它 script 中实现）
+  */
+  let motionLib;
+  try {
+    motionLib = await import('https://esm.sh/motion@12.42.2');
+  } catch (err) {
+    console.warn('[v3] Motion ESM 加载失败，回退到原生 CSS/JS 动画', err);
+    // 兜底：直接标记 motion-ready（让 CSS 知道没有 motion 增强）
+    document.documentElement.classList.add('motion-ready');
+    throw err;
+  }
+  const { animate, inView, scroll, stagger, timeline } = motionLib;
+
+  // 暴露给外部
+  window.motionLib = motionLib;
+  window.motionAnimate = animate;
+  document.documentElement.classList.add('motion-ready');
+
+  /* === 1. 对话气泡入场（Motion animate，等价 <motion.div initial animate>） ===
+     MutationObserver 监听新加入的 .chat-msg 元素，
+     应用 opacity 0→1, y 8→0 入场动画。 */
+  const chatStream = document.getElementById('chat-stream');
+  if (chatStream) {
+    const chatObserver = new MutationObserver((mutations) => {
+      mutations.forEach(m => {
+        m.addedNodes.forEach(node => {
+          if (node.nodeType === 1 && node.classList.contains('chat-msg')) {
+            // 对话气泡入场：opacity 0→1, y 8→0
+            // 对应 React：<motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} transition={{duration:0.3}} />
+            animate(node, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3, ease: [0.4, 0, 0.2, 1] });
+          }
+        });
+      });
+    });
+    chatObserver.observe(chatStream, { childList: true });
+  }
+
+  /* === 2. Agent Trace 行入场（同样的 motion 入场效果） ===
+     新 trace-line 入场：opacity 0→1, x -8→0（左侧滑入）。 */
+  const traceStream = document.getElementById('trace-stream');
+  if (traceStream) {
+    const traceObserver = new MutationObserver((mutations) => {
+      mutations.forEach(m => {
+        m.addedNodes.forEach(node => {
+          if (node.nodeType === 1 && node.classList.contains('trace-line')) {
+            animate(node, { opacity: [0, 1], x: [-8, 0] }, { duration: 0.2, ease: 'ease-out' });
+          }
+        });
+      });
+    });
+    traceObserver.observe(traceStream, { childList: true });
+  }
+
+  /* === 3. Cmd+K 命令面板：AnimatePresence 等价（scale + fade 出入场） ===
+     对应 React：
+       <AnimatePresence>
+         {open && <motion.div
+           initial={{ opacity: 0, scale: 0.96 }}
+           animate={{ opacity: 1, scale: 1 }}
+           exit={{ opacity: 0, scale: 0.96 }} />}
+       </AnimatePresence>
+     实现：拦截 classList.add/remove('open')，改为 motion 动画。 */
+  const cmdkOverlay = document.getElementById('cmdk-overlay');
+  const cmdkBox = document.getElementById('cmdk-box');
+  if (cmdkOverlay && cmdkBox) {
+    const origAdd = cmdkOverlay.classList.add.bind(cmdkOverlay.classList);
+    const origRemove = cmdkOverlay.classList.remove.bind(cmdkOverlay.classList);
+    let closing = false;
+
+    cmdkOverlay.classList.add = function(cls) {
+      origAdd(cls);
+      if (cls === 'open' && !closing) {
+        // 入场：opacity 0→1（overlay），scale 0.96→1, opacity 0→1（box）
+        cmdkOverlay.style.display = 'flex';
+        animate(cmdkOverlay, { opacity: [0, 1] }, { duration: 0.2, ease: 'ease-out' });
+        animate(cmdkBox, { scale: [0.96, 1], opacity: [0, 1] }, { duration: 0.25, ease: [0.4, 0, 0.2, 1] });
+      }
+    };
+    cmdkOverlay.classList.remove = function(cls) {
+      if (cls === 'open') {
+        if (closing) return; // 防止动画期间重复触发
+        closing = true;
+        // 出场：scale 1→0.96, opacity 1→0
+        animate(cmdkBox, { scale: [1, 0.96], opacity: [1, 0] }, { duration: 0.15, ease: 'ease-in' });
+        animate(cmdkOverlay, { opacity: [1, 0] }, {
+          duration: 0.2,
+          ease: 'ease-in',
+          onComplete: () => {
+            origRemove(cls);
+            cmdkOverlay.style.display = '';
+            cmdkBox.style.transform = '';
+            cmdkBox.style.opacity = '';
+            closing = false;
+          }
+        });
+      } else {
+        origRemove(cls);
+      }
+    };
+  }
+
+  /* === 4. 暂停/回滚/通过 等按钮：whileHover / whileTap 等价 ===
+     对应 React：<motion.button whileHover={{scale:1.05}} whileTap={{scale:0.95}} />
+     注意：.magnetic 类的按钮已由 applyMagnetic 处理 transform，
+     这里只对非 magnetic 按钮应用 scale 动画，避免 transform 冲突。 */
+  document.querySelectorAll('.ctrl-btn:not(.magnetic), .chat-send, .export-btn, .quick-chip, .eda-btn, .eda-trigger, .trace-fab').forEach(btn => {
+    btn.addEventListener('mouseenter', () => {
+      animate(btn, { scale: 1.05 }, { duration: 0.15, ease: 'ease-out' });
+    });
+    btn.addEventListener('mouseleave', () => {
+      animate(btn, { scale: 1 }, { duration: 0.15, ease: 'ease-out' });
+    });
+    btn.addEventListener('mousedown', () => {
+      animate(btn, { scale: 0.95 }, { duration: 0.08, ease: 'ease-in' });
+    });
+    btn.addEventListener('mouseup', () => {
+      animate(btn, { scale: 1.05 }, { duration: 0.12, ease: 'ease-out' });
+    });
+  });
+
+  /* === 5. 章节状态切换：animate prop 颜色过渡 ===
+     当 outline-item 的 class 变化（done → generating → done）时，
+     .outline-num 的 backgroundColor 平滑过渡。
+     对应 React：<motion.div animate={{ backgroundColor: isGenerating ? '#8B2C2C' : '#1A1A1A' }} /> */
+  document.querySelectorAll('.outline-item').forEach(item => {
+    const num = item.querySelector('.outline-num');
+    if (!num) return;
+    const observer = new MutationObserver(() => {
+      const isGenerating = item.classList.contains('generating');
+      const isDone = item.classList.contains('done');
+      const targetBg = isGenerating ? '#8B2C2C' : (isDone ? '#4A4A4A' : '#FAF8F3');
+      const targetColor = (isGenerating || isDone) ? '#FAF8F3' : '#4A4A4A';
+      animate(num, { backgroundColor: targetBg, color: targetColor }, { duration: 0.4, ease: 'ease-in-out' });
+    });
+    observer.observe(item, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  /* === 6. 大纲拖拽 Reorder 风格：增强 drop 反馈 ===
+     Motion 的 Reorder.Group 在 vanilla 中无直接等价，
+     已由 HTML5 drag-drop + Auto-Animate FLIP 接管。
+     这里给被拖项添加 motion 风格的 scale 反馈。 */
+  document.querySelectorAll('.outline-item').forEach(item => {
+    item.addEventListener('dragstart', () => {
+      animate(item, { scale: 0.98, opacity: 0.4 }, { duration: 0.15 });
+    });
+    item.addEventListener('dragend', () => {
+      animate(item, { scale: 1, opacity: 1 }, { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] });
+    });
+  });
+
+  /* === 7. 大纲项入场：stagger 浮入 ===
+     对应 React：父容器 variants staggerChildren + 子项 initial/animate */
+  const outlineList = document.getElementById('outline-list');
+  if (outlineList) {
+    animate('.outline-item',
+      { opacity: [0, 1], x: [-12, 0] },
+      { duration: 0.4, ease: 'ease-out', delay: stagger(0.05) }
+    );
+  }
+
+  /* === 8. 论文标题入场：motion 大标题浮入 ===
+     对应 React：<motion.h1 initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{duration:0.8, delay:0.2}} /> */
+  const paperTitle = document.querySelector('.paper-title');
+  if (paperTitle) {
+    animate(paperTitle, { opacity: [0, 1], y: [20, 0] }, { duration: 0.8, ease: [0.4, 0, 0.2, 1], delay: 0.2 });
+  }
+  const paperMeta = document.querySelector('.paper-meta');
+  if (paperMeta) {
+    animate(paperMeta, { opacity: [0, 1] }, { duration: 0.6, delay: 0.4 });
+  }
+
+  /* === 9. EDA 结果增删：motion 入场 ===
+     MutationObserver 监听新加入的 .eda-result 元素。 */
+  const edaPanelEl = document.getElementById('eda-panel');
+  if (edaPanelEl) {
+    const edaObserver = new MutationObserver((mutations) => {
+      mutations.forEach(m => {
+        m.addedNodes.forEach(node => {
+          if (node.nodeType === 1 && node.classList.contains('eda-result')) {
+            animate(node, { opacity: [0, 1], y: [10, 0] }, { duration: 0.3, ease: 'ease-out' });
+          }
+        });
+      });
+    });
+    edaObserver.observe(edaPanelEl, { childList: true });
+  }
+
+  /* === 10. 触发 motion-ready 事件（供其它脚本感知） === */
+  window.dispatchEvent(new Event('motion-ready'));
+</script>
+
+</body>
+</html>

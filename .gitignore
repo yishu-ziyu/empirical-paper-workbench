@@ -1,0 +1,16 @@
+node_modules/
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.scratch/
+.firecrawl/
+.DS_Store
+dist/
+build/
+
+# 用户上传的测试数据（运行时生成，不入版本控制）
+uploads/
+backend/uploads/
+

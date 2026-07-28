@@ -1,0 +1,95 @@
+name: CHARLS
+
+identifier:
+  # 识别 CHARLS：必须包含 community_id，且至少匹配 5 个 qe*_hi 模式列
+  required_columns:
+    - community_id
+  pattern_columns:
+    - 'qe\d+_hi'
+  min_pattern_matches: 5
+
+# 变量映射：CHARLS 原始 code → 可读变量名
+# 涵盖住院支出 / 门诊支出 / 人口学 / 健康行为 / 医保 / 认知等常用变量
+variable_mapping:
+  # ID 与年份
+  community_id: community_id
+  household_id: household_id
+  pid: pid
+  wave: wave
+
+  # 住院与医疗支出（qe3xx_hi 系列）
+  qe303_hi: oopc_exp              # 住院自付支出
+  qe304_hi: inpatient_exp        # 住院总支出
+  qe305_hi: outpatient_exp       # 门诊支出
+  qe306_hi: pharmacy_exp         # 药品支出
+  qe307_hi: self_med_exp         # 自我医疗支出
+  qe308_hi: total_med_exp         # 医疗总支出
+  qe309_hi: insurance_reimburse   # 医保报销金额
+
+  # 人口学（r 前缀变量）
+  rage: age
+  ragender: gender
+  rmarital: marital_status
+  redu: education_level
+  rheight: height
+  rweight: weight
+  rbmi: bmi
+  rhukou: hukou_type
+  rurban: urban_flag
+
+  # 健康自评与功能
+  shlt: self_health_rating       # 自评健康
+  adla: adl_any_difficulty       # ADL 任一困难
+  iadla: iadl_any_difficulty     # IADL 任一困难
+  adltot: adl_total_difficulties
+  iadltot: iadl_total_difficulties
+
+  # 慢性病与诊断
+  chr_disease_count: chronic_disease_count
+  has_hypertension: hypertension_flag
+  has_diabetes: diabetes_flag
+  has_heart_disease: heart_disease_flag
+  has_stroke: stroke_flag
+
+  # 健康行为
+  smoker: smoke_flag
+  drinker: drink_flag
+  exercise_freq: exercise_frequency
+
+  # 医保参保
+  urban_insurance: urban_medical_insurance
+  rural_insurance: rural_medical_insurance
+  uee: urban_employee_insurance
+  uri: urban_resident_insurance
+
+  # 认知 / 抑郁
+  cognitive_score: cognitive_total_score
+  cesd_score: depression_score
+
+  # 家庭与经济
+  household_income: household_total_income
+  individual_income: individual_income
+  household_size: household_size
+  asset_total: total_assets
+
+# CHARLS 调查波次
+waves: [2011, 2013, 2015, 2018, 2020, 2024]
+
+# 默认勾选最常用的两波
+default_waves: [2018, 2020]
+
+# 常见筛选预设（一键应用）
+filter_presets:
+  - name: "60岁以上"
+    conditions:
+      - col: rage
+        op: ">="
+        val: 60
+  - name: "城乡居民医保"
+    conditions:
+      - col: urban_insurance
+        op: "=="
+        val: 1
+  - name: "无缺失值样本"
+    conditions:
+      - type: no_missing

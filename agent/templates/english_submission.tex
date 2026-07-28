@@ -1,0 +1,34 @@
+% English journal submission template (english_submission) — T-10
+% Typography: Source Serif 4, XeLaTeX or pdflatex (no CJK package)
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+% English font: Source Serif 4，缺失时用 fontspec 默认 (Latin Modern)
+\IfFontExistsTF{Source Serif 4}{\setmainfont{Source Serif 4}}{}
+
+\title{ {{- title -}} }
+\author{ {{- author -}} }
+\date{ {{- date -}} }
+
+\begin{document}
+\maketitle
+
+{% if abstract -%}
+\begin{abstract}
+{{ abstract }}
+\end{abstract}
+{% endif %}
+
+{% for chapter in chapters -%}
+\section{ {{- chapter.title -}} }
+
+{{ chapter.content }}
+
+{% endfor -%}
+\end{document}

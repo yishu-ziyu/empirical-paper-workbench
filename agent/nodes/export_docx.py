@@ -1,0 +1,324 @@
+"""export_docx 节点 (T-10).
+
+把 6 章内容填充到 LaTeX 模板，编译生成 PDF + docx。
+
+流程：
+1. 从 ``state['title_chapter']`` 提取标题，从 ``state['body_chapters']`` 提取正文章节
+2. 选择模板（``state['export_template']``，默认 ``cn_journal``）
+3. Jinja2 渲染模板 → LaTeX 源码
+4. ``compile_pdf`` 调 ``latexmk -xelatex`` 生成 PDF（subprocess）
+5. ``convert_docx`` 调 ``pandoc`` 把 .tex 转 .docx（subprocess）
+6. 返回 ``{"latex_source", "pdf_path", "docx_path", "degraded"}``
+
+降级策略：``latexmk`` / ``pandoc`` 不可用时对应路径返回 None，
+``degraded=True``，但 ``latex_source`` 始终可用。测试通过
+``monkeypatch.setattr("nodes.export_docx.compile_pdf", fake)`` 替换编译函数，
+故 ``compile_pdf`` / ``convert_docx`` 必须是模块级函数。
+"""
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any, List, Optional
+
+# macOS BasicTeX/Full TeX 安装在 /Library/TeX/texbin，uvicorn 进程可能 PATH 不含此目录
+_TEX_BIN = "/Library/TeX/texbin"
+if os.path.isdir(_TEX_BIN) and _TEX_BIN not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = _TEX_BIN + os.pathsep + os.environ.get("PATH", "")
+
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+
+from protocols import ExportDocxOutput
+from state import EconPaperState
+
+# 模板目录：agent/templates/
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+
+# 支持的模板名（与文件名去掉 .tex 一致）
+TEMPLATE_NAMES = {
+    "cn_journal",
+    "undergraduate",
+    "master_thesis",
+    "english_submission",
+}
+
+# Jinja2 环境：不转义（LaTeX 源码原样输出），保留尾换行
+_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATES_DIR)),
+    autoescape=False,
+    keep_trailing_newline=True,
+    trim_blocks=False,
+    lstrip_blocks=False,
+)
+
+
+# ---------------------------------------------------------------------------
+# 纯函数：从 state.title_chapter / state.body_chapters 提取 title / sections
+# ---------------------------------------------------------------------------
+def _extract_title(title_chapter: Any) -> str:
+    """从 title_chapter 提取干净的标题文本。
+
+    优先取 ``title`` 字段（非 ``\\title{...}`` 形式）；
+    否则从 ``content`` 里解析 ``\\title{...}``；都没有则返回 "Untitled"。
+    """
+    if not isinstance(title_chapter, dict):
+        return "Untitled"
+    raw_title = (title_chapter.get("title") or "").strip()
+    if raw_title and not raw_title.startswith("\\title"):
+        return raw_title
+    content = title_chapter.get("content") or ""
+    m = re.search(r"\\title\{([^}]*)\}", content)
+    if m:
+        return m.group(1).strip()
+    return "Untitled"
+
+
+def _extract_sections(body_chapters: List[Any]) -> List[dict]:
+    """取正文章节作为正文 sections（{title, content}）。"""
+    sections: List[dict] = []
+    for ch in body_chapters or []:
+        if not isinstance(ch, dict):
+            continue
+        sections.append(
+            {
+                "title": (ch.get("title") or "").strip() or "Untitled section",
+                "content": ch.get("content") or "",
+            }
+        )
+    return sections
+
+
+# ---------------------------------------------------------------------------
+# ADR-0009: references_list → \begin{thebibliography} 渲染
+# ---------------------------------------------------------------------------
+def _render_bibliography(references_list: List[Any]) -> str:
+    """把 references_list 渲染为 LaTeX ``thebibliography`` 环境。
+
+    - 空列表返回空字符串（调用方据此决定是否插入）；
+    - 每条 ``\\bibitem{[index]} text``；
+    - ``thebibliography{N}`` 的 N 取 ``len(references_list)``（最宽编号占位）。
+    """
+    if not references_list:
+        return ""
+    lines: List[str] = []
+    n = len(references_list)
+    lines.append(f"\\begin{{thebibliography}}{{{n}}}")
+    for ref in references_list:
+        if not isinstance(ref, dict):
+            continue
+        idx = ref.get("index", 0)
+        text = ref.get("text", "")
+        lines.append(f"\\bibitem{{[{idx}]}} {text}")
+    lines.append("\\end{thebibliography}")
+    return "\n".join(lines)
+
+
+def _append_bibliography(tex_source: str, references_list: List[Any]) -> str:
+    """在 ``\\end{document}`` 前插入 thebibliography 环境。
+
+    references_list 为空时原样返回 tex_source。
+    """
+    bib = _render_bibliography(references_list)
+    if not bib:
+        return tex_source
+    if "\\end{document}" in tex_source:
+        return tex_source.replace("\\end{document}", bib + "\n\\end{document}")
+    # 无 \end{document} 兜底：直接追加
+    return tex_source + "\n" + bib + "\n"
+
+
+# ---------------------------------------------------------------------------
+# render_template（纯函数，易测）
+# ---------------------------------------------------------------------------
+def render_template(
+    template_name: str,
+    title: str,
+    author: str,
+    chapters: List[dict],
+    abstract: Optional[str] = None,
+    date: str = "",
+) -> str:
+    """用 Jinja2 把 title/author/chapters 填进 ``{template_name}.tex``。
+
+    未知模板名抛 ``ValueError``。
+    """
+    if template_name not in TEMPLATE_NAMES:
+        raise ValueError(
+            f"Unknown template: {template_name!r}; "
+            f"expected one of {sorted(TEMPLATE_NAMES)}"
+        )
+    try:
+        tmpl = _env.get_template(f"{template_name}.tex")
+    except TemplateNotFound as exc:
+        raise ValueError(f"Template not found: {template_name}") from exc
+    return tmpl.render(
+        title=title,
+        author=author,
+        chapters=chapters,
+        abstract=abstract,
+        date=date,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 编译函数（subprocess，可被测试 monkeypatch 替换）
+# ---------------------------------------------------------------------------
+def compile_pdf(tex_source: str, output_dir: str) -> Optional[str]:
+    """编译 PDF。
+
+    优先用 ``latexmk -xelatex``（自动多次跑解析引用）；不可用时
+    fallback 到直接调 ``xelatex`` 两次（第一次生成 .aux，第二次解析引用）。
+
+    成功返回 PDF 绝对路径字符串；两者都不可用或编译失败时返回 None。
+    """
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    tex_path = out / "paper.tex"
+    tex_path.write_text(tex_source, encoding="utf-8")
+
+    # 首选 latexmk
+    if shutil.which("latexmk") is not None:
+        try:
+            subprocess.run(
+                [
+                    "latexmk",
+                    "-xelatex",
+                    "-interaction=nonstopmode",
+                    "-halt-on-error",
+                    "-outdir",
+                    str(out),
+                    str(tex_path),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+            pdf_path = out / "paper.pdf"
+            if pdf_path.exists():
+                return str(pdf_path)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass  # fall through to xelatex
+
+    # Fallback: 直接调 xelatex（跑两次解析交叉引用）
+    if shutil.which("xelatex") is None:
+        return None
+    try:
+        for _ in range(2):
+            subprocess.run(
+                [
+                    "xelatex",
+                    "-interaction=nonstopmode",
+                    "-halt-on-error",
+                    "-output-directory",
+                    str(out),
+                    str(tex_path),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+                cwd=str(out),
+            )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+    pdf_path = out / "paper.pdf"
+    return str(pdf_path) if pdf_path.exists() else None
+
+
+def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
+    """调 ``pandoc`` 把 .tex 转 .docx。
+
+    成功返回 docx 绝对路径字符串；``pandoc`` 不存在或失败时返回 None。
+    """
+    if shutil.which("pandoc") is None:
+        return None
+
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    tex_path = out / "paper.tex"
+    tex_path.write_text(tex_source, encoding="utf-8")
+    docx_path = out / "paper.docx"
+
+    try:
+        subprocess.run(
+            [
+                "pandoc",
+                str(tex_path),
+                "-o",
+                str(docx_path),
+                "--from=latex",
+                "--to=docx",
+            ],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+    return str(docx_path) if docx_path.exists() else None
+
+
+# ---------------------------------------------------------------------------
+# 节点入口
+# ---------------------------------------------------------------------------
+def export_docx(state: EconPaperState) -> ExportDocxOutput:
+    """把 6 章内容填充到 LaTeX 模板，编译生成 PDF + docx。
+
+    返回::
+
+        {
+            "latex_source": str,          # 渲染后的 LaTeX 源码（始终有值）
+            "pdf_path": Optional[str],    # PDF 路径，latexmk 不可用时 None
+            "docx_path": Optional[str],   # docx 路径，pandoc 不可用时 None
+            "degraded": bool,             # 任一编译失败为 True
+        }
+
+    ADR-0009: 若 ``state['references_list']`` 非空，在 ``\\end{document}`` 前追加
+    ``\\begin{thebibliography}`` 环境。
+    """
+    template_name = state.get("export_template") or "cn_journal"
+
+    title = _extract_title(state.get("title_chapter"))
+    author = (state.get("author") or "").strip()
+    abstract = state.get("abstract")
+    sections = _extract_sections(state.get("body_chapters", []) or [])
+
+    tex_source = render_template(
+        template_name,
+        title=title,
+        author=author,
+        chapters=sections,
+        abstract=abstract,
+    )
+
+    # ADR-0009: 追加参考文献列表（references_list 为空时原样返回）
+    references_list = state.get("references_list", []) or []
+    tex_source = _append_bibliography(tex_source, references_list)
+
+    # 输出目录：优先 state['workspace']，否则临时目录
+    output_dir = state.get("workspace") or tempfile.mkdtemp(prefix="econpaper_export_")
+
+    # 写 .tex 源码（无论编译是否成功，源码总要落盘）
+    tex_path = Path(output_dir) / "paper.tex"
+    try:
+        tex_path.parent.mkdir(parents=True, exist_ok=True)
+        tex_path.write_text(tex_source, encoding="utf-8")
+    except OSError:
+        pass
+
+    pdf_path = compile_pdf(tex_source, output_dir)
+    docx_path = convert_docx(tex_source, output_dir)
+
+    degraded = pdf_path is None or docx_path is None
+
+    return {
+        "latex_source": tex_source,
+        "pdf_path": pdf_path,
+        "docx_path": docx_path,
+        "degraded": degraded,
+    }

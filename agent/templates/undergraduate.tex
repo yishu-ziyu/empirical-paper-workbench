@@ -1,0 +1,37 @@
+% 本科毕业论文模板 (undergraduate) — T-10
+% 排版：思源宋体（中文）+ Source Serif 4（英文），XeLaTeX 编译
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{ctex}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{fontspec}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+% 中文字体：思源宋体，缺失时用 ctex 默认
+\IfFontExistsTF{Source Han Serif SC}{\setCJKmainfont{Source Han Serif SC}}{}
+% 英文字体：Source Serif 4，缺失时用 fontspec 默认
+\IfFontExistsTF{Source Serif 4}{\setmainfont{Source Serif 4}}{}
+
+\title{ {{- title -}} }
+\author{ {{- author -}} }
+\date{ {{- date -}} }
+
+\begin{document}
+\maketitle
+
+{% if abstract -%}
+\begin{abstract}
+{{ abstract }}
+\end{abstract}
+{% endif %}
+
+{% for chapter in chapters -%}
+\section{ {{- chapter.title -}} }
+
+{{ chapter.content }}
+
+{% endfor -%}
+\end{document}

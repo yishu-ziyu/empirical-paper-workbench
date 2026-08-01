@@ -14,6 +14,11 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ChapterWriter, { type ChapterWriterProps } from '../ChapterWriter'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const introChapter = {
   type: 'intro',
@@ -31,7 +36,7 @@ const baseProps: ChapterWriterProps = {
 
 describe('ChapterWriter 章节写作器', () => {
   test('渲染章节内容（markdown 文本出现在 DOM）', () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <ChapterWriter
         {...baseProps}
         chapter={introChapter}
@@ -44,7 +49,7 @@ describe('ChapterWriter 章节写作器', () => {
   })
 
   test('渲染章节类型 badge', () => {
-    render(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     const badge = screen.getByTestId('chapter-type-badge')
     expect(badge).toBeInTheDocument()
     expect(badge.textContent).toContain('intro')
@@ -60,7 +65,7 @@ describe('ChapterWriter 章节写作器', () => {
       { type: 'conclusion', colorHint: 'gray' },
     ]
     for (const { type, colorHint } of cases) {
-      const { unmount } = render(
+      const { unmount } = renderWithI18n(
         <ChapterWriter
           {...baseProps}
           chapter={{ type, title: type, status: 'generated', content: 'x' }}
@@ -74,14 +79,14 @@ describe('ChapterWriter 章节写作器', () => {
   })
 
   test('status=generated 时显示 重新生成 / 编辑 / 通过 三按钮', () => {
-    render(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
   })
 
   test('status=streaming 时不显示审批按钮（仅显示加载提示）', () => {
-    render(
+    renderWithI18n(
       <ChapterWriter
         {...baseProps}
         chapter={{ ...introChapter, status: 'streaming' }}
@@ -96,7 +101,7 @@ describe('ChapterWriter 章节写作器', () => {
   test('点击"通过"按钮触发 onApprove', async () => {
     const user = userEvent.setup()
     const onApprove = vi.fn()
-    render(<ChapterWriter {...baseProps} onApprove={onApprove} />)
+    renderWithI18n(<ChapterWriter {...baseProps} onApprove={onApprove} />)
     await user.click(screen.getByRole('button', { name: /通过/ }))
     expect(onApprove).toHaveBeenCalledTimes(1)
   })
@@ -104,13 +109,13 @@ describe('ChapterWriter 章节写作器', () => {
   test('点击"重新生成"按钮触发 onRegenerate', async () => {
     const user = userEvent.setup()
     const onRegenerate = vi.fn()
-    render(<ChapterWriter {...baseProps} onRegenerate={onRegenerate} />)
+    renderWithI18n(<ChapterWriter {...baseProps} onRegenerate={onRegenerate} />)
     await user.click(screen.getByRole('button', { name: /重新生成/ }))
     expect(onRegenerate).toHaveBeenCalledTimes(1)
   })
 
   test('流式 chunks 数组拼接显示（chunks prop 变化时拼接）', () => {
-    const { rerender } = render(
+    const { rerender } = renderWithI18n(
       <ChapterWriter
         {...baseProps}
         chapter={{ ...introChapter, status: 'streaming' }}
@@ -147,7 +152,7 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
   ]
 
   test('status=generated 时显示 4 按钮（重新生成 / 回滚 / 编辑 / 通过）', () => {
-    render(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /回滚/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
@@ -155,20 +160,20 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
   })
 
   test('默认不显示版本历史下拉', () => {
-    render(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
     expect(screen.queryByTestId('version-history')).not.toBeInTheDocument()
   })
 
   test('点击"回滚"按钮显示版本历史下拉', async () => {
     const user = userEvent.setup()
-    render(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
     await user.click(screen.getByRole('button', { name: /回滚/ }))
     expect(screen.getByTestId('version-history')).toBeInTheDocument()
   })
 
   test('版本历史下拉显示所有版本', async () => {
     const user = userEvent.setup()
-    render(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
     await user.click(screen.getByRole('button', { name: /回滚/ }))
     const items = screen.getAllByTestId('version-item')
     expect(items).toHaveLength(3)
@@ -177,7 +182,7 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
   test('选择版本触发 onRollback 回调', async () => {
     const user = userEvent.setup()
     const onRollback = vi.fn()
-    render(
+    renderWithI18n(
       <ChapterWriter
         {...baseProps}
         chapter={introChapter}
@@ -193,14 +198,14 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
 
   test('点击"编辑"进入编辑模式（显示"保存"按钮）', async () => {
     const user = userEvent.setup()
-    render(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     await user.click(screen.getByRole('button', { name: /编辑/ }))
     expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
   })
 
   test('编辑模式下点"保存"退出编辑模式（恢复"编辑"按钮）', async () => {
     const user = userEvent.setup()
-    render(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     // 进入编辑模式
     await user.click(screen.getByRole('button', { name: /编辑/ }))
     expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
@@ -213,7 +218,7 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
   test('点"保存"触发 onSaveEdit 回调', async () => {
     const user = userEvent.setup()
     const onSaveEdit = vi.fn()
-    render(<ChapterWriter {...baseProps} chapter={introChapter} onSaveEdit={onSaveEdit} />)
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} onSaveEdit={onSaveEdit} />)
     await user.click(screen.getByRole('button', { name: /编辑/ }))
     await user.click(screen.getByRole('button', { name: /保存/ }))
     expect(onSaveEdit).toHaveBeenCalledTimes(1)

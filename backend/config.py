@@ -35,16 +35,44 @@ class Settings:
     UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "./uploads"))
     MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
 
-    # --- LangGraph checkpointing ---
-    # Placeholder connection string for a SQLite/Postgres checkpoint store.
+    # --- LangGraph checkpointing (PostgreSQL) ---
+    # Connection string for the PostgresSaver checkpointer.
+    # Default points at localhost PostgreSQL with peer auth.
     CHECKPOINT_DB_URL: str = os.getenv(
-        "CHECKPOINT_DB_URL", "sqlite:///./checkpoints.sqlite"
+        "CHECKPOINT_DB_URL",
+        "postgresql://mahaoxuan@localhost:5432/econpaper",
+    )
+
+    # --- Database (user auth) ---
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite+aiosqlite:///./econpaper.db",
+    )
+
+    # --- JWT ---
+    JWT_SECRET_KEY: str = os.getenv(
+        "JWT_SECRET_KEY",
+        "dev-secret-key-do-not-use-in-production",
+    )
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_HOURS: int = int(
+        os.getenv("ACCESS_TOKEN_EXPIRE_HOURS", "24")
     )
 
     # --- LLM (placeholders, filled by later tickets) ---
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+
+    # --- S3 / Object Storage ---
+    S3_ENDPOINT_URL: str | None = os.getenv("S3_ENDPOINT_URL")
+    S3_ACCESS_KEY_ID: str = os.getenv("S3_ACCESS_KEY_ID", "minioadmin")
+    S3_SECRET_ACCESS_KEY: str = os.getenv("S3_SECRET_ACCESS_KEY", "minioadmin")
+    S3_REGION: str = os.getenv("S3_REGION", "us-east-1")
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "econpaper-uploads")
+    S3_PATH_PREFIX: str = os.getenv("S3_PATH_PREFIX", "uploads/")
+    # 本地缓存目录（用于兼容下游本地文件读取）
+    S3_CACHE_DIR: Path = Path(os.getenv("S3_CACHE_DIR", "./uploads/.s3_cache"))
 
     # --- HTTP client ---
     HTTPX_TIMEOUT_SECONDS: float = float(os.getenv("HTTPX_TIMEOUT_SECONDS", "30.0"))

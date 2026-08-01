@@ -1,4 +1,7 @@
-from langgraph.checkpoint.memory import InMemorySaver
+import os
+
+import psycopg
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 
 from nodes.clean_data import clean_data
@@ -37,6 +40,44 @@ def route_after_chapter(state: EconPaperState) -> str:
     return "translate_code"
 
 
+# ---------------------------------------------------------------------------
+# Database-backed checkpointer (PostgresSaver)
+# ---------------------------------------------------------------------------
+_CHECKPOINTER: PostgresSaver | None = None
+
+
+def _get_checkpointer() -> PostgresSaver:
+    """Return the module-level PostgresSaver singleton.
+
+    Connection string is read from env ``CHECKPOINT_DB_URL`` with a
+    PostgreSQL default pointing at localhost.  Uses ``psycopg.connect``
+    directly (not ``PostgresSaver.from_conn_string``, which is a context
+    manager that closes the connection on exit — unsuitable for a module-
+    level singleton).  Tables are created on first call via ``setup()``.
+    """
+    global _CHECKPOINTER
+    if _CHECKPOINTER is not None:
+        return _CHECKPOINTER
+
+    url = os.getenv(
+        "CHECKPOINT_DB_URL",
+        "postgresql://mahaoxuan@localhost:5432/econpaper",
+    )
+    conn = psycopg.connect(
+        url,
+        autocommit=True,
+        prepare_threshold=0,
+    )
+    saver = PostgresSaver(conn)
+    saver.setup()  # create checkpoint/writes tables if missing
+    _CHECKPOINTER = saver
+    return _CHECKPOINTER
+
+
+# ---------------------------------------------------------------------------
+# Graph construction
+# ---------------------------------------------------------------------------
+
 def build_graph():
     """构建 LangGraph 骨架（含 T-08a 6 章条件边循环 + ADR-0004 评审 + ADR-0009 引用图谱）。
 
@@ -48,7 +89,7 @@ def build_graph():
             评审通过或达上限: route_after_chapter 决定
               current_chapter_index < 6: 回 generate_chapter（下一章）
               current_chapter_index >= 6: translate_code -> generate_references -> export_docx -> END
-    使用 InMemorySaver 作为 checkpointer（开发阶段）。
+    使用 PostgresSaver 持久化 checkpointer。
     """
     builder = StateGraph(EconPaperState)
 
@@ -92,7 +133,7 @@ def build_graph():
     builder.add_edge("generate_references", "export_docx")
     builder.add_edge("export_docx", END)
 
-    checkpointer = InMemorySaver()
+    checkpointer = _get_checkpointer()
     graph = builder.compile(checkpointer=checkpointer)
     return graph
 

@@ -2,6 +2,11 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CleanWizard from '../components/CleanWizard'
+import { I18nProvider } from '../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const sampleProfile = {
   n_rows: 5,
@@ -41,7 +46,7 @@ const sampleOutliers = {
 
 describe('CleanWizard 清洗向导', () => {
   test('渲染 profiling 报告（变量列表 + 类型/缺失率/唯一值）', () => {
-    render(
+    renderWithI18n(
       <CleanWizard
         profile={sampleProfile}
         outliers={sampleOutliers}
@@ -72,7 +77,7 @@ describe('CleanWizard 清洗向导', () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
 
-    render(
+    renderWithI18n(
       <CleanWizard
         profile={sampleProfile}
         outliers={sampleOutliers}
@@ -102,7 +107,7 @@ describe('CleanWizard 清洗向导', () => {
   })
 
   test('显示异常值缩尾前后分布对比', () => {
-    render(
+    renderWithI18n(
       <CleanWizard
         profile={sampleProfile}
         outliers={sampleOutliers}

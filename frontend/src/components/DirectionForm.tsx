@@ -3,6 +3,7 @@
 // 提交 → onSubmit({question, dv, iv, controls[], method, template})
 
 import { useState, type FormEvent } from 'react'
+import { useT } from '../lib/i18n'
 import MethodSelector, { TEMPLATES } from './MethodSelector'
 
 export interface DirectionFormData {
@@ -19,6 +20,7 @@ export interface DirectionFormProps {
 }
 
 export default function DirectionForm({ onSubmit }: DirectionFormProps) {
+  const { t } = useT()
   const [question, setQuestion] = useState('')
   const [dv, setDv] = useState('')
   const [iv, setIv] = useState('')
@@ -49,49 +51,49 @@ export default function DirectionForm({ onSubmit }: DirectionFormProps) {
       className="space-y-3"
     >
       <label className="block">
-        <span className="block text-xs text-muted">研究问题</span>
+        <span className="block text-xs text-muted">{t('direction.question')}</span>
         <textarea
-          aria-label="研究问题"
+          aria-label={t('direction.question')}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           className="mt-1 w-full rounded border border-border p-2"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">因变量</span>
+        <span className="block text-xs text-muted">{t('direction.dv')}</span>
         <input
-          aria-label="因变量"
+          aria-label={t('direction.dv')}
           value={dv}
           onChange={(e) => setDv(e.target.value)}
           className="mt-1 w-full rounded border border-border p-2"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">自变量</span>
+        <span className="block text-xs text-muted">{t('direction.iv')}</span>
         <input
-          aria-label="自变量"
+          aria-label={t('direction.iv')}
           value={iv}
           onChange={(e) => setIv(e.target.value)}
           className="mt-1 w-full rounded border border-border p-2"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">控制变量 (逗号分隔)</span>
+        <span className="block text-xs text-muted">{t('direction.controls')}</span>
         <input
-          aria-label="控制变量"
+          aria-label={t('direction.controls')}
           value={controls}
           onChange={(e) => setControls(e.target.value)}
           className="mt-1 w-full rounded border border-border p-2"
         />
       </label>
       <div className="block">
-        <span className="block text-xs text-muted">方法</span>
+        <span className="block text-xs text-muted">{t('direction.method')}</span>
         <MethodSelector value={method} onChange={setMethod} />
       </div>
       <label className="block">
-        <span className="block text-xs text-muted">模板</span>
+        <span className="block text-xs text-muted">{t('direction.template')}</span>
         <select
-          aria-label="模板"
+          aria-label={t('direction.template')}
           value={template}
           onChange={(e) => setTemplate(e.target.value)}
           className="mt-1 w-full rounded border border-border p-2"
@@ -107,7 +109,7 @@ export default function DirectionForm({ onSubmit }: DirectionFormProps) {
         type="submit"
         className="rounded bg-accent px-3 py-1 text-sm text-white"
       >
-        提交
+        {t('direction.submit')}
       </button>
     </form>
   )

@@ -11,6 +11,11 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DocExportDialog, { type DocExportDialogProps } from '../DocExportDialog'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const baseProps: DocExportDialogProps = {
   sessionId: 'sess-123',
@@ -20,13 +25,13 @@ const baseProps: DocExportDialogProps = {
 
 describe('DocExportDialog 文档导出对话框', () => {
   test('渲染 4 个模板选项', () => {
-    render(<DocExportDialog {...baseProps} />)
+    renderWithI18n(<DocExportDialog {...baseProps} />)
     const options = screen.getAllByTestId('template-option')
     expect(options).toHaveLength(4)
   })
 
   test('模板选项包含 4 个模板名', () => {
-    render(<DocExportDialog {...baseProps} />)
+    renderWithI18n(<DocExportDialog {...baseProps} />)
     const text = screen.getByTestId('doc-export-dialog').textContent ?? ''
     expect(text).toContain('cn_journal')
     expect(text).toContain('undergraduate')
@@ -35,7 +40,7 @@ describe('DocExportDialog 文档导出对话框', () => {
   })
 
   test('默认选中 cn_journal', () => {
-    render(<DocExportDialog {...baseProps} />)
+    renderWithI18n(<DocExportDialog {...baseProps} />)
     const options = screen.getAllByTestId('template-option') as HTMLInputElement[]
     const cn = options.find((o) => o.value === 'cn_journal')
     expect(cn?.checked).toBe(true)
@@ -43,7 +48,7 @@ describe('DocExportDialog 文档导出对话框', () => {
 
   test('可选择 master_thesis 模板', async () => {
     const user = userEvent.setup()
-    render(<DocExportDialog {...baseProps} />)
+    renderWithI18n(<DocExportDialog {...baseProps} />)
     const options = screen.getAllByTestId('template-option') as HTMLInputElement[]
     const master = options.find((o) => o.value === 'master_thesis')
     await user.click(master!)
@@ -54,7 +59,7 @@ describe('DocExportDialog 文档导出对话框', () => {
   })
 
   test('渲染 3 个导出按钮（tex/pdf/docx）', () => {
-    render(<DocExportDialog {...baseProps} />)
+    renderWithI18n(<DocExportDialog {...baseProps} />)
     const buttons = screen.getAllByTestId('export-button')
     const formats = buttons.map((b) => b.getAttribute('data-format'))
     expect(formats).toEqual(expect.arrayContaining(['tex', 'pdf', 'docx']))
@@ -64,7 +69,7 @@ describe('DocExportDialog 文档导出对话框', () => {
   test('点击 tex 导出按钮触发 onExport("tex", "cn_journal")', async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
-    render(<DocExportDialog {...baseProps} onExport={onExport} />)
+    renderWithI18n(<DocExportDialog {...baseProps} onExport={onExport} />)
     const buttons = screen.getAllByTestId('export-button')
     const texBtn = buttons.find((b) => b.getAttribute('data-format') === 'tex')!
     await user.click(texBtn)
@@ -74,7 +79,7 @@ describe('DocExportDialog 文档导出对话框', () => {
   test('选择模板后导出传入选中的模板', async () => {
     const user = userEvent.setup()
     const onExport = vi.fn()
-    render(<DocExportDialog {...baseProps} onExport={onExport} />)
+    renderWithI18n(<DocExportDialog {...baseProps} onExport={onExport} />)
     const options = screen.getAllByTestId('template-option') as HTMLInputElement[]
     const master = options.find((o) => o.value === 'master_thesis')!
     await user.click(master)
@@ -87,7 +92,7 @@ describe('DocExportDialog 文档导出对话框', () => {
   test('关闭按钮触发 onClose', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<DocExportDialog {...baseProps} onClose={onClose} />)
+    renderWithI18n(<DocExportDialog {...baseProps} onClose={onClose} />)
     const btn = screen.getByTestId('close-button')
     await user.click(btn)
     expect(onClose).toHaveBeenCalledOnce()

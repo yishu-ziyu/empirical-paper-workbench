@@ -9,6 +9,7 @@
 // OutlineChapterResponse（与 POST /sessions/{id}/direction 返回体一致）。
 
 import { useRef, useState } from 'react'
+import { useT } from '../lib/i18n'
 import {
   DndContext,
   closestCenter,
@@ -132,6 +133,7 @@ function SortableChapter({
 }
 
 export default function Outline({ body_chapters, onConfirm }: OutlineProps) {
+  const { t } = useT()
   const idCounter = useRef(0)
   const [items, setItems] = useState<InternalChapter[]>(() =>
     body_chapters.map((c, i) => ({ ...c, id: `ch-${i}` })),
@@ -170,7 +172,7 @@ export default function Outline({ body_chapters, onConfirm }: OutlineProps) {
 
   function addChapter() {
     const id = `ch-new-${idCounter.current++}`
-    setItems((prev) => [...prev, { id, type: 'intro', title: '新章节' }])
+    setItems((prev) => [...prev, { id, type: 'intro', title: t('outline.newChapter') }])
   }
 
   function confirm() {
@@ -178,7 +180,7 @@ export default function Outline({ body_chapters, onConfirm }: OutlineProps) {
   }
 
   return (
-    <div data-testid="outline-panel">
+    <div data-testid="outline-content">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -206,14 +208,14 @@ export default function Outline({ body_chapters, onConfirm }: OutlineProps) {
         onClick={addChapter}
         className="mt-2 rounded border border-dashed border-border px-2 py-1 text-xs"
       >
-        + 添加章节
+        {t('outline.addChapter')}
       </button>
       <button
         type="button"
         onClick={confirm}
         className="mt-2 ml-2 rounded bg-accent px-3 py-1 text-xs text-white"
       >
-        确认大纲
+        {t('outline.confirm')}
       </button>
     </div>
   )

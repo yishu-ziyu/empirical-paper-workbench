@@ -3,8 +3,15 @@
 Detects outliers via the IQR rule (for the report) and clips numeric columns
 via percentile winsorization (StatsPAI ``winsor`` with a pandas fallback).
 Before/after distribution stats are recorded per dataset in the step report.
+
+The report carries ``stats_pai_used`` (bool) so callers can tell whether the
+winsorization was delegated to StatsPAI or handled by the pandas fallback.
 """
+import logging
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 _DEFAULT_CUTS = (5, 95)
 
@@ -21,6 +28,7 @@ class OutliersStep:
         after_list: list = []
         iqr_outliers_list: list = []
         winsorized_list: list = []
+        stats_pai_used = False
 
         sp_winsor = None
         try:
@@ -52,9 +60,16 @@ class OutliersStep:
             if sp_winsor is not None:
                 try:
                     df = sp_winsor(df, vars=numeric_cols, cuts=cuts, replace=True)
+                    stats_pai_used = True
                 except Exception:
+                    logger.warning(
+                        "StatsPAI winsor() failed for dataset %d, falling back to pandas", i
+                    )
                     df = _winsorize_pandas(df, numeric_cols, cuts)
             else:
+                logger.warning(
+                    "StatsPAI not available for winsorize (dataset %d), using pandas fallback", i
+                )
                 df = _winsorize_pandas(df, numeric_cols, cuts)
 
             after = _distribution(df, numeric_cols)
@@ -82,6 +97,7 @@ class OutliersStep:
             "after": after_list,
             "iqr_outliers": iqr_outliers_list,
             "winsorized": winsorized_list,
+            "stats_pai_used": stats_pai_used,
         }
 
 

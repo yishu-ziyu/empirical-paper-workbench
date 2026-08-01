@@ -33,8 +33,9 @@ module.exports = {
         border: '#E8E2D6',
       },
       fontFamily: {
+        serif: ['"Source Serif 4"', '"Noto Serif SC"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'Menlo', 'monospace'],
         sans: ['system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
-        serif: ['Charter', 'Georgia', 'serif'],
       },
     },
   },

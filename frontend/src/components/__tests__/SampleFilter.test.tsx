@@ -1,6 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SampleFilter } from '../SampleFilter'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('SampleFilter 条件构建器', () => {
   beforeEach(() => {
@@ -12,7 +17,7 @@ describe('SampleFilter 条件构建器', () => {
   })
 
   test('渲染条件构建器 (列 / 操作符 / 值 输入 + 添加按钮)', () => {
-    render(<SampleFilter sessionId="sess-123" />)
+    renderWithI18n(<SampleFilter sessionId="sess-123" />)
     expect(screen.getByTestId('sample-filter')).toBeInTheDocument()
     expect(screen.getByTestId('sf-column-input')).toBeInTheDocument()
     expect(screen.getByTestId('sf-op-select')).toBeInTheDocument()
@@ -21,7 +26,7 @@ describe('SampleFilter 条件构建器', () => {
   })
 
   test('操作符下拉包含 >= <= > < == !=', () => {
-    render(<SampleFilter sessionId="sess-123" />)
+    renderWithI18n(<SampleFilter sessionId="sess-123" />)
     const select = screen.getByTestId('sf-op-select') as HTMLSelectElement
     const options = Array.from(select.options).map((o) => o.value)
     expect(options).toContain('>=')
@@ -33,7 +38,7 @@ describe('SampleFilter 条件构建器', () => {
   })
 
   test('添加条件后显示在条件列表中', async () => {
-    render(<SampleFilter sessionId="sess-123" />)
+    renderWithI18n(<SampleFilter sessionId="sess-123" />)
 
     fireEvent.change(screen.getByTestId('sf-column-input'), {
       target: { value: 'age' },
@@ -66,7 +71,7 @@ describe('SampleFilter 条件构建器', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<SampleFilter sessionId="sess-123" />)
+    renderWithI18n(<SampleFilter sessionId="sess-123" />)
 
     // 先添加一个条件
     fireEvent.change(screen.getByTestId('sf-column-input'), {
@@ -101,7 +106,7 @@ describe('SampleFilter 条件构建器', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ detail: 'bad' }) }),
     )
-    render(<SampleFilter sessionId="sess-123" />)
+    renderWithI18n(<SampleFilter sessionId="sess-123" />)
     fireEvent.change(screen.getByTestId('sf-column-input'), { target: { value: 'age' } })
     fireEvent.change(screen.getByTestId('sf-op-select'), { target: { value: '>=' } })
     fireEvent.change(screen.getByTestId('sf-value-input'), { target: { value: '50' } })

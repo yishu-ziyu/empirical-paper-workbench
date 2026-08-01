@@ -1,3 +1,5 @@
+import { useT } from '../lib/i18n'
+
 // LaTeX 源码编辑 + PDF 预览 (T-10)
 // - 显示 LaTeX 源码（可编辑 textarea）
 // - 编辑触发 onLatexChange
@@ -21,6 +23,7 @@ export default function LatexPreview({
   degraded,
   onRefresh,
 }: LatexPreviewProps) {
+  const { t } = useT()
   return (
     <div
       data-testid="latex-preview"
@@ -28,7 +31,7 @@ export default function LatexPreview({
     >
       <div className="flex items-center justify-between">
         <span className="font-serif text-sm font-semibold text-ink">
-          LaTeX 源码
+          {t('latex.title')}
         </span>
         {onRefresh && (
           <button
@@ -37,7 +40,7 @@ export default function LatexPreview({
             onClick={onRefresh}
             className="rounded border border-border px-2 py-1 font-serif text-xs text-ink transition-colors hover:bg-panel"
           >
-            刷新预览
+            {t('latex.refresh')}
           </button>
         )}
       </div>
@@ -55,7 +58,7 @@ export default function LatexPreview({
           data-testid="degraded-hint"
           className="rounded border border-amber-400 bg-amber-50 px-3 py-2 font-serif text-xs text-amber-700"
         >
-          PDF 预览不可用：latexmk 未安装，仅支持 .tex 源码导出。
+          {t('latex.degraded')}
         </div>
       )}
 

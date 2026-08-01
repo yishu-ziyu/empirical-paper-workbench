@@ -1,3 +1,5 @@
+import { useT } from '../lib/i18n'
+
 // 代码导出对话框 (T-09)
 // - 4 个下载按钮：Python (.py) / Stata (.do) / R (.R) / EViews (.m)
 // - 点击下载 → 调 GET /sessions/{id}/code-export?format=xxx
@@ -74,6 +76,7 @@ export default function CodeExportDialog({
   isOpen,
   onClose,
 }: CodeExportDialogProps) {
+  const { t } = useT()
   if (!isOpen) return null
 
   const handleDownload = async (format: string) => {
@@ -94,14 +97,14 @@ export default function CodeExportDialog({
         {/* 头部 */}
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-serif text-lg font-semibold text-ink">
-            下载代码
+            {t('codeExport.title')}
           </h2>
           <button
             type="button"
             data-testid="code-export-close"
             onClick={onClose}
             className="rounded p-1 text-muted hover:bg-panel hover:text-ink"
-            aria-label="关闭"
+            aria-label={t('codeExport.close')}
           >
             ✕
           </button>
@@ -109,8 +112,7 @@ export default function CodeExportDialog({
 
         {/* 说明 */}
         <p className="mb-4 font-serif text-xs text-muted">
-          选择要下载的代码格式。每种格式包含相同的分析逻辑，
-          适配对应统计软件的语法。
+          {t('codeExport.desc')}
         </p>
 
         {/* 4 个下载按钮 */}

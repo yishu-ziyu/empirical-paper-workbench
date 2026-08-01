@@ -11,6 +11,11 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import LatexPreview, { type LatexPreviewProps } from '../LatexPreview'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const sampleTex =
   '\\documentclass{article}\n\\begin{document}\n\\title{测试}\n\\end{document}'
@@ -21,7 +26,7 @@ const baseProps: LatexPreviewProps = {
 
 describe('LatexPreview LaTeX 预览组件', () => {
   test('渲染 LaTeX 源码', () => {
-    render(<LatexPreview {...baseProps} />)
+    renderWithI18n(<LatexPreview {...baseProps} />)
     const input = screen.getByTestId('latex-source-input') as HTMLTextAreaElement
     expect(input.value).toContain('\\title{测试}')
   })
@@ -42,7 +47,7 @@ describe('LatexPreview LaTeX 预览组件', () => {
         />
       )
     }
-    render(<Wrapper />)
+    renderWithI18n(<Wrapper />)
     const input = screen.getByTestId('latex-source-input') as HTMLTextAreaElement
     await user.clear(input)
     await user.type(input, '新的内容')
@@ -53,18 +58,18 @@ describe('LatexPreview LaTeX 预览组件', () => {
   })
 
   test('pdfUrl 提供时渲染 PDF 预览', () => {
-    render(<LatexPreview {...baseProps} pdfUrl="/sessions/x/doc-export?format=pdf" />)
+    renderWithI18n(<LatexPreview {...baseProps} pdfUrl="/sessions/x/doc-export?format=pdf" />)
     const preview = screen.getByTestId('pdf-preview')
     expect(preview).toBeInTheDocument()
   })
 
   test('无 pdfUrl 时不渲染 PDF 预览', () => {
-    render(<LatexPreview {...baseProps} />)
+    renderWithI18n(<LatexPreview {...baseProps} />)
     expect(screen.queryByTestId('pdf-preview')).toBeNull()
   })
 
   test('degraded=true 显示降级提示', () => {
-    render(<LatexPreview {...baseProps} degraded={true} />)
+    renderWithI18n(<LatexPreview {...baseProps} degraded={true} />)
     const hint = screen.getByTestId('degraded-hint')
     expect(hint).toBeInTheDocument()
     // 提示文本应包含 latexmk 关键词
@@ -72,14 +77,14 @@ describe('LatexPreview LaTeX 预览组件', () => {
   })
 
   test('degraded=false 不显示降级提示', () => {
-    render(<LatexPreview {...baseProps} degraded={false} />)
+    renderWithI18n(<LatexPreview {...baseProps} degraded={false} />)
     expect(screen.queryByTestId('degraded-hint')).toBeNull()
   })
 
   test('刷新按钮触发 onRefresh', async () => {
     const user = userEvent.setup()
     const onRefresh = vi.fn()
-    render(<LatexPreview {...baseProps} onRefresh={onRefresh} />)
+    renderWithI18n(<LatexPreview {...baseProps} onRefresh={onRefresh} />)
     const btn = screen.getByTestId('refresh-button')
     await user.click(btn)
     expect(onRefresh).toHaveBeenCalledOnce()

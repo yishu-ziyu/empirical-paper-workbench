@@ -3,10 +3,13 @@
 // 数据流：按钮点击 → fetch POST → {columns, rows} 表格 或 {variables, matrix} 热力矩阵
 
 import { useState } from 'react'
+import { useT } from '../lib/i18n'
 
 export interface EdaSidebarProps {
   sessionId: string
   onClose?: () => void
+  charlsDetected?: boolean
+  onOpenCharlsWizard?: () => void
 }
 
 // ADR-0003 例外：EdaResponse.result 后端声明为 Any（EDA action 返回异构 shape），
@@ -59,7 +62,8 @@ function renderCell(value: unknown): string {
   return String(value)
 }
 
-export function EdaSidebar({ sessionId, onClose }: EdaSidebarProps) {
+export function EdaSidebar({ sessionId, onClose, charlsDetected, onOpenCharlsWizard }: EdaSidebarProps) {
+  const { t } = useT()
   const [result, setResult] = useState<EdaResult>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,7 +90,7 @@ export function EdaSidebar({ sessionId, onClose }: EdaSidebarProps) {
   return (
     <div data-testid="eda-sidebar" className="flex h-full flex-col bg-panel">
       <div className="flex items-center justify-between border-b border-border p-3">
-        <h2 className="text-xs uppercase tracking-wider text-muted">EDA</h2>
+        <h2 className="text-xs uppercase tracking-wider text-muted">{t('eda.title')}</h2>
         {onClose && (
           <button onClick={onClose} className="text-muted hover:text-ink" aria-label="close">
             ✕
@@ -108,8 +112,20 @@ export function EdaSidebar({ sessionId, onClose }: EdaSidebarProps) {
         ))}
       </div>
 
+      {charlsDetected && (
+        <div className="mx-3 mb-2 flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-3 py-2">
+          <span className="text-xs font-medium text-amber-800">{t('eda.charlsDetected')}</span>
+          <button
+            onClick={onOpenCharlsWizard}
+            className="text-xs text-amber-700 underline hover:text-amber-900"
+          >
+            {t('eda.variableWizard')}
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-3">
-        {loading && <div className="text-sm text-muted">Loading...</div>}
+        {loading && <div className="text-sm text-muted">{t('eda.loading')}</div>}
         {error && <div className="text-sm text-red-500">{error}</div>}
 
         {isTableResult(result) && (
@@ -139,7 +155,7 @@ export function EdaSidebar({ sessionId, onClose }: EdaSidebarProps) {
 
         {isMatrixResult(result) && (
           <div className="text-xs">
-            <div className="mb-2 text-muted">相关性矩阵：</div>
+            <div className="mb-2 text-muted">{t('eda.corrMatrix')}</div>
             <table>
               <thead>
                 <tr>

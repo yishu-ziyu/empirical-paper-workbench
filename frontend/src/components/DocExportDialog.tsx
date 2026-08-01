@@ -6,6 +6,7 @@
 // 设计：Editorial Academic Refined — 衬线字体 + 暖色调
 
 import { useState } from 'react'
+import { useT } from '../lib/i18n'
 
 export type ExportFormat = 'tex' | 'pdf' | 'docx'
 
@@ -33,6 +34,7 @@ export default function DocExportDialog({
   onClose,
   onExport,
 }: DocExportDialogProps) {
+  const { t } = useT()
   const [template, setTemplate] = useState('cn_journal')
 
   return (
@@ -42,7 +44,7 @@ export default function DocExportDialog({
     >
       <div className="flex items-center justify-between border-b border-border pb-2">
         <h2 className="font-serif text-base font-semibold text-ink">
-          导出文档
+          {t('docExport.title')}
         </h2>
         <button
           type="button"
@@ -56,8 +58,8 @@ export default function DocExportDialog({
 
       <div className="flex flex-col gap-2">
         <span className="font-serif text-xs font-semibold text-muted">
-          选择模板
-        </span>
+            {t('docExport.selectTemplate')}
+          </span>
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {TEMPLATES.map((t) => (
             <label
@@ -82,7 +84,7 @@ export default function DocExportDialog({
 
       <div className="flex flex-col gap-2">
         <span className="font-serif text-xs font-semibold text-muted">
-          导出格式
+          {t('docExport.exportFormat')}
         </span>
         <div className="flex flex-wrap gap-2">
           {FORMATS.map((f) => (
@@ -101,7 +103,7 @@ export default function DocExportDialog({
       </div>
 
       <span className="font-serif text-xs text-muted">
-        会话 {sessionId} · 模板 {template}
+        {t('docExport.session')} {sessionId} · {t('docExport.selectTemplate')} {template}
       </span>
     </div>
   )

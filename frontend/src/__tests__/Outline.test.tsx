@@ -3,6 +3,11 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Outline from '../components/Outline'
 import type { OutlineChapter } from '../components/Outline'
+import { I18nProvider } from '../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const sixChapters: OutlineChapter[] = [
   { type: 'intro', title: '引言' },
@@ -15,7 +20,7 @@ const sixChapters: OutlineChapter[] = [
 
 describe('Outline 左栏大纲', () => {
   test('renders 6 chapters with type badges', () => {
-    render(<Outline body_chapters={sixChapters} />)
+    renderWithI18n(<Outline body_chapters={sixChapters} />)
     expect(screen.getAllByTestId('chapter-item')).toHaveLength(6)
     expect(screen.getAllByTestId('type-badge')).toHaveLength(6)
     expect(screen.getByText('引言')).toBeInTheDocument()
@@ -32,7 +37,7 @@ describe('Outline 左栏大纲', () => {
     // / KeyboardSensor 供真实浏览器拖拽使用）。
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    render(<Outline body_chapters={sixChapters} onConfirm={onConfirm} />)
+    renderWithI18n(<Outline body_chapters={sixChapters} onConfirm={onConfirm} />)
 
     const items = screen.getAllByTestId('chapter-item')
     expect(items[0]).toHaveTextContent('引言')
@@ -50,7 +55,7 @@ describe('Outline 左栏大纲', () => {
 
   test('delete chapter removes it', async () => {
     const user = userEvent.setup()
-    render(<Outline body_chapters={sixChapters} />)
+    renderWithI18n(<Outline body_chapters={sixChapters} />)
     expect(screen.getAllByTestId('chapter-item')).toHaveLength(6)
     const items = screen.getAllByTestId('chapter-item')
     await user.click(within(items[0]).getByRole('button', { name: /删除 引言/ }))
@@ -60,7 +65,7 @@ describe('Outline 左栏大纲', () => {
 
   test('add chapter adds one', async () => {
     const user = userEvent.setup()
-    render(<Outline body_chapters={sixChapters} />)
+    renderWithI18n(<Outline body_chapters={sixChapters} />)
     expect(screen.getAllByTestId('chapter-item')).toHaveLength(6)
     await user.click(screen.getByRole('button', { name: /添加章节/ }))
     expect(screen.getAllByTestId('chapter-item')).toHaveLength(7)
@@ -69,7 +74,7 @@ describe('Outline 左栏大纲', () => {
   test('confirm button calls onConfirm with current outline', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    render(<Outline body_chapters={sixChapters} onConfirm={onConfirm} />)
+    renderWithI18n(<Outline body_chapters={sixChapters} onConfirm={onConfirm} />)
     await user.click(screen.getByRole('button', { name: /确认大纲/ }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
     const confirmed = onConfirm.mock.calls[0][0] as OutlineChapter[]

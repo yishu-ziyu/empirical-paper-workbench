@@ -2,10 +2,15 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DirectionForm from '../components/DirectionForm'
+import { I18nProvider } from '../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('DirectionForm 研究方向输入', () => {
   test('renders research question / dv / iv / controls / method / template inputs', () => {
-    render(<DirectionForm onSubmit={() => {}} />)
+    renderWithI18n(<DirectionForm onSubmit={() => {}} />)
     expect(screen.getByLabelText(/研究问题/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/因变量/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/自变量/i)).toBeInTheDocument()
@@ -17,7 +22,7 @@ describe('DirectionForm 研究方向输入', () => {
   })
 
   test('method selector shows 38 options', () => {
-    render(<DirectionForm onSubmit={() => {}} />)
+    renderWithI18n(<DirectionForm onSubmit={() => {}} />)
     const sel = screen.getByTestId('method-selector')
     const opts = within(sel).getAllByRole('option')
     // 38 个方法 + 1 个占位 "选择方法…"
@@ -27,7 +32,7 @@ describe('DirectionForm 研究方向输入', () => {
   test('submit calls onSubmit with form data', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    render(<DirectionForm onSubmit={onSubmit} />)
+    renderWithI18n(<DirectionForm onSubmit={onSubmit} />)
 
     await user.type(screen.getByLabelText(/研究问题/i), '教育对收入的影响')
     await user.type(screen.getByLabelText(/因变量/i), 'income')

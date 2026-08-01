@@ -1,3 +1,5 @@
+import { useT } from '../lib/i18n'
+
 export interface VariableInfo {
   dtype: string
   missing_rate: number
@@ -45,6 +47,7 @@ export default function CleanWizard({
   onSelectStrategy,
   selectedStrategy,
 }: CleanWizardProps) {
+  const { t } = useT()
   const varNames = Object.keys(profile.variables)
   const outlierVars = Object.keys(outliers.before)
 
@@ -55,20 +58,20 @@ export default function CleanWizard({
         data-testid="profile-report"
         className="rounded-lg border border-gray-200 p-4"
       >
-        <h2 className="mb-3 text-lg font-semibold">数据 Profiling</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t('clean.profiling')}</h2>
         <p className="mb-3 text-sm text-gray-600">
-          行数：<span data-testid="profile-n-rows">{profile.n_rows}</span>
+          {t('clean.rows')}：<span data-testid="profile-n-rows">{profile.n_rows}</span>
           {' / '}
-          列数：<span data-testid="profile-n-cols">{profile.n_cols}</span>
+          {t('clean.cols')}：<span data-testid="profile-n-cols">{profile.n_cols}</span>
         </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
-              <th className="py-1">变量</th>
-              <th className="py-1">类型</th>
-              <th className="py-1">缺失率</th>
-              <th className="py-1">唯一值</th>
-              <th className="py-1">数值型</th>
+              <th className="py-1">{t('clean.variable')}</th>
+              <th className="py-1">{t('clean.type')}</th>
+              <th className="py-1">{t('clean.missingRate')}</th>
+              <th className="py-1">{t('clean.unique')}</th>
+              <th className="py-1">{t('clean.isNumeric')}</th>
             </tr>
           </thead>
           <tbody>
@@ -90,7 +93,7 @@ export default function CleanWizard({
 
       {/* Sub-step 3: missing-value strategy selector */}
       <section className="rounded-lg border border-gray-200 p-4">
-        <h2 className="mb-3 text-lg font-semibold">缺失值处理策略</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t('clean.strategy')}</h2>
         <div className="flex gap-2">
           {STRATEGIES.map((s) => (
             <button
@@ -114,13 +117,13 @@ export default function CleanWizard({
         data-testid="outlier-comparison"
         className="rounded-lg border border-gray-200 p-4"
       >
-        <h2 className="mb-3 text-lg font-semibold">异常值缩尾对比</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t('clean.outlier')}</h2>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
-              <th className="py-1">变量</th>
-              <th className="py-1">Before (前) max</th>
-              <th className="py-1">After (后) max</th>
+              <th className="py-1">{t('clean.variable')}</th>
+              <th className="py-1">{t('clean.before')}</th>
+              <th className="py-1">{t('clean.after')}</th>
             </tr>
           </thead>
           <tbody>

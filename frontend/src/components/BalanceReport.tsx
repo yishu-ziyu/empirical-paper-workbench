@@ -6,6 +6,7 @@
 // 修复漂移 1：字段名 balanced_n/unbalanced_n → balanced/unbalanced，新增 n_periods。
 
 import { useState } from 'react'
+import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
 type BalanceResponse = components['schemas']['BalanceResponse']
@@ -21,6 +22,7 @@ function pct(rate: number): string {
 }
 
 export function BalanceReport({ sessionId }: BalanceReportProps) {
+  const { t } = useT()
   const [panelId, setPanelId] = useState('')
   const [timeCol, setTimeCol] = useState('')
   const [result, setResult] = useState<BalanceResponse | null>(null)
@@ -51,29 +53,29 @@ export function BalanceReport({ sessionId }: BalanceReportProps) {
 
   return (
     <div data-testid="balance-report" className="space-y-4 rounded-lg border border-gray-200 p-4">
-      <h2 className="text-lg font-semibold">面板平衡性检查</h2>
+      <h2 className="text-lg font-semibold">{t('balance.title')}</h2>
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col">
-          <label className="text-xs text-gray-600">个体 ID 列</label>
+          <label className="text-xs text-gray-600">{t('balance.panelId')}</label>
           <input
             data-testid="br-panel-id-input"
             type="text"
             value={panelId}
             onChange={(e) => setPanelId(e.target.value)}
-            placeholder="如 id"
+            placeholder={t('balance.panelIdPlaceholder')}
             className="rounded border border-gray-300 px-2 py-1 text-sm"
           />
         </div>
 
         <div className="flex flex-col">
-          <label className="text-xs text-gray-600">时间列</label>
+          <label className="text-xs text-gray-600">{t('balance.timeCol')}</label>
           <input
             data-testid="br-time-col-input"
             type="text"
             value={timeCol}
             onChange={(e) => setTimeCol(e.target.value)}
-            placeholder="如 year"
+            placeholder={t('balance.timeColPlaceholder')}
             className="rounded border border-gray-300 px-2 py-1 text-sm"
           />
         </div>
@@ -84,7 +86,7 @@ export function BalanceReport({ sessionId }: BalanceReportProps) {
           disabled={loading}
           className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? '检查中...' : '检查平衡性'}
+          {loading ? t('balance.checking') : t('balance.check')}
         </button>
       </div>
 
@@ -94,31 +96,31 @@ export function BalanceReport({ sessionId }: BalanceReportProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
-              <th className="py-1">指标</th>
-              <th className="py-1">值</th>
+              <th className="py-1">{t('balance.metric')}</th>
+              <th className="py-1">{t('balance.value')}</th>
             </tr>
           </thead>
           <tbody>
             <tr className="border-b">
-              <td className="py-1">平衡个体数</td>
+              <td className="py-1">{t('balance.balanced')}</td>
               <td data-testid="br-balanced" className="py-1 font-mono font-semibold">
                 {result.balanced}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="py-1">不平衡个体数</td>
+              <td className="py-1">{t('balance.unbalanced')}</td>
               <td data-testid="br-unbalanced" className="py-1 font-mono font-semibold">
                 {result.unbalanced}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="py-1">期数</td>
+              <td className="py-1">{t('balance.periods')}</td>
               <td data-testid="br-n-periods" className="py-1 font-mono font-semibold">
                 {result.n_periods}
               </td>
             </tr>
             <tr className="border-b">
-              <td className="py-1">流失率 (attrition)</td>
+              <td className="py-1">{t('balance.attrition')}</td>
               <td data-testid="br-attrition-rate" className="py-1 font-mono font-semibold">
                 {pct(result.attrition_rate)}
               </td>

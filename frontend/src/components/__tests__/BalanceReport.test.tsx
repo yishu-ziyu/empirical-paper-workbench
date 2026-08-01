@@ -1,6 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BalanceReport } from '../BalanceReport'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('BalanceReport 面板平衡性报告', () => {
   beforeEach(() => {
@@ -12,7 +17,7 @@ describe('BalanceReport 面板平衡性报告', () => {
   })
 
   test('渲染平衡性检查表单 (panel_id / time_col 输入 + 检查按钮)', () => {
-    render(<BalanceReport sessionId="sess-123" />)
+    renderWithI18n(<BalanceReport sessionId="sess-123" />)
     expect(screen.getByTestId('balance-report')).toBeInTheDocument()
     expect(screen.getByTestId('br-panel-id-input')).toBeInTheDocument()
     expect(screen.getByTestId('br-time-col-input')).toBeInTheDocument()
@@ -33,7 +38,7 @@ describe('BalanceReport 面板平衡性报告', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<BalanceReport sessionId="sess-123" />)
+    renderWithI18n(<BalanceReport sessionId="sess-123" />)
 
     fireEvent.change(screen.getByTestId('br-panel-id-input'), {
       target: { value: 'id' },
@@ -75,7 +80,7 @@ describe('BalanceReport 面板平衡性报告', () => {
       }),
     )
 
-    render(<BalanceReport sessionId="sess-123" />)
+    renderWithI18n(<BalanceReport sessionId="sess-123" />)
     fireEvent.change(screen.getByTestId('br-panel-id-input'), { target: { value: 'id' } })
     fireEvent.change(screen.getByTestId('br-time-col-input'), { target: { value: 'year' } })
     fireEvent.click(screen.getByTestId('br-check'))
@@ -88,7 +93,7 @@ describe('BalanceReport 面板平衡性报告', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ detail: 'no panel' }) }),
     )
-    render(<BalanceReport sessionId="sess-123" />)
+    renderWithI18n(<BalanceReport sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('br-check'))
 
     await waitFor(() => {

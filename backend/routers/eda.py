@@ -15,10 +15,7 @@ Session state is read from ``AgentFacade`` (which owns the in-memory
 session store). The CSV path is stored at the top level of the session
 entry by the upload handler (``sessions.py``).
 
-Router self-registration: the integration phase will move the
-``app.include_router`` call into ``main.py``. For now, importing this
-module attaches the router to ``main.app`` so tests and dev runs reach
-the endpoint without touching ``main.py`` (per T-03 file boundaries).
+The router is registered in ``main.py`` via ``app.include_router(eda_router)``.
 """
 from __future__ import annotations
 
@@ -36,7 +33,6 @@ from schemas.responses import EdaResponse
 router = APIRouter()
 
 _VALID_ACTIONS = {"describe", "corr", "plot", "scatter", "regression", "missing"}
-_REGISTERED = False
 
 
 class EdaRequest(BaseModel):
@@ -177,32 +173,11 @@ async def run_eda(session_id: str, payload: EdaRequest) -> EdaResponse:
         return EdaResponse(action=action, result=result, **result)
     # plot / scatter / regression: T-03 returns a placeholder; later tickets implement.
     placeholder = {
-        "action": action,
         "message": "Not implemented yet",
         "placeholder": True,
     }
     return EdaResponse(action=action, result=placeholder, **placeholder)
 
 
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import.
-
-    The integration phase will move ``app.include_router`` into ``main.py``
-    explicitly. Self-registering here lets tests (which import this module)
-    and dev runs reach the endpoint without modifying ``main.py`` (T-03
-    file-boundary constraint). Idempotent via the ``_REGISTERED`` flag.
-    """
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        # main not importable yet (e.g. during partial builds) — skip silently.
-        pass
-
-
-_self_register()
+# Router is registered in main.py via app.include_router(eda_router).
+# No self-registration needed.

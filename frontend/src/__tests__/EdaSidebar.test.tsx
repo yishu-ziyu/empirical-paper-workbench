@@ -1,6 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { EdaSidebar } from '../components/EdaSidebar'
+import { I18nProvider } from '../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('EdaSidebar EDA 侧边栏', () => {
   beforeEach(() => {
@@ -12,7 +17,7 @@ describe('EdaSidebar EDA 侧边栏', () => {
   })
 
   test('渲染 6 个 EDA 动作按钮', () => {
-    render(<EdaSidebar sessionId="test-session" />)
+    renderWithI18n(<EdaSidebar sessionId="test-session" />)
     expect(screen.getByText(/描述统计/i)).toBeInTheDocument()
     expect(screen.getByText(/相关性/i)).toBeInTheDocument()
     expect(screen.getByText(/分布图/i)).toBeInTheDocument()
@@ -22,7 +27,7 @@ describe('EdaSidebar EDA 侧边栏', () => {
   })
 
   test('按钮带 data-testid 标识 (eda-btn-{action})', () => {
-    render(<EdaSidebar sessionId="test-session" />)
+    renderWithI18n(<EdaSidebar sessionId="test-session" />)
     expect(screen.getByTestId('eda-btn-describe')).toBeInTheDocument()
     expect(screen.getByTestId('eda-btn-corr')).toBeInTheDocument()
     expect(screen.getByTestId('eda-btn-missing')).toBeInTheDocument()
@@ -43,7 +48,7 @@ describe('EdaSidebar EDA 侧边栏', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<EdaSidebar sessionId="sess-123" />)
+    renderWithI18n(<EdaSidebar sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('eda-btn-describe'))
 
     // 表格行渲染出来（age + income）
@@ -75,7 +80,7 @@ describe('EdaSidebar EDA 侧边栏', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<EdaSidebar sessionId="sess-123" />)
+    renderWithI18n(<EdaSidebar sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('eda-btn-corr'))
 
     // 变量名渲染（表头 + 行标签可能重复出现，用 findAllByText）
@@ -89,11 +94,11 @@ describe('EdaSidebar EDA 侧边栏', () => {
     // fetch 永不 resolve → 一直 loading
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
 
-    render(<EdaSidebar sessionId="sess-123" />)
+    renderWithI18n(<EdaSidebar sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('eda-btn-describe'))
 
     await waitFor(() => {
-      expect(screen.getByText(/loading/i)).toBeInTheDocument()
+      expect(screen.getByText(/加载中|loading/i)).toBeInTheDocument()
     })
   })
 
@@ -103,7 +108,7 @@ describe('EdaSidebar EDA 侧边栏', () => {
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ detail: 'bad' }) }),
     )
 
-    render(<EdaSidebar sessionId="sess-123" />)
+    renderWithI18n(<EdaSidebar sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('eda-btn-describe'))
 
     await waitFor(() => {

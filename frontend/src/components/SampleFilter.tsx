@@ -2,6 +2,7 @@
 // 列 / 操作符 / 值 → 添加条件 → 应用筛选 → POST /sessions/{id}/filter → 显示前后样本量
 
 import { useState } from 'react'
+import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
 type Condition = components['schemas']['FilterConditionItem']
@@ -21,6 +22,7 @@ function parseVal(raw: string): string | number {
 }
 
 export function SampleFilter({ sessionId }: SampleFilterProps) {
+  const { t } = useT()
   const [col, setCol] = useState('')
   const [op, setOp] = useState('>=')
   const [val, setVal] = useState('')
@@ -60,23 +62,23 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
 
   return (
     <div data-testid="sample-filter" className="space-y-4 rounded-lg border border-gray-200 p-4">
-      <h2 className="text-lg font-semibold">样本筛选</h2>
+      <h2 className="text-lg font-semibold">{t('filter.title')}</h2>
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex flex-col">
-          <label className="text-xs text-gray-600">列名</label>
+          <label className="text-xs text-gray-600">{t('filter.col')}</label>
           <input
             data-testid="sf-column-input"
             type="text"
             value={col}
             onChange={(e) => setCol(e.target.value)}
-            placeholder="如 age"
+            placeholder={t('filter.colPlaceholder')}
             className="rounded border border-gray-300 px-2 py-1 text-sm"
           />
         </div>
 
         <div className="flex flex-col">
-          <label className="text-xs text-gray-600">操作符</label>
+          <label className="text-xs text-gray-600">{t('filter.op')}</label>
           <select
             data-testid="sf-op-select"
             value={op}
@@ -92,13 +94,13 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
         </div>
 
         <div className="flex flex-col">
-          <label className="text-xs text-gray-600">值</label>
+          <label className="text-xs text-gray-600">{t('filter.value')}</label>
           <input
             data-testid="sf-value-input"
             type="text"
             value={val}
             onChange={(e) => setVal(e.target.value)}
-            placeholder="如 50"
+            placeholder={t('filter.valuePlaceholder')}
             className="rounded border border-gray-300 px-2 py-1 text-sm"
           />
         </div>
@@ -108,13 +110,13 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
           onClick={addCondition}
           className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700 hover:bg-gray-200"
         >
-          添加条件
-        </button>
+          {t('filter.addCondition')}
+          </button>
       </div>
 
       {conditions.length > 0 && (
         <div>
-          <h3 className="mb-2 text-sm font-medium text-gray-700">已添加条件 (AND)</h3>
+          <h3 className="mb-2 text-sm font-medium text-gray-700">{t('filter.conditions')}</h3>
           <ul className="space-y-1">
             {conditions.map((c, i) => (
               <li
@@ -135,7 +137,7 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
         disabled={loading || conditions.length === 0}
         className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? '筛选中...' : '应用筛选'}
+        {loading ? t('filter.applying') : t('filter.apply')}
       </button>
 
       {error && <div className="text-sm text-red-500">{error}</div>}
@@ -143,10 +145,10 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
       {result && (
         <div className="rounded bg-blue-50 p-3 text-sm">
           <p>
-            筛选前样本量：<span data-testid="sf-n-before" className="font-mono font-semibold">{result.n_before}</span>
+            {t('filter.nBefore')}：<span data-testid="sf-n-before" className="font-mono font-semibold">{result.n_before}</span>
           </p>
           <p>
-            筛选后样本量：<span data-testid="sf-n-after" className="font-mono font-semibold">{result.n_after}</span>
+            {t('filter.nAfter')}：<span data-testid="sf-n-after" className="font-mono font-semibold">{result.n_after}</span>
           </p>
         </div>
       )}

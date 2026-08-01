@@ -1,6 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { VariableConstructor } from '../VariableConstructor'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('VariableConstructor 变量构造表单', () => {
   beforeEach(() => {
@@ -12,7 +17,7 @@ describe('VariableConstructor 变量构造表单', () => {
   })
 
   test('渲染变量构造表单 (type / column / params 输入)', () => {
-    render(<VariableConstructor sessionId="sess-123" />)
+    renderWithI18n(<VariableConstructor sessionId="sess-123" />)
     expect(screen.getByTestId('variable-constructor')).toBeInTheDocument()
     expect(screen.getByTestId('vc-type-select')).toBeInTheDocument()
     expect(screen.getByTestId('vc-column-input')).toBeInTheDocument()
@@ -20,7 +25,7 @@ describe('VariableConstructor 变量构造表单', () => {
   })
 
   test('类型下拉包含 log / onehot / label / bin / interaction / policy_dummy', () => {
-    render(<VariableConstructor sessionId="sess-123" />)
+    renderWithI18n(<VariableConstructor sessionId="sess-123" />)
     const select = screen.getByTestId('vc-type-select') as HTMLSelectElement
     const options = Array.from(select.options).map((o) => o.value)
     expect(options).toContain('log_transform')
@@ -42,7 +47,7 @@ describe('VariableConstructor 变量构造表单', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<VariableConstructor sessionId="sess-123" />)
+    renderWithI18n(<VariableConstructor sessionId="sess-123" />)
 
     fireEvent.change(screen.getByTestId('vc-column-input'), {
       target: { value: 'income' },
@@ -71,7 +76,7 @@ describe('VariableConstructor 变量构造表单', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ detail: 'bad column' }) }),
     )
-    render(<VariableConstructor sessionId="sess-123" />)
+    renderWithI18n(<VariableConstructor sessionId="sess-123" />)
     fireEvent.click(screen.getByTestId('vc-submit'))
 
     await waitFor(() => {

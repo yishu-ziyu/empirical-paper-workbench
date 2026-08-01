@@ -2,8 +2,10 @@
 
 sys.path setup + mock_llm 已上移至根 conftest.py（ADR-0003 Stage C）。
 本文件只保留 backend 专用 fixture：client (FastAPI TestClient)、
-sample_csv_path、uploaded_session。
+sample_csv_path、uploaded_session、s3_enabled。
 """
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -41,6 +43,12 @@ def sample_csv_path(tmp_path):
     )
     csv.write_text(content, encoding="utf-8")
     return csv
+
+
+@pytest.fixture(scope="session")
+def s3_enabled() -> bool:
+    """Check if S3/MinIO is available for integration tests."""
+    return bool(os.getenv("S3_ENDPOINT_URL"))
 
 
 @pytest.fixture

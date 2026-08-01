@@ -80,6 +80,14 @@ class CreateSessionResponse(BaseModel):
     session_id: str
 
 
+class SessionInfoResponse(BaseModel):
+    """GET /sessions/{id} 返回体：会话存在性及基本信息。"""
+
+    session_id: str
+    exists: bool
+    has_dataset: bool = False
+
+
 # ---------------------------------------------------------------------------
 # outline.py
 # ---------------------------------------------------------------------------

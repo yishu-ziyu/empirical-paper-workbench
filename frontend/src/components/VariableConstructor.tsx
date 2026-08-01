@@ -2,6 +2,7 @@
 // 类型下拉 + 列名输入 → POST /sessions/{id}/transform → 显示已构造变量列表
 
 import { useState } from 'react'
+import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
 type TransformResult = components['schemas']['TransformResponse']
@@ -22,6 +23,7 @@ const TYPES: { id: string; label: string }[] = [
 const API_BASE = 'http://localhost:8000'
 
 export function VariableConstructor({ sessionId }: VariableConstructorProps) {
+  const { t } = useT()
   const [vtype, setVtype] = useState('log_transform')
   const [column, setColumn] = useState('')
   const [constructed, setConstructed] = useState<string[]>([])
@@ -52,10 +54,10 @@ export function VariableConstructor({ sessionId }: VariableConstructorProps) {
 
   return (
     <div data-testid="variable-constructor" className="space-y-4 rounded-lg border border-gray-200 p-4">
-      <h2 className="text-lg font-semibold">变量构造</h2>
+      <h2 className="text-lg font-semibold">{t('vc.title')}</h2>
 
       <div className="flex flex-col gap-2">
-        <label className="text-sm text-gray-600">构造类型</label>
+        <label className="text-sm text-gray-600">{t('vc.type')}</label>
         <select
           data-testid="vc-type-select"
           value={vtype}
@@ -69,13 +71,13 @@ export function VariableConstructor({ sessionId }: VariableConstructorProps) {
           ))}
         </select>
 
-        <label className="text-sm text-gray-600">列名</label>
+        <label className="text-sm text-gray-600">{t('vc.col')}</label>
         <input
           data-testid="vc-column-input"
           type="text"
           value={column}
           onChange={(e) => setColumn(e.target.value)}
-          placeholder="如 income"
+          placeholder={t('vc.colPlaceholder')}
           className="rounded border border-gray-300 px-2 py-1 text-sm"
         />
 
@@ -85,7 +87,7 @@ export function VariableConstructor({ sessionId }: VariableConstructorProps) {
           disabled={loading}
           className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? '构造中...' : '构造变量'}
+          {loading ? t('vc.constructing') : t('vc.construct')}
         </button>
       </div>
 
@@ -93,7 +95,7 @@ export function VariableConstructor({ sessionId }: VariableConstructorProps) {
 
       {constructed.length > 0 && (
         <div>
-          <h3 className="mb-2 text-sm font-medium text-gray-700">已构造变量</h3>
+          <h3 className="mb-2 text-sm font-medium text-gray-700">{t('vc.constructed')}</h3>
           <ul className="space-y-1">
             {constructed.map((v) => (
               <li

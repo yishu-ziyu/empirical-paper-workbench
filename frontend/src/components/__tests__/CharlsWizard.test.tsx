@@ -2,6 +2,11 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CharlsWizard, { type CharlsConfig } from '../CharlsWizard'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 const sampleConfig: CharlsConfig = {
   name: 'CHARLS',
@@ -30,7 +35,7 @@ const sampleConfig: CharlsConfig = {
 
 describe('CharlsWizard CHARLS 向导', () => {
   test('isOpen=false 时不渲染', () => {
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={false}
         config={sampleConfig}
@@ -42,7 +47,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   })
 
   test('isOpen=true 时渲染向导 + 变量映射表', () => {
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -60,7 +65,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   })
 
   test('渲染 6 个年份 checkbox，默认勾选 2018 和 2020', () => {
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -83,7 +88,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   })
 
   test('渲染 3 个筛选预设按钮', () => {
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -100,7 +105,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   test('点击筛选预设按钮应用筛选', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -117,7 +122,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   test('点击确认按钮触发 onConfirm，参数包含映射 + 年份 + 筛选', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -140,7 +145,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   test('编辑变量映射名后确认提交新名称', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}
@@ -160,7 +165,7 @@ describe('CharlsWizard CHARLS 向导', () => {
   test('点击取消按钮触发 onClose', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(
+    renderWithI18n(
       <CharlsWizard
         isOpen={true}
         config={sampleConfig}

@@ -17,9 +17,12 @@ these names propagates immediately.
 """
 from __future__ import annotations
 
+import os
 import uuid
+from pathlib import Path
 from typing import Any, List, Optional
 
+from config import settings
 from fastapi import HTTPException
 
 # ---------------------------------------------------------------------------
@@ -93,31 +96,91 @@ class AgentFacade:
     """
 
     def __init__(self) -> None:
-        # Module-level session store (dev stage). Production swaps to
-        # PostgresSaver (see spec decision 2).
+        # Session metadata store (csv_path, charls_config, etc.).
+        # The LangGraph State itself is persisted in Postgres via the
+        # checkpointer — this dict only holds thin metadata needed by
+        # HTTP routers that does not flow through the graph.
         self._sessions: dict = {}
+        # Degradation log (F7): each entry is
+        # {node, reason, fallback, timestamp}
+        self._degradations: dict[str, list[dict]] = {}
 
     # ------------------------------------------------------------------
     # Session lifecycle
     # ------------------------------------------------------------------
-    def create_session(self, session_id: Optional[str] = None) -> str:
-        """Create an empty session and return its id."""
+    def create_session(
+        self,
+        session_id: Optional[str] = None,
+        user_id: Optional[int] = None,
+    ) -> str:
+        """Create an empty session and return its id.
+
+        If ``user_id`` is provided, the session is owned by that user.
+        Anonymous sessions (no user_id) are created for unauthenticated uploads.
+        """
         if session_id is None:
             session_id = str(uuid.uuid4())
-        self._sessions[session_id] = {"state": {}}
+        self._sessions[session_id] = {"user_id": user_id}
         return session_id
 
     def has_session(self, session_id: str) -> bool:
         return session_id in self._sessions
 
+    def get_session_owner(self, session_id: str) -> Optional[int]:
+        """Return the user_id that owns this session, or None if anonymous."""
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return None
+        return entry.get("user_id")
+
+    def list_sessions_by_user(self, user_id: int) -> list[str]:
+        """Return all session IDs owned by the given user."""
+        return [
+            sid
+            for sid, entry in self._sessions.items()
+            if entry.get("user_id") == user_id
+        ]
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session. Returns True if it existed, False otherwise."""
+        if session_id in self._sessions:
+            del self._sessions[session_id]
+            return True
+        return False
+
     def get_state(self, session_id: str) -> dict:
-        """Return the state dict for a session (404 if missing)."""
-        if session_id not in self._sessions:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return self._sessions[session_id].get("state", {}) or {}
+        """Return the state dict for a session (404 if missing).
+
+        Precedence:
+        1. In-memory ``_sessions`` entry (used by the single-node call
+           pattern: ``set_direction_and_outline`` / ``generate_chapter``).
+        2. Postgres checkpointer (used by the full graph pipeline:
+           ``run_upload_pipeline``). This is a fallback so that the
+           single-node pattern always sees its own state, not the
+           stale graph-invoked state from the checkpointer.
+        """
+        if session_id in self._sessions:
+            return self._sessions[session_id].get("state", {}) or {}
+        # Fallback to the Postgres checkpointer (full-graph sessions).
+        if _graph is not None:
+            try:
+                config = {"configurable": {"thread_id": session_id}}
+                checkpoint = _graph.get_state(config)
+                if checkpoint and checkpoint.values:
+                    # Mirror into in-memory for subsequent reads.
+                    self._sessions[session_id] = {"state": dict(checkpoint.values)}
+                    return dict(checkpoint.values)
+            except Exception:
+                pass
+        raise HTTPException(status_code=404, detail="Session not found")
 
     def save_state(self, session_id: str, state: dict) -> None:
-        """Overwrite the session state."""
+        """Overwrite the session state (in-memory metadata only).
+
+        The LangGraph state is persisted by the checkpointer automatically
+        during graph.invoke() — this method is kept for the thin metadata
+        layer (csv_path, charls_config, etc.) that routers need.
+        """
         if session_id not in self._sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         self._sessions[session_id]["state"] = state
@@ -130,13 +193,17 @@ class AgentFacade:
         return state
 
     def get_session_entry(self, session_id: str) -> dict:
-        """Return the raw session entry (state + csv_path etc.)."""
+        """Return the raw session entry (metadata + csv_path etc.)."""
         if session_id not in self._sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         return self._sessions[session_id]
 
     def get_csv_path(self, session_id: str) -> str:
-        """Resolve the CSV path stored for this session."""
+        """Resolve the CSV path stored for this session.
+
+        If the local file does not exist but an S3 object is available,
+        download it to the local cache transparently.
+        """
         entry = self.get_session_entry(session_id)
         csv_path = entry.get("csv_path")
         if not csv_path:
@@ -148,6 +215,23 @@ class AgentFacade:
             raise HTTPException(
                 status_code=400, detail="No dataset path in session"
             )
+
+        # 本地文件不存在时，尝试从 S3 缓存拉取
+        if not os.path.exists(csv_path) and settings.S3_ENDPOINT_URL:
+            try:
+                from storage.s3 import s3_fs as _s3_fs
+                s3_remote = f"{session_id}/data.csv"
+                if _s3_fs.exists(s3_remote):
+                    cache_dir = Path(settings.S3_CACHE_DIR)
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    local_cache = cache_dir / f"{session_id}.csv"
+                    _s3_fs.download_to_file(s3_remote, local_cache)
+                    csv_path = str(local_cache)
+                    # 更新 entry 的 csv_path 指向缓存
+                    entry["csv_path"] = csv_path
+            except Exception:
+                pass  # 降级：使用原始路径（会触发下游 404）
+
         return csv_path
 
     def set_csv_path(self, session_id: str, csv_path: str) -> None:
@@ -194,11 +278,13 @@ class AgentFacade:
             initial_state,
             config={"configurable": {"thread_id": session_id}},
         )
-        # Persist final state + csv_path on the entry (matches the legacy
-        # ``_sessions[sid] = {"state": ..., "csv_path": ...}`` shape).
+        # Persist final state + csv_path on the entry. Preserve the existing
+        # ``user_id`` if set (F10: session ownership).
+        existing = self._sessions.get(session_id, {})
         self._sessions[session_id] = {
             "state": final_state if isinstance(final_state, dict) else {},
             "csv_path": str(csv_path),
+            "user_id": existing.get("user_id"),
         }
         return self._sessions[session_id]["state"]
 
@@ -232,6 +318,7 @@ class AgentFacade:
             )
         state = self.get_state(session_id)
         state = {**state, "user_adjusted_outline": user_adjusted_outline}
+        state = {**state, "resumed": True}
         state = {**state, **generate_outline_node(state)}
         self.save_state(session_id, state)
         return state
@@ -563,6 +650,36 @@ class AgentFacade:
             "chapter_index": chapter_index,
             "next_action": next_action,
         }
+
+    # ------------------------------------------------------------------
+    # Degradation tracking (F7: 异常处理与降级 UX)
+    # ------------------------------------------------------------------
+    def record_degradation(
+        self,
+        session_id: str,
+        node: str,
+        reason: str,
+        fallback: str,
+    ) -> None:
+        """Record a degradation event for a session.
+
+        Called by cleaning nodes and other parts of the pipeline when
+        the primary method fails and a fallback is used.
+        """
+        if session_id not in self._degradations:
+            self._degradations[session_id] = []
+        from datetime import datetime, timezone
+
+        self._degradations[session_id].append({
+            "node": node,
+            "reason": reason,
+            "fallback": fallback,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    def get_degradations(self, session_id: str) -> list[dict]:
+        """Return the degradation log for a session."""
+        return self._degradations.get(session_id, [])
 
     # ------------------------------------------------------------------
     # Test helpers

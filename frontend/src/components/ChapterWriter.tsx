@@ -2,14 +2,14 @@
 // - 中栏用 CodeMirror 6 渲染流式 markdown（chunks 数组拼接）
 // - 章节类型 badge（6 色：intro=蓝 / lit_review=紫 / data_desc=绿 /
 //   methods=橙 / results=红 / conclusion=灰）
-// - status === 'generated' 显示 4 按钮：重新生成 / 回滚 / 编辑 / 通过
+// - status === 'generated' 显示 4 按钮：重新生成 / 回滚 / {t('chapter.edit')} / {t('chapter.approve')}
 // - status === 'streaming' 显示加载提示，不显示按钮
 // - 回滚下拉：点"回滚"显示版本历史（VersionHistory 组件），选择版本 → onRollback
-// - 编辑模式：点"编辑" → CodeMirror 可编辑 + 按钮变"保存"；点"保存" → onSaveEdit
+// - {t('chapter.edit')}模式：点"{t('chapter.edit')}" → CodeMirror 可{t('chapter.edit')} + 按钮变"{t('chapter.save')}"；点"{t('chapter.save')}" → onSaveEdit
 // - onApprove / onRegenerate / onRollback / onSaveEdit 回调
 //
-// HITL 简化：节点完成后由 backend interrupt() 暂停 graph，前端通过 WS 收到
-// status='generated' 后显示审批按钮，用户点"通过" → POST /approve-chapter
+// HITL 简化：节点完成后由 backend interrupt() 暂停 graph，前端{t('chapter.approve')} WS 收到
+// status='generated' 后显示审批按钮，用户点"{t('chapter.approve')}" → POST /approve-chapter
 // → graph resume 下一章。
 //
 // Stage D 修复漂移 4：删除手写 Chapter interface，改 import types/api.ts 的
@@ -18,6 +18,7 @@
 
 import { useMemo, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
+import { useT } from '../lib/i18n'
 import VersionHistory from './VersionHistory'
 import type { components } from '../types/api'
 // TODO(T-07 followup): 安装 @codemirror/lang-markdown + @codemirror/language-data
@@ -26,7 +27,7 @@ import type { components } from '../types/api'
 //   import { languages } from '@codemirror/language-data'
 // 当前 @uiw/react-codemirror 已装但 lang-markdown 未装，先用 CodeMirror
 // 纯文本模式渲染（仍是 CodeMirror 6，符合任务规格"用 CodeMirror 6 渲染流式
-// markdown"的最小要求；流式 append 通过 value prop 控制）。
+// markdown"的最小要求；流式 append {t('chapter.approve')} value prop 控制）。
 
 /** 章节类型，由 OpenAPI codegen 生成（components.schemas.ChapterResponse）。 */
 type Chapter = components['schemas']['ChapterResponse']
@@ -37,7 +38,7 @@ export interface ChapterWriterProps {
   chunks?: string[]
   onApprove?: (chapter: Chapter) => void
   onRegenerate?: (chapter: Chapter) => void
-  /** T-08c: 会话 ID（用于回滚 / 编辑 API 路径，集成阶段使用） */
+  /** T-08c: 会话 ID（用于回滚 / {t('chapter.edit')} API 路径，集成阶段使用） */
   sessionId?: string
   /** T-08c: 当前章索引 */
   chapterIndex?: number
@@ -45,7 +46,7 @@ export interface ChapterWriterProps {
   versions?: string[]
   /** T-08c: 选择版本回滚回调（集成阶段调 POST /sessions/{id}/rollback） */
   onRollback?: (versionIndex: number) => void
-  /** T-08c: 保存编辑回调（集成阶段调 POST /sessions/{id}/edit-chapter） */
+  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter） */
   onSaveEdit?: (content: string) => void
 }
 
@@ -75,9 +76,10 @@ export default function ChapterWriter({
   // sessionId, chapterIndex — 接口保留供集成阶段直接 fetch 使用，
   // 当前组件走回调模式（onRollback / onSaveEdit），不在此解构以避免未使用告警。
 }: ChapterWriterProps) {
-  // 编辑模式状态
+  const { t } = useT()
+  // {t('chapter.edit')}模式状态
   const [isEditing, setIsEditing] = useState(false)
-  // 编辑中的内容（进入编辑模式时初始化）
+  // {t('chapter.edit')}中的内容（进入{t('chapter.edit')}模式时初始化）
   const [editedContent, setEditedContent] = useState('')
   // 回滚下拉显示状态
   const [showVersions, setShowVersions] = useState(false)
@@ -93,16 +95,16 @@ export default function ChapterWriter({
   const isStreaming = chapter.status === 'streaming'
   const isGenerated = chapter.status === 'generated'
 
-  // 编辑模式显示的内容：编辑中用 editedContent，否则用 content
+  // {t('chapter.edit')}模式显示的内容：{t('chapter.edit')}中用 editedContent，否则用 content
   const displayContent = isEditing ? editedContent : content
 
-  // 进入编辑模式
+  // 进入{t('chapter.edit')}模式
   const handleEnterEdit = () => {
     setEditedContent(content)
     setIsEditing(true)
   }
 
-  // 保存编辑
+  // {t('chapter.save')}{t('chapter.edit')}
   const handleSaveEdit = () => {
     setIsEditing(false)
     onSaveEdit?.(editedContent)
@@ -149,7 +151,7 @@ export default function ChapterWriter({
           data-testid="chapter-streaming-hint"
           className="rounded bg-blue-50 p-2 text-xs text-blue-700"
         >
-          正在生成…（流式接收中）
+          {t('chapter.streaming')}
         </div>
       )}
 
@@ -162,14 +164,14 @@ export default function ChapterWriter({
               onClick={() => onRegenerate?.(chapter)}
               className="rounded border border-border px-3 py-1 text-xs"
             >
-              重新生成
+              {t('chapter.regenerate')}
             </button>
             <button
               type="button"
               onClick={() => setShowVersions((v) => !v)}
               className="rounded border border-border px-3 py-1 text-xs"
             >
-              回滚
+              {t('chapter.rollback')}
             </button>
             {isEditing ? (
               <button
@@ -177,7 +179,7 @@ export default function ChapterWriter({
                 onClick={handleSaveEdit}
                 className="rounded border border-accent px-3 py-1 text-xs text-accent"
               >
-                保存
+                {t('chapter.save')}
               </button>
             ) : (
               <button
@@ -185,7 +187,7 @@ export default function ChapterWriter({
                 onClick={handleEnterEdit}
                 className="rounded border border-border px-3 py-1 text-xs"
               >
-                编辑
+                {t('chapter.edit')}
               </button>
             )}
             <button
@@ -193,7 +195,7 @@ export default function ChapterWriter({
               onClick={() => onApprove?.(chapter)}
               className="rounded bg-accent px-3 py-1 text-xs text-white"
             >
-              通过
+              {t('chapter.approve')}
             </button>
           </div>
 

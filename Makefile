@@ -1,4 +1,5 @@
-.PHONY: dev dev-frontend dev-backend install install-frontend install-backend install-agent health test clean gen-api check-api-drift
+.PHONY: dev dev-frontend dev-backend install install-frontend install-backend install-agent health test clean gen-api check-api-drift \
+        docker-up docker-down docker-build docker-logs docker-ps docker-clean
 
 # 默认并发起 frontend + backend；Ctrl-C 同时杀掉
 dev:
@@ -53,6 +54,36 @@ verify: smoke-agent
 clean:
 	rm -rf frontend/node_modules frontend/dist backend/.venv agent/.venv
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Docker 部署（F11）
+# ---------------------------------------------------------------------------
+
+# 首次启动（构建 + 后台运行）
+docker-up:
+	@test -f .env || { echo "缺少 .env 文件，请 cp .env.docker .env 后编辑"; exit 1; }
+	docker compose up -d --build
+
+# 停止并移除容器
+docker-down:
+	docker compose down
+
+# 仅构建镜像（不启动）
+docker-build:
+	docker compose build
+
+# 查看实时日志
+docker-logs:
+	docker compose logs -f
+
+# 查看容器状态
+docker-ps:
+	docker compose ps
+
+# 清理所有 Docker 资源（数据卷 + 镜像 + 容器）
+docker-clean:
+	docker compose down -v
+	docker rmi econpaper-backend econpaper-frontend 2>/dev/null || true
 
 # Stage D: 从 backend 导出 openapi.json 并生成 frontend types/api.ts
 # 依赖：backend/.venv 已装、frontend/node_modules 已装

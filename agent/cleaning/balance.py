@@ -5,10 +5,10 @@ Detects attrition and unbalanced panels. The step report carries:
 - ``n_periods``: number of distinct time periods observed
 - ``attrition_rate``: fraction of entities present in the first period but
   absent from the last period
-
-StatsPAI ``balance_panel()`` is attempted first (per T-05 验收项); if the
-package is unavailable or rejects the frame, a pandas fallback computes the
-same metrics so the step never blocks on a missing optional dependency.
+- ``stats_pai_used``: always ``false`` — this step computes metrics from scratch
+  via pandas rather than delegating to StatsPAI (the previous attempt to call
+  ``sp.balance_panel()`` was a no-op that discarded the result, so it was
+  removed to avoid CPU waste and user confusion).
 """
 import pandas as pd
 
@@ -22,18 +22,11 @@ class BalanceStep:
 
         path = _first_path(datasets)
         if not path or not panel_id or not time_col:
-            return datasets, {"balanced": 0, "n_periods": 0, "attrition_rate": 0.0}
+            return datasets, {"balanced": 0, "n_periods": 0, "attrition_rate": 0.0, "stats_pai_used": False}
 
         df = pd.read_csv(path)
         if panel_id not in df.columns or time_col not in df.columns:
-            return datasets, {"balanced": 0, "n_periods": 0, "attrition_rate": 0.0}
-
-        try:
-            from statspai import balance_panel  # type: ignore
-
-            balance_panel(df, id=panel_id, time=time_col)
-        except Exception:
-            pass
+            return datasets, {"balanced": 0, "n_periods": 0, "attrition_rate": 0.0, "stats_pai_used": False}
 
         base = _report_from_pandas(df, panel_id, time_col)
         n_periods = int(df[time_col].nunique())
@@ -41,6 +34,7 @@ class BalanceStep:
             "balanced": base["balanced_n"],
             "n_periods": n_periods,
             "attrition_rate": base["attrition_rate"],
+            "stats_pai_used": False,
         }
 
 

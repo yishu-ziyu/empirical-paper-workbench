@@ -47,8 +47,10 @@ async def stream(ws: WebSocket, session_id: str):
         title_chapter = state.get("title_chapter") or {}
         title_content = title_chapter.get("content") or ""
 
-        # 1. Push "running" status frames for each node (no "done" yet — the
-        #    client drain helper breaks on the first done).
+        body_chapters = state.get("body_chapters", []) or []
+        resumed = state.get("resumed", False)
+
+        # 1. Push "running" status frames for each node.
         await ws.send_json(
             {"type": "status", "node": "upload_data", "status": "running"}
         )
@@ -73,18 +75,91 @@ async def stream(ws: WebSocket, session_id: str):
                 )
                 await asyncio.sleep(0.01)
 
-        # 3. Push the final "done" status (triggers the client drain to stop).
-        await ws.send_json(
-            {"type": "status", "node": "generate_title", "status": "done"}
-        )
-        await ws.send_json(
-            {
-                "type": "interrupt",
-                "chapter_id": "title",
-                "content": title_content,
-            }
-        )
+        if resumed:
+            # 3a. User already confirmed via HITL → stream chapters.
+            has_chapters = any(
+                isinstance(ch, dict) and ch.get("content")
+                for ch in body_chapters
+            )
+            if has_chapters:
+                await ws.send_json(
+                    {"type": "status", "node": "generate_outline", "status": "running"}
+                )
+                await asyncio.sleep(0.02)
+                await ws.send_json(
+                    {"type": "status", "node": "generate_outline", "status": "done"}
+                )
+
+                for idx, ch in enumerate(body_chapters):
+                    if not isinstance(ch, dict):
+                        continue
+                    chapter_type = ch.get("type", f"chapter_{idx}")
+                    chapter_content = ch.get("content", "")
+                    if not chapter_content:
+                        continue
+
+                    await ws.send_json(
+                        {
+                            "type": "status",
+                            "node": "generate_chapter",
+                            "status": "running",
+                        }
+                    )
+
+                    chunk_size = 5
+                    for i in range(0, len(chapter_content), chunk_size):
+                        chunk = chapter_content[i : i + chunk_size]
+                        await ws.send_json(
+                            {
+                                "type": "streaming_chunk",
+                                "chapter_id": chapter_type,
+                                "chunk": chunk,
+                            }
+                        )
+                        await asyncio.sleep(0.01)
+
+                    await ws.send_json(
+                        {
+                            "type": "status",
+                            "node": "generate_chapter",
+                            "status": "done",
+                        }
+                    )
+
+                await ws.send_json(
+                    {"type": "status", "node": "export_docx", "status": "done"}
+                )
+            else:
+                await ws.send_json(
+                    {"type": "status", "node": "generate_title", "status": "done"}
+                )
+        else:
+            # 3b. First connection → send interrupt (HITL pause).
+            await ws.send_json(
+                {"type": "status", "node": "generate_title", "status": "done"}
+            )
+            await ws.send_json(
+                {
+                    "type": "interrupt",
+                    "chapter_id": "title",
+                    "content": title_content,
+                }
+            )
     except Exception as exc:  # pragma: no cover - defensive
-        await ws.send_json({"type": "error", "message": str(exc)})
+        try:
+            await ws.send_json({"type": "error", "message": str(exc)})
+        except Exception:
+            pass
     finally:
-        await ws.close()
+        # Keep the WebSocket alive until the client disconnects.
+        # This prevents the frontend from immediately showing "disconnected"
+        # before it has processed all streamed messages.
+        try:
+            while True:
+                await ws.receive_text()
+        except Exception:
+            pass
+        try:
+            await ws.close()
+        except Exception:
+            pass

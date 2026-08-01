@@ -12,6 +12,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ReviewPanel, { type ReviewPanelProps } from '../ReviewPanel'
 import type { components } from '../../types/api'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderWithI18n(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 type ReviewInfoResponse = components['schemas']['ReviewInfoResponse']
 
@@ -64,7 +69,7 @@ describe('ReviewPanel 人工评审面板', () => {
   })
 
   test('渲染 5 维 rubric 条形图', () => {
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     const dims = ['endogeneity', 'identification', 'robustness', 'contribution', 'readability']
     dims.forEach((dim) => {
       expect(screen.getByTestId(`rubric-dim-${dim}`)).toBeInTheDocument()
@@ -72,7 +77,7 @@ describe('ReviewPanel 人工评审面板', () => {
   })
 
   test('渲染 rubric 中文标签', () => {
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     expect(screen.getByText('内生性')).toBeInTheDocument()
     expect(screen.getByText('识别策略')).toBeInTheDocument()
     expect(screen.getByText('稳健性')).toBeInTheDocument()
@@ -81,31 +86,31 @@ describe('ReviewPanel 人工评审面板', () => {
   })
 
   test('渲染评审反馈和修改建议', () => {
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     expect(screen.getByText('章节质量良好，内生性处理得当。')).toBeInTheDocument()
     expect(screen.getByText('建议补充稳健性检验。')).toBeInTheDocument()
   })
 
   test('渲染自动决策标签 pass', () => {
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     const badge = screen.getByTestId('review-auto-decision')
     expect(badge.textContent).toContain('自动通过')
   })
 
   test('渲染自动决策标签 fail', () => {
-    render(<ReviewPanel {...baseProps} review={failReview} />)
+    renderWithI18n(<ReviewPanel {...baseProps} review={failReview} />)
     const badge = screen.getByTestId('review-auto-decision')
     expect(badge.textContent).toContain('自动不通过')
   })
 
   test('auto_decision=pass 时强制通过按钮禁用', () => {
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     const forcePassBtn = screen.getByTestId('review-btn-force-pass')
     expect(forcePassBtn).toBeDisabled()
   })
 
   test('auto_decision=fail 时强制通过按钮可用', () => {
-    render(<ReviewPanel {...baseProps} review={failReview} />)
+    renderWithI18n(<ReviewPanel {...baseProps} review={failReview} />)
     const forcePassBtn = screen.getByTestId('review-btn-force-pass')
     expect(forcePassBtn).not.toBeDisabled()
   })
@@ -119,7 +124,7 @@ describe('ReviewPanel 人工评审面板', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<ReviewPanel {...baseProps} onDecision={onDecision} />)
+    renderWithI18n(<ReviewPanel {...baseProps} onDecision={onDecision} />)
     await user.click(screen.getByTestId('review-btn-accept'))
 
     await waitFor(() => {
@@ -140,7 +145,7 @@ describe('ReviewPanel 人工评审面板', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<ReviewPanel {...baseProps} onDecision={onDecision} />)
+    renderWithI18n(<ReviewPanel {...baseProps} onDecision={onDecision} />)
     await user.click(screen.getByTestId('review-btn-reject'))
 
     await waitFor(() => {
@@ -157,7 +162,7 @@ describe('ReviewPanel 人工评审面板', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<ReviewPanel {...baseProps} review={failReview} onDecision={onDecision} />)
+    renderWithI18n(<ReviewPanel {...baseProps} review={failReview} onDecision={onDecision} />)
     await user.click(screen.getByTestId('review-btn-force-pass'))
 
     await waitFor(() => {
@@ -174,7 +179,7 @@ describe('ReviewPanel 人工评审面板', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    render(<ReviewPanel {...baseProps} />)
+    renderWithI18n(<ReviewPanel {...baseProps} />)
     await user.click(screen.getByTestId('review-btn-accept'))
 
     await waitFor(() => {
@@ -194,7 +199,7 @@ describe('ReviewPanel 人工评审面板', () => {
       max_review_iterations: 2,
       auto_decision: 'fail',
     }
-    render(<ReviewPanel {...baseProps} review={emptyReview} />)
+    renderWithI18n(<ReviewPanel {...baseProps} review={emptyReview} />)
     expect(screen.getByText('暂无评审反馈')).toBeInTheDocument()
     expect(screen.getByText('暂无修改建议')).toBeInTheDocument()
   })

@@ -2,111 +2,142 @@
 
 > 中文原生 + 极致章节交互 + LaTeX/Word 兼容的经济学论文 AI 协作工具
 
-Web SaaS 产品。用户上传真实数据集（CHARLS/CFPS/CGSS 或 CSV/Excel/JSON/Parquet），通过 LangGraph 编排的 Agent 章节式生成实证论文，每章暂停等用户反馈，最终输出 LaTeX 源码 + Pandoc 转换的 Word + 可复现的 Python/Stata/R/EViews 代码。
+**econpaper 让经济学研究者专注于研究本身，而非写作细节。** 上传真实数据集（CSV/CHARLS），通过对话式交互设定研究方向，AI 自动生成完整的实证经济学论文，包含 LaTeX 源码、PDF、Word 文档和可复现的分析代码。
 
-完整设计见 [docs/specs/copaper-pivot-v1.md](docs/specs/copaper-pivot-v1.md)。
+## 核心功能
 
-## 仓库结构
+- **对话式论文生成**：上传 CSV → 设定方向 → 逐章生成 → 导出论文，全程无需写代码
+- **章节式交互**：6 章标准论文结构（引言、文献综述、数据描述、实证方法、实证结果、结论），每章暂停等你审阅
+- **HITL 评审**：AI 自动 5 维评审（内生性、识别策略、稳健性、贡献、可读性）+ 人工决策
+- **多格式导出**：LaTeX（4 套模板）/ PDF / Word / 分析代码（Python / Stata / R / EViews）
+- **CHARLS 原生支持**：自动检测 CHARLS 数据集，提供变量名映射向导
+- **8 步数据清洗**：profiling → 合并 → 缺失值 → 异常值 → 变量构造 → 筛选 → 平衡性 → 留痕
 
-```
-econpaper/
-├── frontend/      # Vite + React 18 + react-router + Tailwind + tremor + motion
-├── backend/       # FastAPI + uvicorn + LangGraph
-├── agent/         # LangGraph graph 定义 + 节点实现
-└── docs/          # spec + ADRs
-```
+## 快速开始
 
-上游依赖（workspace 同级目录，editable install）：
-
-- `../StatsPAI/` — 38 种计量方法统一入口 `sp.causal.<method>()`
-- `../Auto-Empirical-Research-Skills/` (AERS) — prompt/skill 库（不 pip install）
-- `../stata-code/` — Python → Stata/R/EViews 代码翻译引擎
-
-## 启动开发环境
-
-### 1. 装依赖（一次性）
+### 开发环境
 
 ```bash
+# 1. 装依赖（一次性）
 make install
-```
 
-等价于：
-
-```bash
-# frontend
-cd frontend && npm install
-
-# backend (含上游 editable 包)
-cd backend && python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-pip install -e ../StatsPAI
-pip install -e ../stata-code  # 若存在 setup.py / pyproject.toml
-
-# agent
-cd agent && python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-```
-
-> **注意**：上游 `StatsPAI` / `stata-code` 仓库需已 clone 到 `/Users/mahaoxuan/Desktop/经济学论文/` 同级目录。Python 需 ≥ 3.10（numpy 2.1 要求）。
-
-### 2. 起开发服务器
-
-```bash
+# 2. 启动开发服务器
 make dev
 ```
 
-后台并发起：
-
-- **Frontend** — Vite dev server，<http://localhost:5173>
-- **Backend** — FastAPI uvicorn (reload 模式)，<http://localhost:8000>
-
-单独起某一个：
+启动后：
+- **前端**：<http://localhost:5173>
+- **后端 API**：<http://localhost:8000>
+- **API 文档**：<http://localhost:8000/docs>
 
 ```bash
-make dev-frontend
-make dev-backend
-```
-
-### 3. 验证
-
-```bash
-# backend 健康检查
-curl http://localhost:8000/health
-# 期望：{"status":"ok"}
-
-# agent graph 冒烟测试
-make smoke-agent
-# 期望：graph ok: <_Graph object at ...>
-
-# 一键全栈验证
+# 3. 验证
 make verify
 ```
 
-## 常用命令
+### Docker 部署（生产环境）
+
+```bash
+# 1. 从模板创建环境变量文件并编辑
+cp .env.docker .env
+# 编辑 .env：至少设置 LLM_API_KEY 和 JWT_SECRET_KEY
+
+# 2. 构建并启动
+make docker-up
+
+# 3. 访问
+# 前端：http://localhost
+# API 文档：http://localhost/docs
+```
+
+## 技术栈
+
+| 层 | 技术 |
+|------|------|
+| 前端 | Vite + React 18 + TypeScript + Tailwind + tremor + motion |
+| 后端 | FastAPI + uvicorn（reload 模式）|
+| Agent 框架 | LangGraph（Hybrid 架构） + PostgresSaver |
+| 计量引擎 | StatsPAI（38 种方法统一入口 `sp.causal.<method>()`）|
+| 代码翻译 | stata-code（Python → Stata / R / EViews）|
+| 排版 | LaTeX + Pandoc（一键转 Word）|
+| 数据库 | PostgreSQL 16+（checkpoint 持久化）|
+
+## 项目结构
+
+```
+econpaper/
+├── frontend/         # Vite + React 18 前端应用
+│   ├── src/
+│   │   ├── components/   # UI 组件（三栏布局、编辑器、向导等）
+│   │   ├── lib/          # WebSocket 客户端
+│   │   └── types/        # OpenAPI 生成的类型定义
+│   └── ...
+├── backend/          # FastAPI + uvicorn 后端服务
+│   ├── routers/        # 11 个路由模块
+│   ├── schemas/        # Pydantic 响应模型
+│   ├── services/       # 业务逻辑
+│   └── facade.py       # AgentFacade（路由层与 Agent 层的契约边界）
+├── agent/            # LangGraph graph 定义 + 13 个节点实现
+│   ├── nodes/          # upload_data, clean_data, generate_chapter 等
+│   ├── cleaning/       # 8 步数据清洗流程
+│   ├── prompts/        # 6 章模板 prompt
+│   ├── llm/            # LLM 路由（多提供商支持）
+│   └── templates/      # 4 套 LaTeX 模板
+└── docs/             # 文档
+    ├── api/            # API 文档（OpenAPI 规范 + 端点说明）
+    ├── adr/            # 架构决策记录（7 个 ADR）
+    ├── specs/          # 产品规格
+    ├── user-guide.md   # 用户手册
+    └── deployment.md   # 部署文档
+```
+
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [API 文档](docs/api/README.md) | 完整端点列表、请求/响应格式、WebSocket 协议、curl 示例 |
+| [用户手册](docs/user-guide.md) | 快速开始教程、功能导览、FAQ |
+| [部署文档](docs/deployment.md) | 环境要求、安装步骤、配置表、故障排查 |
+| [OpenAPI 规范](docs/api/openapi.json) | OpenAPI 3.1 完整规范（25 个端点） |
+| [架构决策记录](docs/adr/) | 7 个 ADR 覆盖关键设计决策 |
+
+## 开发命令
 
 | 命令 | 作用 |
-|---|---|
+|------|------|
 | `make dev` | 并发起 frontend + backend |
-| `make install` | 装齐 frontend + backend + agent 依赖 |
+| `make install` | 装齐所有依赖 |
 | `make verify` | 三件套冒烟检查 |
-| `make smoke-agent` | agent graph 可 import 验证 |
-| `make health` | backend /health 端点 |
-| `make test` | 跑测试套件（占位） |
-| `make clean` | 清 node_modules / .venv / __pycache__ |
+| `make smoke-agent` | Agent graph 可 import 验证 |
+| `make health` | 后端 /health 端点检查 |
+| `make test` | 运行测试套件 |
+| `make clean` | 清空依赖和缓存 |
+| `make gen-api` | 导出 OpenAPI schema + 生成前端类型 |
+| `make docker-up` | Docker Compose 构建并启动 |
+| `make docker-down` | Docker Compose 停止服务 |
+| `make docker-logs` | 查看容器实时日志 |
+| `make docker-ps` | 查看容器状态 |
+| `make docker-clean` | 清理所有 Docker 资源（含数据卷） |
 
-## 开发约定
+## 上游依赖
 
-- **Agent 框架**：LangGraph（Hybrid 架构），graph 编排 + 节点内 ReAct loop
-- **HITL**：LangGraph `interrupt()` + `Command(resume=...)`
-- **Checkpointer**：开发 `InMemorySaver`，生产 `PostgresSaver`
-- **测试 seam**：graph 整体行为（pytest）+ 前端三栏交互（Playwright + Vitest）
-- **提交前**：`make verify` 必须 all green
+| 仓库 | 说明 |
+|------|------|
+| [StatsPAI](https://github.com/yishu-ziyu/StatsPAI) | 38 种计量方法统一入口（private fork） |
+| [AERS](https://github.com/yishu-ziyu/Auto-Empirical-Research-Skills) | prompt/skill 库（不 pip install） |
+| [stata-code](https://github.com/yishu-ziyu/stata-code) | Python → Stata/R/EViews 代码翻译引擎 |
 
-## 状态
+需与 `econpaper/` 同级目录，`make install` 自动 pip install -e。
 
-- **当前 ticket**：T-01 Workspace bootstrap（本 README + Makefile 即其交付物之一）
-- **下一步**：T-02..T-11 tracer-bullet tickets，见 [.scratch/copaper-pivot-v1/issues/](.scratch/copaper-pivot-v1/issues/)
+## 当前状态
 
-## 上游贡献策略
+- **后端**：23 个路由端点，全部通过测试
+- **Agent**：13 节点 LangGraph，342 个测试通过
+- **前端**：20 个 UI 组件，132 个测试通过
+- **数据清洗**：8 子步骤完整实现，HITL 暂停点
+- **持久化**：PostgresSaver checkpoint 已上线
+- **下一步**：用户体系、部署配置、CI/CD
 
-StatsPAI / AERS / stata-code 三仓 private fork，**不 push 回上游**，仅本地加中文扩展 skill。同步上游走本地 rebase，不破坏 fork commit history。
+## 许可
+
+MIT

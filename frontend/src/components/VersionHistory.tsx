@@ -1,3 +1,5 @@
+import { useT } from '../lib/i18n'
+
 // 版本历史下拉 (T-08c)
 // - 显示所有版本列表（版本索引 + 前 50 字预览）
 // - 当前版本高亮（accent）
@@ -22,6 +24,7 @@ export default function VersionHistory({
   onSelectVersion,
   currentVersionIndex,
 }: VersionHistoryProps) {
+  const { t } = useT()
   return (
     <div
       data-testid="version-history"
@@ -29,7 +32,7 @@ export default function VersionHistory({
     >
       {versions.length === 0 ? (
         <div className="p-3 text-center font-serif text-xs text-muted">
-          暂无版本
+          {t('version.empty')}
         </div>
       ) : (
         <ul className="divide-y divide-border">
@@ -52,8 +55,8 @@ export default function VersionHistory({
                       isCurrent ? 'text-accent' : 'text-ink'
                     }`}
                   >
-                    版本 {idx}
-                    {isCurrent && '（当前）'}
+                    {t('version.label')} {idx}
+                    {isCurrent && t('version.current')}
                   </span>
                   <span className="text-muted line-clamp-2">{preview(ver)}</span>
                 </button>

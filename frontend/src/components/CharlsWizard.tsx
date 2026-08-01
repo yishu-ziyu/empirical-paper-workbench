@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useT } from '../lib/i18n'
 
 /**
  * CHARLS dataset native wizard (T-11).
@@ -57,6 +58,7 @@ export default function CharlsWizard({
   onConfirm,
   onClose,
 }: CharlsWizardProps) {
+  const { t } = useT()
   // Variable mapping: editable copy of config.variable_mapping.
   const [mapping, setMapping] = useState<Record<string, string>>({})
   // Selected waves: initialized from config.default_waves.
@@ -116,14 +118,14 @@ export default function CharlsWizard({
       <div className="max-h-[90vh] w-[min(720px,90vw)] overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <header className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
-            检测到 CHARLS 数据集
+            {t('charls.title')}
           </h2>
           <button
             data-testid="charls-cancel-btn"
             onClick={onClose}
             className="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
           >
-            取消
+            {t('charls.cancel')}
           </button>
         </header>
 
@@ -132,13 +134,13 @@ export default function CharlsWizard({
           data-testid="variable-mapping-table"
           className="mb-6 rounded border border-gray-200 p-3"
         >
-          <h3 className="mb-2 text-sm font-semibold">变量映射（可编辑）</h3>
+          <h3 className="mb-2 text-sm font-semibold">{t('charls.mapping')}</h3>
           <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b text-left">
-                  <th className="py-1 pr-2">原始变量</th>
-                  <th className="py-1">可读变量名</th>
+                  <th className="py-1 pr-2">{t('charls.originalVar')}</th>
+                  <th className="py-1">{t('charls.readableVar')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,7 +174,7 @@ export default function CharlsWizard({
           data-testid="waves-section"
           className="mb-6 rounded border border-gray-200 p-3"
         >
-          <h3 className="mb-2 text-sm font-semibold">调查波次</h3>
+          <h3 className="mb-2 text-sm font-semibold">{t('charls.waves')}</h3>
           <div className="flex flex-wrap gap-3">
             {config.waves.map((wave) => {
               const checked = selectedWaves.includes(wave)
@@ -199,7 +201,7 @@ export default function CharlsWizard({
           data-testid="filter-presets-section"
           className="mb-6 rounded border border-gray-200 p-3"
         >
-          <h3 className="mb-2 text-sm font-semibold">筛选预设</h3>
+          <h3 className="mb-2 text-sm font-semibold">{t('charls.presets')}</h3>
           <div className="flex flex-wrap gap-2">
             {config.filter_presets.map((preset) => {
               const active = appliedPresets.includes(preset.name)
@@ -228,7 +230,7 @@ export default function CharlsWizard({
             onClick={handleConfirm}
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            确认
+            {t('charls.confirm')}
           </button>
         </footer>
       </div>

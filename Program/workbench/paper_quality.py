@@ -29,7 +29,16 @@ SECTION_ALIASES = {
     "Literature and Contribution": ["literature", "contribution", "文献", "贡献"],
     "Institutional Background / Theory / Context": ["background", "theory", "context", "背景", "理论", "制度"],
     "Data and Measurement": ["data", "measurement", "变量", "数据"],
-    "Empirical Strategy": ["empirical strategy", "identification", "research design", "识别", "实证策略", "研究设计"],
+    "Empirical Strategy": [
+        "empirical strategy",
+        "identification",
+        "research design",
+        "识别",
+        "实证策略",
+        "研究设计",
+        "估计策略",
+        "方法",  # Chinese method section heading (course papers)
+    ],
     "Main Results": ["results", "main results", "结果", "主结果"],
     "Robustness / Mechanisms / Heterogeneity": ["robustness", "mechanism", "heterogeneity", "稳健", "机制", "异质"],
     "Conclusion": ["conclusion", "结论"],
@@ -252,23 +261,36 @@ def build_format_checks(text: str, profile: str) -> dict[str, Any]:
 
 
 def extract_section_body(text: str, section: str) -> str:
+    """Extract body under a section heading, including subsections.
+
+    Stops only when a heading of equal or higher level appears (e.g. ## stops
+    at next ## or #, but keeps ### content). Older logic stopped at any `#`,
+    which zeroed length for sections that open with ### subheads.
+    """
     aliases = SECTION_ALIASES[section]
     lines = text.splitlines()
     start: int | None = None
+    start_level = 2
     for index, line in enumerate(lines):
         stripped = line.strip()
         if not stripped.startswith("#"):
             continue
+        hashes = len(stripped) - len(stripped.lstrip("#"))
         heading = stripped.lstrip("#").strip().lower()
         if any(alias in heading for alias in aliases):
             start = index + 1
+            start_level = max(1, hashes)
             break
     if start is None:
         return ""
     body: list[str] = []
     for line in lines[start:]:
-        if line.strip().startswith("#"):
-            break
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            hashes = len(stripped) - len(stripped.lstrip("#"))
+            # only peer/parent headings end the section
+            if hashes <= start_level:
+                break
         body.append(line)
     return "\n".join(body).strip()
 
@@ -546,13 +568,14 @@ def build_evidence_integrity_checks(
             }
         )
 
-    method = str(
-        results_payload.get("method")
-        or design_payload.get("method")
-        or design_payload.get("recommended")
-        or ""
-    ).upper()
-    if method == "IV" and not has_iv_diagnostics(results_payload):
+    # Prefer the estimator actually executed for this package over a stale
+    # design "recommended" that may still say IV while the run is OLS-only.
+    method = resolve_active_method(results_payload, design_payload)
+    paper_claims_iv = bool(
+        re.search(r"\b(2SLS|IV\s*估计|工具变量|LATE)\b", draft_text, flags=re.IGNORECASE)
+    ) and not re.search(r"不是因果|非因果|不允许.*LATE|禁止.*因果", draft_text[:4000])
+
+    if method == "IV" and paper_claims_iv and not has_iv_diagnostics(results_payload):
         issues.append(
             {
                 "severity": "Critical",
@@ -561,12 +584,13 @@ def build_evidence_integrity_checks(
                 "evidence": {
                     "results_path": str(results_path) if results_path else None,
                     "design_path": str(design_path) if design_path else None,
+                    "resolved_method": method,
                 },
                 "fix": "补充 first_stage / weak_iv / Anderson-Rubin 或明确降级为设计草案。",
             }
         )
 
-    if method == "IV" and not defines_iv_strategy(design_payload):
+    if method == "IV" and paper_claims_iv and not defines_iv_strategy(design_payload):
         issues.append(
             {
                 "severity": "Major",
@@ -575,6 +599,7 @@ def build_evidence_integrity_checks(
                 "evidence": {
                     "design_path": str(design_path) if design_path else None,
                     "available_top_level_keys": sorted(design_payload.keys()),
+                    "resolved_method": method,
                 },
                 "fix": "在 DesignSpec 中补齐 treatment / outcome / instrument / unit_of_analysis / causal_graph。",
             }
@@ -663,6 +688,8 @@ def artifact_prefixes_for_draft(project_root: Path, draft_path: Path | None) -> 
         prefixes.append(parts[1])
     stem = draft_path.stem
     suffixes = [
+        "_full_pipeline_paper",
+        "_loop_paper",
         "_paper_draft",
         "_working_paper",
         "_manuscript",
@@ -671,7 +698,11 @@ def artifact_prefixes_for_draft(project_root: Path, draft_path: Path | None) -> 
     ]
     for suffix in suffixes:
         if stem.endswith(suffix):
-            prefixes.append(stem[: -len(suffix)])
+            base = stem[: -len(suffix)]
+            prefixes.append(base)
+            # parent_education_wage_full_pipeline → also parent_education_wage
+            if base.endswith("_full_pipeline"):
+                prefixes.append(base[: -len("_full_pipeline")])
             break
     prefixes.append(stem)
     return unique_nonempty(prefixes)
@@ -682,6 +713,9 @@ def prefixed_results_candidates(project_root: Path, draft_path: Path | None) -> 
     for prefix in artifact_prefixes_for_draft(project_root, draft_path):
         candidates.extend(
             [
+                # Continuous Empirical Loop / full_pipeline first
+                project_root / "Results" / "json" / f"{prefix}_full_pipeline_main_results.json",
+                project_root / "Results" / "json" / f"{prefix}_main_results.json",
                 project_root / "Results" / "json" / f"{prefix}_results_evidence_package.json",
                 project_root / "Results" / "json" / f"{prefix}_method_execution_result.json",
                 project_root / "Results" / "json" / f"{prefix}_regression_tables.json",
@@ -786,8 +820,67 @@ def has_main_result_table(payload: dict[str, Any]) -> bool:
         "primary_result",
         "result_number_bindings",
         "source_artifacts",
+        # full_pipeline main results shape
+        "coefficients",
     }
-    return any(key in payload and bool(payload.get(key)) for key in keys)
+    if any(key in payload and bool(payload.get(key)) for key in keys):
+        return True
+    # OLS association package: formula + nobs is enough to bind a main table
+    if payload.get("formula") and payload.get("nobs") is not None:
+        return True
+    return False
+
+
+def resolve_active_method(
+    results_payload: dict[str, Any],
+    design_payload: dict[str, Any],
+) -> str:
+    """Resolve the method that the integrity gate should enforce.
+
+    Stale Tasks/*/design.json may still recommend IV while Continuous Loop
+    packages only run OLS with causal_claim_allowed=false. Prefer executed
+    estimator / explicit association packages over design wishlist.
+    """
+    if not isinstance(results_payload, dict):
+        results_payload = {}
+    if not isinstance(design_payload, dict):
+        design_payload = {}
+
+    # Explicit non-causal package wins
+    if results_payload.get("causal_claim_allowed") is False:
+        est = str(results_payload.get("estimator") or "OLS").upper()
+        return est if est else "OLS"
+
+    for key in ("estimator", "method", "cov_type"):
+        raw = results_payload.get(key)
+        if isinstance(raw, str) and raw.strip():
+            up = raw.strip().upper()
+            if up in {"OLS", "WLS", "GLS", "IV", "2SLS", "DID", "RDD", "RD"}:
+                return "IV" if up in {"2SLS"} else up
+            if "OLS" in up:
+                return "OLS"
+            if "IV" in up or "2SLS" in up:
+                return "IV"
+
+    methods = results_payload.get("methods")
+    if isinstance(methods, list) and methods:
+        joined = " ".join(str(m) for m in methods).upper()
+        if "IV" in joined or "2SLS" in joined:
+            return "IV"
+        if "OLS" in joined:
+            return "OLS"
+
+    for key in ("method", "recommended"):
+        raw = design_payload.get(key)
+        if isinstance(raw, str) and raw.strip():
+            up = raw.strip().upper()
+            if up in {"OLS", "IV", "2SLS", "DID", "RDD"}:
+                return "IV" if up == "2SLS" else up
+            if "IV" in up:
+                return "IV"
+            if "OLS" in up:
+                return "OLS"
+    return ""
 
 
 def has_iv_diagnostics(payload: dict[str, Any]) -> bool:

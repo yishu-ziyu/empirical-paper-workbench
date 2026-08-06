@@ -22,8 +22,12 @@ from typing import Any, Iterator
 from urllib import error, request
 from urllib.parse import urlparse
 
-DEFAULT_PROVIDER = "openrouter"
+# Product + local dev default: Grok 4.5 (xAI Grok CLI session or XAI_API_KEY).
+DEFAULT_PROVIDER = "grok"
+DEFAULT_GROK_MODEL = "grok-4.5"
 DEFAULT_TIMEOUT = 120
+DEFAULT_GROK_CLI_PROXY = "https://cli-chat-proxy.grok.com/v1"
+DEFAULT_XAI_API = "https://api.x.ai/v1"
 
 
 @dataclass(frozen=True)
@@ -176,6 +180,33 @@ PROVIDER_PRESETS: dict[str, ProviderPreset] = {
             "Official docs: https://platform.minimax.io/docs/api-reference/text-anthropic-api"
         ),
     ),
+    "grok": ProviderPreset(
+        id="grok",
+        name="Grok 4.5 (xAI Grok CLI session / proxy)",
+        api_type="openai-compatible",
+        # Local Grok Build / Grok CLI session token → cli-chat-proxy (model id grok-4.5).
+        # Requires x-grok-client-version header (see _grok_extra_headers).
+        base_url=os.getenv("GROK_BASE_URL", DEFAULT_GROK_CLI_PROXY),
+        default_model=os.getenv("GROK_MODEL", DEFAULT_GROK_MODEL),
+        models=(DEFAULT_GROK_MODEL, "grok-4.5-build", "grok-4", "grok-3"),
+        api_key_env="GROK_API_KEY",
+        doc=(
+            "Preferred product + dev LLM. OpenAI-compatible chat/completions. "
+            "Auth: GROK_API_KEY or XAI_API_KEY, else auto-load ~/.grok/auth.json session key. "
+            "Default base: https://cli-chat-proxy.grok.com/v1 (Grok CLI proxy). "
+            "Default model: grok-4.5. Client version header from ~/.grok/version.json."
+        ),
+    ),
+    "xai": ProviderPreset(
+        id="xai",
+        name="xAI API (official)",
+        api_type="openai-compatible",
+        base_url=os.getenv("XAI_BASE_URL", DEFAULT_XAI_API),
+        default_model=os.getenv("XAI_MODEL", DEFAULT_GROK_MODEL),
+        models=(DEFAULT_GROK_MODEL, "grok-4", "grok-3", "grok-3-mini"),
+        api_key_env="XAI_API_KEY",
+        doc="Official xAI API https://api.x.ai/v1. Prefer provider_id=grok for Grok CLI session.",
+    ),
 }
 
 MODEL_ENV_BY_PROVIDER = {
@@ -184,6 +215,8 @@ MODEL_ENV_BY_PROVIDER = {
     "deepseek": "DEEPSEEK_MODEL",
     "mimo": "MIMO_MODEL",
     "minimax": "MINIMAX_MODEL",
+    "grok": "GROK_MODEL",
+    "xai": "XAI_MODEL",
     "openrouter": "OPENROUTER_MODEL",
     "moonshot-kimi": "MOONSHOT_MODEL",
     "kimi-code": "KIMI_CODE_MODEL",
@@ -197,6 +230,8 @@ BASE_URL_ENV_BY_PROVIDER = {
     "deepseek": "DEEPSEEK_BASE_URL",
     "mimo": "MIMO_BASE_URL",
     "minimax": "MINIMAX_BASE_URL",
+    "grok": "GROK_BASE_URL",
+    "xai": "XAI_BASE_URL",
     "openrouter": "OPENROUTER_BASE_URL",
     "moonshot-kimi": "MOONSHOT_BASE_URL",
     "kimi-code": "KIMI_CODE_BASE_URL",
@@ -204,6 +239,8 @@ BASE_URL_ENV_BY_PROVIDER = {
 }
 
 PROVIDER_ATTEMPT_ORDER = (
+    "grok",
+    "xai",
     "codex-cli",
     "openai",
     "stepfun",
@@ -224,8 +261,78 @@ class LLMError(RuntimeError):
 
 
 def resolve_provider(provider_id: str | None) -> ProviderPreset:
-    key = (provider_id or DEFAULT_PROVIDER).strip() or DEFAULT_PROVIDER
+    raw = (provider_id or os.getenv("EMPIRICAL_LLM_PROVIDER") or DEFAULT_PROVIDER).strip()
+    key = raw or DEFAULT_PROVIDER
+    # Aliases
+    if key in {"grok-4.5", "grok45", "grok4.5"}:
+        key = "grok"
     return PROVIDER_PRESETS.get(key, PROVIDER_PRESETS[DEFAULT_PROVIDER])
+
+
+def _grok_client_version() -> str:
+    env_v = os.getenv("GROK_CLIENT_VERSION", "").strip()
+    if env_v:
+        return env_v
+    version_path = Path.home() / ".grok" / "version.json"
+    if version_path.exists():
+        try:
+            data = json.loads(version_path.read_text(encoding="utf-8"))
+            v = str(data.get("version") or "").strip()
+            if v:
+                return v
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+    return "0.2.118"
+
+
+def load_grok_session_key() -> str | None:
+    """Load Grok CLI OAuth session token from ~/.grok/auth.json (no secret logging)."""
+    auth_path = Path(os.getenv("GROK_AUTH_PATH", "").strip() or Path.home() / ".grok" / "auth.json").expanduser()
+    if not auth_path.exists():
+        return None
+    try:
+        data = json.loads(auth_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    # Prefer non-expired entries if expires_at present
+    candidates: list[tuple[str, str]] = []
+    for _k, v in data.items():
+        if not isinstance(v, dict):
+            continue
+        key = str(v.get("key") or "").strip()
+        if not key:
+            continue
+        expires = str(v.get("expires_at") or "")
+        candidates.append((expires, key))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1]
+
+
+def resolve_grok_api_key(explicit: str | None = None) -> str:
+    """GROK_API_KEY / XAI_API_KEY / ~/.grok/auth.json session."""
+    for value in (
+        (explicit or "").strip(),
+        os.getenv("GROK_API_KEY", "").strip(),
+        os.getenv("XAI_API_KEY", "").strip(),
+    ):
+        if value:
+            return value
+    session = load_grok_session_key()
+    return session or ""
+
+
+def _grok_extra_headers() -> dict[str, str]:
+    """cli-chat-proxy requires x-grok-client-version or returns HTTP 426."""
+    ver = _grok_client_version()
+    return {
+        "User-Agent": f"GrokCLI/{ver}",
+        "x-grok-client-version": ver,
+        "x-grok-client-mode": os.getenv("GROK_CLIENT_MODE", "chat").strip() or "chat",
+    }
 
 
 def load_local_env_if_present(start: Path | None = None) -> None:
@@ -278,11 +385,17 @@ def _provider_default_base_url(preset: ProviderPreset) -> str:
 def _provider_has_key(provider_id: str, preset: ProviderPreset) -> bool:
     if provider_id == "codex-cli":
         return os.getenv("EMPIRICAL_WORKFLOW_ENABLE_CODEX_EXEC") == "1" and bool(probe_codex_login().get("ready"))
+    if provider_id in {"grok", "xai"}:
+        return bool(resolve_grok_api_key())
     if not preset.requires_api_key:
         return True
     if preset.api_key_env and os.getenv(preset.api_key_env, "").strip():
         return True
-    return provider_id == "minimax" and bool(os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip())
+    if provider_id == "minimax" and bool(os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip()):
+        return True
+    if provider_id == "xai" and bool(os.getenv("GROK_API_KEY", "").strip()):
+        return True
+    return False
 
 
 def _codex_bin() -> str:
@@ -487,6 +600,7 @@ def _call_openai_compatible(
     temperature: float,
     provider_name: str,
     timeout_seconds: int = DEFAULT_TIMEOUT,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[str, dict[str, int]]:
     payload: dict[str, Any] = {
         "model": model,
@@ -499,6 +613,8 @@ def _call_openai_compatible(
     }
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    if extra_headers:
+        headers.update(extra_headers)
 
     req = request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -635,6 +751,7 @@ def _build_openai_stream_request(
     messages: list[dict[str, str]],
     temperature: float,
     max_tokens: int,
+    extra_headers: dict[str, str] | None = None,
 ) -> request.Request:
     payload: dict[str, Any] = {
         "model": model,
@@ -649,6 +766,8 @@ def _build_openai_stream_request(
     }
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    if extra_headers:
+        headers.update(extra_headers)
 
     return request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -814,10 +933,17 @@ def chat_completion(
         LLMError: On provider error, auth failure, or network issue.
     """
     load_local_env_if_present()
+    # Default product model preference when caller omits provider
+    if not provider_id:
+        provider_id = os.getenv("EMPIRICAL_LLM_PROVIDER") or DEFAULT_PROVIDER
+    if not model:
+        model = os.getenv("EMPIRICAL_LLM_MODEL") or None
     preset = resolve_provider(provider_id)
 
     # Resolve API key: explicit > primary env var > alias env vars > empty
     resolved_key = (api_key or "").strip()
+    if not resolved_key and preset.id in {"grok", "xai"}:
+        resolved_key = resolve_grok_api_key()
     if not resolved_key and preset.api_key_env:
         resolved_key = os.getenv(preset.api_key_env, "").strip()
     # Backward-compat alias: MINIMAX_TOKEN_PLAN_KEY (old name) → MINIMAX_API_KEY (new)
@@ -825,17 +951,34 @@ def chat_completion(
         resolved_key = os.getenv("MINIMAX_TOKEN_PLAN_KEY", "").strip()
 
     if preset.requires_api_key and not resolved_key:
+        if preset.id in {"grok", "xai"}:
+            raise LLMError(
+                "missing_api_key",
+                f"{preset.name} requires GROK_API_KEY / XAI_API_KEY or a logged-in Grok CLI session (~/.grok/auth.json). "
+                "Run `grok login` if using session auth.",
+            )
         raise LLMError("missing_api_key", f"{preset.name} requires API key. Set env var {preset.api_key_env} or pass api_key.")
 
     # Resolve model
     selected_model = (model or _provider_default_model(preset)).strip()
     if not selected_model:
         raise LLMError("missing_model", f"{preset.name} model is required.")
+    # Prefer grok-4.5 naming for product tests when env sets EMPIRICAL_LLM_MODEL
+    if selected_model in {"grok4.5", "grok-4.5-build"} and preset.id in {"grok", "xai"}:
+        # Keep grok-4.5 for proxy; build variant still accepted by proxy as model id sometimes
+        pass
 
     # Resolve base URL: explicit > per-provider env var > preset default
     effective_base_url = base_url
     if not effective_base_url:
         effective_base_url = _provider_default_base_url(preset) or None
+
+    extra_headers: dict[str, str] | None = None
+    if preset.id == "grok" or (
+        preset.id == "xai"
+        and "cli-chat-proxy.grok.com" in (effective_base_url or _provider_default_base_url(preset) or "")
+    ):
+        extra_headers = _grok_extra_headers()
 
     # Resolve base URL
     if preset.api_type == "openai-compatible":
@@ -850,6 +993,7 @@ def chat_completion(
             temperature=temperature,
             provider_name=preset.name,
             timeout_seconds=timeout_seconds,
+            extra_headers=extra_headers,
         )
 
     if preset.api_type == "anthropic-compatible":
@@ -900,13 +1044,16 @@ def chat_completion_with_fallback(
 
     last_error = ""
     for attempt in attempts:
-        provider_id = attempt.get("provider_id", "openrouter")
+        provider_id = attempt.get("provider_id", DEFAULT_PROVIDER)
         model = attempt.get("model")
         env_var = attempt.get("env")
 
-        # Skip if env var required but not set
+        # Skip if env var required but not set (Grok may use ~/.grok/auth.json instead)
         if env_var and not os.getenv(env_var, "").strip():
-            continue
+            if provider_id in {"grok", "xai"} and resolve_grok_api_key():
+                pass
+            else:
+                continue
 
         try:
             text, usage = chat_completion(
@@ -959,11 +1106,11 @@ def chat_completion_stream(
 
     Args:
         messages: List of {"role": "system"|"user"|"assistant", "content": str}
-        provider_id: Provider preset ID (默认 openrouter). 当前主要用 "minimax" (Anthropic-compatible).
-        model: Model name override.
+        provider_id: Provider preset ID (默认 grok / EMPIRICAL_LLM_PROVIDER).
+        model: Model name override (默认 EMPIRICAL_LLM_MODEL 或 grok-4.5).
         temperature: Sampling temperature.
         max_tokens: Max tokens for response.
-        api_key: API key override (falls back to env var).
+        api_key: API key override (falls back to env var / Grok session).
         base_url: Base URL override.
 
     Yields:
@@ -972,10 +1119,17 @@ def chat_completion_stream(
     Raises:
         LLMError: On provider error, auth failure, or network issue after retries.
     """
+    load_local_env_if_present()
+    if not provider_id:
+        provider_id = os.getenv("EMPIRICAL_LLM_PROVIDER") or DEFAULT_PROVIDER
+    if not model:
+        model = os.getenv("EMPIRICAL_LLM_MODEL") or None
     preset = resolve_provider(provider_id)
 
     # Resolve API key (mirrors chat_completion logic)
     resolved_key = (api_key or "").strip()
+    if not resolved_key and preset.id in {"grok", "xai"}:
+        resolved_key = resolve_grok_api_key()
     if not resolved_key and preset.api_key_env:
         resolved_key = os.getenv(preset.api_key_env, "").strip()
     if not resolved_key and preset.id == "minimax":
@@ -984,16 +1138,23 @@ def chat_completion_stream(
     if preset.requires_api_key and not resolved_key:
         raise LLMError(
             "missing_api_key",
-            f"{preset.name} requires API key. Set env var {preset.api_key_env} or pass api_key.",
+            f"{preset.name} requires API key (or Grok session for provider=grok).",
         )
 
-    selected_model = (model or preset.default_model).strip()
+    selected_model = (model or _provider_default_model(preset)).strip()
     if not selected_model:
         raise LLMError("missing_model", f"{preset.name} model is required.")
 
     effective_base_url = base_url
-    if not effective_base_url and preset.id == "minimax":
-        effective_base_url = os.getenv("MINIMAX_BASE_URL", "").strip() or None
+    if not effective_base_url:
+        effective_base_url = _provider_default_base_url(preset) or None
+
+    extra_headers: dict[str, str] | None = None
+    if preset.id == "grok" or (
+        preset.id == "xai"
+        and "cli-chat-proxy.grok.com" in (effective_base_url or "")
+    ):
+        extra_headers = _grok_extra_headers()
 
     if preset.api_type == "anthropic-compatible":
         normalized_base = normalize_base_url(
@@ -1019,6 +1180,7 @@ def chat_completion_stream(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
+            extra_headers=extra_headers,
         )
         stream_fn = _stream_openai_compatible
 

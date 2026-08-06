@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Status · Empirical Paper Workbench</title>
+  <style>
+    :root {
+      --paper: #f3efe6;
+      --paper-2: #ebe4d6;
+      --surface: #fffdf8;
+      --surface-2: #faf7f0;
+      --ink: #1a1714;
+      --ink-2: #3f3a34;
+      --muted: #7a736a;
+      --faint: #a39c92;
+      --line: #ddd4c4;
+      --line-soft: #ebe3d4;
+      --forest: #1e3f36;
+      --forest-mid: #2f5c4e;
+      --forest-soft: #dce8e2;
+      --good: #1b5e3b;
+      --good-bg: #e7f1ea;
+      --warn: #8a5a12;
+      --warn-bg: #f7efd9;
+      --bad: #8b1e36;
+      --bad-bg: #f8e8ec;
+      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Source Han Serif SC",
+        "Noto Serif SC", "Songti SC", Georgia, serif;
+      --sans: "Source Sans 3", "IBM Plex Sans", "PingFang SC", "Noto Sans SC",
+        system-ui, -apple-system, sans-serif;
+      --mono: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --shadow: 0 1px 0 rgba(26, 23, 20, 0.03), 0 14px 36px rgba(26, 23, 20, 0.05);
+      --max: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(1100px 480px at 8% -8%, #fff9ef 0%, transparent 55%),
+        radial-gradient(900px 420px at 100% 0%, #e4eee8 0%, transparent 48%),
+        linear-gradient(180deg, #f6f2ea 0%, var(--paper) 40%, #efe9dc 100%);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--forest-mid);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+    a:hover { color: var(--forest); }
+
+    .wrap {
+      width: min(var(--max), calc(100% - 40px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+
+    /* ── header ── */
+    header.top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px 28px;
+      margin-bottom: 28px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; flex-direction: column; gap: 8px; max-width: 52ch; }
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .brand h1 {
+      margin: 0;
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: clamp(28px, 3.4vw, 36px);
+      letter-spacing: -0.025em;
+      line-height: 1.12;
+      color: var(--ink);
+    }
+    .brand .sub {
+      color: var(--ink-2);
+      font-size: 14px;
+      max-width: 48ch;
+    }
+    .meta-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      text-align: right;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .badge::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+    }
+    .badge.green { color: var(--good); background: var(--good-bg); border-color: #bbd8c4; }
+    .badge.warn { color: var(--warn); background: var(--warn-bg); border-color: #e8d4a4; }
+    .badge.bad { color: var(--bad); background: var(--bad-bg); border-color: #ecc0cc; }
+    .badge.idle { color: var(--muted); background: #f3f0ea; border-color: var(--line); }
+    .ts {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .meta-right { align-items: flex-start; text-align: left; }
+      .wrap { width: min(var(--max), calc(100% - 28px)); padding-top: 28px; }
+    }
+    .span-2 { grid-column: 1 / -1; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 22px 24px;
+      position: relative;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 3px;
+      border-radius: 14px 14px 0 0;
+      background: linear-gradient(90deg, var(--forest) 0%, #6b8f7f 45%, transparent 100%);
+      opacity: 0.55;
+    }
+    .card h2 {
+      margin: 0 0 6px;
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+    }
+    .card .hint {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+
+    /* ── score hero ── */
+    .score-hero {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 22px 30px;
+      align-items: end;
+    }
+    @media (max-width: 560px) {
+      .score-hero { grid-template-columns: 1fr; }
+    }
+    .score-num {
+      font-family: var(--serif);
+      font-size: clamp(60px, 9.5vw, 80px);
+      line-height: 0.9;
+      letter-spacing: -0.045em;
+      color: var(--forest);
+      font-variant-numeric: tabular-nums;
+    }
+    .score-num small {
+      display: block;
+      margin-top: 10px;
+      font-family: var(--sans);
+      font-size: 11.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .score-side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+      padding-bottom: 4px;
+    }
+    .flag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--ink-2);
+    }
+    .chip.ok { color: var(--good); background: var(--good-bg); border-color: #bbd8c4; }
+    .chip.no { color: var(--bad); background: var(--bad-bg); border-color: #ecc0cc; }
+    .spark { width: 100%; height: 56px; display: block; }
+    .delta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .delta.up { color: var(--good); }
+    .delta.down { color: var(--bad); }
+
+    /* ── component bars ── */
+    .comps {
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line-soft);
+    }
+    .comp {
+      display: grid;
+      grid-template-columns: 118px 1fr 48px;
+      gap: 10px;
+      align-items: center;
+    }
+    @media (max-width: 480px) {
+      .comp { grid-template-columns: 92px 1fr 42px; }
+    }
+    .comp .label {
+      font-size: 12.5px;
+      color: var(--ink-2);
+      font-weight: 600;
+    }
+    .comp .label .w {
+      color: var(--faint);
+      font-weight: 500;
+      margin-left: 2px;
+    }
+    .comp .val {
+      font-family: var(--mono);
+      font-size: 12px;
+      text-align: right;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .bar {
+      height: 9px;
+      border-radius: 999px;
+      background: var(--paper-2);
+      overflow: hidden;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #3a6f5d, var(--forest));
+      transition: width 520ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .bar.weak > i { background: linear-gradient(90deg, #b45309, #c9851a); }
+    .bar.dead > i { background: linear-gradient(90deg, #9f1239, #be123c); }
+
+    /* ── kv / actions ── */
+    .kv { display: grid; gap: 10px; }
+    .kv .row {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 8px;
+      align-items: start;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--line-soft);
+    }
+    .kv .row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .kv .k {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding-top: 2px;
+    }
+    .kv .v {
+      font-size: 13.5px;
+      color: var(--ink);
+      word-break: break-word;
+    }
+    code.path, .kv .v code {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: var(--ink-2);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 15px;
+      border-radius: 9px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+    .btn:hover {
+      background: var(--surface-2);
+      border-color: #d0c5b0;
+      text-decoration: none;
+    }
+    .btn.primary {
+      background: var(--forest);
+      border-color: var(--forest);
+      color: #f4faf7;
+    }
+    .btn.primary:hover {
+      background: #142c26;
+      border-color: #142c26;
+      color: #fff;
+    }
+
+    /* ── history table ── */
+    table.hist {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.hist th {
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 0 10px 11px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    table.hist td {
+      padding: 11px 10px 11px 0;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+    }
+    table.hist tr:last-child td { border-bottom: 0; }
+    table.hist tr.is-best td {
+      background: color-mix(in srgb, var(--forest-soft) 60%, transparent);
+    }
+    table.hist tr.is-best td:first-child {
+      box-shadow: inset 3px 0 0 var(--forest);
+    }
+    table.hist .score {
+      font-family: var(--serif);
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--forest);
+    }
+    table.hist .mono {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    table.hist .mini-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .notes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+    .note {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--ink-2);
+      background: var(--paper-2);
+      border-radius: 6px;
+      padding: 4px 8px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+
+    /* ── remaining reds ── */
+    .reds-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .reds-count {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--bad);
+      font-weight: 600;
+    }
+    .reds-count.ok { color: var(--good); }
+    .verdict-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .verdict-pill {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--bad-bg);
+      color: var(--bad);
+      border: 1px solid #ecc0cc;
+      font-weight: 600;
+    }
+    .verdict-pill.soft {
+      background: var(--warn-bg);
+      color: var(--warn);
+      border-color: #e8d4a4;
+    }
+    .red-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .red-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 14px;
+      align-items: center;
+      padding: 11px 13px;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-soft);
+    }
+    .red-item.hard {
+      background: color-mix(in srgb, var(--bad-bg) 55%, var(--surface));
+      border-color: #ecc0cc;
+    }
+    .red-item .ri-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .red-item .ri-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .red-item .ri-status {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .ri-status.bad { color: var(--bad); background: var(--bad-bg); }
+    .ri-status.warn { color: var(--warn); background: var(--warn-bg); }
+    .progress-thin {
+      grid-column: 1 / -1;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--paper-2);
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .progress-thin > i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #c9851a, var(--forest-mid));
+      border-radius: inherit;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13.5px;
+      padding: 8px 0;
+    }
+    .error-banner {
+      display: none;
+      margin-bottom: 16px;
+      padding: 13px 15px;
+      border-radius: 10px;
+      background: var(--warn-bg);
+      border: 1px solid #e8d4a4;
+      color: var(--warn);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .error-banner.show { display: block; }
+    .error-banner code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: rgba(255,255,255,0.55);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    footer.foot {
+      margin-top: 30px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    footer.foot code {
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .loading .score-num { color: var(--faint); }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="error-banner" id="errorBanner"></div>
+
+    <header class="top">
+      <div class="brand">
+        <div class="eyebrow">Empirical Paper Workbench</div>
+        <h1>Continuous Empirical Loop</h1>
+        <div class="sub" id="headline">题目 + 数据 → 设计 → 估计 → 成文 → 复现 → 修订</div>
+      </div>
+      <div class="meta-right">
+        <span class="badge idle" id="statusBadge">loading</span>
+        <div class="ts" id="refreshTs">—</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Best score -->
+      <section class="card loading" id="scoreCard">
+        <h2>Best package score</h2>
+        <p class="hint">state/evolve_archive/best.json · weighted 0–100</p>
+        <div class="score-hero">
+          <div>
+            <div class="score-num" id="bestScore">—<small>best archive</small></div>
+          </div>
+          <div class="score-side">
+            <div class="flag-row" id="flagRow"></div>
+            <svg class="spark" id="spark" viewBox="0 0 240 56" preserveAspectRatio="none" aria-label="score history"></svg>
+            <div class="delta" id="scoreDelta">history —</div>
+          </div>
+        </div>
+        <div class="comps" id="comps"></div>
+        <div class="notes" id="bestNotes"></div>
+      </section>
+
+      <!-- Best package + PDF -->
+      <section class="card">
+        <h2>Best package</h2>
+        <p class="hint">pointers · PDF · paper draft</p>
+        <div class="kv" id="bestKv">
+          <div class="empty">Loading…</div>
+        </div>
+        <div class="actions" id="bestActions"></div>
+      </section>
+
+      <!-- Remaining reds -->
+      <section class="card span-2">
+        <div class="reds-head">
+          <h2 style="margin:0">Remaining reds</h2>
+          <span class="reds-count" id="redsCount">—</span>
+        </div>
+        <p class="hint" style="margin-top:6px">
+          from quality report · section length / verdict / format / revision
+        </p>
+        <div id="verdictRow" class="verdict-row"></div>
+        <div class="red-list" id="redList">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+
+      <!-- History last 10 -->
+      <section class="card span-2">
+        <h2>Score history</h2>
+        <p class="hint">state/evolve_archive/history.jsonl · last 10 · newest first</p>
+        <div id="histWrap">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+
+      <!-- Latest loop -->
+      <section class="card">
+        <h2>Latest loop</h2>
+        <p class="hint">continuous_loop_latest + loop_state</p>
+        <div class="kv" id="loopKv">
+          <div class="empty">Loading…</div>
+        </div>
+        <div class="actions" id="loopActions"></div>
+      </section>
+
+      <!-- Identity -->
+      <section class="card">
+        <h2>Loop identity</h2>
+        <p class="hint">docs/loop-status.json</p>
+        <div class="kv" id="identityKv">
+          <div class="empty">Loading…</div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <div>Auto-refresh 15s · static page · no build</div>
+      <div>
+        Serve from repo root:
+        <code>python3 scripts/serve_dashboard.py</code>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const PATHS = {
+      best: "../../state/evolve_archive/best.json",
+      pointers: "../../state/evolve_archive/best_pointers.json",
+      history: "../../state/evolve_archive/history.jsonl",
+      loopStatus: "../loop-status.json",
+      latest: "../../Results/json/parent_education_wage_continuous_loop_latest.json",
+      quality: "../../Results/json/parent_education_wage_full_pipeline_quality.json",
+      qualityLoop: "../../.hour-loop/quality_loop_latest.json",
+      pdfFallback: "../../Submissions/parent_education_wage_loop_paper.pdf",
+    };
+
+    const WEIGHTS = {
+      repro: 25,
+      quality: 25,
+      substance: 15,
+      latex_pdf: 20,
+      honesty: 10,
+      loop_status: 5,
+    };
+
+    const COMP_LABELS = {
+      repro: "Repro",
+      quality: "Quality",
+      substance: "Substance",
+      latex_pdf: "LaTeX PDF",
+      honesty: "Honesty",
+      loop_status: "Loop",
+    };
+
+    const STATUS_MAP = {
+      completed_green: { cls: "green", label: "completed_green" },
+      halted_honest: { cls: "warn", label: "halted_honest" },
+      max_rounds: { cls: "warn", label: "max_rounds" },
+      failed: { cls: "bad", label: "failed" },
+      running: { cls: "idle", label: "running" },
+    };
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${url} → ${res.status}`);
+      return res.json();
+    }
+
+    async function fetchText(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`${url} → ${res.status}`);
+      return res.text();
+    }
+
+    function parseJsonl(text) {
+      return text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          try { return JSON.parse(l); }
+          catch { return null; }
+        })
+        .filter(Boolean);
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return "—";
+      try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso);
+        return d.toLocaleString(undefined, {
+          year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", second: "2-digit",
+        });
+      } catch {
+        return String(iso);
+      }
+    }
+
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function pathHref(rel) {
+      if (!rel) return null;
+      const clean = String(rel).replace(/^\.\//, "").replace(/^\/+/, "");
+      if (clean.startsWith("../../") || clean.startsWith("http")) return clean;
+      return "../../" + clean;
+    }
+
+    function setBadge(status) {
+      const el = document.getElementById("statusBadge");
+      const m = STATUS_MAP[status] || { cls: "idle", label: status || "unknown" };
+      el.className = "badge " + m.cls;
+      el.textContent = m.label;
+    }
+
+    function renderComps(components) {
+      const root = document.getElementById("comps");
+      const keys = Object.keys(WEIGHTS);
+      root.innerHTML = keys.map((k) => {
+        const v = Number((components && components[k]) ?? 0);
+        const pct = Math.max(0, Math.min(100, v * 100));
+        let barCls = "";
+        if (v < 0.35) barCls = "dead";
+        else if (v < 0.75) barCls = "weak";
+        return `
+          <div class="comp">
+            <div class="label">${esc(COMP_LABELS[k] || k)}<span class="w">×${WEIGHTS[k]}</span></div>
+            <div class="bar ${barCls}"><i style="width:${pct.toFixed(1)}%"></i></div>
+            <div class="val">${v.toFixed(2)}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderFlags(flags) {
+      const root = document.getElementById("flagRow");
+      const items = [
+        ["repro_ok", "REPRO"],
+        ["quality_green", "Quality"],
+        ["pdf_ok", "PDF"],
+      ];
+      root.innerHTML = items.map(([k, label]) => {
+        const ok = !!(flags && flags[k]);
+        return `<span class="chip ${ok ? "ok" : "no"}">${esc(label)} ${ok ? "ok" : "no"}</span>`;
+      }).join("");
+    }
+
+    function renderSpark(history) {
+      const svg = document.getElementById("spark");
+      if (!history.length) {
+        svg.innerHTML = "";
+        return;
+      }
+      const scores = history.map((h) => Number(h.score) || 0);
+      const w = 240, h = 56, pad = 4;
+      const min = Math.min(...scores, 0);
+      const max = Math.max(...scores, 100);
+      const span = Math.max(max - min, 1);
+      const pts = scores.map((s, i) => {
+        const x = pad + (i * (w - pad * 2)) / Math.max(scores.length - 1, 1);
+        const y = h - pad - ((s - min) / span) * (h - pad * 2);
+        return [x, y];
+      });
+      const d = pts.map((p, i) => (i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`)).join(" ");
+      const last = pts[pts.length - 1];
+      const area = `${d} L ${last[0]} ${h - pad} L ${pts[0][0]} ${h - pad} Z`;
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1e3f36" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#1e3f36" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${area}" fill="url(#sg)" />
+        <path d="${d}" fill="none" stroke="#1e3f36" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${last[0]}" cy="${last[1]}" r="3.2" fill="#142c26" />
+      `;
+    }
+
+    function renderNotes(notes, elId) {
+      const el = document.getElementById(elId);
+      if (!notes || !notes.length) {
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML = notes.slice(0, 8).map((n) => `<span class="note">${esc(n)}</span>`).join("");
+    }
+
+    function renderBest(best, pointers) {
+      document.getElementById("scoreCard").classList.remove("loading");
+      const score = best && best.score != null ? Number(best.score).toFixed(2) : "—";
+      document.getElementById("bestScore").innerHTML = `${esc(score)}<small>best archive</small>`;
+      renderComps((best && best.components) || {});
+      renderFlags((best && best.flags) || {});
+      renderNotes((best && best.notes) || [], "bestNotes");
+
+      const pdf = (pointers && pointers.pdf) || "Submissions/parent_education_wage_loop_paper.pdf";
+      const paper = (pointers && pointers.paper) || "";
+      const saved = (pointers && pointers.saved_at) || (best && best.built_at) || "";
+
+      document.getElementById("bestKv").innerHTML = `
+        <div class="row"><div class="k">Score</div><div class="v"><strong>${esc(score)}</strong></div></div>
+        <div class="row"><div class="k">PDF</div><div class="v"><code class="path">${esc(pdf)}</code></div></div>
+        <div class="row"><div class="k">Paper</div><div class="v"><code class="path">${esc(paper || "—")}</code></div></div>
+        <div class="row"><div class="k">Saved</div><div class="v">${esc(fmtTime(saved))}</div></div>
+      `;
+
+      const actions = document.getElementById("bestActions");
+      const pdfHref = pathHref(pdf);
+      const paperHref = paper ? pathHref(paper) : null;
+      actions.innerHTML = `
+        <a class="btn primary" href="${esc(pdfHref)}" target="_blank" rel="noopener">Open PDF</a>
+        ${paperHref ? `<a class="btn" href="${esc(paperHref)}" target="_blank" rel="noopener">Open paper.md</a>` : ""}
+        <a class="btn" href="../../state/evolve_archive/best.json" target="_blank" rel="noopener">best.json</a>
+      `;
+    }
+
+    function renderHistory(history, bestScore) {
+      renderSpark(history);
+      const deltaEl = document.getElementById("scoreDelta");
+      if (history.length >= 2) {
+        const a = Number(history[history.length - 2].score) || 0;
+        const b = Number(history[history.length - 1].score) || 0;
+        const d = b - a;
+        const cls = d > 0.01 ? "up" : d < -0.01 ? "down" : "";
+        const sign = d > 0 ? "+" : "";
+        deltaEl.className = "delta " + cls;
+        deltaEl.textContent = `last Δ ${sign}${d.toFixed(2)} · n=${history.length}`;
+      } else {
+        deltaEl.className = "delta";
+        deltaEl.textContent = `n=${history.length}`;
+      }
+
+      const wrap = document.getElementById("histWrap");
+      if (!history.length) {
+        wrap.innerHTML = `<div class="empty">No history yet.</div>`;
+        return;
+      }
+
+      // last 10, newest first
+      const last10 = history.slice(-10).reverse();
+      const bestIdx = last10.findIndex(
+        (x) => bestScore != null && Math.abs(Number(x.score) - Number(bestScore)) < 0.001
+      );
+
+      const rows = last10.map((h, idx) => {
+        const score = Number(h.score) || 0;
+        const isBest = idx === bestIdx;
+        const flags = h.flags || {};
+        const comps = h.components || {};
+        const mini = ["repro", "quality", "substance", "latex_pdf"]
+          .map((k) => `<span class="tag">${esc(COMP_LABELS[k] || k)} ${(Number(comps[k]) || 0).toFixed(2)}</span>`)
+          .join("");
+        return `
+          <tr class="${isBest ? "is-best" : ""}">
+            <td class="score">${score.toFixed(2)}${isBest ? " ★" : ""}</td>
+            <td>
+              <div class="mini-flags">
+                <span class="chip ${flags.repro_ok ? "ok" : "no"}">R</span>
+                <span class="chip ${flags.quality_green ? "ok" : "no"}">Q</span>
+                <span class="chip ${flags.pdf_ok ? "ok" : "no"}">P</span>
+              </div>
+            </td>
+            <td>${mini}</td>
+            <td class="mono">${esc(fmtTime(h.built_at))}</td>
+          </tr>`;
+      }).join("");
+
+      wrap.innerHTML = `
+        <table class="hist">
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>Flags</th>
+              <th>Components</th>
+              <th>Built</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function renderIdentity(meta) {
+      const el = document.getElementById("identityKv");
+      if (!meta) {
+        el.innerHTML = `<div class="empty">loop-status.json unavailable</div>`;
+        return;
+      }
+      if (meta.headline) {
+        document.getElementById("headline").textContent = meta.headline;
+      }
+      el.innerHTML = `
+        <div class="row"><div class="k">Product</div><div class="v">${esc(meta.product || "—")}</div></div>
+        <div class="row"><div class="k">Now</div><div class="v">${esc(meta.now_deliverable || "—")}</div></div>
+        <div class="row"><div class="k">Next</div><div class="v">${esc(meta.next || "—")}</div></div>
+        <div class="row"><div class="k">LLM</div><div class="v"><code>${esc(meta.llm_default || "—")}</code></div></div>
+        <div class="row"><div class="k">CLI</div><div class="v"><code>${esc(meta.cli || "—")}</code></div></div>
+        <div class="row"><div class="k">Updated</div><div class="v">${esc(meta.updated || "—")}</div></div>
+      `;
+    }
+
+    function renderLoop(latest, loopState, qualityLoop) {
+      const status =
+        (loopState && loopState.status) ||
+        (latest && latest.status) ||
+        (qualityLoop && qualityLoop.status) ||
+        "unknown";
+      setBadge(status);
+
+      const loopId = (loopState && loopState.loop_id) || (latest && latest.loop_id) || "—";
+      const reason = (loopState && loopState.reason) || "";
+      const started = (loopState && loopState.started_at) || "";
+      const finished = (loopState && loopState.finished_at) || (latest && latest.updated_at) || "";
+      const pkg = (loopState && loopState.package) || (latest && latest.package) || {};
+      const liveScore = qualityLoop && qualityLoop.score != null ? qualityLoop.score : null;
+
+      document.getElementById("loopKv").innerHTML = `
+        <div class="row"><div class="k">Status</div><div class="v"><strong>${esc(status)}</strong>${reason ? ` · ${esc(reason)}` : ""}</div></div>
+        <div class="row"><div class="k">Loop id</div><div class="v"><code class="path">${esc(loopId)}</code></div></div>
+        <div class="row"><div class="k">Started</div><div class="v">${esc(fmtTime(started))}</div></div>
+        <div class="row"><div class="k">Finished</div><div class="v">${esc(fmtTime(finished))}</div></div>
+        <div class="row"><div class="k">Live score</div><div class="v">${liveScore != null ? `<strong>${esc(Number(liveScore).toFixed(2))}</strong> (quality-loop)` : "—"}</div></div>
+        <div class="row"><div class="k">Package</div><div class="v"><code class="path">${esc(pkg.paper || "—")}</code></div></div>
+      `;
+
+      const statePath = pkg.loop_state || (latest && latest.package && latest.package.loop_state);
+      const pdfPath = pkg.pdf || "Submissions/parent_education_wage_loop_paper.pdf";
+      const actions = [];
+      if (pdfPath) {
+        actions.push(`<a class="btn primary" href="${esc(pathHref(pdfPath))}" target="_blank" rel="noopener">Open PDF</a>`);
+      }
+      if (statePath) {
+        actions.push(`<a class="btn" href="${esc(pathHref(statePath))}" target="_blank" rel="noopener">loop_state.json</a>`);
+      }
+      document.getElementById("loopActions").innerHTML = actions.join("") || "";
+    }
+
+    function isRedStatus(s) {
+      if (!s) return false;
+      const ok = new Set(["passed", "ok", "green", "found", "not_applicable", "n/a"]);
+      return !ok.has(String(s).toLowerCase());
+    }
+
+    function renderReds(quality, latest) {
+      const listEl = document.getElementById("redList");
+      const countEl = document.getElementById("redsCount");
+      const verdictEl = document.getElementById("verdictRow");
+
+      // Prefer package quality path from latest loop if present
+      if (!quality) {
+        countEl.textContent = "quality json unavailable";
+        countEl.className = "reds-count";
+        verdictEl.innerHTML = "";
+        listEl.innerHTML = `
+          <div class="empty">
+            无法读取 quality JSON。请用
+            <code>python3 scripts/serve_dashboard.py</code>
+            从仓库根启动（file:// 下 fetch 会被拦）。
+          </div>`;
+        return;
+      }
+
+      const reds = [];
+      const softs = [];
+
+      // verdict pills
+      let verdicts = quality.verdict || [];
+      if (!Array.isArray(verdicts)) verdicts = verdicts ? [verdicts] : [];
+      verdictEl.innerHTML = verdicts.length
+        ? verdicts.map((v) => `<span class="verdict-pill">${esc(v)}</span>`).join("")
+        : `<span class="verdict-pill soft">no open verdict</span>`;
+
+      // section length reds
+      const secLen = (quality.section_length_checks && quality.section_length_checks.sections) || {};
+      Object.entries(secLen).forEach(([name, s]) => {
+        if (!s || !isRedStatus(s.status)) return;
+        const cur = s.chinese_char_count ?? s.english_word_count ?? 0;
+        const min = s.min_chinese_chars ?? s.min_english_words ?? 0;
+        const pct = min > 0 ? Math.min(100, (Number(cur) / Number(min)) * 100) : 0;
+        reds.push({
+          hard: true,
+          title: name,
+          meta: `${cur} / min ${min} · ${s.target_chinese_chars || s.target_english_words || ""}`,
+          status: s.status,
+          pct,
+        });
+      });
+
+      // format warnings
+      const fmt = quality.format_checks || {};
+      (fmt.warnings || []).forEach((w) => {
+        softs.push({
+          hard: false,
+          title: `format · ${w}`,
+          meta: "format_checks.warnings",
+          status: "warn",
+        });
+      });
+      (fmt.hard_errors || []).forEach((w) => {
+        reds.push({
+          hard: true,
+          title: `format · ${w}`,
+          meta: "format_checks.hard_errors",
+          status: "error",
+        });
+      });
+
+      // missing sections
+      const missing = (quality.section_checks && quality.section_checks.missing_sections) || [];
+      missing.forEach((m) => {
+        reds.push({
+          hard: true,
+          title: `missing section · ${m}`,
+          meta: "section_checks",
+          status: "missing",
+        });
+      });
+
+      // gate blocks
+      const blocks = [
+        ["section_length", quality.section_length_checks],
+        ["revision", quality.revision_checks],
+        ["evidence", quality.evidence_integrity_checks],
+        ["citation", quality.citation_checks],
+        ["method_gate", quality.method_gate_checks],
+      ];
+      blocks.forEach(([label, block]) => {
+        if (!block || !isRedStatus(block.status)) return;
+        // skip if already covered by section list for section_length
+        if (label === "section_length" && reds.some((r) => r.pct != null)) return;
+        const extra =
+          block.gate_status ? `gate=${block.gate_status}` :
+          block.overall_verdict ? String(block.overall_verdict) : "";
+        const item = {
+          hard: label !== "method_gate" || block.gate_status === "red",
+          title: `${label} · ${block.status}`,
+          meta: extra || (block.path || ""),
+          status: block.status,
+        };
+        if (item.hard) reds.push(item);
+        else softs.push(item);
+      });
+
+      // word count shortfall
+      const wc = quality.word_count || {};
+      const cn = wc.main_text_chinese_chars;
+      const cnMin = wc.thresholds && wc.thresholds.chinese_min_chars;
+      if (cn != null && cnMin != null && Number(cn) < Number(cnMin)) {
+        reds.push({
+          hard: true,
+          title: "body length below chinese_min_chars",
+          meta: `${cn} / ${cnMin} chars`,
+          status: "too_short",
+          pct: Math.min(100, (Number(cn) / Number(cnMin)) * 100),
+        });
+      }
+
+      const all = [...reds, ...softs];
+      const nHard = reds.length;
+      if (!all.length) {
+        countEl.textContent = "0 open reds";
+        countEl.className = "reds-count ok";
+        listEl.innerHTML = `<div class="empty">No remaining reds in quality report · ${esc(fmtTime(quality.generated_at))}</div>`;
+        return;
+      }
+
+      countEl.textContent = `${nHard} hard · ${softs.length} soft`;
+      countEl.className = "reds-count";
+
+      listEl.innerHTML = all.map((r) => {
+        const stCls = r.hard ? "bad" : "warn";
+        const bar = r.pct != null
+          ? `<div class="progress-thin"><i style="width:${r.pct.toFixed(1)}%"></i></div>`
+          : "";
+        return `
+          <div class="red-item ${r.hard ? "hard" : ""}">
+            <div>
+              <div class="ri-title">${esc(r.title)}</div>
+              <div class="ri-meta">${esc(r.meta || "")}</div>
+            </div>
+            <span class="ri-status ${stCls}">${esc(r.status)}</span>
+            ${bar}
+          </div>`;
+      }).join("");
+    }
+
+    function showError(msg) {
+      const el = document.getElementById("errorBanner");
+      el.innerHTML = msg;
+      el.classList.add("show");
+    }
+    function clearError() {
+      const el = document.getElementById("errorBanner");
+      el.classList.remove("show");
+      el.textContent = "";
+    }
+
+    async function loadAll() {
+      const settled = await Promise.allSettled([
+        fetchJson(PATHS.best),
+        fetchJson(PATHS.pointers),
+        fetchText(PATHS.history),
+        fetchJson(PATHS.loopStatus),
+        fetchJson(PATHS.latest),
+        fetchJson(PATHS.qualityLoop),
+        fetchJson(PATHS.quality),
+      ]);
+
+      const val = (i) => (settled[i].status === "fulfilled" ? settled[i].value : null);
+      const errors = [];
+      settled.forEach((s) => {
+        if (s.status === "rejected") {
+          errors.push(String(s.reason && s.reason.message || s.reason));
+        }
+      });
+
+      const best = val(0);
+      const pointers = val(1);
+      const historyText = val(2);
+      const loopStatus = val(3);
+      const latest = val(4);
+      const qualityLoop = val(5);
+      let quality = val(6);
+
+      // Try quality path from latest package if primary missing
+      if (!quality && latest && latest.package && latest.package.quality) {
+        try {
+          quality = await fetchJson(pathHref(latest.package.quality));
+        } catch (_) { /* soft */ }
+      }
+
+      if (!best && !latest && !quality) {
+        showError(
+          "无法读取状态 JSON。请从仓库根目录启动：<code>python3 scripts/serve_dashboard.py</code>（不要直接用 file:// 打开，浏览器会拦 fetch）"
+        );
+      } else if (errors.length) {
+        const softKeys = ["quality_loop", ".hour-loop", "loop-status"];
+        const hard = errors.filter((e) => !softKeys.some((k) => e.includes(k)));
+        if (hard.length) {
+          showError("部分数据源读取失败：" + hard.slice(0, 3).map(esc).join(" · "));
+        } else {
+          clearError();
+        }
+      } else {
+        clearError();
+      }
+
+      const history = historyText ? parseJsonl(historyText) : [];
+      if (best) {
+        renderBest(best, pointers);
+      } else if (qualityLoop) {
+        renderBest(
+          {
+            score: qualityLoop.score,
+            components: qualityLoop.components,
+            flags: {},
+            notes: [],
+            built_at: qualityLoop.ts,
+          },
+          {
+            pdf: qualityLoop.pdf || "Submissions/parent_education_wage_loop_paper.pdf",
+            paper: qualityLoop.package && qualityLoop.package.paper,
+            saved_at: qualityLoop.ts,
+          }
+        );
+      }
+
+      renderHistory(history, best && best.score);
+      renderIdentity(loopStatus);
+      renderReds(quality, latest);
+
+      let loopState = null;
+      const stateRel =
+        (latest && latest.package && latest.package.loop_state) ||
+        (qualityLoop && qualityLoop.package && qualityLoop.package.loop_state);
+      if (stateRel) {
+        try {
+          loopState = await fetchJson(pathHref(stateRel));
+        } catch (_) { /* soft */ }
+      }
+      renderLoop(latest, loopState, qualityLoop);
+
+      document.getElementById("refreshTs").textContent =
+        "refreshed " + new Date().toLocaleTimeString();
+    }
+
+    loadAll();
+    setInterval(loadAll, 15000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+{
+  "query": "父母教育 子女工资",
+  "total": "8",
+  "page": "1/1",
+  "body_snippet": " 总库 检索 CNKI AI 出版来源 我的CNKI\n  充值 会员 \n机构登录 个人登录\n主题 \n×\n结果中检索\n检索设置\n总库\n8\n中文\n外文\n学术期刊\n2\n学位论文\n6\n图书\n0\n会议\n0\n报纸\n0\n年鉴\n专利\n标准\n0\n法律法规\n主题\n主要主题\n次要主题\n留守子女(1)\n家庭收入结构(1)\n下一代(1)\n实证研究(1)\n公共转移支付(1)\n机制研究(1)\n财富转移(1)\n农民工(1)\n链式",
+  "results": [
+    {
+      "n": 1,
+      "title": "教育准入政策对农民工随迁子女人力资本投资行为的影响研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wbhyqPsXYPna0XixkhGfKI8bIMAvMQ0SRP5KLkvAE5-EJ8JNvt4qm6IoRaWbPURjIc501_vRIO-ZeoIFsaWOnewSSXNhcEoeLUbKHFGzu8Lvd1im-XGRJ1HkzQLLRwel03diNUWOuy4pX0gjIBeYJxnhjQWs9W7KDmCvsIWI5pw1yE8V06y0pg&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnrtDQ33_xKaVZU5i5z_W16twneWrfo0YJU2eWl-PcvssdIJfnwo9P-8t7MR_kUeJc",
+      "authors": "陈博欧",
+      "journal": "上海财经大学",
+      "date": "2022-05-01",
+      "citations": "3",
+      "downloads": "1510"
+    },
+    {
+      "n": 2,
+      "title": "家庭收入结构与子女自我教育期望的关系：链式中介效应分析",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xZKHPWRcTz9CWfrkhnt5xIhOMHqMbhj4BfxKwx5Q9Ht8AR2KmrrG2NTvPZSaO_O4m__9Hp9ONcaOgIX_OM7tTW3mRivdUpIIjvdw4WM92GESCN5T7sojpkJGYPEEYmpdF_gSmhw0ObrZQiDkXEZK8nQzfGZen9vMwWkfSn30D-Ew==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgienEsmDlbZu6lytiH0XSqwfnCKgg0RqvInuquWxtPRZ4RcJFnCXWEvXwdDhbxhTw8J3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "赵红霞; 许倩文",
+      "journal": "兵团教育学院学报",
+      "date": "2021-06-15",
+      "citations": "7",
+      "downloads": "791"
+    },
+    {
+      "n": 3,
+      "title": "公共转移支付对儿童人力资本影响研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0x_ZC98YZu36ETpy6B7pV41_xwCHVrrEv3oWICwMflzhv0imjUnSgBSYXbbfaCKt5Ww8K4T1mip_w7-0MdQSKAn-Z6PcoxaHnsQ3B-k4RG5AeMxBM-_gYOZtoIjdqLcKlaAP-MbIdKOLTZdbz9pF4edq0b5cK52JU53W4-ZBaUhZU1DsP8uxi9r&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnHS1CJ7OAYDx7jXzLUO9U99wneWrfo0YJU2eWl-Pcvsv035vwP9NiK0Drw-b4p-fQ",
+      "authors": "齐兴辉",
+      "journal": "武汉大学",
+      "date": "2020-11-01",
+      "citations": "",
+      "downloads": "223"
+    },
+    {
+      "n": 4,
+      "title": "教育与代际阶层流动——来自中国高校扩招的证据",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wC_0ICTp5E3OAw6-7PWpSsu_LzRadRMuFxVGISwn2jx95k86e7uNEE9L6_m-mj2KEMYBpXTT6zqJ1imyOXb5TGW044Zr0cnAhACKdbPJ6NnZBLwkZi6HAEYpRlO3XHLKeQdGi5DLn6zwNsuGv1mWXe3PzYoPjiBVZ31mpfJ0eWbQhmrx892QE2&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnna5Oj_hfaeIWWxI8UYR1GtwneWrfo0YJU2eWl-PcvstZR-NqoF1KPZlWsA9gHUV4",
+      "authors": "万千",
+      "journal": "华中科技大学",
+      "date": "2018-05-01",
+      "citations": "7",
+      "downloads": "1985"
+    },
+    {
+      "n": 5,
+      "title": "父母外出务工对留守子女教育的影响——基于CFPS2014数据的分析",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wC_0ICTp5E3OAw6-7PWpSseMuQIJprKZKjjn5nqxR9APocsgfw6fMzVfS4KeWF0fd1CFaYkDMCQyDLRWLoQtAj8FMZmPD-SS2BPWy4BE9RL0WYdMwXacu0xnGoBw5WrZ3OJg4q8z-IFqhqAs7ozdcQ2J8413wWH5g81gMre_ukkyu09wVi7w5t&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmn5YjtcdfExCeIjbUFHMEzhbdyBo3QdYKtLXzVWenlX7bI1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "熊新燕",
+      "journal": "华中师范大学",
+      "date": "2018-05-01",
+      "citations": "13",
+      "downloads": "1324"
+    },
+    {
+      "n": 6,
+      "title": "家庭财富转移对下一代劳动收入的影响机制研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0w4HdMJyzFop7W_BjbjgR8zSTnYpfl8L97QQOE-N8KGzt0DMweHFi8le7OG_wNdDArHbsld4s11NpKfpJSWp42Ve1wTnlwp-OwISAD30ZnB3oN-OxheopvKLNHkVpeILgxyoNxN7CQVKVeqCKoeKQyVP1VJG_Ywu3581KL6vNISZl84RD2GqJpd&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnggBjSLNm6CdEsKExs4xVFdwneWrfo0YJU2eWl-Pcvst6R1-q-v5m0zIDz_cK9G7U",
+      "authors": "陈敏",
+      "journal": "浙江大学",
+      "date": "2015-06-01",
+      "citations": "25",
+      "downloads": "2295"
+    },
+    {
+      "n": 7,
+      "title": "父母政治资本如何影响子女工资溢价:“拼爹”还是“拼搏”?",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0w4HdMJyzFop7W_BjbjgR8zXHV193P0naMA_2S5LuAorB9LIGJ78ohvkLRUw1H1PzFcwGCOuW7Loex8KlkXcLxYhOrZhHyxHkLWPpHjNfpgjXbfT4udzCi1BdAHBVVb4O6uQ3QPgFc_cco68ZxSXuM7zc9F_OTt5UEePiCvELjVuA==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgicuauLA-L19kjiOlw7KDpD9ntIznKYcE36K3ztHxqjyn5743cnqaA9eAJ9i6ME4Uj13KAUBlVIsgcb0E8u_YkCK",
+      "authors": "谭远发",
+      "journal": "管理世界",
+      "date": "2015-03-15",
+      "citations": "178",
+      "downloads": "7045"
+    },
+    {
+      "n": 8,
+      "title": "父母政治资本对后代的收入溢价效应的实证研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wdgwzFt1j4a6FcfVGm6nbiR6XQ1YZ0DQ_iQjGlZQu-McJ1GWuso6lWZv5zmZUlewB3WKGw7MgXm8-odsO57Nb_wl96FCNxg0X8hPPzdiAyTbZRBLL774Myxswuc7eBfSvT7XZQnmyRurVAWENoeWD1OYzEkUnxHPmEBaEd6di5InAe0GF76XLN&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnU7PWGVE6erMA1oOZS2b48A04ronANllGkH9HUZ0lhBDI1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "王斌",
+      "journal": "西南财经大学",
+      "date": "2014-03-01",
+      "citations": "4",
+      "downloads": "642"
+    }
+  ]
+}

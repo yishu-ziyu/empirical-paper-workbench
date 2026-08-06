@@ -1,141 +1,43 @@
-# 当前阶段
+# Current stage
 
-## 2026-06-19 产品流水线收敛
+**Product**: Continuous Empirical Loop（全自动实证论文工作台）  
+**SSOT**: `docs/PRODUCT.md`  
+**Updated**: 2026-08-07
 
-- 当前产品定义：用户输入题目和数据，系统判断研究问题是否清楚，整理文献和变量，生成方法方案和执行预检，能跑就跑模型，不能跑就明确阻断原因，生成论文初稿或半成品论文，给出审阅报告和修订清单，最后交付 PDF/DOCX、证据包、复现说明。
-- 当前控制文件：`Tasks/product-pipeline-artifact-map-2026-06-19.md`。
-- 当前唯一推进线：CGSS 论文生产链。从现有 PDF 样稿和课程论文质量报告出发，生成浏览器内用户可读修订清单，并把下一步动作回写到 headless state。
-- 当前能力证据：CGSS 已覆盖题目、数据发现、变量候选、文献种子、方法门、模型结果、论文草稿、PDF 和质量报告；父母教育工资已覆盖数据修复、最小 OLS、完整初稿、PDF/DOCX 和交付包；CHARLS DID 只作为严格 proof case 和 runtime 来源。
-- 当前清理状态：React 主入口只挂论文生产状态，不再挂旧 P0 聚合面板；`Product/web` 静态工作台源码已删除，`/legacy` 只重定向到 `/`；旧 P 阶段后端和历史组件暂作为能力/历史源码留存，不再作为用户主路径。
-- 当前停止事项：不再用 P0-P18 或“第一版/第二版”定义产品；不新增平行 demo；不把 PDF ready 当论文完成；不把 workflow 合同、Agent 日志或 mock report 当研究证据。
-- 下一步入口：`Tasks/cgss-course-paper-review-revision-list-bdd.md`，先写失败测试，再做最小实现。
+## Now
 
-## 2026-06-17 项目管理重置
+主路径已具备：
 
-- 当前主仓库：`/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`。
-- 2026-06-19 纠偏进展：第二层 workflow 已改成 CHARLS-like paper pipeline contract，不再默认生成 mock 研究员笔记；第三层 headless-state 新增 `course_paper_quality` 组件，PDF 样稿必须完成论文审阅后才能进入人工终审。
-- 2026-06-19 新接口：`GET/POST /api/v1/projects/{project_id}/product-control/course-paper-quality`；POST 使用 final-pdf manifest 的 `source_markdown` 生成论文审阅报告，输出 `Results/json/course_paper_quality_report.json`。
-- CHARLS DID 仓库定位：`/Users/mahaoxuan/Desktop/经济学论文/StatspAI_跑通一次_CHARLS_DID`，第一阶段 proof case + 第二层 runtime 来源样例；不再作为后续产品开发主仓库。
-- 桌面旧入口 `/Users/mahaoxuan/Desktop/StatspAI_跑通一次_CHARLS_DID` 已保留为符号链接。
-- 历史能力证据：`docs/product-control/` + `Tasks/product-control-demo-line.md` 的固定 demo 线，题目为 `父母受教育水平对子女工资收入的影响`。它不再定义当前产品主线。
-- 产品交付标准已固定：第一用户体验围绕 `paper_draft.pdf / paper_draft.docx`，成功分支输出完整论文初稿，阻断分支输出半成品论文、红标缺口和问题清单；详见 `docs/product-control/08_Draft-first交付标准.md`。
-- 当前阶段入口：`Tasks/project-management-reset-2026-06-17.md`。
-- P0 已按长程阶段包完成后端/API 收口：P0-A topic audit、P0-B SupervisorPlan/Agent Task Queue、P0-C Evidence Audit、P0-D 作品集脚本与 package 已连续生成。
-- P0 阶段产品入口：`GET /api/v1/projects/{project_id}/product-control/p0-phase` 只读返回阶段报告；`POST /api/v1/projects/{project_id}/product-control/p0-phase` 显式刷新阶段包；直接服务函数为 `run_product_control_p0_phase(project_root)`。
-- P0 当前真实状态：`Results/json/product_control_p0_phase.json` 为 `p0_phase_ready_for_review`；`state/product/agent_task_queue.json` 有 6 个任务，默认 `can_execute=false`；报告内已有 `agent_tasks`、`evidence_checks` 和正式层边界。
-- P0 前端状态：`ProductControlP0Panel` 是历史聚合面板源码，当前主入口已经不再挂载。后续若还需要保留 P0-P18 证明链路，应进入 legacy/capability 命名空间，不得回到用户主路径。
-- 旧工作台处理：`/legacy` 不再服务旧 UI，运行时重定向到 React 主入口；`Product/web` 已删除，不再作为源码、回退入口或产品验收面。
-- P1-A 文献证据账本已完成：`Results/json/parent_education_wage_literature_evidence_ledger.json` 和 `Reviews/parent_education_wage_literature_evidence_ledger.md` 只记录 4 个当前题目的检索 seed，`verified_count=0`，不会写正式 bibliography 或正式论文；真实文献 metadata/DOI/全文来源仍需外部检索或人工核验。
-- P1-B 数据字段绑定账本已完成：`Results/json/parent_education_wage_data_field_binding_ledger.json` 和 `Reviews/parent_education_wage_data_field_binding_ledger.md` 显示 12 个候选变量中 8 个 matched、4 个 missing；`father_education`、`mother_education`、`parent_education` 和 `hukou` 尚缺真实字段绑定，因此不能写正式 VariableRoleSet。
-- P1-C 方法执行账本已完成：`Results/json/parent_education_wage_method_execution_ledger.json` 和 `Reviews/parent_education_wage_method_execution_ledger.md` 显示 `execution_allowed=false`、`run_id=null`，IV/DID/DML 全部 blocked；P2 修复后阻断原因已收敛为 required fields 缺失。
-- Phase 6 验收包已完成：`Reviews/parent_education_wage_p0_p1_acceptance_package.md` 汇总 P0/P1-A/P1-B/P1-C 状态、正式层边界、验证命令和下一步。
-- P2 执行准入已完成：`Results/json/parent_education_wage_p2_execution_readiness.json` 和 `Reviews/parent_education_wage_p2_execution_readiness.md` 显示 `execution_preflight_allowed=false`、`run_id=null`；`hukou` 找到 `qa2` 等候选但尚未人工绑定，`father_education`、`mother_education`、`parent_education` 仍缺字段。
-- P2 设计去污染已完成：`Tasks/parent-education-wage/design.json` 不再含旧 `robot_exposure`、`bartik_iv`、`robot_density`、`ln_robot` 等 code stub；本次只修任务层草案，未写正式 `state/product/design_spec.json`。
-- P3 DraftPackage 阻断分支已完成：`Results/json/parent_education_wage_p3_draft_package.json` 状态为 `blocked_draft_package_ready`；真实项目已生成 `Submissions/parent_education_wage_paper_draft.docx`、`Manuscripts/generated/parent_education_wage_paper_draft.md`、`Manuscripts/generated/parent_education_wage_issue_list.md` 和 `Reviews/parent_education_wage_draft_audit_report.md`。
-- P4 字段来源候选已完成：`Results/json/parent_education_wage_p4_field_source_candidates.json` 状态为 `field_source_candidates_ready_for_review`；只读扫描真实 CFPS 根目录下 36 个 `.dta`、21546 个 Stata 标签，生成 52 个候选。`father_education` 和 `mother_education` 均已找到候选，`parent_education` 为 `constructable_needs_review`，`hukou` 已有候选但仍需人工确认角色。
-- P5 正式变量角色草案预检已完成：`Results/json/parent_education_wage_p5_variable_role_preflight.json` 状态为 `variable_role_preflight_ready_for_review`；推荐 outcome 为 `ln_wage`，treatment 为 `parent_education`，构造建议为 `max(father_education, mother_education)`，controls 为 `age/female/urban/edu_last/experience`。
-- P6 人工签收/提升路径已完成第一版：`Results/json/parent_education_wage_p6_variable_role_signoff.json` 状态为 `variable_role_signoff_required`，列出 5 个必须人工确认项；完整签收后可提升到可编辑 `state/product/variable_roles_drafts.json` 草稿。
-- P7 页面签收台已完成：React Product Control 的 P6 面板现在显示五项可编辑确认输入、推荐默认值和“确认并生成可编辑草稿”按钮；按钮只调用 editable draft promotion，不写正式 VariableRoleSet，不跑模型。用户已在页面完成 P7 promotion，真实项目最新 editable draft 为 `variable_roles_draft_parent_education_wage_p6_20260617T1752108259430000`。
-- P7 审查修复已完成：即使 P7 promotion 生成了 editable draft，旧 `PUT /variable-roles` 也不会解锁正式写入；后端会继续返回 409，直到 P8 存在单独的正式变量角色批准。
-- P8 正式变量角色审批门禁已完成：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p8-variable-role-approval`，React Product Control 显示 `P8 正式变量角色审批`、reviewer/note/confirmation 输入和“不写 RunPlan；不跑模型”。P8 审批只写 `state/product/variable_role_formal_approvals.json`，不会直接写正式 `variable_roles.json`，不会写 DesignSpec/RunPlan，不创建 run id，不执行模型。独立审查后已收紧：正式保存必须使用当前最新 P7/P6 editable draft 的有效 P8 approval，且 latest draft roles、approval `source_draft_roles`、PUT roles 三者必须一致；旧 approval 不能解锁新 draft，同一 draft id 的 roles 被篡改后原 approval 也会失效。我已按用户授权提交真实项目 P8 approval，只批准变量角色保存门禁。
-- P9 正式 VariableRoleSet 保存门禁已完成：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p9-variable-role-formal-save`，React Product Control 显示 `P9 正式变量表保存`、dataset/source metadata 缺口、reviewer/note/confirmation 和“不写 DesignSpec；不写 RunPlan；不跑模型”。P9 只有在 P8 approval 有效、dataset path 存在、所有 approved role 字段有 source metadata 时才会写正式 `state/product/variable_roles.json`；payload 不能替换已批准 roles 或 dataset。
-- 北极星计划已建立：`Tasks/north-star-product-plan.md` 固定产品目标为本科生可用、可审计、可交付的论文生产流水线；首交付物是 `paper_draft.docx / paper_draft.pdf`，证据不足时交付半成品论文、红标问题清单和下一步补齐动作。后续 P10-P16 按 SDD/BDD/TDD、最小验证、状态更新和交付总结推进。
-- P10 Product Control 当前门禁中心已完成：React Product Control 现在先显示 `当前门禁` 和 `P9 正式变量表保存`，再显示研究阶段导航；P0-P8 默认折叠为阶段历史，P9 当前阻断详情、缺失 source metadata、禁用保存按钮和 no-model 边界仍可见。桌面和 390px 移动端已验收，页面没有“运行模型”入口。
-- P11 source metadata 补齐路径已完成产品实现：新增 `GET/POST /api/v1/projects/{project_id}/product-control/p11-source-metadata-contract`，React Product Control 当前门禁详情新增 `P11 Source Metadata` 表单。P11 只把 dataset path、field_bindings 和 `parent_education` construction 写入最新 editable draft 的 `source_contract`；完整后只让 P9 GET 变成 `formal_variable_role_save_ready`，不写正式 VariableRoleSet、DesignSpec、RunPlan，不创建 run id，不跑模型。
-- P11A source contract review kit 已完成：P11 GET 现在返回 `source_contract_review_kit`，包含推荐 dataset path、dataset path candidates、来自 P5/P4 的字段候选、缺口状态和 no-model boundary；React P11 面板在 JSON 表单前展示 `Source review kit`，降低用户确认 source contract 的难度，但不替用户保存。
-- P11B per-field source confirmation editor 已完成：React P11 表单新增 `Per-field source confirmation`，将 9 个 required source fields 拆成 dataset column、source field、source path、evidence level 可编辑行；保存时生成原 P11 `field_bindings` payload，JSON textarea 只作为 `field_bindings JSON preview`。P11B 不保存真实 source contract，不写正式层，不跑模型。
-- P11C source contract readiness check 已完成：React P11 表单新增 `Source contract readiness`，保存前列出 reviewer、note、confirmation、dataset path、parent education construction 和 source rows 的具体缺口；缺口存在时保存按钮禁用。P11C 不保存真实 source contract，不写正式层，不跑模型。
-- P11D row human confirmation gate 已完成：React P11 表单新增逐字段人工确认 checkbox；预填候选行默认未确认，readiness 会把未勾选行列为 `<field>:human_confirmation`，保存按钮保持禁用。P11D 不改后端 P11 payload，不保存真实 source contract，不写正式层，不跑模型。
-- P11E human signoff readable rows 已完成：React P11 字段来源行现在在桌面和移动端都显示 `dataset column`、`source field`、`source path`、`evidence level` 标签；390px 移动端页面级 horizontal overflow=false；保存门禁、P9 阻断和正式层边界不变。
-- P11F human signoff review queue 已完成：React P11 在长表单前新增 `Human signoff review queue`，按 9 个 required source fields 展示 status、missing items 和 action；用户可以先按队列检查，再到下方逐行编辑并勾选 human confirmation。P11F 不保存真实 source contract，不写正式层，不跑模型。
-- P11G source contract signoff workspace 已完成：React P11 现在是 `Source Contract Signoff` 工作台，先显示状态条，再用左侧 `Review queue` 和右侧 `Source contract form` 分开审核与填写；`Source review kit` 默认折叠，底部 action bar 明确 `No model run`，保存按钮仍在缺口存在时禁用。桌面和 390px 移动端已验收，P11G 不保存真实 source contract，不写正式层，不跑模型。
-- P11-Human / P11H 已完成：真实项目已保存 source contract，dataset path 为 `Data/Final/cfps_robot_reallocation.csv`，9 个 required source fields 均有 dataset column/source field/source path/evidence level 和逐行 human confirmation；`parent_education` construction 为 `max(father_education, mother_education)`。React 页面已显示 `P11 已签收`、`已解锁 P9 正式变量表保存` 和 no P12/run/model 边界。
-- P9-Human / P9H 已完成：正式 `state/product/variable_roles.json` 已保存，状态为 `approved`；P9 GET 现在返回 `formal_variable_roles_saved`，不再提示重复保存。P9 完成后仍不写 DesignSpec/RunPlan，不创建 run id，不跑模型。
-- P12-0 Design Tree / Pre-PRD 已完成：`docs/product-control/p12-p16-design-tree.md` 已写清 P12 DesignSpec Preflight、P13 RunPlan Approval、P14 Model Execution And Evidence Ledger、P15 Draft Generation And Export、P16 User Acceptance And Satisfaction Loop 的输入、产出、验收标准、回退路径和停机条件。
-- P12-0 可视化验收已完成：`/workflow-dashboard` 已显示 CEO 摘要、P12-0 当前门禁、P12 DesignSpec 下一步和 P12-P16 分支；产品页 P9H 当前门禁摘要在 390px 移动端不再重叠。
-- P12 DesignSpec Preflight 已完成：`Results/json/parent_education_wage_p12_design_spec_preflight.json` 和 `Reviews/parent_education_wage_p12_design_spec_preflight.md` 已生成；baseline 公式为 `ln_wage ~ parent_education + age + female + urban + edu_last + experience`。
-- P13-P16 阻断交付分支已完成：P13 已用真实 CSV 表头校验 P12 公式，缺 `parent_education` 和 `experience`；P14 已写出不运行模型的执行账本；P15 已交付半成品论文路径和红标问题清单；P16 已生成用户验收包。
-- 当前真实阻断点：`Data/Final/cfps_robot_reallocation.csv` 缺 `parent_education` 和 `experience`，所以不能批准运行计划、不能创建运行编号、不能运行模型、不能声称完整实证论文。
-- 下一步入口：数据修复。补齐或合并 `parent_education`、构造 `experience` 后，重跑 P13-P16，才允许进入完整论文和模型结果分支。
-- 第二层 runtime 状态：已迁入主仓库，优先用 `python3 scripts/25_agent_runtime_preflight.py` 验证。
-- 本文件下方 2026-05-17 内容保留为历史快照；后续判断以本节、`Tasks/todo.md` 顶部和 `Tasks/project-management-reset-2026-06-17.md` 为准。
+- 10 步内环 + 外环 continuous loop + LaTeX PDF  
+- 正文学术化（禁止路径/证据戳）  
+- 文献：Crossref DOI + CNKI 页面核验（demo `parent_education_wage` verified_count≈25）  
+- 因果语言对 OLS demo 仍关闭  
 
-- 更新时间：2026-05-17
-- 当前提交基线：Pipeline MVP Review 工作区改动，待提交 `Make the pipeline MVP review visually verifiable`
-- 当前本地验收入口：`http://127.0.0.1:8768/?v=20260517-pipeline-mvp-review-final2`
-- 当前主线修正：产品入口已经从“展示所有功能模块”调整为“先确认研究选题，再进入研究判断”。选题已经持久化为后端 `ResearchQuestion / TopicSession`，SupervisorPlan 生成前必须绑定 confirmed ResearchQuestion；SupervisorPlan 已进入人工审批状态机，只有 approved plan 才能创建摘要优先的 Agent Task Queue。
-- 研究题目：机器人应用是否影响劳动力市场匹配效率？
-- 当前主线：实证论文产品主流程已收敛到 Dataset -> VariableRoleSet -> DesignSpec -> RunPlan -> Run -> Results -> Draft -> Review/Export
-- 当前进展：
-  - P2-Q Topic-first Home 已完成：首页显示 `开始一项实证研究`，用户输入或选择选题后才展开下一步研究决策、智能中控和 SupervisorPlan。
-  - P2-R ResearchQuestion / TopicSession 已完成：首页确认选题会写入 `state/product/research_question.json`，跨 Session 可恢复，且不会自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
-  - P2-S SupervisorPlan Topic Binding 已完成：生成 SupervisorPlan 前必须存在 confirmed ResearchQuestion；计划输入证据记录 `question`、`topic_session_id`、`version`、`research_question_path`，前端审阅台显示绑定选题。
-  - P2-T SupervisorPlan Review State Machine 已完成：`PUT /api/v1/projects/{project_id}/supervisor-plan/review` 支持 approve / needs_revision / reject；审批只写 `state/product/supervisor_plan.json`，approved 后才 `can_dispatch=true`，不会改写 ResearchQuestion、VariableRoleSet、DesignSpec 或 RunPlan。
-  - P2-U Agent Task Queue 已完成：`GET/POST /api/v1/projects/{project_id}/agent-task-queue` 只从 `status=approved` 且 `can_dispatch=true` 的 SupervisorPlan 创建 `state/product/agent_task_queue.json`；队列默认只显示任务摘要、阻塞和负责人，输入证据/输出要求/风险/审计日志按需展开；创建队列不执行任务、不改写 ResearchQuestion、VariableRoleSet、DesignSpec、RunPlan 或 SupervisorPlan。
-  - P2-V Human Dispatch Audit 已完成：每个 Agent Task Queue item 创建后默认 `can_execute=false`、`next_action=dispatch_review_required`；用户必须逐项点击 `批准派工`、`要求修改` 或 `阻断任务`。批准后任务进入 `reviewed_for_dispatch`，但仍不自动执行，下一步只是 `select_execution_backend`。
-  - P2-W Real VariableRoleCandidate Promotion 已完成：已审批真实字段候选现在只能 promotion 成 `state/product/variable_roles_drafts.json` 中的可编辑草稿；不会覆盖正式 `state/product/variable_roles.json`。只有用户在正式变量角色编辑器里显式保存后，才进入 approved VariableRoleSet，并携带 candidate/draft provenance。
-  - P2-X Method Workflow Checklist 已完成：新增 `GET /api/v1/projects/{project_id}/method-workflows`，把 OLS/DID/IV/RDD/PSM/DML 的前置条件、诊断和 blocker 作为产品状态；RunPlan 保存时会拒绝 blocked DID/IV/RDD 等方法，前端默认折叠方法细节以降低噪声。
-  - P2-Y Reviewer Scorecard 已完成：新增 `GET/POST /api/v1/projects/{project_id}/reviewer-scorecard`，把 successful full run 后的审稿反馈落成五维评分卡；低分维度生成可人工接受的后续任务建议，但不会自动写入 Agent Task Queue。
-  - P2-Z Verifier Gates 已完成：新增 `GET/POST /api/v1/projects/{project_id}/verifier-checks`，Review & Export 页面在最终导出前显式显示结果绑定、复现清单、运行计划、方法执行、草稿预览、证据等级和 docx 导出预检；当前真实项目 8 个 gate 中 7 个 passed，`docx_export_preflight` blocked，因此最终 docx 导出仍禁用。
-  - Pipeline MVP Review 已完成：Playwright 浏览器验收 10 项全部通过，截图保存到 `artifacts/ui-checks/pipeline-mvp-*.png`；SupervisorPlan approved 状态显示修复为 `人工审批 已批准`，`docx 最终导出` 按钮有稳定 id 且在 verifier blocked 时 disabled。
-  - P2-P Local Codex SupervisorPlan 已完成：本地 Codex Supervisor 可以生成待审计划 artifact，但默认执行开关关闭，不能直接改写 VariableRoleSet、DesignSpec 或 RunPlan。
-  - P2-N StatsPAI Independent OLS Validation 已完成：StatsPAI 已作为 CSV OLS 独立验证后端产出 `local_execution` evidence；其他方法族仍需后续执行器。
-  - P1-K Manuscript consumption 已完成：Manuscript candidates 只消费 `can_write_to_draft=true` 且 `review_status=approved` 的 FindingCard。
-  - P1-L Manuscript candidate review 已完成：正文候选有独立 `review_status`、`can_promote` 和 `candidate_review` provenance。
-  - P1-M Manuscript promote preflight 已完成：approved candidate 可进入 `promotion_status=ready_for_export`，状态保存到 `state/product/manuscript_candidate_promotions.json`，但 `can_write_back=false`。
-  - P1-N Export preflight preview 已完成：`ready_for_export` candidate 可生成 write-back preview 和 export package manifest，状态保存到 `state/product/export_package_manifest.json`，但仍 `can_write_back=false`。
-  - P1-O Review & Export package workbench 已完成：`GET /api/v1/projects/{project_id}/export-package` 读取 `preview_ready` package，Review & Export 页面显示导出包验收台、evaluator checks、Frontier-Eng iteration log，并可回到 Results & Draft 查看候选来源。
-  - P1-Q Chinese Copy + Archive Interface 已完成：页面可见文案已中文化，全局界面升级为 `archive-shell`，右侧 `archive-inspector` 显示研究档案、相邻笔记、证据图例和收藏架。
-  - P1-R Clean Workbench Visual Pass 已完成：全局 archive shell 去掉纸格噪声和厚重阴影，右侧变为 `inspector-rail` 属性检查器，Data & Design 的变量角色入口改成单列 record/list，修复截图中的文本重叠。
-  - P2-A Dataset Quality Profile 已完成：`GET /datasets` 返回本地 CSV 质量画像，前端“数据与设计”显示样本量、缺失率、字段类型和 readiness。
-  - P2-B Method Skill Catalog 已完成：RunPlan 暴露 OLS/DID/IV/RDD/PSM/DML 方法技能集；OLS/PSM/DML 当前 ready，DID/IV/RDD 暴露缺面板时间、工具变量和断点运行变量；前端“研究设计细节”显示纵向方法准入证据清单。
-  - P2-C OLS Execution Adapter 已完成：approved OLS RunPlan 现在会生成 `Results/json/method_execution_result.json`，run response 和 `run_manifest.json` 都包含 `method_execution.evidence_level=local_execution`；unsupported method 返回 `unsupported_run_plan_method`，数据不足/公式不可估返回 `method_execution_failed`。
-  - P2-D Method Execution Evidence UI 已完成：`method_execution_result.json` 现在进入 `observability.method_execution` 和 `findings[].method_evidence`；“实证执行”和“结果与草稿”页面都显示 OLS adapter、公式、样本量、处理变量系数、证据等级和 artifact 路径。
-  - P2-E OLS Evaluator Evidence 已完成：`method_execution_result.json` 现在包含标准误、t 统计量、normal approximation p 值、95% 置信区间、残差诊断和 evaluator checks；Results & Draft 的 FindingCard 显示中文紧凑方法证据摘要，最新验收 run 为 `run_a3674e9e78c6`。
-  - P2-F Real Data Candidate Pool 已完成：`GET /datasets` 返回只读 `external_catalog`，默认扫描 `/Users/mahaoxuan/Desktop/实证数据库`；本机实证数据库发现 223 个真实候选文件，前端“数据与设计”显示 6 张只读候选卡，与当前项目内 `analysis_sample.csv` 分开。
-  - P2-G Real Dataset Bind Preflight 已完成：真实候选文件现在可生成导入/绑定预检，预检写入 `state/product/dataset_import_preflights.json`，页面显示 `待人工确认`、源路径、目标 `Data/Raw/<filename>`、策略、只读说明和检查项；预检不复制、不移动、不绑定数据。
-  - P2-H Real Dataset Import Apply 已完成：`ready_for_review` 预检现在可通过显式人工动作复制到项目、只绑定外部引用或取消；apply 记录 SHA256、大小、目标路径和 `dataset_import`，云端 runtime 对本地路径返回 `cloud_upload_required`。
-  - P2-L Variable Role Candidate Review 已完成：已画像真实 CFPS `.dta` 可以生成 `VariableRoleCandidate`，并支持“候选已确认 / 需要调整 / 驳回候选”；候选 review 只写入 `state/product/variable_role_candidates.json`，不会改写正式 `state/product/variable_roles.json`。
-  - 当前真实候选来自 `finding_trained_effect`，绑定 `run_c424d6a11af7`、`Results/json/analysis_result.json`、`Manuscripts/generated/paper_draft.md`、`state/product/finding_reviews.json`、`state/product/manuscript_candidate_reviews.json`、`state/product/manuscript_candidate_promotions.json`、`state/product/export_package_manifest.json` 和 `Manuscripts/generated/previews/manuscript_candidate_finding_trained_effect_results.md`。
-  - API 为 `GET /api/v1/projects/{project_id}/manuscript-candidates`、`PUT /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/review`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/promote`、`POST /api/v1/projects/{project_id}/manuscript-candidates/{candidate_id}/export-preflight`、`GET /api/v1/projects/{project_id}/export-package`，前端在 Results & Draft 页面渲染 `manuscript-candidates-list`，在 Review & Export 页面渲染 `export-package-workbench`。
-- 下一步：
-  - P2-AA：把已人工派工审阅的 Agent Task Queue 接到执行后端选择层；先做 BDD/TDD，区分 StatsPAI/Python/StataMCP/Codex 子 Agent 的执行边界、日志、结果文件、evaluator checks 和 `local_execution` 证据。
-  - P2-M：把 approved candidate 连接到正式变量角色编辑确认流程，允许用户基于真实字段候选搜索/修改 outcome、treatment、controls、instruments；保存时才写入正式 `state/product/variable_roles.json`。
-  - 后续 P2-N：接入真实 StatsPAI/StatsAPI 或 StataMCP 执行器，要求独立日志、结果文件、evaluator checks、交叉验证和 `local_execution` evidence。
-  - 只有 `method_catalog` 中 `readiness_status=ready` 的方法才允许进入 RunPlan 执行任务；blocked 方法只能展示阻塞原因。
-  - 继续保持不直接覆盖 `Manuscripts/generated/paper_draft.md`；任何源草稿写回都必须单独 BDD/TDD，并要求显式人工动作。
-  - 若继续视觉迭代，应在现有 archive shell 中把 Review/Export、Artifacts、Agents 做成证据架和审计时间线，不要回到普通 SaaS landing page。
-- 当前约束：
-  - 原始数据不手改
-  - 正文不直接从临时结果取数
-  - 临时试验优先放 `Program/temp/`
-  - mock 输出不得冒充真实研究证据
-  - 第一版优先复用现有 FastAPI + 静态前端产品壳
-  - 已确认 VariableRoleSet 保存在 `state/product/variable_roles.json`
-  - 已确认 DesignSpec 保存在 `state/product/design_spec.json`
-  - 已确认 RunPlan 保存在 `state/product/run_plan.json`
-  - 完整 run 只能在 RunPlan approved 后启动；当前已通过 `POST /api/v1/projects/{project_id}/runs/full` 生成 `run_c424d6a11af7`
-  - Results & Draft 当前已通过 `GET /api/v1/projects/{project_id}/results-draft` 读取 `run_c424d6a11af7` 并生成 FindingCard / DraftSection evidence binding
-  - FindingCard 当前已支持 claim review；`finding_trained_effect` 已 approved，`can_write_to_draft=true`，审阅状态保存在 `state/product/finding_reviews.json`
-  - Manuscript candidates 当前是派生候选，不写回源草稿；候选审阅状态已保存到 `state/product/manuscript_candidate_reviews.json`
-  - Manuscript promotion 当前是导出前检查状态，不写回源草稿；promotion 状态已保存到 `state/product/manuscript_candidate_promotions.json`
-  - Export preflight 当前只生成 `Manuscripts/generated/previews/...md` 和 `state/product/export_package_manifest.json`，不覆盖 `Manuscripts/generated/paper_draft.md`
-  - Review & Export 当前只展示导出包和 evaluator 结果，不执行写回或 docx 生成；可视化验收截图为 `/tmp/empirical-workbench-review-export-p1o.png`
-  - Archive Interface 当前只改前端信息架构和视觉层，不改变后端状态机；验收入口为 `http://127.0.0.1:8765/?v=20260513-archive1`
-  - Clean Workbench 当前是第一轮视觉清洁层；验收入口为 `http://127.0.0.1:8765/?v=20260513-clean1`
-  - Dataset Quality Profile 当前是轻量 CSV 画像，不是完整 StatsPAI 描述统计；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2a`
-  - Method Skill Catalog 当前是 `local_file` 前置条件目录，不是 StatsPAI 真实执行；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2b-clean`
-  - OLS Execution Adapter 当前是最小本地 Python OLS 执行器，不是完整 StatsPAI/Stata 统计引擎；验收 run 为 `run_4c62f1721afb`，`Results/json/method_execution_result.json` 为 `local_execution` 证据。
-  - Method Execution Evidence UI 当前已把 OLS 方法执行证据接入 Execution / Findings；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2d-method`。
-  - OLS Evaluator Evidence 当前已把标准误、p 值、置信区间和 evaluator checks 接入方法执行与 FindingCard；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2e-eval`，最新 run 为 `run_a3674e9e78c6`。
-  - Real Data Candidate Pool 当前是只读真实数据 inventory；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2f-realdata2`，发现 223 个候选文件，但尚未导入/绑定到当前项目。
-  - Real Dataset Bind Preflight 当前是只读导入准备状态；验收入口为 `http://127.0.0.1:8765/?v=20260513-p2g-bind1`，可对 CFPS 候选文件生成 `ready_for_review` 预检，但尚未创建项目内数据文件。
-  - Real Dataset Import Apply 当前已支持本地复制、外部引用绑定和取消预检；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2h-import1`，但尚未解析 DTA/XLSX/Parquet 变量字典。
-  - P2-I/P2-J 已完成真实数据字段画像：已绑定 CFPS `.dta` 可通过 metadata-only 读取变量名、变量标签、Stata 类型、样本数和字段数；该画像仍不自动改写 VariableRoleSet、DesignSpec 或 RunPlan。
-  - P2-K Rigorous Empirical Execution Contract 已完成：full run 会声明当前真实执行后端 `python_ols_adapter`，把 StatsPAI/StatsAPI 和 StataMCP/Stata 标为候选后端，并记录数据预检与可复现入口；验收入口为 `http://127.0.0.1:8765/?v=20260514-p2k-rigorous4`。
-  - P2-L Variable Role Candidate Review 已完成：验收入口为 `http://127.0.0.1:8765/?v=20260515-p2l-candidates1`；最新真实 CFPS 候选状态为 `approved_candidate`，但正式 `state/product/variable_roles.json` 哈希与 mtime 未变化。
-  - P2-W Real VariableRoleCandidate Promotion 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2w-real-variable-promotion`；浏览器可见 `候选建议` 和 `正式变量角色`，点击 `基于候选创建变量角色草稿` 后只创建草稿并显示保存入口，网络 4xx 和 console errors 均为 0。
-  - P2-X Method Workflow Checklist 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2x-method-workflow`；Research Design 页面可见 `OLS：可执行`、`DID：缺少时间变量、处理时点`、`IV：缺少工具变量`、`RDD：缺少断点运行变量`、`PSM：可预检`、`DML：可预检`；`查看方法要求` 默认折叠，展开后显示诊断和前置条件。
-  - P2-Y Reviewer Scorecard 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2y-reviewer-scorecard`；Review & Export 页面显示 `新颖性`、`识别可信度`、`数据质量`、`表达清晰度`、`政策相关性` 五个评分维度；`查看理由与后续任务` 初始关闭，点击后显示证据、理由和 `加入任务队列草案`。
-  - P2-Z Verifier Gates 已完成：验收入口为 `http://127.0.0.1:8768/?v=20260517-p2z-verifier-gates`；Review & Export 页面显示 `导出核验门`，8 个 verifier rows 可见，其中 `结果绑定`、`复现清单`、`运行计划`、`分析结果产物`、`方法执行产物`、`草稿预览`、`证据等级` passed，`docx 导出预检` blocked，`docx 最终导出` 按钮 disabled。
-  - Feynman 当前只作为 callable external research engine 参考写入 metadata，没有嵌入源码或实际调用 CLI
+## Next（只记一件主线）
+
+在不回退文风红线的前提下，把文献中文侧与写厚质量再抬一轮（CNKI 作者/DOI 清洗 + 学术扩写），并让 quality loop 多轮后 verified_count 稳定不丢 CNKI。
+
+## Run
+
+```bash
+# 文献包
+PYTHONPATH=. python3 -m runtime.literature_pack
+
+# 质量环（Grok 4.5）
+PYTHONPATH=. python3 -u scripts/41_quality_loop_2h.py --hours 1 --provider grok --model grok-4.5
+
+# CNKI（需 Chrome CDP :9333）
+# 见 docs/superpowers/handoffs/2026-08-07-continuous-loop-literature-cnki-handoff.md
+```
+
+## Docs for re-entry
+
+- Spec: `docs/superpowers/specs/2026-08-07-continuous-loop-literature-cnki-spec.md`
+- Handoff: `docs/superpowers/handoffs/2026-08-07-continuous-loop-literature-cnki-handoff.md`
+- Log: `notes/session-logs/2026-08-07-continuous-loop-style-lit-cnki.md`
+
+## Not this stage
+
+- 不恢复 P0–P18 / product-control 叙事。  
+- 不把 OLS 写成 LATE。  
+- 不在正文写仓库路径。

@@ -6,6 +6,13 @@
 .env
 .env.local
 .env.*.local
+.env.local.bak*
+.env*.bak*
+
+# Long quality-loop / scrape noise
+.hour-loop/
+.firecrawl/
+.od-skills/
 
 # Python caches
 __pycache__/
@@ -67,6 +74,9 @@ docs/workflows/
 .claude/worktrees/
 .agent-memory/local/
 .playwright-cli/
+
+# Matt Pocock skills local-markdown issue tracker (wayfinder maps, tickets, specs)
+.scratch/
 
 # Local verification and generated review outputs
 Product/artifacts/

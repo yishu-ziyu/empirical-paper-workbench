@@ -1,6 +1,18 @@
-# Empirical Research OS Project Instructions
+# Empirical Paper Workbench — Project Instructions
 
-本文件约束 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板` 及其子目录。
+本文件约束 `/Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板`（empirical-paper-workbench）及其子目录。
+
+## Product identity（先读）
+
+- 产品：`docs/PRODUCT.md` — **Continuous Empirical Loop**（全自动：设计→估计→成文→复现→修订）
+- Agent 身份：`SOUL.md`
+- 人入口：`README.md`
+- 状态：`WORKFLOW_STATUS.md`（只记现在，无 P 朝代）
+- 编排 SSOT：`runtime/continuous_loop.py`（内环 `runtime/full_pipeline.py`）
+- **默认 LLM：Grok 4.5**（`provider_id=grok` · `docs/SETUP_GROK.md`）。开发/测试真实调用一律 Grok 4.5，禁止默默退回 MiniMax。
+
+**禁止**把已删除的 product-control / P0–P18 /「半成品+红标品牌」叙事当产品定义。  
+审计与质量门是 loop 内刹车，不是首页哲学。
 
 ## 默认工作方式：BDD + TDD
 
@@ -74,3 +86,19 @@
 - 纯只读检查、项目状态汇报、命令输出解释、简单文案整理、无行为变化的文档记录，可以不进入完整 BDD/TDD。
 - 紧急恢复或阻断性故障可先做最小止血，但必须在最终说明中标记跳过了哪些 BDD/TDD 阶段以及原因。
 
+## Agent skills
+
+Matt Pocock 的工程 skills（vendored at `~/.trae-cn/vendor/mattpocock-skills/`）在本仓库按下列配置生效。首次使用 `/to-tickets`、`/to-spec`、`/wayfinder`、`/triage`、`/implement` 等 skill 前需先读完此区块指向的 docs。
+
+### Issue tracker
+
+Local markdown tracker — issues/specs 作为 markdown 文件存放在 `.scratch/<feature-slug>/`，不使用 `gh`/`glab`。wayfinder 用 `.scratch/<effort>/map.md` + 子 ticket 文件。See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout — 一个根 `CONTEXT.md` + `docs/adr/`。`CONTEXT-MAP.md` 不存在；如未来出现 monorepo 信号再切 multi-context。See `docs/agents/domain.md`.
+
+## Lessons
+
+- **Manuscript body is human academic prose only (2026-08-06):** Never put repo paths, `(证据：tables/...)`, claim register IDs, Continuous Loop / integrity / package jargon, or JSON/CSV filenames in the paper body or PDF front matter. Evidence binding lives only in claim register, Results JSON, and replication. Prefer `course_paper_builder` as primary writer; reject LLM polish that reintroduces path leaks.
+- **Literature must be DOI-verified before author-year cites (2026-08-06):** Use `runtime/literature_pack.py` (Crossref) → `references.bib` + verified CSV + contribution matrix. Writing may cite only verified entries. Never paste placeholder seeds or invent author/year/journal. `verified_count=0` means no formal bibliography claims in the body. Style failures are hard reds, not "extra craft points".

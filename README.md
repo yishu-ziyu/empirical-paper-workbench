@@ -1,102 +1,117 @@
-# 实证论文项目模板
+# empirical-paper-workbench
 
-这个模板把 AER 风格的 replication package 结构、Git 版本控制、以及和 Agent 协作时的最小约束放在一起。
+**全自动实证论文工作台 · Continuous Empirical Loop**
 
-## 目录原则
+远程：https://github.com/yishu-ziyu/empirical-paper-workbench.git  
+本地：本目录
 
-- `Data/`：只管数据真源。
-- `Program/`：只管可重复运行的程序。
-- `Results/`：只管程序导出的结果。
-- `Manuscripts/`：只从 `Results/` 或明确的编辑层取数字和图表。
-- `Submissions/`：投稿时导出自包含材料包。
-- `Reference/`：文献、制度材料、阅读资料。
-- `docs/`：项目说明、方案、规范。
-- `Tasks/`：当前阶段、待办、Agent 协作记录。
+## 一句话
 
-## Data 规则
+题目 + 数据进来 → 系统无人值守转 **设计 → 估计 → 成文 → 复现 → 修订** 环 → 吐出可打开的论文包。
 
-- `Data/Raw/`：原始数据，保留原貌，不手改。
-- `Data/Interim/`：中间数据，记录处理过程。
-- `Data/Final/`：正式分析输入，只认这里的成品数据。
-- `Program/Clean/` 负责从 `Raw` 生成 `Interim` 和 `Final`。
+人只在三处出现：丢料、验收、抢方向盘。  
+审计、哈希、claim 门、质量门是 **loop 内部的刹车**，不是产品口号，不是每一步签到台。
 
-## Program 规则
+## 成功标准
 
-- `Program/setup.do`：统一路径配置。
-- `Program/master.do`：主链路入口，一键串联全流程。
-- `Program/Clean/`：清洗、变量构造、样本筛选。
-- `Program/Analysis/`：读取 `Data/Final/`，导出表格和图表。
-- `Program/temp/`：临时试错代码。
-- `Program/discarded/`：放弃但保留的旧脚本。
+| 算成功 | 不算成功 |
+|--------|----------|
+| 课程/本科题目 + 可用数据 → 多轮自动跑 → 论文可打开 + 复现脚本可跑 | 只剩 JSON 门禁、红标清单、「请人工确认第 N 步」 |
+| 轨迹可回放；无证据 claim 进不了 PASS | 漂亮 PDF 但系数/文献捏造 |
+| 证据不够时 **降级诚实输出**，然后 **自动改设计/重跑**，不是停成半成品剧场 | 用「半成品 + 缺口」当品牌身份 |
 
-## Results 规则
+## 一次跑通（主路径 = Continuous Loop）
 
-- `Results/tab/`：正式表格。
-- `Results/fig/`：正式图形。
-- `Results/temp/`：临时输出和调试产物。
-- 手稿正文只从 `Results/` 或明确的编辑层取数字。
+```bash
+cd /Users/mahaoxuan/Desktop/经济学论文/实证论文项目模板
+set -a; source .env.local; set +a
+export MINIMAX_CN_API_KEY="${MINIMAX_API_KEY}"
 
-## Git 规则
+# **主路径** evaluate→learn 回炉（默认 Grok 4.5）
+PYTHONPATH=. python3 -m Product.cli continuous-loop --llm --max-rounds 3
 
-- 主线仓库保持干净。
-- 稳健性检验、修稿、Agent 试验优先走分支。
-- 大体量数据、投稿打包、编辑器缓存、Stata 和 LaTeX 中间产物默认不进仓库。
+# Pi 能拍多少拍多少（写稿默认 Grok；Pi 仅助攻）
+PYTHONPATH=. python3 -m Product.cli agent-pi --loop --max-rounds 3 "跑通父母教育工资 Continuous Loop"
+```
 
-## 推荐启动顺序
+LLM 默认：`provider=grok` · `model=grok-4.5`（见 `docs/SETUP_GROK.md`）。开发/测试真实调用一律 Grok 4.5。
 
-1. 把原始数据放进 `Data/Raw/`。
-2. 在 `Program/Clean/` 写清洗脚本，生成 `Data/Final/`。
-3. 在 `Program/Analysis/` 写主分析和稳健性分析脚本。
-4. 统一从 `Program/master.do` 运行。
-5. 结果落到 `Results/tab/` 和 `Results/fig/`。
-6. 手稿只读取这些最终结果。
+内环线性 10 步（调试用，不是产品主身份）：
 
-## 和 Agent 协作
+```bash
+PYTHONPATH=. python3 -m Product.cli full-pipeline --llm --provider grok --model grok-4.5
+```
 
-- 当前阶段写进 `Tasks/current-stage.md`。
-- 新任务先说明改的是 `Data`、`Program`、`Results`、还是 `Manuscripts`。
-- 临时试验先放 `Program/temp/`，验证后再迁回正式目录。
+详见 `docs/TRY_CONTINUOUS_LOOP.md`。
 
-## Phase A 运行入口
+产品壳（可选 UI）：
 
-- 项目定义：`paper.yaml`
-- 分析配置：`Program/config/analysis_config.yaml`
-- 统一入口：`python3 Program/run_paper.py --project-root . --dry-run`
+```bash
+python3 Product/serve_product.py   # http://127.0.0.1:8765
+```
 
-第一次运行后应至少生成：
+## Continuous Empirical Loop
 
-- `state/project_state.json`
-- `Results/index.json`
-- `Results/json/project_snapshot.json`
-- `Results/logs/run_paper.log`
-- `Manuscripts/generated/paper_draft.md`
-- `Manuscripts/generated/paper_draft.tex`
+```text
+        ┌─────────────────────────────────────────┐
+        │                                         │
+  题目+数据 → design → lit → data → estimate       │
+        │         │                │              │
+        │         ▼                ▼              │
+        │      evaluate ←── write ← results       │
+        │         │                │              │
+        │         ▼                ▼              │
+        │   revise / re-spec ──► reproduce ──► package
+        │         │                               │
+        └─────────┴───────────────────────────────┘
+              内部：claim↔evidence · quality gate · REPRO
+```
 
-Word 导出入口：
+固定闸门管 **阶段合同**；闸门内 Agent 可多轮 ReAct。  
+质量门红灯 → 纠正动作（改规格/补数据/重估/重写），不是把「请人点确认」当终局。
 
-- `python3 Program/export_docx.py --project-root .`
+## 仓库结构（落地，不是叙事）
 
-导出后应至少生成：
+| 路径 | 职责 |
+|------|------|
+| `runtime/full_pipeline.py` | 全流程编排 SSOT |
+| `Product/` | CLI、Agent、API、可选 React 壳 |
+| `Program/` | 可复现分析代码 |
+| `Data/` | Raw / Interim / Final |
+| `Results/` | 表图 JSON 证据 |
+| `Manuscripts/` | 正文与生成稿 |
+| `evidence/` | claim register / integrity audit |
+| `replication/` | 独立复现脚本 |
+| `docs/PRODUCT.md` | **产品叙事唯一入口** |
+| `SOUL.md` | Agent 身份 |
 
-- `Submissions/paper_draft.docx`
-- `Submissions/export_manifest.json`
-- `Results/logs/export_docx.log`
+旧 P0–P18 门禁剧场、半成品品牌稿、product-control 阶段叙事 **已删除**。  
+历史 run 产物可在 `Results/`、`Reviews/`、`state/` 里当证据考古，不再当产品定义。
 
-## Product Shell
+## 已验证 demo
 
-当前产品骨架位于 `Product/`。
+- 题目：父母受教育水平对子女工资收入的影响（CFPS 修复样本）
+- 例：`full_pipeline_parent_education_wage_20260806_212153` · 10/10 · `REPRO_OK`
+- 论文：`Manuscripts/generated/parent_education_wage_full_pipeline_paper.md`
+- 复现：`python3 replication/reproduce_parent_education_wage_full_pipeline.py`
 
-本地启动：
+## 能力标尺
 
-- `python3 Product/serve_product.py`
+生产 Agent 以 [ai-agent-book](file:///Users/mahaoxuan/Desktop/AI产品经理/ai-agent-book) 为上限参考：
 
-启动后打开：
+```text
+Demo:  Agent = LLM + 上下文 + 工具
+Prod:  Agent = Model + Harness
+Harness = 上下文 + 工具 + 约束 + 验证 + 纠正
+Loop:  思考 → 行动 → 观察 → … → 停止条件
+```
 
-- `http://127.0.0.1:8765`
+无评估则无进步。工具自包含、完整回传。Skills 渐进披露。Multi-agent 要有独立 IO，禁止人设串戏。
 
-当前运行入口：
+## 文档
 
-- FastAPI：`Product/app.py`
-- React 产品壳：`Product/web-react/src/App.tsx`
-- 当前产品主线：论文生产流水线，覆盖题目/数据输入、研究问题判断、文献变量、方法预检、模型执行或阻断、论文草稿、审阅修订、PDF/DOCX/证据包/复现说明。
-- Product/web 已移除：旧静态工作台不再是源码、回退入口或验收入口。
+- **产品叙事**：`docs/PRODUCT.md`（只认这一份）
+- **试用**：`docs/TRY_FULL_PIPELINE.md` · `docs/TRY_EMPIRICAL_AGENT.md`
+- **Agent 约束**：`AGENTS.md` · `SOUL.md`
+- **术语**：`CONTEXT.md`
+- **当前状态**：`WORKFLOW_STATUS.md`

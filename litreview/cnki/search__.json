@@ -1,0 +1,227 @@
+{
+  "query": "父母受教育年限 子女收入",
+  "total": "23",
+  "page": "1/2",
+  "results": [
+    {
+      "n": 1,
+      "title": "父母受教育程度对子代就业质量的影响研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wt0fj13jOW1xdwR4aeo-aRZRDnG1oq2fdqaPhmGSaAjGK609Hpf6kRlP7QuV6QXmLFzIhIgH_qHUtuiGXXGlsH8oBjpVY8tV_6q1uCwKurNZT4K4o9_qnBjhJoZagfKfHL8lx7v2IoDy0L5xQFbSy4g5ZqrMnEYGGn0pYfHS5YhEEsOM4WdIKB&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnz58yCymH9k9_Ris4aGYDHhFl849V_KNsQ5Jnf-N0sGvPhQCRo5kYiP4eWkONp9c2",
+      "authors": "张泽宇",
+      "journal": "黑龙江大学",
+      "date": "2024-05-11",
+      "citations": "",
+      "downloads": "533"
+    },
+    {
+      "n": 2,
+      "title": "父代教育水平、代际传递与子代基础教育不平等",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xNxeHNW6nM5h8cNVtg24HYyG2fseYVnX-aTrbNQ5wijKD-6DFz6hel09Ro1gmXsFPjKqo269ebaQWOi-7TdDdeGd8Bq7_YXWZN7XKGZ5pc3-zYCCrKehSkaYhiHucP9gqN46928cNf0PznGVyEjywjb5A7B_yOWVtdjCHpfwxXGA==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgifGyOjoWjwwqjYKX0QVccmUAVpHZPFjK-R5QTIwODeKTa3tX2onnTexasLcgF4O3JF3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "刘金典; 程名望; 吴春燕",
+      "journal": "经济学动态",
+      "date": "2023-07-18",
+      "citations": "54",
+      "downloads": "3963"
+    },
+    {
+      "n": 3,
+      "title": "教育财政投入的长期影响——来自国家级贫困县一期义教工程的证据",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wzbZPxRd2KeDTGnUvQ1ESjIcBESeAvKJ-L5euckh8rjx1kMgmG5CL3Yy_MyKbc0XFfBj-jY35humeqH-lRHh3c_Zm4751aWMmTNeSd-5a2PBATd4vffgPQrvlgFnFyarGejP_6nmylDPnQns26TGhN9Z06yQXdu4JTvdmCF824Nt9VMymrzf1F&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmn7kgdHiH6wAxZGquP6rA2chMQcTim95WbQcQvyZY8W5vI1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "黄立朋",
+      "journal": "上海财经大学",
+      "date": "2023-06-01",
+      "citations": "",
+      "downloads": "186"
+    },
+    {
+      "n": 4,
+      "title": "公共政策、人力资本与共同富裕",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0z8cJE3rLcvF6Yscsg0Egy_XdAV2bNietq26zAhF9PayXpIguwJcPsu2YTaEwlImdQNcqGMfUUJHVTvZ6yyEWT-LxKkF-mybcwWQ5T_J-wfJCbDrn74o54jA2UrGkeSnrw0uXgUdy48MYq5bXHq3DAlSqN92Su4W7h7EvmK-vUoIWcritrTOKem&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnR4fPkmeA5jvjfltCtc-ix9wneWrfo0YJU2eWl-Pcvsv035vwP9NiK0Drw-b4p-fQ",
+      "authors": "亢延锟",
+      "journal": "中央财经大学",
+      "date": "2023-05-12",
+      "citations": "",
+      "downloads": "976"
+    },
+    {
+      "n": 5,
+      "title": "区域性政策对人力资本积累的影响研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xPD-EDRXHB9ra1oamAkvoOSEo7vLIbWfozaKvuEi0QsqIAakHj5k2yvRPJFSNeskolMth8kKxnRscE_mzBKq6L2NGn4JlU00b2reCOC_VOuUfPOcijvWsK8reD3kOO6Gbt6UkJm4XFecBriauUju3ObUkqmF0e36lpyV3W9Xnb52ytt1VICaRM&uniplatform=NZKPT&language=CHS",
+      "exportId": "eQD7iSfLfq3gVvjewcWhV4dDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmn9jYPcw--DRU7ACDX7E0kFtwneWrfo0YJU2eWl-Pcvsv035vwP9NiK0Drw-b4p-fQ",
+      "authors": "贾昊文",
+      "journal": "西南财经大学",
+      "date": "2023-05-01",
+      "citations": "",
+      "downloads": "395"
+    },
+    {
+      "n": 6,
+      "title": "子女教育与老年人健康行为——基于CHARLS数据的研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0w4UdvAV5pChEpW-TBKGz_1osRG8r-BJmB0avmuy9P8Kt1_Hq3-ag2P568SeHeK3ChumoKnlUPsRMJJEfCn9ZJNM-76eerQ6K_x7DKOPGQL-VOdDjfy5D1NFn3qmonw5sIxiQMR5Pjy1-HIciXPDa1WYTe7PZs3vrrRgFkDaVnq3gQT2Jqa2f3t&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnOB-Rc8ySTVQt1xxKaXZOBxFl849V_KNsQ5Jnf-N0sGvPhQCRo5kYiP4eWkONp9c2",
+      "authors": "于喆",
+      "journal": "中央财经大学",
+      "date": "2022-05-15",
+      "citations": "1",
+      "downloads": "331"
+    },
+    {
+      "n": 7,
+      "title": "基于父母教育背景的中国家庭校外教育支出分化——兼论家庭需求视角下“双减”政策实施的优化",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wRFWegnLnZTtMsHmdoOyEiQsUXTKlCK3UnIzhUHiYGgLVALgaL4WAmZ1EZ2QscxJggu06R_U545lAC-qAWbU-quDi6oVs3EeQqWeTYeuxDXW7aWsrC5GloNqlfnrU4ygg2qHgr0L3yg8or9M6Xa8PefZVIPXmPS_asJPBBki2u_w==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgieHErSwbgidRAax3iHSLf6HzQuG-0MYul2oOwepbrs4rRvU-zPPyvLbKFuSpmggmKp3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "黄斌; 何沛芸; 朱宇; 魏易",
+      "journal": "中国教育学刊",
+      "date": "2022-04-10",
+      "citations": "33",
+      "downloads": "4618"
+    },
+    {
+      "n": 8,
+      "title": "教育代际传递与社会分层——来自中国综合社会调查的经验证据",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xKYBes5SWpcrpVMheFYJmxbsgMB7oaZXElr0LmEt3eRKtqDhRJOvASfwAoR-zcmRvtS8d8jeDYDOwva3xEKwIf2z1xcWhOuSUf_85wWbsrEvwACJ4d_sx_JZE3DiJ6-ne-KGCl-OvP70T7QDow9NESYmUowvxmXCYF8WpxGTmMuw==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgicL9te_icMdrpF9K_w2bnL6q0G3HQVUPGx5AaK7DiBF5hvU-zPPyvLbKFuSpmggmKp3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "潘艺林; 吴春燕; 刘金典",
+      "journal": "中国经济问题",
+      "date": "2022-03-20",
+      "citations": "45",
+      "downloads": "3353"
+    },
+    {
+      "n": 9,
+      "title": "家长受教育程度对家庭教育支出的因果效应分析——基于准实验研究设计",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0zIBmcLYDrNjtYb8jJkzeM6v-OoNtoBqmkoJqJcTnbhQred8R27hTdqx9nH_4cDH7fORYpYM3QeiR6eqRvw0n8x1Q5RWR_ibn6-mxHDfVBdIYy2VifAwIbqFezP0IYJN6YzDIwRG4Qmi8xK0sKF-8BHLpnB88k-3EPyhQYehZ7vH2enqOFIokiT&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnxcY9SnsZTrh8CWi48Nk5hhFl849V_KNsQ5Jnf-N0sGvPhQCRo5kYiP4eWkONp9c2",
+      "authors": "何沛芸",
+      "journal": "南京财经大学",
+      "date": "2021-10-23",
+      "citations": "",
+      "downloads": "421"
+    },
+    {
+      "n": 10,
+      "title": "家庭文化资本对农村青少年辍学的影响研究——基于Cox模型的实证分析",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wrtMDWrn37qjvFqkIQvNVKRxBY84HDt46zJ0ucVBrYFtvhXQQR2rQUJaqGpGin6MpXk9-Bl7ApkPhHnLUMlT0KXiOKVjdTao-ToxIshiixWvXs0hs5isS8nngdjhkYsmari0nfSThimQse3c700wSTHy8YJPx2FrIzaQrdcVRneREfbHw-b6PB&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnoVbz3HjEXCu_RAbT7CuqoqgR0PBUzSTmBzLmbQF9ZHvPhQCRo5kYiP4eWkONp9c2",
+      "authors": "朱彦平",
+      "journal": "上海财经大学",
+      "date": "2021-05-01",
+      "citations": "2",
+      "downloads": "393"
+    },
+    {
+      "n": 11,
+      "title": "家庭背景对个人教育回报率的影响",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wCY1eLfEi7cVKxKTjdEjj7qMGmvakcoOtrNzkYfHkxAHL7brQIitThPyjHblZ_P0UxdfcXPPBr1VIntfmuCzw7T-CYEkyeO6gwTBLrPhTuNVQxmADH6qZ4n_SZSR4YlY4_w2RRhUlP2KwqnjIhGygu9jSQvuiTXc3l0I3KH60NHg==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgid7ieNpn_gSMrhKGFa1gv9ok5A79FOUP__wXExo6UdM_xcJFnCXWEvXwdDhbxhTw8J3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "刘泽云; 袁青青",
+      "journal": "中国人口科学",
+      "date": "2021-04-23 17:50",
+      "citations": "37",
+      "downloads": "3534"
+    },
+    {
+      "n": 12,
+      "title": "交际翻译理论视角下教育经济学文献翻译实践报告——以论文《代际教育流动性和经济发展水平》汉译为例",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0z3kh7y8Z-3duknPQBnVbzjLisF8bo3J3b6fM5IqR_fyr-r1jSgyx1jQ-l46ygRJ6blSow51oak40TWRFq9qFGRoddWR-pcrTimxWtSijnY43P0nHcN-ojm052hmFCiwD6yYlJQfA7257nWUaWgwgnEtBOpuYGZgiFQEWZur-gfp_eHSRlxU6AQ&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnSFxYypb9c4af0Qps9GHOxmxc0mMpJ4zM9cw0rLyMgU7I1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "雷敬霞",
+      "journal": "济南大学",
+      "date": "2020-07-01",
+      "citations": "1",
+      "downloads": "307"
+    },
+    {
+      "n": 13,
+      "title": "子女数量对子女教育程度的影响效应研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xBcniJKXj8eTYtiLNN5KAMPR3qdYYRIXWaUcEAFmAbM1qKeJlyF35XQfA-N4m_wxzoyUSUHmKMYE1BMA-ovjNLf3kyX2dUqzEnWhqOmabhsv4Rax7exxLht6VdVwSLc4yYuD14CKPcnW_4vfEgNewd1ETxQSDrQA4P-E6AaeqIV3TG_sbvug3W&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnP7AUUzmYHqUmpSB4SKGGI2xc0mMpJ4zM9cw0rLyMgU7I1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "魏宇航",
+      "journal": "辽宁大学",
+      "date": "2020-05-01",
+      "citations": "4",
+      "downloads": "844"
+    },
+    {
+      "n": 14,
+      "title": "基于农村收入差距视角我国农民子女教育获得研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0xBcniJKXj8eTYtiLNN5KAM8GjUuP_WGv8ZuE-N_SZ79fTvpewcJotk-wucZFmVpvnptbT9WU7twgIDdCSssxLdVeo2z8pjicBLZZ223qw_49wAw7OjxNSxMCqvdRJ9EB-EhWDORnpPhbgezD4IoKqk6qyGscJbazYGHVlm54VLJA==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgieCVRP_Mli9KL1dPVt2yG55FsoGyDqW53Th3ZNF7qw4xKLqpt-UE7qLGJpZtSTKj2x3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "付晶晶; 张杰",
+      "journal": "新疆农垦经济",
+      "date": "2019-02-15",
+      "citations": "",
+      "downloads": "431"
+    },
+    {
+      "n": 15,
+      "title": "有其父必有其子吗? 中国教育代际传递规模与影响因素分析",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0yVkgy5JYuINdx0-a3rTRzVA3BVJbWdtouZnL-1cjPP_qmEe5UAiYBJo0lxpTAO1LMWN454BasaYyzoE1xURZojg9Pj8fBvmtEngBsyJoBdIO_3LxuSNwRiX21KzFBR3bciiS00kyRlROsGvRI3lfuGDKei3J8K_enLz9sYsMafMQ==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgieXoCNqoJVlAHXAUFvmEkR4tKQTTRfi_jarbKyvEMqniKLqpt-UE7qLGJpZtSTKj2x3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "杜凤莲; 石婧; 张悦平; 张麟",
+      "journal": "劳动经济研究",
+      "date": "2019-02-15",
+      "citations": "43",
+      "downloads": "1820"
+    },
+    {
+      "n": 16,
+      "title": "“学二代”现象普遍存在吗?——基于教育数量和质量的代际流动研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0yiehpvedyjzPp_liv5VFMKPy-5MFOcMHH3lfZdhgSLM2gU2DpPzcMALKW66jh3KNOalYCaDlJzsU9p-OxDbkxDT4RzNyufZKN9U6VJnyDAfJzFw2Gr5rYVjj0eUue7Zav9UK3y6Hra9oSGdf8s-hNEuZpnABU4mSILuGJuAknbrA==&uniplatform=NZKPT&language=CHS",
+      "exportId": "Pe2nFq1PBOM11SpCErZ-LwM1UHjV0uMR_icN4IXwgichMhCjcDjVGFuDlqU6PwTISGfU1kA0tMXdhF9IDSXe_aLqpt-UE7qLGJpZtSTKj2x3KAUBlVIsgcb0E8u_YkCK",
+      "authors": "李军; 周安华",
+      "journal": "教育与经济",
+      "date": "2018-12-15",
+      "citations": "67",
+      "downloads": "2594"
+    },
+    {
+      "n": 17,
+      "title": "学校和家庭因素对城镇居民教育收益率的影响",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0zla5EChRvj24063iuywrF8EMahMIxlJ1hF0SnqVpBDRsIYU73XBPR4a7r-idC0r6Z5Lv8Jkjr_LYyqGiJKZazhbHE13uwJjQSI4DDhI3YlOaDROFrBHAirG1y7Pnx1_b9Is9Y_M5hTsTvwdsf8u-ymxcj_JFFaQSeU2v01btJdVQYCE3vPz8OF&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmn3h7RfXQ4PTocbv2nIXOrZbdyBo3QdYKtLXzVWenlX7bI1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "魏超",
+      "journal": "山东大学",
+      "date": "2018-05-25",
+      "citations": "",
+      "downloads": "192"
+    },
+    {
+      "n": 18,
+      "title": "农村女性受教育水平和代际流动性",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wsPntcC7kb2oaE-gK0RZUN1fn6xvX_I1fvN9yyv7SOukq4r8cZ__fw4CRevRSmA2j9ReRwRf7GsoERRqEyBdd4Zvi3bbzsqBqpo47ptMDSuDjtH-6nx3vcKmZe4GYVyi8LPHzt5wKcqeCPpaqwBuKYtn6PLUmUrHjcwI30SnswY8IXkhJ5Yxhg&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmn4pmE3gNBlW90bRPnIPFmVLdyBo3QdYKtLXzVWenlX7bPhQCRo5kYiP4eWkONp9c2",
+      "authors": "张哲学",
+      "journal": "厦门大学",
+      "date": "2018-04-01",
+      "citations": "3",
+      "downloads": "418"
+    },
+    {
+      "n": 19,
+      "title": "家庭收入对子女教育程度的影响——基于CHNS的实证研究",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0wsPntcC7kb2oaE-gK0RZUN1fn6xvX_I1fvN9yyv7SOusYilMcRLe_5ju1lhc_0FyQNzmmnIzSttjDLjjH6DtCgWuKGJHEm0o9ykR05SKEUzs9zp1uG9eZXisvddVRqO4BxWzsvLeM_KF6AHduh_oKlGjF2-XVTZPO2Va0Cw8cfnrHXB3Hq2zrm&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnPcNZ0nVY9XzrqeM5OMJxFkkz4t-Jqvom4D1UtsBjugfPhQCRo5kYiP4eWkONp9c2",
+      "authors": "付瑞",
+      "journal": "东北财经大学",
+      "date": "2017-10-01",
+      "citations": "5",
+      "downloads": "653"
+    },
+    {
+      "n": 20,
+      "title": "有其父必有其子吗？中国教育代际传递的规模与机制",
+      "href": "https://kns.cnki.net/kcms2/article/abstract?v=CK5qQJ1_U0ypc29z2cVlCkLLEaI29bUy6QezJeSvIRYGSTR9azUh8M_PYefeA7MumW0bLdHHzpUw06QiXn9KnyJdL1WbQ4eoD4uFllAC-XbNTUhiEIyxzfuC7KcQEgyOvic5HjjNE7TnOs6FsUFa6Mfk7az9NT9YGaxxztJaheP3jvwzfFOClefGJkiY-eqR&uniplatform=NZKPT&language=CHS",
+      "exportId": "RGa7mrESpptToOMuMXTtLIdDpABOkPy0aETAVZfzihwm4iM4UTsUTJq-th3gskmnXAAzzS1oq4xY2b_5kzb61DcbsoACm-a-lVfdL_bgLwnI1ZqBdCn8bJxRuFKgHA9D",
+      "authors": "张麟",
+      "journal": "内蒙古大学",
+      "date": "2016-06-10",
+      "citations": "14",
+      "downloads": "681"
+    }
+  ]
+}

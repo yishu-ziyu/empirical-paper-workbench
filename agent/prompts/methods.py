@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from prompts.revision import REVISION_BLOCK, fill_revision
+
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【方法】章节。"
     "方法章节必须让读者明白本文如何用数据回答研究问题，核心是识别策略。"
@@ -25,6 +27,7 @@ USER_TEMPLATE = (
     "要求：按【识别策略 → 计量模型 → 假设条件】三段式展开，"
     "主回归方程用 LaTeX 行内公式标注；"
     "至少列出 2 条识别假设并说明检验思路。"
+    + REVISION_BLOCK
 )
 
 
@@ -32,5 +35,6 @@ def render(**kwargs) -> tuple[str, str]:
     """Render system + user prompts with the given kwargs.
 
     Required kwargs: method, research_question.
+    Optional: low_dims, revision_suggestions.
     """
-    return SYSTEM_PROMPT, USER_TEMPLATE.format(**kwargs)
+    return SYSTEM_PROMPT, USER_TEMPLATE.format(**fill_revision(kwargs))

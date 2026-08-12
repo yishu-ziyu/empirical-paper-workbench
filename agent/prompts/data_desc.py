@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from prompts.revision import REVISION_BLOCK, fill_revision
+
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【数据描述】章节。"
     "数据描述章节是读者复现本文结果的关键，必须清晰交代数据来源、变量构造、"
@@ -25,6 +27,7 @@ USER_TEMPLATE = (
     "要求：按【数据来源 → 变量定义 → 描述统计表引用】三段式展开，"
     "变量定义部分至少列出因变量、自变量与 2 个控制变量；"
     "描述统计部分必须引用上面的 EDA 结果。"
+    + REVISION_BLOCK
 )
 
 
@@ -32,5 +35,6 @@ def render(**kwargs) -> tuple[str, str]:
     """Render system + user prompts with the given kwargs.
 
     Required kwargs: data_summary, eda_results.
+    Optional: low_dims, revision_suggestions.
     """
-    return SYSTEM_PROMPT, USER_TEMPLATE.format(**kwargs)
+    return SYSTEM_PROMPT, USER_TEMPLATE.format(**fill_revision(kwargs))

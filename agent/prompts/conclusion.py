@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from prompts.revision import REVISION_BLOCK, fill_revision
+
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【结论】章节。"
     "结论章节不是结果的简单重复，而是把发现拔高到政策与学术意义层面。"
@@ -25,6 +27,7 @@ USER_TEMPLATE = (
     "要求：按【主要发现 → 政策含义 → 局限与未来】三段式展开，"
     "主要发现用要点列出；政策建议要具体可执行；"
     "局限至少列出 2 条。"
+    + REVISION_BLOCK
 )
 
 
@@ -32,5 +35,6 @@ def render(**kwargs) -> tuple[str, str]:
     """Render system + user prompts with the given kwargs.
 
     Required kwargs: results, research_question.
+    Optional: low_dims, revision_suggestions.
     """
-    return SYSTEM_PROMPT, USER_TEMPLATE.format(**kwargs)
+    return SYSTEM_PROMPT, USER_TEMPLATE.format(**fill_revision(kwargs))

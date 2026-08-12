@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from prompts.revision import REVISION_BLOCK, fill_revision
+
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【结果】章节。"
     "结果章节是论文的核心实证展示，必须有条理地呈现基准、稳健性、异质性三层结果。"
@@ -25,6 +27,7 @@ USER_TEMPLATE = (
     "要求：按【基准回归 → 稳健性 → 异质性】三段式展开，"
     "基准回归部分必须引用上面的回归结果并解读系数；"
     "异质性部分至少讨论 1 个维度。"
+    + REVISION_BLOCK
 )
 
 
@@ -32,5 +35,6 @@ def render(**kwargs) -> tuple[str, str]:
     """Render system + user prompts with the given kwargs.
 
     Required kwargs: results, method.
+    Optional: low_dims, revision_suggestions.
     """
-    return SYSTEM_PROMPT, USER_TEMPLATE.format(**kwargs)
+    return SYSTEM_PROMPT, USER_TEMPLATE.format(**fill_revision(kwargs))

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from prompts.revision import REVISION_BLOCK, fill_revision
+
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【文献综述】章节。"
     "文献综述不是文献罗列，而是有逻辑地组织已有研究，凸显本文的研究空白与定位。"
@@ -37,6 +39,7 @@ USER_TEMPLATE = (
     "要求：按【文献回顾 → 研究空白 → 本文定位】三段式展开，"
     "至少分 2 个子主题；明确写出研究空白与本文定位；"
     "叙述中提及文献时按引用编号表附加 [N] 标记。"
+    + REVISION_BLOCK
 )
 
 
@@ -74,7 +77,7 @@ def render(**kwargs: Any) -> tuple[str, str]:
     dict 会被 _format_citation_indices 转为可读文本。
     """
     # 复制 kwargs 避免修改调用方传入的 dict
-    fmt_kwargs: Dict[str, Any] = dict(kwargs)
+    fmt_kwargs: Dict[str, Any] = fill_revision(dict(kwargs))
     ci = fmt_kwargs.get("citation_indices")
     if isinstance(ci, dict):
         fmt_kwargs["citation_indices"] = _format_citation_indices(ci)

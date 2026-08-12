@@ -16,7 +16,8 @@
 """
 from __future__ import annotations
 
-from typing import Any, List
+import json
+from typing import Any, List, Optional
 
 from protocols import ReviewOutput, ReviewRubric
 from state import EconPaperState
@@ -24,7 +25,7 @@ from state import EconPaperState
 # 评审通过阈值（运行时常量，不入 state）
 REVIEW_SCORE_THRESHOLD = 0.7
 
-# 综合分加权公式
+# 综合分加权公式（实证章节默认）
 # 0.3*endogeneity + 0.25*identification + 0.2*robustness + 0.15*contribution + 0.1*readability
 RUBRIC_WEIGHTS = {
     "endogeneity": 0.3,
@@ -33,6 +34,112 @@ RUBRIC_WEIGHTS = {
     "contribution": 0.15,
     "readability": 0.1,
 }
+
+# ADR-0004 Decision C：非实证章节内生性权重降为 0，可读 / 贡献抬高
+RUBRIC_WEIGHTS_BY_TYPE = {
+    "methods": RUBRIC_WEIGHTS,
+    "results": RUBRIC_WEIGHTS,
+    "data_desc": {
+        "endogeneity": 0.0,
+        "identification": 0.1,
+        "robustness": 0.25,
+        "contribution": 0.25,
+        "readability": 0.4,
+    },
+    "lit_review": {
+        "endogeneity": 0.0,
+        "identification": 0.1,
+        "robustness": 0.1,
+        "contribution": 0.4,
+        "readability": 0.4,
+    },
+    "intro": {
+        "endogeneity": 0.0,
+        "identification": 0.05,
+        "robustness": 0.05,
+        "contribution": 0.5,
+        "readability": 0.4,
+    },
+    "conclusion": {
+        "endogeneity": 0.0,
+        "identification": 0.05,
+        "robustness": 0.1,
+        "contribution": 0.45,
+        "readability": 0.4,
+    },
+}
+
+_RUBRIC_DIMS = (
+    "endogeneity",
+    "identification",
+    "robustness",
+    "contribution",
+    "readability",
+)
+
+
+def invoke_review_llm(
+    config: Any,
+    chapter_content: str,
+    rubric_template: ReviewRubric,
+    research_direction: str,
+    literature_entries: List[Any],
+) -> dict:
+    """非 mock 评审通道。要求 JSON ``{rubric, feedback, suggestions}``。"""
+    from llm.call_llm import call_llm as unified_call
+
+    prompt = (
+        "你是经济学论文审稿人。只输出 JSON，不要 markdown。"
+        "字段：rubric{endogeneity,identification,robustness,contribution,readability}"
+        "（每维 0 到 1）、feedback、suggestions。\n"
+        f"研究方向：{research_direction}\n"
+        f"文献条数：{len(literature_entries or [])}\n"
+        f"章节正文：\n{chapter_content}"
+    )
+    raw = unified_call(prompt, node_type="review")
+    parsed = _parse_review_json(raw)
+    if parsed is None:
+        raise ValueError("review llm returned unparseable json")
+    return parsed
+
+
+def _parse_review_json(raw: str) -> Optional[dict]:
+    """解析评审 JSON。失败返回 None，由调用方降级 mock。"""
+    if not raw or not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.startswith("json"):
+            text = text[4:].strip()
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            payload = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(payload, dict):
+        return None
+    rubric_raw = payload.get("rubric") or {}
+    if not isinstance(rubric_raw, dict):
+        return None
+    rubric: ReviewRubric = ReviewRubric()
+    for dim in _RUBRIC_DIMS:
+        try:
+            value = float(rubric_raw.get(dim, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        rubric[dim] = min(1.0, max(0.0, value))
+    return {
+        "rubric": rubric,
+        "feedback": str(payload.get("feedback") or ""),
+        "suggestions": str(payload.get("suggestions") or ""),
+    }
 
 
 def call_review_llm(
@@ -45,9 +152,8 @@ def call_review_llm(
 
     ADR-0008: 通过 LLMRouter 调用评审 LLM。
     - provider == "mock"（默认）→ 调 mock_review_llm（开发/测试）
-    - provider == "anthropic" / "openai" → Stage 2 接真实 LLM；当前占位仍调 mock
-
-    通过 monkeypatch 可替换为真实 LLM 或其他 mock（测试接缝不变）。
+    - provider == "anthropic" / "openai" → 走 invoke_review_llm；
+      JSON 解析失败降级回 mock，不把 graph 打费
     """
     from llm.router import router
     from nodes.review_sources.mock_review import mock_review_llm
@@ -55,24 +161,59 @@ def call_review_llm(
     config = router.get_config("review")
 
     if config.provider == "mock":
-        # 开发/测试：用 mock_review_llm（确定性规则评分）
         return mock_review_llm(
             chapter_content, rubric_template, research_direction, literature_entries
         )
 
-    # 生产环境：调真实 LLM（通过统一入口）
-    # 当前占位：仍用 mock（Stage 2 接 langchain-anthropic / openai）
-    return mock_review_llm(
-        chapter_content, rubric_template, research_direction, literature_entries
-    )
+    try:
+        return invoke_review_llm(
+            config,
+            chapter_content,
+            rubric_template,
+            research_direction,
+            literature_entries,
+        )
+    except Exception:
+        return mock_review_llm(
+            chapter_content, rubric_template, research_direction, literature_entries
+        )
 
 
-def _compute_composite_score(rubric: ReviewRubric) -> float:
-    """加权综合分：0.3*endo + 0.25*ident + 0.2*rob + 0.15*contrib + 0.1*read。"""
+def weights_for_chapter(chapter_type: str) -> dict:
+    """按章取 rubric 权重。未知 type 退回实证默认。"""
+    return RUBRIC_WEIGHTS_BY_TYPE.get(chapter_type or "", RUBRIC_WEIGHTS)
+
+
+def _compute_composite_score(
+    rubric: ReviewRubric, chapter_type: str = "methods"
+) -> float:
+    """加权综合分。默认 methods 权重，兼容既有单测。"""
+    weights = weights_for_chapter(chapter_type)
     total = 0.0
-    for dim, weight in RUBRIC_WEIGHTS.items():
+    for dim, weight in weights.items():
         total += rubric.get(dim, 0.0) * weight
-    return total
+    return round(total, 6)
+
+
+def _chapter_type_of(chapter: Any, state: EconPaperState, idx: int) -> str:
+    if isinstance(chapter, dict) and chapter.get("type"):
+        return str(chapter["type"])
+    outline = state.get("outline") or []
+    if isinstance(outline, list) and 0 <= idx < len(outline):
+        spec = outline[idx]
+        if isinstance(spec, dict):
+            return str(spec.get("type") or "")
+    return ""
+
+
+def _methods_method_from_outline(state: EconPaperState) -> str:
+    outline = state.get("outline") or []
+    if not isinstance(outline, list):
+        return ""
+    for spec in outline:
+        if isinstance(spec, dict) and spec.get("type") == "methods":
+            return str(spec.get("method") or "")
+    return str(state.get("method") or "")
 
 
 def review_chapter(state: EconPaperState) -> ReviewOutput:
@@ -161,10 +302,45 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
     llm_result = call_review_llm(
         chapter_content, rubric_template, research_direction, literature_entries,
     )
-    rubric = llm_result["rubric"]
+    rubric = dict(llm_result["rubric"])
     feedback = llm_result["feedback"]
     suggestions = llm_result["suggestions"]
-    score = _compute_composite_score(rubric)
+
+    chapter_type = _chapter_type_of(chapter, state, idx)
+    method = ""
+    if isinstance(chapter, dict):
+        method = str(chapter.get("method") or state.get("method") or "")
+    else:
+        method = str(state.get("method") or "")
+
+    from nodes.review_sources.structure_checks import (
+        apply_structure_cap,
+        check_structure,
+    )
+    from nodes.review_sources.threat_cards import (
+        active_threat_cards,
+        apply_threat_caps,
+    )
+
+    triggered = apply_threat_caps(rubric, chapter_content, active_threat_cards(state))
+    if triggered:
+        suggestions = (
+            f"{suggestions} 未处理识别威胁：{', '.join(triggered)}。"
+        ).strip()
+
+    score = _compute_composite_score(rubric, chapter_type)
+    failures = check_structure(
+        chapter_type,
+        chapter_content,
+        method=method,
+        methods_method=_methods_method_from_outline(state),
+        citation_indices=state.get("citation_indices"),
+    )
+    score = apply_structure_cap(score, failures)
+    if failures:
+        suggestions = (
+            f"{suggestions} 结构层失败：{', '.join(failures)}。不得只堆关键词。"
+        ).strip()
 
     review_feedback[idx] = feedback
     revision_suggestions[idx] = suggestions

@@ -17,14 +17,16 @@ from prompts import get_prompt
 # ---------------------------------------------------------------------------
 # 每个模板的占位符契约（任务规格里指定）
 # ---------------------------------------------------------------------------
+_REVISION = ["low_dims", "revision_suggestions"]
+
 TEMPLATE_CONTRACTS = {
-    "intro": ["research_question", "data_summary"],
+    "intro": ["research_question", "data_summary", *_REVISION],
     # ADR-0009 Stage 3: lit_review 新增 citation_indices 占位符（[1][2] 引用标记）
-    "lit_review": ["research_question", "key_references", "citation_indices"],
-    "data_desc": ["data_summary", "eda_results"],
-    "methods": ["method", "research_question"],
-    "results": ["results", "method"],
-    "conclusion": ["results", "research_question"],
+    "lit_review": ["research_question", "key_references", "citation_indices", *_REVISION],
+    "data_desc": ["data_summary", "eda_results", *_REVISION],
+    "methods": ["method", "research_question", *_REVISION],
+    "results": ["results", "method", *_REVISION],
+    "conclusion": ["results", "research_question", *_REVISION],
 }
 
 
@@ -116,6 +118,14 @@ def test_render_returns_tuple_and_replaces_placeholders(chapter_type, placeholde
         assert "{" + ph + "}" not in user, (
             f"{chapter_type} render() left placeholder {{{ph}}} unreplaced"
         )
+
+
+def test_render_revision_defaults_are_empty_not_none():
+    """缺省弱维 / 建议时不把 None 写进 prompt。"""
+    mod = get_prompt("methods")
+    _, user = mod.render(method="DID", research_question="Q")
+    assert "None" not in user
+    assert "上一轮弱维：" in user
 
 
 # ---------------------------------------------------------------------------

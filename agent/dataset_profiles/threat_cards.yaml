@@ -1,0 +1,32 @@
+# CHARLS 识别威胁卡。key 必须带 n_waves_min。
+# 默认波 [2018, 2020] 只有两期，交错 DID 卡在 n_waves < 3 时禁用。
+cards:
+  - id: attrition
+    n_waves_min: 2
+    dims: [robustness]
+    constraint: "必须交代样本流失与平衡/非平衡面板构造，不能假装每期都能对上。"
+    check: ["流失", "attrition", "平衡面板", "非平衡", "追踪"]
+
+  - id: hukou_selection
+    n_waves_min: 1
+    dims: [endogeneity]
+    constraint: "户口/城乡身份是选择偏差来源，必须作为内生或分层讨论。"
+    check: ["户口", "hukou", "城乡", "选择偏差"]
+
+  - id: insurance_endo
+    n_waves_min: 1
+    dims: [endogeneity]
+    constraint: "医保参保内生，需工具、政策冲击或明确承认选择。"
+    check: ["医保", "参保", "内生", "报销"]
+
+  - id: recall_oopc
+    n_waves_min: 1
+    dims: [robustness]
+    constraint: "自付医疗支出有回忆偏差，需对数、缩尾或敏感性。"
+    check: ["回忆", "缩尾", "对数", "oopc", "自付"]
+
+  - id: staggered_did
+    n_waves_min: 3
+    dims: [identification]
+    constraint: "交错 DID 需处理异质性处理时点（Callaway/Sun-Abraham）；两期数据禁用此卡。"
+    check: ["交错", "staggered", "sun", "abraham", "callaway"]

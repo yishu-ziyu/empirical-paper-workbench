@@ -57,9 +57,11 @@ export default function JourneyTimeline({
   const stepKeys = Array.from({ length: stages.length }, (_, i) => i + 1)
 
   return (
-    <div className="border-b border-border bg-panel/50 px-6 py-4">
-      <h2 className="mb-3 text-sm font-semibold text-ink">{t('journey.title')}</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-8">
+    <div data-testid="journey-timeline">
+      <h2 className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+        {t('journey.title')}
+      </h2>
+      <div className="flex flex-col gap-2">
         {stepKeys.map((stepNum, index) => {
           const stage = stages[index]
           const isExpanded = expandedStage === index

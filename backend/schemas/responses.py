@@ -81,11 +81,23 @@ class CreateSessionResponse(BaseModel):
 
 
 class SessionInfoResponse(BaseModel):
-    """GET /sessions/{id} 返回体：会话存在性及基本信息。"""
+    """GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。"""
 
     session_id: str
     exists: bool
     has_dataset: bool = False
+    claim: Optional[str] = None
+    star_rating: Optional[int] = None
+    identification_failed: bool = False
+    identification_report: Optional[str] = None
+    results: Optional[str] = None
+    estimate: Any = None
+    literature_source: Optional[str] = None
+    write_blockers: List[str] = Field(default_factory=list)
+    robustness_status: Optional[str] = None
+    outline: List[OutlineChapterResponse] = Field(default_factory=list)
+    body_chapters: List[ChapterResponse] = Field(default_factory=list)
+    research_direction: Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +119,7 @@ class DirectionResponse(BaseModel):
     literature_source: Optional[str] = None
     degradations: List[Any] = Field(default_factory=list)
     write_blockers: List[str] = Field(default_factory=list)
+    robustness_status: Optional[str] = None
 
 
 class ResumeResponse(BaseModel):

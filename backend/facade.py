@@ -178,6 +178,51 @@ class AgentFacade:
             return True
         return False
 
+    @staticmethod
+    def instrument_fields(state: dict) -> dict:
+        """Desk readout + outline/chapters the UI can rehydrate after refresh."""
+        diag = state.get("identification_diag") or {}
+        report = diag.get("report") if isinstance(diag, dict) else None
+        blockers = [str(item) for item in (state.get("write_blockers") or []) if item]
+        if state.get("star_rating") == 0 and "star_0" not in blockers:
+            blockers = ["star_0", *blockers]
+        rob = state.get("robustness_results")
+        rob_status = None
+        if isinstance(rob, dict) and rob:
+            degs = state.get("degradations") or []
+            if any(
+                isinstance(item, dict)
+                and "robust" in str(item.get("node") or "").lower()
+                for item in degs
+            ):
+                rob_status = "degraded"
+            else:
+                rob_status = "ran"
+        outline = [
+            item
+            for item in (state.get("outline") or [])
+            if isinstance(item, dict)
+        ]
+        body_chapters = [
+            item
+            for item in (state.get("body_chapters") or [])
+            if isinstance(item, dict)
+        ]
+        return {
+            "claim": state.get("claim"),
+            "star_rating": state.get("star_rating"),
+            "identification_failed": bool(state.get("identification_failed")),
+            "identification_report": report,
+            "results": state.get("results"),
+            "estimate": state.get("estimate"),
+            "literature_source": state.get("literature_source"),
+            "write_blockers": blockers,
+            "robustness_status": rob_status,
+            "outline": outline,
+            "body_chapters": body_chapters,
+            "research_direction": state.get("research_direction"),
+        }
+
     def get_state(self, session_id: str) -> dict:
         """Return the state dict for a session (404 if missing).
 

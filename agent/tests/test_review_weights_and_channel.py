@@ -18,10 +18,10 @@ from conftest import make_state
 
 
 def test_intro_weights_zero_out_endogeneity():
-    """引言不按内生 0.3 打分。"""
+    """课设引言：不按内生打，可读高于贡献。"""
     weights = weights_for_chapter("intro")
     assert weights["endogeneity"] == 0.0
-    assert weights["contribution"] >= 0.4
+    assert weights["readability"] > weights["contribution"]
     rubric = {
         "endogeneity": 1.0,
         "identification": 0.0,
@@ -101,8 +101,9 @@ def test_review_non_mock_uses_invoke(monkeypatch):
     """非 mock 走 invoke_review_llm，不直接调 mock_review_llm。"""
     seen = {}
 
-    def fake_invoke(config, content, rubric, direction, literature):
+    def fake_invoke(config, content, rubric, direction, literature, claim=""):
         seen["called"] = True
+        seen["claim"] = claim
         return {
             "rubric": {
                 "endogeneity": 0.6,
@@ -128,7 +129,7 @@ def test_review_non_mock_uses_invoke(monkeypatch):
 def test_review_bad_json_falls_back_to_mock(monkeypatch):
     """评审 JSON 坏掉时可见降级 mock，不得假装审过。"""
 
-    def boom(config, content, rubric, direction, literature):
+    def boom(config, content, rubric, direction, literature, claim=""):
         raise ValueError("bad json")
 
     monkeypatch.setattr("nodes.review_chapter.invoke_review_llm", boom)

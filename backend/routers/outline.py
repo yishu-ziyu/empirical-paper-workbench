@@ -72,22 +72,20 @@ async def set_direction_endpoint(
     """接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。"""
     rd = payload.model_dump()
     state = facade.set_direction_and_outline(session_id, rd)
-    diag = state.get("identification_diag") or {}
-    blockers: list[str] = []
-    if state.get("star_rating") == 0:
-        blockers = ["star_0"]
+    fields = facade.instrument_fields(state)
     return DirectionResponse(
-        outline=state.get("outline") or [],
-        research_direction=state.get("research_direction") or rd,
-        star_rating=state.get("star_rating"),
-        identification_failed=bool(state.get("identification_failed")),
-        identification_report=diag.get("report") if isinstance(diag, dict) else None,
-        results=state.get("results"),
-        estimate=state.get("estimate"),
-        claim=state.get("claim"),
-        literature_source=state.get("literature_source"),
+        outline=fields.get("outline") or [],
+        research_direction=fields.get("research_direction") or rd,
+        star_rating=fields.get("star_rating"),
+        identification_failed=bool(fields.get("identification_failed")),
+        identification_report=fields.get("identification_report"),
+        results=fields.get("results"),
+        estimate=fields.get("estimate"),
+        claim=fields.get("claim"),
+        literature_source=fields.get("literature_source"),
         degradations=list(state.get("degradations") or []),
-        write_blockers=blockers,
+        write_blockers=list(fields.get("write_blockers") or []),
+        robustness_status=fields.get("robustness_status"),
     )
 
 

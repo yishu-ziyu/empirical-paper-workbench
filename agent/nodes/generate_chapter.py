@@ -156,6 +156,10 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         user = f"{user}\n\n识别威胁约束（必须在正文处理）：\n{threat_text}"
 
     prose = call_llm(system, user)
+    if str(chapter_type) == "intro":
+        from prompts.intro import strip_contribution
+
+        prose = strip_contribution(prose)
     est = state.get("estimate") or {}
     if (
         str(chapter_type) == "results"

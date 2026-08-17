@@ -170,7 +170,6 @@ def test_intro_end_to_end_contains_required_section(
     recorder.return_value = (
         "# 引言\n\n## 研究背景\n教育回报是劳动经济学的经典议题...\n\n"
         "## 研究问题\n本文研究教育对收入的影响。\n\n"
-        "## 贡献\n使用 CHARLS 数据...\n\n"
         "## 论文结构\n..."
     )
     state = make_write_ready_state(
@@ -183,7 +182,27 @@ def test_intro_end_to_end_contains_required_section(
     content = result["body_chapters"][0]["content"]
     assert "研究背景" in content
     assert "研究问题" in content
-    assert "贡献" in content
+    assert "论文结构" in content
+
+
+def test_intro_generated_contribution_section_is_stripped(recorder, six_chapter_outline):
+    recorder.return_value = (
+        "## 研究背景\n背景。\n\n"
+        "## 研究问题\n年龄和收入是否相关。\n\n"
+        "## 贡献\n本文有三点边际贡献。\n\n"
+        "## 论文结构\n后文给出估计。"
+    )
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=six_chapter_outline,
+        research_question="年龄与收入",
+        data_summary="24 行课设样例",
+    )
+    result = generate_chapter(state)
+    content = result["body_chapters"][0]["content"]
+    assert "研究背景" in content
+    assert "边际贡献" not in content
+    assert "## 贡献" not in content
 
 
 def test_results_chapter_blocked_without_estimate(recorder):

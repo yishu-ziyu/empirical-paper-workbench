@@ -18,21 +18,6 @@ export interface ChapterListProps {
   onSelectChapter: (index: number) => void
 }
 
-// 6 色 badge（与 ChapterWriter 一致）
-const BADGE_COLORS: Record<string, string> = {
-  intro: 'bg-blue-100 text-blue-800',
-  lit_review: 'bg-purple-100 text-purple-800',
-  data_desc: 'bg-green-100 text-green-800',
-  methods: 'bg-orange-100 text-orange-800',
-  results: 'bg-red-100 text-red-800',
-  conclusion: 'bg-gray-200 text-gray-800',
-}
-
-function badgeClass(type: string): string {
-  return BADGE_COLORS[type] ?? 'bg-gray-100 text-gray-700'
-}
-
-// 状态图标
 function statusIcon(status: string): string {
   switch (status) {
     case 'done':
@@ -75,16 +60,7 @@ export default function ChapterList({
               {statusIcon(ch.status ?? '')}
             </span>
 
-            {/* 章节标题 */}
             <span className="flex-1 truncate text-sm">{ch.title}</span>
-
-            {/* 类型 badge */}
-            <span
-              data-testid="chapter-type-badge"
-              className={`rounded px-1.5 py-0.5 font-mono text-[10px] ${badgeClass(ch.type)}`}
-            >
-              {ch.type}
-            </span>
           </button>
         )
       })}

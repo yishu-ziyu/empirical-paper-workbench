@@ -131,16 +131,32 @@ def test_render_revision_defaults_are_empty_not_none():
 # ---------------------------------------------------------------------------
 # 章节特化 system prompt 内容契约（任务规格 §T-07）
 # ---------------------------------------------------------------------------
+def test_intro_strip_contribution_drops_heading_block():
+    from prompts.intro import strip_contribution
+
+    raw = (
+        "## 研究背景\n背景。\n\n"
+        "## 贡献\n- 数据新\n- 方法新\n\n"
+        "## 论文结构\n后面写结果。"
+    )
+    out = strip_contribution(raw)
+    assert "贡献" not in out
+    assert "研究背景" in out
+    assert "论文结构" in out
+
+
 def test_intro_system_prompt_mentions_required_sections():
-    """intro system prompt 引导写"研究背景+研究问题+贡献+论文结构"。"""
+    """课设引言：背景 + 问题 + 结构，禁止贡献三条。"""
     mod = get_prompt("intro")
     sp = mod.SYSTEM_PROMPT
-    # 至少命中其中 3 个关键词
-    hits = sum(
-        kw in sp
-        for kw in ("研究背景", "研究问题", "贡献", "论文结构", "引言")
-    )
-    assert hits >= 3, f"intro SYSTEM_PROMPT missing required sections: {sp!r}"
+    assert "研究背景" in sp
+    assert "研究问题" in sp
+    assert "论文结构" in sp
+    assert "课程论文" in sp or "课设" in sp
+    assert "禁止" in sp and "贡献" in sp
+    _, user = mod.render(research_question="年龄与收入", data_summary="24 行")
+    assert "不要写贡献" in user
+    assert "边际贡献" not in user
 
 
 def test_lit_review_system_prompt_mentions_required_sections():

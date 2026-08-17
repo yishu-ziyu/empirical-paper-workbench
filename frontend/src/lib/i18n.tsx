@@ -9,7 +9,7 @@ const LS_LANG_KEY = 'econpaper_lang'
 
 const zh = {
   // App / Header
-  'app.title': 'econpaper v0',
+  'app.title': 'econpaper',
   'app.upload': '上传 CSV',
   'app.uploading': '上传中...',
   'app.hint': '请上传 CSV 文件开始分析',
@@ -36,7 +36,7 @@ const zh = {
   'app.exportDoc': '导出论文',
   'app.exportCode': '导出代码',
   'app.directionTitle': '研究方向',
-  'app.directionWorking': '正在确认方向并验真识别…',
+  'app.directionWorking': '正在估计主结果并检索文献…',
   'app.identBlocked': '识别是 0 星，先改研究设计再写。',
   'app.directionFailed': '研究方向提交失败',
   'app.uploadToExplore': '先上传 CSV，再做数据探索。',
@@ -52,6 +52,23 @@ const zh = {
   'app.exportFailed': '导出失败',
 
   // Desk — empty first screen
+  'guide.kicker': '怎么用',
+  'guide.heading': '用数据写实证论文',
+  'guide.lead': '上传 CSV，填写研究问题和方法。先看到估计结果，再一章一章写。',
+  'guide.sub': '提交后不会生成整篇。没有主表，不能写结果章。',
+  'guide.step1Title': '上传 CSV',
+  'guide.step1Body': '截面或面板都可以。没有文件就用示例数据。',
+  'guide.step2Title': '填写研究设计',
+  'guide.step2Body': '研究问题、因变量、自变量、控制变量，再选一种方法：OLS、DiD、IV、RD、SCM。',
+  'guide.step3Title': '看结果，再写章节',
+  'guide.step3Body': '先出现主张、星级、主表、稳健性和文献。有数字之后，再选一章写。',
+  'guide.haveData': '上传 CSV',
+  'guide.trySample': '用示例数据',
+  'guide.writePaper': '还没想好问题',
+  'guide.nowDirection': '下一步：填写研究问题和方法。提交后先出估计结果。',
+  'guide.nowWrite': '下一步：在左侧选一章来写。没有主表就不能写结果。',
+  'guide.nowAgain': '使用说明',
+
   'desk.heading': '脑子里有什么，先倒出来。',
   'desk.sub': '乱写也行。写完我会问你一句，帮你收成研究问题。',
   'desk.paperLabel': '把想法写在这里',
@@ -164,6 +181,7 @@ const zh = {
 
   // DirectionForm
   'direction.question': '研究问题',
+  'direction.columns': '数据列：',
   'direction.dv': '因变量',
   'direction.iv': '自变量',
   'direction.controls': '控制变量 (逗号分隔)',
@@ -180,9 +198,19 @@ const zh = {
   'direction.unitCol': '单位列',
   'direction.treatmentTime': '处理时点',
   'bench.writeChapter': '写这一章',
-  'bench.writing': '在写…',
+  'bench.writing': '正在写「{title}」…',
   'bench.writeBlocked': '这一章还不能写',
   'bench.pickChapter': '选一章来写',
+  'bench.editDirection': '改方向',
+  'bench.directionSettled': '方向已提交',
+  'bench.chapters': '章节',
+  'bench.noChapters': '提交方向后，六章会出现在这里。',
+  'bench.openData': '看数据',
+  'bench.closeData': '收起数据',
+  'bench.steps': '步骤',
+  'bench.reviewAfterDirection': '提交方向并写出一章后，这里给出评审。',
+  'bench.reviewAfterWrite': '写出一章后，评审会出现在这里。',
+  'bench.paperEmpty': '先看见数字，再写正文。',
 
   // BalanceReport
   'balance.title': '面板平衡性检查',
@@ -206,6 +234,12 @@ const zh = {
   'chapter.save': '保存',
   'chapter.edit': '编辑',
   'chapter.approve': '通过',
+  'chapter.type.intro': '引言',
+  'chapter.type.lit_review': '文献',
+  'chapter.type.data_desc': '数据',
+  'chapter.type.methods': '方法',
+  'chapter.type.results': '结果',
+  'chapter.type.conclusion': '结论',
 
   // CharlsWizard
   'charls.title': '检测到 CHARLS 数据集',
@@ -281,6 +315,7 @@ const zh = {
 
   // MethodSelector
   'method.select': '选择方法…',
+  'method.hint': '只跑这五类：OLS / DiD / IV / RD / SCM。选了就会真的估。',
 
   // StepIndicator
   'step.uploadData': '上传数据',
@@ -291,7 +326,7 @@ const zh = {
   'review.rubricEndogeneity': '内生性',
   'review.rubricIdentification': '识别策略',
   'review.rubricRobustness': '稳健性',
-  'review.rubricContribution': '贡献度',
+  'review.rubricContribution': '题目写清',
   'review.rubricReadability': '可读性',
 
   // ReviewPanel — iteration and score labels
@@ -321,7 +356,7 @@ const zh = {
 }
 
 const en: typeof zh = {
-  'app.title': 'econpaper v0',
+  'app.title': 'econpaper',
   'app.upload': 'Upload CSV',
   'app.uploading': 'Uploading...',
   'app.hint': 'Upload a CSV file to start',
@@ -348,7 +383,7 @@ const en: typeof zh = {
   'app.exportDoc': 'Export paper',
   'app.exportCode': 'Export code',
   'app.directionTitle': 'Research direction',
-  'app.directionWorking': 'Confirming direction and checking identification…',
+  'app.directionWorking': 'Estimating the main table and searching literature…',
   'app.identBlocked': 'Identification is 0 stars. Change the design before writing.',
   'app.directionFailed': 'Could not submit research direction',
   'app.uploadToExplore': 'Upload a CSV to explore the data.',
@@ -362,6 +397,23 @@ const en: typeof zh = {
   'app.robustEmpty': 'No main specification yet. Submit a research direction first.',
   'app.robustFailed': 'Robustness check failed',
   'app.exportFailed': 'Export failed',
+
+  'guide.kicker': 'How it works',
+  'guide.heading': 'Write an empirical paper from your data',
+  'guide.lead': 'Upload a CSV, enter the research question and method. See the estimate first, then write chapter by chapter.',
+  'guide.sub': 'Submitting does not generate the whole paper. No main table, no results chapter.',
+  'guide.step1Title': 'Upload a CSV',
+  'guide.step1Body': 'Cross-section or panel. Use the sample file if you do not have one yet.',
+  'guide.step2Title': 'Enter the research design',
+  'guide.step2Body': 'Question, outcome, treatment, controls, then one method: OLS, DiD, IV, RD, SCM.',
+  'guide.step3Title': 'Read the results, then write',
+  'guide.step3Body': 'Claim, stars, main table, robustness, and sources appear first. Then pick a chapter.',
+  'guide.haveData': 'Upload CSV',
+  'guide.trySample': 'Use sample data',
+  'guide.writePaper': 'I do not have a question yet',
+  'guide.nowDirection': 'Next: enter the research question and method. You get the estimate first.',
+  'guide.nowWrite': 'Next: pick a chapter on the left. Results stay closed until the table is here.',
+  'guide.nowAgain': 'How it works',
 
   'desk.heading': 'Put down whatever is in your head.',
   'desk.sub': 'It can be messy. I will ask one thing and shape it into a research question.',
@@ -465,6 +517,7 @@ const en: typeof zh = {
   'clean.after': 'After max',
 
   'direction.question': 'Research Question',
+  'direction.columns': 'Columns: ',
   'direction.dv': 'Dependent Variable',
   'direction.iv': 'Independent Variable',
   'direction.controls': 'Controls (comma separated)',
@@ -481,9 +534,19 @@ const en: typeof zh = {
   'direction.unitCol': 'Unit column',
   'direction.treatmentTime': 'Treatment time',
   'bench.writeChapter': 'Write this chapter',
-  'bench.writing': 'Writing…',
+  'bench.writing': 'Writing “{title}”…',
   'bench.writeBlocked': 'This chapter cannot be written yet',
   'bench.pickChapter': 'Pick a chapter to write',
+  'bench.editDirection': 'Change direction',
+  'bench.directionSettled': 'Direction submitted',
+  'bench.chapters': 'Chapters',
+  'bench.noChapters': 'Six chapters appear here after you submit a direction.',
+  'bench.openData': 'Open data',
+  'bench.closeData': 'Hide data',
+  'bench.steps': 'Steps',
+  'bench.reviewAfterDirection': 'Submit a direction and write a chapter. Review appears here.',
+  'bench.reviewAfterWrite': 'Write a chapter and the review will show up here.',
+  'bench.paperEmpty': 'See the numbers first, then write.',
 
   'balance.title': 'Panel Balance Check',
   'balance.panelId': 'Panel ID column',
@@ -505,6 +568,12 @@ const en: typeof zh = {
   'chapter.save': 'Save',
   'chapter.edit': 'Edit',
   'chapter.approve': 'Approve',
+  'chapter.type.intro': 'Intro',
+  'chapter.type.lit_review': 'Literature',
+  'chapter.type.data_desc': 'Data',
+  'chapter.type.methods': 'Methods',
+  'chapter.type.results': 'Results',
+  'chapter.type.conclusion': 'Conclusion',
 
   'charls.title': 'CHARLS Dataset Detected',
   'charls.cancel': 'Cancel',
@@ -570,6 +639,7 @@ const en: typeof zh = {
   'progress.completed': 'Completed',
 
   'method.select': 'Select method…',
+  'method.hint': 'Only these five run: OLS / DiD / IV / RD / SCM.',
 
   'step.uploadData': 'Upload Data',
   'step.exploreData': 'Explore Data',
@@ -578,7 +648,7 @@ const en: typeof zh = {
   'review.rubricEndogeneity': 'Endogeneity',
   'review.rubricIdentification': 'Identification',
   'review.rubricRobustness': 'Robustness',
-  'review.rubricContribution': 'Contribution',
+  'review.rubricContribution': 'Question clarity',
   'review.rubricReadability': 'Readability',
   'review.roundLabel': 'Round {0}/{1}',
   'review.scoreLabel': 'Score {0}',

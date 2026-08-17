@@ -41,12 +41,11 @@ describe('ChapterList 章节大纲列表', () => {
     expect(screen.getByText('结论')).toBeInTheDocument()
   })
 
-  test('每项显示类型 badge', () => {
+  test('列表只用中文标题，不叠英文 type', () => {
     render(<ChapterList {...baseProps} />)
-    const badges = screen.getAllByTestId('chapter-type-badge')
-    expect(badges).toHaveLength(6)
-    expect(badges[0].textContent).toContain('intro')
-    expect(badges[3].textContent).toContain('methods')
+    expect(screen.queryByTestId('chapter-type-badge')).not.toBeInTheDocument()
+    expect(screen.queryByText('intro')).not.toBeInTheDocument()
+    expect(screen.queryByText('lit_review')).not.toBeInTheDocument()
   })
 
   test('每项显示状态图标', () => {

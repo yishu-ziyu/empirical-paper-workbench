@@ -81,7 +81,7 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(screen.getByText('内生性')).toBeInTheDocument()
     expect(screen.getByText('识别策略')).toBeInTheDocument()
     expect(screen.getByText('稳健性')).toBeInTheDocument()
-    expect(screen.getByText('贡献度')).toBeInTheDocument()
+    expect(screen.getByText('题目写清')).toBeInTheDocument()
     expect(screen.getByText('可读性')).toBeInTheDocument()
   })
 

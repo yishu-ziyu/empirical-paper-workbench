@@ -18,8 +18,10 @@ import pytest
 
 from nodes.review_chapter import (
     REVIEW_SCORE_THRESHOLD,
+    apply_association_review_guard,
     _compute_composite_score,
     call_review_llm,
+    invoke_review_llm,
     review_chapter,
 )
 from protocols import ReviewRubric
@@ -537,6 +539,124 @@ def test_association_methods_fixture_passes_without_rollback():
     assert "missing_ident_assumptions" not in (
         result.get("revision_suggestions") or [""]
     )[0]
+
+
+def test_association_live_llm_cannot_fail_for_missing_iv(monkeypatch):
+    """现场 LLM 按缺 IV/RDD 打低分时，相关引言不得自动不通过。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(
+            {
+                "endogeneity": 0.1,
+                "identification": 0.1,
+                "robustness": 0.2,
+                "contribution": 0.3,
+                "readability": 0.4,
+            },
+            feedback="缺少识别策略，应使用 IV 或 RDD。",
+            suggestions="补双重差分或工具变量。",
+        ),
+    )
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "intro",
+            "title": "引言",
+            "content": "本文描述年龄与收入的条件相关，不识别因果。" + ("论" * 80),
+            "status": "generated",
+            "versions": [],
+            "chapter_index": 0,
+            "method": "ols",
+        }],
+        claim="association",
+        research_direction={"method": "ols", "claim": "association"},
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] >= 0.7
+    assert "current_chapter_index" not in result
+    assert "IV" not in (result.get("revision_suggestions") or [""])[0]
+    assert "RDD" not in (result.get("revision_suggestions") or [""])[0]
+
+
+def test_association_intro_low_contribution_does_not_auto_fail(monkeypatch):
+    """相关引言贡献分偏低、但未写成因果时，不得自动不通过。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(
+            {
+                "endogeneity": 0.9,
+                "identification": 0.85,
+                "robustness": 0.55,
+                "contribution": 0.45,
+                "readability": 0.75,
+            },
+            feedback="定位为条件相关是对的，但贡献三条偏满。",
+            suggestions="收束贡献表述。",
+        ),
+    )
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "intro",
+            "title": "引言",
+            "content": "本文描述年龄与收入的条件相关，不识别因果。" + ("论" * 80),
+            "status": "generated",
+            "chapter_index": 0,
+            "method": "ols",
+        }],
+        claim="association",
+        research_direction={"method": "ols", "claim": "association"},
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] >= 0.7
+    assert "current_chapter_index" not in result
+
+
+def test_association_guard_rewrites_causal_demand():
+    rubric, feedback, suggestions = apply_association_review_guard(
+        {
+            "endogeneity": 0.1,
+            "identification": 0.1,
+            "robustness": 0.2,
+            "contribution": 0.3,
+            "readability": 0.4,
+        },
+        "必须补充 IV 与 RDD。文献覆盖不足。",
+        "否则识别失败。收束贡献表述。",
+        "association",
+        "年龄与收入的相关。",
+    )
+    assert rubric["identification"] >= 0.7
+    assert rubric["contribution"] >= 0.7
+    assert "IV" not in suggestions
+    assert "相关" in feedback
+    assert "文献覆盖不足" in feedback
+    assert "收束贡献" in suggestions
+
+
+def test_invoke_review_prompt_states_association(monkeypatch):
+    seen = {}
+
+    def fake_call(prompt, node_type="review"):
+        seen["prompt"] = prompt
+        return (
+            '{"rubric":{"endogeneity":0.8,"identification":0.8,'
+            '"robustness":0.8,"contribution":0.8,"readability":0.8},'
+            '"feedback":"ok","suggestions":"ok"}'
+        )
+
+    monkeypatch.setattr("llm.call_llm.call_llm", fake_call)
+    invoke_review_llm(None, "正文", ReviewRubric(), "dir", [], claim="association")
+    assert "association" in seen["prompt"]
+    assert "不得因为没有" in seen["prompt"]
+    assert "课程论文" in seen["prompt"]
+    assert "边际贡献" in seen["prompt"]
 
 
 # ---------------------------------------------------------------------------

@@ -48,23 +48,25 @@ describe('ChapterWriter 章节写作器', () => {
     expect(container.textContent).toContain('教育回报')
   })
 
+  test('纸面渲染标题，不露出井号', () => {
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
+    const paper = screen.getByTestId('chapter-paper')
+    expect(paper.querySelector('h2')?.textContent).toBe('研究背景')
+    expect(paper.textContent).toContain('教育回报')
+    expect(paper.textContent).not.toContain('##')
+    expect(paper.textContent).not.toContain('# 引言')
+  })
+
   test('渲染章节类型 badge', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     const badge = screen.getByTestId('chapter-type-badge')
     expect(badge).toBeInTheDocument()
-    expect(badge.textContent).toContain('intro')
+    expect(badge.textContent).toContain('引言')
   })
 
-  test('6 种 chapter_type 各有对应颜色 class', () => {
-    const cases: Array<{ type: string; colorHint: string }> = [
-      { type: 'intro', colorHint: 'blue' },
-      { type: 'lit_review', colorHint: 'purple' },
-      { type: 'data_desc', colorHint: 'green' },
-      { type: 'methods', colorHint: 'orange' },
-      { type: 'results', colorHint: 'red' },
-      { type: 'conclusion', colorHint: 'gray' },
-    ]
-    for (const { type, colorHint } of cases) {
+  test('6 种 chapter_type 用同一套纸墨徽章，不用彩虹色', () => {
+    const types = ['intro', 'lit_review', 'data_desc', 'methods', 'results', 'conclusion']
+    for (const type of types) {
       const { unmount } = renderWithI18n(
         <ChapterWriter
           {...baseProps}
@@ -72,8 +74,8 @@ describe('ChapterWriter 章节写作器', () => {
         />,
       )
       const badge = screen.getByTestId('chapter-type-badge')
-      // class 必须含对应颜色关键词（bg-blue-100 / text-purple-800 等）
-      expect(badge.className.toLowerCase()).toContain(colorHint)
+      expect(badge.className.toLowerCase()).toContain('text-muted')
+      expect(badge.className.toLowerCase()).not.toMatch(/blue|purple|pink|orange|red-/)
       unmount()
     }
   })

@@ -1,49 +1,9 @@
-// 38 种计量方法选择器 (T-06)
-// 方法列表从 spec §6 / StatsPAI registry 提取，硬编码于此。
-// 模板：中文核心期刊 / 本科 / 硕论 / 英文投稿
+// 方法列只承诺发动机真会跑的五类。
+// 38 个名字不再出现在选择器里，避免人选了 Causal Forest 以为会跑森林。
 
 import { useT } from '../lib/i18n'
 
-export const METHODS_38: string[] = [
-  'OLS',
-  'IV',
-  'GMM',
-  '2SLS',
-  'LIML',
-  'JIVE',
-  'DiD',
-  'Event Study',
-  'Synthetic Control',
-  'Synthetic DiD',
-  'RDD',
-  'RKD',
-  'Multi-cutoff RDD',
-  'DML',
-  'Causal Forest',
-  'BCF',
-  'BART',
-  'PSM',
-  'IPW',
-  'DR-learner',
-  'R-learner',
-  'X-learner',
-  'QTE',
-  'CIC',
-  'Bounds',
-  'Bartik IV',
-  'Shift-share',
-  'Panel FE',
-  'Panel RE',
-  'GMM Panel',
-  'Spatial DiD',
-  'Spatial IV',
-  'Bayesian DID',
-  'Bayesian DML',
-  'TMLE',
-  'LTMLE',
-  'Mediation',
-  'Surrogate',
-]
+export const ENGINE_METHODS: string[] = ['OLS', 'DiD', 'IV', 'RD', 'SCM']
 
 export const TEMPLATES: { value: string; label: string }[] = [
   { value: 'cn_journal', label: '中文核心期刊' },
@@ -63,19 +23,22 @@ export default function MethodSelector({
 }: MethodSelectorProps) {
   const { t } = useT()
   return (
-    <select
-      data-testid="method-selector"
-      aria-label={t('direction.method')}
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
-      className="mt-1 w-full rounded border border-border p-2"
-    >
-      <option value="">{t('method.select')}</option>
-      {METHODS_38.map((m) => (
-        <option key={m} value={m}>
-          {m}
-        </option>
-      ))}
-    </select>
+    <div>
+      <select
+        data-testid="method-selector"
+        aria-label={t('direction.method')}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        className="mt-1 w-full rounded border border-border p-2"
+      >
+        <option value="">{t('method.select')}</option>
+        {ENGINE_METHODS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-[11px] leading-5 text-muted">{t('method.hint')}</p>
+    </div>
   )
 }

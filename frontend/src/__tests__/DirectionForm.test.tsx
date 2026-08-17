@@ -21,12 +21,20 @@ describe('DirectionForm 研究方向输入', () => {
     expect(screen.getByTestId('method-selector')).toBeInTheDocument()
   })
 
-  test('method selector shows 38 options', () => {
+  test('method selector shows the five engine methods', () => {
     renderWithI18n(<DirectionForm onSubmit={() => {}} />)
     const sel = screen.getByTestId('method-selector')
     const opts = within(sel).getAllByRole('option')
-    // 38 个方法 + 1 个占位 "选择方法…"
-    expect(opts).toHaveLength(39)
+    expect(opts).toHaveLength(6)
+    expect(opts.map((el) => el.textContent)).toEqual([
+      '选择方法…',
+      'OLS',
+      'DiD',
+      'IV',
+      'RD',
+      'SCM',
+    ])
+    expect(screen.getByText(/只跑这五类/)).toBeInTheDocument()
   })
 
   test('submit calls onSubmit with form data', async () => {
@@ -73,5 +81,38 @@ describe('DirectionForm 研究方向输入', () => {
       id_col: 'id',
       first_treat_col: 'g',
     })
+  })
+
+  test('empty form cannot submit', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    renderWithI18n(<DirectionForm onSubmit={onSubmit} />)
+    expect(screen.getByRole('button', { name: /提交/ })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /提交/ }))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  test('sample initials and columns fill the form', () => {
+    renderWithI18n(
+      <DirectionForm
+        onSubmit={() => {}}
+        initial={{
+          question: '这份课设样例里，年龄和收入是否相关？',
+          dv: 'income',
+          iv: 'age',
+          controls: 'treat',
+          method: 'OLS',
+          template: 'undergrad',
+        }}
+        columns={['id', 'year', 'income', 'treat', 'age']}
+      />,
+    )
+    expect(screen.getByLabelText(/研究问题/i)).toHaveValue('这份课设样例里，年龄和收入是否相关？')
+    expect(screen.getByLabelText(/因变量/i)).toHaveValue('income')
+    expect(screen.getByLabelText(/自变量/i)).toHaveValue('age')
+    expect(screen.getByLabelText(/控制变量/i)).toHaveValue('treat')
+    expect(screen.getByTestId('method-selector')).toHaveValue('OLS')
+    expect(screen.getByLabelText(/模板/i)).toHaveValue('undergrad')
+    expect(screen.getByTestId('data-columns')).toHaveTextContent('income')
   })
 })

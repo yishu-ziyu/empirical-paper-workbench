@@ -1,6 +1,5 @@
-// 研究方向输入表单 (T-06)
-// 用户输入：研究问题 / 因变量 / 自变量 / 控制变量 / 方法 (38 种) / 模板
-// 提交 → onSubmit({question, dv, iv, controls[], method, template})
+// 研究方向输入表单
+// 四问 + 发动机五类方法。方法变了，多出来的列才出现。
 
 import { useState, type FormEvent } from 'react'
 import { useT } from '../lib/i18n'
@@ -43,19 +42,35 @@ function methodKind(method: string): 'ols' | 'did' | 'iv' | 'rd' | 'scm' | '' {
   return 'ols'
 }
 
+export type DirectionFormInitial = {
+  question?: string
+  dv?: string
+  iv?: string
+  controls?: string
+  method?: string
+  template?: string
+}
+
 export interface DirectionFormProps {
   onSubmit: (data: DirectionFormData) => void
   initialQuestion?: string
+  initial?: DirectionFormInitial
+  columns?: string[]
 }
 
-export default function DirectionForm({ onSubmit, initialQuestion = '' }: DirectionFormProps) {
+export default function DirectionForm({
+  onSubmit,
+  initialQuestion = '',
+  initial,
+  columns = [],
+}: DirectionFormProps) {
   const { t } = useT()
-  const [question, setQuestion] = useState(initialQuestion)
-  const [dv, setDv] = useState('')
-  const [iv, setIv] = useState('')
-  const [controls, setControls] = useState('')
-  const [method, setMethod] = useState('')
-  const [template, setTemplate] = useState('cn_journal')
+  const [question, setQuestion] = useState(initial?.question ?? initialQuestion)
+  const [dv, setDv] = useState(initial?.dv ?? '')
+  const [iv, setIv] = useState(initial?.iv ?? '')
+  const [controls, setControls] = useState(initial?.controls ?? '')
+  const [method, setMethod] = useState(initial?.method ?? '')
+  const [template, setTemplate] = useState(initial?.template ?? 'undergrad')
   const [instrument, setInstrument] = useState('')
   const [timeCol, setTimeCol] = useState('')
   const [idCol, setIdCol] = useState('')
@@ -65,9 +80,11 @@ export default function DirectionForm({ onSubmit, initialQuestion = '' }: Direct
   const [unitCol, setUnitCol] = useState('')
   const [treatmentTime, setTreatmentTime] = useState('')
   const kind = methodKind(method)
+  const canSubmit = Boolean(question.trim() && dv.trim() && iv.trim() && method)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!canSubmit) return
     const controlsArr = controls
       .split(',')
       .map((s) => s.trim())
@@ -103,6 +120,12 @@ export default function DirectionForm({ onSubmit, initialQuestion = '' }: Direct
       onSubmit={handleSubmit}
       className="space-y-3"
     >
+      {columns.length > 0 ? (
+        <p data-testid="data-columns" className="text-xs leading-5 text-muted">
+          {t('direction.columns')}
+          {columns.join('、')}
+        </p>
+      ) : null}
       <label className="block">
         <span className="block text-xs text-muted">{t('direction.question')}</span>
         <textarea
@@ -246,7 +269,8 @@ export default function DirectionForm({ onSubmit, initialQuestion = '' }: Direct
       </label>
       <button
         type="submit"
-        className="rounded bg-accent px-3 py-1 text-sm text-white"
+        disabled={!canSubmit}
+        className="rounded bg-accent px-3 py-1 text-sm text-white disabled:opacity-40"
       >
         {t('direction.submit')}
       </button>

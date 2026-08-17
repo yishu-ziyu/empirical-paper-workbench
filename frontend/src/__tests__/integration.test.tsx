@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
 
@@ -63,7 +63,7 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
 
     // 触发文件上传
     const fileInput = screen.getByTestId('file-input') as HTMLInputElement
@@ -71,171 +71,112 @@ describe('前端集成测试', () => {
       target: { files: [new File(['a,b\n1,2'], 'test.csv', { type: 'text/csv' })] },
     })
 
-    // sessionId 出现在 header 中
     await waitFor(() => {
-      expect(screen.getByTestId('session-id-indicator')).toBeInTheDocument()
+      expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
-    expect(screen.getByText(/test-123/i)).toBeInTheDocument()
+    expect(screen.getByTestId('session-ready')).toBeInTheDocument()
+    expect(screen.queryByText(/test-123/i)).not.toBeInTheDocument()
 
-    // sessionId 保存到 localStorage
     expect(localStorage.getItem('econpaper_session_id')).toBe('test-123')
-
-    // EdaSidebar 已渲染（sessionId 传递到子组件）
-    expect(screen.getByTestId('eda-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('direction-section')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('eda-sidebar')).not.toBeInTheDocument()
   })
 
-  // ── 场景 B：WebSocket 连接和消息分发 ──────────────────────
-  test('场景 B：WebSocket 连接和消息分发更新 Editor 和 AgentPanel', async () => {
-    // 预设 localStorage 有 sessionId，后端验证通过
+  test('场景 B：提交方向后出现读数和按章写，不再走整篇 WebSocket', async () => {
     localStorage.setItem('econpaper_session_id', 'test-456')
     const mockFetch = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes('/sessions/')) {
+      const href = String(url)
+      if (href.includes('/direction')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ exists: true }),
+          json: () =>
+            Promise.resolve({
+              outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+              research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+              star_rating: null,
+              identification_failed: false,
+              identification_report: '当前方法没有对应的识别诊断套餐',
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.12 | 0.04 | 0.01 |', produced_by: 'estimate' },
+              results: '| age | 0.12 | 0.04 | 0.01 |',
+            }),
         })
       }
-      return Promise.reject(new Error('unexpected URL'))
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+      })
     })
     vi.stubGlobal('fetch', mockFetch)
 
     renderWithI18n(<App />)
 
-    // 等待 sessionId 恢复并显示
     await waitFor(() => {
-      expect(screen.getByTestId('session-id-indicator')).toBeInTheDocument()
+      expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
-    expect(screen.getByText(/test-456/i)).toBeInTheDocument()
-
-    // WSClient 被创建 → MockWebSocket 实例存在
-    const ws = MockWebSocket.instances[0]
-    expect(ws).toBeDefined()
-
-    // 模拟 WebSocket 连接成功
-    act(() => {
-      ws.onopen!({})
+    fireEvent.change(screen.getByLabelText(/研究问题/), {
+      target: { value: '教育对收入的影响' },
     })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
 
-    // 连接状态更新为 connected
     await waitFor(() => {
-      expect(screen.getByText(/connected/i)).toBeInTheDocument()
+      expect(screen.getByTestId('instrument-readout')).toBeInTheDocument()
     })
-
-    // 发送 streaming_chunk 消息
-    act(() => {
-      ws.onmessage!({
-        data: JSON.stringify({ type: 'streaming_chunk', chapter_id: '1', chunk: 'Hello ' }),
-      })
-    })
-    act(() => {
-      ws.onmessage!({
-        data: JSON.stringify({ type: 'streaming_chunk', chapter_id: '1', chunk: 'World!' }),
-      })
-    })
-
-    // Editor 拼接显示内容
-    await waitFor(() => {
-      expect(screen.getByText('Hello World!')).toBeInTheDocument()
-    })
-
-    // 发送 status 消息
-    act(() => {
-      ws.onmessage!({
-        data: JSON.stringify({ type: 'status', node: 'generate_title', status: 'running' }),
-      })
-    })
-
-    // AgentPanel 显示当前 node
-    await waitFor(() => {
-      expect(screen.getByText('generate_title')).toBeInTheDocument()
-    })
-
-    // 发送 interrupt 消息
-    act(() => {
-      ws.onmessage!({
-        data: JSON.stringify({
-          type: 'interrupt',
-          chapter_id: '1',
-          content: '等待用户确认',
-        }),
-      })
-    })
-
-    // 显示暂停提示（span 和 p 各匹配一次，至少一个）
-    await waitFor(() => {
-      expect(screen.getAllByText(/暂停|paused/i).length).toBeGreaterThan(0)
-    })
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('age')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('0.12')
+    expect(screen.getByTestId('write-chapter-intro')).toBeInTheDocument()
+    expect(MockWebSocket.instances.length).toBe(0)
+    expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
+    expect(screen.queryByText(/connected/i)).not.toBeInTheDocument()
   })
 
-  // ── 场景 C：页面刷新后 localStorage 恢复 ──────────────────────
-  test('场景 C：页面刷新后从 localStorage 恢复 sessionId 并自动重连 WebSocket', async () => {
+  test('场景 C：页面刷新后从 session 回填读数，不重连 WebSocket', async () => {
     localStorage.setItem('econpaper_session_id', 'test-789')
 
     const mockFetch = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes('/sessions/')) {
+      if (String(url).endsWith('/sessions/test-789')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ exists: true }),
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| treat | 0.08 | 0.05 | 0.12 |' },
+              outline: [{ type: 'results', title: '结果' }],
+              research_direction: { method: 'DiD', dv: 'y', iv: 'd' },
+            }),
         })
       }
-      return Promise.reject(new Error('unexpected URL'))
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+      })
     })
     vi.stubGlobal('fetch', mockFetch)
 
     renderWithI18n(<App />)
 
-    // 从 localStorage 恢复 sessionId
     await waitFor(() => {
-      expect(screen.getByTestId('session-id-indicator')).toBeInTheDocument()
+      expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
-    expect(screen.getByText(/test-789/i)).toBeInTheDocument()
+    expect(screen.queryByText(/test-789/i)).not.toBeInTheDocument()
+    expect(await screen.findByTestId('instrument-readout')).toBeInTheDocument()
+    expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
 
-    // 后端验证请求被发出（含 auth headers）
     expect(mockFetch).toHaveBeenCalledWith(
       `${API_BASE}/sessions/test-789`,
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer test-token-for-auth' }),
       }),
     )
-
-    // WebSocket 自动重连 — MockWebSocket 实例被创建
-    expect(MockWebSocket.instances.length).toBeGreaterThan(0)
-    expect(MockWebSocket.instances[0].url).toContain('test-789')
-  })
-
-  // ── 场景 B 补充：WebSocket 错误消息显示 ──────────────────────
-  test('场景 B 补充：收到 WebSocket error 消息时显示错误提示', async () => {
-    localStorage.setItem('econpaper_session_id', 'test-err')
-    const mockFetch = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes('/sessions/')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ exists: true }),
-        })
-      }
-      return Promise.reject(new Error('unexpected URL'))
-    })
-    vi.stubGlobal('fetch', mockFetch)
-
-    renderWithI18n(<App />)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-id-indicator')).toBeInTheDocument()
-    })
-
-    const ws = MockWebSocket.instances[0]
-    expect(ws).toBeDefined()
-
-    // 发送 error 消息
-    act(() => {
-      ws.onmessage!({
-        data: JSON.stringify({ type: 'error', message: 'StatsPAI 不可用' }),
-      })
-    })
-
-    // 错误提示显示
-    await waitFor(() => {
-      expect(screen.getByText(/StatsPAI 不可用/i)).toBeInTheDocument()
-    })
+    expect(MockWebSocket.instances.length).toBe(0)
   })
 })

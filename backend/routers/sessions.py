@@ -183,16 +183,22 @@ async def get_session_info(
     """
     exists = facade.has_session(session_id)
     has_dataset = False
+    extra: dict = {}
     if exists:
         try:
             csv_path = facade.get_csv_path(session_id)
             has_dataset = bool(csv_path)
         except Exception:
             has_dataset = False
+        try:
+            extra = facade.instrument_fields(facade.get_state(session_id))
+        except Exception:
+            extra = {}
     return SessionInfoResponse(
         session_id=session_id,
         exists=exists,
         has_dataset=has_dataset,
+        **extra,
     )
 
 

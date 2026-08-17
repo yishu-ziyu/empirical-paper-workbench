@@ -77,6 +77,39 @@ def test_post_direction_endpoint(uploaded_session, client):
     assert data.get("literature_source")
 
 
+def test_get_session_hydrates_instrument_after_direction(client):
+    """刷新桌面：GET /sessions/{id} 带回主张、主表、大纲，不要求人再交一次方向。"""
+    sid = "test-desk-hydrate"
+    facade.seed_state(
+        sid,
+        {
+            "claim": "association",
+            "star_rating": None,
+            "literature_source": "mock",
+            "estimate": {
+                "treatment_row": "| age | 0.1234 | 0.0456 | 0.0078 |",
+                "produced_by": "estimate",
+            },
+            "results": "| age | 0.1234 | 0.0456 | 0.0078 |",
+            "outline": [{"type": "intro", "title": "引言"}],
+            "robustness_results": {"produced_by": "robustness_check"},
+        },
+    )
+    try:
+        resp = client.get(f"/sessions/{sid}")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["exists"] is True
+        assert data["claim"] == "association"
+        assert data["star_rating"] is None
+        assert data["literature_source"] == "mock"
+        assert data["estimate"]["treatment_row"].startswith("| age")
+        assert data["robustness_status"] == "ran"
+        assert data["outline"][0]["type"] == "intro"
+    finally:
+        facade.drop_session(sid)
+
+
 def test_post_resume_endpoint(uploaded_session, client):
     """POST /sessions/{id}/resume 接受调整后的 outline 并写回 session。"""
     if uploaded_session == "red-stage-dummy-session-id":

@@ -12,16 +12,24 @@ describe('InstrumentReadout', () => {
         literatureSource="mock"
       />,
     )
-    expect(screen.getByTestId('readout-claim')).toHaveTextContent('association')
-    expect(screen.getByTestId('readout-star')).toHaveTextContent('NONE')
-    expect(screen.getByTestId('readout-table')).toHaveTextContent('| age | 0.1234 |')
-    expect(screen.getByTestId('readout-lit')).toHaveTextContent('mock')
+    expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
+    expect(screen.getByTestId('readout-star')).toHaveTextContent('无因果评级')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('变量')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('age')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('0.1234')
+    expect(screen.getByTestId('readout-lit')).toHaveTextContent('示例文献')
+    expect(screen.getByTestId('readout-robust')).toHaveTextContent('—')
     expect(screen.queryByTestId('readout-block')).not.toBeInTheDocument()
   })
 
   test('empty table tells the user results cannot be written', () => {
     render(<InstrumentReadout claim="association" />)
     expect(screen.getByTestId('readout-table-empty')).toBeInTheDocument()
+  })
+
+  test('ran robustness shows on the readout', () => {
+    render(<InstrumentReadout claim="association" robustnessStatus="ran" />)
+    expect(screen.getByTestId('readout-robust')).toHaveTextContent('已跑')
   })
 
   test('zero star lights the block line', () => {
@@ -32,7 +40,7 @@ describe('InstrumentReadout', () => {
         writeBlockers={['star_0']}
       />,
     )
-    expect(screen.getByTestId('readout-star')).toHaveTextContent('0')
+    expect(screen.getByTestId('readout-star')).toHaveTextContent('0 星')
     expect(screen.getByTestId('readout-block')).toHaveTextContent('0 星')
   })
 })

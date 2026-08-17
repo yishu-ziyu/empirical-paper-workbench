@@ -37,21 +37,14 @@ export interface OutlineProps {
   onConfirm?: (body_chapters: OutlineChapter[]) => void
 }
 
-const BADGE_COLORS: Record<string, string> = {
-  intro: 'bg-blue-100 text-blue-800',
-  lit_review: 'bg-purple-100 text-purple-800',
-  data_desc: 'bg-green-100 text-green-800',
-  methods: 'bg-orange-100 text-orange-800',
-  results: 'bg-pink-100 text-pink-800',
-  conclusion: 'bg-gray-200 text-gray-800',
-}
+const BADGE_CLASS = 'bg-paper text-muted border border-border'
 
 interface InternalChapter extends OutlineChapter {
   id: string
 }
 
-function badgeClass(type: string): string {
-  return BADGE_COLORS[type] ?? 'bg-gray-100 text-gray-700'
+function badgeClass(_type: string): string {
+  return BADGE_CLASS
 }
 
 interface SortableChapterProps {
@@ -124,7 +117,7 @@ function SortableChapter({
         type="button"
         aria-label={`删除 ${chapter.title}`}
         onClick={onDelete}
-        className="px-1 text-xs text-red-500"
+        className="px-1 text-xs text-danger"
       >
         ✕
       </button>

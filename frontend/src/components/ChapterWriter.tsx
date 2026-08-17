@@ -19,6 +19,7 @@
 import { useMemo, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { useT } from '../lib/i18n'
+import { renderPaperMarkdown } from '../lib/paperMarkdown'
 import VersionHistory from './VersionHistory'
 import type { components } from '../types/api'
 // TODO(T-07 followup): 安装 @codemirror/lang-markdown + @codemirror/language-data
@@ -50,19 +51,10 @@ export interface ChapterWriterProps {
   onSaveEdit?: (content: string) => void
 }
 
-// 6 色 badge（任务规格 §T-07：intro=蓝 / lit_review=紫 / data_desc=绿 /
-// methods=橙 / results=红 / conclusion=灰）
-const BADGE_COLORS: Record<string, string> = {
-  intro: 'bg-blue-100 text-blue-800',
-  lit_review: 'bg-purple-100 text-purple-800',
-  data_desc: 'bg-green-100 text-green-800',
-  methods: 'bg-orange-100 text-orange-800',
-  results: 'bg-red-100 text-red-800',
-  conclusion: 'bg-gray-200 text-gray-800',
-}
+const BADGE_CLASS = 'bg-paper text-muted border border-border'
 
-function badgeClass(type: string): string {
-  return BADGE_COLORS[type] ?? 'bg-gray-100 text-gray-700'
+function badgeClass(_type: string): string {
+  return BADGE_CLASS
 }
 
 export default function ChapterWriter({
@@ -124,32 +116,39 @@ export default function ChapterWriter({
           data-testid="chapter-type-badge"
           className={`rounded px-2 py-0.5 text-xs font-mono ${badgeClass(chapter.type)}`}
         >
-          {chapter.type}
+          {t(`chapter.type.${chapter.type}`)}
         </span>
         <h3 className="text-sm font-semibold">{chapter.title}</h3>
       </div>
 
-      {/* CodeMirror 6 markdown 流式渲染 */}
-      <div data-testid="chapter-codemirror" className="border border-border rounded">
-        <CodeMirror
-          value={displayContent}
-          extensions={[]}
-          editable={isEditing}
-          basicSetup={{ lineNumbers: false, foldGutter: false }}
-          height="auto"
-          onChange={(val) => {
-            if (isEditing) {
-              setEditedContent(val)
-            }
-          }}
-        />
-      </div>
+      {isEditing || isStreaming ? (
+        <div data-testid="chapter-codemirror" className="rounded border border-border">
+          <CodeMirror
+            value={displayContent}
+            extensions={[]}
+            editable={isEditing}
+            basicSetup={{ lineNumbers: false, foldGutter: false }}
+            height="auto"
+            onChange={(val) => {
+              if (isEditing) {
+                setEditedContent(val)
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <article
+          data-testid="chapter-paper"
+          className="rounded border border-border bg-paper px-5 py-4 font-serif text-base leading-loose text-ink"
+        >
+          {renderPaperMarkdown(displayContent)}
+        </article>
+      )}
 
-      {/* streaming 提示 */}
       {isStreaming && (
         <div
           data-testid="chapter-streaming-hint"
-          className="rounded bg-blue-50 p-2 text-xs text-blue-700"
+          className="rounded bg-accent/10 p-2 text-xs text-accent"
         >
           {t('chapter.streaming')}
         </div>

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
@@ -58,15 +59,15 @@ RUBRIC_WEIGHTS_BY_TYPE = {
         "endogeneity": 0.0,
         "identification": 0.05,
         "robustness": 0.05,
-        "contribution": 0.5,
-        "readability": 0.4,
+        "contribution": 0.15,
+        "readability": 0.75,
     },
     "conclusion": {
         "endogeneity": 0.0,
         "identification": 0.05,
         "robustness": 0.1,
-        "contribution": 0.45,
-        "readability": 0.4,
+        "contribution": 0.2,
+        "readability": 0.65,
     },
 }
 
@@ -99,6 +100,17 @@ RUBRIC_WEIGHTS_METHODS_ASSOCIATION = {
 }
 
 CAUSAL_CLAIM_SCORE_CAP = 0.50
+ASSOCIATION_SCORE_FLOOR = 0.7
+
+_CAUSAL_IDENT_DEMAND = (
+    "工具变量",
+    "双重差分",
+    "断点回归",
+    "识别策略",
+    "自然实验",
+    "内生性",
+    "rdd",
+)
 
 _GROUNDING_CODES = (
     "causal_claim_forbidden",
@@ -114,14 +126,17 @@ def invoke_review_llm(
     rubric_template: ReviewRubric,
     research_direction: str,
     literature_entries: List[Any],
+    claim: str = "",
 ) -> dict:
     """非 mock 评审通道。要求 JSON ``{rubric, feedback, suggestions}``。"""
     from llm.call_llm import call_llm as unified_call
 
+    claim_block = _review_claim_instruction(claim)
     prompt = (
         "你是经济学论文审稿人。只输出 JSON，不要 markdown。"
         "字段：rubric{endogeneity,identification,robustness,contribution,readability}"
         "（每维 0 到 1）、feedback、suggestions。\n"
+        f"{claim_block}\n"
         f"研究方向：{research_direction}\n"
         f"文献条数：{len(literature_entries or [])}\n"
         f"章节正文：\n{chapter_content}"
@@ -208,6 +223,7 @@ def call_review_llm(
             rubric_template,
             research_direction,
             literature_entries,
+            claim=claim,
         )
         return {**result, "review_source": "llm", "review_degraded": False}
     except Exception:
@@ -279,6 +295,110 @@ def _claim_of(state: EconPaperState) -> str:
         return claim_mode(state) or ""
     except Exception:
         return ""
+
+
+def _review_claim_instruction(claim: str) -> str:
+    course = (
+        "这是本科课程论文，不是期刊投稿。"
+        "不得因为没有边际贡献、三条贡献、政策贡献或学术增量而扣 contribution。"
+        "contribution 只看题目有没有写清楚、有没有按课设作答。"
+    )
+    if _is_association_claim(claim):
+        return (
+            course
+            + "本文主张模式是 association（条件相关，不是因果识别）。"
+            "不得因为没有 IV、RDD、DID、工具变量或识别策略而扣 "
+            "identification / endogeneity / contribution。"
+            "这些方法不是本篇的要求。"
+            "只检查：有没有把相关写成因果；论述是否清楚。"
+        )
+    return course + "识别策略按课设深度来看，不要按核心刊标准。"
+
+
+def _is_association_claim(claim: str) -> bool:
+    return str(claim or "").strip().lower() in {
+        "association",
+        "assoc",
+        "correlation",
+    }
+
+
+def _demands_causal_ident(text: str) -> bool:
+    raw = text or ""
+    low = raw.lower()
+    if re.search(r"\biv\b", low) or re.search(r"\bdid\b", low):
+        return True
+    return any(token in low for token in _CAUSAL_IDENT_DEMAND)
+
+
+def apply_association_review_guard(
+    rubric: dict,
+    feedback: str,
+    suggestions: str,
+    claim: str,
+    content: str,
+) -> tuple[dict, str, str]:
+    """现场 LLM 常按因果稿打相关文。相关且未写禁句时，缺 IV/RDD 不是失败。"""
+    if not _is_association_claim(claim):
+        return dict(rubric), feedback, suggestions
+    if _has_forbidden_causal_claim(content):
+        return dict(rubric), feedback, suggestions
+    next_rubric = dict(rubric)
+    for dim in ("endogeneity", "identification", "contribution"):
+        try:
+            value = float(next_rubric.get(dim) or 0.0)
+        except (TypeError, ValueError):
+            value = 0.0
+        if value < ASSOCIATION_SCORE_FLOOR:
+            next_rubric[dim] = ASSOCIATION_SCORE_FLOOR
+    if _demands_causal_ident(f"{feedback}\n{suggestions}"):
+        for dim in ("endogeneity", "identification", "robustness", "contribution"):
+            try:
+                value = float(next_rubric.get(dim) or 0.0)
+            except (TypeError, ValueError):
+                value = 0.0
+            next_rubric[dim] = max(value, ASSOCIATION_SCORE_FLOOR)
+        try:
+            readability = float(next_rubric.get("readability") or 0.0)
+        except (TypeError, ValueError):
+            readability = 0.0
+        next_rubric["readability"] = max(readability, ASSOCIATION_SCORE_FLOOR)
+        note = "本文按相关写。缺少 IV / RDD / 双重差分不是缺陷。"
+        kept_fb = _drop_required_ident_spans(feedback)
+        kept_sg = _drop_required_ident_spans(suggestions)
+        feedback = note if not kept_fb else f"{note}\n{kept_fb}"
+        suggestions = kept_sg or "保持相关表述，不要把系数写成处理效应。"
+    return next_rubric, feedback, suggestions
+
+
+def _looks_like_ident_requirement(text: str) -> bool:
+    return any(
+        token in text
+        for token in (
+            "必须",
+            "应使用",
+            "应当",
+            "缺少识别",
+            "补双重",
+            "补 IV",
+            "否则识别",
+            "识别失败",
+        )
+    )
+
+
+def _drop_required_ident_spans(text: str) -> str:
+    if not text:
+        return ""
+    kept: list[str] = []
+    for part in re.split(r"(?<=[。；\n])", text):
+        piece = part.strip()
+        if not piece:
+            continue
+        if _demands_causal_ident(piece) and _looks_like_ident_requirement(piece):
+            continue
+        kept.append(part)
+    return "".join(kept).strip()
 
 
 def _has_forbidden_causal_claim(content: str) -> bool:
@@ -406,8 +526,8 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
         claim=claim,
     )
     rubric = dict(llm_result["rubric"])
-    feedback = llm_result["feedback"]
-    suggestions = llm_result["suggestions"]
+    feedback = str(llm_result["feedback"] or "")
+    suggestions = str(llm_result["suggestions"] or "")
     review_source = str(llm_result.get("review_source") or "mock")
     review_degraded = bool(llm_result.get("review_degraded"))
     method = ""
@@ -430,6 +550,13 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
         suggestions = (
             f"{suggestions} 未处理识别威胁：{', '.join(triggered)}。"
         ).strip()
+    rubric, feedback, suggestions = apply_association_review_guard(
+        rubric,
+        feedback,
+        suggestions,
+        claim,
+        chapter_content,
+    )
 
     score = _compute_composite_score(rubric, chapter_type, claim=claim)
     structure_kwargs = {}

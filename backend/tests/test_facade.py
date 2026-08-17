@@ -236,31 +236,122 @@ def test_run_upload_pipeline_503_when_graph_missing(monkeypatch):
 # ---------------------------------------------------------------------------
 # Single-node calls
 # ---------------------------------------------------------------------------
-def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
-    """set_direction_and_outline calls set_direction then generate_outline."""
-    calls = []
+def _patch_prewrite_nodes(monkeypatch, calls, *, star_rating=3):
+    """run_prewrite imports node functions at call time."""
 
     def fake_set_direction(state):
         calls.append("set_direction")
         return {"research_direction": state["research_direction"]}
 
-    def fake_generate_outline(state):
+    def fake_identify(state):
+        calls.append("identification_verify")
+        return {
+            "identification_diag": {"report": "ok", "star_rating": star_rating},
+            "identification_failed": star_rating == 0,
+            "star_rating": star_rating,
+        }
+
+    def fake_estimate(state):
+        calls.append("estimate")
+        return {
+            "results": "# 主结果",
+            "estimate": {
+                "produced_by": "estimate",
+                "status": "ok",
+                "treatment_row": "| x | 1 |",
+            },
+        }
+
+    def fake_robustness(state):
+        calls.append("robustness_check")
+        return {
+            "robustness_results": {
+                "produced_by": "robustness_check",
+                "diagnostics": [],
+            }
+        }
+
+    def fake_search(state):
+        calls.append("search_literature")
+        return {
+            "literature_entries": [],
+            "literature_query": "q",
+            "literature_source": "mock",
+            "literature_produced_by": "search_literature",
+        }
+
+    def fake_citation(state):
+        calls.append("build_citation_graph")
+        return {"citation_graph": {}, "citation_indices": {}}
+
+    def fake_title(state):
+        calls.append("generate_title")
+        return {"title_chapter": {"type": "title", "title": "T"}}
+
+    def fake_outline(state):
         calls.append("generate_outline")
         return {"outline": [{"type": "intro"}]}
 
-    monkeypatch.setattr("facade.set_direction_node", fake_set_direction)
-    monkeypatch.setattr("facade.generate_outline_node", fake_generate_outline)
+    monkeypatch.setattr("nodes.set_direction.set_direction", fake_set_direction)
+    monkeypatch.setattr(
+        "nodes.identification_verify.identification_verify", fake_identify
+    )
+    monkeypatch.setattr("nodes.estimate.estimate", fake_estimate)
+    monkeypatch.setattr(
+        "nodes.robustness_check.robustness_check", fake_robustness
+    )
+    monkeypatch.setattr(
+        "nodes.search_literature.search_literature", fake_search
+    )
+    monkeypatch.setattr(
+        "nodes.citation_graph.build_citation_graph", fake_citation
+    )
+    monkeypatch.setattr("nodes.generate_title.generate_title", fake_title)
+    monkeypatch.setattr("nodes.generate_outline.generate_outline", fake_outline)
+
+
+def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
+    """预写顺序：识别 → 估计 → 稳健性 → 文献 → 标题 → 大纲。"""
+    calls = []
+    _patch_prewrite_nodes(monkeypatch, calls)
 
     sid = "test-direction"
     facade.seed_state(sid, {})
     rd = {"question": "q", "method": "OLS"}
     result = facade.set_direction_and_outline(sid, rd)
 
-    assert calls == ["set_direction", "generate_outline"]
+    assert calls == [
+        "set_direction",
+        "identification_verify",
+        "estimate",
+        "robustness_check",
+        "search_literature",
+        "build_citation_graph",
+        "generate_title",
+        "generate_outline",
+    ]
     assert result["research_direction"] == rd
     assert result["outline"] == [{"type": "intro"}]
-    # state persisted
+    assert result["star_rating"] == 3
+    assert result["estimate"]["produced_by"] == "estimate"
     assert facade.get_state(sid)["outline"] == [{"type": "intro"}]
+    facade.drop_session(sid)
+
+
+def test_set_direction_and_outline_skips_outline_on_zero_star(monkeypatch):
+    """0 星识别：写回诊断，不生成大纲，也不跑估计。"""
+    calls = []
+    _patch_prewrite_nodes(monkeypatch, calls, star_rating=0)
+
+    sid = "test-zero-star"
+    facade.seed_state(sid, {})
+    result = facade.set_direction_and_outline(
+        sid, {"question": "q", "method": "did"}
+    )
+    assert calls == ["set_direction", "identification_verify"]
+    assert result.get("outline") is None
+    assert result["star_rating"] == 0
+    assert result["identification_failed"] is True
     facade.drop_session(sid)
 
 
@@ -304,6 +395,7 @@ def test_generate_chapter_calls_node_and_persists(monkeypatch):
         return {"body_chapters": [state["current_chapter"]]}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-gen-chapter"
     facade.seed_state(sid, {})
@@ -317,22 +409,54 @@ def test_generate_chapter_calls_node_and_persists(monkeypatch):
 
 
 def test_generate_chapter_merges_render_kwargs(monkeypatch):
-    """generate_chapter fills in missing render_kwargs into state."""
+    """非真值 render_kwargs 可补空键；TRUTH_KEYS（如 results）必须忽略。"""
     def fake_generate_chapter(state):
         return {"body_chapters": [{"content": state.get("research_question")}]}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-gen-kwargs"
     facade.seed_state(sid, {})
     facade.generate_chapter(
         sid,
         {"type": "intro"},
-        render_kwargs={"research_question": "Q1", "data_summary": "D1"},
+        render_kwargs={
+            "research_question": "Q1",
+            "data_summary": "D1",
+            "results": "FAKE TABLE",
+        },
     )
     state = facade.get_state(sid)
     assert state["research_question"] == "Q1"
     assert state["data_summary"] == "D1"
+    assert state.get("results") != "FAKE TABLE"
+    facade.drop_session(sid)
+
+
+def test_generate_chapter_calls_review_after_write(monkeypatch):
+    """写章成功后必须调用 review_chapter。"""
+    calls = []
+
+    def fake_generate_chapter(state):
+        return {
+            "body_chapters": [
+                {"type": "intro", "content": "x", "status": "generated"}
+            ]
+        }
+
+    def fake_review(state):
+        calls.append("review_chapter")
+        return {"review_scores": [0.8]}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", fake_review)
+
+    sid = "test-gen-review"
+    facade.seed_state(sid, {})
+    result = facade.generate_chapter(sid, {"type": "intro", "title": "引言"})
+    assert calls == ["review_chapter"]
+    assert result["review_scores"] == [0.8]
     facade.drop_session(sid)
 
 
@@ -342,6 +466,7 @@ def test_generate_chapter_does_not_overwrite_existing_kwargs(monkeypatch):
         return {"body_chapters": []}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-gen-nooverwrite"
     facade.seed_state(sid, {"research_question": "original"})
@@ -378,6 +503,7 @@ def test_regenerate_chapter_sets_index_and_calls_node(monkeypatch):
         return {"body_chapters": [{"content": "new"}]}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-regen"
     facade.seed_state(sid, {})

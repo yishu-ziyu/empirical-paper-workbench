@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from engine.bind import bind_chapter_kwargs
+from engine.readiness import paper_ready_to_write, resolve_slot
 from prompts import get_prompt
 from protocols import GenerateChapterOutput
 from state import EconPaperState
@@ -35,7 +37,7 @@ def invoke_generate_llm(config: Any, system: str, user: str) -> str:
     """非 mock 生成通道。与占位字符串分离，测试可断言走了真通道。"""
     from llm.call_llm import call_llm as unified_call
 
-    return unified_call(f"{system}\n\n{user}", node_type="generate")
+    return unified_call(user, node_type="generate", system=system)
 
 
 def call_llm(system: str, user: str) -> str:
@@ -117,19 +119,18 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     6. 返回 ``current_chapter_index + 1``（推进到下一章）。
 
     缺 ``current_chapter_index`` 或 ``outline`` 时返回 ``{}``（no-op）。
+    未就绪返回 ``write_blocked``，不写 ``body_chapters``。
     """
-    idx = state.get("current_chapter_index")
-    outline = state.get("outline")
-    if idx is None or not outline:
+    idx, chapter_spec = resolve_slot(state)
+    if idx < 0 or not chapter_spec:
         return {}
 
-    if idx >= len(outline):
-        # 所有章节已生成，无操作
-        return {}
-
-    chapter_spec: dict = dict(outline[idx])
+    chapter_spec = dict(chapter_spec)
     chapter_spec["chapter_index"] = idx
     chapter_type = chapter_spec.get("type", "intro")
+    ready, blockers = paper_ready_to_write(state, str(chapter_type))
+    if not ready:
+        return {"write_blocked": True, "write_blockers": blockers}
 
     # 加载模板（未知 type 在此抛 ValueError）
     prompt_mod = get_prompt(chapter_type)
@@ -138,6 +139,11 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     render_state = {**state, **chapter_spec}
     _inject_revision_context(render_state, state, idx)
     kwargs = _collect_render_kwargs(render_state, prompt_mod.USER_TEMPLATE)
+    bound = bind_chapter_kwargs(state, chapter_spec)
+    for key, value in bound.items():
+        current = kwargs.get(key, "")
+        if key not in kwargs or current in ("", None):
+            kwargs[key] = value
     system, user = prompt_mod.render(**kwargs)
 
     from nodes.review_sources.threat_cards import (
@@ -149,13 +155,24 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     if threat_text:
         user = f"{user}\n\n识别威胁约束（必须在正文处理）：\n{threat_text}"
 
-    content = call_llm(system, user)
+    prose = call_llm(system, user)
+    est = state.get("estimate") or {}
+    if (
+        str(chapter_type) == "results"
+        and isinstance(est, dict)
+        and est.get("status") == "ok"
+    ):
+        table = (state.get("results") or "").strip()
+        content = prose + "\n\n" + table if table else prose
+    else:
+        content = prose
 
     body_chapters: list = list(state.get("body_chapters", []) or [])
     while len(body_chapters) < _NUM_CHAPTERS:
         body_chapters.append({})
 
-    # regenerate：已有章节的 versions 保留，新版本 prepend
+    # regenerate：已有章节的 versions 保留，新版本 prepend。
+    # versions[0] 已含当时拼上的主表；rollback 不要再拼一次。
     existing = body_chapters[idx] if isinstance(body_chapters[idx], dict) else {}
     existing_versions = list(existing.get("versions", []) or [])
     versions = [content] + existing_versions

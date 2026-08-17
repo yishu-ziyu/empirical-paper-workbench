@@ -139,3 +139,49 @@ def test_call_llm_unknown_node_uses_default():
     """未知 node_type 走 default 配置，不报错。"""
     result = call_llm("test prompt", node_type="nonexistent")
     assert isinstance(result, str)
+
+
+def test_call_llm_mock_placeholder_by_node():
+    """各节点 mock 占位串保持原值，现有单测语义不变。"""
+    assert call_llm("p", node_type="title") == "Placeholder Title from LLM"
+    assert call_llm("p", node_type="outline") == "Placeholder outline from LLM"
+    assert call_llm("p", node_type="generate") == "Placeholder chapter content from LLM"
+    assert call_llm("p", node_type="review") == "Mock LLM response"
+
+
+def test_from_env_uses_minimax_outside_pytest(monkeypatch):
+    """非 pytest 且有 MiniMax key 时走 MiniMax，不读死 mock。"""
+    monkeypatch.delenv("GENERATE_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("GENERATE_LLM_MODEL", raising=False)
+    monkeypatch.delenv("GENERATE_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("ECONPAPER_LLM", raising=False)
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
+    monkeypatch.setenv("MINIMAX_MODEL", "MiniMax-M3")
+    monkeypatch.setenv("MINIMAX_OPENAI_BASE_URL", "https://api.minimaxi.com/v1")
+    monkeypatch.setattr("llm.router.in_pytest", lambda: False)
+    config = LLMConfig.from_env("GENERATE")
+    assert config.provider == "minimax"
+    assert config.model == "MiniMax-M3"
+    assert config.api_key == "sk-test-minimax"
+    assert config.base_url == "https://api.minimaxi.com/v1"
+
+
+def test_econpaper_llm_mock_wins_outside_pytest(monkeypatch):
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
+    monkeypatch.setattr("llm.router.in_pytest", lambda: False)
+    config = LLMConfig.from_env("GENERATE")
+    assert config.provider == "mock"
+
+
+def test_router_reload_rereads_env(monkeypatch):
+    router = LLMRouter()
+    assert router.get_config("generate").provider == "mock"
+    monkeypatch.setenv("GENERATE_LLM_PROVIDER", "minimax")
+    monkeypatch.setenv("GENERATE_LLM_MODEL", "MiniMax-M3")
+    monkeypatch.setenv("GENERATE_LLM_API_KEY", "sk-reload")
+    router.reload()
+    gen = router.get_config("generate")
+    assert gen.provider == "minimax"
+    assert gen.model == "MiniMax-M3"
+    assert gen.api_key == "sk-reload"

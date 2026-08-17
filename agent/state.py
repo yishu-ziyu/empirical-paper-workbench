@@ -57,7 +57,9 @@ class EconPaperState(TypedDict, total=False):
     chapter_statuses: List[str]  # 6 章的审批状态
     # 以下为占位字段，后续 ticket 逐步填充
     eda_results: List[Any]
-    research_direction: Optional[str]
+    research_direction: Optional[dict]
+    main_specification: Optional[dict]  # robustness_check / spec_curve 主设定
+    spec_curve: Optional[dict]  # 探索臂设定表（全部规格留在桌上）
     outline: Optional[Any]
     # T-06: 用户在前端拖拽调整后的 outline (HITL resume 路径写入)
     user_adjusted_outline: Optional[Any]
@@ -85,6 +87,11 @@ class EconPaperState(TypedDict, total=False):
     literature_entries: List[Any]  # List[LiteratureEntry]，见 protocols.py
     literature_query: Optional[str]
     literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled"
+    literature_produced_by: Optional[str]
+    write_blocked: bool
+    write_blockers: List[str]
+    claim: Optional[str]
+    degradations: List[Any]
     # ADR-0004: 章节评审（review_chapter 节点写入）
     review_feedback: List[str]
     revision_suggestions: List[str]
@@ -94,6 +101,9 @@ class EconPaperState(TypedDict, total=False):
     review_chapter_index: Optional[int]
     review_enabled: bool
     max_review_iterations: int
+    review_source: str  # "llm" | "mock" | "mock_fallback"
+    review_degraded: bool
+    grounding_failures: List[str]
     # ADR-0007: HITL 人工评审（叠加层，默认关闭）
     hitl_review_enabled: bool           # 是否启用人工评审暂停点（默认 False）
     hitl_decision: Optional[str]        # "accept" | "reject" | "force_pass"
@@ -103,3 +113,14 @@ class EconPaperState(TypedDict, total=False):
     citation_graph: Optional[Any]  # {entries: [...], edges: [{from, to}], indices: {doi: int}}
     references_list: List[Any]  # 最终参考文献列表 [{index, text, doi, entry}]
     citation_indices: Dict[str, int]  # doi → 引用编号 [1] [2] ...
+    # 识别策略验证（identification_verify 节点写入）
+    identification_diag: Optional[dict]  # {strategy: str, diagnostics: list[dict], passed: bool, report: str, star_rating: int}
+    identification_failed: Optional[bool]  # True = 诊断不通过，需用户调整
+    star_rating: Optional[int]  # 0-3 星：0=完全不可信（0星截断），1-2=继续但标注，3=最佳
+    # HITL_pause：0星截断后等待用户调整研究方向的图内中断点
+    hitl_pause_reason: Optional[str]  # "identification_0star" 等
+    # 稳健性检验（robustness_check 节点写入）
+    robustness_results: Optional[dict]  # {robustness: list[dict], heterogeneity: list[dict], placebos: list[dict], summary_table: str}
+    # 主估计（estimate 节点写入）。results 是结果章 prompt 的 {results}。
+    results: Optional[str]
+    estimate: Optional[dict]

@@ -1,6 +1,10 @@
 .PHONY: dev dev-frontend dev-backend install install-frontend install-backend install-agent health test clean gen-api check-api-drift \
         docker-up docker-down docker-build docker-logs docker-ps docker-clean
 
+# Python 版本：项目锁定 3.12（3.14 下 numpy/pydantic 依赖装不上）。
+# 可用 PY=python3.12 覆盖，需机器上存在 python3.12。
+PY ?= python3.12
+
 # 默认并发起 frontend + backend；Ctrl-C 同时杀掉
 dev:
 	@trap 'kill 0' INT TERM; \
@@ -22,16 +26,19 @@ install-frontend:
 	cd frontend && npm install
 
 install-backend:
-	cd backend && python3 -m venv .venv || true; \
+	cd backend && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
 	pip install -r requirements.txt; \
-	pip install -e ../StatsPAI || true; \
-	pip install -e ../stata-code || true
+	pip install -e ../../StatsPAI || true; \
+	pip install "pyfixest==0.60.0" || true; \
+	pip install -e ../../stata-code || true
 
 install-agent:
-	cd agent && python3 -m venv .venv || true; \
+	cd agent && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
-	pip install -r requirements.txt
+	pip install -r requirements.txt; \
+	pip install -e ../../StatsPAI || true; \
+	pip install "pyfixest==0.60.0" || true
 
 # 验证 backend 健康检查
 health:

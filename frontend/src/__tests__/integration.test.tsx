@@ -63,8 +63,7 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
-    // 初始无 sessionId → 显示提示文字（header + Editor 空态）
-    expect(screen.getAllByText(/请上传 CSV 文件开始分析/i).length).toBeGreaterThan(0)
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
 
     // 触发文件上传
     const fileInput = screen.getByTestId('file-input') as HTMLInputElement

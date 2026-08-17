@@ -9,15 +9,16 @@ from typing import get_type_hints
 
 from protocols import (
     UploadDataOutput, CleanDataOutput, GenerateTitleOutput, SetDirectionOutput,
-    GenerateOutlineOutput, GenerateChapterOutput, TranslateCodeOutput,
+    EstimateOutput, GenerateOutlineOutput, GenerateChapterOutput, TranslateCodeOutput,
     ExportDocxOutput, ApproveChapterOutput, RollbackOutput, ReviewOutput,
-    CitationGraphOutput, ReferencesOutput,
+    CitationGraphOutput, ReferencesOutput, LiteratureOutput,
 )
 from state import EconPaperState
 from nodes.upload_data import upload_data
 from nodes.clean_data import clean_data
 from nodes.generate_title import generate_title
 from nodes.set_direction import set_direction
+from nodes.estimate import estimate
 from nodes.generate_outline import generate_outline
 from nodes.generate_chapter import generate_chapter
 from nodes.review_chapter import review_chapter
@@ -27,6 +28,7 @@ from nodes.approve_chapter import approve_chapter
 from nodes.rollback import rollback_chapter
 from nodes.citation_graph import build_citation_graph
 from nodes.generate_references import generate_references
+from nodes.search_literature import search_literature
 
 
 STATE_KEYS = set(EconPaperState.__annotations__.keys())
@@ -37,6 +39,7 @@ NODES = [
     (clean_data, CleanDataOutput),
     (generate_title, GenerateTitleOutput),
     (set_direction, SetDirectionOutput),
+    (estimate, EstimateOutput),
     (generate_outline, GenerateOutlineOutput),
     (generate_chapter, GenerateChapterOutput),
     (review_chapter, ReviewOutput),
@@ -46,6 +49,7 @@ NODES = [
     (rollback_chapter, RollbackOutput),
     (build_citation_graph, CitationGraphOutput),
     (generate_references, ReferencesOutput),
+    (search_literature, LiteratureOutput),
 ]
 
 

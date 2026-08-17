@@ -17,31 +17,19 @@ describe('App 三栏布局', () => {
     vi.unstubAllGlobals()
   })
 
-  test('无 session 时显示欢迎引导卡片，包含上传按钮和步骤指引', () => {
+  test('无 session 时先进入空桌，不摊开工作台', () => {
     renderWithI18n(<App />)
 
-    // 上传按钮始终在 header 中
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('upload-btn')).toBeInTheDocument()
-
-    // 欢迎卡片
-    expect(screen.getByTestId('welcome-card')).toBeInTheDocument()
-
-    // 产品名（同时出现在header和欢迎卡片中，使用getAllByText）
-    expect(screen.getAllByText(/econpaper/i).length).toBeGreaterThan(0)
-
-    // 三步指引（文本可能出现在 StepIndicator 和欢迎卡片中，使用 getAllByText）
-    expect(screen.getAllByText(/上传数据|Upload your data/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/探索与分析|Explore and analyze/i).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/生成论文|Generate your paper/i).length).toBeGreaterThan(0)
-
-    // 欢迎卡片中的上传按钮
-    expect(screen.getByTestId('welcome-upload-btn')).toBeInTheDocument()
+    expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('welcome-card')).not.toBeInTheDocument()
   })
 
-  test('未上传时显示提示文字，不显示 EdaSidebar', () => {
+  test('未上传时不显示 EdaSidebar', () => {
     renderWithI18n(<App />)
-    // 提示文字出现在 header 和 Editor 空态中，至少一个匹配
-    expect(screen.getAllByText(/请上传 CSV 文件开始分析/i).length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('eda-sidebar')).not.toBeInTheDocument()
   })
 
   test('左栏从 state 渲染章节列表（T-02 仅 1 章 title）', () => {
@@ -71,8 +59,7 @@ describe('App 三栏布局', () => {
 
     renderWithI18n(<App />)
 
-    // 初始无 sessionId → 提示文字可见（header + Editor 空态）
-    expect(screen.getAllByText(/请上传 CSV 文件开始分析/i).length).toBeGreaterThan(0)
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
 
     // 触发文件选择 → 模拟选择 CSV
     const fileInput = screen.getByTestId('file-input')
@@ -115,6 +102,51 @@ describe('App 三栏布局', () => {
       expect(screen.getByTestId('upload-error')).toBeInTheDocument()
     })
     expect(screen.getByText(/HTTP 400/i)).toBeInTheDocument()
+  })
+
+  test('提交研究方向后显示识别报告', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+              research_direction: { method: 'OLS' },
+              star_rating: null,
+              identification_failed: false,
+              identification_report: '当前方法没有对应的识别诊断套餐',
+              claim: 'association',
+              literature_source: 'mock',
+              estimate: { treatment_row: '| age | 0.1234 | 0.0456 | 0.0078 |', produced_by: 'estimate' },
+              results: '| age | 0.1234 | 0.0456 | 0.0078 |',
+            }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+
+    fireEvent.change(screen.getByLabelText(/研究问题/), {
+      target: { value: '教育对收入的影响' },
+    })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ident-report')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('ident-report')).toHaveTextContent('识别诊断套餐')
+    expect(screen.getByText('引言')).toBeInTheDocument()
+    expect(screen.getByTestId('instrument-readout')).toBeInTheDocument()
+    expect(screen.getByTestId('readout-claim')).toHaveTextContent('association')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('| age | 0.1234 |')
+    expect(screen.getByTestId('write-chapter-results')).toBeInTheDocument()
   })
 
   test('上传中按钮显示"上传中..."并禁用', async () => {

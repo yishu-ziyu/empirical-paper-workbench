@@ -30,8 +30,10 @@ def test_set_direction_writes_research_direction():
     state = make_state(research_direction=rd)
     result = set_direction(state)
     assert "research_direction" in result
-    assert result["research_direction"] == rd
-    assert result["research_direction"]["question"] == "教育对收入的影响"
+    written = result["research_direction"]
+    for key, value in rd.items():
+        assert written[key] == value
+    assert written["question"] == "教育对收入的影响"
 
 
 def test_generate_outline_creates_six_chapters(mock_llm_for):
@@ -54,6 +56,14 @@ def test_generate_outline_creates_six_chapters(mock_llm_for):
         assert expected in types, f"outline missing chapter type: {expected}"
     # generate_outline 必须调用 call_llm (mock 记录)
     assert len(recorder.calls) > 0, "generate_outline did not call the LLM"
+    results = next(ch for ch in outline if ch["type"] == "results")
+    assert results["bind"]["requires"] == [
+        "identification",
+        "estimate",
+        "robustness",
+    ]
+    intro = next(ch for ch in outline if ch["type"] == "intro")
+    assert intro["bind"]["requires"] == ["identification"]
 
 
 def test_generate_outline_uses_user_adjusted_outline(mock_llm_for):
@@ -72,3 +82,17 @@ def test_generate_outline_uses_user_adjusted_outline(mock_llm_for):
     assert len(recorder.calls) == 0, (
         "generate_outline should skip LLM when user_adjusted_outline is present"
     )
+
+
+def test_outline_call_llm_delegates_to_unified(monkeypatch):
+    seen = {}
+
+    def fake_unified(prompt, node_type="default", system=None):
+        seen["node_type"] = node_type
+        return "Live outline"
+
+    monkeypatch.setattr("llm.call_llm.call_llm", fake_unified)
+    from nodes.generate_outline import call_llm
+
+    assert call_llm("p") == "Live outline"
+    assert seen["node_type"] == "outline"

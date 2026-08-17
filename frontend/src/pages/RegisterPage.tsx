@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { useT } from '../lib/i18n'
 
 const API_BASE = 'http://localhost:8000'

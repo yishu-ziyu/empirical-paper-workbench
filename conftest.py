@@ -91,6 +91,70 @@ def make_six_chapter_outline() -> list:
     ]
 
 
+def make_write_ready_state(**overrides) -> dict:
+    """State that may write any of the six chapter slots."""
+    treatment_row = "| age | 0.1234 | 0.0456 | 0.0078 |"
+    ready = make_state(
+        research_direction={
+            "question": "年龄与收入",
+            "dv": "income",
+            "iv": "age",
+            "method": "ols",
+            "claim": "association",
+        },
+        identification_diag={
+            "strategy": None,
+            "diagnostics": [],
+            "passed": True,
+            "report": "OLS 无识别套餐，按相关表述。",
+            "star_rating": None,
+        },
+        star_rating=None,
+        claim="association",
+        estimate={
+            "status": "ok",
+            "produced_by": "estimate",
+            "method": "ols",
+            "estimator": "statspai.feols",
+            "treatment": "age",
+            "coef": 0.1234,
+            "se": 0.0456,
+            "p": 0.0078,
+            "n": 5,
+            "treatment_row": treatment_row,
+            "formula": "income ~ age",
+        },
+        results=(
+            "# 主结果\n\n| 变量 | 系数 | SE | p |\n"
+            "|------|------|----|---|\n" + treatment_row
+        ),
+        robustness_results={
+            "produced_by": "robustness_check",
+            "diagnostics": [],
+            "degraded": True,
+            "reason": "no_cluster_or_groups",
+            "summary_table": "# 稳健性",
+        },
+        literature_produced_by="search_literature",
+        literature_source="mock",
+        literature_query="q",
+        literature_entries=[
+            {
+                "title": "T",
+                "authors": ["A"],
+                "year": 2020,
+                "doi": "10.1/x",
+                "source": "mock",
+            }
+        ],
+        citation_indices={"10.1/x": 1},
+        outline=make_six_chapter_outline(),
+        current_chapter_index=0,
+    )
+    ready.update(overrides)
+    return ready
+
+
 def make_cleaning_report() -> dict:
     """构造清洗报告（clean_data 输出，8 步 StepReport）。"""
     return {

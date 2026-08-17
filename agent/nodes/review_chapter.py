@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from protocols import ReviewOutput, ReviewRubric
@@ -75,6 +76,35 @@ _RUBRIC_DIMS = (
     "robustness",
     "contribution",
     "readability",
+)
+
+# 关联主张禁用子串（当作本文主张）。允许句不在此列。
+FORBIDDEN_CAUSAL_CLAIMS = (
+    "本文识别了因果",
+    "因果效应显著",
+    "识别策略成立",
+    "解决内生性",
+)
+ALLOWED_CAUSAL_PHRASES = (
+    "无法做因果识别",
+    "仅解释为相关",
+)
+
+RUBRIC_WEIGHTS_METHODS_ASSOCIATION = {
+    "endogeneity": 0.0,
+    "identification": 0.1,
+    "robustness": 0.25,
+    "contribution": 0.25,
+    "readability": 0.4,
+}
+
+CAUSAL_CLAIM_SCORE_CAP = 0.50
+
+_GROUNDING_CODES = (
+    "causal_claim_forbidden",
+    "invented_number",
+    "missing_estimate_number",
+    "invented_table",
 )
 
 
@@ -147,6 +177,7 @@ def call_review_llm(
     rubric_template: ReviewRubric,
     research_direction: str,
     literature_entries: List[Any],
+    claim: str = "",
 ) -> dict:
     """模块级 LLM 调用函数（与 generate_chapter.call_llm 同一 monkeypatch 模式）。
 
@@ -161,34 +192,51 @@ def call_review_llm(
     config = router.get_config("review")
 
     if config.provider == "mock":
-        return mock_review_llm(
-            chapter_content, rubric_template, research_direction, literature_entries
+        result = mock_review_llm(
+            chapter_content,
+            rubric_template,
+            research_direction,
+            literature_entries,
+            claim=claim,
         )
+        return {**result, "review_source": "mock", "review_degraded": False}
 
     try:
-        return invoke_review_llm(
+        result = invoke_review_llm(
             config,
             chapter_content,
             rubric_template,
             research_direction,
             literature_entries,
         )
+        return {**result, "review_source": "llm", "review_degraded": False}
     except Exception:
-        return mock_review_llm(
-            chapter_content, rubric_template, research_direction, literature_entries
+        result = mock_review_llm(
+            chapter_content,
+            rubric_template,
+            research_direction,
+            literature_entries,
+            claim=claim,
         )
+        return {
+            **result,
+            "review_source": "mock_fallback",
+            "review_degraded": True,
+        }
 
 
-def weights_for_chapter(chapter_type: str) -> dict:
+def weights_for_chapter(chapter_type: str, claim: str = "") -> dict:
     """按章取 rubric 权重。未知 type 退回实证默认。"""
+    if (chapter_type or "") == "methods" and claim == "association":
+        return dict(RUBRIC_WEIGHTS_METHODS_ASSOCIATION)
     return RUBRIC_WEIGHTS_BY_TYPE.get(chapter_type or "", RUBRIC_WEIGHTS)
 
 
 def _compute_composite_score(
-    rubric: ReviewRubric, chapter_type: str = "methods"
+    rubric: ReviewRubric, chapter_type: str = "methods", claim: str = ""
 ) -> float:
     """加权综合分。默认 methods 权重，兼容既有单测。"""
-    weights = weights_for_chapter(chapter_type)
+    weights = weights_for_chapter(chapter_type, claim=claim)
     total = 0.0
     for dim, weight in weights.items():
         total += rubric.get(dim, 0.0) * weight
@@ -214,6 +262,46 @@ def _methods_method_from_outline(state: EconPaperState) -> str:
         if isinstance(spec, dict) and spec.get("type") == "methods":
             return str(spec.get("method") or "")
     return str(state.get("method") or "")
+
+
+def _claim_of(state: EconPaperState) -> str:
+    raw = state.get("claim")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    rd = state.get("research_direction")
+    if isinstance(rd, dict):
+        user_claim = rd.get("claim")
+        if isinstance(user_claim, str) and user_claim.strip():
+            return user_claim.strip()
+    try:
+        from engine.readiness import claim_mode
+
+        return claim_mode(state) or ""
+    except Exception:
+        return ""
+
+
+def _has_forbidden_causal_claim(content: str) -> bool:
+    text = content or ""
+    for allowed in ALLOWED_CAUSAL_PHRASES:
+        text = text.replace(allowed, "")
+    return any(token in text for token in FORBIDDEN_CAUSAL_CLAIMS)
+
+
+def _visibility_fields(
+    review_source: str,
+    review_degraded: bool,
+    grounding_failures: List[str],
+    degradations: Optional[List[Any]] = None,
+) -> dict:
+    fields: dict = {
+        "review_source": review_source,
+        "review_degraded": review_degraded,
+        "grounding_failures": list(grounding_failures),
+    }
+    if degradations:
+        fields["degradations"] = degradations
+    return fields
 
 
 def review_chapter(state: EconPaperState) -> ReviewOutput:
@@ -285,6 +373,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_rubrics": review_rubrics,
             "review_iteration": 0,
             "review_chapter_index": idx,
+            **_visibility_fields("", False, []),
         }
 
     # 新章节检测：若上一轮 review_chapter_index != idx，说明换了章节，重置迭代
@@ -298,15 +387,29 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
     literature_entries = state.get("literature_entries", [])
     max_iterations = min(state.get("max_review_iterations", 2), 3)
 
+    claim = _claim_of(state)
+    chapter_type = _chapter_type_of(chapter, state, idx)
+    grounding_failures: List[str] = []
+    if claim == "association" and _has_forbidden_causal_claim(chapter_content):
+        grounding_failures.append("causal_claim_forbidden")
+    if chapter_type == "results":
+        from nodes.review_sources.grounding import check_grounding
+
+        grounding_failures.extend(check_grounding(state, chapter_content))
+
     rubric_template = ReviewRubric()
     llm_result = call_review_llm(
-        chapter_content, rubric_template, research_direction, literature_entries,
+        chapter_content,
+        rubric_template,
+        research_direction,
+        literature_entries,
+        claim=claim,
     )
     rubric = dict(llm_result["rubric"])
     feedback = llm_result["feedback"]
     suggestions = llm_result["suggestions"]
-
-    chapter_type = _chapter_type_of(chapter, state, idx)
+    review_source = str(llm_result.get("review_source") or "mock")
+    review_degraded = bool(llm_result.get("review_degraded"))
     method = ""
     if isinstance(chapter, dict):
         method = str(chapter.get("method") or state.get("method") or "")
@@ -328,24 +431,49 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             f"{suggestions} 未处理识别威胁：{', '.join(triggered)}。"
         ).strip()
 
-    score = _compute_composite_score(rubric, chapter_type)
+    score = _compute_composite_score(rubric, chapter_type, claim=claim)
+    structure_kwargs = {}
+    if "star_rating" in state:
+        structure_kwargs["star_rating"] = state.get("star_rating")
     failures = check_structure(
         chapter_type,
         chapter_content,
         method=method,
         methods_method=_methods_method_from_outline(state),
         citation_indices=state.get("citation_indices"),
+        claim=claim,
+        **structure_kwargs,
     )
     score = apply_structure_cap(score, failures)
     if failures:
         suggestions = (
             f"{suggestions} 结构层失败：{', '.join(failures)}。不得只堆关键词。"
         ).strip()
+    hit_codes = [code for code in grounding_failures if code in _GROUNDING_CODES]
+    if hit_codes:
+        score = min(score, CAUSAL_CLAIM_SCORE_CAP)
+        suggestions = (
+            f"{suggestions} 主张/接地层失败：{', '.join(hit_codes)}。"
+        ).strip()
 
     review_feedback[idx] = feedback
     revision_suggestions[idx] = suggestions
     review_scores[idx] = score
     review_rubrics[idx] = rubric
+
+    degradations = None
+    if review_degraded:
+        degradations = list(state.get("degradations") or [])
+        degradations.append({
+            "node": "review_chapter",
+            "reason": "review_llm_unparseable_or_error",
+            "fallback": "mock_review_llm",
+            "visible": True,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    visible = _visibility_fields(
+        review_source, review_degraded, grounding_failures, degradations
+    )
 
     if score < REVIEW_SCORE_THRESHOLD and review_iteration < max_iterations:
         # 回退：重生成当前章
@@ -357,6 +485,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_iteration": review_iteration + 1,
             "review_chapter_index": idx,
             "current_chapter_index": idx,  # 回退
+            **visible,
         }
     elif score >= REVIEW_SCORE_THRESHOLD:
         # 真正通过：重置迭代，为下一章准备
@@ -367,6 +496,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_rubrics": review_rubrics,
             "review_iteration": 0,
             "review_chapter_index": idx,
+            **visible,
         }
     else:
         # 强制通过（iteration >= max）：保留 review_iteration，让 route_after_review
@@ -378,4 +508,5 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_rubrics": review_rubrics,
             "review_iteration": review_iteration,
             "review_chapter_index": idx,
+            **visible,
         }

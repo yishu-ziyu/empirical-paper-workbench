@@ -35,7 +35,13 @@ class GenerateTitleOutput(TypedDict, total=False):
 
 
 class SetDirectionOutput(TypedDict, total=False):
-    research_direction: str
+    research_direction: Any
+    main_specification: Any
+
+
+class EstimateOutput(TypedDict, total=False):
+    results: str
+    estimate: Any
 
 
 class GenerateOutlineOutput(TypedDict, total=False):
@@ -46,6 +52,8 @@ class GenerateOutlineOutput(TypedDict, total=False):
 class GenerateChapterOutput(TypedDict, total=False):
     body_chapters: List[Chapter]
     current_chapter_index: int
+    write_blocked: bool
+    write_blockers: List[str]
 
 
 class TranslateCodeOutput(TypedDict, total=False):
@@ -87,6 +95,7 @@ class LiteratureOutput(TypedDict, total=False):
     literature_entries: List[LiteratureEntry]
     literature_query: str
     literature_source: str
+    literature_produced_by: str
 
 
 # ADR-0004: 章节评审节点输出
@@ -113,6 +122,9 @@ class ReviewOutput(TypedDict, total=False):
     review_iteration: int
     review_chapter_index: int
     current_chapter_index: int  # 仅在判定不通过、需回退时写入
+    review_source: str  # "llm" | "mock" | "mock_fallback"
+    review_degraded: bool
+    grounding_failures: List[str]
 
 
 # ADR-0009: 引用图谱与参考文献列表

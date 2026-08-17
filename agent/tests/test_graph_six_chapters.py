@@ -21,7 +21,7 @@ from nodes.generate_chapter import generate_chapter
 from nodes.translate_code import translate_code
 from state import EconPaperState
 
-from conftest import make_state
+from conftest import make_write_ready_state
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def _build_chapter_loop_graph():
 
 def _loop_state(six_chapter_outline):
     """构造循环 graph 需要的 state。"""
-    return make_state(
+    return make_write_ready_state(
         current_chapter_index=0,
         outline=six_chapter_outline,
         body_chapters=[],
@@ -94,7 +94,6 @@ def _loop_state(six_chapter_outline):
         key_references="REF",
         eda_results="EDA",
         method="OLS",
-        results="R",
     )
 
 
@@ -168,8 +167,36 @@ def test_graph_llm_called_six_times(recorder, six_chapter_outline):
 # build_graph() 结构：包含 translate_code 节点 + 条件边
 # ---------------------------------------------------------------------------
 def test_build_graph_compiles_with_translate_code():
-    """build_graph() 能编译，包含 translate_code 终点。"""
+    """build_graph() 能编译。章节节点不在预写图里。"""
     from graph import build_graph
 
     g = build_graph()
     assert g is not None
+    node_ids = set(g.get_graph().nodes.keys())
+    assert "generate_chapter" not in node_ids
+    assert "run_estimate" in node_ids
+    assert "search_literature" in node_ids
+
+
+def test_route_after_identification_goes_to_estimate():
+    from graph import route_after_identification
+
+    assert route_after_identification({"star_rating": None}) == [
+        "run_estimate",
+        "search_literature",
+    ]
+    assert route_after_identification({"star_rating": 2}) == [
+        "run_estimate",
+        "search_literature",
+    ]
+    assert route_after_identification({"star_rating": 0}) == "hitl_pause"
+
+
+def test_route_after_clean_stops_without_direction():
+    from graph import route_after_clean
+    from langgraph.graph import END
+
+    assert route_after_clean({}) == END
+    assert route_after_clean({"research_direction": {"question": "q"}}) == (
+        "set_direction"
+    )

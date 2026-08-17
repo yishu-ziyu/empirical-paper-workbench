@@ -1,19 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Google Fonts: 思源宋体 + Source Serif 4 + JetBrains Mono */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap');
-
 :root {
-  --bg: #FAF8F3;
-  --ink: #1A1A1A;
-  --accent: #8B2C2C;
-  --muted: #6B6357;
-  --border: #E8E2D6;
-  --panel: #F3EFE6;
-  --success: #2D7D46;
-  --warning: #B8860B;
+  --bg: #f4efe4;
+  --cream: #f1f0ed;
+  --ink: #181515;
+  --accent: #2f6b4f;
+  --muted: #515151;
+  --border: #d8d2c6;
+  --panel: #fffdf7;
+  --success: #2f6b4f;
+  --warning: #8a6a12;
+  --danger: #9b3d30;
 }
 
 html,
@@ -26,14 +27,14 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Instrument Sans', system-ui, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Selection highlight ── */
 ::selection {
-  background-color: rgba(139, 44, 44, 0.2);
+  background-color: rgba(47, 107, 79, 0.22);
 }
 
 /* ── Keyframe animations ── */
@@ -88,4 +89,13 @@ body {
 .animate-progress-pulse {
   animation: progress-pulse 1.5s ease-in-out infinite;
   transform-origin: left center;
+}
+
+@keyframes listen-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 107, 79, 0.28); }
+  50%      { box-shadow: 0 0 0 8px rgba(47, 107, 79, 0); }
+}
+
+.animate-listen {
+  animation: listen-ring 1.6s ease-out infinite;
 }

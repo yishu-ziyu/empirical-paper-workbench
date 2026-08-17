@@ -15,7 +15,7 @@ import pytest
 
 from nodes.generate_chapter import generate_chapter
 
-from conftest import make_state
+from conftest import make_state, make_write_ready_state
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def recorder(mock_llm_for):
 # ---------------------------------------------------------------------------
 def test_generate_chapter_writes_to_body_chapters(recorder, six_chapter_outline):
     """generate_chapter 把生成的章节写到 state['body_chapters'][idx]。"""
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=six_chapter_outline,
         research_question="教育对收入的影响",
@@ -57,7 +57,7 @@ def test_generate_chapter_preserves_other_body_chapters(
         "versions": ["OLD INTRO"],
         "chapter_index": 0,
     }
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=1,  # 写第 1 章
         outline=six_chapter_outline,
         body_chapters=[existing],
@@ -77,7 +77,7 @@ def test_generate_chapter_calls_llm_with_system_and_user(
     recorder, six_chapter_outline
 ):
     """generate_chapter 必须调 call_llm(system, user) 两参数（不是单 prompt）。"""
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=six_chapter_outline,
         research_question="RQ",
@@ -106,7 +106,7 @@ def test_generate_chapter_no_index_returns_empty(recorder):
 def test_generate_chapter_unknown_type_raises(recorder):
     """未知 chapter_type 抛错（不要 silent fallback 成 intro，掩盖 bug）。"""
     outline = [{"type": "unknown_xyz", "title": "x"}]
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=outline,
     )
@@ -133,7 +133,7 @@ def test_generate_chapter_all_six_types(
 ):
     """6 种 chapter_type 都能加载模板 + render + 调 LLM + 写回 body_chapters。"""
     outline = [{"type": chapter_type, "title": chapter_type}]
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=outline,
         **required_fields,
@@ -142,7 +142,13 @@ def test_generate_chapter_all_six_types(
     out = result["body_chapters"][0]
     assert out["type"] == chapter_type
     assert out["status"] == "generated"
-    assert out["content"] == "MOCK CHAPTER CONTENT"
+    expected = "MOCK CHAPTER CONTENT"
+    if chapter_type == "results":
+        table = (state.get("results") or "").strip()
+        if table:
+            expected = expected + "\n\n" + table
+    assert out["content"] == expected
+    assert out["versions"][0] == out["content"]
     # 检查 LLM 被调用且 user prompt 含所有占位符的值
     assert len(recorder.calls) == 1
     _, user = recorder.calls[0]["args"]
@@ -167,7 +173,7 @@ def test_intro_end_to_end_contains_required_section(
         "## 贡献\n使用 CHARLS 数据...\n\n"
         "## 论文结构\n..."
     )
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=six_chapter_outline,
         research_question="教育对收入的影响",
@@ -178,3 +184,107 @@ def test_intro_end_to_end_contains_required_section(
     assert "研究背景" in content
     assert "研究问题" in content
     assert "贡献" in content
+
+
+def test_results_chapter_blocked_without_estimate(recorder):
+    state = make_state(
+        current_chapter_index=0,
+        outline=[{"type": "results", "title": "结果"}],
+        identification_diag={"report": "ok"},
+    )
+    result = generate_chapter(state)
+    assert result.get("write_blocked") is True
+    assert "no_results" in result.get("write_blockers", [])
+    assert "body_chapters" not in result
+
+
+def test_intro_blocked_without_identification(recorder):
+    state = make_state(
+        current_chapter_index=0,
+        outline=[{"type": "intro", "title": "引言"}],
+    )
+    result = generate_chapter(state)
+    assert result.get("write_blocked") is True
+    assert "no_identification" in result.get("write_blockers", [])
+
+
+def test_intro_writes_with_only_identification(recorder):
+    state = make_state(
+        current_chapter_index=0,
+        outline=[{"type": "intro", "title": "引言"}],
+        identification_diag={"report": "ok"},
+        research_question="Q",
+        data_summary="D",
+    )
+    result = generate_chapter(state)
+    assert result.get("write_blocked") is not True
+    assert result["body_chapters"][0]["type"] == "intro"
+
+
+def test_bind_fills_empty_research_question(recorder):
+    """同名空键由 bind_chapter_kwargs 用研究方向补上。"""
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "intro", "title": "引言"}],
+        research_question="",
+        data_summary="D",
+    )
+    generate_chapter(state)
+    _, user = recorder.calls[0]["args"]
+    assert "年龄与收入" in user
+
+
+def test_bind_formats_key_references_from_literature_entries(recorder):
+    """key_references 真值来自 literature_entries，不来自空 HTTP 键。"""
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "lit_review", "title": "文献综述"}],
+    )
+    generate_chapter(state)
+    _, user = recorder.calls[0]["args"]
+    assert "T" in user
+    assert "2020" in user
+
+
+def test_methods_bind_uses_association_system(recorder):
+    """OLS / association 的方法章 system 不含「解决内生性」。"""
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "methods", "title": "方法", "method": "ols"}],
+    )
+    generate_chapter(state)
+    system, user = recorder.calls[0]["args"]
+    assert "解决内生性" not in system
+    assert "ols" in user.lower()
+
+
+def test_results_appends_tool_table_when_estimate_ok(recorder):
+    """结果章 content / versions[0] = 解读 + 当前主表。"""
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "results", "title": "结果"}],
+    )
+    result = generate_chapter(state)
+    ch = result["body_chapters"][0]
+    table = (state.get("results") or "").strip()
+    assert ch["content"] == "MOCK CHAPTER CONTENT\n\n" + table
+    assert ch["versions"][0] == ch["content"]
+    assert "| age |" in ch["content"]
+    assert state["estimate"]["treatment_row"] in ch["content"]
+
+
+def test_results_skips_splice_when_estimate_not_ok(recorder):
+    """estimate.status 不是 ok：只写 prose，不拼表。"""
+    ready = make_write_ready_state()
+    estimate = dict(ready["estimate"])
+    estimate["status"] = "error"
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "results", "title": "结果"}],
+        estimate=estimate,
+    )
+    result = generate_chapter(state)
+    ch = result["body_chapters"][0]
+    assert ch["content"] == "MOCK CHAPTER CONTENT"
+    assert ch["versions"][0] == "MOCK CHAPTER CONTENT"
+    assert "| age |" not in ch["content"]

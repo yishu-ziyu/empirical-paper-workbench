@@ -125,18 +125,20 @@ async def generate_chapter_endpoint(
     )
 
     body_chapters: List[Any] = state.get("body_chapters", []) or []
-    idx = state.get("current_chapter_index")
-    # current_chapter_index 已被 generate_chapter 推进到下一章；本端点返回
-    # 刚生成的那一章，即 idx-1。若 idx 不可用则回退到最后一章。
-    if isinstance(idx, int) and 0 < idx <= len(body_chapters):
-        chapter = body_chapters[idx - 1]
-    elif body_chapters:
-        chapter = body_chapters[-1]
-    else:
-        chapter = {}
+    # 评审可能回退 current_chapter_index。按请求 type 取刚写的那一章。
+    chapter = _chapter_with_type(body_chapters, payload.chapter.type)
+    if not chapter:
+        idx = state.get("current_chapter_index")
+        if isinstance(idx, int) and 0 < idx <= len(body_chapters):
+            chapter = body_chapters[idx - 1]
+        elif body_chapters:
+            chapter = body_chapters[-1]
+        else:
+            chapter = {}
     return GenerateChapterResponse(
         chapter=_to_chapter_response(chapter),
         body_chapters=[_to_chapter_response(c) for c in body_chapters],
+        **_review_response_fields(state),
     )
 
 
@@ -169,12 +171,14 @@ async def approve_chapter_endpoint(
     else:
         if not body_chapters:
             raise HTTPException(status_code=404, detail="No chapter to approve")
-        # 默认 approve 最后生成的章节（current_chapter_index - 1）
-        idx = state.get("current_chapter_index")
-        if isinstance(idx, int) and 0 < idx <= len(body_chapters):
-            target_idx = idx - 1
-        else:
-            target_idx = len(body_chapters) - 1
+        # 默认 approve 最后一篇已写成的章（评审回退 idx 时不能落到空槽）
+        target_idx = _last_written_index(body_chapters)
+        if target_idx is None:
+            idx = state.get("current_chapter_index")
+            if isinstance(idx, int) and 0 < idx <= len(body_chapters):
+                target_idx = idx - 1
+            else:
+                target_idx = len(body_chapters) - 1
 
     body_chapters[target_idx] = {
         **body_chapters[target_idx],
@@ -253,6 +257,7 @@ async def regenerate_chapter_endpoint(
     return RegenerateResponse(
         chapter=_to_chapter_response(chapter),
         body_chapters=[_to_chapter_response(c) for c in body_chapters],
+        **_review_response_fields(state),
     )
 
 
@@ -299,6 +304,44 @@ async def get_versions(
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+def _review_response_fields(state: dict) -> dict:
+    """写章响应上的评审可见字段。回退 idx 时用分数判 fail，不拿空槽。"""
+    scores = state.get("review_scores") or []
+    idx = state.get("review_chapter_index")
+    score = 0.0
+    if isinstance(idx, int) and 0 <= idx < len(scores):
+        try:
+            score = float(scores[idx])
+        except (TypeError, ValueError):
+            score = 0.0
+    return {
+        "score": score,
+        "auto_decision": "pass" if score >= 0.7 else "fail",
+        "review_source": state.get("review_source") or "",
+        "review_degraded": bool(state.get("review_degraded")),
+        "grounding_failures": list(state.get("grounding_failures") or []),
+    }
+
+
+def _chapter_with_type(body_chapters: List[Any], chapter_type: str) -> dict:
+    for ch in body_chapters:
+        if (
+            isinstance(ch, dict)
+            and ch.get("type") == chapter_type
+            and ch.get("content")
+        ):
+            return ch
+    return {}
+
+
+def _last_written_index(body_chapters: List[Any]) -> Optional[int]:
+    last = None
+    for i, ch in enumerate(body_chapters):
+        if isinstance(ch, dict) and ch.get("type") and ch.get("content"):
+            last = i
+    return last
+
+
 def _to_chapter_response(chapter: Any) -> ChapterResponse:
     """把 state 里的 dict 章节转成 ``ChapterResponse``。
 

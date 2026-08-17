@@ -24,11 +24,13 @@ from state import EconPaperState
 def call_llm(prompt: str) -> str:
     """调 LLM 生成大纲文案。
 
-    生产环境接 langchain-anthropic；开发阶段返回占位。测试通过
+    走 ``llm.call_llm``（运行时 MiniMax；pytest 为占位）。测试通过
     ``monkeypatch.setattr(nodes.generate_outline, "call_llm", ...)`` 替换为
     fake，故必须是模块级函数。
     """
-    return "Placeholder outline from LLM"
+    from llm.call_llm import call_llm as unified_call
+
+    return unified_call(prompt, node_type="outline")
 
 
 def generate_outline(state: EconPaperState) -> GenerateOutlineOutput:
@@ -47,6 +49,8 @@ def generate_outline(state: EconPaperState) -> GenerateOutlineOutput:
     prompt = build_outline_prompt(rd)
     llm_summary = call_llm(prompt)
 
+    from engine.readiness import SLOT_REQUIREMENTS, estimate_ran
+
     outline = [
         {
             "type": "intro",
@@ -60,6 +64,14 @@ def generate_outline(state: EconPaperState) -> GenerateOutlineOutput:
         {"type": "results", "title": "结果"},
         {"type": "conclusion", "title": "结论"},
     ]
+    literature_n = len(state.get("literature_entries") or [])
+    has_row = estimate_ran(state)
+    for chapter in outline:
+        chapter["bind"] = {
+            "requires": list(SLOT_REQUIREMENTS.get(chapter["type"], ("identification",))),
+            "has_treatment_row": has_row,
+            "literature_n": literature_n,
+        }
 
     # ADR-0004 Stage 2: 文献条目非空时，给 lit_review 章节加大纲注释，
     # 提示后续 generate_chapter 引用这些文献。

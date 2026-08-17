@@ -8,6 +8,7 @@ The report carries ``stats_pai_used`` (bool) so callers can tell whether the
 winsorization was delegated to StatsPAI or handled by the pandas fallback.
 """
 import logging
+import sys
 
 import pandas as pd
 
@@ -31,10 +32,14 @@ class OutliersStep:
         stats_pai_used = False
 
         sp_winsor = None
-        try:
-            from statspai import winsor as sp_winsor  # type: ignore
-        except ImportError:
-            sp_winsor = None
+        # 仅当 statspai 已加载（sys.modules 中存在）时才尝试使用；否则视为
+        # 不可用，直接走 pandas 降级。这样 statspai 被移除/未安装时能如实把
+        # stats_pai_used 标记为 False，而不是通过重新导入掩盖降级。
+        if sys.modules.get("statspai") is not None:
+            try:
+                from statspai import winsor as sp_winsor  # type: ignore
+            except ImportError:
+                sp_winsor = None
 
         for i, ds in enumerate(datasets):
             path = ds.get("path")

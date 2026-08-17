@@ -155,16 +155,18 @@ def test_generate_chapter_passes_citation_indices_to_lit_review_prompt(monkeypat
 
     from nodes.generate_chapter import generate_chapter
 
-    state = {
-        "current_chapter_index": 1,  # 第 2 章 = lit_review
-        "outline": [
+    from conftest import make_write_ready_state
+
+    state = make_write_ready_state(
+        current_chapter_index=1,  # 第 2 章 = lit_review
+        outline=[
             {"type": "intro", "title": "引言"},
             {"type": "lit_review", "title": "文献综述"},
         ],
-        "research_question": "X 对 Y 的影响",
-        "key_references": "Smith (2020). Some Paper.",
-        "citation_indices": {"10.1/a": 1, "10.1/b": 2},
-    }
+        research_question="X 对 Y 的影响",
+        key_references="Smith (2020). Some Paper.",
+        citation_indices={"10.1/a": 1, "10.1/b": 2},
+    )
 
     result = generate_chapter(state)
 
@@ -187,16 +189,18 @@ def test_generate_chapter_no_citation_indices_does_not_crash(monkeypatch):
 
     from nodes.generate_chapter import generate_chapter
 
-    state = {
-        "current_chapter_index": 1,
-        "outline": [
+    from conftest import make_write_ready_state
+
+    state = make_write_ready_state(
+        current_chapter_index=1,
+        outline=[
             {"type": "intro", "title": "引言"},
             {"type": "lit_review", "title": "文献综述"},
         ],
-        "research_question": "X",
-        "key_references": "refs",
-        # 故意不传 citation_indices
-    }
+        research_question="X",
+        key_references="refs",
+    )
+    state.pop("citation_indices", None)
 
     result = generate_chapter(state)
     chapter = result["body_chapters"][1]

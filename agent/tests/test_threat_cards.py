@@ -10,7 +10,7 @@ from nodes.review_sources.threat_cards import (
     resolve_n_waves,
 )
 
-from conftest import make_state
+from conftest import make_state, make_write_ready_state
 
 
 def test_five_seed_cards_exist():
@@ -70,7 +70,7 @@ def test_unhandled_threat_caps_dimension():
 
 def test_generate_chapter_injects_charls_constraints(mock_llm_for):
     recorder = mock_llm_for("generate_chapter", return_value="M")
-    state = make_state(
+    state = make_write_ready_state(
         current_chapter_index=0,
         outline=[{"type": "methods", "title": "方法", "method": "DID"}],
         method="DID",

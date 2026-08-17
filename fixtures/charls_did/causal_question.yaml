@@ -1,0 +1,41 @@
+question: "城乡居民基本医疗保险整合是否降低农村中老年人的住院自付支出？"
+current_contribution: "当前证据不支持稳健减负的强结论；贡献在于展示该结论对固定效应、控制变量、聚类和安慰剂检验高度敏感，并提示医疗利用和支出结构调整。"
+data:
+  source: "CHARLS 2011-2020"
+  unit: "individual-year"
+  analysis_ready_rows: 80375
+  individuals: 24421
+treatment:
+  variable: "treat"
+  definition: "基线或调查期持有新农合"
+control:
+  definition: "城镇职工医保或城镇居民医保参保人"
+post:
+  variable: "post"
+  definition: "2018 年及以后"
+outcome:
+  primary: "ln_oophos = log1p(past-year inpatient out-of-pocket expenditure)"
+preferred_specification:
+  model: "TWFE DID"
+  fixed_effects:
+    - "individual"
+    - "wave/year"
+  controls:
+    - "demographic"
+    - "economic"
+    - "health"
+  baseline_cluster: "individual"
+  robustness_cluster: "individual + year"
+current_main_result:
+  coefficient: 0.081
+  standard_error: 0.053
+  interpretation: "not statistically significant at conventional levels"
+identification_limits:
+  - "没有使用省级实际整合时点"
+  - "2015 placebo test fails"
+  - "2020 wave may be affected by COVID-19"
+  - "FE spec curve is positive but not significant across M5-family specifications"
+next_checks:
+  - "exclude 2020 wave"
+  - "level outcome and medical burden ratio"
+  - "two-part or Heckman selection model"

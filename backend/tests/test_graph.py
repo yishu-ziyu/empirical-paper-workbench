@@ -16,26 +16,56 @@ from conftest import make_state
 
 
 def test_graph_has_three_nodes():
-    """The graph wires upload_data -> clean_data -> generate_title.
-
-    Beyond node presence, clean_data must actually detect missing values
-    (not just be a print-only placeholder). The presence check passes in
-    the red stage; the missing-value behavior check fails.
-    """
+    """预写图含上传/清洗/标题；无方向时 invoke 不得写出标题。"""
     g = build_graph()
     try:
         node_ids = set(g.get_graph().nodes.keys())
     except Exception as e:  # pragma: no cover - defensive introspection
         assert False, f"could not introspect graph nodes: {e}"
-    for name in ("upload_data", "clean_data", "generate_title"):
+    for name in (
+        "upload_data",
+        "clean_data",
+        "run_estimate",
+        "robustness_check",
+        "search_literature",
+        "generate_title",
+    ):
         assert name in node_ids, f"graph missing node: {name} (have {node_ids})"
+    assert "generate_chapter" not in node_ids
 
-    # clean_data must write missing_count into the state — placeholder does not.
-    result = graph.invoke(make_state(session_id="t1", uploaded_datasets=[]))
+    result = graph.invoke(
+        make_state(session_id="t1", uploaded_datasets=[]),
+        config={"configurable": {"thread_id": "test-graph-no-direction"}},
+    )
     assert any(
         isinstance(d, dict) and "missing_count" in d
         for d in result.get("uploaded_datasets", [])
     ), "clean_data did not write missing_count into uploaded_datasets"
+    assert not result.get("title_chapter")
+
+
+def test_route_after_identification_goes_to_estimate():
+    from graph import route_after_identification
+
+    assert route_after_identification({"star_rating": None}) == [
+        "run_estimate",
+        "search_literature",
+    ]
+    assert route_after_identification({"star_rating": 2}) == [
+        "run_estimate",
+        "search_literature",
+    ]
+    assert route_after_identification({"star_rating": 0}) == "hitl_pause"
+
+
+def test_route_after_clean_stops_without_direction():
+    from graph import route_after_clean
+    from langgraph.graph import END
+
+    assert route_after_clean({}) == END
+    assert route_after_clean({"research_direction": {"question": "q"}}) == (
+        "set_direction"
+    )
 
 
 def test_graph_upload_node_writes_dataset_meta(sample_csv_path):

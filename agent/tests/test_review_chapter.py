@@ -24,7 +24,7 @@ from nodes.review_chapter import (
 )
 from protocols import ReviewRubric
 
-from conftest import make_state
+from conftest import make_state, make_write_ready_state
 
 
 def _make_chapter(content: str = "章节内容") -> dict:
@@ -397,3 +397,258 @@ def test_review_preserves_existing_review_lists(monkeypatch):
     assert result["review_scores"][0] == 0.95
     # 第 2 章新增
     assert result["review_feedback"][1] == "第2章反馈"
+
+
+# ---------------------------------------------------------------------------
+# 关联主张检查（rubric 之前）
+# ---------------------------------------------------------------------------
+def test_association_forbidden_claim_caps_score_and_rolls_back(monkeypatch):
+    """命中禁用主张：grounding_failures 含码，综合分封顶 0.50 并回炉。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    content = (
+        "本文识别了因果。"
+        r"$y_i=\alpha+\beta D_i+u_i$ "
+        "外生性 sutva。"
+        + ("论" * 200)
+    )
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "methods",
+            "title": "方法",
+            "content": content,
+            "status": "generated",
+            "versions": [content],
+            "chapter_index": 0,
+            "method": "ols",
+        }],
+        claim="association",
+        research_direction={"method": "ols", "claim": "association"},
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert "causal_claim_forbidden" in result["grounding_failures"]
+    assert result["review_scores"][0] <= 0.50
+    assert result["current_chapter_index"] == 0
+
+
+def test_allowed_causal_phrases_do_not_trigger_forbidden(monkeypatch):
+    """允许句不记 causal_claim_forbidden。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    content = (
+        "无法做因果识别，仅解释为相关。"
+        r"$y_i=\alpha+\beta D_i+u_i$ "
+        "外生性 sutva。"
+        + ("论" * 200)
+    )
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "methods",
+            "title": "方法",
+            "content": content,
+            "status": "generated",
+            "versions": [content],
+            "chapter_index": 0,
+            "method": "ols",
+        }],
+        claim="association",
+        research_direction={"method": "ols", "claim": "association"},
+        max_review_iterations=2,
+    )
+    result = review_chapter(state)
+    assert "causal_claim_forbidden" not in result.get("grounding_failures", [])
+    assert result["review_scores"][0] >= 0.7
+    assert "current_chapter_index" not in result
+
+
+def test_causal_claim_other_forbidden_substrings(monkeypatch):
+    """因果效应显著 / 识别策略成立 / 解决内生性 同样回炉。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    for phrase in ("因果效应显著", "识别策略成立", "解决内生性"):
+        content = phrase + r" $y_i=\alpha+\beta D_i+u_i$ 外生性 sutva。" + ("论" * 200)
+        state = make_state(
+            review_enabled=True,
+            current_chapter_index=1,
+            body_chapters=[{
+                "type": "methods",
+                "content": content,
+                "status": "generated",
+            }],
+            claim="association",
+            max_review_iterations=2,
+        )
+        result = review_chapter(state)
+        assert "causal_claim_forbidden" in result["grounding_failures"], phrase
+        assert result["review_scores"][0] <= 0.50, phrase
+        assert result.get("current_chapter_index") == 0, phrase
+
+
+def test_association_methods_fixture_passes_without_rollback():
+    """硬条 6：关联方法章走 mock 真路径，综合分 >= 0.7 且不回退。"""
+    content = (
+        "本节给出条件关联的计量模型。本文用普通最小二乘描述收入与处理变量"
+        "之间的条件关联，系数读作相关强度。\n\n"
+        "## 模型设定\n"
+        "在控制可观测协变量后，本文估计条件均值上的线性关联。"
+        "该系数应读作相关，而不是处理带来的平均效应。\n\n"
+        "## 计量模型\n"
+        "主回归写为 $y_i=\\alpha+\\beta D_i+u_i$。其中 $y_i$ 是结果变量，"
+        "$D_i$ 是关注的解释变量，$\\alpha$ 是截距，$\\beta$ 是条件关联系数，"
+        "$u_i$ 是误差项。下标 $i$ 表示个体。\n\n"
+        "## 解释边界\n"
+        "若遗漏不可观测因素，该系数不能当成处理效应。"
+        "后文稳健性部分更换控制变量，检查相关方向是否保持。"
+    )
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "methods",
+            "title": "方法",
+            "content": content,
+            "status": "generated",
+            "versions": [content],
+            "chapter_index": 0,
+            "method": "ols",
+        }],
+        claim="association",
+        research_direction={"method": "ols", "claim": "association"},
+        star_rating=None,
+        max_review_iterations=2,
+    )
+    result = review_chapter(state)
+    assert result["review_rubrics"][0]["endogeneity"] == 0.7
+    assert result["review_rubrics"][0]["identification"] == 0.7
+    assert result["review_scores"][0] >= 0.7
+    assert "current_chapter_index" not in result
+    assert "missing_ident_assumptions" not in (
+        result.get("revision_suggestions") or [""]
+    )[0]
+
+
+# ---------------------------------------------------------------------------
+# 结果章接地（批次 4）
+# ---------------------------------------------------------------------------
+_TREATMENT_ROW = "| age | 0.1234 | 0.0456 | 0.0078 |"
+
+
+def _results_chapter(content: str) -> dict:
+    return {
+        "type": "results",
+        "title": "结果",
+        "content": content,
+        "status": "generated",
+        "versions": [content],
+        "chapter_index": 0,
+        "method": "ols",
+    }
+
+
+def _results_ready(content: str, **overrides) -> dict:
+    return make_write_ready_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[_results_chapter(content)],
+        max_review_iterations=2,
+        review_iteration=0,
+        **overrides,
+    )
+
+
+def test_results_grounding_pass_does_not_rollback(monkeypatch):
+    """真 treatment_row、无另造处理行：不因接地失败回退。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    content = (
+        "本节报告 OLS 主估计。"
+        f"{_TREATMENT_ROW}"
+        " | N | 1200 |  | 常数项 | 1.2300 |"
+        "系数方向与预期一致。"
+        + ("论" * 80)
+    )
+    result = review_chapter(_results_ready(content))
+    failures = result.get("grounding_failures") or []
+    assert "invented_number" not in failures
+    assert "missing_estimate_number" not in failures
+    assert result["review_scores"][0] > 0.50
+    assert "current_chapter_index" not in result
+
+
+def test_results_invented_number_caps_and_rolls_back(monkeypatch):
+    """另造 | age | 0.9999 | 或 | treat | 0.9999 |：invented_number，封顶回炉。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    for fake in ("| age | 0.9999 |", "| treat | 0.9999 |"):
+        content = (
+            "本节报告 OLS 主估计。"
+            f"{_TREATMENT_ROW} {fake} "
+            + ("论" * 80)
+        )
+        result = review_chapter(_results_ready(content))
+        assert "invented_number" in result["grounding_failures"], fake
+        assert result["review_scores"][0] <= 0.50, fake
+        assert result["current_chapter_index"] == 0, fake
+
+
+def test_results_missing_treatment_row_caps_and_rolls_back(monkeypatch):
+    """缺 treatment_row 子串：missing_estimate_number，封顶回炉。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    content = "本节报告 OLS 主估计，但没有贴出主表。" + ("论" * 80)
+    result = review_chapter(_results_ready(content))
+    assert "missing_estimate_number" in result["grounding_failures"]
+    assert result["review_scores"][0] <= 0.50
+    assert result["current_chapter_index"] == 0
+
+
+def test_intro_and_methods_do_not_require_estimate_table(monkeypatch):
+    """引言 / 方法章：不因没表而报 missing_estimate_number。"""
+    monkeypatch.setattr(
+        "nodes.review_chapter.call_review_llm",
+        lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
+    )
+    methods_content = (
+        "本节给出条件关联的计量模型。"
+        r"$y_i=\alpha+\beta D_i+u_i$"
+        "外生性 sutva。"
+        + ("论" * 200)
+    )
+    for chapter_type, content in (
+        ("intro", "本文讨论年龄与收入的条件关联。" + ("论" * 80)),
+        ("methods", methods_content),
+    ):
+        state = make_write_ready_state(
+            review_enabled=True,
+            current_chapter_index=1,
+            body_chapters=[{
+                "type": chapter_type,
+                "title": chapter_type,
+                "content": content,
+                "status": "generated",
+                "versions": [content],
+                "chapter_index": 0,
+                "method": "ols",
+            }],
+            max_review_iterations=2,
+        )
+        result = review_chapter(state)
+        assert "missing_estimate_number" not in (result.get("grounding_failures") or []), chapter_type

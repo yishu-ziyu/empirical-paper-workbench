@@ -94,8 +94,13 @@ def _mice_impute(df: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     try:
         from statspai import mice as sp_mice
 
-        result = sp_mice(df, m=1, max_iter=5, seed=42, print_progress=False)
-        return result.complete(0), True
+        # StatsPAI mice 只接受数值列，对含缺失的分类列会因 astype(float) 抛错。
+        # 先把分类列编码为整数码喂给 mice，跑完再解码回原始标签，保证正常路径
+        # 能用上 StatsPAI（stats_pai_used=True）。
+        df_enc, encoders = _encode_categorical(df)
+        result = sp_mice(df_enc, m=1, max_iter=5, seed=42, print_progress=False)
+        completed = result.complete(0)
+        return _decode_categorical(completed, encoders), True
     except Exception:
         logger.warning("StatsPAI mice() failed, falling back to sklearn IterativeImputer")
     try:
@@ -110,3 +115,35 @@ def _mice_impute(df: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     except Exception:
         logger.warning("sklearn IterativeImputer also failed, falling back to pandas median/mode")
         return _impute_median_mode(df), False
+
+
+def _encode_categorical(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """把非数值列编码为整数码，供 StatsPAI mice 使用。
+
+    Returns ``(df_encoded, encoders)``，其中 ``encoders`` 为 ``列名 -> 标签列表``。
+    缺失值先以占位串填充再编码，确保它能被 mice 当作可观测值处理。
+    """
+    encoders: dict[str, list] = {}
+    df_enc = df.copy()
+    for col in df_enc.columns:
+        if pd.api.types.is_numeric_dtype(df_enc[col]):
+            continue
+        codes, uniques = pd.factorize(df_enc[col].fillna("__NA__"))
+        encoders[col] = uniques.tolist()
+        df_enc[col] = codes
+    return df_enc, encoders
+
+
+def _decode_categorical(df_enc: pd.DataFrame, encoders: dict) -> pd.DataFrame:
+    """把 mice 输出的整数码列映射回原始分类标签。"""
+    df = df_enc.copy()
+    for col, labels in encoders.items():
+
+        def _to_label(v):
+            i = int(v)
+            if 0 <= i < len(labels):
+                return labels[i]
+            return labels[-1] if labels else None
+
+        df[col] = df_enc[col].map(_to_label)
+    return df

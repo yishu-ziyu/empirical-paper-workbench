@@ -40,19 +40,25 @@ export default function ReviewPanel({
   sessionId,
   onDecision,
 }: ReviewPanelProps) {
-  const { t, lang } = useT()
+  const { t } = useT()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const autoPass = review.auto_decision === 'pass'
   const rubric = review.rubric ?? {}
+  const extra = review as ReviewInfoResponse & {
+    review_source?: string | null
+    grounding_failures?: string[]
+  }
+  const reviewSource = extra.review_source
+  const grounding = extra.grounding_failures ?? []
 
   async function submitDecision(decision: string) {
     setSubmitting(true)
     setError(null)
     try {
       const resp = await fetch(
-        `/sessions/${sessionId}/review/decision`,
+        `http://localhost:8000/sessions/${sessionId}/review/decision`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -98,6 +104,18 @@ export default function ReviewPanel({
           {t('review.roundLabel').replace('{0}', String(review.review_iteration)).replace('{1}', String(review.max_review_iterations))} · {t('review.scoreLabel').replace('{0}', review.score.toFixed(2))}
         </span>
       </div>
+      {(reviewSource || grounding.length > 0) && (
+        <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted">
+          {reviewSource ? (
+            <span data-testid="review-source">source={reviewSource}</span>
+          ) : null}
+          {grounding.length > 0 ? (
+            <span data-testid="review-grounding" className="ml-3 text-warning">
+              {grounding.join(' · ')}
+            </span>
+          ) : null}
+        </div>
+      )}
 
       {/* 5 维 rubric 条形图 */}
       <div data-testid="review-rubric" className="px-4 py-3">

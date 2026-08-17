@@ -98,6 +98,15 @@ class DirectionResponse(BaseModel):
 
     outline: List[OutlineChapterResponse] = Field(default_factory=list)
     research_direction: Any = None
+    star_rating: Optional[int] = None
+    identification_failed: bool = False
+    identification_report: Optional[str] = None
+    results: Optional[str] = None
+    estimate: Any = None
+    claim: Optional[str] = None
+    literature_source: Optional[str] = None
+    degradations: List[Any] = Field(default_factory=list)
+    write_blockers: List[str] = Field(default_factory=list)
 
 
 class ResumeResponse(BaseModel):
@@ -117,6 +126,11 @@ class GenerateChapterResponse(BaseModel):
 
     chapter: ChapterResponse
     body_chapters: List[ChapterResponse] = Field(default_factory=list)
+    score: Optional[float] = None
+    auto_decision: Optional[str] = None  # "pass" | "fail"
+    review_source: Optional[str] = None
+    review_degraded: bool = False
+    grounding_failures: List[str] = Field(default_factory=list)
 
 
 class ApproveChapterResponse(BaseModel):
@@ -139,6 +153,11 @@ class RegenerateResponse(BaseModel):
 
     chapter: ChapterResponse
     body_chapters: List[ChapterResponse] = Field(default_factory=list)
+    score: Optional[float] = None
+    auto_decision: Optional[str] = None  # "pass" | "fail"
+    review_source: Optional[str] = None
+    review_degraded: bool = False
+    grounding_failures: List[str] = Field(default_factory=list)
 
 
 class ChapterVersionItem(BaseModel):
@@ -176,6 +195,30 @@ class ProgressResponse(BaseModel):
     completed: int
     current: Optional[Union[int, str]] = None
     body_chapters: List[ProgressChapterSummary] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# journey.py (8-stage research journey)
+# ---------------------------------------------------------------------------
+
+
+class JourneyStageItem(BaseModel):
+    """8 阶段研究旅程的单个阶段状态。"""
+
+    status: str  # pending / active / completed / interrupt
+    canIntervene: bool = False
+
+
+class JourneyResponse(BaseModel):
+    """GET /sessions/{id}/journey 返回体：8 阶段旅程整体进度。
+
+    阶段（0-index）：
+    0 选题 1 文献 2 数据清洗 3 识别策略 4 估计建模 5 稳健性审计 6 写作评审 7 降AIGC导出
+    可介入：{0, 2, 3, 5, 6}
+    """
+
+    currentStage: int
+    stages: List[JourneyStageItem] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

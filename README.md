@@ -1,8 +1,8 @@
 # econpaper
 
-> 中文原生 + 极致章节交互 + LaTeX/Word 兼容的经济学论文 AI 协作工具
+> 网页端实证论文工作台：上传数据 → 设定方向 → 识别与稳健 → 逐章写 → 导出
 
-**econpaper 让经济学研究者专注于研究本身，而非写作细节。** 上传真实数据集（CSV/CHARLS），通过对话式交互设定研究方向，AI 自动生成完整的实证经济学论文，包含 LaTeX 源码、PDF、Word 文档和可复现的分析代码。
+**econpaper 是这个工作区唯一的产品，当前做网页端。** 上传真实数据集（CSV/CHARLS），设定研究方向，跑识别与稳健，再逐章写成文。输出 LaTeX / PDF / Word 和可复现的分析代码。
 
 ## 核心功能
 
@@ -14,6 +14,11 @@
 - **8 步数据清洗**：profiling → 合并 → 缺失值 → 异常值 → 变量构造 → 筛选 → 平衡性 → 留痕
 
 ## 快速开始
+
+### 前置要求
+
+- **Python 3.12**（项目锁定版本）。系统默认 `python3` 可能是 3.14，在 3.14 下 numpy 需源码编译、pydantic 与 typing-extensions 冲突，依赖装不上。请确保有 `python3.12`（如没有：`brew install python@3.12` 或 `pyenv install 3.12`）。Makefile 用 `PY ?= python3.12`，可用 `make install PY=python3.12` 覆盖。
+- `StatsPAI`、`stata-code` 需与 `econpaper/` 同级目录（`make install` 自动 `pip install -e`）。
 
 ### 开发环境
 
@@ -131,12 +136,10 @@ econpaper/
 
 ## 当前状态
 
-- **后端**：23 个路由端点，全部通过测试
-- **Agent**：13 节点 LangGraph，342 个测试通过
-- **前端**：20 个 UI 组件，132 个测试通过
-- **数据清洗**：8 子步骤完整实现，HITL 暂停点
-- **持久化**：PostgresSaver checkpoint 已上线
-- **下一步**：用户体系、部署配置、CI/CD
+- **产品身份**：一个网页产品。旧两仓说法作废（ADR-0010）。
+- **主路径**：上传数据 → 设定方向 → 清洗 → 识别验真 → 文献 → 估计 / 设定表 → 稳健性 → 6 章写作 + 评审 → 导出。
+- **Journey**：8 站；可介入 {选题, 数据, 识别, 稳健, 写作}。
+- **样例**：CHARLS DID 说明在 `fixtures/charls_did/`，不是第二个产品。
 
 ## 许可
 

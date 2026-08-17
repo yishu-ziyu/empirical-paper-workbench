@@ -9,16 +9,50 @@ agent/tests/test_generate_outline.py（ADR-0003 Stage C 命名约定）。
 """
 import pytest
 
+from facade import facade
+
+
+def test_post_direction_runs_identification_without_blocking_ols(client):
+    """坐着写路径：提交方向会跑识别；OLS 无套餐不截断，仍出大纲。"""
+    sid = "test-direction-ident"
+    facade.seed_state(sid, {"csv_path": "/tmp/missing.csv"})
+    try:
+        resp = client.post(
+            f"/sessions/{sid}/direction",
+            json={
+                "question": "教育对收入的影响",
+                "dv": "income",
+                "iv": "education",
+                "controls": ["age", "gender"],
+                "method": "OLS",
+                "template": "cn_journal",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["identification_failed"] is False
+        assert data.get("identification_report")
+        assert "识别诊断套餐" in data["identification_report"]
+        assert len(data["outline"]) == 6
+        assert data.get("results")
+        assert isinstance(data.get("estimate"), dict)
+        assert data["estimate"].get("produced_by") == "estimate"
+        assert data.get("claim") == "association"
+    finally:
+        facade.drop_session(sid)
+
 
 def test_post_direction_endpoint(uploaded_session, client):
     """POST /sessions/{id}/direction 接受研究方向并返回 6 章 outline。"""
+    if uploaded_session == "red-stage-dummy-session-id":
+        pytest.skip("upload pipeline unavailable in this env (graph/psycopg)")
     resp = client.post(
         f"/sessions/{uploaded_session}/direction",
         json={
-            "question": "教育对收入的影响",
+            "question": "年龄与收入",
             "dv": "income",
-            "iv": "education",
-            "controls": ["age", "gender"],
+            "iv": "age",
+            "controls": [],
             "method": "OLS",
             "template": "cn_journal",
         },
@@ -33,10 +67,20 @@ def test_post_direction_endpoint(uploaded_session, client):
     assert "conclusion" in types
     # research_direction 也应回显
     assert data["research_direction"]["method"] == "OLS"
+    # OLS 无识别套餐：不截断，带识别报告
+    assert data["identification_failed"] is False
+    assert data.get("identification_report")
+    assert data.get("results")
+    assert data.get("estimate", {}).get("produced_by") == "estimate"
+    assert data["estimate"].get("status") == "ok"
+    assert data.get("claim") == "association"
+    assert data.get("literature_source")
 
 
 def test_post_resume_endpoint(uploaded_session, client):
     """POST /sessions/{id}/resume 接受调整后的 outline 并写回 session。"""
+    if uploaded_session == "red-stage-dummy-session-id":
+        pytest.skip("upload pipeline unavailable in this env (graph/psycopg)")
     adjusted = [{"type": "intro", "title": "调整后引言"}]
     resp = client.post(
         f"/sessions/{uploaded_session}/resume",

@@ -35,7 +35,8 @@ async def get_review(session_id: str) -> ReviewInfoResponse:
     """返回当前章的评审信息。
 
     Response: ``{chapter_index, feedback, suggestions, score, rubric,
-                 review_iteration, max_review_iterations, auto_decision}``
+                 review_iteration, max_review_iterations, auto_decision,
+                 review_source, review_degraded, grounding_failures}``
 
     无评审数据时返回 200 + 空字段（非 404），让前端渲染空态。
     """
@@ -49,6 +50,9 @@ async def get_review(session_id: str) -> ReviewInfoResponse:
         review_iteration=info["review_iteration"],
         max_review_iterations=info["max_review_iterations"],
         auto_decision=info["auto_decision"],
+        review_source=info.get("review_source") or "",
+        review_degraded=bool(info.get("review_degraded")),
+        grounding_failures=list(info.get("grounding_failures") or []),
     )
 
 

@@ -17,7 +17,7 @@ from pathlib import Path
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 
 # ---------------------------------------------------------------------------
-# 1. StatsPAI — Python package (src/statspai/, pyproject.toml, v1.6.3)
+# 1. StatsPAI — Python package (src/statspai/, pyproject.toml, v1.22.0)
 # ---------------------------------------------------------------------------
 # Repo:    /Users/mahaoxuan/Desktop/经济学论文/StatsPAI
 # Import:  `import statspai as sp`
@@ -29,7 +29,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 STATSPAI_REPO_PATH = WORKSPACE_ROOT / "StatsPAI"
 STATSPAI_INSTALLED = False
 STATSPAI_IMPORT_NAME = "statspai"
-STATSPAI_EXPECTED_VERSION = "1.6.3"
+STATSPAI_EXPECTED_VERSION = "1.22.0"
 
 # ---------------------------------------------------------------------------
 # 2. AERS — Auto-Empirical-Research-Skills (skill library, NOT a Python pkg)
@@ -37,11 +37,10 @@ STATSPAI_EXPECTED_VERSION = "1.6.3"
 # AERS is a catalog of SKILL.md files (1,150 skills across 69 collections).
 # It is loaded as a prompt/resource by LangGraph nodes, not pip-installed.
 #
-# Two copies exist in the workspace; we prefer `_refs/AERS-ref/` because
-# `_refs/` is the read-only reference area (matches private-fork policy).
-# `Auto-Empirical-Research-Skills/` is kept as a fallback / mirror.
+# Canonical copy is `_refs/AERS-ref/` (read-only upstream mirror).
+# The old root clone `Auto-Empirical-Research-Skills/` was removed 2026-08-13.
 AERS_SKILLS_PATH = WORKSPACE_ROOT / "_refs" / "AERS-ref" / "skills"
-AERS_SKILLS_PATH_FALLBACK = WORKSPACE_ROOT / "Auto-Empirical-Research-Skills" / "skills"
+AERS_SKILLS_PATH_FALLBACK = WORKSPACE_ROOT / "_refs" / "AERS-ref" / "skills"
 AERS_CATALOG_JSON = WORKSPACE_ROOT / "_refs" / "AERS-ref" / "catalog" / "skills.json"
 
 # ---------------------------------------------------------------------------

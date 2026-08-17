@@ -6,9 +6,9 @@ OpenAPI schema，前端通过 ``openapi-typescript`` codegen 消费
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ReviewRubricResponse(BaseModel):
@@ -32,6 +32,9 @@ class ReviewInfoResponse(BaseModel):
     review_iteration: int
     max_review_iterations: int
     auto_decision: str  # "pass" | "fail"
+    review_source: Optional[str] = None  # "llm" | "mock" | "mock_fallback"
+    review_degraded: bool = False
+    grounding_failures: List[str] = Field(default_factory=list)
 
 
 class ReviewDecisionRequest(BaseModel):

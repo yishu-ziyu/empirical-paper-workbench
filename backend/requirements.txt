@@ -19,5 +19,13 @@ psycopg2-binary==2.9.10     # LangGraph PostgresSaver 依赖
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 
+# --- 估计门（Facade 调 agent estimate / robustness；与 agent/requirements 对齐）---
+jinja2==3.1.6
+psycopg[binary]==3.2.3
+statsmodels==0.14.6
+langgraph-checkpoint-postgres==2.0.19
+# StatsPAI is the local checkout, same as agent venv:
+#   pip install --ignore-scripts -e ../StatsPAI
+
 # --- S3 / 对象存储 ---
 boto3>=1.35.0

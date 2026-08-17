@@ -15,8 +15,8 @@
 **上游依赖**（需与 econpaper 同级目录）：
 
 ```
-../StatsPAI/          — 38 种计量方法统一入口
-../Auto-Empirical-Research-Skills/  — prompt/skill 库（不 pip install）
+../StatsPAI/          — 因果推断主库
+../_refs/AERS-ref/    — prompt/skill 库（不 pip install）
 ../stata-code/        — Python → Stata/R/EViews 代码翻译引擎
 ```
 

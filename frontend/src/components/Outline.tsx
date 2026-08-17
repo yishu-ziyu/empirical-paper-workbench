@@ -8,7 +8,7 @@
 // Stage D: 删除手写 OutlineChapter interface，改 import types/api.ts 的
 // OutlineChapterResponse（与 POST /sessions/{id}/direction 返回体一致）。
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '../lib/i18n'
 import {
   DndContext,
@@ -138,6 +138,10 @@ export default function Outline({ body_chapters, onConfirm }: OutlineProps) {
   const [items, setItems] = useState<InternalChapter[]>(() =>
     body_chapters.map((c, i) => ({ ...c, id: `ch-${i}` })),
   )
+
+  useEffect(() => {
+    setItems(body_chapters.map((c, i) => ({ ...c, id: `ch-${i}` })))
+  }, [body_chapters])
 
   const sensors = useSensors(
     useSensor(PointerSensor),

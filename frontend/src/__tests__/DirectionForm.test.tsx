@@ -51,4 +51,27 @@ describe('DirectionForm 研究方向输入', () => {
     expect(data.method).toBe('OLS')
     expect(data.template).toBe('master')
   })
+
+  test('DiD reveals panel columns and submits them', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    renderWithI18n(<DirectionForm onSubmit={onSubmit} />)
+
+    await user.type(screen.getByLabelText(/研究问题/i), '政策')
+    await user.type(screen.getByLabelText(/因变量/i), 'y')
+    await user.type(screen.getByLabelText(/自变量/i), 'd')
+    await user.selectOptions(screen.getByLabelText(/方法/i), 'DiD')
+    expect(screen.getByLabelText(/时间列/i)).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/时间列/i), 'year')
+    await user.type(screen.getByLabelText(/个体列/i), 'id')
+    await user.type(screen.getByLabelText(/队列列/i), 'g')
+    await user.click(screen.getByRole('button', { name: /提交/ }))
+
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      method: 'DiD',
+      time_col: 'year',
+      id_col: 'id',
+      first_treat_col: 'g',
+    })
+  })
 })

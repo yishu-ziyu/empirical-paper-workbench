@@ -5,6 +5,7 @@ from nodes.search_literature import (
     MAX_LITERATURE_ENTRIES,
     _build_query,
     _mock_search,
+    resolve_literature_source,
     search_literature,
 )
 
@@ -16,14 +17,15 @@ def test_search_returns_literature_output():
     assert "literature_entries" in result
     assert "literature_query" in result
     assert "literature_source" in result
+    assert result["literature_produced_by"] == "search_literature"
 
 
-def test_search_query_built_from_direction_and_title():
-    """查询串由 research_direction + title 派生。"""
+def test_search_query_built_from_direction_not_title():
+    """查询串只由研究方向派生，不拼标题。"""
     state = {"research_direction": "劳动经济学", "title_chapter": {"title": "教育回报"}}
     result = search_literature(state)
     assert "劳动经济学" in result["literature_query"]
-    assert "教育回报" in result["literature_query"]
+    assert "教育回报" not in result["literature_query"]
 
 
 def test_search_disabled_returns_empty():
@@ -102,10 +104,10 @@ def test_each_entry_has_required_fields():
 
 
 def test_build_query_str_direction():
-    """_build_query: research_direction 为 str 时直接拼接。"""
+    """_build_query: research_direction 为 str 时直接使用，忽略标题。"""
     q = _build_query("劳动经济学", "教育回报")
     assert "劳动经济学" in q
-    assert "教育回报" in q
+    assert "教育回报" not in q
 
 
 def test_build_query_dict_direction():
@@ -114,7 +116,7 @@ def test_build_query_dict_direction():
     q = _build_query(rd, "教育回报")
     assert "教育对收入的影响" in q
     assert "OLS" in q
-    assert "教育回报" in q
+    assert "教育回报" not in q
 
 
 def test_build_query_defaults_to_economics():
@@ -342,18 +344,101 @@ def test_search_literature_semantic_scholar_propagates_query(monkeypatch):
     result = search_literature(state)
 
     assert "劳动经济学" in result["literature_query"]
-    assert "教育回报" in result["literature_query"]
+    assert "教育回报" not in result["literature_query"]
     assert result["literature_source"] == "semantic_scholar"
 
 
 def test_search_literature_mock_default_unchanged():
-    """Stage 4 后默认 mock 路径保持原行为（回归测试）。"""
+    """pytest 下默认仍 mock，不打真网。"""
     state = {"research_direction": "劳动 教育"}
     result = search_literature(state)
 
     assert result["literature_source"] == "mock"
     assert isinstance(result["literature_entries"], list)
     # mock 路径条目 source 应为 "mock"
+    for e in result["literature_entries"]:
+        assert e["source"] == "mock"
+
+
+def test_pytest_default_does_not_call_crossref(monkeypatch):
+    """pytest 默认路径不得调用 crossref_search。"""
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("crossref must not be called under pytest default")
+
+    monkeypatch.setattr(
+        "nodes.literature_sources.crossref.crossref_search",
+        _boom,
+    )
+    result = search_literature({"research_direction": "劳动 教育"})
+    assert result["literature_source"] == "mock"
+
+
+def test_pytest_ignores_literature_source_env(monkeypatch):
+    """pytest 优先于 LITERATURE_SOURCE，避免本地 env 把测试打到真网。"""
+    monkeypatch.setenv("LITERATURE_SOURCE", "crossref")
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("crossref must not be called under pytest")
+
+    monkeypatch.setattr(
+        "nodes.literature_sources.crossref.crossref_search",
+        _boom,
+    )
+    assert resolve_literature_source({}) == "mock"
+    result = search_literature({"research_direction": "劳动 教育"})
+    assert result["literature_source"] == "mock"
+
+
+def test_resolve_runtime_last_resort_is_crossref(monkeypatch):
+    """运行时最后一档是 crossref，不是 mock。"""
+    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
+    monkeypatch.delenv("ECONPAPER_LLM", raising=False)
+    assert resolve_literature_source({}) == "crossref"
+    assert resolve_literature_source({"literature_source": ""}) == "crossref"
+    assert resolve_literature_source({"literature_source": None}) == "crossref"
+
+
+def test_resolve_econpaper_llm_mock_even_outside_pytest(monkeypatch):
+    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
+    assert resolve_literature_source({}) == "mock"
+
+
+def test_resolve_literature_source_env_outside_pytest(monkeypatch):
+    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setenv("LITERATURE_SOURCE", "semantic_scholar")
+    monkeypatch.delenv("ECONPAPER_LLM", raising=False)
+    assert resolve_literature_source({}) == "semantic_scholar"
+
+
+def test_resolve_explicit_state_wins(monkeypatch):
+    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setenv("LITERATURE_SOURCE", "crossref")
+    monkeypatch.delenv("ECONPAPER_LLM", raising=False)
+    assert resolve_literature_source({"literature_source": "disabled"}) == "disabled"
+
+
+def test_runtime_crossref_failure_is_mock_degraded(monkeypatch):
+    """运行时默认走 Crossref；失败必须 mock_degraded，不能假装成功。"""
+    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
+    monkeypatch.delenv("ECONPAPER_LLM", raising=False)
+
+    def _boom(query, **kwargs):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(
+        "nodes.literature_sources.crossref.crossref_search",
+        _boom,
+    )
+    result = search_literature({"research_direction": "劳动 教育"})
+    assert result["literature_source"] == "mock_degraded"
+    assert result["literature_source"] != "crossref"
+    assert result["literature_produced_by"] == "search_literature"
+    assert result["literature_entries"]
     for e in result["literature_entries"]:
         assert e["source"] == "mock"
 

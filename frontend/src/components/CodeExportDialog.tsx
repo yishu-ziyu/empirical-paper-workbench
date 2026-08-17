@@ -49,7 +49,7 @@ const FORMATS: FormatConfig[] = [
 
 // 触发浏览器下载：fetch 拿 blob → createObjectURL → click 隐藏 <a>
 async function downloadCode(sessionId: string, format: string): Promise<void> {
-  const url = `/sessions/${sessionId}/code-export?format=${format}`
+  const url = `http://localhost:8000/sessions/${sessionId}/code-export?format=${format}`
   const resp = await fetch(url, { method: 'GET' })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')

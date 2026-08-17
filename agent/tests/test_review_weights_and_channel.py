@@ -3,13 +3,18 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from nodes.generate_chapter import call_llm as generate_call_llm
 from nodes.review_chapter import (
     _compute_composite_score,
     call_review_llm,
+    review_chapter,
     weights_for_chapter,
 )
 from protocols import ReviewRubric
+
+from conftest import make_state
 
 
 def test_intro_weights_zero_out_endogeneity():
@@ -44,6 +49,27 @@ def test_default_weights_unchanged_for_methods():
         "readability": 0.0,
     }
     assert _compute_composite_score(rubric) == 0.3
+
+
+def test_methods_association_weights():
+    """association 方法章：内生权重为 0，可读最高。"""
+    weights = weights_for_chapter("methods", claim="association")
+    assert weights["endogeneity"] == 0
+    assert weights["identification"] == 0.1
+    assert weights["robustness"] == 0.25
+    assert weights["contribution"] == 0.25
+    assert weights["readability"] == 0.4
+    assert weights_for_chapter("methods")["endogeneity"] == 0.3
+    rubric = {
+        "endogeneity": 0.7,
+        "identification": 0.7,
+        "robustness": 0.7,
+        "contribution": 0.7,
+        "readability": 0.8,
+    }
+    assert _compute_composite_score(
+        rubric, "methods", claim="association"
+    ) == pytest.approx(0.74)
 
 
 def test_generate_call_llm_mock_keeps_placeholder():
@@ -100,7 +126,7 @@ def test_review_non_mock_uses_invoke(monkeypatch):
 
 
 def test_review_bad_json_falls_back_to_mock(monkeypatch):
-    """评审 JSON 坏掉时降级 mock，不把 graph 打费。"""
+    """评审 JSON 坏掉时可见降级 mock，不得假装审过。"""
 
     def boom(config, content, rubric, direction, literature):
         raise ValueError("bad json")
@@ -114,3 +140,25 @@ def test_review_bad_json_falls_back_to_mock(monkeypatch):
     assert "rubric" in result
     assert "feedback" in result
     assert result["rubric"]["endogeneity"] == 0.4
+    assert result["review_source"] == "mock_fallback"
+    assert result["review_degraded"] is True
+
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[{
+            "type": "intro",
+            "title": "引言",
+            "content": "短文本",
+            "status": "generated",
+            "versions": ["短文本"],
+            "chapter_index": 0,
+        }],
+        research_direction="test",
+        max_review_iterations=2,
+    )
+    out = review_chapter(state)
+    assert out["review_source"] == "mock_fallback"
+    assert out["review_degraded"] is True
+    assert out["review_rubrics"][0]
+    assert out["review_rubrics"][0]["endogeneity"] == 0.4

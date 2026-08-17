@@ -33,6 +33,21 @@ async def lifespan(app: FastAPI):
 
     await create_tables()
 
+    try:
+        from llm.ssot import load_ssot
+        from llm.router import router as llm_router
+
+        load_ssot()
+        llm_router.reload()
+        gen = llm_router.get_config("generate")
+        rev = llm_router.get_config("review")
+        print(
+            f"✓ LLM generate={gen.provider}/{gen.model} "
+            f"review={rev.provider}/{rev.model}"
+        )
+    except Exception as exc:
+        print(f"⚠ LLM router init failed (will mock): {exc}")
+
     # Initialize S3 connection if configured.
     if settings.S3_ENDPOINT_URL:
         try:
@@ -139,9 +154,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+from routers.analysis import router as analysis_router  # noqa: E402
 from routers.auth import router as auth_router  # noqa: E402
 from routers.charls import router as charls_router  # noqa: E402
 from routers.chapter import router as chapter_router  # noqa: E402
+from routers.desk import router as desk_router  # noqa: E402
 from routers.code_export import router as code_export_router  # noqa: E402
 from routers.doc_export import router as doc_export_router  # noqa: E402
 from routers.eda import router as eda_router  # noqa: E402
@@ -153,11 +170,13 @@ from routers.sessions import router as sessions_router  # noqa: E402
 from routers.ws import router as ws_router  # noqa: E402
 
 app.include_router(auth_router)
+app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(sessions_router)
 app.include_router(ws_router)
 app.include_router(outline_router)
 app.include_router(chapter_router)
+app.include_router(desk_router)
 app.include_router(sample_router)
 app.include_router(charls_router)
 app.include_router(code_export_router)

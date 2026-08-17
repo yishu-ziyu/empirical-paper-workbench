@@ -230,3 +230,24 @@ def test_high_quality_feedback_says_passing():
     low_dims = [d for d, s in result["rubric"].items() if s < 0.5]
     assert len(low_dims) == 0
     assert "良好" in result["feedback"] or "达标" in result["feedback"]
+
+
+def test_association_scores_are_pinned_not_else_0_4():
+    """association 无禁用主张：endo/ident=0.7，不走 else=0.4。"""
+    content = "条件关联。" * 40
+    result = mock_review_llm(content, ReviewRubric(), "", [], claim="association")
+    assert result["rubric"]["endogeneity"] == 0.7
+    assert result["rubric"]["identification"] == 0.7
+    assert result["rubric"]["robustness"] == 0.7
+    assert result["rubric"]["contribution"] == 0.7
+    assert result["rubric"]["readability"] == 0.8
+
+
+def test_association_forbidden_claim_drops_endo_ident():
+    """association 命中禁用主张：endo/ident=0.2，rob/contrib 仍 0.7。"""
+    content = "本文识别了因果，识别策略解决内生性。" * 10
+    result = mock_review_llm(content, ReviewRubric(), "", [], claim="association")
+    assert result["rubric"]["endogeneity"] == 0.2
+    assert result["rubric"]["identification"] == 0.2
+    assert result["rubric"]["robustness"] == 0.7
+    assert result["rubric"]["contribution"] == 0.7

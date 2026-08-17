@@ -131,7 +131,7 @@ describe('ReviewPanel 人工评审面板', () => {
       expect(onDecision).toHaveBeenCalledWith('accept', 'proceed')
     })
     expect(mockFetch).toHaveBeenCalledWith(
-      '/sessions/test-session-1/review/decision',
+      expect.stringContaining('/sessions/test-session-1/review/decision'),
       expect.objectContaining({ method: 'POST' }),
     )
   })

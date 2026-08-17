@@ -30,12 +30,91 @@ def test_methods_with_equation_and_assumptions_passes():
     assert check_structure("methods", content, method="DID") == []
 
 
+def test_association_methods_equation_only_passes():
+    """association 只要方程，不要识别假设菜单。"""
+    content = "条件关联模型为 $y_i=\\alpha+\\beta D_i+u_i$。系数读作相关。"
+    assert check_structure("methods", content, claim="association") == []
+
+
+def test_star_none_did_skips_parallel_trends():
+    """star is None 的 DiD 按 association，不逼平行趋势词。"""
+    content = "主回归 $y_i=\\alpha+\\beta D_i+u_i$。本文报告条件关联。"
+    assert (
+        check_structure(
+            "methods", content, method="DID", star_rating=None
+        )
+        == []
+    )
+
+
 def test_lit_review_invented_citation_fails():
     """编造 [99] 结构失败。"""
     failures = check_structure(
         "lit_review",
         "Smith (2020) [1] 指出，Jones [99] 反对。",
         citation_indices={"10.1/a": 1},
+    )
+    assert "invented_citation" in failures
+
+
+def test_lit_review_empty_index_author_year_fails():
+    """编号表为空、正文 Smith (2020) 且无 [N] → invented_citation。"""
+    text = "Smith (2020) 指出……"
+    for indices in ({}, None):
+        failures = check_structure(
+            "lit_review", text, citation_indices=indices
+        )
+        assert "invented_citation" in failures
+
+
+def test_lit_review_empty_index_parenthetical_author_year_fails():
+    """空表时 (Author, 2020) / （张三, 2020） / Name and Name (2020) 也算编造。"""
+    for text in (
+        "(Author, 2020) 认为……",
+        "（张三, 2020）认为……",
+        "Name and Name (2020) 指出。",
+    ):
+        failures = check_structure("lit_review", text, citation_indices={})
+        assert "invented_citation" in failures, text
+
+
+def test_lit_review_empty_index_no_author_year_ok():
+    """空表且无作者-年份、无 [N] → 不报 invented_citation。"""
+    text = "现有研究尚未回答该问题。"
+    assert "invented_citation" not in check_structure(
+        "lit_review", text, citation_indices={}
+    )
+    assert "invented_citation" not in check_structure(
+        "lit_review", text, citation_indices=None
+    )
+
+
+def test_lit_review_year_mention_is_not_citation():
+    """「2020 年」不是作者-年份引用。"""
+    failures = check_structure(
+        "lit_review",
+        "2020 年以来该问题仍未解决。",
+        citation_indices={},
+    )
+    assert "invented_citation" not in failures
+
+
+def test_lit_review_author_year_with_valid_bracket_ok():
+    """表有编号时 Smith (2020) [1] 不要误杀。"""
+    failures = check_structure(
+        "lit_review",
+        "Smith (2020) [1] 指出……",
+        citation_indices={"10.1/a": 1},
+    )
+    assert "invented_citation" not in failures
+
+
+def test_lit_review_empty_index_bracket_still_fails():
+    """空表但正文有 [1] → 仍 invented_citation。"""
+    failures = check_structure(
+        "lit_review",
+        "已有研究 [1] 指出。",
+        citation_indices={},
     )
     assert "invented_citation" in failures
 

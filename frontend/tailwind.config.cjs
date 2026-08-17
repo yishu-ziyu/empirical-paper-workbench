@@ -1,5 +1,5 @@
 // Tailwind config (CommonJS — project is "type": "module", so .cjs is required).
-// Warm-parchment palette aligned with the v3 HTML prototype.
+// Living-notes cream/paper/green. Crayon red is retired.
 
 // Tremor plugin: newer @tremor/react (v3.18+) no longer ships a tailwind plugin
 // export; load defensively so the build stays green across versions.
@@ -24,18 +24,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: '#FAF8F3',
-        paper: '#FAF8F3',
-        panel: '#F3EFE6',
-        ink: '#1A1A1A',
-        muted: '#6B6357',
-        accent: '#8B2C2C',
-        border: '#E8E2D6',
+        bg: '#f4efe4',
+        paper: '#f4efe4',
+        cream: '#f1f0ed',
+        panel: '#fffdf7',
+        ink: '#181515',
+        muted: '#515151',
+        accent: '#2f6b4f',
+        border: '#d8d2c6',
+        warning: '#8a6a12',
+        danger: '#9b3d30',
       },
       fontFamily: {
-        serif: ['"Source Serif 4"', '"Noto Serif SC"', 'Georgia', 'serif'],
+        serif: ['"Instrument Serif"', '"Noto Serif SC"', 'Georgia', 'serif'],
         mono: ['"JetBrains Mono"', 'Menlo', 'monospace'],
-        sans: ['system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['"Instrument Sans"', 'system-ui', 'Segoe UI', 'sans-serif'],
       },
     },
   },

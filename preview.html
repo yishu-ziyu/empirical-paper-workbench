@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>econpaper · 设计系统预览</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;700&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== DESIGN TOKENS — econpaper ===== */
+  :root {
+    --bg: #161411;
+    --bg-deep: #0C0B0A;
+    --fg: #D4CDC4;
+    --muted: #8A837A;
+    --muted-2: #6B655D;
+    --accent: #e35342;
+    --accent-signal: #D71921;
+    --accent-subtle: rgba(227,83,66,0.12);
+    --surface: #1E1B17;
+    --surface-raised: #27231E;
+    --border: #2E2A24;
+    --border-strong: #3D3730;
+    --paper: #F2E3CF;
+    --paper-ink: #2A241C;
+    --paper-muted: #d4c8bc;
+    --success: #2D7D46;
+    --warning: #B8860B;
+    --error: #D71921;
+    --glass-bg: rgba(30,27,23,0.72);
+    --glass-edge: rgba(255,255,255,0.14);
+    --glass-inner: inset 0 1px 0 rgba(255,255,255,0.06);
+    --glass-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 18px 50px rgba(0,0,0,0.4);
+
+    --font-display: 'Doto', monospace;
+    --font-mono: 'Space Mono', monospace;
+    --font-ui: 'Space Grotesk', system-ui, sans-serif;
+    --font-serif: 'Noto Serif SC', serif;
+
+    --r-sm: 4px; --r-subtle: 8px; --r-std: 12px; --r-window: 14px; --r-comf: 20px; --r-pill: 60px;
+    --space: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: var(--font-ui);
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ===== 三栏仪器骨架 ===== */
+  .app { display: grid; grid-template-columns: 260px 1fr 320px; min-height: 100vh; }
+
+  /* ===== 顶栏 ===== */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-family: var(--font-ui); font-weight: 500; font-size: 16px; letter-spacing: -0.4px; color: var(--fg); }
+  .brand em { font-style: normal; color: var(--accent); }
+  .top-meta { display: flex; align-items: center; gap: 20px; }
+  .mono-tag { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); display: inline-block; margin-right: 6px; }
+  .dot.live { background: var(--accent); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 8px 18px; border-radius: var(--r-pill);
+    font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+    cursor: pointer; border: none; transition: all .15s ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #fff; color: var(--accent); }
+  .btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--border-strong); }
+  .btn-ghost:hover { background: var(--surface-raised); }
+  .btn-subtle { background: var(--surface-raised); color: var(--fg); }
+  .btn-subtle:hover { opacity: .85; }
+  .btn-icon { padding: 8px; border-radius: var(--r-subtle); background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .btn-icon:hover { color: var(--fg); }
+
+  /* ===== 左栏 ===== */
+  .left { background: var(--bg); border-right: 1px solid var(--border); padding: 20px 16px; }
+  .panel-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+  .chapter { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-subtle); cursor: pointer; transition: background .15s; }
+  .chapter:hover { background: var(--surface); }
+  .chapter.active { background: var(--surface); border: 1px solid var(--border-strong); }
+  .chapter .num { font-family: var(--font-display); font-size: 16px; color: var(--muted-2); width: 24px; }
+  .chapter.active .num { color: var(--accent); }
+  .chapter .t { font-size: 14px; color: var(--fg); }
+  .chapter .t small { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted-2); text-transform: uppercase; }
+  .glyph { width: 20px; height: 20px; display: grid; grid-template-columns: repeat(4,1fr); grid-template-rows: repeat(4,1fr); gap: 2px; }
+  .glyph i { background: var(--muted-2); border-radius: 1px; }
+  .chapter.active .glyph i { background: var(--accent); }
+
+  /* ===== 中栏 ===== */
+  .center { padding: 40px 24px; display: flex; justify-content: center; }
+  .paper {
+    width: 100%; max-width: 620px;
+    background: var(--paper); color: var(--paper-ink);
+    border-radius: 20px 20px 4px 4px;
+    padding: 48px 48px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .paper .paper-meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-muted); margin-bottom: 16px; }
+  .paper h1 { font-family: var(--font-serif); font-weight: 600; font-size: 28px; line-height: 1.4; color: var(--paper-ink); margin-bottom: 12px; }
+  .paper .sub { font-family: var(--font-serif); font-size: 15px; color: var(--paper-muted); margin-bottom: 32px; }
+  .paper p.body { font-family: var(--font-serif); font-size: 16px; line-height: 1.8; color: var(--paper-ink); margin-bottom: 16px; }
+
+  /* ===== 右栏 · 遥测总线 ===== */
+  .right { background: var(--bg); border-left: 1px solid var(--border); padding: 20px 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-std); padding: 16px; margin-bottom: 16px; }
+  .card h3 { font-family: var(--font-ui); font-size: 14px; font-weight: 500; color: var(--fg); margin-bottom: 12px; }
+  .telemetry { display: flex; align-items: center; justify-content: space-between; }
+  .telemetry .led-row { display: flex; gap: 6px; align-items: center; }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: var(--muted-2); }
+  .led.running { background: var(--accent); animation: pulse 1s infinite; }
+  .led.pause { background: var(--warning); }
+  .led.done { background: var(--success); }
+  .reading { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--fg); }
+  .reading small { font-family: var(--font-mono); font-size: 10px; color: var(--muted-2); letter-spacing: 0.08em; margin-left: 6px; }
+  .node-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.05em; color: var(--muted); }
+  .node-row .val { color: var(--fg); text-transform: uppercase; }
+
+  /* ===== 徽章 ===== */
+  .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--r-pill); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .badge-signal { background: var(--accent-subtle); color: var(--accent); }
+  .badge-done { background: rgba(45,125,70,0.15); color: var(--success); }
+  .badge-warn { background: rgba(184,134,11,0.15); color: var(--warning); }
+  .badge-err { background: rgba(215,25,33,0.15); color: var(--error); }
+  .badge-neutral { background: var(--surface-raised); color: var(--muted); }
+
+  /* ===== 玻璃浮层 ===== */
+  .glass-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+  }
+  .glass-backdrop.open { display: flex; }
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--glass-inner), var(--glass-shadow);
+    border-radius: var(--r-window);
+    padding: 28px;
+    width: min(480px, 90vw);
+    color: var(--fg);
+  }
+  .glass h2 { font-family: var(--font-ui); font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  .glass p { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  .glass-actions { display: flex; gap: 12px; justify-content: flex-end; }
+
+  /* ===== 表单 ===== */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 10px 12px; border-radius: var(--r-subtle);
+    border: 1px solid var(--border); background: var(--surface-raised);
+    font-family: var(--font-ui); font-size: 14px; color: var(--fg); outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(227,83,66,0.15); }
+
+  /* ===== 设计系统 section ===== */
+  .ds-wrap { padding: 48px 24px; border-top: 1px solid var(--border); }
+  .ds { max-width: 1080px; margin: 0 auto; }
+  .ds section { margin-bottom: 48px; }
+  .ds .section-title { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 24px; }
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 16px; }
+  .swatch { border-radius: var(--r-std); overflow: hidden; border: 1px solid var(--border); }
+  .swatch .block { height: 72px; }
+  .swatch .info { padding: 10px 12px; background: var(--surface); }
+  .swatch .name { font-size: 13px; font-weight: 500; color: var(--fg); }
+  .swatch .hex { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .type-row { display: flex; align-items: baseline; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .type-row .role { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); width: 120px; flex-shrink: 0; }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .btn-row .label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); width: 90px; }
+  .radius-row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .radius-item { text-align: center; }
+  .radius-block { width: 80px; height: 80px; background: var(--surface-raised); border: 2px solid var(--accent); margin-bottom: 8px; }
+  .radius-item .l { font-size: 12px; color: var(--muted); }
+  .radius-item .v { font-family: var(--font-mono); font-size: 11px; color: var(--muted-2); }
+
+  /* ===== 视图切换条 ===== */
+  .view-switch {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 200; display: flex; gap: 4px; padding: 4px;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: var(--r-pill);
+  }
+  .view-switch button {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    padding: 6px 14px; border-radius: var(--r-pill); border: none; cursor: pointer;
+    background: transparent; color: var(--muted); transition: all .15s;
+  }
+  .view-switch button.on { background: var(--accent); color: #fff; }
+
+  /* ===== 登录 / 注册视图 ===== */
+  .auth-view {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+  }
+  .auth-bg {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(138,131,122,0.10) 1px, transparent 0);
+    background-size: 28px 28px;
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 75%);
+  }
+  .auth-shell { position: relative; z-index: 1; width: min(400px, 92vw); }
+  .auth-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid var(--glass-edge);
+    box-shadow: var(--glass-inner), var(--glass-shadow);
+    border-radius: var(--r-window);
+    padding: 36px 32px 28px;
+    animation: authIn .5s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes authIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .auth-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .auth-kicker { font-family: var(--font-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted-2); margin: 14px 0 4px; }
+  .auth-title { font-family: var(--font-ui); font-size: 22px; font-weight: 500; color: var(--fg); letter-spacing: -0.2px; }
+  .auth-sub { font-family: var(--font-serif); font-size: 13px; color: var(--muted); margin: 8px 0 26px; line-height: 1.6; }
+  .auth-status { display: flex; align-items: center; gap: 8px; margin: 18px 0; padding-top: 16px; border-top: 1px solid var(--border); }
+  .btn-block { width: 100%; margin-top: 6px; }
+  .auth-foot { margin-top: 22px; text-align: center; font-size: 13px; color: var(--muted); }
+  .link { background: none; border: none; cursor: pointer; color: var(--accent); font-family: var(--font-ui); font-size: 13px; padding: 0; }
+  .link:hover { text-decoration: underline; }
+
+  @media (max-width: 1024px) {
+    .app { grid-template-columns: 1fr; }
+    .left, .right { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 视图切换条（预览用） ===== -->
+<div class="view-switch">
+  <button class="on" onclick="switchView('auth-login')">登录</button>
+  <button onclick="switchView('auth-register')">注册</button>
+  <button onclick="switchView('workspace')">工作台</button>
+  <button onclick="switchView('design')">设计系统</button>
+</div>
+
+<!-- ===== 登录 / 注册视图 ===== -->
+<div id="view-auth" class="auth-view">
+  <div class="auth-bg"></div>
+
+  <!-- 登录卡 -->
+  <div id="auth-login" class="auth-shell">
+    <div class="auth-card">
+      <div class="auth-head">
+        <span class="brand">econ<em>paper</em></span>
+        <span class="mono-tag">TERMINAL v0.1</span>
+      </div>
+      <div class="auth-kicker">Empirical Research Terminal</div>
+      <div class="auth-title">登录，进入你的研究台</div>
+      <div class="auth-sub">把论文写进看得见、可审查的工业过程里。</div>
+      <div class="auth-status">
+        <span class="led"></span><span class="mono-tag">SYS.IDLE · 等待接入</span>
+      </div>
+      <div class="field">
+        <label>邮箱 / Email</label>
+        <input type="email" placeholder="you@institute.edu">
+      </div>
+      <div class="field">
+        <label>密码 / Password</label>
+        <input type="password" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-block">启动工作台 →</button>
+      <p class="auth-foot">没有账号？<button class="link" onclick="switchView('auth-register')">创建账号</button></p>
+    </div>
+  </div>
+
+  <!-- 注册卡 -->
+  <div id="auth-register" class="auth-shell" style="display:none">
+    <div class="auth-card">
+      <div class="auth-head">
+        <span class="brand">econ<em>paper</em></span>
+        <span class="mono-tag">TERMINAL v0.1</span>
+      </div>
+      <div class="auth-kicker">New Researcher</div>
+      <div class="auth-title">创建你的研究台</div>
+      <div class="auth-sub">从数据到论文，全程留痕。</div>
+      <div class="auth-status">
+        <span class="led" style="background:var(--accent)"></span><span class="mono-tag">SYS.PROVISIONING</span>
+      </div>
+      <div class="field">
+        <label>邮箱 / Email</label>
+        <input type="email" placeholder="you@institute.edu">
+      </div>
+      <div class="field">
+        <label>密码 / Password</label>
+        <input type="password" placeholder="至少 6 位">
+      </div>
+      <div class="field">
+        <label>确认密码 / Confirm</label>
+        <input type="password" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-block">创建账号 →</button>
+      <p class="auth-foot">已有账号？<button class="link" onclick="switchView('auth-login')">返回登录</button></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== 工作台视图 ===== -->
+<div id="view-workspace">
+
+<!-- ===== 顶栏 ===== -->
+<div class="topbar">
+  <div class="brand">econ<em>paper</em></div>
+  <div class="top-meta">
+    <span class="mono-tag"><span class="dot live"></span>生成中 · NODE_IDENTIFY</span>
+    <button class="btn btn-ghost btn-sm" onclick="openGlass()">上传 CSV</button>
+    <button class="btn btn-primary btn-sm" onclick="openGlass()">导出 ↓</button>
+  </div>
+</div>
+
+<!-- ===== 三栏 ===== -->
+<div class="app">
+  <!-- 左栏 -->
+  <aside class="left">
+    <div class="panel-label">大纲 / Outline</div>
+    <div class="chapter active">
+      <div class="glyph"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="num">01</div>
+      <div class="t">引言<small>intro</small></div>
+    </div>
+    <div class="chapter">
+      <div class="glyph"><i></i><i></i><i></i><i></i></div>
+      <div class="num">02</div>
+      <div class="t">文献综述<small>lit_review</small></div>
+    </div>
+    <div class="chapter">
+      <div class="glyph"><i></i><i></i><i></i></div>
+      <div class="num">03</div>
+      <div class="t">数据与识别<small>identification</small></div>
+    </div>
+    <div class="chapter">
+      <div class="glyph"><i></i><i></i><i></i></div>
+      <div class="num">04</div>
+      <div class="t">实证结果<small>results</small></div>
+    </div>
+  </aside>
+
+  <!-- 中栏 · 论文纸卡 -->
+  <main class="center">
+    <article class="paper">
+      <div class="paper-meta">数据集 CHARLS · 方法 DID · 样本 12,450</div>
+      <h1>医疗保险整合对老年人住院自付支出的影响</h1>
+      <div class="sub">—— 基于 CHARLS 2018-2020 的双重差分分析</div>
+      <p class="body">本文利用中国健康与养老追踪调查（CHARLS）2018 与 2020 两期数据，以基本医疗保险制度整合为准自然实验，考察制度整合对老年人住院自付支出与医疗可及性的影响。</p>
+      <p class="body">识别策略采用多期双重差分设计，通过平衡性检验、平行趋势检验与安慰剂检验验证识别假设的稳健性。研究结果为医保制度并轨的福利效应提供了实证证据。</p>
+    </article>
+  </main>
+
+  <!-- 右栏 · 遥测总线 -->
+  <aside class="right">
+    <div class="panel-label">Agent 遥测</div>
+    <div class="card">
+      <h3>连接状态</h3>
+      <div class="telemetry">
+        <div class="led-row"><span class="led running"></span><span class="mono-tag">connected</span></div>
+        <span class="badge badge-signal">REC</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>当前节点</h3>
+      <div class="node-row"><span>NODE</span><span class="val">identification_verify</span></div>
+      <div class="node-row" style="margin-top:8px"><span>STATUS</span><span class="val">running</span></div>
+    </div>
+    <div class="card">
+      <h3>生成进度</h3>
+      <div class="telemetry">
+        <span class="reading">64<span class="reading small">%</span></span>
+        <span class="mono-tag">3,842 字</span>
+      </div>
+    </div>
+    <div class="card" style="border-color: rgba(227,83,66,0.3)">
+      <h3 style="color:var(--accent)">识别策略诊断</h3>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px">平行趋势检验通过，识别假设成立，星级评级 <span style="color:var(--accent);font-family:var(--font-display)">★★★</span></p>
+      <span class="badge badge-done">通过 · 稳健</span>
+    </div>
+  </aside>
+</div>
+
+<!-- ===== 玻璃浮层（点按钮触发） ===== -->
+<div class="glass-backdrop" id="glass" onclick="if(event.target===this)closeGlass()">
+  <div class="glass">
+    <h2>确认继续生成</h2>
+    <p>识别策略诊断通过，是否继续生成正文？此操作将推进论文写作，可随时暂停。</p>
+    <div class="field">
+      <label>研究标题</label>
+      <input type="text" value="医疗保险整合对老年人住院自付支出的影响">
+    </div>
+    <div class="glass-actions">
+      <button class="btn btn-ghost" onclick="closeGlass()">稍后</button>
+      <button class="btn btn-primary" onclick="closeGlass()">确认，继续</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /view-workspace -->
+
+<!-- ===== 设计系统展示区（独立视图，预览用，非产品界面） ===== -->
+<div id="view-design" style="display:none">
+<div class="ds-wrap">
+  <div class="ds">
+
+    <section>
+      <div class="section-title">颜色 / Color Palette</div>
+      <div class="swatch-grid">
+        <div class="swatch"><div class="block" style="background:#161411"></div><div class="info"><div class="name">暖墨</div><div class="hex">#161411</div></div></div>
+        <div class="swatch"><div class="block" style="background:#1E1B17"></div><div class="info"><div class="name">抬升面</div><div class="hex">#1E1B17</div></div></div>
+        <div class="swatch"><div class="block" style="background:#27231E"></div><div class="info"><div class="name">二级抬升</div><div class="hex">#27231E</div></div></div>
+        <div class="swatch"><div class="block" style="background:#e35342"></div><div class="info"><div class="name">蜡笔红</div><div class="hex">#e35342</div></div></div>
+        <div class="swatch"><div class="block" style="background:#F2E3CF"></div><div class="info"><div class="name">暖纸</div><div class="hex">#F2E3CF</div></div></div>
+        <div class="swatch"><div class="block" style="background:#D4CDC4"></div><div class="info"><div class="name">前景</div><div class="hex">#D4CDC4</div></div></div>
+        <div class="swatch"><div class="block" style="background:#8A837A"></div><div class="info"><div class="name">弱化</div><div class="hex">#8A837A</div></div></div>
+        <div class="swatch"><div class="block" style="background:#2D7D46"></div><div class="info"><div class="name">成功</div><div class="hex">#2D7D46</div></div></div>
+        <div class="swatch"><div class="block" style="background:#B8860B"></div><div class="info"><div class="name">告警</div><div class="hex">#B8860B</div></div></div>
+        <div class="swatch"><div class="block" style="background:#D71921"></div><div class="info"><div class="name">信号红</div><div class="hex">#D71921</div></div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">字体 / Typography</div>
+      <div class="type-row"><span class="role">Display 读数</span><span style="font-family:var(--font-display);font-size:48px;font-weight:700">0123456789</span></div>
+      <div class="type-row"><span class="role">状态读数</span><span style="font-family:var(--font-display);font-size:24px">64%</span></div>
+      <div class="type-row"><span class="role">章节标题</span><span style="font-family:var(--font-ui);font-size:20px;font-weight:500">医疗保险整合的影响</span></div>
+      <div class="type-row"><span class="role">论文正文</span><span style="font-family:var(--font-serif);font-size:16px;line-height:1.8">本文利用双重差分设计考察医保整合的福利效应。</span></div>
+      <div class="type-row"><span class="role">Mono 标签</span><span style="font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase">CURRENT_NODE · VERIFY</span></div>
+    </section>
+
+    <section>
+      <div class="section-title">按钮 / Buttons</div>
+      <div class="btn-row"><span class="label">Primary</span><button class="btn btn-primary">启动生成</button></div>
+      <div class="btn-row"><span class="label">Ghost</span><button class="btn btn-ghost">上传 CSV</button></div>
+      <div class="btn-row"><span class="label">Subtle</span><button class="btn btn-subtle">折叠</button></div>
+      <div class="btn-row"><span class="label">Icon</span><button class="btn btn-icon">▦</button></div>
+    </section>
+
+    <section>
+      <div class="section-title">徽章 / Badges</div>
+      <div class="btn-row">
+        <span class="badge badge-signal">REC</span>
+        <span class="badge badge-done">通过 · 稳健</span>
+        <span class="badge badge-warn">暂停</span>
+        <span class="badge badge-err">失败</span>
+        <span class="badge badge-neutral">空闲</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">圆角 / Radius</div>
+      <div class="radius-row">
+        <div class="radius-item"><div class="radius-block" style="border-radius:4px"></div><div class="l">Micro</div><div class="v">4px</div></div>
+        <div class="radius-item"><div class="radius-block" style="border-radius:8px"></div><div class="l">Subtle</div><div class="v">8px</div></div>
+        <div class="radius-item"><div class="radius-block" style="border-radius:12px"></div><div class="l">Standard</div><div class="v">12px</div></div>
+        <div class="radius-item"><div class="radius-block" style="border-radius:20px"></div><div class="l">Comfortable</div><div class="v">20px</div></div>
+        <div class="radius-item"><div class="radius-block" style="border-radius:60px"></div><div class="l">Pill</div><div class="v">60px</div></div>
+        <div class="radius-item"><div class="radius-block" style="border-radius:20px 20px 4px 4px"></div><div class="l">撕纸角</div><div class="v">20/20/4/4</div></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+</div><!-- /view-design -->
+
+<script>
+  function openGlass(){ document.getElementById('glass').classList.add('open'); }
+  function closeGlass(){ document.getElementById('glass').classList.remove('open'); }
+
+  function switchView(v){
+    var isAuth = (v === 'auth-login' || v === 'auth-register');
+    document.getElementById('view-auth').style.display = isAuth ? '' : 'none';
+    document.getElementById('view-workspace').style.display = (v === 'workspace') ? '' : 'none';
+    document.getElementById('view-design').style.display = (v === 'design') ? '' : 'none';
+    document.getElementById('auth-login').style.display = (v === 'auth-login') ? '' : 'none';
+    document.getElementById('auth-register').style.display = (v === 'auth-register') ? '' : 'none';
+    var btns = document.querySelectorAll('.view-switch button');
+    btns.forEach(function(b){ b.classList.toggle('on', b.getAttribute('onclick').indexOf(v) !== -1); });
+  }
+</script>
+
+</body>
+</html>

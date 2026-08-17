@@ -6,16 +6,14 @@ from langgraph.graph import END, START, StateGraph
 
 from nodes.clean_data import clean_data
 from nodes.citation_graph import build_citation_graph
-from nodes.export_docx import export_docx
-from nodes.generate_chapter import generate_chapter
+from nodes.estimate import estimate
 from nodes.generate_outline import generate_outline
-from nodes.generate_references import generate_references
 from nodes.generate_title import generate_title
-from nodes.review_chapter import review_chapter
-from nodes.route_after_review import route_after_review
+from nodes.hitl_pause import hitl_pause
+from nodes.identification_verify import identification_verify
+from nodes.robustness_check import robustness_check
 from nodes.search_literature import search_literature
 from nodes.set_direction import set_direction
-from nodes.translate_code import translate_code
 from nodes.upload_data import upload_data
 from state import EconPaperState
 
@@ -38,6 +36,25 @@ def route_after_chapter(state: EconPaperState) -> str:
     if idx < len(CHAPTER_TYPES):
         return "generate_chapter"
     return "translate_code"
+
+
+def route_after_clean(state: EconPaperState) -> str:
+    """清洗后：无方向则停；有方向才进预写。"""
+    rd = state.get("research_direction") or {}
+    if isinstance(rd, dict) and (rd.get("question") or rd.get("dv")):
+        return "set_direction"
+    return END
+
+
+def route_after_identification(state: EconPaperState) -> str | list[str]:
+    """identification_verify 后的条件边路由。
+
+    - 0 星 → HITL_pause（不进估计、不进文献）
+    - 否则 → 估计与文献并行，扇入 generate_title
+    """
+    if state.get("star_rating") == 0:
+        return "hitl_pause"
+    return ["run_estimate", "search_literature"]
 
 
 # ---------------------------------------------------------------------------
@@ -78,64 +95,68 @@ def _get_checkpointer() -> PostgresSaver:
 # Graph construction
 # ---------------------------------------------------------------------------
 
-def build_graph():
-    """构建 LangGraph 骨架（含 T-08a 6 章条件边循环 + ADR-0004 评审 + ADR-0009 引用图谱）。
+def wire_prewrite_edges(builder: StateGraph) -> None:
+    """预写边：识别后估计∥文献，两边结束后只进一次 generate_title。
 
-    流转：START -> upload_data -> clean_data -> generate_title -> set_direction
-          -> search_literature -> build_citation_graph -> generate_outline
-          -> generate_chapter -> review_chapter
-          -(条件边 route_after_review)->
-            评审不通过且未达迭代上限: 回 generate_chapter（重生成当前章）
-            评审通过或达上限: route_after_chapter 决定
-              current_chapter_index < 6: 回 generate_chapter（下一章）
-              current_chapter_index >= 6: translate_code -> generate_references -> export_docx -> END
-    使用 PostgresSaver 持久化 checkpointer。
+    扇入必须用 add_edge([a, b], join)。两条独立边会让标题跑两次。
+    """
+    builder.add_edge(START, "upload_data")
+    builder.add_edge("upload_data", "clean_data")
+    builder.add_conditional_edges(
+        "clean_data",
+        route_after_clean,
+        {
+            "set_direction": "set_direction",
+            END: END,
+        },
+    )
+    builder.add_edge("set_direction", "identification_verify")
+    builder.add_conditional_edges(
+        "identification_verify",
+        route_after_identification,
+        {
+            "hitl_pause": "hitl_pause",
+            "run_estimate": "run_estimate",
+            "search_literature": "search_literature",
+        },
+    )
+    builder.add_edge("hitl_pause", "identification_verify")
+    builder.add_edge("run_estimate", "robustness_check")
+    builder.add_edge("search_literature", "build_citation_graph")
+    builder.add_edge(
+        ["robustness_check", "build_citation_graph"],
+        "generate_title",
+    )
+    builder.add_edge("generate_title", "generate_outline")
+    builder.add_edge("generate_outline", END)
+
+
+def build_graph():
+    """预写图：上传清洗后无方向即停；有方向则识别后估计∥文献，再标题→大纲。
+
+    章节、评审、导出不编进这张图，由 Facade 调用。
+    Facade 的 run_prewrite 仍串行，本函数只改图边。
     """
     builder = StateGraph(EconPaperState)
 
     builder.add_node("upload_data", upload_data)
     builder.add_node("clean_data", clean_data)
-    builder.add_node("generate_title", generate_title)
     builder.add_node("set_direction", set_direction)
+    builder.add_node("identification_verify", identification_verify)
+    builder.add_node("hitl_pause", hitl_pause)
+    # Node id cannot equal a state key (LangGraph). State still uses `estimate`.
+    builder.add_node("run_estimate", estimate)
+    builder.add_node("robustness_check", robustness_check)
     builder.add_node("search_literature", search_literature)
     builder.add_node("build_citation_graph", build_citation_graph)
+    builder.add_node("generate_title", generate_title)
     builder.add_node("generate_outline", generate_outline)
-    builder.add_node("generate_chapter", generate_chapter)
-    builder.add_node("review_chapter", review_chapter)
-    builder.add_node("translate_code", translate_code)
-    builder.add_node("generate_references", generate_references)
-    builder.add_node("export_docx", export_docx)
 
-    builder.add_edge(START, "upload_data")
-    builder.add_edge("upload_data", "clean_data")
-    builder.add_edge("clean_data", "generate_title")
-    builder.add_edge("generate_title", "set_direction")
-    builder.add_edge("set_direction", "search_literature")
-    # ADR-0009: search_literature 后构建引用图谱，再进 generate_outline
-    builder.add_edge("search_literature", "build_citation_graph")
-    builder.add_edge("build_citation_graph", "generate_outline")
-    builder.add_edge("generate_outline", "generate_chapter")
-    # ADR-0004: generate_chapter 后顺序进入 review_chapter（评审节点只读不写 body_chapters）
-    builder.add_edge("generate_chapter", "review_chapter")
-    # ADR-0004: review_chapter 后条件边 route_after_review
-    #   评审不通过且未达上限 → "generate_chapter"（重生成，review_chapter 已回退 idx）
-    #   评审通过或达上限 → "translate_code"（route_after_review 内部委托 route_after_chapter）
-    builder.add_conditional_edges(
-        "review_chapter",
-        route_after_review,
-        {
-            "generate_chapter": "generate_chapter",
-            "translate_code": "translate_code",
-        },
-    )
-    # ADR-0009: translate_code 后生成参考文献列表，再进 export_docx
-    builder.add_edge("translate_code", "generate_references")
-    builder.add_edge("generate_references", "export_docx")
-    builder.add_edge("export_docx", END)
+    wire_prewrite_edges(builder)
 
     checkpointer = _get_checkpointer()
-    graph = builder.compile(checkpointer=checkpointer)
-    return graph
+    compiled = builder.compile(checkpointer=checkpointer)
+    return compiled
 
 
 class _Graph:

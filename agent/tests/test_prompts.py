@@ -25,7 +25,7 @@ TEMPLATE_CONTRACTS = {
     "lit_review": ["research_question", "key_references", "citation_indices", *_REVISION],
     "data_desc": ["data_summary", "eda_results", *_REVISION],
     "methods": ["method", "research_question", *_REVISION],
-    "results": ["results", "method", *_REVISION],
+    "results": ["results", "robustness_table", "method", *_REVISION],
     "conclusion": ["results", "research_question", *_REVISION],
 }
 
@@ -160,13 +160,53 @@ def test_data_desc_system_prompt_mentions_required_sections():
 
 
 def test_methods_system_prompt_mentions_required_sections():
-    """methods system prompt 引导写"识别策略+计量模型+假设条件"。"""
+    """methods 默认 system 引导写模型与解释边界（association）。"""
     mod = get_prompt("methods")
     sp = mod.SYSTEM_PROMPT
     hits = sum(
         kw in sp for kw in ("识别策略", "计量模型", "假设", "方法", "模型设定")
     )
     assert hits >= 3, f"methods SYSTEM_PROMPT missing sections: {sp!r}"
+    assert "解决内生性" not in sp
+
+
+def test_methods_association_render_omits_endogeneity_language():
+    """{claim}=association 时渲染出的 system 不含「解决内生性」。"""
+    mod = get_prompt("methods")
+    system, user = mod.render(
+        method="ols", research_question="年龄与收入", claim="association"
+    )
+    assert "解决内生性" not in system
+    assert "相关" in system or "条件关联" in system
+    assert "ols" in user
+
+
+def test_methods_causal_render_keeps_ident_language():
+    """causal_with_caveat + DID 才写识别假设。"""
+    mod = get_prompt("methods")
+    system, user = mod.render(
+        method="did", research_question="Q", claim="causal_with_caveat"
+    )
+    assert "识别策略" in system
+    assert "识别假设" in user
+
+
+def test_results_system_forbids_redrawing_table():
+    """结果章 system 只解读文末主表，禁止再画表 / 见表 2。"""
+    mod = get_prompt("results")
+    sp = mod.SYSTEM_PROMPT
+    assert "主表已在文末" in sp
+    assert "禁止再画表" in sp
+    assert "见表 2" in sp
+
+
+def test_lit_review_empty_table_must_not_invent_author_year():
+    """编号表为空时不得教模型继续编 (Author, Year)。"""
+    mod = get_prompt("lit_review")
+    sp = mod.SYSTEM_PROMPT
+    assert "仍使用 (Author, Year)" not in sp
+    assert "编号表为空则仍使用 (Author, Year)" not in sp
+    assert "不得编造篇名与年份" in sp
 
 
 def test_results_system_prompt_mentions_required_sections():

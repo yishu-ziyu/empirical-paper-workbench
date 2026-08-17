@@ -243,7 +243,7 @@ describe('App auth flow', () => {
     const calls = getItemSpy.mock.calls.map(c => c[0])
     console.error('localStorage.getItem calls:', calls)
     getItemSpy.mockRestore()
-    expect(screen.getByTestId('login-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByText(/econpaper/i)).toBeInTheDocument()
   })
 

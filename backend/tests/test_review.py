@@ -16,11 +16,13 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 
+import routers.chapter  # noqa: F401  # 触发 generate-chapter 注册
 import routers.review  # noqa: F401  # 触发 self-registration
 from facade import facade
 
-from conftest import make_state
+from conftest import make_state, make_write_ready_state
 
 # 评审通过的高分 rubric（综合分 >= 0.7）
 HIGH_RUBRIC = {
@@ -308,3 +310,90 @@ def test_post_decision_reject_degrades_when_regenerate_unavailable(client, monke
     # decision 仍写入
     state = facade.get_state(sid)
     assert state["hitl_decision"] == "reject"
+
+
+# ---------------------------------------------------------------------------
+# 批次 1b：写章调用之后 GET /review，不是只读手写 state
+# ---------------------------------------------------------------------------
+def test_generate_chapter_then_get_review_has_review_source(client):
+    """POST generate-chapter 之后 GET /review 含 review_source。"""
+    sid = f"test-review-gen-{uuid.uuid4()}"
+    facade.seed_state(sid, make_write_ready_state())
+    gen = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "intro", "title": "引言"}},
+    )
+    assert gen.status_code == 200, gen.text
+    gen_body = gen.json()
+    assert "review_source" in gen_body
+    assert gen_body["review_source"] in {"mock", "llm", "mock_fallback"}
+
+    resp = client.get(f"/sessions/{sid}/review")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert "review_source" in data
+    assert data["review_source"] in {"mock", "llm", "mock_fallback"}
+    assert "review_degraded" in data
+    assert "grounding_failures" in data
+    facade.drop_session(sid)
+
+
+def test_generate_chapter_review_rollback_still_200_fail(client):
+    """评审回退 current_chapter_index 时写章仍 200，auto_decision=fail。"""
+    sid = f"test-review-fail-{uuid.uuid4()}"
+    facade.seed_state(sid, make_write_ready_state())
+    gen = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "intro", "title": "引言"}},
+    )
+    assert gen.status_code == 200, gen.text
+    body = gen.json()
+    assert body["auto_decision"] == "fail"
+    assert body["chapter"]["type"] == "intro"
+    assert body["chapter"].get("content")
+
+    state = facade.get_state(sid)
+    # 占位 intro 综合分 < 0.7，评审应回退到刚写的那一章
+    assert state.get("current_chapter_index") == state.get("review_chapter_index")
+    facade.drop_session(sid)
+
+
+def test_generate_chapter_bad_review_json_get_review_is_mock_fallback(
+    client, monkeypatch
+):
+    """坏 JSON 走 mock 后，GET /review 必须写出 mock_fallback，不能假装真审。"""
+
+    def boom(*_a, **_k):
+        raise ValueError("bad json")
+
+    def fake_config(node):
+        if node == "review":
+            return SimpleNamespace(provider="anthropic", model="claude")
+        return SimpleNamespace(provider="mock", model="default")
+
+    monkeypatch.setattr("nodes.review_chapter.invoke_review_llm", boom)
+    monkeypatch.setattr("llm.router.router.get_config", fake_config)
+
+    sid = f"test-review-fallback-{uuid.uuid4()}"
+    facade.seed_state(sid, make_write_ready_state())
+    gen = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "intro", "title": "引言"}},
+    )
+    assert gen.status_code == 200, gen.text
+    assert gen.json()["review_source"] == "mock_fallback"
+    assert gen.json()["review_degraded"] is True
+
+    resp = client.get(f"/sessions/{sid}/review")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["review_source"] == "mock_fallback"
+    assert data["review_degraded"] is True
+    assert data["rubric"]
+    degs = facade.get_degradations(sid)
+    assert any(
+        d.get("node") == "review_chapter" and d.get("visible") is True
+        for d in degs
+    )
+    facade.drop_session(sid)
+    facade._degradations.pop(sid, None)

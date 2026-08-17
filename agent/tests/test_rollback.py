@@ -100,6 +100,83 @@ def test_rollback_second_chapter(rollback_chapters):
 
 
 # ---------------------------------------------------------------------------
+# 批次 4：含表版本回滚不得再拼当前 results
+# ---------------------------------------------------------------------------
+def test_rollback_keeps_old_table_and_does_not_resplice_results():
+    """versions = [prose+表, 已含表的 old] 回滚到 1：content 就是 old，不再拼当前 results。"""
+    old_table = "| age | 0.1111 | 0.0222 | 0.0333 |"
+    old = (
+        "旧解读\n\n# 旧主结果\n\n"
+        "| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        + old_table
+    )
+    current_results = (
+        "# 主结果\n\n| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        "| age | 0.1234 | 0.0456 | 0.0078 |"
+    )
+    newest = "新解读\n\n" + current_results
+    chapters = [
+        {
+            "type": "results",
+            "title": "结果",
+            "content": newest,
+            "status": "generated",
+            "versions": [newest, old],
+            "chapter_index": 0,
+        }
+    ]
+    state = make_state(
+        body_chapters=chapters,
+        chapter_index=0,
+        version_index=1,
+        results=current_results,
+    )
+    result = rollback_chapter(state)
+    ch = result["body_chapters"][0]
+    assert ch["content"] == old
+    assert old_table in ch["content"]
+    assert ch["content"] != old + "\n\n" + current_results
+    assert "| age | 0.1234 |" not in ch["content"]
+    assert ch["status"] == "rolled_back"
+    assert ch["versions"] == [newest, old]
+
+
+def test_rollback_prose_only_old_does_not_gain_current_results():
+    """old 当时没有表：回滚后仍是那段散文，不会贴上当前 results。"""
+    current_results = (
+        "# 主结果\n\n| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        "| age | 0.1234 | 0.0456 | 0.0078 |"
+    )
+    newest = "新解读\n\n" + current_results
+    old = "只有散文，没有表"
+    chapters = [
+        {
+            "type": "results",
+            "title": "结果",
+            "content": newest,
+            "status": "generated",
+            "versions": [newest, old],
+            "chapter_index": 0,
+        }
+    ]
+    state = make_state(
+        body_chapters=chapters,
+        chapter_index=0,
+        version_index=1,
+        results=current_results,
+    )
+    result = rollback_chapter(state)
+    ch = result["body_chapters"][0]
+    assert ch["content"] == old
+    assert current_results not in ch["content"]
+    assert "| age | 0.1234 |" not in ch["content"]
+    assert ch["status"] == "rolled_back"
+
+
+# ---------------------------------------------------------------------------
 # 错误处理
 # ---------------------------------------------------------------------------
 def test_rollback_missing_chapter_index_raises(rollback_chapters):

@@ -2,6 +2,8 @@
 
 本文件是 econpaper 项目的领域术语表（glossary），只定义术语，不写实现细节、不写 spec、不做决策记录（决策走 ADR）。
 
+产品身份：这个工作区唯一的实证论文网页产品。旧两仓契约已废（ADR-0010）。
+
 ## 数据层
 
 - **Dataset** — 用户上传的原始数据集（CSV/Excel），由 `upload_data` 节点接收，记录在 `state.uploaded_datasets`。
@@ -25,7 +27,8 @@
 - **upload_data** — 接收 CSV 上传，写入 `uploaded_datasets`，初始化 session。
 - **clean_data** — 8 子步骤数据清洗管道（profiling → merge → missing → outliers → transform → filter → balance → audit），含 HITL 暂停点。
 - **generate_title** — 生成论文标题，写入 `title_chapter`（不写 `body_chapters`）。
-- **set_direction** — 用户设定研究方向，写入 `research_direction`。
+- **set_direction** — 用户设定研究方向，并写出 `main_specification`。
+- **spec_curve** — 探索臂设定表。全部规格留在桌上，主结果仍以用户确认的研究方向为准。
 - **generate_outline** — 生成 6 章大纲，写入 `outline` + 初始化 `current_chapter_index=0`。
 - **generate_chapter** — 按 `current_chapter_index` 从 `outline` 取章节类型，生成正文，写入 `body_chapters[idx]`，`current_chapter_index += 1`。
 - **approve_chapter** — 用户审批章节，`body_chapters[idx].status` 转为 "approved"。

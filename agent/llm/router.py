@@ -1,78 +1,125 @@
 """ADR-0008: 多 LLM 路由器。
 
-支持不同节点用不同 LLM 配置，降低同模型自评偏差。
-
-设计要点（见 docs/adr/0008-multi-llm-routing.md）：
-- 配置优先级：环境变量（GENERATE_LLM_*、REVIEW_LLM_*）→ 默认 mock
-- 模块级单例 `router` 在 import 时读 env，全局共享
-- 未知 node_type 降级为 default（= generate）配置
-- `is_multi_llm()` 比较 provider + model，两者任一不同即视为多 LLM
-- 不 import 任何 nodes.*，避免循环依赖（Fitness Function）
+配置优先级：
+1. ECONPAPER_LLM=mock → 全 mock（本地关真模型）
+2. GENERATE_LLM_* / REVIEW_LLM_* 显式环境变量
+3. pytest → mock（单测不打网）
+4. 本机 SSOT 有 MiniMax key → MiniMax
+5. mock（无 key）
 """
 import os
 from typing import Optional, Dict
+
+from llm.ssot import in_pytest, load_ssot
+
+MINIMAX_BASE_URL = "https://api.minimaxi.com/v1"
+MINIMAX_MODEL = "MiniMax-M3"
+
+
+def _env(*names: str) -> Optional[str]:
+    for name in names:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return None
 
 
 class LLMConfig:
     """单个 LLM 配置。"""
 
-    def __init__(self, provider: str, model: str, api_key: Optional[str] = None):
-        self.provider = provider  # "anthropic" | "openai" | "mock"
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        self.provider = provider
         self.model = model
         self.api_key = api_key
+        self.base_url = base_url
 
     @classmethod
     def from_env(cls, prefix: str) -> "LLMConfig":
-        """从环境变量读配置。
+        """prefix=GENERATE → GENERATE_LLM_PROVIDER / MODEL / API_KEY / BASE_URL。"""
+        load_ssot()
+        explicit = _env(f"{prefix}_LLM_PROVIDER")
+        if os.environ.get("ECONPAPER_LLM") == "mock":
+            provider = "mock"
+        elif explicit:
+            provider = explicit
+        elif in_pytest():
+            provider = "mock"
+        elif _env("MINIMAX_API_KEY", "MINIMAX_TOKEN_PLAN_KEY"):
+            provider = "minimax"
+        else:
+            provider = "mock"
 
-        prefix=GENERATE → GENERATE_LLM_PROVIDER, GENERATE_LLM_MODEL, GENERATE_LLM_API_KEY
-        prefix=REVIEW   → REVIEW_LLM_PROVIDER,   REVIEW_LLM_MODEL,   REVIEW_LLM_API_KEY
+        if provider == "mock":
+            return cls(provider="mock", model="default")
 
-        环境变量缺失时 provider 默认 "mock"（向后兼容，行为同 ADR 0004）。
-        """
+        model = _env(f"{prefix}_LLM_MODEL")
+        if not model or model == "default":
+            model = _env("MINIMAX_MODEL") or MINIMAX_MODEL
+        api_key = _env(
+            f"{prefix}_LLM_API_KEY",
+            "MINIMAX_API_KEY",
+            "MINIMAX_TOKEN_PLAN_KEY",
+            "OPENAI_API_KEY",
+        )
+        base_url = _env(
+            f"{prefix}_LLM_BASE_URL",
+            "MINIMAX_OPENAI_BASE_URL",
+        ) or MINIMAX_BASE_URL
+        if provider == "openai" and not _env(f"{prefix}_LLM_BASE_URL"):
+            if _env("OPENAI_API_KEY") and not _env("MINIMAX_API_KEY", "MINIMAX_TOKEN_PLAN_KEY"):
+                base_url = _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
+                api_key = _env("OPENAI_API_KEY")
         return cls(
-            provider=os.environ.get(f"{prefix}_LLM_PROVIDER", "mock"),
-            model=os.environ.get(f"{prefix}_LLM_MODEL", "default"),
-            api_key=os.environ.get(f"{prefix}_LLM_API_KEY"),
+            provider=provider,
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
         )
 
 
 class LLMRouter:
-    """LLM 路由器，按节点类型分发到不同 LLM。
+    """按节点类型分发 LLM 配置。"""
 
-    配置优先级：
-    1. 环境变量（GENERATE_LLM_*、REVIEW_LLM_*）
-    2. 默认（所有节点用 mock）
-    """
-
-    def __init__(self):
+    def __init__(self) -> None:
         self._configs: Dict[str, LLMConfig] = {}
         self._load_from_env()
 
-    def _load_from_env(self):
-        """从环境变量加载配置。"""
+    def _load_from_env(self) -> None:
         self._configs["generate"] = LLMConfig.from_env("GENERATE")
         self._configs["review"] = LLMConfig.from_env("REVIEW")
-        # 其他节点默认用 generate 配置
+        self._configs["title"] = self._configs["generate"]
+        self._configs["outline"] = self._configs["generate"]
+        self._configs["desk"] = LLMConfig.from_env("DESK")
+        if self._configs["desk"].provider == "mock" and not in_pytest():
+            key = os.environ.get("MINIMAX_API_KEY")
+            if key:
+                self._configs["desk"] = LLMConfig(
+                    provider="minimax",
+                    model=os.environ.get("MINIMAX_MODEL") or MINIMAX_MODEL,
+                    api_key=key,
+                    base_url=os.environ.get("MINIMAX_OPENAI_BASE_URL") or MINIMAX_BASE_URL,
+                )
+        if self._configs["desk"].provider == "mock":
+            self._configs["desk"] = self._configs["generate"]
         self._configs["default"] = self._configs["generate"]
 
-    def get_config(self, node_type: str) -> LLMConfig:
-        """获取节点的 LLM 配置。
+    def reload(self) -> None:
+        """Re-read env. Backend startup calls this after process env is ready."""
+        self._load_from_env()
 
-        node_type: "generate" | "review" | "title" | "outline" | ...
-        未知 node_type 返回 default 配置（= generate）。
-        """
+    def get_config(self, node_type: str) -> LLMConfig:
         return self._configs.get(node_type, self._configs["default"])
 
     def is_multi_llm(self) -> bool:
-        """是否配置了多 LLM（generate 和 review 用不同配置）。
-
-        provider 或 model 任一不同即视为多 LLM。
-        """
         gen = self._configs["generate"]
         rev = self._configs["review"]
         return gen.provider != rev.provider or gen.model != rev.model
 
 
-# 模块级单例（生产环境使用；测试用 LLMRouter() new 新实例避免状态泄漏）
 router = LLMRouter()

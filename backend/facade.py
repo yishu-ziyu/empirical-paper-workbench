@@ -45,9 +45,39 @@ except Exception:  # pragma: no cover
     generate_outline_node = None
 
 try:
+    from nodes.identification_verify import identification_verify as identification_verify_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    identification_verify_node = None
+
+try:
+    from nodes.estimate import estimate as estimate_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    estimate_node = None
+
+try:
+    from nodes.robustness_check import robustness_check as robustness_check_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    robustness_check_node = None
+
+try:
     from nodes.generate_chapter import generate_chapter as generate_chapter_node  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
     generate_chapter_node = None
+
+try:
+    from nodes.review_chapter import review_chapter as review_chapter_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    review_chapter_node = None
+
+try:
+    from nodes.search_literature import search_literature as search_literature_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    search_literature_node = None
+
+try:
+    from nodes.citation_graph import build_citation_graph as build_citation_graph_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    build_citation_graph_node = None
 
 try:
     from nodes.rollback import rollback_chapter as rollback_chapter_node  # type: ignore[import-not-found]
@@ -294,18 +324,67 @@ class AgentFacade:
     def set_direction_and_outline(
         self, session_id: str, research_direction: dict
     ) -> dict:
-        """Run set_direction + generate_outline, persist, return new state."""
+        """Run the shared pre-write path: identify → estimate → robustness → literature → outline."""
         if set_direction_node is None or generate_outline_node is None:
             raise HTTPException(
                 status_code=503,
                 detail="outline nodes not available (agent module missing)",
             )
+        try:
+            from engine.prewrite import run_prewrite
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"prewrite unavailable: {exc}",
+            ) from exc
         state = self.get_state(session_id)
         state = {**state, "research_direction": research_direction}
-        state = {**state, **set_direction_node(state)}
-        state = {**state, **generate_outline_node(state)}
+        if not state.get("csv_path"):
+            entry = self._sessions.get(session_id) or {}
+            csv_path = entry.get("csv_path")
+            if csv_path:
+                state["csv_path"] = csv_path
+        state = run_prewrite(state)
         self.save_state(session_id, state)
         return state
+
+    def run_identification_verify(self, session_id: str) -> dict:
+        """Run identification verification after method selection.
+
+        Reads current state, runs diagnostics, writes back to session.
+        Returns diagnosis dict with passed/report.
+        """
+        if identification_verify_node is None:
+            raise HTTPException(
+                status_code=503,
+                detail="identification_verify node not available",
+            )
+        state = self.get_state(session_id)
+        result = identification_verify_node(state)
+        state = {**state, **result}
+        self.save_state(session_id, state)
+        return {
+            "passed": result.get("identification_failed") is not True,
+            "diagnosis": result.get("identification_diag", {}),
+            "star_rating": result.get("star_rating", 0),
+            "identification_failed": result.get("identification_failed") is True,
+        }
+
+    def run_robustness_check(self, session_id: str) -> dict:
+        """Run full robustness battery after main estimation.
+
+        Returns summary table and detailed results.
+        """
+        if robustness_check_node is None:
+            raise HTTPException(
+                status_code=503,
+                detail="robustness_check node not available",
+            )
+        state = self.get_state(session_id)
+        result = robustness_check_node(state)
+        state = {**state, **result}
+        self.save_state(session_id, state)
+        return result
 
     def resume_outline(
         self, session_id: str, user_adjusted_outline: Any
@@ -337,16 +416,20 @@ class AgentFacade:
             )
         state = self.get_state(session_id)
         state = {**state, "current_chapter": chapter}
+        try:
+            from engine.readiness import TRUTH_KEYS
+        except Exception:
+            TRUTH_KEYS = frozenset()
         for k, v in (render_kwargs or {}).items():
+            if k in TRUTH_KEYS:
+                continue
             if k not in state or state.get(k) in (None, ""):
                 state[k] = v
         try:
             result = generate_chapter_node(state)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        state = {**state, **result}
-        self.save_state(session_id, state)
-        return state
+        return self._persist_after_chapter(session_id, state, result)
 
     def regenerate_chapter(self, session_id: str, chapter_index: int) -> dict:
         """Re-run generate_chapter on the given chapter index."""
@@ -361,7 +444,37 @@ class AgentFacade:
             result = generate_chapter_node(state)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+        return self._persist_after_chapter(session_id, state, result)
+
+    def _persist_after_chapter(
+        self, session_id: str, state: dict, result: dict
+    ) -> dict:
         state = {**state, **result}
+        if result.get("write_blocked"):
+            self.save_state(session_id, state)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "write_blocked": True,
+                    "write_blockers": result.get("write_blockers") or [],
+                },
+            )
+        if review_chapter_node is not None:
+            reviewed = review_chapter_node(state)
+            state = {**state, **reviewed}
+            if reviewed.get("review_degraded") or reviewed.get("review_source") == "mock_fallback":
+                reason = "review_llm_unparseable_or_error"
+                for item in reviewed.get("degradations") or []:
+                    if isinstance(item, dict) and item.get("node") == "review_chapter":
+                        reason = str(item.get("reason") or reason)
+                        break
+                self.record_degradation(
+                    session_id,
+                    node="review_chapter",
+                    reason=reason,
+                    fallback="mock_review_llm",
+                    visible=True,
+                )
         self.save_state(session_id, state)
         return state
 
@@ -581,6 +694,9 @@ class AgentFacade:
             "review_iteration": review_iteration,
             "max_review_iterations": max_review_iterations,
             "auto_decision": auto_decision,
+            "review_source": state.get("review_source") or "",
+            "review_degraded": bool(state.get("review_degraded")),
+            "grounding_failures": list(state.get("grounding_failures") or []),
         }
 
     def submit_review_decision(
@@ -660,6 +776,7 @@ class AgentFacade:
         node: str,
         reason: str,
         fallback: str,
+        visible: bool = False,
     ) -> None:
         """Record a degradation event for a session.
 
@@ -674,12 +791,36 @@ class AgentFacade:
             "node": node,
             "reason": reason,
             "fallback": fallback,
+            "visible": visible,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
     def get_degradations(self, session_id: str) -> list[dict]:
         """Return the degradation log for a session."""
         return self._degradations.get(session_id, [])
+
+    def discuss_desk(self, notes: str, turns: list[dict] | None = None) -> dict:
+        """空桌讨论：走统一 LLM 通道，失败时启发式降级。"""
+        try:
+            from desk.socratic import discuss
+        except Exception as exc:  # pragma: no cover
+            raise HTTPException(status_code=503, detail=f"desk discuss unavailable: {exc}") from exc
+        return discuss(notes, turns or [])
+
+    def transcribe_desk(self, raw: bytes, filename: str = "clip.webm") -> dict:
+        try:
+            from desk.stepfun_asr import transcribe_upload
+        except Exception as exc:  # pragma: no cover
+            raise HTTPException(status_code=503, detail=f"desk asr unavailable: {exc}") from exc
+        text = transcribe_upload(raw, filename=filename)
+        return {"text": text, "source": "stepfun"}
+
+    def speak_desk(self, text: str) -> bytes:
+        try:
+            from desk.minimax_tts import synthesize
+        except Exception as exc:  # pragma: no cover
+            raise HTTPException(status_code=503, detail=f"desk tts unavailable: {exc}") from exc
+        return synthesize(text)
 
     # ------------------------------------------------------------------
     # Test helpers

@@ -1,6 +1,6 @@
-// HITL 评审面板：先点通过/否决，再给看机器分。
-// 点之前不显示自动通过、综合分、五维分数——对照里看得见分就会照抄。
-// 强制通过会泄底，点之前不提供。
+// HITL 评审：人先点，机器意见可选看。
+// 点之前不显示自动通过、综合分、五维分数，也不说教。
+// 修改建议里的「结构层失败」会泄底，点之前剥掉。
 
 import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
@@ -11,7 +11,7 @@ type ReviewInfoResponse = components['schemas']['ReviewInfoResponse']
 export interface ReviewPanelProps {
   review: ReviewInfoResponse
   sessionId: string
-  /** 点完并看过机器分之后，父组件再刷新 */
+  /** 点完之后，父组件再刷新 */
   onDecision?: (decision: string, nextAction: string) => void
 }
 
@@ -30,6 +30,17 @@ function barColorClass(score: number | null | undefined): string {
   return 'bg-red-600'
 }
 
+/** 点之前把判决从建议里剥掉，避免提前泄底。 */
+export function stripVerdictFromSuggestions(text: string): string {
+  return (text || '')
+    .replace(/结构层失败[：:][^.。]*[。.]?/g, '')
+    .replace(/主张\/接地层失败[：:][^.。]*[。.]?/g, '')
+    .replace(/未处理识别威胁[：:][^.。]*[。.]?/g, '')
+    .replace(/不得只堆关键词。?/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export default function ReviewPanel({
   review,
   sessionId,
@@ -38,14 +49,16 @@ export default function ReviewPanel({
   const { t } = useT()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState(false)
+  const [decided, setDecided] = useState(false)
+  const [peekMachine, setPeekMachine] = useState(false)
   const [pending, setPending] = useState<{
     decision: string
     nextAction: string
   } | null>(null)
 
   useEffect(() => {
-    setRevealed(false)
+    setDecided(false)
+    setPeekMachine(false)
     setPending(null)
     setError(null)
   }, [review.chapter_index, review.review_iteration])
@@ -58,6 +71,10 @@ export default function ReviewPanel({
   }
   const reviewSource = extra.review_source
   const grounding = extra.grounding_failures ?? []
+  const showMachine = decided && peekMachine
+  const suggestionsText = showMachine
+    ? (review.suggestions || '').trim()
+    : stripVerdictFromSuggestions(review.suggestions || '')
 
   async function submitDecision(decision: string) {
     setSubmitting(true)
@@ -77,7 +94,7 @@ export default function ReviewPanel({
       }
       const data = await resp.json()
       setPending({ decision, nextAction: data.next_action })
-      setRevealed(true)
+      setDecided(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -100,7 +117,7 @@ export default function ReviewPanel({
           <span className="font-serif text-sm font-semibold text-ink">
             {t('review.title')}
           </span>
-          {revealed && (
+          {showMachine && (
             <span
               data-testid="review-auto-decision"
               className={`rounded px-2 py-0.5 font-serif text-xs ${
@@ -117,7 +134,7 @@ export default function ReviewPanel({
           {t('review.roundLabel')
             .replace('{0}', String(review.review_iteration))
             .replace('{1}', String(review.max_review_iterations))}
-          {revealed ? (
+          {showMachine ? (
             <>
               {' · '}
               <span data-testid="review-score">
@@ -128,16 +145,7 @@ export default function ReviewPanel({
         </span>
       </div>
 
-      {!revealed && (
-        <p
-          data-testid="review-blind-hint"
-          className="border-b border-border px-4 py-2 font-serif text-xs text-muted"
-        >
-          {t('review.decideFirst')}
-        </p>
-      )}
-
-      {revealed && (reviewSource || grounding.length > 0) && (
+      {showMachine && (reviewSource || grounding.length > 0) && (
         <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted">
           {reviewSource ? (
             <span data-testid="review-source">source={reviewSource}</span>
@@ -150,24 +158,31 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {revealed && pending && (
+      {decided && pending && (
         <div
-          data-testid="review-machine-reveal"
-          className="border-b border-border px-4 py-2 font-serif text-xs text-ink"
+          data-testid="review-your-decision"
+          className="flex items-center justify-between gap-2 border-b border-border px-4 py-2"
         >
-          {t('review.yourDecision').replace(
-            '{0}',
-            pending.decision === 'reject' ? t('review.blindReject') : t('review.blindAccept'),
-          )}
-          {' · '}
-          {t('review.machineReveal').replace(
-            '{0}',
-            autoPass ? t('review.autoPass') : t('review.autoFail'),
-          )}
+          <span className="font-serif text-xs text-ink">
+            {t('review.yourDecision').replace(
+              '{0}',
+              pending.decision === 'reject'
+                ? t('review.blindReject')
+                : t('review.blindAccept'),
+            )}
+          </span>
+          <button
+            type="button"
+            data-testid="review-btn-peek"
+            onClick={() => setPeekMachine((open) => !open)}
+            className="font-serif text-xs text-muted underline underline-offset-2 hover:text-ink"
+          >
+            {peekMachine ? t('review.hideMachine') : t('review.peekMachine')}
+          </button>
         </div>
       )}
 
-      {revealed && (
+      {showMachine && (
         <div data-testid="review-rubric" className="px-4 py-3">
           <div className="mb-2 font-serif text-xs font-semibold text-muted">
             {t('review.rubric')}
@@ -204,7 +219,7 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {revealed && (
+      {showMachine && (
         <div data-testid="review-feedback" className="border-t border-border px-4 py-3">
           <div className="mb-1 font-serif text-xs font-semibold text-muted">
             {t('review.feedback')}
@@ -223,7 +238,7 @@ export default function ReviewPanel({
           {t('review.suggestions')}
         </div>
         <p className="font-serif text-sm text-ink whitespace-pre-wrap">
-          {review.suggestions || t('review.noSuggestions')}
+          {suggestionsText || t('review.noSuggestions')}
         </p>
       </div>
 
@@ -237,7 +252,7 @@ export default function ReviewPanel({
       )}
 
       <div className="flex gap-2 border-t border-border px-4 py-3">
-        {revealed ? (
+        {decided ? (
           <button
             type="button"
             data-testid="review-btn-continue"

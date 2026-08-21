@@ -1,20 +1,23 @@
-// HITL 盲评：点通过/否决之前不泄机器分；POST 成功后才 reveal，点继续才调 onDecision。
+// HITL 盲评：点通过/否决之前不泄机器分；POST 后先出现「你点了…」和「看机器怎么说」，
+// 点 peek 才 reveal 机器意见，点继续才调 onDecision。
 //
 // 契约：
 // 1. 点之前不显示自动通过、综合分、五维分数
-// 2. 点之前显示修改建议和通过/否决（按钮永远是「通过」，不是「接受重生成」）
+// 2. 点之前显示修改建议和通过/否决（无 hint）
 // 3. 点之前不显示强制通过
-// 4. 点之前不显示评审反馈（反馈会泄底）
-// 5. 点击通过：POST，出现机器分，还不调 onDecision
-// 6. 点通过后再点继续：才调 onDecision('accept', 'proceed')
-// 7. 点击否决：POST，reveal，点继续后 onDecision('reject', 'regenerate')
-// 8. fetch 失败显示错误，仍不出现 auto-decision
-// 9. 空建议显示暂无修改建议；反馈空态只在 reveal 之后
-// 10. 点 fail 稿通过后，徽章是自动不通过，综合分 0.42 出现
+// 4. 点之前不显示评审反馈
+// 5. 点之前剥掉结构层失败
+// 6. 点击通过：POST，出现你点了通过和看机器怎么说，还不出现分数，不调 onDecision
+// 7. 点看机器怎么说才出现自动通过和综合分
+// 8. 点通过后再点继续才调 onDecision
+// 9. 点击否决后点继续
+// 10. fetch 失败不泄底
+// 11. 空建议
+// 12. fail 稿：点看机器怎么说后徽章是自动不通过 0.42
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import ReviewPanel, { type ReviewPanelProps } from '../ReviewPanel'
+import ReviewPanel, { stripVerdictFromSuggestions, type ReviewPanelProps } from '../ReviewPanel'
 import type { components } from '../../types/api'
 import { I18nProvider } from '../../lib/i18n'
 
@@ -58,6 +61,11 @@ const failReview: ReviewInfoResponse = {
   auto_decision: 'fail',
 }
 
+const stuffedReview: ReviewInfoResponse = {
+  ...failReview,
+  suggestions: '结构层失败：keyword_stuffed。不得只堆关键词。请改写引言。',
+}
+
 const baseProps: ReviewPanelProps = {
   review: passReview,
   sessionId: 'test-session-1',
@@ -73,6 +81,29 @@ function mockDecisionFetch(decision: string, nextAction: string) {
   })
 }
 
+function expectMachineHidden() {
+  expect(screen.queryByTestId('review-auto-decision')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('review-score')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('review-rubric')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('review-feedback')).not.toBeInTheDocument()
+  RUBRIC_DIMS.forEach((dim) => {
+    expect(screen.queryByTestId(`rubric-dim-${dim}`)).not.toBeInTheDocument()
+  })
+  expect(screen.queryByText('自动通过')).not.toBeInTheDocument()
+  expect(screen.queryByText('自动不通过')).not.toBeInTheDocument()
+  expect(screen.queryByText(/综合 0\.\d+/)).not.toBeInTheDocument()
+}
+
+describe('stripVerdictFromSuggestions', () => {
+  test('剥掉结构层失败、不得只堆关键词等判决短语', () => {
+    expect(
+      stripVerdictFromSuggestions('结构层失败：keyword_stuffed。不得只堆关键词。请改写引言。'),
+    ).toBe('请改写引言。')
+    expect(stripVerdictFromSuggestions('建议补充稳健性检验。')).toBe('建议补充稳健性检验。')
+    expect(stripVerdictFromSuggestions('')).toBe('')
+  })
+})
+
 describe('ReviewPanel 人工评审面板', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -84,26 +115,22 @@ describe('ReviewPanel 人工评审面板', () => {
   test('点之前不显示自动通过、综合分、五维分数', () => {
     renderWithI18n(<ReviewPanel {...baseProps} />)
 
-    expect(screen.queryByTestId('review-auto-decision')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-score')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-rubric')).not.toBeInTheDocument()
-    RUBRIC_DIMS.forEach((dim) => {
-      expect(screen.queryByTestId(`rubric-dim-${dim}`)).not.toBeInTheDocument()
-    })
-    expect(screen.queryByText('自动通过')).not.toBeInTheDocument()
-    expect(screen.queryByText('自动不通过')).not.toBeInTheDocument()
-    expect(screen.queryByText(/综合 0\.87/)).not.toBeInTheDocument()
+    expectMachineHidden()
     expect(screen.queryByTestId('review-source')).not.toBeInTheDocument()
     expect(screen.queryByTestId('review-grounding')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-machine-reveal')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-your-decision')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-btn-peek')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-blind-hint')).not.toBeInTheDocument()
+    expect(screen.queryByText('先看正文再点')).not.toBeInTheDocument()
   })
 
-  test('点之前显示修改建议和通过/否决', () => {
+  test('点之前显示修改建议和通过/否决（无 hint）', () => {
     renderWithI18n(<ReviewPanel {...baseProps} />)
 
     expect(screen.getByText('章节评审')).toBeInTheDocument()
     expect(screen.getByText('第 1/2 轮')).toBeInTheDocument()
-    expect(screen.getByTestId('review-blind-hint')).toHaveTextContent('先看正文再点。点完才显示机器分。')
+    expect(screen.queryByTestId('review-blind-hint')).not.toBeInTheDocument()
+    expect(screen.queryByText('先看正文再点')).not.toBeInTheDocument()
     expect(screen.getByTestId('review-suggestions')).toHaveTextContent('建议补充稳健性检验。')
 
     const acceptBtn = screen.getByTestId('review-btn-accept')
@@ -112,6 +139,7 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(acceptBtn).not.toHaveTextContent('接受重生成')
     expect(rejectBtn).toHaveTextContent('否决')
     expect(screen.queryByTestId('review-btn-continue')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-btn-peek')).not.toBeInTheDocument()
   })
 
   test('点之前不显示强制通过', () => {
@@ -125,7 +153,7 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(screen.queryByText('强制通过')).not.toBeInTheDocument()
   })
 
-  test('点之前不显示评审反馈（反馈会泄底）', () => {
+  test('点之前不显示评审反馈', () => {
     renderWithI18n(<ReviewPanel {...baseProps} />)
 
     expect(screen.queryByTestId('review-feedback')).not.toBeInTheDocument()
@@ -133,7 +161,18 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(screen.queryByText('暂无评审反馈')).not.toBeInTheDocument()
   })
 
-  test('点击通过：POST，出现机器分，还不调 onDecision', async () => {
+  test('点之前剥掉结构层失败', () => {
+    renderWithI18n(<ReviewPanel {...baseProps} review={stuffedReview} />)
+
+    const suggestions = screen.getByTestId('review-suggestions')
+    expect(suggestions).toHaveTextContent('请改写引言。')
+    expect(suggestions).not.toHaveTextContent('结构层失败')
+    expect(suggestions).not.toHaveTextContent('keyword_stuffed')
+    expect(suggestions).not.toHaveTextContent('不得只堆关键词')
+    expect(screen.queryByText('自动不通过')).not.toBeInTheDocument()
+  })
+
+  test('点击通过：POST，出现你点了通过和看机器怎么说，还不出现分数，不调 onDecision', async () => {
     const user = userEvent.setup()
     const onDecision = vi.fn()
     const mockFetch = mockDecisionFetch('accept', 'proceed')
@@ -143,7 +182,7 @@ describe('ReviewPanel 人工评审面板', () => {
     await user.click(screen.getByTestId('review-btn-accept'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('review-auto-decision')).toBeInTheDocument()
+      expect(screen.getByTestId('review-your-decision')).toBeInTheDocument()
     })
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -154,6 +193,31 @@ describe('ReviewPanel 人工评审面板', () => {
       }),
     )
     expect(onDecision).not.toHaveBeenCalled()
+    expect(screen.getByTestId('review-your-decision')).toHaveTextContent('你点了通过')
+    expect(screen.getByTestId('review-btn-peek')).toHaveTextContent('看机器怎么说')
+    expect(screen.getByTestId('review-btn-continue')).toHaveTextContent('继续')
+    expect(screen.queryByTestId('review-btn-accept')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-btn-reject')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-blind-hint')).not.toBeInTheDocument()
+    expectMachineHidden()
+  })
+
+  test('点看机器怎么说才出现自动通过和综合分', async () => {
+    const user = userEvent.setup()
+    const onDecision = vi.fn()
+    vi.stubGlobal('fetch', mockDecisionFetch('accept', 'proceed'))
+
+    renderWithI18n(<ReviewPanel {...baseProps} onDecision={onDecision} />)
+    await user.click(screen.getByTestId('review-btn-accept'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('review-btn-peek')).toBeInTheDocument()
+    })
+    expectMachineHidden()
+    expect(onDecision).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('review-btn-peek'))
+
     expect(screen.getByTestId('review-auto-decision')).toHaveTextContent('自动通过')
     expect(screen.getByTestId('review-score')).toHaveTextContent('综合 0.87')
     expect(screen.getByTestId('review-rubric')).toBeInTheDocument()
@@ -161,14 +225,16 @@ describe('ReviewPanel 人工评审面板', () => {
       expect(screen.getByTestId(`rubric-dim-${dim}`)).toBeInTheDocument()
     })
     expect(screen.getByTestId('review-feedback')).toHaveTextContent('章节质量良好，内生性处理得当。')
-    expect(screen.getByTestId('review-machine-reveal')).toBeInTheDocument()
-    expect(screen.getByTestId('review-btn-continue')).toHaveTextContent('继续')
-    expect(screen.queryByTestId('review-btn-accept')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-btn-reject')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-blind-hint')).not.toBeInTheDocument()
+    expect(screen.getByTestId('review-btn-peek')).toHaveTextContent('收起机器意见')
+    expect(onDecision).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('review-btn-peek'))
+    expectMachineHidden()
+    expect(screen.getByTestId('review-btn-peek')).toHaveTextContent('看机器怎么说')
+    expect(screen.getByTestId('review-your-decision')).toHaveTextContent('你点了通过')
   })
 
-  test("点通过后再点继续：才调 onDecision('accept', 'proceed')", async () => {
+  test("点通过后再点继续才调 onDecision('accept', 'proceed')", async () => {
     const user = userEvent.setup()
     const onDecision = vi.fn()
     vi.stubGlobal('fetch', mockDecisionFetch('accept', 'proceed'))
@@ -186,7 +252,7 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(onDecision).toHaveBeenCalledWith('accept', 'proceed')
   })
 
-  test("点击否决：POST，reveal，点继续后 onDecision('reject', 'regenerate')", async () => {
+  test("点击否决后点继续：onDecision('reject', 'regenerate')", async () => {
     const user = userEvent.setup()
     const onDecision = vi.fn()
     const mockFetch = mockDecisionFetch('reject', 'regenerate')
@@ -196,7 +262,7 @@ describe('ReviewPanel 人工评审面板', () => {
     await user.click(screen.getByTestId('review-btn-reject'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('review-machine-reveal')).toBeInTheDocument()
+      expect(screen.getByTestId('review-your-decision')).toBeInTheDocument()
     })
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -207,17 +273,16 @@ describe('ReviewPanel 人工评审面板', () => {
       }),
     )
     expect(onDecision).not.toHaveBeenCalled()
-    expect(screen.getByTestId('review-auto-decision')).toBeInTheDocument()
-    expect(screen.getByTestId('review-score')).toBeInTheDocument()
-    expect(screen.getByTestId('review-rubric')).toBeInTheDocument()
-    expect(screen.getByTestId('review-feedback')).toBeInTheDocument()
+    expect(screen.getByTestId('review-your-decision')).toHaveTextContent('你点了否决')
+    expect(screen.getByTestId('review-btn-peek')).toHaveTextContent('看机器怎么说')
+    expectMachineHidden()
 
     await user.click(screen.getByTestId('review-btn-continue'))
     expect(onDecision).toHaveBeenCalledTimes(1)
     expect(onDecision).toHaveBeenCalledWith('reject', 'regenerate')
   })
 
-  test('fetch 失败显示错误，仍不出现 auto-decision', async () => {
+  test('fetch 失败不泄底', async () => {
     const user = userEvent.setup()
     const onDecision = vi.fn()
     const mockFetch = vi.fn().mockResolvedValue({
@@ -234,18 +299,16 @@ describe('ReviewPanel 人工评审面板', () => {
       expect(screen.getByTestId('review-error')).toBeInTheDocument()
     })
     expect(screen.getByTestId('review-error').textContent).toContain('服务器错误')
-    expect(screen.queryByTestId('review-auto-decision')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-score')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-rubric')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-feedback')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('review-machine-reveal')).not.toBeInTheDocument()
+    expectMachineHidden()
+    expect(screen.queryByTestId('review-your-decision')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-btn-peek')).not.toBeInTheDocument()
     expect(screen.queryByTestId('review-btn-continue')).not.toBeInTheDocument()
     expect(screen.getByTestId('review-btn-accept')).toBeInTheDocument()
     expect(screen.getByTestId('review-btn-reject')).toBeInTheDocument()
     expect(onDecision).not.toHaveBeenCalled()
   })
 
-  test('空建议显示暂无修改建议', () => {
+  test('空建议', () => {
     const emptyReview: ReviewInfoResponse = {
       chapter_index: 0,
       feedback: '',
@@ -264,7 +327,7 @@ describe('ReviewPanel 人工评审面板', () => {
     expect(screen.queryByText('暂无评审反馈')).not.toBeInTheDocument()
   })
 
-  test('点 fail 稿通过后，徽章是自动不通过，综合分 0.42 出现', async () => {
+  test('fail 稿：点看机器怎么说后徽章是自动不通过 0.42', async () => {
     const user = userEvent.setup()
     const onDecision = vi.fn()
     vi.stubGlobal('fetch', mockDecisionFetch('accept', 'proceed'))
@@ -273,12 +336,35 @@ describe('ReviewPanel 人工评审面板', () => {
     await user.click(screen.getByTestId('review-btn-accept'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('review-auto-decision')).toBeInTheDocument()
+      expect(screen.getByTestId('review-btn-peek')).toBeInTheDocument()
     })
+    expect(screen.queryByTestId('review-auto-decision')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('review-score')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('review-btn-peek'))
 
     expect(screen.getByTestId('review-auto-decision')).toHaveTextContent('自动不通过')
     expect(screen.getByTestId('review-score')).toHaveTextContent('综合 0.42')
-    expect(screen.getByTestId('review-machine-reveal').textContent).toContain('自动不通过')
     expect(onDecision).not.toHaveBeenCalled()
+  })
+
+  test('点看机器怎么说后还原完整建议（含结构层失败）', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', mockDecisionFetch('accept', 'proceed'))
+
+    renderWithI18n(<ReviewPanel {...baseProps} review={stuffedReview} />)
+    expect(screen.getByTestId('review-suggestions')).not.toHaveTextContent('结构层失败')
+
+    await user.click(screen.getByTestId('review-btn-accept'))
+    await waitFor(() => {
+      expect(screen.getByTestId('review-btn-peek')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('review-suggestions')).toHaveTextContent('请改写引言。')
+    expect(screen.getByTestId('review-suggestions')).not.toHaveTextContent('结构层失败')
+
+    await user.click(screen.getByTestId('review-btn-peek'))
+    expect(screen.getByTestId('review-suggestions')).toHaveTextContent(
+      '结构层失败：keyword_stuffed。不得只堆关键词。请改写引言。',
+    )
   })
 })

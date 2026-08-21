@@ -283,9 +283,9 @@ const zh = {
   'review.submitError': '决策提交失败：',
   'review.blindAccept': '通过',
   'review.blindReject': '否决',
-  'review.decideFirst': '先看正文再点。点完才显示机器分。',
   'review.yourDecision': '你点了{0}',
-  'review.machineReveal': '机器：{0}',
+  'review.peekMachine': '看机器怎么说',
+  'review.hideMachine': '收起机器意见',
   'review.continue': '继续',
 
   // SampleFilter
@@ -618,9 +618,9 @@ const en: typeof zh = {
   'review.submitError': 'Decision submission failed: ',
   'review.blindAccept': 'Accept',
   'review.blindReject': 'Reject',
-  'review.decideFirst': 'Read the chapter first. Scores appear after you decide.',
   'review.yourDecision': 'You chose {0}',
-  'review.machineReveal': 'Machine: {0}',
+  'review.peekMachine': 'See what the machine said',
+  'review.hideMachine': 'Hide machine opinion',
   'review.continue': 'Continue',
 
   'filter.title': 'Sample Filter',

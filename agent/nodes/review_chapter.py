@@ -119,6 +119,51 @@ _GROUNDING_CODES = (
     "invented_table",
 )
 
+# #8 下游监督：命中主题词但 lit_review 没写 [N]，relevance 给负分
+UNCITED_TOPIC_PENALTY = -0.5
+_CITE_MARKER_RE = re.compile(r"\[(\d+)\]")
+
+
+def apply_uncited_topic_penalty(
+    entries: List[Any],
+    content: str,
+    citation_indices: Any,
+    query: str,
+) -> List[Any]:
+    """命中检索主题词、却没出现在 lit_review [N] 里的条目，relevance 改成负数。
+
+    不调 LLM。关键词按 literature_query 空格切开。
+    """
+    if not entries:
+        return list(entries or [])
+    cited_nums = {int(n) for n in _CITE_MARKER_RE.findall(content or "")}
+    keywords = [
+        token.strip().lower()
+        for token in (query or "").split()
+        if len(token.strip()) > 1
+    ]
+    indices = citation_indices if isinstance(citation_indices, dict) else {}
+    out: List[Any] = []
+    for entry in entries:
+        item = dict(entry)
+        key = item.get("doi") or item.get("title") or ""
+        num = indices.get(key)
+        try:
+            num_int = int(num) if num is not None else None
+        except (TypeError, ValueError):
+            num_int = None
+        title = (item.get("title") or "").lower()
+        abstract = (item.get("abstract") or "").lower()
+        hit = bool(keywords) and any(
+            kw in title or kw in abstract for kw in keywords
+        )
+        cited = num_int is not None and num_int in cited_nums
+        if hit and not cited:
+            item["relevance_score"] = UNCITED_TOPIC_PENALTY
+        out.append(item)
+    return out
+
+
 
 def invoke_review_llm(
     config: Any,
@@ -602,6 +647,15 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
         review_source, review_degraded, grounding_failures, degradations
     )
 
+    penalty_fields: dict = {}
+    if chapter_type == "lit_review":
+        penalty_fields["literature_entries"] = apply_uncited_topic_penalty(
+            literature_entries or [],
+            chapter_content,
+            state.get("citation_indices"),
+            str(state.get("literature_query") or ""),
+        )
+
     if score < REVIEW_SCORE_THRESHOLD and review_iteration < max_iterations:
         # 回退：重生成当前章
         return {
@@ -613,6 +667,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_chapter_index": idx,
             "current_chapter_index": idx,  # 回退
             **visible,
+            **penalty_fields,
         }
     elif score >= REVIEW_SCORE_THRESHOLD:
         # 真正通过：重置迭代，为下一章准备
@@ -624,6 +679,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_iteration": 0,
             "review_chapter_index": idx,
             **visible,
+            **penalty_fields,
         }
     else:
         # 强制通过（iteration >= max）：保留 review_iteration，让 route_after_review
@@ -636,4 +692,5 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_iteration": review_iteration,
             "review_chapter_index": idx,
             **visible,
+            **penalty_fields,
         }

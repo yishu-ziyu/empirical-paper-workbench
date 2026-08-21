@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from nodes.review_sources.structure_checks import check_structure
+
+_CITATION_INDICES = {
+    "10.1093/restud/rdaa084": 1,
+    "10.1016/j.jhealeco.2015.01.004": 2,
+}
+
 
 def _base(
     *,
@@ -16,6 +23,15 @@ def _base(
     idx = {"intro": 0, "lit_review": 1, "data_desc": 2, "methods": 3, "results": 4, "conclusion": 5}[
         chapter_type
     ]
+    # 产品结构层赢过 caller 的 auto_decision：堆词 / 过声称 / 编造引用一律机器 fail。
+    failures = check_structure(
+        chapter_type,
+        content,
+        method=method,
+        citation_indices=_CITATION_INDICES,
+    )
+    if failures:
+        auto_decision = "fail"
     state: Dict[str, Any] = {
         "session_id": f"ab-{packet_id}",
         "packet_id": packet_id,
@@ -56,7 +72,7 @@ def _base(
                 "readability": 0.5,
             }
         ],
-        "citation_indices": {"10.1093/restud/rdaa084": 1, "10.1016/j.jhealeco.2015.01.004": 2},
+        "citation_indices": dict(_CITATION_INDICES),
         "literature_entries": [
             {
                 "title": "Difference-in-Differences with Multiple Time Periods",
@@ -88,8 +104,9 @@ def _base(
 def packet_good_methods() -> Dict[str, Any]:
     content = (
         "本文用 CHARLS 2011–2020 面板，处理组为新农合参保人，对照为城镇职工/居民医保。"
+        "主回归 $y_{it}=\\alpha+\\beta D_{it}+\\varepsilon_{it}$。"
         "因各省整合时点交错，主规格采用 Callaway–Sant'Anna [1] 处理交错 DID，"
-        "并报告平行趋势事件研究。CHARLS 流失与回忆偏差写入威胁卡："
+        "识别依赖平行趋势与 SUTVA，并报告平行趋势事件研究。CHARLS 流失与回忆偏差写入威胁卡："
         "死亡/失访与住院利用相关，故稳健性排除 2020 年疫情波。"
         "不能把简单双向固定效应的负向结果写成政策减负。"
     )
@@ -140,6 +157,7 @@ def packet_overclaim_results() -> Dict[str, Any]:
         chapter_type="results",
         content=content,
         auto_decision="pass",
+        method="",
     )
 
 

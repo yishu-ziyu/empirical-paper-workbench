@@ -37,14 +37,14 @@ def test_invented_citation_rejected_in_both_arms():
             assert verdict["decision"] == "reject", (persona, see_auto)
 
 
-def test_keyword_intro_blind_rejects_see_auto_accepts():
-    """机器说通过时，看得见分的人会放过堆词；看不见的人会否决。"""
+def test_keyword_intro_rejected_in_both_arms():
+    """产品结构层已把堆词判 fail，三人格两组都否决，不再被机器分带过去。"""
     state = packet_keyword_intro()
+    assert state["review_scores"][0] < 0.7
     for persona in persona_ids():
-        blind = rule_judge(persona, state, see_auto=False)
-        seen = rule_judge(persona, state, see_auto=True)
-        assert blind["decision"] == "reject", persona
-        assert seen["decision"] == "accept", persona
+        for see_auto in (False, True):
+            verdict = rule_judge(persona, state, see_auto=see_auto)
+            assert verdict["decision"] == "reject", (persona, see_auto)
 
 
 def test_overclaim_splits_by_persona_when_blind():
@@ -52,6 +52,22 @@ def test_overclaim_splits_by_persona_when_blind():
     assert rule_judge("applied_micro", state, see_auto=False)["decision"] == "reject"
     assert rule_judge("journal_referee", state, see_auto=False)["decision"] == "reject"
     assert rule_judge("econometrician", state, see_auto=False)["decision"] == "accept"
+
+
+def test_overclaim_rejected_when_auto_fails_see_auto():
+    """产品 overclaim 让机器 fail 后：应微/期刊两组都否；计量盲审仍过，see_auto 跟机器否。
+
+    econometrician 没有 overclaim 软规则，盲审仍 accept；see_auto 走
+    ``if see_auto and auto == "fail"`` 跟着机器 reject。
+    """
+    state = packet_overclaim_results()
+    assert state["review_scores"][0] < 0.7
+    for persona in ("applied_micro", "journal_referee"):
+        for see_auto in (False, True):
+            verdict = rule_judge(persona, state, see_auto=see_auto)
+            assert verdict["decision"] == "reject", (persona, see_auto)
+    assert rule_judge("econometrician", state, see_auto=False)["decision"] == "accept"
+    assert rule_judge("econometrician", state, see_auto=True)["decision"] == "reject"
 
 
 def test_weak_iv_rejected_by_econometrician():
@@ -75,8 +91,11 @@ def test_run_ab_writes_labels_without_scores(tmp_path, monkeypatch):
     see = report["by_arm"]["see_auto"]["agree_with_auto"]
     blind = report["by_arm"]["blind"]["agree_with_auto"]
     assert see is not None and blind is not None
-    assert see > blind
-    assert report["rubber_stamp"] > 0
+    # 结构层接上后机器不再误通过堆词，see_auto 不应再大幅盖过 blind（旧 rubber_stamp=0.467）
+    assert see - blind < 0.467
+    keyword_events = [event for event in events if event.get("packet_id") == "keyword_intro"]
+    assert len(keyword_events) == 6  # 3 人 × 2 组
+    assert all(event["decision"] == "reject" for event in keyword_events)
 
 
 def test_event_from_human_decision_persists(tmp_path, monkeypatch):

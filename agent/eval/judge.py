@@ -6,6 +6,7 @@ import re
 from typing import Any, Dict, Optional
 
 from eval.personas import system_prompt
+from nodes.review_sources.structure_checks import is_keyword_stuffed, is_overclaim
 
 _CITE_RE = re.compile(r"\[(\d+)\]")
 _DECISION_RE = re.compile(r"\b(accept|reject)\b", re.IGNORECASE)
@@ -35,28 +36,6 @@ def _invented_citation(state: Dict[str, Any]) -> bool:
         if int(match.group(1)) not in allowed:
             return True
     return False
-
-
-def _keyword_stuffed(content: str) -> bool:
-    hits = sum(
-        1
-        for word in ("DID", "IV", "RDD", "三重差分", "合成控制", "断点回归")
-        if word in content
-    )
-    has_design = any(
-        token in content
-        for token in ("Callaway", "交错 DID", "一阶段", "平行趋势事件", "处理组为")
-    )
-    return hits >= 3 and not has_design
-
-
-def _overclaim(content: str) -> bool:
-    boasts = "显著降低" in content or "政策效果稳健" in content
-    weak = any(
-        token in content
-        for token in ("不显著", "+0.081", "安慰剂未通过")
-    )
-    return boasts and weak
 
 
 def _missing_method_anchor(state: Dict[str, Any], content: str) -> bool:
@@ -89,9 +68,9 @@ def _hard_reject(state: Dict[str, Any]) -> Optional[str]:
 
 def _soft_reject(persona_id: str, state: Dict[str, Any]) -> Optional[str]:
     content = _content(state)
-    if _keyword_stuffed(content):
+    if is_keyword_stuffed(content):
         return "只堆方法词，没有识别设计"
-    if persona_id in {"applied_micro", "journal_referee"} and _overclaim(content):
+    if persona_id in {"applied_micro", "journal_referee"} and is_overclaim(content):
         return "证据不支持这么强的结论"
     if persona_id == "econometrician" and _missing_method_anchor(state, content):
         return "方法锚缺失"

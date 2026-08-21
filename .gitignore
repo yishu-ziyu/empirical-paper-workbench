@@ -28,4 +28,4 @@ backend/data/*.jsonl
 # 运行时 SQLite（不要把本地会话库提交上去）
 *.db
 *.db-journal
-
+*.sqlite3

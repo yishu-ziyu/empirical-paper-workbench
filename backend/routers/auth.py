@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,17 @@ class RegisterRequest(BaseModel):
     email: str = Field(..., max_length=255)
     username: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=6, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def email_must_look_valid(cls, v: str) -> str:
+        value = (v or "").strip()
+        if "@" not in value or value.startswith("@") or value.endswith("@"):
+            raise ValueError("Invalid email address")
+        local, _, domain = value.partition("@")
+        if not local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+            raise ValueError("Invalid email address")
+        return value
 
 
 class LoginRequest(BaseModel):

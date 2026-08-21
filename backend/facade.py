@@ -789,6 +789,12 @@ class AgentFacade:
             hitl_reviewer=reviewer,
             hitl_comment=comment,
         )
+        from nodes.learning_labels import collect_learning_labels
+
+        state = self.update_state(
+            session_id,
+            learning_labels=collect_learning_labels(state),
+        )
 
         # reject → 触发重生成；accept / force_pass → proceed
         if decision == "reject":

@@ -162,6 +162,7 @@ from routers.desk import router as desk_router  # noqa: E402
 from routers.code_export import router as code_export_router  # noqa: E402
 from routers.doc_export import router as doc_export_router  # noqa: E402
 from routers.eda import router as eda_router  # noqa: E402
+from routers.labels import router as labels_router  # noqa: E402
 from routers.outline import router as outline_router  # noqa: E402
 from routers.progress import router as progress_router  # noqa: E402
 from routers.review import router as review_router  # noqa: E402
@@ -174,6 +175,7 @@ app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(sessions_router)
 app.include_router(ws_router)
+app.include_router(labels_router)
 app.include_router(outline_router)
 app.include_router(chapter_router)
 app.include_router(desk_router)

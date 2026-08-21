@@ -795,6 +795,27 @@ class AgentFacade:
             session_id,
             learning_labels=collect_learning_labels(state),
         )
+        try:
+            from nodes.label_store import (
+                ARM_HUMAN,
+                REVIEWER_HUMAN,
+                append_event,
+                event_from_decision,
+            )
+
+            append_event(
+                event_from_decision(
+                    {**state, "session_id": session_id},
+                    decision=decision,
+                    reviewer=reviewer,
+                    comment=comment,
+                    reviewer_kind=REVIEWER_HUMAN,
+                    ab_arm=ARM_HUMAN,
+                )
+            )
+        except Exception:
+            # 落盘失败不挡决策；测试会直接打 label_store。
+            pass
 
         # reject → 触发重生成；accept / force_pass → proceed
         if decision == "reject":

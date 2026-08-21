@@ -219,6 +219,7 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
             "literature_query": query,
             "literature_source": "disabled",
             "literature_produced_by": "search_literature",
+            "literature_actions": [],
         }
 
     entries, effective_source = _dispatch_search(query, source)
@@ -237,10 +238,16 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
             threat, _threat_src = _dispatch_search(threat_query, threat_source)
 
     unique = _merge_unique(anchors, entries, threat)
+    actions = ["keyword"]
+    if anchors:
+        actions.append("method_anchor")
+    if threat:
+        actions.append("threat")
 
     return {
         "literature_entries": unique,
         "literature_query": query,
         "literature_source": effective_source,
         "literature_produced_by": "search_literature",
+        "literature_actions": actions,
     }

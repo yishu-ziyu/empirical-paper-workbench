@@ -21,6 +21,10 @@ backend/uploads/.s3_cache/
 .env
 !.env.docker
 
+# 运行时学习标签（对照报告的样例可入库，原始 jsonl 不入库）
+data/*.jsonl
+backend/data/*.jsonl
+
 # 运行时 SQLite（不要把本地会话库提交上去）
 *.db
 *.db-journal

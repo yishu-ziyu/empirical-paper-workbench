@@ -104,6 +104,7 @@ def build_citation_graph(state: EconPaperState) -> CitationGraphOutput:
             "citation_graph": {"entries": [], "edges": [], "indices": {}},
             "citation_indices": {},
             "literature_entries": [],
+            "literature_actions": list(state.get("literature_actions") or []),
         }
 
     from nodes.literature_sources.semantic_scholar import (
@@ -193,8 +194,13 @@ def build_citation_graph(state: EconPaperState) -> CitationGraphOutput:
         "indices": citation_indices,
     }
 
+    actions = list(state.get("literature_actions") or [])
+    if extras and "citation_hop" not in actions:
+        actions.append("citation_hop")
+
     return {
         "citation_graph": graph,
         "citation_indices": citation_indices,
         "literature_entries": expanded,
+        "literature_actions": actions,
     }

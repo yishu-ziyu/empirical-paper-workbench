@@ -10,8 +10,17 @@
 - mock_llm_for(node_name): 通用 LLM mock 工厂，支持 generate_title/outline/chapter 三种签名
 - charls_csv / generic_csv / workspace: 跨文件复用的数据 fixture
 """
+import os
 import sys
 from pathlib import Path
+
+# Backend tests import config at collection time. Local/demo tests rely on
+# anonymous sessions; production (DEBUG=false) rejects those with 401.
+os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault(
+    "JWT_SECRET_KEY",
+    "test-only-jwt-secret-key-32chars-min",
+)
 
 import pytest
 

@@ -14,10 +14,12 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import DirectionResponse, ResumeResponse
 
 router = APIRouter()
@@ -67,9 +69,12 @@ class ResumeRequest(BaseModel):
     response_model=DirectionResponse,
 )
 async def set_direction_endpoint(
-    session_id: str, payload: DirectionRequest
+    session_id: str,
+    payload: DirectionRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> DirectionResponse:
     """接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。"""
+    require_session_ownership(session_id, current_user)
     rd = payload.model_dump()
     state = facade.set_direction_and_outline(session_id, rd)
     fields = facade.instrument_fields(state)
@@ -94,9 +99,12 @@ async def set_direction_endpoint(
     response_model=ResumeResponse,
 )
 async def resume_endpoint(
-    session_id: str, payload: ResumeRequest
+    session_id: str,
+    payload: ResumeRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> ResumeResponse:
     """接受用户调整后的 outline → 写入 user_adjusted_outline → 重跑 generate_outline。"""
+    require_session_ownership(session_id, current_user)
     state = facade.resume_outline(session_id, payload.outline)
     return ResumeResponse(
         ok=True,

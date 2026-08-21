@@ -21,10 +21,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import (
     ApproveChapterResponse,
     ChapterResponse,
@@ -99,7 +101,9 @@ class RegenerateRequest(BaseModel):
     response_model=GenerateChapterResponse,
 )
 async def generate_chapter_endpoint(
-    session_id: str, payload: GenerateChapterRequest
+    session_id: str,
+    payload: GenerateChapterRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> GenerateChapterResponse:
     """触发 generate_chapter 节点：写入 current_chapter → 跑节点 → 返回章节。
 
@@ -109,6 +113,7 @@ async def generate_chapter_endpoint(
       "body_chapters": [...],  # 全部正文章节
     }
     """
+    require_session_ownership(session_id, current_user)
     # 校验 chapter.type 合法性（未知 type 直接 400，不进 generate_chapter）
     if payload.chapter.type not in _VALID_CHAPTER_TYPES:
         raise HTTPException(
@@ -147,13 +152,16 @@ async def generate_chapter_endpoint(
     response_model=ApproveChapterResponse,
 )
 async def approve_chapter_endpoint(
-    session_id: str, payload: ApproveChapterRequest
+    session_id: str,
+    payload: ApproveChapterRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> ApproveChapterResponse:
     """用户审批章节 → 标记 status="approved"。
 
     graph resume 由后续集成阶段在 graph 层加 interrupt() 后实现；此处只
     更新 session 状态。
     """
+    require_session_ownership(session_id, current_user)
     state = facade.get_state(session_id)
     body_chapters: List[Any] = list(state.get("body_chapters", []) or [])
 
@@ -201,7 +209,9 @@ async def approve_chapter_endpoint(
     response_model=RollbackResponse,
 )
 async def rollback_chapter_endpoint(
-    session_id: str, payload: RollbackRequest
+    session_id: str,
+    payload: RollbackRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> RollbackResponse:
     """回滚到指定版本。
 
@@ -212,6 +222,7 @@ async def rollback_chapter_endpoint(
     ``rollback_chapter(state)`` 节点（T-08a），节点返回
     ``{"body_chapters": [...]}``，合并回 session 状态。
     """
+    require_session_ownership(session_id, current_user)
     chapter_index = payload.chapter_index
     version_index = payload.version_index
     state = facade.rollback_chapter(session_id, chapter_index, version_index)
@@ -234,7 +245,9 @@ async def rollback_chapter_endpoint(
     response_model=RegenerateResponse,
 )
 async def regenerate_chapter_endpoint(
-    session_id: str, payload: RegenerateRequest
+    session_id: str,
+    payload: RegenerateRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> RegenerateResponse:
     """重新生成当前章。
 
@@ -244,6 +257,7 @@ async def regenerate_chapter_endpoint(
     设置 ``state['current_chapter_index']``，调 ``generate_chapter(state)``
     节点，合并结果。
     """
+    require_session_ownership(session_id, current_user)
     chapter_index = payload.chapter_index
     state = facade.regenerate_chapter(session_id, chapter_index)
 
@@ -266,7 +280,9 @@ async def regenerate_chapter_endpoint(
     response_model=VersionsResponse,
 )
 async def get_versions(
-    session_id: str, chapter_index: int
+    session_id: str,
+    chapter_index: int,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> VersionsResponse:
     """获取指定章节的所有版本。
 
@@ -276,6 +292,7 @@ async def get_versions(
     每个版本的 ``preview`` 截断到前 50 字。章节无 ``versions`` 列表时，
     降级用 ``content`` 作为唯一版本。
     """
+    require_session_ownership(session_id, current_user)
     state = facade.get_state(session_id)
     body_chapters = state.get("body_chapters", []) or []
     if chapter_index < 0 or chapter_index >= len(body_chapters):

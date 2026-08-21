@@ -113,6 +113,14 @@ async def get_optional_user(
     return await _resolve_user(token, db, required=False)
 
 
+async def get_user_from_token(
+    token: Optional[str],
+    db: AsyncSession,
+) -> Optional[User]:
+    """Resolve a user from a raw token string (WebSocket query / subprotocol)."""
+    return await _resolve_user(token, db, required=False)
+
+
 async def _resolve_user(
     token: Optional[str],
     db: AsyncSession,
@@ -158,3 +166,55 @@ async def _resolve_user(
             )
         return None
     return user
+
+
+# ---------------------------------------------------------------------------
+# Session ownership + debug-gated auth
+# ---------------------------------------------------------------------------
+
+
+def require_session_ownership(session_id: str, user: Optional[User]) -> None:
+    """Enforce session existence and ownership on session-scoped routes.
+
+    - Session missing → 404
+    - Session has owner_id → require authenticated user and user.id == owner_id
+      (401 if unauthenticated, 403 if a different user)
+    - Session has no owner (anonymous) AND DEBUG is false → 401
+    - Session has no owner AND DEBUG is true → allow (local demo)
+    """
+    from facade import facade
+
+    if not facade.has_session(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    owner_id = facade.get_session_owner(session_id)
+    if owner_id is not None:
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for this session",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if user.id != owner_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not own this session",
+            )
+        return
+
+    if not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for this session",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def require_auth_unless_debug(user: Optional[User]) -> None:
+    """Require an authenticated user when DEBUG is false (desk / demo routes)."""
+    if user is None and not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

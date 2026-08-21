@@ -14,11 +14,13 @@ Router self-registration: 与 eda.py / chapter.py 一致，import 时自动 atta
 """
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import (
     JourneyResponse,
     JourneyStageItem,
@@ -50,8 +52,12 @@ _JOURNEY_STAGES = [
     "/sessions/{session_id}/progress",
     response_model=ProgressResponse,
 )
-async def get_progress(session_id: str) -> ProgressResponse:
+async def get_progress(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> ProgressResponse:
     """返回 6 章完成进度。"""
+    require_session_ownership(session_id, current_user)
     state = facade.get_state(session_id)
     body_chapters: List[Any] = list(state.get("body_chapters", []) or [])
 
@@ -173,13 +179,17 @@ def _infer_journey(state: dict) -> tuple[int, bool]:
     "/sessions/{session_id}/journey",
     response_model=JourneyResponse,
 )
-async def get_journey(session_id: str) -> JourneyResponse:
+async def get_journey(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> JourneyResponse:
     """返回 8 阶段研究旅程进度（收敛版，去掉了无节点的"表格图形"站）。
 
     每个阶段状态：``pending`` / ``active`` / ``completed`` / ``interrupt``。
     currentStage 为正在进行的阶段；若 state 为空，降级为第 0 站 active、
     其余 pending，不抛错。
     """
+    require_session_ownership(session_id, current_user)
     try:
         state = facade.get_state(session_id)
     except Exception:

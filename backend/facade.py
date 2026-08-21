@@ -465,8 +465,9 @@ class AgentFacade:
             from engine.readiness import TRUTH_KEYS
         except Exception:
             TRUTH_KEYS = frozenset()
+        _blocked_render_keys = frozenset({"workspace", "csv_path", "user_id"})
         for k, v in (render_kwargs or {}).items():
-            if k in TRUTH_KEYS:
+            if k in TRUTH_KEYS or k in _blocked_render_keys:
                 continue
             if k not in state or state.get(k) in (None, ""):
                 state[k] = v

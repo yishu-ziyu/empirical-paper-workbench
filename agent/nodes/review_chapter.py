@@ -656,6 +656,19 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             str(state.get("literature_query") or ""),
         )
 
+    snapshot = dict(state)
+    snapshot["review_scores"] = review_scores
+    # 用本轮开始时的 iteration 判断「改到顶了」——不能用 +1 后的值，
+    # 否则还在重写的那一轮会被误记成封顶失败。
+    snapshot["review_iteration"] = review_iteration
+    snapshot["review_chapter_index"] = idx
+    snapshot["review_degraded"] = review_degraded
+    if penalty_fields.get("literature_entries") is not None:
+        snapshot["literature_entries"] = penalty_fields["literature_entries"]
+    from nodes.learning_labels import collect_learning_labels
+
+    penalty_fields["learning_labels"] = collect_learning_labels(snapshot)
+
     if score < REVIEW_SCORE_THRESHOLD and review_iteration < max_iterations:
         # 回退：重生成当前章
         return {

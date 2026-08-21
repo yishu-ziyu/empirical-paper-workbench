@@ -178,3 +178,110 @@ def test_review_chapter_caps_keyword_only_methods():
     assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
     assert result["current_chapter_index"] == 0
     assert "结构层失败" in result["revision_suggestions"][0]
+
+
+def test_intro_keyword_stuffing_fails_structure():
+    """intro 只堆 DID/IV/RDD 与识别词，没有处理组/对照 → keyword_stuffed。"""
+    content = (
+        "本文使用 DID IV RDD 三重差分合成控制断点回归因果识别。"
+        "内生性稳健性异质性安慰剂平行趋势弱工具变量均已考虑。"
+        "城乡医保整合显著降低农村中老年住院自付支出，贡献巨大。"
+        "没写谁被处理、什么时候开始、跟谁比，也没写 CHARLS 流失。"
+    )
+    failures = check_structure("intro", content)
+    assert "keyword_stuffed" in failures
+
+
+def test_intro_with_design_not_stuffed():
+    """intro 提 DID/IV，但写了处理组/对照和 Callaway → 不算堆词。"""
+    content = (
+        "本文使用 DID 与 IV。"
+        "处理组为新农合参保人，对照为城镇职工医保。"
+        "主规格采用 Callaway 交错 DID。"
+    )
+    failures = check_structure("intro", content)
+    assert "keyword_stuffed" not in failures
+
+
+def test_results_overclaim_fails_structure():
+    """results 先写不显著/安慰剂未通过，再写显著降低与政策效果稳健。"""
+    content = (
+        "表 3 首选规格 M5 系数为 +0.081，标准误 0.053，不显著。"
+        "2015 安慰剂未通过。据此我们得出：城乡医保整合显著降低了"
+        "农村中老年人住院自付支出，政策效果稳健。"
+    )
+    failures = check_structure("results", content)
+    assert "overclaim" in failures
+
+
+def test_results_hedged_not_overclaim():
+    """不显著且对显著结论加了不能写/不支持 → 不算 overclaim。"""
+    content = (
+        "表 3 首选规格系数为 +0.081，不显著。"
+        "不能写显著降低，也不支持显著下降。"
+    )
+    failures = check_structure("results", content)
+    assert "overclaim" not in failures
+
+
+def test_review_chapter_caps_stuffed_intro():
+    """节点层：堆词 intro 章走回炉，建议点出 keyword_stuffed。"""
+    content = (
+        "本文使用 DID IV RDD 三重差分合成控制断点回归因果识别。"
+        "内生性稳健性异质性安慰剂平行趋势弱工具变量均已考虑。"
+        "城乡医保整合显著降低农村中老年住院自付支出，贡献巨大。"
+        "没写谁被处理、什么时候开始、跟谁比，也没写 CHARLS 流失。" * 4
+    )
+    chapter = {
+        "type": "intro",
+        "title": "引言",
+        "content": content,
+        "status": "generated",
+        "versions": [content],
+        "chapter_index": 0,
+    }
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[chapter],
+        outline=[{"type": "intro", "title": "引言"}],
+        research_direction="test",
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
+    assert result["current_chapter_index"] == 0
+    assert "结构层失败" in result["revision_suggestions"][0]
+    assert "keyword_stuffed" in result["revision_suggestions"][0]
+
+
+def test_review_chapter_caps_overclaim_results():
+    """节点层：overclaim results 章走回炉，建议点出 overclaim。"""
+    content = (
+        "表 3 首选规格 M5 系数为 +0.081，标准误 0.053，不显著。"
+        "2015 安慰剂未通过。据此我们得出：城乡医保整合显著降低了"
+        "农村中老年人住院自付支出，政策效果稳健。DID 内生。" * 4
+    )
+    chapter = {
+        "type": "results",
+        "title": "结果",
+        "content": content,
+        "status": "generated",
+        "versions": [content],
+        "chapter_index": 0,
+    }
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[chapter],
+        outline=[{"type": "results", "title": "结果"}],
+        research_direction="test",
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
+    assert result["current_chapter_index"] == 0
+    assert "结构层失败" in result["revision_suggestions"][0]
+    assert "overclaim" in result["revision_suggestions"][0]

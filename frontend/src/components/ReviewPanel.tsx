@@ -1,11 +1,8 @@
-// ADR-0007 Stage 2: HITL 人工评审面板
-// - 显示评审反馈、5 维 rubric 分数（条形图）、修改建议、综合分、迭代轮次
-// - 三个按钮：接受、拒绝（重生成）、{t('review.forcePass')}
-// - 调 POST /sessions/{id}/review/decision
-// 设计：Editorial Academic Refined — 衬线字体 + 暖色调（与 VersionHistory 一致）
-// 类型：从 types/api.ts import（遵循 ADR 0003 codegen 规范，不手写 API 响应 interface）
+// HITL 评审面板：先点通过/否决，再给看机器分。
+// 点之前不显示自动通过、综合分、五维分数——对照里看得见分就会照抄。
+// 强制通过会泄底，点之前不提供。
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -14,11 +11,10 @@ type ReviewInfoResponse = components['schemas']['ReviewInfoResponse']
 export interface ReviewPanelProps {
   review: ReviewInfoResponse
   sessionId: string
-  /** 决策提交后回调，父组件可据此刷新或切换 UI */
+  /** 点完并看过机器分之后，父组件再刷新 */
   onDecision?: (decision: string, nextAction: string) => void
 }
 
-// rubric 5 维中文标签 + 取值 key
 const RUBRIC_DIMS: { key: keyof NonNullable<ReviewInfoResponse['rubric']>; labelKey: string }[] = [
   { key: 'endogeneity', labelKey: 'review.rubricEndogeneity' },
   { key: 'identification', labelKey: 'review.rubricIdentification' },
@@ -27,7 +23,6 @@ const RUBRIC_DIMS: { key: keyof NonNullable<ReviewInfoResponse['rubric']>; label
   { key: 'readability', labelKey: 'review.rubricReadability' },
 ]
 
-// 按分数返回条形颜色 class（0-1）
 function barColorClass(score: number | null | undefined): string {
   if (score === null || score === undefined) return 'bg-muted'
   if (score >= 0.7) return 'bg-emerald-600'
@@ -43,6 +38,17 @@ export default function ReviewPanel({
   const { t } = useT()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [revealed, setRevealed] = useState(false)
+  const [pending, setPending] = useState<{
+    decision: string
+    nextAction: string
+  } | null>(null)
+
+  useEffect(() => {
+    setRevealed(false)
+    setPending(null)
+    setError(null)
+  }, [review.chapter_index, review.review_iteration])
 
   const autoPass = review.auto_decision === 'pass'
   const rubric = review.rubric ?? {}
@@ -70,7 +76,8 @@ export default function ReviewPanel({
         throw new Error(body.detail || `HTTP ${resp.status}`)
       }
       const data = await resp.json()
-      onDecision?.(decision, data.next_action)
+      setPending({ decision, nextAction: data.next_action })
+      setRevealed(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -78,33 +85,59 @@ export default function ReviewPanel({
     }
   }
 
+  function continueAfterReveal() {
+    if (!pending) return
+    onDecision?.(pending.decision, pending.nextAction)
+  }
+
   return (
     <div
       data-testid="review-panel"
       className="border border-border rounded bg-paper shadow-sm"
     >
-      {/* 头部：综合分 + 迭代轮次 + 自动决策 */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="font-serif text-sm font-semibold text-ink">
             {t('review.title')}
           </span>
-          <span
-            data-testid="review-auto-decision"
-            className={`rounded px-2 py-0.5 font-serif text-xs ${
-              autoPass
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-red-100 text-red-700'
-            }`}
-          >
-            {autoPass ? t('review.autoPass') : t('review.autoFail')}
-          </span>
+          {revealed && (
+            <span
+              data-testid="review-auto-decision"
+              className={`rounded px-2 py-0.5 font-serif text-xs ${
+                autoPass
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {autoPass ? t('review.autoPass') : t('review.autoFail')}
+            </span>
+          )}
         </div>
         <span className="font-serif text-xs text-muted">
-          {t('review.roundLabel').replace('{0}', String(review.review_iteration)).replace('{1}', String(review.max_review_iterations))} · {t('review.scoreLabel').replace('{0}', review.score.toFixed(2))}
+          {t('review.roundLabel')
+            .replace('{0}', String(review.review_iteration))
+            .replace('{1}', String(review.max_review_iterations))}
+          {revealed ? (
+            <>
+              {' · '}
+              <span data-testid="review-score">
+                {t('review.scoreLabel').replace('{0}', review.score.toFixed(2))}
+              </span>
+            </>
+          ) : null}
         </span>
       </div>
-      {(reviewSource || grounding.length > 0) && (
+
+      {!revealed && (
+        <p
+          data-testid="review-blind-hint"
+          className="border-b border-border px-4 py-2 font-serif text-xs text-muted"
+        >
+          {t('review.decideFirst')}
+        </p>
+      )}
+
+      {revealed && (reviewSource || grounding.length > 0) && (
         <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted">
           {reviewSource ? (
             <span data-testid="review-source">source={reviewSource}</span>
@@ -117,53 +150,71 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {/* 5 维 rubric 条形图 */}
-      <div data-testid="review-rubric" className="px-4 py-3">
-        <div className="mb-2 font-serif text-xs font-semibold text-muted">
-          {t('review.rubric')}
+      {revealed && pending && (
+        <div
+          data-testid="review-machine-reveal"
+          className="border-b border-border px-4 py-2 font-serif text-xs text-ink"
+        >
+          {t('review.yourDecision').replace(
+            '{0}',
+            pending.decision === 'reject' ? t('review.blindReject') : t('review.blindAccept'),
+          )}
+          {' · '}
+          {t('review.machineReveal').replace(
+            '{0}',
+            autoPass ? t('review.autoPass') : t('review.autoFail'),
+          )}
         </div>
-        <div className="flex flex-col gap-2">
-          {RUBRIC_DIMS.map(({ key, labelKey }) => {
-            const val = rubric[key] ?? null
-            const pct = val !== null ? Math.round(val * 100) : 0
-            return (
-              <div
-                key={key}
-                data-testid={`rubric-dim-${key}`}
-                className="flex items-center gap-2"
-              >
-                <span className="w-20 shrink-0 font-serif text-xs text-ink">
-                  {t(labelKey)}
-                </span>
-                <div className="h-2 flex-1 overflow-hidden rounded bg-panel">
-                  <div
-                    className={`h-full ${barColorClass(val)}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span
-                  data-testid={`rubric-val-${key}`}
-                  className="w-10 shrink-0 text-right font-serif text-xs text-muted"
+      )}
+
+      {revealed && (
+        <div data-testid="review-rubric" className="px-4 py-3">
+          <div className="mb-2 font-serif text-xs font-semibold text-muted">
+            {t('review.rubric')}
+          </div>
+          <div className="flex flex-col gap-2">
+            {RUBRIC_DIMS.map(({ key, labelKey }) => {
+              const val = rubric[key] ?? null
+              const pct = val !== null ? Math.round(val * 100) : 0
+              return (
+                <div
+                  key={key}
+                  data-testid={`rubric-dim-${key}`}
+                  className="flex items-center gap-2"
                 >
-                  {val !== null ? val.toFixed(2) : '—'}
-                </span>
-              </div>
-            )
-          })}
+                  <span className="w-20 shrink-0 font-serif text-xs text-ink">
+                    {t(labelKey)}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded bg-panel">
+                    <div
+                      className={`h-full ${barColorClass(val)}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span
+                    data-testid={`rubric-val-${key}`}
+                    className="w-10 shrink-0 text-right font-serif text-xs text-muted"
+                  >
+                    {val !== null ? val.toFixed(2) : '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 评审反馈 */}
-      <div data-testid="review-feedback" className="border-t border-border px-4 py-3">
-        <div className="mb-1 font-serif text-xs font-semibold text-muted">
-          {t('review.feedback')}
+      {revealed && (
+        <div data-testid="review-feedback" className="border-t border-border px-4 py-3">
+          <div className="mb-1 font-serif text-xs font-semibold text-muted">
+            {t('review.feedback')}
+          </div>
+          <p className="font-serif text-sm text-ink whitespace-pre-wrap">
+            {review.feedback || t('review.noFeedback')}
+          </p>
         </div>
-        <p className="font-serif text-sm text-ink whitespace-pre-wrap">
-          {review.feedback || t('review.noFeedback')}
-        </p>
-      </div>
+      )}
 
-      {/* 修改建议 */}
       <div
         data-testid="review-suggestions"
         className="border-t border-border px-4 py-3"
@@ -176,7 +227,6 @@ export default function ReviewPanel({
         </p>
       </div>
 
-      {/* 错误提示 */}
       {error && (
         <div
           data-testid="review-error"
@@ -186,36 +236,38 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {/* 决策按钮 */}
       <div className="flex gap-2 border-t border-border px-4 py-3">
-        <button
-          type="button"
-          data-testid="review-btn-accept"
-          disabled={submitting}
-          onClick={() => submitDecision('accept')}
-          className="flex-1 rounded border border-accent bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-50"
-        >
-          {autoPass ? t('review.accept') : t('review.acceptRegen')}
-        </button>
-        <button
-          type="button"
-          data-testid="review-btn-reject"
-          disabled={submitting}
-          onClick={() => submitDecision('reject')}
-          className="flex-1 rounded border border-red-400 bg-red-50 px-3 py-1.5 font-serif text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-        >
-          {t('review.reject')}
-        </button>
-        <button
-          type="button"
-          data-testid="review-btn-force-pass"
-          disabled={submitting || autoPass}
-          title={autoPass ? t('review.forcePassDisabled') : undefined}
-          onClick={() => submitDecision('force_pass')}
-          className="flex-1 rounded border border-amber-400 bg-amber-50 px-3 py-1.5 font-serif text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {t('review.forcePass')}
-        </button>
+        {revealed ? (
+          <button
+            type="button"
+            data-testid="review-btn-continue"
+            onClick={continueAfterReveal}
+            className="flex-1 rounded border border-accent bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/80"
+          >
+            {t('review.continue')}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              data-testid="review-btn-accept"
+              disabled={submitting}
+              onClick={() => submitDecision('accept')}
+              className="flex-1 rounded border border-accent bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-50"
+            >
+              {t('review.blindAccept')}
+            </button>
+            <button
+              type="button"
+              data-testid="review-btn-reject"
+              disabled={submitting}
+              onClick={() => submitDecision('reject')}
+              className="flex-1 rounded border border-red-400 bg-red-50 px-3 py-1.5 font-serif text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+            >
+              {t('review.blindReject')}
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

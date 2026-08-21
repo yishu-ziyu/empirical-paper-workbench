@@ -112,7 +112,8 @@ class ReviewRubric(TypedDict, total=False):
 class ReviewOutput(TypedDict, total=False):
     """review_chapter 节点返回值（NodeResult 协议）。
 
-    注意：不含 body_chapters 字段 —— 评审节点只读章节、只写反馈。
+    注意：不含 body_chapters 字段 —— 评审节点不改正文。
+    #8：文献综述章可回写 literature_entries 的 relevance_score。
     """
 
     review_feedback: List[str]
@@ -125,6 +126,7 @@ class ReviewOutput(TypedDict, total=False):
     review_source: str  # "llm" | "mock" | "mock_fallback"
     review_degraded: bool
     grounding_failures: List[str]
+    literature_entries: List[LiteratureEntry]
 
 
 # ADR-0009: 引用图谱与参考文献列表
@@ -141,6 +143,7 @@ class CitationGraphOutput(TypedDict, total=False):
 
     citation_graph: Any
     citation_indices: Dict[str, int]
+    literature_entries: List[LiteratureEntry]
 
 
 class ReferencesOutput(TypedDict, total=False):

@@ -449,3 +449,128 @@ def test_search_literature_disabled_still_works():
     result = search_literature(state)
     assert result["literature_entries"] == []
     assert result["literature_source"] == "disabled"
+
+
+# ---------------------------------------------------------------------------
+# #8 方法锚 + 反证跳
+# ---------------------------------------------------------------------------
+CALLAWAY_DOI = "10.1016/j.jeconom.2022.019"
+STOCK_YOGO_DOI = "10.1016/j.jeconom.2021.020"
+LEE_LEMIEUX_DOI = "10.1016/j.jeconom.2020.021"
+
+
+def _unrelated_hits(n: int = 1):
+    return [
+        {
+            "title": f"Unrelated {i}",
+            "authors": ["A"],
+            "year": 2020,
+            "abstract": " unrelated ",
+            "doi": f"10.1/u{i}",
+            "source": "mock",
+            "relevance_score": 0.5,
+        }
+        for i in range(n)
+    ]
+
+
+def test_did_session_includes_callaway_anchor(monkeypatch):
+    """DID 方向即使词袋没命中，也要塞 Callaway–Sant'Anna。"""
+
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+    )
+    result = search_literature(
+        {"research_direction": {"question": "养老金", "method": "DID"}}
+    )
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert CALLAWAY_DOI in dois
+    assert len(result["literature_entries"]) <= MAX_LITERATURE_ENTRIES
+
+
+def test_iv_session_includes_stock_yogo_anchor(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+    )
+    result = search_literature(
+        {"research_direction": {"question": "教育回报", "method": "IV"}}
+    )
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert STOCK_YOGO_DOI in dois
+
+
+def test_rdd_session_includes_lee_lemieux_anchor(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+    )
+    result = search_literature(
+        {"research_direction": {"question": "高考分数", "method": "RDD"}}
+    )
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert LEE_LEMIEUX_DOI in dois
+
+
+def test_chinese_did_alias_includes_anchor(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+    )
+    result = search_literature(
+        {"research_direction": {"question": "医保", "method": "双重差分"}}
+    )
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert CALLAWAY_DOI in dois
+
+
+def test_threat_hop_adds_counterexample_paper(monkeypatch):
+    """反证跳会把「该方法的威胁」那条加进来，不覆盖方法锚。"""
+
+    def fake(query: str):
+        if "交错" in query:
+            return [
+                {
+                    "title": "Staggered treatment bias",
+                    "authors": ["X"],
+                    "year": 2021,
+                    "abstract": "交错 DID 威胁",
+                    "doi": "10.9/threat",
+                    "source": "mock",
+                    "relevance_score": 0.6,
+                }
+            ]
+        return _unrelated_hits()
+
+    monkeypatch.setattr("nodes.search_literature._mock_search", fake)
+    result = search_literature(
+        {"research_direction": {"question": "养老金", "method": "DID"}}
+    )
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert CALLAWAY_DOI in dois
+    assert "10.9/threat" in dois
+    assert "10.1/u0" in dois
+
+
+def test_anchor_survives_when_l0_already_full(monkeypatch):
+    """L0 已有 20 条时，方法锚仍在，总长仍 <= 20。"""
+
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits(20)
+    )
+    result = search_literature(
+        {"research_direction": {"question": "养老金", "method": "DID"}}
+    )
+    entries = result["literature_entries"]
+    dois = [e.get("doi") for e in entries]
+    assert CALLAWAY_DOI in dois
+    assert len(entries) == MAX_LITERATURE_ENTRIES
+    assert len(entries) <= 20
+
+
+def test_no_method_skips_anchor_hop(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+    )
+    result = search_literature({"research_direction": {"question": "养老金"}})
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert CALLAWAY_DOI not in dois
+    assert dois == ["10.1/u0"]
+

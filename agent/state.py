@@ -88,6 +88,7 @@ class EconPaperState(TypedDict, total=False):
     literature_query: Optional[str]
     literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled"
     literature_produced_by: Optional[str]
+    literature_actions: List[str]  # #11: keyword / method_anchor / threat / citation_hop
     write_blocked: bool
     write_blockers: List[str]
     claim: Optional[str]
@@ -109,6 +110,7 @@ class EconPaperState(TypedDict, total=False):
     hitl_decision: Optional[str]        # "accept" | "reject" | "force_pass"
     hitl_reviewer: Optional[str]        # 评审人标识（用户名 / open_id）
     hitl_comment: Optional[str]         # 评审人备注（可选）
+    learning_labels: List[Any]  # #11: 真事件标签，不含 mock 分数
     # ADR-0009: 引用图谱
     citation_graph: Optional[Any]  # {entries: [...], edges: [{from, to}], indices: {doi: int}}
     references_list: List[Any]  # 最终参考文献列表 [{index, text, doi, entry}]

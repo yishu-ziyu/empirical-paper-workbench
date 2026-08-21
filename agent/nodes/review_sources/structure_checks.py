@@ -3,6 +3,8 @@
 纯规则，不调 LLM。methods 要方程；association 不要识别假设菜单。
 lit_review 的 [N] 必须落在 citation_indices；编号表为空时作者-年份也算编造。
 results 的 method 必须与 methods 章一致。
+intro 只堆方法词、没有识别设计 → keyword_stuffed。
+results 自己写了不显著、结论却写显著 → overclaim。
 """
 from __future__ import annotations
 
@@ -10,6 +12,9 @@ import re
 from typing import Any, Iterable, List, Optional
 
 STRUCTURE_SCORE_CAP = 0.65
+
+KEYWORD_STUFFED = "keyword_stuffed"
+OVERCLAIM = "overclaim"
 
 _UNSET = object()
 
@@ -36,6 +41,30 @@ _AUTHOR_YEAR_NARRATIVE = re.compile(
 _AUTHOR_YEAR_PAREN = re.compile(
     r"[（(](?:[A-Z][A-Za-z.\-']+|[\u4e00-\u9fff]{1,8})[,，]\s*\d{4}[)）]"
 )
+
+# 方法词：堆 ≥3 个且没有设计句，算堆词。IV/DID/RDD 按独立词算，避免误伤。
+_METHOD_WORD_RE = re.compile(r"\b(?:did|iv|rdd)\b", re.IGNORECASE)
+_METHOD_PHRASES = ("三重差分", "合成控制", "断点回归", "双重差分", "工具变量")
+_DESIGN_TOKENS = (
+    "处理组为",
+    "对照为",
+    "Callaway",
+    "交错 DID",
+    "交错处理",
+    "一阶段 F",
+    "平行趋势事件",
+    "政策时点",
+)
+_BOAST_TOKENS = (
+    "显著降低",
+    "显著提高",
+    "显著减少",
+    "显著增加",
+    "显著减负",
+    "政策效果稳健",
+)
+_WEAK_TOKENS = ("不显著", "安慰剂未通过", "不能证明")
+_HEDGE_TOKENS = ("不能写显著", "不能称显著", "并非显著", "未能显著", "不支持显著")
 
 
 def _normalize_method(method: str) -> str:
@@ -100,6 +129,30 @@ def _effective_claim(claim: str, star_rating: Any) -> str:
     return "causal_with_caveat"
 
 
+def _method_token_count(content: str) -> int:
+    text = content or ""
+    words = {item.group(0).lower() for item in _METHOD_WORD_RE.finditer(text)}
+    phrases = sum(1 for token in _METHOD_PHRASES if token in text)
+    return len(words) + phrases
+
+
+def is_keyword_stuffed(content: str) -> bool:
+    """方法词 ≥3 且没有识别设计句。"""
+    if _method_token_count(content) < 3:
+        return False
+    return not any(token in (content or "") for token in _DESIGN_TOKENS)
+
+
+def is_overclaim(content: str) -> bool:
+    """同一段里既写不显著，又写显著降低/政策效果稳健。"""
+    text = content or ""
+    if any(token in text for token in _HEDGE_TOKENS):
+        return False
+    boasts = any(token in text for token in _BOAST_TOKENS)
+    weak = any(token in text for token in _WEAK_TOKENS)
+    return boasts and weak
+
+
 def check_structure(
     chapter_type: str,
     content: str,
@@ -113,20 +166,24 @@ def check_structure(
     """返回结构失败码。空列表 = 结构过关。"""
     failures: List[str] = []
     kind = (chapter_type or "").strip()
+    text = content or ""
 
     if kind == "methods":
-        if not _EQUATION_RE.search(content or ""):
+        if not _EQUATION_RE.search(text):
             failures.append("missing_equation")
         if _effective_claim(claim, star_rating) != "association":
             menu = hypothesis_menu(method)
-            if _count_hypothesis_hits(content or "", menu) < 2:
+            if _count_hypothesis_hits(text, menu) < 2:
                 failures.append("missing_ident_assumptions")
 
+    if kind == "intro" and is_keyword_stuffed(text):
+        failures.append(KEYWORD_STUFFED)
+
     if kind == "lit_review":
-        invented = _invented_citations(content or "", citation_indices)
+        invented = _invented_citations(text, citation_indices)
         if invented or (
             _citation_table_empty(citation_indices)
-            and _has_author_year_citation(content or "")
+            and _has_author_year_citation(text)
         ):
             failures.append("invented_citation")
 
@@ -135,8 +192,10 @@ def check_structure(
         actual = _normalize_method(method)
         if methods_method and actual and expected != actual:
             failures.append("method_mismatch")
-        if expected and expected not in (content or "").lower():
+        if expected and expected not in text.lower():
             failures.append("method_not_in_results")
+        if is_overclaim(text):
+            failures.append(OVERCLAIM)
 
     return failures
 

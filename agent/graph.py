@@ -80,6 +80,8 @@ def _get_checkpointer() -> Any:
     - ``CHECKPOINT_DB_URL`` unset/empty → ``MemorySaver`` (local boot / tests).
     - URL set and Postgres reachable → ``PostgresSaver`` (connection kept open
       for the process; not ``from_conn_string``, which closes on exit).
+      ``psycopg.connect`` uses ``connect_timeout=5`` so an unreachable host
+      fails fast instead of blocking on TCP timeout.
     - URL set but connect/setup fails → raise; do not cache MemorySaver.
 
     Does not connect at import; first call builds the singleton.
@@ -100,6 +102,7 @@ def _get_checkpointer() -> Any:
             url,
             autocommit=True,
             prepare_threshold=0,
+            connect_timeout=5,
         )
         saver = PostgresSaver(conn)
         saver.setup()  # create checkpoint/writes tables if missing

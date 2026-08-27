@@ -623,6 +623,7 @@ function App() {
           uploading={uploading}
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
+          onFile={(file) => { void takeCsv(file) }}
           onTrySample={() => { void handleTrySample() }}
           onWritePaper={() => {
             markGuideSeen()

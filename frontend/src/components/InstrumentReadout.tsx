@@ -42,9 +42,9 @@ export default function InstrumentReadout({
   return (
     <section
       data-testid="instrument-readout"
-      className="mb-6 rounded border border-border bg-panel p-4"
+      className="mb-8 rounded-lg border border-border bg-panel p-6"
     >
-      <h2 className="mb-3 font-mono text-xs tracking-wider text-muted">
+      <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
         读数
       </h2>
       <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">

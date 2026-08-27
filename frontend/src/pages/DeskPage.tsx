@@ -268,13 +268,13 @@ export default function DeskPage({
         }
       />
 
-      <main className="mx-auto flex max-w-[640px] flex-col px-6 pb-24 pt-16 sm:pt-20">
-        <h1 className="font-serif text-[2.35rem] leading-tight tracking-tight text-ink sm:text-[2.75rem]">
+      <main className="mx-auto flex max-w-[720px] flex-col px-6 pb-24 pt-16 sm:pt-20">
+        <h1 className="font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.1rem]">
           {t('desk.heading')}
         </h1>
-        <p className="mt-4 max-w-[32em] text-[16px] leading-7 text-muted">{t('desk.sub')}</p>
+        <p className="mt-5 max-w-[34em] text-[17px] leading-8 text-muted">{t('desk.sub')}</p>
 
-        <label className="relative mt-10 block">
+        <label className="relative mt-12 block">
           <span className="sr-only">{t('desk.paperLabel')}</span>
           <textarea
             ref={paperRef}
@@ -282,11 +282,23 @@ export default function DeskPage({
             value={text}
             onChange={(e) => handleChange(e.target.value)}
             placeholder={text ? '' : t('desk.placeholder')}
-            className={`w-full resize-none rounded-lg border bg-panel px-5 py-5 font-serif text-[17px] leading-8 text-ink outline-none transition-colors duration-200 placeholder:text-muted/55 focus:border-accent/40 ${
+            className={`w-full resize-none rounded-lg border bg-panel px-6 py-6 font-serif text-[18px] leading-8 text-ink outline-none transition-colors duration-200 placeholder:text-muted/55 focus:border-accent/40 ${
               voiceStatus === 'listening' ? 'border-accent animate-listen' : 'border-border'
             }`}
           />
         </label>
+
+        <button
+          type="button"
+          onClick={onPickData}
+          disabled={uploading}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-panel px-4 py-4 text-[13px] text-muted transition-colors hover:border-accent/40 hover:text-ink disabled:opacity-50"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          {uploading ? t('app.uploading') : t('workbench.dropBody')}
+        </button>
 
         {!text && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -331,7 +343,7 @@ export default function DeskPage({
                 data-testid="desk-shape-btn"
                 onClick={() => void askModel(text, turns)}
                 disabled={busy}
-                className="rounded-md bg-accent px-4 py-2 text-[13px] text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
+                className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
               >
                 {t('desk.shape')}
               </button>
@@ -437,7 +449,7 @@ export default function DeskPage({
                   type="button"
                   data-testid="desk-confirm-btn"
                   onClick={() => onConfirm(title)}
-                      className="rounded-md bg-accent px-4 py-2 text-[13px] text-white transition-opacity duration-200 hover:opacity-90"
+                      className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity duration-200 hover:opacity-90"
                 >
                   {t('desk.confirm')}
                 </button>

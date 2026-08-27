@@ -7,11 +7,11 @@ export function BrandMark() {
     <span className="inline-flex items-center gap-2.5">
       <span
         aria-hidden
-        className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-ink font-serif text-[15px] leading-none text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink font-serif text-[16px] leading-none text-white"
       >
         e
       </span>
-      <span className="text-[15px] font-medium tracking-tight text-ink">{t('app.title')}</span>
+      <span className="text-[16px] font-medium tracking-tight text-ink">{t('app.title')}</span>
     </span>
   )
 }
@@ -19,11 +19,11 @@ export function BrandMark() {
 export function LangPills() {
   const { lang, setLang } = useT()
   return (
-    <div className="inline-flex rounded-full border border-border bg-white p-0.5 text-[12px]">
+    <div className="inline-flex rounded-lg border border-border bg-panel p-0.5 text-[12px]">
       <button
         type="button"
         onClick={() => setLang('en')}
-        className={`rounded-full px-3 py-1 transition-colors duration-200 ${
+        className={`rounded-md px-2.5 py-1 transition-colors duration-200 ${
           lang === 'en' ? 'bg-accent/15 text-ink' : 'text-muted hover:text-ink'
         }`}
       >
@@ -32,7 +32,7 @@ export function LangPills() {
       <button
         type="button"
         onClick={() => setLang('zh')}
-        className={`rounded-full px-3 py-1 transition-colors duration-200 ${
+        className={`rounded-md px-2.5 py-1 transition-colors duration-200 ${
           lang === 'zh' ? 'bg-accent/15 text-ink' : 'text-muted hover:text-ink'
         }`}
       >
@@ -78,11 +78,11 @@ export default function UnauthHeader({
   const hasNav = Boolean(onHow || onPreview)
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto grid h-[64px] max-w-[1120px] grid-cols-[1fr_auto] items-center gap-4 px-6 md:grid-cols-[1fr_auto_1fr]">
+    <header className="sticky top-0 z-30 border-b border-border/80 bg-bg/92 backdrop-blur-md">
+      <div className="mx-auto grid h-[72px] max-w-[1200px] grid-cols-[1fr_auto] items-center gap-4 px-6 md:grid-cols-[1fr_auto_1fr]">
         <BrandMark />
         {hasNav && (
-          <nav className="hidden items-center gap-7 text-[13px] text-ink/80 md:flex">
+          <nav className="hidden items-center gap-8 text-[14px] text-ink/75 md:flex">
             {onHow && (
               <button type="button" onClick={onHow} className="transition-colors duration-200 hover:text-ink">
                 {t('guide.navHow')}
@@ -95,7 +95,7 @@ export default function UnauthHeader({
             )}
           </nav>
         )}
-        <div className={`flex items-center gap-4 text-[13px] ${hasNav ? 'md:justify-self-end' : 'justify-self-end'}`}>
+        <div className={`flex items-center gap-4 text-[14px] ${hasNav ? 'md:justify-self-end' : 'justify-self-end'}`}>
           {extra}
           {onLogin && (
             <button
@@ -111,7 +111,7 @@ export default function UnauthHeader({
             <button
               type="button"
               onClick={onRegister}
-              className="rounded-full bg-accent px-3.5 py-1.5 text-[13px] text-white transition-opacity duration-200 hover:opacity-90"
+              className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity duration-200 hover:opacity-90"
             >
               {t('app.signUp')}
             </button>

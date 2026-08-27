@@ -239,3 +239,36 @@ def test_doc_export_default_template_is_cn_journal(doc_session, client, monkeypa
     )
     assert resp.status_code == 200
     assert captured["export_template"] == "cn_journal"
+
+
+def test_doc_export_undergrad_alias_returns_tex(doc_session, client):
+    """Sample / DirectionForm send template=undergrad; tex must not 500."""
+    resp = client.get(
+        f"/sessions/{doc_session}/doc-export",
+        params={"format": "tex", "template": "undergrad"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert "本科毕业论文模板" in resp.text
+    assert "\\title{" in resp.text
+
+
+def test_doc_export_undergrad_alias_returns_docx(
+    doc_session, client, monkeypatch, tmp_path
+):
+    """format=docx&template=undergrad renders undergraduate.tex then returns docx."""
+    docx = tmp_path / "paper.docx"
+    docx.write_bytes(b"PK\x03\x04real-docx-bytes")
+
+    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr(
+        "nodes.export_docx.convert_docx", lambda tex, outdir: str(docx)
+    )
+
+    resp = client.get(
+        f"/sessions/{doc_session}/doc-export",
+        params={"format": "docx", "template": "undergrad"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"PK")
+    ctype = resp.headers.get("content-type", "").lower()
+    assert "wordprocessingml" in ctype or "octet-stream" in ctype or "docx" in ctype

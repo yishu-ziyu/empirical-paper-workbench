@@ -46,6 +46,19 @@ TEMPLATE_NAMES = {
     "english_submission",
 }
 
+# Product / DirectionForm short names → canonical TEMPLATE_NAMES.
+# Sample write loop and MethodSelector send these aliases.
+TEMPLATE_ALIASES = {
+    "undergrad": "undergraduate",
+    "master": "master_thesis",
+    "en_submission": "english_submission",
+}
+
+
+def normalize_template(template_name: str) -> str:
+    """Map FE aliases onto canonical template files. Canonical names pass through."""
+    return TEMPLATE_ALIASES.get(template_name, template_name)
+
 # Jinja2 环境：不转义（LaTeX 源码原样输出），保留尾换行
 _env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -144,8 +157,9 @@ def render_template(
 ) -> str:
     """用 Jinja2 把 title/author/chapters 填进 ``{template_name}.tex``。
 
-    未知模板名抛 ``ValueError``。
+    未知模板名抛 ``ValueError``。``undergrad`` 等产品别名先归一化。
     """
+    template_name = normalize_template(template_name)
     if template_name not in TEMPLATE_NAMES:
         raise ValueError(
             f"Unknown template: {template_name!r}; "
@@ -283,7 +297,7 @@ def export_docx(state: EconPaperState) -> ExportDocxOutput:
     ADR-0009: 若 ``state['references_list']`` 非空，在 ``\\end{document}`` 前追加
     ``\\begin{thebibliography}`` 环境。
     """
-    template_name = state.get("export_template") or "cn_journal"
+    template_name = normalize_template(state.get("export_template") or "cn_journal")
 
     title = _extract_title(state.get("title_chapter"))
     author = (state.get("author") or "").strip()

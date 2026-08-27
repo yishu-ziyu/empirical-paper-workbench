@@ -803,6 +803,9 @@ function App() {
               </section>
             )}
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
+            <p data-testid="product-journey" className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+              {t('bench.journey')}
+            </p>
             {!hasReadout && (
               <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowDirection')}
@@ -811,6 +814,11 @@ function App() {
             {hasReadout && !writtenChapter?.content && !writeBusy && (
               <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowWrite')}
+              </p>
+            )}
+            {hasReadout && Boolean(writtenChapter?.content) && (
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
+                {t('guide.nowExport')}
               </p>
             )}
             <section data-testid="direction-section" className="mb-8 rounded-lg border border-border bg-panel p-6">

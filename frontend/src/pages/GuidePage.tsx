@@ -1,3 +1,4 @@
+import { useState, type DragEvent } from 'react'
 import UnauthHeader from '../components/UnauthHeader'
 import SamplePaperPreview from '../components/SamplePaperPreview'
 import WorkspacePreview from '../components/WorkspacePreview'
@@ -9,8 +10,13 @@ export interface GuidePageProps {
   onPickData: () => void
   onTrySample: () => void
   onWritePaper: () => void
+  onFile?: (file: File) => void
   onLogin?: () => void
   onRegister?: () => void
+}
+
+function isCsvFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.csv')
 }
 
 const STEPS = [
@@ -96,10 +102,25 @@ export default function GuidePage({
   onPickData,
   onTrySample,
   onWritePaper,
+  onFile,
   onLogin,
   onRegister,
 }: GuidePageProps) {
   const { t } = useT()
+  const [dropError, setDropError] = useState<string | null>(null)
+  const error = dropError || uploadError
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (!isCsvFile(file)) {
+      setDropError(t('workbench.dropCsvOnly'))
+      return
+    }
+    setDropError(null)
+    onFile?.(file)
+  }
 
   return (
     <div data-testid="guide-page" className="min-h-screen bg-white text-ink">
@@ -140,7 +161,12 @@ export default function GuidePage({
           <div className="mt-14 w-full max-w-[680px] rounded-[32px] bg-[#f5f5f3] px-4 py-8 sm:px-8">
             <p className="text-center text-[1.05rem] font-medium tracking-tight text-ink">{t('guide.ingestKicker')}</p>
             <p className="mt-1 text-center text-[13px] text-[#8a8a8a]">{t('guide.ingestSub')}</p>
-            <div className="composer-shell mt-6 p-4 text-left sm:p-5">
+            <div
+              data-testid="guide-composer"
+              className="composer-shell mt-6 p-4 text-left sm:p-5"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+            >
               <p className="px-1 pb-4 text-[15px] leading-7 text-[#6b6b6b]">{t('guide.composerHint')}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -181,15 +207,31 @@ export default function GuidePage({
               </div>
             </div>
             <ul className="mt-6 flex flex-wrap justify-center gap-3">
-              <li className="source-tile">
-                <SourceIcon kind="csv" />
-                <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceCsv')}</p>
-                <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('workbench.dropFormats')}</p>
+              <li>
+                <button
+                  type="button"
+                  data-testid="guide-source-csv"
+                  onClick={onPickData}
+                  disabled={uploading}
+                  className="source-tile disabled:opacity-50"
+                >
+                  <SourceIcon kind="csv" />
+                  <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceCsv')}</p>
+                  <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('workbench.dropFormats')}</p>
+                </button>
               </li>
-              <li className="source-tile">
-                <SourceIcon kind="sample" />
-                <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceSample')}</p>
-                <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('guide.trySample')}</p>
+              <li>
+                <button
+                  type="button"
+                  data-testid="guide-source-sample"
+                  onClick={onTrySample}
+                  disabled={uploading}
+                  className="source-tile disabled:opacity-50"
+                >
+                  <SourceIcon kind="sample" />
+                  <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceSample')}</p>
+                  <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('guide.trySample')}</p>
+                </button>
               </li>
               <li className="source-tile">
                 <SourceIcon kind="methods" />
@@ -199,9 +241,9 @@ export default function GuidePage({
             </ul>
           </div>
 
-          {uploadError && (
+          {error && (
             <p data-testid="upload-error" className="mt-4 text-sm text-danger">
-              {uploadError}
+              {error}
             </p>
           )}
         </section>

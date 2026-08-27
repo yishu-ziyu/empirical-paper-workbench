@@ -70,6 +70,33 @@ def test_connect_failure_falls_back_to_memory(monkeypatch, reset_graph_runtime):
     assert isinstance(cp, MemorySaver)
 
 
+def test_setup_failure_closes_connection_then_memory(monkeypatch, reset_graph_runtime):
+    """connect() success + setup() fail must close the socket before MemorySaver."""
+    monkeypatch.setenv(
+        "CHECKPOINT_DB_URL",
+        "postgresql://nope@127.0.0.1:1/none",
+    )
+    graph_mod._reset_runtime()
+    closed: list[int] = []
+
+    class FakeConn:
+        def close(self) -> None:
+            closed.append(1)
+
+    class BoomSaver:
+        def __init__(self, _conn) -> None:
+            pass
+
+        def setup(self) -> None:
+            raise RuntimeError("setup failed")
+
+    monkeypatch.setattr(graph_mod.psycopg, "connect", lambda *_a, **_k: FakeConn())
+    monkeypatch.setattr(graph_mod, "PostgresSaver", BoomSaver)
+    cp = graph_mod._get_checkpointer()
+    assert isinstance(cp, MemorySaver)
+    assert closed == [1]
+
+
 def test_public_graph_is_lazy_until_used(monkeypatch, reset_graph_runtime):
     monkeypatch.delenv("CHECKPOINT_DB_URL", raising=False)
     graph_mod._reset_runtime()

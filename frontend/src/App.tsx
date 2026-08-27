@@ -108,11 +108,13 @@ function asControlList(raw: unknown): string[] | undefined {
   return undefined
 }
 
-function readCsvMeta(): { name: string | null; rows: number | null; cols: number | null } {
+function readCsvMeta(sessionId: string | null): { name: string | null; rows: number | null; cols: number | null } {
   try {
+    if (!sessionId) return { name: null, rows: null, cols: null }
     const raw = sessionStorage.getItem(LS_CSV_KEY)
     if (!raw) return { name: null, rows: null, cols: null }
-    const parsed = JSON.parse(raw) as { name?: unknown; rows?: unknown; cols?: unknown }
+    const parsed = JSON.parse(raw) as { sessionId?: unknown; name?: unknown; rows?: unknown; cols?: unknown }
+    if (parsed.sessionId !== sessionId) return { name: null, rows: null, cols: null }
     return {
       name: typeof parsed.name === 'string' ? parsed.name : null,
       rows: typeof parsed.rows === 'number' ? parsed.rows : null,
@@ -123,8 +125,31 @@ function readCsvMeta(): { name: string | null; rows: number | null; cols: number
   }
 }
 
-function writeCsvMeta(name: string | null, rows: number | null, cols: number | null): void {
-  sessionStorage.setItem(LS_CSV_KEY, JSON.stringify({ name, rows, cols }))
+function writeCsvMeta(
+  sessionId: string,
+  name: string | null,
+  rows: number | null,
+  cols: number | null,
+): void {
+  sessionStorage.setItem(LS_CSV_KEY, JSON.stringify({ sessionId, name, rows, cols }))
+}
+
+function chapterIndexForApply(
+  accepted: { type: string }[],
+  opts: {
+    freshIDecide: boolean
+    iDecideLocked: boolean
+    currentType?: string
+    currentIndex: number
+  },
+): number {
+  if (!accepted.length) return 0
+  if (opts.freshIDecide) return 0
+  if (opts.iDecideLocked && opts.currentType) {
+    const idx = accepted.findIndex((ch) => ch.type === opts.currentType)
+    return idx >= 0 ? idx : 0
+  }
+  return Math.min(Math.max(0, opts.currentIndex), accepted.length - 1)
 }
 
 function toDirectionInitial(record: DirectionFormData | null): DirectionFormInitial | undefined {
@@ -191,9 +216,9 @@ function App() {
       return []
     }
   })
-  const [csvName, setCsvName] = useState<string | null>(() => readCsvMeta().name)
-  const [csvRows, setCsvRows] = useState<number | null>(() => readCsvMeta().rows)
-  const [csvCols, setCsvCols] = useState<number | null>(() => readCsvMeta().cols)
+  const [csvName, setCsvName] = useState<string | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).name)
+  const [csvRows, setCsvRows] = useState<number | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).rows)
+  const [csvCols, setCsvCols] = useState<number | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).cols)
   const [directionRecord, setDirectionRecord] = useState<DirectionFormData | null>(null)
 
   const [globalError, setGlobalError] = useState<string | null>(null)
@@ -244,13 +269,21 @@ function App() {
     setAuthToken(token)
   }, [])
 
+  const forgetCsvMeta = useCallback(() => {
+    sessionStorage.removeItem(LS_CSV_KEY)
+    setCsvName(null)
+    setCsvRows(null)
+    setCsvCols(null)
+  }, [])
+
   const handleLogout = useCallback(() => {
     clearToken()
     setAuthToken(null)
     setSessionId(null)
     localStorage.removeItem(LS_KEY)
+    forgetCsvMeta()
     setAuthPage(null)
-  }, [])
+  }, [forgetCsvMeta])
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
@@ -260,9 +293,10 @@ function App() {
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
+    forgetCsvMeta()
     setSessionId(data.session_id)
     return data.session_id as string
-  }, [sessionId])
+  }, [sessionId, forgetCsvMeta])
 
   const refreshReview = useCallback(async (sid: string) => {
     try {
@@ -277,7 +311,7 @@ function App() {
     }
   }, [])
 
-  const applyDeskSnapshot = useCallback((data: DeskSnapshot) => {
+  const applyDeskSnapshot = useCallback((data: DeskSnapshot, sid?: string | null) => {
     if (data.exists === false) return
     const hasDesk = Boolean(
       data.claim ||
@@ -312,6 +346,7 @@ function App() {
         const idx = data.outline?.findIndex((item) => item.type === lastWithText.type) ?? -1
         if (idx >= 0) setCurrentChapterIndex(idx)
       }
+      if (data.body_chapters.some((ch) => ch.content)) setOutlineLocked(true)
     }
     const summary = directionLine(data.research_direction)
     if (summary) {
@@ -340,7 +375,7 @@ function App() {
         treatment_time: rd.treatment_time || prev?.treatment_time,
       }))
     }
-    const csv = readCsvMeta()
+    const csv = readCsvMeta(sid ?? localStorage.getItem(LS_KEY))
     if (csv.name) setCsvName(csv.name)
     if (csv.rows != null) setCsvRows(csv.rows)
     if (csv.cols != null) setCsvCols(csv.cols)
@@ -355,12 +390,13 @@ function App() {
         if (!data.exists) {
           localStorage.removeItem(LS_KEY)
           setSessionId(null)
+          forgetCsvMeta()
           return
         }
-        applyDeskSnapshot(data)
+        applyDeskSnapshot(data, saved)
       })
       .catch(() => {})
-  }, [applyDeskSnapshot])
+  }, [applyDeskSnapshot, forgetCsvMeta])
 
   useEffect(() => {
     if (sessionId) {
@@ -547,7 +583,7 @@ function App() {
       const rowCount = data.dataset_meta?.rows
       const rows = typeof rowCount === 'number' ? rowCount : null
       setCsvRows(rows)
-      writeCsvMeta(file.name, rows, colCount)
+      writeCsvMeta(data.session_id, file.name, rows, colCount)
       markGuideSeen()
       setSessionId(data.session_id)
     } catch (err) {
@@ -604,7 +640,7 @@ function App() {
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const result = await resp.json()
-      applyDeskSnapshot(result)
+      applyDeskSnapshot(result, sid)
       if (result.identification_report) {
         setIdentReport(formatIdentReport(result.star_rating, result.identification_report))
       }
@@ -730,15 +766,18 @@ function App() {
     writeBusyRef.current = true
     setWriteBusy(true)
     try {
+      const freshIDecide = payload?.decideChapters === 'me' && !outlineLocked
       let accepted = list
-      if (payload?.decideChapters === 'me') {
+      if (freshIDecide) {
         const resumed = await postResumeOutline(list)
         if (resumed?.length) accepted = resumed
       }
-      const useIdx =
-        payload?.decideChapters === 'me'
-          ? 0
-          : Math.min(Math.max(0, currentChapterIndex), accepted.length - 1)
+      const useIdx = chapterIndexForApply(accepted, {
+        freshIDecide,
+        iDecideLocked: payload?.decideChapters === 'me' && outlineLocked,
+        currentType: outline[currentChapterIndex]?.type,
+        currentIndex: currentChapterIndex,
+      })
       const ch = accepted[useIdx]
       if (!ch) return
       setCurrentChapterIndex(useIdx)
@@ -752,6 +791,7 @@ function App() {
     }
   }, [
     outline,
+    outlineLocked,
     currentChapterIndex,
     sessionId,
     postResumeOutline,

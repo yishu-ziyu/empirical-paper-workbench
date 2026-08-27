@@ -317,6 +317,13 @@ def test_translate_code_direction_without_python_fences_emits_panel_scripts():
     assert "feols" in by_lang["r"]
     assert "felm" in by_lang["r"]
     assert "l_homicide" in by_lang["r"]
+    assert "C(sid)" in by_lang["py"]
+    assert "C(year)" in by_lang["py"]
+    assert 'smf.ols("l_homicide ~ post + l_prison", data=df)' not in by_lang["py"]
+    assert "TWFE" in by_lang["py"]
+    assert "TWFE" in by_lang["stata"]
+    assert "TWFE" in by_lang["r"]
+    assert "MISMATCH" in by_lang["eviews"]
     assert "无 Python 代码可翻译" not in by_lang["stata"]
     assert "无 Python 代码" not in by_lang["py"]
 

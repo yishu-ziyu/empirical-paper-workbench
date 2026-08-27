@@ -25,7 +25,6 @@ from __future__ import annotations
 from typing import Any
 
 from engine.bind import bind_chapter_kwargs
-from engine.data_eda import compute_csv_eda
 from engine.readiness import paper_ready_to_write, resolve_slot
 from prompts import get_prompt
 from protocols import GenerateChapterOutput
@@ -172,8 +171,8 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         table = (state.get("results") or "").strip()
         content = prose + "\n\n" + table if table else prose
     elif str(chapter_type) == "data_desc":
-        _, eda_table = compute_csv_eda(state)
-        content = prose + "\n\n" + eda_table if eda_table.strip() else prose
+        eda_table = str(bound.get("eda_results") or "").strip()
+        content = prose + "\n\n" + eda_table if eda_table else prose
     else:
         content = prose
 

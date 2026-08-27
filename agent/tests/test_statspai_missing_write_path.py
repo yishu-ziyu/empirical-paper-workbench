@@ -5,6 +5,7 @@ import sys
 
 import pandas as pd
 from engine.prewrite import run_prewrite
+from nodes.estimate import estimate
 from nodes.robustness_check import robustness_check
 from nodes.set_direction import set_direction
 
@@ -71,6 +72,9 @@ def test_set_direction_and_prewrite_survive_missing_statspai(tmp_path, monkeypat
     assert estimate.get("status") == "ok"
     assert estimate.get("estimator") == "statsmodels.ols"
     assert estimate.get("treatment_row")
+    formula = estimate.get("formula") or ""
+    assert "|" not in formula
+    assert "y ~ treat" in formula
     outline = state.get("outline") or []
     assert len(outline) == 6
     assert {ch.get("type") for ch in outline} >= {
@@ -105,3 +109,55 @@ def test_robustness_clustering_falls_back_when_statspai_missing(tmp_path, monkey
     assert rr.get("robustness")
     assert rr["robustness"][0]["coef"] is not None
     assert any(d.get("status") == "fallback" for d in (rr.get("diagnostics") or []))
+
+
+def test_missing_statspai_persists_sm_formula_not_fe_syntax(tmp_path, monkeypatch):
+    csv_path = _panel_csv(tmp_path)
+    _block_statspai_import(monkeypatch)
+    out = estimate(
+        {
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "method": "did",
+                "formula": "y ~ treat | id + year",
+                "feols_formula": "y ~ treat | id + year",
+                "treatment": "treat",
+                "id_col": "id",
+                "time_col": "year",
+            },
+        }
+    )
+    est = out["estimate"]
+    assert est["status"] == "ok"
+    assert est["estimator"] == "statsmodels.ols"
+    assert est["formula"] == "y ~ treat"
+    assert "|" not in est["formula"]
+    assert "y ~ treat | id + year" not in out["results"]
+
+
+def test_feols_runtime_error_stays_error_not_pooled_ols(tmp_path, monkeypatch):
+    import types
+
+    csv_path = _panel_csv(tmp_path)
+    fake = types.ModuleType("statspai")
+
+    def boom(*_a, **_k):
+        raise ValueError("singular FE")
+
+    fake.feols = boom
+    monkeypatch.setitem(sys.modules, "statspai", fake)
+    out = estimate(
+        {
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "method": "ols",
+                "formula": "y ~ treat | id + year",
+                "treatment": "treat",
+            },
+        }
+    )
+    est = out["estimate"]
+    assert est["status"] == "error"
+    assert est.get("estimator") != "statsmodels.ols"
+    assert est.get("treatment_row") in ("", None)
+    assert "coef" not in est

@@ -392,21 +392,44 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
         "Script is built from the session research direction, not StatsPAI."
     )
 
-    py_formula = f"{y} ~ {rhs_plus}"
+    if model["panel"]:
+        i, t = model["id_col"], model["time_col"]
+        spec_note = (
+            f"Common spec: TWFE {y} ~ {rhs_plus} | {i} + {t}, cluster {i}. "
+            "Python uses C(id)+C(time) dummies (same TWFE); "
+            "Stata xtreg/reghdfe and R feols/felm absorb the same FE."
+        )
+        py_formula = f"{y} ~ {rhs_plus} + C({i}) + C({t})"
+        py_fit = (
+            f'model = smf.ols("{py_formula}", data=df).fit('
+            f'cov_type="cluster", cov_kwds={{"groups": df["{i}"]}})'
+        )
+        eviews_note = (
+            f"MISMATCH: EViews `ls` is pooled OLS, not the TWFE spec "
+            f"({y} ~ {rhs_plus} | {i} + {t}) used in Python/Stata/R."
+        )
+    else:
+        spec_note = f"Common spec: pooled OLS {y} ~ {rhs_plus}."
+        py_formula = f"{y} ~ {rhs_plus}"
+        py_fit = f'model = smf.ols("{py_formula}", data=df).fit()'
+        eviews_note = spec_note
+
     py = (
         '"""Auto-generated Python script from research direction.\n\n'
         f"{note}\n"
+        f"{spec_note}\n"
         '"""\n'
         "import pandas as pd\n"
         "import statsmodels.formula.api as smf\n\n"
         f'df = pd.read_csv("{csv}")\n'
-        f'model = smf.ols("{py_formula}", data=df).fit()\n'
+        f"{py_fit}\n"
         "print(model.summary())\n"
     )
 
     stata = [
         "* Auto-generated Stata script from research direction",
         f"* {note}",
+        f"* {spec_note}",
         "clear all",
         f'import delimited "{csv}", clear',
     ]
@@ -425,6 +448,7 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     r = [
         "# Auto-generated R script from research direction",
         f"# {note}",
+        f"# {spec_note}",
         "library(fixest)",
         "library(lfe)",
         f'df <- read.csv("{csv}")',
@@ -450,6 +474,7 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     eviews = [
         "' Auto-generated EViews script from research direction",
         f"' {note}",
+        f"' {eviews_note}",
         f"import {csv}",
         f"ls {y} c {rhs_space}",
     ]

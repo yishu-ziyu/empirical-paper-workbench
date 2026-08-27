@@ -6,6 +6,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+# Wide CSVs (castle-style) keep a bounded describe table.
+_EDA_COL_CAP = 40
+
 
 def _fmt(value: Any) -> str:
     if value is None:
@@ -23,15 +26,24 @@ def compute_csv_eda(state: Mapping[str, Any]) -> tuple[str, str]:
     try:
         import pandas as pd
 
-        df = pd.read_csv(csv_path)
+        header = pd.read_csv(csv_path, nrows=0)
+        all_cols = [str(c) for c in header.columns]
+        k = len(all_cols)
+        cols = all_cols[:_EDA_COL_CAP]
+        df = pd.read_csv(csv_path, usecols=cols)
     except Exception:
         return "", ""
-    if df.empty and len(df.columns) == 0:
+    if df.empty and k == 0:
         return "", ""
 
-    n, k = len(df), len(df.columns)
-    cols = ", ".join(str(c) for c in df.columns)
-    summary = f"{n} 行 × {k} 列；列：{cols}"
+    n = len(df)
+    col_list = ", ".join(cols)
+    if k > _EDA_COL_CAP:
+        summary = (
+            f"{n} 行 × {k} 列（描述统计列上限 {_EDA_COL_CAP}）；列：{col_list} …"
+        )
+    else:
+        summary = f"{n} 行 × {k} 列；列：{col_list}"
 
     lines = [
         "表 1 描述统计（由上传 CSV 计算，非占位）",
@@ -39,7 +51,7 @@ def compute_csv_eda(state: Mapping[str, Any]) -> tuple[str, str]:
         "| 变量 | N | 均值 | 标准差 | 最小 | 最大 | 缺失 |",
         "|---|---|---|---|---|---|---|",
     ]
-    for col in df.columns:
+    for col in cols:
         s = df[col]
         numeric = False
         try:
@@ -58,4 +70,6 @@ def compute_csv_eda(state: Mapping[str, Any]) -> tuple[str, str]:
         lines.append(
             f"| {col} | {count} | {_fmt(mean)} | {_fmt(std)} | {_fmt(lo)} | {_fmt(hi)} | {missing} |"
         )
+    if k > _EDA_COL_CAP:
+        lines.append(f"| … | 其余 {k - _EDA_COL_CAP} 列未列入本表 | — | — | — | — | — |")
     return summary, "\n".join(lines)

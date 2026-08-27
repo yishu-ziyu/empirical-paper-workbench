@@ -1,10 +1,16 @@
+import type { ReactElement } from 'react'
 import { describe, test, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import InstrumentReadout from '../InstrumentReadout'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderReadout(ui: ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 describe('InstrumentReadout', () => {
   test('shows claim, NONE star, treatment row, and literature source', () => {
-    render(
+    renderReadout(
       <InstrumentReadout
         claim="association"
         starRating={null}
@@ -23,17 +29,17 @@ describe('InstrumentReadout', () => {
   })
 
   test('empty table tells the user results cannot be written', () => {
-    render(<InstrumentReadout claim="association" />)
+    renderReadout(<InstrumentReadout claim="association" />)
     expect(screen.getByTestId('readout-table-empty')).toBeInTheDocument()
   })
 
   test('ran robustness shows on the readout', () => {
-    render(<InstrumentReadout claim="association" robustnessStatus="ran" />)
+    renderReadout(<InstrumentReadout claim="association" robustnessStatus="ran" />)
     expect(screen.getByTestId('readout-robust')).toHaveTextContent('已跑')
   })
 
   test('zero star lights the block line', () => {
-    render(
+    renderReadout(
       <InstrumentReadout
         starRating={0}
         identificationFailed

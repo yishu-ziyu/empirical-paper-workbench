@@ -13,9 +13,13 @@ r"""T-10 RED tests for export_docx 节点 + LaTeX 模板.
 """
 from __future__ import annotations
 
+from pathlib import Path
+import zipfile
+
 import pytest
 
 from nodes.export_docx import (
+    convert_docx,
     export_docx,
     render_template,
     TEMPLATE_NAMES,
@@ -294,3 +298,25 @@ def test_append_bibliography_empty_returns_unchanged():
     from nodes.export_docx import _append_bibliography
     tex = "\\begin{document}\n\\end{document}"
     assert _append_bibliography(tex, []) == tex
+
+
+def test_convert_docx_without_pandoc_writes_ooxml(tmp_path, monkeypatch):
+    """pandoc 缺失时仍写出可下载的 .docx（OOXML zip），含章节正文。"""
+    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    tex = (
+        "\\title{Castle paper}\n"
+        "\\begin{document}\n"
+        "\\section{数据描述}\n"
+        "l_homicide 均值见下表\n"
+        "\\end{document}\n"
+    )
+    path = convert_docx(tex, str(tmp_path))
+    assert path
+    out = Path(path)
+    assert out.exists()
+    assert out.read_bytes()[:2] == b"PK"
+    with zipfile.ZipFile(out) as zf:
+        text = zf.read("word/document.xml").decode("utf-8")
+    assert "Castle paper" in text
+    assert "数据描述" in text
+    assert "l_homicide" in text

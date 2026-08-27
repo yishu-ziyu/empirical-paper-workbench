@@ -98,3 +98,9 @@ body {
 .animate-listen {
   animation: listen-ring 1.6s ease-out infinite;
 }
+
+@layer components {
+  .journal-page {
+    @apply bg-white px-8 py-10 font-serif text-[16.5px] leading-[1.9] text-ink sm:px-14 sm:py-14;
+  }
+}

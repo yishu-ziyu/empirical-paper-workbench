@@ -141,7 +141,7 @@ export default function ChapterWriter({
       ) : (
         <article
           data-testid="chapter-paper"
-          className="rounded-xl bg-[#faf8f4] px-6 py-5 font-serif text-base leading-loose text-ink"
+          className="journal-page"
         >
           {renderPaperMarkdown(displayContent)}
         </article>

@@ -141,6 +141,57 @@ def test_export_no_translations_returns_404(client):
     assert resp.status_code == 404
 
 
+def test_post_translate_code_fills_export(client):
+    """Empty translations 404; POST /translate-code then GET do|R return text."""
+    import uuid
+
+    sid = f"test-translate-hook-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/castle.csv",
+            "research_direction": {
+                "question": "post on l_homicide",
+                "dv": "l_homicide",
+                "iv": "post",
+                "controls": ["l_prison"],
+                "method": "did",
+                "id_col": "sid",
+                "time_col": "year",
+            },
+            "body_chapters": [
+                {"type": "results", "content": "no python fences in this chapter"}
+            ],
+        },
+    )
+    try:
+        empty = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert empty.status_code == 404
+
+        posted = client.post(f"/sessions/{sid}/translate-code")
+        assert posted.status_code == 200, posted.text
+        body = posted.json()
+        assert body["ok"] is True
+        langs = {t["lang"] for t in body["code_translations"]}
+        assert langs == {"py", "stata", "r", "eviews"}
+
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "xtreg" in do.text
+        assert "reghdfe" in do.text
+        assert "l_homicide" in do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "feols" in r_resp.text
+        assert "felm" in r_resp.text
+        assert "l_homicide" in r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+    finally:
+        facade.drop_session(sid)
+
+
 def test_export_default_format_is_py(client):
     """未指定 format 时默认 py。"""
     sid = _seed_session_with_translations()

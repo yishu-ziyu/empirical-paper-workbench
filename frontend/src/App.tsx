@@ -11,7 +11,7 @@ import { BrandMark, LangPills } from './components/UnauthHeader'
 import { CsvDropZone } from './components/CsvDropZone'
 import PaperPath from './components/PaperPath'
 import DirectionForm from './components/DirectionForm'
-import type { DirectionFormData } from './components/DirectionForm'
+import type { DirectionFormData, DirectionFormInitial } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
 import WriteLoop from './components/WriteLoop'
 import type { PausePayload } from './components/WriteLoop'
@@ -31,6 +31,7 @@ const LS_TOKEN_KEY = 'econpaper_access_token'
 const LS_GUIDE_KEY = 'econpaper_seen_guide'
 const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
+const LS_CSV_KEY = 'econpaper_csv_meta'
 const SAMPLE_CSV = '/samples/course-panel.csv'
 const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',
@@ -57,7 +58,22 @@ type DeskSnapshot = {
   robustness_status?: string | null
   outline?: OutlineChapter[]
   body_chapters?: WrittenChapter[]
-  research_direction?: { method?: string; dv?: string; iv?: string; question?: string } | null
+  research_direction?: {
+    method?: string
+    dv?: string
+    iv?: string
+    question?: string
+    controls?: string[] | string
+    template?: string
+    instrument?: string
+    time_col?: string
+    id_col?: string
+    first_treat_col?: string
+    running_var?: string
+    cutoff?: number
+    unit_col?: string
+    treatment_time?: string
+  } | null
 }
 
 function storeToken(token: string): void {
@@ -81,6 +97,54 @@ function directionLine(rd: { method?: string; dv?: string; iv?: string } | null 
   if (!method && !dv && !iv) return null
   if (dv && iv) return `${method || 'OLS'} · ${dv} ~ ${iv}`
   return method || null
+}
+
+function asControlList(raw: unknown): string[] | undefined {
+  if (Array.isArray(raw)) return raw.filter((item): item is string => typeof item === 'string')
+  if (typeof raw === 'string') {
+    const parts = raw.split(',').map((item) => item.trim()).filter(Boolean)
+    return parts
+  }
+  return undefined
+}
+
+function readCsvMeta(): { name: string | null; rows: number | null; cols: number | null } {
+  try {
+    const raw = sessionStorage.getItem(LS_CSV_KEY)
+    if (!raw) return { name: null, rows: null, cols: null }
+    const parsed = JSON.parse(raw) as { name?: unknown; rows?: unknown; cols?: unknown }
+    return {
+      name: typeof parsed.name === 'string' ? parsed.name : null,
+      rows: typeof parsed.rows === 'number' ? parsed.rows : null,
+      cols: typeof parsed.cols === 'number' ? parsed.cols : null,
+    }
+  } catch {
+    return { name: null, rows: null, cols: null }
+  }
+}
+
+function writeCsvMeta(name: string | null, rows: number | null, cols: number | null): void {
+  sessionStorage.setItem(LS_CSV_KEY, JSON.stringify({ name, rows, cols }))
+}
+
+function toDirectionInitial(record: DirectionFormData | null): DirectionFormInitial | undefined {
+  if (!record) return undefined
+  return {
+    question: record.question,
+    dv: record.dv,
+    iv: record.iv,
+    controls: Array.isArray(record.controls) ? record.controls.join(', ') : record.controls,
+    method: record.method,
+    template: record.template,
+    instrument: record.instrument,
+    time_col: record.time_col,
+    id_col: record.id_col,
+    first_treat_col: record.first_treat_col,
+    running_var: record.running_var,
+    cutoff: record.cutoff,
+    unit_col: record.unit_col,
+    treatment_time: record.treatment_time,
+  }
 }
 
 function App() {
@@ -127,9 +191,9 @@ function App() {
       return []
     }
   })
-  const [csvName, setCsvName] = useState<string | null>(null)
-  const [csvRows, setCsvRows] = useState<number | null>(null)
-  const [csvCols, setCsvCols] = useState<number | null>(null)
+  const [csvName, setCsvName] = useState<string | null>(() => readCsvMeta().name)
+  const [csvRows, setCsvRows] = useState<number | null>(() => readCsvMeta().rows)
+  const [csvCols, setCsvCols] = useState<number | null>(() => readCsvMeta().cols)
   const [directionRecord, setDirectionRecord] = useState<DirectionFormData | null>(null)
 
   const [globalError, setGlobalError] = useState<string | null>(null)
@@ -164,6 +228,7 @@ function App() {
   const [identReport, setIdentReport] = useState<string | null>(null)
   const [writingType, setWritingType] = useState<string | null>(null)
   const [writeBusy, setWriteBusy] = useState(false)
+  const writeBusyRef = useRef(false)
   const [writtenChapters, setWrittenChapters] = useState<WrittenChapter[]>([])
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0)
   const [outlineLocked, setOutlineLocked] = useState(false)
@@ -256,15 +321,29 @@ function App() {
     const asked = data.research_direction?.question?.trim()
     if (asked) setShapedQuestion(asked)
     if (data.research_direction) {
+      const rd = data.research_direction
+      const controls = asControlList(rd.controls)
       setDirectionRecord((prev) => ({
         question: asked || prev?.question || '',
-        dv: data.research_direction?.dv || prev?.dv || '',
-        iv: data.research_direction?.iv || prev?.iv || '',
-        controls: prev?.controls || [],
-        method: data.research_direction?.method || prev?.method || '',
-        template: prev?.template || 'undergrad',
+        dv: rd.dv || prev?.dv || '',
+        iv: rd.iv || prev?.iv || '',
+        controls: controls ?? prev?.controls ?? [],
+        method: rd.method || prev?.method || '',
+        template: rd.template || prev?.template || 'undergrad',
+        instrument: rd.instrument || prev?.instrument,
+        time_col: rd.time_col || prev?.time_col,
+        id_col: rd.id_col || prev?.id_col,
+        first_treat_col: rd.first_treat_col || prev?.first_treat_col,
+        running_var: rd.running_var || prev?.running_var,
+        cutoff: rd.cutoff ?? prev?.cutoff,
+        unit_col: rd.unit_col || prev?.unit_col,
+        treatment_time: rd.treatment_time || prev?.treatment_time,
       }))
     }
+    const csv = readCsvMeta()
+    if (csv.name) setCsvName(csv.name)
+    if (csv.rows != null) setCsvRows(csv.rows)
+    if (csv.cols != null) setCsvCols(csv.cols)
   }, [])
 
   useEffect(() => {
@@ -446,24 +525,29 @@ function App() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
       const cols = data.dataset_meta?.columns
+      let colCount: number | null = null
       if (Array.isArray(cols) && cols.every((item: unknown) => typeof item === 'string')) {
         setDataColumns(cols)
         sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(cols))
-        setCsvCols(cols.length)
+        colCount = cols.length
+        setCsvCols(colCount)
       } else {
         try {
           const header = (await file.slice(0, 2048).text()).split(/\r?\n/).find(Boolean) || ''
           const parsed = header.split(',').map((name) => name.trim()).filter(Boolean)
           setDataColumns(parsed)
           sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(parsed))
-          setCsvCols(parsed.length)
+          colCount = parsed.length
+          setCsvCols(colCount)
         } catch {
           setDataColumns([])
         }
       }
       setCsvName(file.name)
       const rowCount = data.dataset_meta?.rows
-      setCsvRows(typeof rowCount === 'number' ? rowCount : null)
+      const rows = typeof rowCount === 'number' ? rowCount : null
+      setCsvRows(rows)
+      writeCsvMeta(file.name, rows, colCount)
       markGuideSeen()
       setSessionId(data.session_id)
     } catch (err) {
@@ -542,6 +626,42 @@ function App() {
     }
   }, [ensureSession, applyDeskSnapshot, showGlobalError, t])
 
+  const runGenerateChapter = useCallback(async (
+    chapterType: string,
+    title: string,
+    renderKwargs?: Record<string, number>,
+  ) => {
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        chapter: { type: chapterType, title },
+        ...(renderKwargs && Object.keys(renderKwargs).length ? { render_kwargs: renderKwargs } : {}),
+      }),
+    })
+    const payload = await resp.json().catch(() => ({}))
+    if (resp.status === 409) {
+      const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail : payload
+      const blockers = Array.isArray(detail.write_blockers) ? detail.write_blockers : []
+      setWriteBlockers(blockers)
+      showGlobalError(t('bench.writeBlocked'))
+      return
+    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    if (payload.chapter) {
+      setWrittenChapters((prev) => {
+        const next = prev.filter((ch) => ch.type !== payload.chapter.type)
+        return [...next, payload.chapter]
+      })
+    }
+    setWriteBlockers([])
+    await refreshReview(sessionId)
+  }, [sessionId, refreshReview, showGlobalError, t])
+
   const handleWriteChapter = useCallback(async (
     chapterType: string,
     title: string,
@@ -551,42 +671,22 @@ function App() {
       showGlobalError(t('app.needSession'))
       return
     }
+    if (writeBusyRef.current) return
+    writeBusyRef.current = true
     setWriteBusy(true)
     setWritingType(chapterType)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          chapter: { type: chapterType, title },
-          ...(renderKwargs && Object.keys(renderKwargs).length ? { render_kwargs: renderKwargs } : {}),
-        }),
-      })
-      const payload = await resp.json().catch(() => ({}))
-      if (resp.status === 409) {
-        const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail : payload
-        const blockers = Array.isArray(detail.write_blockers) ? detail.write_blockers : []
-        setWriteBlockers(blockers)
-        showGlobalError(t('bench.writeBlocked'))
-        return
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      if (payload.chapter) {
-        setWrittenChapters((prev) => {
-          const next = prev.filter((ch) => ch.type !== payload.chapter.type)
-          return [...next, payload.chapter]
-        })
-      }
-      setWriteBlockers([])
-      await refreshReview(sessionId)
+      await runGenerateChapter(chapterType, title, renderKwargs)
     } catch (err) {
       showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
     } finally {
+      writeBusyRef.current = false
       setWriteBusy(false)
     }
-  }, [sessionId, refreshReview, showGlobalError, t])
+  }, [sessionId, runGenerateChapter, showGlobalError, t])
 
   const handleSelectChapter = useCallback((index: number) => {
+    if (writeBusyRef.current) return
     const ch = outline[index]
     if (!ch) return
     setCurrentChapterIndex(index)
@@ -599,42 +699,89 @@ function App() {
     void handleWriteChapter(ch.type, ch.title)
   }, [outline, writtenChapters, identFailed, handleWriteChapter, showGlobalError, t])
 
-  const handleApplyGenerate = useCallback((payload?: PausePayload) => {
+  const postResumeOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return null
+    }
+    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ outline: nextOutline }),
+    })
+    const result = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const accepted =
+      Array.isArray(result.outline) && result.outline.length ? result.outline : nextOutline
+    setOutline(accepted)
+    setOutlineLocked(true)
+    setCurrentChapterIndex(0)
+    return accepted as PausePayload['outline']
+  }, [sessionId, showGlobalError, t])
+
+  const handleApplyGenerate = useCallback(async (payload?: PausePayload) => {
+    if (writeBusyRef.current) return
     const list = payload?.outline?.length ? payload.outline : outline
     if (!list.length) return
-    const useIdx = Math.min(Math.max(0, currentChapterIndex), list.length - 1)
-    const ch = list[useIdx]
-    setCurrentChapterIndex(useIdx)
-    void handleWriteChapter(ch.type, ch.title, payload?.render_kwargs)
-  }, [outline, currentChapterIndex, handleWriteChapter])
-
-  const handleApproveOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
     if (!sessionId) {
       showGlobalError(t('app.needSession'))
       return
     }
+    writeBusyRef.current = true
+    setWriteBusy(true)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ outline: nextOutline }),
-      })
-      const result = await resp.json().catch(() => ({}))
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      if (Array.isArray(result.outline) && result.outline.length) {
-        setOutline(result.outline)
-      } else {
-        setOutline(nextOutline)
+      let accepted = list
+      if (payload?.decideChapters === 'me') {
+        const resumed = await postResumeOutline(list)
+        if (resumed?.length) accepted = resumed
       }
-      setOutlineLocked(true)
-      setCurrentChapterIndex(0)
+      const useIdx =
+        payload?.decideChapters === 'me'
+          ? 0
+          : Math.min(Math.max(0, currentChapterIndex), accepted.length - 1)
+      const ch = accepted[useIdx]
+      if (!ch) return
+      setCurrentChapterIndex(useIdx)
+      setWritingType(ch.type)
+      await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
+    } finally {
+      writeBusyRef.current = false
+      setWriteBusy(false)
+    }
+  }, [
+    outline,
+    currentChapterIndex,
+    sessionId,
+    postResumeOutline,
+    runGenerateChapter,
+    showGlobalError,
+    t,
+  ])
+
+  const handleApproveOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
+    if (writeBusyRef.current) return
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    writeBusyRef.current = true
+    setWriteBusy(true)
+    try {
+      await postResumeOutline(nextOutline)
     } catch (err) {
       showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      writeBusyRef.current = false
+      setWriteBusy(false)
     }
-  }, [sessionId, showGlobalError, t])
+  }, [sessionId, postResumeOutline, showGlobalError, t])
 
   const handleRefine = useCallback(async (instruction: string) => {
     if (!sessionId) return
+    if (writeBusyRef.current) return
+    writeBusyRef.current = true
     setWriteBusy(true)
     try {
       const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
@@ -660,6 +807,7 @@ function App() {
     } catch (err) {
       showGlobalError(err instanceof Error ? err.message : String(err))
     } finally {
+      writeBusyRef.current = false
       setWriteBusy(false)
     }
   }, [sessionId, currentChapterIndex, markChapterUpdated, refreshReview, showGlobalError])
@@ -980,7 +1128,7 @@ function App() {
                 <DirectionForm
                   onSubmit={handleDirectionSubmit}
                   initialQuestion={shapedQuestion}
-                  initial={sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
+                  initial={toDirectionInitial(directionRecord) ?? sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
                   columns={dataColumns}
                 />
               ) : (

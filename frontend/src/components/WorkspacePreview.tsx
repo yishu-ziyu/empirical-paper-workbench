@@ -26,8 +26,11 @@ export default function WorkspacePreview() {
           <span className="px-2.5 py-0.5 text-muted">{t('workbench.tabFormat')}</span>
         </div>
       </div>
-      <div className="grid min-h-[420px] grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_240px]">
-        <aside className="hidden border-r border-black/[0.06] bg-[#f7f7f5] p-4 lg:block">
+      <div
+        className="desk-preview-columns"
+        style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr) 240px' }}
+      >
+        <aside className="border-r border-black/[0.06] bg-[#f7f7f5] p-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('bench.chapters')}</p>
           <ul className="mt-3 space-y-1">
             {chapters.map((title, i) => (
@@ -86,7 +89,7 @@ export default function WorkspacePreview() {
             <span className="text-[13px] text-muted">{t('workbench.dropBody')}</span>
           </div>
         </section>
-        <aside className="hidden border-l border-black/[0.06] bg-[#f7f7f5] p-4 lg:block">
+        <aside className="border-l border-black/[0.06] bg-[#f7f7f5] p-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('bench.steps')}</p>
           <ol className="relative mt-3 ml-1.5 border-l border-border">
             {PAPER_NODES.map((id, i) => (

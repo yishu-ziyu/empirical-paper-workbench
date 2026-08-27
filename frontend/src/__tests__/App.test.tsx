@@ -65,7 +65,15 @@ describe('App 三栏布局', () => {
     expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
     const rightPane = screen.getByTestId('agent-panel')
     expect(rightPane).toContainElement(screen.getByTestId('paper-path'))
-    expect(rightPane.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0/)
+    expect(rightPane.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0|lg:block|lg:hidden/)
+    const desk = screen.getByTestId('desk-columns')
+    expect(desk).toContainElement(rightPane)
+    expect(desk.className).not.toMatch(/grid-cols-1|lg:grid-cols/)
+    expect(desk).toHaveStyle({
+      display: 'grid',
+      gridTemplateColumns: '220px minmax(0, 1fr) 280px',
+    })
+    expect(rightPane).toHaveStyle({ minWidth: '280px' })
     for (const id of PAPER_NODES) {
       expect(rightPane).toContainElement(screen.getByTestId(`paper-path-${id}`))
     }

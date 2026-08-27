@@ -1,5 +1,13 @@
 import { useT } from '../lib/i18n'
 import {
+  journalCaption,
+  journalNotes,
+  journalTable,
+  journalTd,
+  journalTh,
+  journalTheadRow,
+} from '../lib/paperMarkdown'
+import {
   claimLabel,
   literatureLabel,
   parseEstimateRows,
@@ -23,6 +31,15 @@ function robustLabel(status: string | null | undefined): string {
   return '—'
 }
 
+function starsFromP(p: string): string {
+  const n = Number(p)
+  if (!Number.isFinite(n)) return ''
+  if (n < 0.01) return '***'
+  if (n < 0.05) return '**'
+  if (n < 0.1) return '*'
+  return ''
+}
+
 export default function InstrumentReadout({
   claim,
   starRating,
@@ -40,7 +57,7 @@ export default function InstrumentReadout({
 
   return (
     <section data-testid="instrument-readout" className="mb-8 bg-panel px-1 py-2">
-      <h2 className="border-t border-ink/25 pt-3 font-sans text-[1.15rem] font-semibold tracking-tight text-ink">
+      <h2 className="border-t border-ink/25 pt-3 font-serif text-[1.35rem] font-semibold tracking-tight text-ink">
         {t('readout.section')}
       </h2>
       <dl className="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
@@ -69,38 +86,43 @@ export default function InstrumentReadout({
           </dd>
         </div>
       </dl>
-      <h3 className="mt-8 font-sans text-[1.05rem] font-semibold tracking-tight text-ink">
+      <h3 className="mt-8 font-serif text-[1.12rem] font-semibold tracking-tight text-ink">
         {t('readout.main')}
       </h3>
-      <p className="mt-4 max-w-[40em] text-justify font-serif text-[15px] leading-[1.9] text-ink/90 first-line:indent-[2em]">
+      <p className="mt-4 max-w-[40em] text-justify font-serif text-[15px] leading-[1.9] text-ink/90 indent-[2em]">
         {t('readout.lead')}
       </p>
       <div className="mt-6">
-        <p className="font-sans text-[13px] font-semibold text-ink">{t('readout.caption')}</p>
+        <p className={journalCaption}>{t('readout.caption')}</p>
         {rows.length > 0 ? (
-          <table
-            data-testid="readout-table"
-            className="mt-2 w-full border-collapse text-left text-[13px] text-ink"
-          >
-            <thead>
-              <tr className="border-t-[1.5px] border-b border-ink">
-                <th className="py-2 pr-3 font-sans font-semibold">{t('readout.var')}</th>
-                <th className="py-2 pr-3 text-center font-sans font-semibold">{t('readout.coef')}</th>
-                <th className="py-2 pr-3 text-center font-sans font-semibold">{t('readout.se')}</th>
-                <th className="py-2 text-center font-sans font-semibold">{t('readout.p')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={`${row.variable}-${row.coef}`} className="border-b-[1.5px] border-ink">
-                  <td className="py-2 pr-3 font-serif">{row.variable}</td>
-                  <td className="py-2 pr-3 text-center font-serif tabular-nums">{row.coef}</td>
-                  <td className="py-2 pr-3 text-center font-serif tabular-nums">{row.se}</td>
-                  <td className="py-2 text-center font-serif tabular-nums">{row.p}</td>
+          <>
+            <table data-testid="readout-table" className={journalTable}>
+              <thead>
+                <tr className={journalTheadRow}>
+                  <th className={journalTh}>{t('readout.var')}</th>
+                  <th className={`${journalTh} text-center`}>{t('readout.spec')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row, r) => (
+                  <tr
+                    key={`${row.variable}-${row.coef}`}
+                    className={`even:bg-[#f6f6f6] ${r === rows.length - 1 ? 'border-b-[2.5px] border-ink' : ''}`}
+                  >
+                    <td className={`${journalTd} font-semibold`}>{row.variable}</td>
+                    <td className={`${journalTd} text-center font-serif tabular-nums`}>
+                      <span className="block">
+                        {row.coef}
+                        {starsFromP(row.p)}
+                      </span>
+                      <span className="block text-[12.5px] text-ink/60">({row.se})</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className={journalNotes}>{t('readout.notes')}</p>
+          </>
         ) : (
           <p data-testid="readout-table-empty" className="mt-2 font-serif text-[15px] leading-7 text-muted">
             {t('readout.empty')}

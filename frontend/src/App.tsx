@@ -7,6 +7,9 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DeskPage from './pages/DeskPage'
 import GuidePage from './pages/GuidePage'
+import { BrandMark, LangPills } from './components/UnauthHeader'
+import { CsvDropZone } from './components/CsvDropZone'
+import PaperPath from './components/PaperPath'
 import DirectionForm from './components/DirectionForm'
 import type { DirectionFormData } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
@@ -79,7 +82,7 @@ function directionLine(rd: { method?: string; dv?: string; iv?: string } | null 
 }
 
 function App() {
-  const { t, lang, setLang } = useT()
+  const { t } = useT()
 
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(LS_TOKEN_KEY))
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
@@ -143,6 +146,7 @@ function App() {
   const [gateBusy, setGateBusy] = useState(false)
   const [docExportOpen, setDocExportOpen] = useState(false)
   const [codeExportOpen, setCodeExportOpen] = useState(false)
+  const [workbenchTab, setWorkbenchTab] = useState<'paper' | 'data' | 'format'>('paper')
   const [directionBusy, setDirectionBusy] = useState(false)
   const [directionOpen, setDirectionOpen] = useState(true)
   const [directionSummary, setDirectionSummary] = useState<string | null>(null)
@@ -449,13 +453,17 @@ function App() {
     }
   }, [markGuideSeen])
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const takeCsv = useCallback(async (file: File) => {
     sessionStorage.removeItem(LS_SAMPLE_KEY)
     setSampleDirection(null)
     await uploadCsv(file)
   }, [uploadCsv])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await takeCsv(file)
+  }, [takeCsv])
 
   const handleTrySample = useCallback(async () => {
     setUploading(true)
@@ -621,6 +629,7 @@ function App() {
             setDeskOpen(true)
           }}
           onLogin={() => setAuthPage('login')}
+          onRegister={() => setAuthPage('register')}
         />
       </>
     )
@@ -635,6 +644,7 @@ function App() {
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
           onLogin={() => setAuthPage('login')}
+          onRegister={() => setAuthPage('register')}
           onConfirm={(title) => {
             setShapedQuestion(title)
             setDeskOpen(false)
@@ -651,23 +661,45 @@ function App() {
           ⚠ {globalError}
         </div>
       )}
-      <header className="flex items-center justify-between border-b border-border bg-cream px-6 py-3">
+      <header className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-4 py-2.5">
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setLeftOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleLeft')}>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold tracking-tight font-serif">{t('app.title')}</h1>
+          <BrandMark />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="hidden items-center rounded-full bg-bg p-0.5 sm:flex">
+          {([
+            ['paper', t('workbench.tabPaper')],
+            ['data', t('workbench.tabData')],
+            ['format', t('workbench.tabFormat')],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              data-testid={`workbench-tab-${id}`}
+              onClick={() => {
+                setWorkbenchTab(id)
+                if (id === 'data' && sessionId) setEdaOpen(true)
+              }}
+              className={`rounded-full px-3 py-1 text-[12px] transition-colors duration-200 ${
+                workbenchTab === id ? 'bg-accent text-white' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-3">
           {sessionId ? (
             <span data-testid="session-ready" hidden />
           ) : (
             <span className="text-xs text-muted font-mono">{t('app.hint')}</span>
           )}
           <input ref={fileInputRef} type="file" accept=".csv" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
-          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1 text-xs text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
+          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
             {uploading && (
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                 <circle cx="12" cy="12" r="10" strokeDasharray="31.4 31.4" strokeLinecap="round" />
@@ -698,9 +730,9 @@ function App() {
           {authToken ? (
             <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
           ) : (
-            <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.login')}</button>
+            <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>
           )}
-          <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.langSwitch')}</button>
+          <LangPills />
           <button type="button" onClick={() => setRightOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleRight')}>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -742,10 +774,17 @@ function App() {
               <p className="text-xs leading-6 text-muted">{t('bench.noChapters')}</p>
             )}
             <div className="mt-6 border-t border-border pt-4">
-              {edaOpen && sessionId ? (
-                <EdaSidebar sessionId={sessionId} onClose={() => setEdaOpen(false)} />
-              ) : sessionId ? (
-                <button onClick={() => setEdaOpen(true)} className="text-sm text-accent transition-colors duration-200 hover:text-accent/80">{t('bench.openData')}</button>
+              {sessionId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkbenchTab('data')
+                    setEdaOpen(true)
+                  }}
+                  className="text-sm text-accent transition-colors duration-200 hover:text-accent/80"
+                >
+                  {t('bench.openData')}
+                </button>
               ) : (
                 <p className="text-xs text-muted">{t('app.uploadToExplore')}</p>
               )}
@@ -754,6 +793,29 @@ function App() {
         }
         editor={
           <ErrorBoundary>
+            {workbenchTab === 'data' && (
+              <section className="mb-6">
+                <h2 className="mb-3 font-serif text-lg text-ink">{t('workbench.dataTitle')}</h2>
+                <CsvDropZone
+                  uploading={uploading}
+                  onBrowse={() => fileInputRef.current?.click()}
+                  onFile={(file) => { void takeCsv(file) }}
+                />
+                {sessionId && edaOpen ? (
+                  <div className="mt-4">
+                    <EdaSidebar sessionId={sessionId} onClose={() => setEdaOpen(false)} />
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-muted">{t('workbench.dataEmpty')}</p>
+                )}
+              </section>
+            )}
+            {workbenchTab === 'format' && (
+              <section className="mb-6 rounded border border-border bg-panel p-4">
+                <h2 className="font-serif text-lg text-ink">{t('workbench.formatTitle')}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">{t('workbench.formatBody')}</p>
+              </section>
+            )}
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
             {!hasReadout && (
               <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
@@ -829,10 +891,34 @@ function App() {
         }
         agent={
           <ErrorBoundary>
+            <PaperPath
+              uploading={uploading}
+              hasSession={Boolean(sessionId)}
+              hasDirection={Boolean(directionSummary)}
+              directionOpen={directionOpen}
+              hasReadout={hasReadout}
+              hasOutline={outline.length > 0}
+              writing={writeBusy}
+              hasChapter={Boolean(writtenChapter?.content)}
+              awaitingApprove={writtenChapter?.status === 'generated'}
+              canExport={canExport}
+              onSelect={(id) => {
+                if (id === 'upload_data' || id === 'clean_data') {
+                  setWorkbenchTab('data')
+                  if (sessionId) setEdaOpen(true)
+                } else if (id === 'translate_code' || id === 'export_docx') {
+                  setWorkbenchTab('format')
+                } else {
+                  setWorkbenchTab('paper')
+                }
+              }}
+            />
             {sessionId && review ? (
-              <ReviewPanel sessionId={sessionId} review={review} onDecision={() => refreshReview(sessionId)} />
+              <div className="mt-4">
+                <ReviewPanel sessionId={sessionId} review={review} onDecision={() => refreshReview(sessionId)} />
+              </div>
             ) : (
-              <p data-testid="review-idle" className="text-xs leading-6 text-muted">
+              <p data-testid="review-idle" className="mt-4 text-xs leading-6 text-muted">
                 {hasReadout ? t('bench.reviewAfterWrite') : t('bench.reviewAfterDirection')}
               </p>
             )}

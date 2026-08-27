@@ -44,7 +44,7 @@ export default function InstrumentReadout({
       data-testid="instrument-readout"
       className="mb-6 rounded border border-border bg-panel p-4"
     >
-      <h2 className="mb-3 text-xs tracking-wider text-muted">
+      <h2 className="mb-3 font-mono text-xs tracking-wider text-muted">
         读数
       </h2>
       <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
@@ -78,7 +78,7 @@ export default function InstrumentReadout({
         {rows.length > 0 ? (
           <table
             data-testid="readout-table"
-            className="mt-1 w-full border-collapse text-left text-xs text-ink"
+            className="mt-1 w-full border-collapse text-left text-[12px] text-ink"
           >
             <thead>
               <tr className="border-b border-border text-muted">

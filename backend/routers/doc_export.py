@@ -5,6 +5,8 @@
     format=pdf  → PDF 文件（application/pdf），latexmk 不可用时 503
     format=docx → Word 文件，pandoc 不可用时 503
     template ∈ {cn_journal, undergraduate, master_thesis, english_submission}
+    别名：undergrad → undergraduate，master → master_thesis，
+    en_submission → english_submission
     默认 cn_journal
 
 session 状态由 ``AgentFacade`` 持有。``export_docx`` 节点在

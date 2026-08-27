@@ -52,6 +52,29 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('agent-panel-content')).not.toBeInTheDocument()
   })
 
+  test('工作台右栏是锁定论文路径，不含额外站点', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-path-upload_data')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-path-clean_data')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-path-set_direction')).toHaveAttribute('data-status', 'paused')
+    expect(screen.getByTestId('paper-path-generate_chapter')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-path-translate_code')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-path-export_docx')).toBeInTheDocument()
+    expect(screen.getByTestId('clean-step-profiling')).toBeInTheDocument()
+    expect(screen.getByTestId('clean-step-audit')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-tab-paper')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-tab-data')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-tab-format')).toBeInTheDocument()
+    expect(screen.queryByTestId('paper-path-generate_title')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('paper-path-identification_verify')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('paper-path-search_literature')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('paper-path-eda')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
+  })
+
   test('上传 CSV 成功后 sessionId 从 response 获取并显示', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -214,7 +237,7 @@ describe('App 三栏布局', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     await waitFor(() => {
-      expect(screen.getByText(/上传中\.\.\./i)).toBeInTheDocument()
+      expect(screen.getByTestId('guide-upload-btn')).toHaveTextContent(/上传中/)
     })
     expect(screen.getByTestId('guide-upload-btn')).toBeDisabled()
   })

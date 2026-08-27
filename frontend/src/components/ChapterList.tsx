@@ -52,14 +52,12 @@ export default function ChapterList({
                 : 'border-transparent text-ink hover:bg-panel'
             }`}
           >
-            {/* 状态图标 */}
             <span
               data-testid="chapter-status-icon"
               className="w-4 text-center text-xs"
             >
               {statusIcon(ch.status ?? '')}
             </span>
-
             <span className="flex-1 truncate text-sm">{ch.title}</span>
           </button>
         )

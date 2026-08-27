@@ -23,6 +23,10 @@ body,
   height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -32,12 +36,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Selection highlight ── */
 ::selection {
   background-color: rgba(47, 107, 79, 0.22);
 }
-
-/* ── Keyframe animations ── */
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -64,8 +65,6 @@ body {
   50%  { opacity: 1; }
   100% { transform: scaleX(1); opacity: 0.6; }
 }
-
-/* ── Utility animation classes ── */
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;

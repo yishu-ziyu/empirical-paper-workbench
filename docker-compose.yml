@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: econpaper
       POSTGRES_USER: econpaper
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-econpaper_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,20 +14,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -42,32 +37,31 @@ services:
       minio:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql+asyncpg://econpaper:${DB_PASSWORD:-econpaper_dev}@postgres:5432/econpaper
-      - CHECKPOINT_DB_URL=postgresql://econpaper:${DB_PASSWORD:-econpaper_dev}@postgres:5432/econpaper
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-do-not-use-in-production}
+      - DATABASE_URL=postgresql+asyncpg://econpaper:${POSTGRES_PASSWORD}@postgres:5432/econpaper
+      - CHECKPOINT_DB_URL=postgresql://econpaper:${POSTGRES_PASSWORD}@postgres:5432/econpaper
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY}
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_HOURS=24
-      - CORS_ORIGINS=http://localhost:80
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - UPLOAD_DIR=/data/uploads
       - DEBUG=false
-      # S3 / MinIO 配置
       - S3_ENDPOINT_URL=http://minio:9000
-      - S3_ACCESS_KEY_ID=minioadmin
-      - S3_SECRET_ACCESS_KEY=minioadmin
+      - S3_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - S3_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - S3_BUCKET=econpaper-uploads
       - S3_PATH_PREFIX=uploads/
       - S3_CACHE_DIR=/data/uploads/.s3_cache
     volumes:
       - uploads:/data/uploads
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   frontend:
     build: ./frontend
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
 
 volumes:
   pgdata:

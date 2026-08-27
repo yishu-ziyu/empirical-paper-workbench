@@ -133,7 +133,7 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://econpaper:${DB_PASSWORD:-econpaper_dev}@postgres:5432/econpaper
       - CHECKPOINT_DB_URL=postgresql://econpaper:${DB_PASSWORD:-econpaper_dev}@postgres:5432/econpaper
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-do-not-use-in-production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?set JWT_SECRET_KEY}
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_HOURS=24
       - CORS_ORIGINS=http://localhost:80

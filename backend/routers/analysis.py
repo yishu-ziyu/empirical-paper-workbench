@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 
 router = APIRouter()
 
@@ -27,7 +29,11 @@ class RobustnessResponse(BaseModel):
     "/sessions/{session_id}/identification",
     response_model=IdentificationResponse,
 )
-async def run_identification(session_id: str) -> IdentificationResponse:
+async def run_identification(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> IdentificationResponse:
+    require_session_ownership(session_id, current_user)
     result = facade.run_identification_verify(session_id)
     return IdentificationResponse(
         passed=bool(result.get("passed")),
@@ -41,7 +47,11 @@ async def run_identification(session_id: str) -> IdentificationResponse:
     "/sessions/{session_id}/robustness",
     response_model=RobustnessResponse,
 )
-async def run_robustness(session_id: str) -> RobustnessResponse:
+async def run_robustness(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> RobustnessResponse:
+    require_session_ownership(session_id, current_user)
     result = facade.run_robustness_check(session_id)
     return RobustnessResponse(
         robustness_results=result.get("robustness_results") or {},

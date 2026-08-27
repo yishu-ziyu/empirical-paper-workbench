@@ -1,15 +1,19 @@
 """空桌讨论：把乱想法收成一个研究问题。"""
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_auth_unless_debug
 from facade import facade
+from models.user import User
 
 router = APIRouter()
+
+_MAX_TRANSCRIBE_BYTES = 25 * 1024 * 1024  # 25MB
 
 
 class DeskTurn(BaseModel):
@@ -42,7 +46,11 @@ class DeskDiscussResponse(BaseModel):
 
 
 @router.post("/desk/discuss", response_model=DeskDiscussResponse)
-async def discuss_desk(body: DeskDiscussRequest) -> DeskDiscussResponse:
+async def discuss_desk(
+    body: DeskDiscussRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> DeskDiscussResponse:
+    require_auth_unless_debug(current_user)
     result = facade.discuss_desk(
         body.notes,
         [item.model_dump() for item in body.turns],
@@ -70,8 +78,24 @@ class DeskSpeakRequest(BaseModel):
 
 
 @router.post("/desk/transcribe")
-async def transcribe_desk(file: UploadFile = File(...)) -> dict:
+async def transcribe_desk(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> dict:
+    require_auth_unless_debug(current_user)
+    raw_len = request.headers.get("content-length")
+    if raw_len:
+        try:
+            if int(raw_len) > _MAX_TRANSCRIBE_BYTES:
+                raise HTTPException(
+                    status_code=413, detail="Audio exceeds 25MB upload limit"
+                )
+        except ValueError:
+            pass
     raw = await file.read()
+    if len(raw) > _MAX_TRANSCRIBE_BYTES:
+        raise HTTPException(status_code=413, detail="Audio exceeds 25MB upload limit")
     if not raw:
         raise HTTPException(status_code=400, detail="empty audio")
     try:
@@ -83,7 +107,11 @@ async def transcribe_desk(file: UploadFile = File(...)) -> dict:
 
 
 @router.post("/desk/speak")
-async def speak_desk(body: DeskSpeakRequest) -> Response:
+async def speak_desk(
+    body: DeskSpeakRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> Response:
+    require_auth_unless_debug(current_user)
     if not body.text.strip():
         raise HTTPException(status_code=400, detail="empty text")
     try:

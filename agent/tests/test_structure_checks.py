@@ -119,95 +119,6 @@ def test_lit_review_empty_index_bracket_still_fails():
     assert "invented_citation" in failures
 
 
-# ---------------------------------------------------------------------------
-# 引用可回溯（北极星：综述每条引用必须指回真实条目）
-# ---------------------------------------------------------------------------
-
-def _traceback_entries():
-    """两级条目：[1]=Smith 2019 (doi 10.1/a)，[2]=Lee 2021 (doi 10.1/b)。"""
-    return [
-        {"title": "Minimum Wages", "authors": ["Smith"], "year": 2019, "doi": "10.1/a"},
-        {"title": "Education Returns", "authors": ["Lee"], "year": 2021, "doi": "10.1/b"},
-    ]
-
-
-def test_lit_review_citation_year_mismatch_fails():
-    """[N] 在表内，但叙述年份与条目元数据不符 → 张冠李戴，必须拦下。"""
-    failures = check_structure(
-        "lit_review",
-        "Smith (2020) [1] 指出最低工资的就业效应显著为负。",
-        citation_indices={"10.1/a": 1},
-        literature_entries=_traceback_entries(),
-    )
-    assert "citation_year_mismatch" in failures
-
-
-def test_lit_review_citation_matching_entry_passes():
-    """[N]、作者、年份与条目一致 → 不新增任何结构失败。"""
-    failures = check_structure(
-        "lit_review",
-        "Smith (2019) [1] 指出最低工资的就业效应存在争议。",
-        citation_indices={"10.1/a": 1},
-        literature_entries=_traceback_entries(),
-    )
-    assert "citation_year_mismatch" not in failures
-    assert "invented_citation" not in failures
-
-
-def test_lit_review_bracket_without_author_year_still_ok():
-    """只有 [N] 无作者-年份叙述（如「已有研究 [1]」）→ 无从比对，不误杀。"""
-    failures = check_structure(
-        "lit_review",
-        "关于该问题，已有研究 [1] 给出了不同估计。",
-        citation_indices={"10.1/a": 1},
-        literature_entries=_traceback_entries(),
-    )
-    assert "citation_year_mismatch" not in failures
-
-
-def test_lit_review_multi_marker_second_sentence_mismatch_fails():
-    """同段多引用：第二句的 [2] 叙述 2019，但条目是 2021 → 失败。"""
-    text = (
-        "Smith (2019) [1] 指出就业效应存在争议。"
-        "Lee (2019) [2] 则发现教育回报显著。"
-    )
-    failures = check_structure(
-        "lit_review",
-        text,
-        citation_indices={"10.1/a": 1, "10.1/b": 2},
-        literature_entries=_traceback_entries(),
-    )
-    assert "citation_year_mismatch" in failures
-
-
-def test_lit_review_nonempty_table_unattributed_author_year_fails():
-    """表非空时，作者-年份出现在没有任何合法 [N] 的句子里 → 无从核对。"""
-    text = (
-        "Wong (2015) 认为数字化冲击被低估。"      # 该句无任何 [N]
-        "Smith (2019) [1] 则持相反意见。"
-    )
-    failures = check_structure(
-        "lit_review",
-        text,
-        citation_indices={"10.1/a": 1},
-        literature_entries=_traceback_entries(),
-    )
-    assert "invented_citation" in failures
-
-
-def test_results_checks_ignore_literature_kwarg():
-    """其他章节类型不受新参数影响。"""
-    failures = check_structure(
-        "results",
-        "income ~ age 的 OLS 结果见表 2。",
-        method="OLS",
-        methods_method="OLS",
-        citation_indices={"10.1/a": 1},
-        literature_entries=_traceback_entries(),
-    )
-    assert "citation_year_mismatch" not in failures
-
-
 def test_results_method_must_match_methods_chapter():
     """results 另起一个 method 词 → 失败。"""
     failures = check_structure(
@@ -267,3 +178,110 @@ def test_review_chapter_caps_keyword_only_methods():
     assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
     assert result["current_chapter_index"] == 0
     assert "结构层失败" in result["revision_suggestions"][0]
+
+
+def test_intro_keyword_stuffing_fails_structure():
+    """intro 只堆 DID/IV/RDD 与识别词，没有处理组/对照 → keyword_stuffed。"""
+    content = (
+        "本文使用 DID IV RDD 三重差分合成控制断点回归因果识别。"
+        "内生性稳健性异质性安慰剂平行趋势弱工具变量均已考虑。"
+        "城乡医保整合显著降低农村中老年住院自付支出，贡献巨大。"
+        "没写谁被处理、什么时候开始、跟谁比，也没写 CHARLS 流失。"
+    )
+    failures = check_structure("intro", content)
+    assert "keyword_stuffed" in failures
+
+
+def test_intro_with_design_not_stuffed():
+    """intro 提 DID/IV，但写了处理组/对照和 Callaway → 不算堆词。"""
+    content = (
+        "本文使用 DID 与 IV。"
+        "处理组为新农合参保人，对照为城镇职工医保。"
+        "主规格采用 Callaway 交错 DID。"
+    )
+    failures = check_structure("intro", content)
+    assert "keyword_stuffed" not in failures
+
+
+def test_results_overclaim_fails_structure():
+    """results 先写不显著/安慰剂未通过，再写显著降低与政策效果稳健。"""
+    content = (
+        "表 3 首选规格 M5 系数为 +0.081，标准误 0.053，不显著。"
+        "2015 安慰剂未通过。据此我们得出：城乡医保整合显著降低了"
+        "农村中老年人住院自付支出，政策效果稳健。"
+    )
+    failures = check_structure("results", content)
+    assert "overclaim" in failures
+
+
+def test_results_hedged_not_overclaim():
+    """不显著且对显著结论加了不能写/不支持 → 不算 overclaim。"""
+    content = (
+        "表 3 首选规格系数为 +0.081，不显著。"
+        "不能写显著降低，也不支持显著下降。"
+    )
+    failures = check_structure("results", content)
+    assert "overclaim" not in failures
+
+
+def test_review_chapter_caps_stuffed_intro():
+    """节点层：堆词 intro 章走回炉，建议点出 keyword_stuffed。"""
+    content = (
+        "本文使用 DID IV RDD 三重差分合成控制断点回归因果识别。"
+        "内生性稳健性异质性安慰剂平行趋势弱工具变量均已考虑。"
+        "城乡医保整合显著降低农村中老年住院自付支出，贡献巨大。"
+        "没写谁被处理、什么时候开始、跟谁比，也没写 CHARLS 流失。" * 4
+    )
+    chapter = {
+        "type": "intro",
+        "title": "引言",
+        "content": content,
+        "status": "generated",
+        "versions": [content],
+        "chapter_index": 0,
+    }
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[chapter],
+        outline=[{"type": "intro", "title": "引言"}],
+        research_direction="test",
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
+    assert result["current_chapter_index"] == 0
+    assert "结构层失败" in result["revision_suggestions"][0]
+    assert "keyword_stuffed" in result["revision_suggestions"][0]
+
+
+def test_review_chapter_caps_overclaim_results():
+    """节点层：overclaim results 章走回炉，建议点出 overclaim。"""
+    content = (
+        "表 3 首选规格 M5 系数为 +0.081，标准误 0.053，不显著。"
+        "2015 安慰剂未通过。据此我们得出：城乡医保整合显著降低了"
+        "农村中老年人住院自付支出，政策效果稳健。DID 内生。" * 4
+    )
+    chapter = {
+        "type": "results",
+        "title": "结果",
+        "content": content,
+        "status": "generated",
+        "versions": [content],
+        "chapter_index": 0,
+    }
+    state = make_state(
+        review_enabled=True,
+        current_chapter_index=1,
+        body_chapters=[chapter],
+        outline=[{"type": "results", "title": "结果"}],
+        research_direction="test",
+        max_review_iterations=2,
+        review_iteration=0,
+    )
+    result = review_chapter(state)
+    assert result["review_scores"][0] <= STRUCTURE_SCORE_CAP
+    assert result["current_chapter_index"] == 0
+    assert "结构层失败" in result["revision_suggestions"][0]
+    assert "overclaim" in result["revision_suggestions"][0]

@@ -56,21 +56,24 @@ def test_edges_built_from_references_api(monkeypatch):
 
 
 def test_edges_filter_out_dois_outside_graph(monkeypatch):
-    """图谱外的 cited_doi 被过滤掉（去噪）。"""
+    """图谱外的 cited_doi 先写进文献集，再留边（#8 被引跳）。"""
     entries = [
         {"title": "A", "year": 2020, "doi": "10.1/a"},
         {"title": "B", "year": 2021, "doi": "10.1/b"},
     ]
     _patch_references(monkeypatch, {
-        "10.1/a": ["10.1/b", "10.99/external"],  # external 不在图谱内
+        "10.1/a": ["10.1/b", "10.99/external"],  # external 原本不在图谱内
     })
 
     result = build_citation_graph({"literature_entries": entries})
     edges = result["citation_graph"]["edges"]
+    dois = [e.get("doi") for e in result["literature_entries"]]
 
+    assert "10.99/external" in dois
     assert {"from": "10.1/a", "to": "10.1/b"} in edges
-    assert all(e["to"] != "10.99/external" for e in edges)
-    assert len(edges) == 1
+    assert {"from": "10.1/a", "to": "10.99/external"} in edges
+    assert len(result["literature_entries"]) <= 20
+    assert "10.99/external" in result["citation_indices"]
 
 
 def test_self_loop_excluded(monkeypatch):
@@ -222,3 +225,79 @@ def test_fitness_function_edge_endpoints_in_indices(monkeypatch):
     for edge in edges:
         assert edge["from"] in indices, f"from DOI {edge['from']} 不在 indices"
         assert edge["to"] in indices, f"to DOI {edge['to']} 不在 indices"
+
+
+def test_citation_hop_adds_out_of_set_doi_and_keeps_cap(monkeypatch):
+    """有被引跳时集外 DOI 进 literature_entries，总长 <= 20。"""
+    from nodes.search_literature import MAX_LITERATURE_ENTRIES
+
+    entries = [
+        {"title": "A", "year": 2020, "doi": "10.1/a", "citation_count": 99},
+        {"title": "B", "year": 2021, "doi": "10.1/b", "citation_count": 1},
+    ]
+    _patch_references(monkeypatch, {
+        "10.1/a": ["10.99/external"],
+    })
+    result = build_citation_graph({"literature_entries": entries})
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert "10.99/external" in dois
+    assert len(result["literature_entries"]) <= MAX_LITERATURE_ENTRIES
+    assert {"from": "10.1/a", "to": "10.99/external"} in result["citation_graph"]["edges"]
+
+
+def test_citation_hop_does_not_exceed_max_when_l0_full(monkeypatch):
+    """L0 已 20 条时，集外 DOI 不能再进，边仍滤掉。"""
+    from nodes.search_literature import MAX_LITERATURE_ENTRIES
+
+    entries = [
+        {"title": f"P{i}", "year": 2000 + i, "doi": f"10.1/p{i}", "citation_count": i}
+        for i in range(MAX_LITERATURE_ENTRIES)
+    ]
+    # citation_count 最高的是 p19
+    _patch_references(monkeypatch, {
+        "10.1/p19": ["10.99/external"],
+    })
+    result = build_citation_graph({"literature_entries": entries})
+    dois = [e.get("doi") for e in result["literature_entries"]]
+    assert len(result["literature_entries"]) == MAX_LITERATURE_ENTRIES
+    assert "10.99/external" not in dois
+    assert all(e["to"] != "10.99/external" for e in result["citation_graph"]["edges"])
+
+
+def test_citation_hop_api_failure_does_not_crash(monkeypatch):
+    """无 key / API 失败时不崩，文献集保持 L0。"""
+    entries = [
+        {"title": "A", "year": 2020, "doi": "10.1/a", "citation_count": 10},
+        {"title": "B", "year": 2021, "doi": "10.1/b"},
+    ]
+    from nodes.literature_sources import semantic_scholar
+
+    def _boom(doi, api_key=None, max_results=20):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(semantic_scholar, "semantic_scholar_references", _boom)
+    result = build_citation_graph({"literature_entries": entries})
+    assert len(result["literature_entries"]) == 2
+    assert result["citation_graph"]["edges"] == []
+    assert result["citation_indices"]["10.1/a"] == 1
+
+
+def test_citation_hop_only_queries_top_three(monkeypatch):
+    """被引跳只打 citation 最高的 3 条。"""
+    entries = [
+        {"title": f"P{i}", "year": 2000, "doi": f"10.1/p{i}", "citation_count": i}
+        for i in range(6)
+    ]
+    called: list[str] = []
+    from nodes.literature_sources import semantic_scholar
+
+    def _counter(doi, api_key=None, max_results=20):
+        called.append(doi)
+        return []
+
+    monkeypatch.setattr(semantic_scholar, "semantic_scholar_references", _counter)
+    build_citation_graph({"literature_entries": entries})
+    # 先 hop 最高 3：p5 p4 p3；剩余预算再补 p0 p1（MAX_API_CALL_ENTRIES=5）
+    assert called[:3] == ["10.1/p5", "10.1/p4", "10.1/p3"]
+    assert len(called) == MAX_API_CALL_ENTRIES
+

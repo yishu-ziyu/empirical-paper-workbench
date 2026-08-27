@@ -187,6 +187,7 @@ def compile_pdf(tex_source: str, output_dir: str) -> Optional[str]:
                 [
                     "latexmk",
                     "-xelatex",
+                    "-no-shell-escape",
                     "-interaction=nonstopmode",
                     "-halt-on-error",
                     "-outdir",
@@ -211,6 +212,7 @@ def compile_pdf(tex_source: str, output_dir: str) -> Optional[str]:
             subprocess.run(
                 [
                     "xelatex",
+                    "-no-shell-escape",
                     "-interaction=nonstopmode",
                     "-halt-on-error",
                     "-output-directory",

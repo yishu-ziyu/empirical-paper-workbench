@@ -16,7 +16,7 @@ asyncpg==0.30.0             # PostgreSQL async（生产用）
 psycopg2-binary==2.9.10     # LangGraph PostgresSaver 依赖
 
 # --- 认证 ---
-passlib[bcrypt]==1.7.4
+bcrypt>=5.0.0
 python-jose[cryptography]==3.3.0
 
 # --- 估计门（Facade 调 agent estimate / robustness；与 agent/requirements 对齐）---

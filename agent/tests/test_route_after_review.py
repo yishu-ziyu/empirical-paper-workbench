@@ -1,12 +1,12 @@
 """ADR-0004 Stage 1: route_after_review 条件边测试。
 
-契约：
+契约（修订：删除"达上限即放行"）：
 1. review_enabled=False → 委托 route_after_chapter
 2. 评审通过（score >= 0.7）→ 委托 route_after_chapter
 3. 评审不通过且未达上限 → "generate_chapter"（重生成）
-4. 评审不通过但达上限 → 委托 route_after_chapter
+4. 评审不通过但达上限 → "hitl_pause"（交人裁决，不许静默放行）
 5. 无评审分数或 review_chapter_index → 委托 route_after_chapter
-6. 返回值与 route_after_chapter 兼容（"generate_chapter" / "translate_code"）
+6. 返回值 ∈ {"generate_chapter", "translate_code", "hitl_pause"}
 """
 from __future__ import annotations
 
@@ -115,8 +115,8 @@ def test_review_low_score_iteration_one_returns_generate_chapter():
 # ---------------------------------------------------------------------------
 # 评审不通过但达上限 → 委托 route_after_chapter
 # ---------------------------------------------------------------------------
-def test_review_score_below_threshold_but_iteration_at_max_delegates():
-    """评审不通过但达上限 → 委托 route_after_chapter。"""
+def test_review_score_below_threshold_but_iteration_at_max_goes_to_hitl():
+    """评审不通过且预算耗尽 → hitl_pause，不许静默推进到下一章。"""
     state = _review_state(
         score=0.5,
         review_iteration=2,
@@ -124,12 +124,11 @@ def test_review_score_below_threshold_but_iteration_at_max_delegates():
         current_chapter_index=3,
     )
     result = route_after_review(state)
-    # 委托 route_after_chapter：current=3 < 6 → generate_chapter（下一章）
-    assert result == "generate_chapter"
+    assert result == "hitl_pause"
 
 
-def test_review_score_below_threshold_iteration_at_max_six_chapters_done():
-    """低分 + 达上限 + 6 章完成 → translate_code。"""
+def test_review_score_below_threshold_iteration_at_max_six_chapters_done_hitl():
+    """低分 + 达上限 + 即使 6 章全部写完 → hitl_pause，不许进导出。"""
     state = _review_state(
         score=0.5,
         review_iteration=2,
@@ -137,7 +136,7 @@ def test_review_score_below_threshold_iteration_at_max_six_chapters_done():
         current_chapter_index=6,
     )
     result = route_after_review(state)
-    assert result == "translate_code"
+    assert result == "hitl_pause"
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +195,8 @@ def test_route_after_review_max_iterations_hard_cap_3():
         current_chapter_index=3,
     )
     result = route_after_review(state)
-    # iteration=3 >= 硬上限 3 → 委托 route_after_chapter
-    assert result == "generate_chapter"  # current=3 < 6
+    # iteration=3 >= 硬上限 3 且未过审 → hitl_pause
+    assert result == "hitl_pause"
 
 
 # ---------------------------------------------------------------------------

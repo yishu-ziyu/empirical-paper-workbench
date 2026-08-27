@@ -1,6 +1,6 @@
 """Authentication utilities: password hashing, JWT, and dependency injection.
 
-Uses passlib (bcrypt) for password hashing and python-jose for JWT tokens.
+Uses bcrypt for password hashing and python-jose for JWT tokens.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,17 +23,25 @@ from models.user import User
 # Password hashing
 # ---------------------------------------------------------------------------
 
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt 算法本身只加密前 72 字节(passlib 时代静默截断)。bcrypt 5.x 起
+# 对超长输入直接抛错,这里手动截断,保持与既有 $2b$ 哈希可互相验证。
+_BCRYPT_MAX_SECRET_BYTES = 72
 
 
 def hash_password(password: str) -> str:
     """Return a bcrypt hash of the given plain-text password."""
-    return _pwd_context.hash(password)
+    secret = password.encode("utf-8")[:_BCRYPT_MAX_SECRET_BYTES]
+    return bcrypt.hashpw(secret, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain-text password against a bcrypt hash."""
-    return _pwd_context.verify(plain_password, hashed_password)
+    secret = plain_password.encode("utf-8")[:_BCRYPT_MAX_SECRET_BYTES]
+    try:
+        return bcrypt.checkpw(secret, hashed_password.encode("utf-8"))
+    except ValueError:
+        # 非法哈希串按"密码不匹配"处理,而不是让请求 500。
+        return False
 
 
 # ---------------------------------------------------------------------------

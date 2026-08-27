@@ -45,23 +45,65 @@ def test_generate_chapter_endpoint_returns_generated_chapter(client):
     assert len(data["body_chapters"]) >= 1
 
 
-def test_approve_chapter_endpoint_marks_approved(client):
-    """POST /sessions/{id}/approve-chapter 标记最后生成章节 status=approved。"""
+def test_approve_chapter_review_gate_blocks_failing_chapter(client):
+    """评审未通过（分数 < 阈值）时，不带 force 的 approve 返回 409。"""
     sid = _seed_write_ready()
     gen = client.post(
         f"/sessions/{sid}/generate-chapter",
         json={"chapter": {"type": "intro", "title": "引言"}},
     )
     assert gen.status_code == 200, gen.text
-    resp = client.post(
-        f"/sessions/{sid}/approve-chapter",
-        json={},
+    resp = client.post(f"/sessions/{sid}/approve-chapter", json={})
+    assert resp.status_code == 409, resp.text
+    detail = resp.json()["detail"]
+    assert detail["review_gate"] is True
+    assert detail["needs_force"] is True
+    assert isinstance(detail["score"], float)
+
+
+def test_approve_chapter_force_overrides_gate_and_marks_bypassed(client):
+    """force=True 是唯一旁路：放行并在章节上留 approved_forced 标记。"""
+    sid = _seed_write_ready()
+    gen = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "intro", "title": "引言"}},
     )
+    assert gen.status_code == 200, gen.text
+    blocked = client.post(f"/sessions/{sid}/approve-chapter", json={})
+    assert blocked.status_code == 409
+    forced = client.post(
+        f"/sessions/{sid}/approve-chapter",
+        json={"force": True},
+    )
+    assert forced.status_code == 200, forced.text
+    data = forced.json()
+    assert data["ok"] is True
+    ch = data["chapter"]
+    assert ch["status"] == "approved"
+    assert ch.get("approved_forced") is True
+
+
+def test_approve_chapter_passes_cleanly_when_review_score_high(client):
+    """评审分数达标（>= 阈值）时不需要 force，直接 approve。"""
+    sid = _seed_write_ready(
+        body_chapters=[
+            {
+                "type": "intro",
+                "title": "引言",
+                "content": "已生成并通过评审的正文。",
+                "versions": ["v1"],
+                "status": "generated",
+            }
+        ],
+        review_scores=[0.9],
+    )
+    resp = client.post(f"/sessions/{sid}/approve-chapter", json={})
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["ok"] is True
-    assert data["chapter"]["status"] == "approved"
-    assert data["chapter"]["type"] == "intro"
+    ch = data["chapter"]
+    assert ch["status"] == "approved"
+    assert "approved_forced" not in ch
 
 
 def test_approve_chapter_endpoint_with_explicit_type(client):
@@ -75,9 +117,10 @@ def test_approve_chapter_endpoint_with_explicit_type(client):
         f"/sessions/{sid}/generate-chapter",
         json={"chapter": {"type": "methods", "title": "方法"}},
     )
+    # 该章评审分数(0.4)未达阈值 → 必须走 force 旁路才能审批
     resp = client.post(
         f"/sessions/{sid}/approve-chapter",
-        json={"chapter_type": "intro"},
+        json={"chapter_type": "intro", "force": True},
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()

@@ -11,8 +11,10 @@
   生产环境可通过 monkeypatch 替换为真实 LLM
 - max_review_iterations 硬上限 3（即使用户设 5，也截断为 3）
 - 空章节不触发回退（避免无限循环）
-- 强制通过（iteration >= max）时不重置 review_iteration，让 route_after_review
-  能据此委托 route_after_chapter；新章节检测到 review_chapter_index 变化时重置
+- 预算耗尽仍未过审（iteration >= max 且 score < threshold）时不重置
+  review_iteration；route_after_review 据此转 "hitl_pause" 交人裁决，
+  审批端点上需显式 force 才能放行（留 approved_forced 标记可查）。
+  新章节检测到 review_chapter_index 变化时重置
 """
 from __future__ import annotations
 
@@ -626,8 +628,9 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             **visible,
         }
     else:
-        # 强制通过（iteration >= max）：保留 review_iteration，让 route_after_review
-        # 能据此委托 route_after_chapter；下一章评审时由新章节检测重置
+        # 预算耗尽仍未过审（iteration >= max）：保留 review_iteration，
+        # 让 route_after_review 转入 "hitl_pause" 交人裁决；
+        # 下一章评审时由新章节检测重置
         return {
             "review_feedback": review_feedback,
             "revision_suggestions": revision_suggestions,

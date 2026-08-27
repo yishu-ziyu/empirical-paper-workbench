@@ -48,6 +48,22 @@ def test_ws_streams_status_messages(uploaded_session, client):
 def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
     """WS streams generate_title tokens as streaming_chunk frames."""
     mock_llm_for("generate_title", return_value="Mocked Title")
+    # 图在清洗后因无研究方向而 HITL 暂停；先按产品真实路径设方向,
+    # 跑完预写(含 generate_title)再开 WS,才有标题可流。
+    direction = client.post(
+        f"/sessions/{uploaded_session}/direction",
+        json={
+            "question": "年龄与收入",
+            "dv": "income",
+            "iv": "age",
+            "controls": [],
+            "method": "OLS",
+            "template": "cn_journal",
+        },
+    )
+    assert direction.status_code == 200, (
+        f"set direction failed: {direction.status_code}: {direction.text}"
+    )
     messages = _drain_ws(client, uploaded_session)
     chunks = [m for m in messages if m.get("type") == "streaming_chunk"]
     assert len(chunks) > 0, "no streaming_chunk frames received over WS"

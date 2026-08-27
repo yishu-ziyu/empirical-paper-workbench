@@ -37,6 +37,15 @@ from schemas.responses import (
 router = APIRouter()
 _REGISTERED = False
 
+# 评审通过阈值：与 agent/nodes/review_chapter.REVIEW_SCORE_THRESHOLD 同源。
+# agent 模块缺失时退回默认值，保持与 facade 的 try/except 导入风格一致。
+try:
+    from nodes.review_chapter import (
+        REVIEW_SCORE_THRESHOLD as _REVIEW_SCORE_THRESHOLD,
+    )
+except Exception:  # pragma: no cover
+    _REVIEW_SCORE_THRESHOLD = 0.7
+
 # 合法 chapter type（与 agent/graph.py CHAPTER_TYPES 一致）
 # 端点校验：未知 type 直接 400，避免 generate_chapter 索引流默默走 outline 忽略请求
 _VALID_CHAPTER_TYPES = {
@@ -76,6 +85,9 @@ class ApproveChapterRequest(BaseModel):
 
     # 可选：指定要 approve 的章节 type；缺省为最后生成的章节
     chapter_type: Optional[str] = None
+    # 显式强制放行：评审未通过（分数不达标或接地失败）时必须置 True,
+    # 章节会带上 approved_forced 标记留在产物里（可查）。
+    force: bool = False
 
 
 class RollbackRequest(BaseModel):
@@ -180,10 +192,35 @@ async def approve_chapter_endpoint(
             else:
                 target_idx = len(body_chapters) - 1
 
-    body_chapters[target_idx] = {
+    # 硬证据门（北极星：未经核对的内容不得静默进入论文）：
+    # - 无评审记录 → 视为未核对，不得直接 approve
+    # - score < REVIEW_SCORE_THRESHOLD → 评审未通过
+    # - force=True 是唯一旁路，且章节会带上 approved_forced 标记
+    review_scores = list(state.get("review_scores") or [])
+    if target_idx < len(review_scores):
+        score = float(review_scores[target_idx])
+    else:
+        score = None
+    passed = score is not None and score >= _REVIEW_SCORE_THRESHOLD
+    if not passed and not payload.force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "review_gate": True,
+                "chapter_index": target_idx,
+                "score": score,
+                "threshold": _REVIEW_SCORE_THRESHOLD,
+                "needs_force": True,
+            },
+        )
+
+    approved_chapter = {
         **body_chapters[target_idx],
         "status": "approved",
     }
+    if not passed:
+        approved_chapter["approved_forced"] = True
+    body_chapters[target_idx] = approved_chapter
     facade.update_state(session_id, body_chapters=body_chapters)
 
     return ApproveChapterResponse(

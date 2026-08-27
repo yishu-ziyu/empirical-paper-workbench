@@ -17,6 +17,7 @@ export type OutlinePart = { type: string; title: string }
 export type PausePayload = {
   outline: OutlinePart[]
   render_kwargs: Record<string, number>
+  decideChapters: DecideMode
 }
 
 const CATALOG: OutlinePart[] = [
@@ -152,7 +153,7 @@ export default function WriteLoop({
     if (paragraphs === 'me') render_kwargs.paragraphs = paragraphCount
     if (isResultsPart && tables === 'me') render_kwargs.tables = tableCount
     if (isResultsPart && figures === 'me') render_kwargs.figures = figureCount
-    return { outline: currentOutline, render_kwargs }
+    return { outline: currentOutline, render_kwargs, decideChapters: chapters }
   }
 
   function sendRefine() {
@@ -195,7 +196,7 @@ export default function WriteLoop({
             </div>
             <div>
               <dt className="text-muted">{t('write.infoControls')}</dt>
-              <dd className="text-ink">{controls}</dd>
+              <dd data-testid="info-controls" className="text-ink">{controls}</dd>
             </div>
             <div>
               <dt className="text-muted">{t('write.infoMethod')}</dt>
@@ -203,7 +204,13 @@ export default function WriteLoop({
             </div>
             <div>
               <dt className="text-muted">{t('write.infoDataset')}</dt>
-              <dd className="text-ink">{fileName || 'CSV'}</dd>
+              <dd data-testid="info-dataset" className="text-ink">
+                {fileName
+                  ? rows != null
+                    ? `${fileName} (${rows})`
+                    : fileName
+                  : 'CSV'}
+              </dd>
             </div>
             <div>
               <dt className="text-muted">{t('write.infoOutput')}</dt>
@@ -354,8 +361,9 @@ export default function WriteLoop({
           <button
             type="button"
             data-testid="outline-approve-btn"
+            disabled={!onApproveOutline || writeBusy}
             onClick={() => onApproveOutline?.(currentOutline)}
-            className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] text-white"
+            className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] text-white disabled:opacity-40"
           >
             {t('write.approveOutline')}
           </button>

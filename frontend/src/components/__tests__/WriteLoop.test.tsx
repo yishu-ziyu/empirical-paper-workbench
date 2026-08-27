@@ -40,7 +40,11 @@ describe('WriteLoop pause and refine', () => {
     expect(onApply).toHaveBeenCalledTimes(1)
     expect(onApprove).toHaveBeenCalledTimes(1)
     expect(onApprove.mock.calls[0][0]).toEqual(SERVER_OUTLINE)
-    expect(onApply.mock.calls[0][0]).toEqual({ outline: SERVER_OUTLINE, render_kwargs: {} })
+    expect(onApply.mock.calls[0][0]).toEqual({
+      outline: SERVER_OUTLINE,
+      render_kwargs: {},
+      decideChapters: 'ai',
+    })
   })
 
   test('I-decide chapters changes the outline passed to Approve Outline', async () => {
@@ -91,6 +95,36 @@ describe('WriteLoop pause and refine', () => {
       figures: 1,
     })
     expect(onApply.mock.calls[0][0].outline).toEqual(SERVER_OUTLINE)
+    expect(onApply.mock.calls[0][0].decideChapters).toBe('ai')
+  })
+
+  test('I-decide Apply sends the edited outline and decideChapters=me', async () => {
+    const user = userEvent.setup()
+    const onApply = vi.fn()
+    render(
+      <I18nProvider>
+        <WriteLoop
+          outline={SERVER_OUTLINE}
+          hasOutline
+          onApplyGenerate={onApply}
+        />
+      </I18nProvider>,
+    )
+    await user.click(screen.getByTestId('chapters-me'))
+    await user.click(screen.getByTestId('pause-keep-results'))
+    await user.click(screen.getByTestId('pause-apply'))
+    expect(onApply.mock.calls[0][0].decideChapters).toBe('me')
+    expect(onApply.mock.calls[0][0].outline).toEqual([{ type: 'intro', title: '引言' }])
+  })
+
+  test('writeBusy disables Apply and Approve Outline', () => {
+    render(
+      <I18nProvider>
+        <WriteLoop hasOutline writeBusy onApproveOutline={() => {}} />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('pause-apply')).toBeDisabled()
+    expect(screen.getByTestId('outline-approve-btn')).toBeDisabled()
   })
 
   test('refine 发送 is a button and fires on click and Enter', async () => {

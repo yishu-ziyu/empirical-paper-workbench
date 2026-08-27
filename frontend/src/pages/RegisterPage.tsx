@@ -73,7 +73,7 @@ export default function RegisterPage({ onRegister, onSwitchToLogin }: RegisterPa
   return (
     <div className="min-h-screen bg-bg text-ink">
       <UnauthHeader />
-      <main className="mx-auto flex w-full max-w-[400px] flex-col px-6 pb-24 pt-16">
+      <main className="mx-auto flex w-full max-w-[420px] flex-col px-6 pb-24 pt-24">
         <h1 className="font-serif text-[2rem] leading-tight tracking-tight text-ink">
           {t('register.subtitle')}
         </h1>
@@ -152,7 +152,7 @@ export default function RegisterPage({ onRegister, onSwitchToLogin }: RegisterPa
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-accent px-4 py-2.5 text-sm text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {loading ? t('register.creating') : t('register.createAccount')}
           </button>

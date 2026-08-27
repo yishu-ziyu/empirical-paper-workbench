@@ -16,21 +16,21 @@ export default function ThreeColumn({
   rightOpen = true,
 }: ThreeColumnProps) {
   return (
-    <main className="relative grid flex-1 grid-cols-1 divide-x divide-border lg:grid-cols-[260px_1fr_320px]">
+    <main className="relative grid flex-1 grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)_300px]">
       <aside
         data-testid="outline-panel"
-        className={`overflow-auto bg-panel p-4 transition-all duration-300 ${
+        className={`overflow-auto border-b border-border bg-cream p-5 transition-all duration-300 lg:border-b-0 lg:border-r ${
           leftOpen ? 'max-h-full opacity-100' : 'max-h-0 overflow-hidden opacity-0 lg:max-h-full lg:opacity-100'
         }`}
       >
         <div className="animate-fade-in">{outline}</div>
       </aside>
-      <section data-testid="editor-panel" className="overflow-auto bg-bg p-6 transition-all duration-300">
+      <section data-testid="editor-panel" className="overflow-auto bg-bg">
         {editor}
       </section>
       <aside
         data-testid="agent-panel"
-        className={`overflow-auto bg-panel p-4 transition-all duration-300 ${
+        className={`overflow-auto border-t border-border bg-cream p-5 transition-all duration-300 lg:border-l lg:border-t-0 ${
           rightOpen ? 'max-h-full opacity-100' : 'max-h-0 overflow-hidden opacity-0 lg:max-h-full lg:opacity-100'
         }`}
       >

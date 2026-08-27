@@ -12,7 +12,7 @@ export function CsvDropZone({ uploading = false, uploadError = null, onBrowse, o
 
   return (
     <div
-      className="rounded-lg border border-dashed border-border bg-panel px-6 py-12 text-center"
+      className="rounded-2xl border border-dashed border-border bg-panel px-6 py-14 text-center"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()

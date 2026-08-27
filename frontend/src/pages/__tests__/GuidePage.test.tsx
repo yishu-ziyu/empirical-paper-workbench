@@ -19,14 +19,18 @@ function renderGuide(props: Partial<ComponentProps<typeof GuidePage>> = {}) {
 }
 
 describe('GuidePage 进门介绍', () => {
-  test('说清产品做什么，并列出三步', () => {
+  test('说清产品做什么，并列出四步', () => {
     renderGuide()
     expect(screen.getByTestId('guide-page')).toBeInTheDocument()
     expect(screen.getByText('用数据写实证论文')).toBeInTheDocument()
     expect(screen.getByTestId('guide-steps')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '四步写出论文' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '上传 CSV' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '填写研究设计' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '看结果，再写章节' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '看估计' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '按章写，再导出' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '生成论文长什么样' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '从上传到导出，你都在场' })).toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
   })
 

@@ -85,7 +85,17 @@ OMITTED_CELL = "未估计"
 
 _RHS_SKIP = {"", "1", "0"}
 _SIMPLE_VAR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_COEF_HEADER_MARKERS = ("系数", "coef", "se", "p")
+_COEF_HEADER_MARKERS = (
+    "系数",
+    "coef",
+    "se",
+    "std. error",
+    "std_error",
+    "p",
+    "p值",
+    "pvalue",
+    "p-value",
+)
 
 
 def _as_name_list(raw: Any) -> List[str]:
@@ -231,51 +241,56 @@ def _table_rows_from_fit(
 
 
 def _is_coef_header_line(line: str) -> bool:
+    """True only for a real coef header (系数/SE/p), not a 变量 codebook."""
     if "|" not in line:
         return False
     cells = [c.strip().lower() for c in line.strip().strip("|").split("|")]
-    if not cells:
-        return False
-    if cells[0] in {"变量", "variable"}:
-        return True
-    return any(mark in cells for mark in _COEF_HEADER_MARKERS)
+    return bool(cells) and any(mark in cells for mark in _COEF_HEADER_MARKERS)
 
 
 def looks_like_coef_table(content: str) -> bool:
     return any(_is_coef_header_line(line) for line in (content or "").splitlines())
 
 
-def _main_results_table_end(lines: List[str]) -> int:
-    """Last line index of the 主结果 coef table, not a later robustness table."""
-    start = None
+def _main_results_table_span(lines: List[str]) -> Optional[tuple[int, int]]:
+    """Inclusive (start, end) of the 主结果 coef table, not a later robustness table."""
+    heading = None
     for i, line in enumerate(lines):
         if re.match(r"^#+\s*主结果\s*$", line.strip()):
+            heading = i
+            break
+    start = None
+    search_from = heading if heading is not None else 0
+    for i in range(search_from, len(lines)):
+        if _is_coef_header_line(lines[i]):
             start = i
             break
-    if start is None:
-        for i, line in enumerate(lines):
-            if _is_coef_header_line(line):
+    if start is None and heading is not None:
+        for i in range(heading, len(lines)):
+            stripped = lines[i].strip()
+            if stripped.startswith("|") and stripped.count("|") >= 2:
                 start = i
                 break
     if start is None:
-        return -1
-    last = -1
-    seen_table = False
+        return None
+    end = start
     for i in range(start, len(lines)):
         stripped = lines[i].strip()
         if stripped.startswith("|") and stripped.count("|") >= 2:
-            seen_table = True
-            last = i
+            end = i
             continue
-        if seen_table:
+        if i > start:
             break
-    return last
+    return start, end
 
 
 def splice_missing_table_rows(
     content: str, spec: Dict[str, Any], estimate: Dict[str, Any]
 ) -> str:
-    """Insert omitted/real rows after the main-results table only."""
+    """Insert omitted/real rows after the main-results table only.
+
+    Presence of a name is checked inside that 主结果 table, not later 稳健性.
+    """
     if not content:
         return content
     formula = estimate.get("formula") or spec.get("formula") or spec.get("feols_formula")
@@ -288,16 +303,18 @@ def splice_missing_table_rows(
         cells = [c.strip() for c in row.strip().strip("|").split("|")]
         if cells:
             by_name[cells[0]] = row if row.startswith("|") else f"| {row}"
+    lines = content.splitlines()
+    span = _main_results_table_span(lines)
+    haystack = "\n".join(lines[span[0] : span[1] + 1]) if span else ""
     extras: List[str] = []
     for name in names:
-        if re.search(rf"\|\s*{re.escape(name)}\s*\|", content):
+        if haystack and re.search(rf"\|\s*{re.escape(name)}\s*\|", haystack):
             continue
         extras.append(by_name.get(name) or row_for_name(name))
     if not extras:
         return content
-    lines = content.splitlines()
-    insert_at = _main_results_table_end(lines)
-    if insert_at >= 0:
+    if span is not None:
+        insert_at = span[1]
         lines[insert_at + 1 : insert_at + 1] = extras
         return "\n".join(lines)
     header = [

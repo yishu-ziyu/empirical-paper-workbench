@@ -17,6 +17,7 @@ import pytest
 
 from nodes.export_docx import (
     export_docx,
+    normalize_template,
     render_template,
     TEMPLATE_NAMES,
 )
@@ -85,6 +86,43 @@ def test_render_template_unknown_name_raises():
     """未知模板名抛 ValueError。"""
     with pytest.raises(ValueError):
         render_template("nonexistent", title="T", author="A", chapters=[])
+
+
+@pytest.mark.parametrize(
+    "alias,canonical",
+    [
+        ("undergrad", "undergraduate"),
+        ("master", "master_thesis"),
+        ("en_submission", "english_submission"),
+        ("undergraduate", "undergraduate"),
+        ("cn_journal", "cn_journal"),
+    ],
+)
+def test_normalize_template_aliases(alias, canonical):
+    """DirectionForm / sample write-loop aliases map onto TEMPLATE_NAMES."""
+    assert normalize_template(alias) == canonical
+
+
+def test_render_template_undergrad_alias_matches_undergraduate():
+    """template=undergrad renders the undergraduate template, not ValueError."""
+    kwargs = dict(
+        title="T",
+        author="A",
+        chapters=[{"title": "S", "content": "C"}],
+    )
+    aliased = render_template("undergrad", **kwargs)
+    canonical = render_template("undergraduate", **kwargs)
+    assert aliased == canonical
+    assert "本科毕业论文模板" in aliased
+
+
+def test_export_docx_undergrad_alias_from_state(tmp_path, monkeypatch):
+    """state.export_template='undergrad' must not raise; uses undergraduate.tex."""
+    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("nodes.export_docx.convert_docx", lambda tex, outdir: None)
+    result = export_docx(_full_state(export_template="undergrad"))
+    assert "本科毕业论文模板" in result["latex_source"]
+    assert "\\begin{document}" in result["latex_source"]
 
 
 def test_render_template_cn_journal_uses_ctex():

@@ -13,7 +13,7 @@ export type { PaperPathState }
 function statusClass(status: PathStatus): string {
   if (status === 'completed' || status === 'active') return 'text-accent'
   if (status === 'paused') return 'text-warning'
-  return 'text-muted'
+  return 'text-ink'
 }
 
 function dotClass(status: PathStatus): string {
@@ -32,8 +32,8 @@ export default function PaperPath({ onSelect, ...state }: PaperPathProps) {
   const { nodes, clean } = derivePaperPath(state)
 
   return (
-    <section data-testid="paper-path">
-      <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+    <section data-testid="paper-path" className="flex min-h-0 flex-col">
+      <h2 className="mb-4 font-mono text-[12px] uppercase tracking-[0.16em] text-muted">
         {t('bench.steps')}
       </h2>
       <ol className="relative ml-1.5 border-l border-border">
@@ -45,45 +45,41 @@ export default function PaperPath({ onSelect, ...state }: PaperPathProps) {
               key={id}
               data-testid={`paper-path-${id}`}
               data-status={status}
-              className="relative"
+              className={`relative pb-3 pl-5 ${status === 'paused' ? 'bg-warning/5' : ''}`}
             >
+              <span
+                aria-hidden
+                className={`absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full ring-4 ring-cream ${dotClass(status)}`}
+              />
               <button
                 type="button"
                 onClick={() => onSelect?.(id)}
-                className={`w-full py-2.5 pl-5 pr-1 text-left ${
-                  status === 'paused' ? 'bg-warning/5' : ''
-                }`}
+                className="flex w-full items-baseline justify-between gap-2 py-0.5 text-left"
               >
-                <span
-                  aria-hidden
-                  className={`absolute -left-[5px] top-3.5 h-2.5 w-2.5 rounded-full ring-4 ring-cream ${dotClass(status)}`}
-                />
-                <div className="flex items-center justify-between gap-2">
-                  <p className={`font-mono text-[11px] leading-4 ${statusClass(status)}`}>
-                    {t(`path.${id}`)}
-                  </p>
-                  {paused && (
-                    <span className="shrink-0 font-mono text-[10px] text-warning">{t('path.paused')}</span>
-                  )}
-                </div>
-                {id === 'clean_data' && (
-                  <ol className="mt-2 space-y-1">
-                    {CLEAN_STEPS.map((step) => (
-                      <li
-                        key={step}
-                        data-testid={`clean-step-${step}`}
-                        data-status={clean[step]}
-                        className={`font-mono text-[11px] leading-4 ${statusClass(clean[step])}`}
-                      >
-                        {t(`path.clean.${step}`)}
-                        {clean[step] === 'paused' && (
-                          <span className="ml-2 text-warning">{t('path.paused')}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                <span className={`font-mono text-[12px] leading-5 ${statusClass(status)}`}>
+                  {t(`path.${id}`)}
+                </span>
+                {paused && (
+                  <span className="shrink-0 font-mono text-[10px] text-warning">{t('path.paused')}</span>
                 )}
               </button>
+              {id === 'clean_data' && (
+                <ol className="mt-1.5 space-y-1 border-l border-border pl-3">
+                  {CLEAN_STEPS.map((step) => (
+                    <li
+                      key={step}
+                      data-testid={`clean-step-${step}`}
+                      data-status={clean[step]}
+                      className={`font-mono text-[12px] leading-5 ${statusClass(clean[step])}`}
+                    >
+                      {t(`path.clean.${step}`)}
+                      {clean[step] === 'paused' && (
+                        <span className="ml-2 text-[10px] text-warning">{t('path.paused')}</span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
             </li>
           )
         })}

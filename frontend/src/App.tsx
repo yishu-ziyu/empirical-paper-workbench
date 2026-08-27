@@ -13,6 +13,7 @@ import PaperPath from './components/PaperPath'
 import DirectionForm from './components/DirectionForm'
 import type { DirectionFormData } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
+import WriteLoop from './components/WriteLoop'
 import ChapterWriter from './components/ChapterWriter'
 import ChapterList from './components/ChapterList'
 import ReviewPanel from './components/ReviewPanel'
@@ -125,6 +126,10 @@ function App() {
       return []
     }
   })
+  const [csvName, setCsvName] = useState<string | null>(null)
+  const [csvRows, setCsvRows] = useState<number | null>(null)
+  const [csvCols, setCsvCols] = useState<number | null>(null)
+  const [directionRecord, setDirectionRecord] = useState<DirectionFormData | null>(null)
 
   const [globalError, setGlobalError] = useState<string | null>(null)
   const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -248,6 +253,16 @@ function App() {
     }
     const asked = data.research_direction?.question?.trim()
     if (asked) setShapedQuestion(asked)
+    if (data.research_direction) {
+      setDirectionRecord((prev) => ({
+        question: asked || prev?.question || '',
+        dv: data.research_direction?.dv || prev?.dv || '',
+        iv: data.research_direction?.iv || prev?.iv || '',
+        controls: prev?.controls || [],
+        method: data.research_direction?.method || prev?.method || '',
+        template: prev?.template || 'undergrad',
+      }))
+    }
   }, [])
 
   useEffect(() => {
@@ -432,16 +447,21 @@ function App() {
       if (Array.isArray(cols) && cols.every((item: unknown) => typeof item === 'string')) {
         setDataColumns(cols)
         sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(cols))
+        setCsvCols(cols.length)
       } else {
         try {
           const header = (await file.slice(0, 2048).text()).split(/\r?\n/).find(Boolean) || ''
           const parsed = header.split(',').map((name) => name.trim()).filter(Boolean)
           setDataColumns(parsed)
           sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(parsed))
+          setCsvCols(parsed.length)
         } catch {
           setDataColumns([])
         }
       }
+      setCsvName(file.name)
+      const rowCount = data.dataset_meta?.rows
+      setCsvRows(typeof rowCount === 'number' ? rowCount : null)
       markGuideSeen()
       setSessionId(data.session_id)
     } catch (err) {
@@ -508,6 +528,7 @@ function App() {
         setDirectionOpen(false)
       }
       if (data.question.trim()) setShapedQuestion(data.question)
+      setDirectionRecord(data)
       if (result.identification_failed) {
         showGlobalError(t('app.identBlocked'))
       }
@@ -567,6 +588,11 @@ function App() {
     }
     void handleWriteChapter(ch.type, ch.title)
   }, [outline, writtenChapters, identFailed, handleWriteChapter, showGlobalError, t])
+
+  const handleApplyGenerate = useCallback(() => {
+    const idx = outline.findIndex((ch) => !writtenChapters.some((item) => item.type === ch.type && item.content))
+    handleSelectChapter(idx >= 0 ? idx : currentChapterIndex)
+  }, [outline, writtenChapters, currentChapterIndex, handleSelectChapter])
 
   const handleDocExport = useCallback(async (format: 'tex' | 'pdf' | 'docx', template: string) => {
     if (!sessionId) return
@@ -845,6 +871,23 @@ function App() {
                 {t('guide.nowExport')}
               </p>
             )}
+            <WriteLoop
+              fileName={csvName}
+              rows={csvRows}
+              cols={csvCols ?? (dataColumns.length || null)}
+              direction={directionRecord}
+              hasDirection={Boolean(directionSummary)}
+              hasOutline={outline.length > 0 && !identFailed}
+              hasChapter={Boolean(writtenChapter?.content)}
+              isResultsPart={outline[currentChapterIndex]?.type === 'results'}
+              partIndex={currentChapterIndex + 1}
+              agentPct={writeBusy ? 10 : directionBusy || uploading ? 0 : null}
+              onAddMore={() => setDirectionOpen(true)}
+              onGoPart1={() => setWorkbenchTab('paper')}
+              onApplyGenerate={handleApplyGenerate}
+              onReviseOutline={() => setDirectionOpen(true)}
+              onApproveOutline={handleApplyGenerate}
+            />
             <section data-testid="direction-section" className="mb-8 rounded-lg border border-border bg-panel p-6">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="font-serif text-[1.15rem] text-ink">{t('app.directionTitle')}</h2>

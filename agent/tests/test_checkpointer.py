@@ -55,7 +55,9 @@ def test_unset_url_does_not_call_psycopg(monkeypatch, reset_graph_runtime):
     assert calls == []
 
 
-def test_connect_failure_falls_back_to_memory(monkeypatch, reset_graph_runtime):
+def test_connect_failure_fails_loud_without_memory_cache(
+    monkeypatch, reset_graph_runtime
+):
     monkeypatch.setenv(
         "CHECKPOINT_DB_URL",
         "postgresql://nope@127.0.0.1:1/none",
@@ -66,12 +68,15 @@ def test_connect_failure_falls_back_to_memory(monkeypatch, reset_graph_runtime):
         raise OSError("connection refused")
 
     monkeypatch.setattr(graph_mod.psycopg, "connect", boom)
-    cp = graph_mod._get_checkpointer()
-    assert isinstance(cp, MemorySaver)
+    with pytest.raises(OSError, match="connection refused"):
+        graph_mod._get_checkpointer()
+    assert graph_mod._CHECKPOINTER is None
 
 
-def test_setup_failure_closes_connection_then_memory(monkeypatch, reset_graph_runtime):
-    """connect() success + setup() fail must close the socket before MemorySaver."""
+def test_setup_failure_closes_connection_then_fails_loud(
+    monkeypatch, reset_graph_runtime
+):
+    """connect() success + setup() fail must close the socket, then raise."""
     monkeypatch.setenv(
         "CHECKPOINT_DB_URL",
         "postgresql://nope@127.0.0.1:1/none",
@@ -92,9 +97,10 @@ def test_setup_failure_closes_connection_then_memory(monkeypatch, reset_graph_ru
 
     monkeypatch.setattr(graph_mod.psycopg, "connect", lambda *_a, **_k: FakeConn())
     monkeypatch.setattr(graph_mod, "PostgresSaver", BoomSaver)
-    cp = graph_mod._get_checkpointer()
-    assert isinstance(cp, MemorySaver)
+    with pytest.raises(RuntimeError, match="setup failed"):
+        graph_mod._get_checkpointer()
     assert closed == [1]
+    assert graph_mod._CHECKPOINTER is None
 
 
 def test_public_graph_is_lazy_until_used(monkeypatch, reset_graph_runtime):

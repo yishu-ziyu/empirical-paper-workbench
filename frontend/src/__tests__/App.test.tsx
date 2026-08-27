@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
 import { API_BASE } from '../lib/apiBase'
@@ -370,5 +371,216 @@ describe('App 三栏布局', () => {
     expect(await screen.findByLabelText(/因变量/i)).toHaveValue('income')
     expect(screen.getByTestId('method-selector')).toHaveValue('OLS')
     expect(screen.getByTestId('data-columns')).toHaveTextContent('income')
+  })
+
+  test('Approve Outline POSTs /resume and does not generate-chapter', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/resume')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ok: true,
+            outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+          }),
+        })
+      }
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+            star_rating: null,
+            identification_failed: false,
+            identification_report: '当前方法没有对应的识别诊断套餐',
+            claim: 'association',
+            literature_source: 'mock',
+            robustness_status: 'ran',
+            estimate: { treatment_row: '| age | 0.1234 | 0.0456 | 0.0078 |', produced_by: 'estimate' },
+            results: '| age | 0.1234 | 0.0456 | 0.0078 |',
+          }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+
+    fireEvent.change(screen.getByLabelText(/研究问题/), { target: { value: '教育对收入的影响' } })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+    expect(await screen.findByTestId('outline-approve-btn')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('outline-approve-btn'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/resume'))).toBe(true)
+    })
+    const resumeCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/resume'))!
+    expect(JSON.parse(String(resumeCall[1].body)).outline).toEqual([
+      { type: 'intro', title: '引言' },
+      { type: 'results', title: '结果' },
+    ])
+    expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toBe(false)
+    expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/approve-chapter'))).toBe(false)
+    await waitFor(() => {
+      expect(screen.queryByTestId('outline-approve-btn')).not.toBeInTheDocument()
+    })
+  })
+
+  test('I-decide chapters change the outline posted to /resume', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/resume')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, outline: [{ type: 'intro', title: '引言' }] }),
+        })
+      }
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+            identification_failed: false,
+            identification_report: 'ok',
+            claim: 'association',
+            literature_source: 'mock',
+            robustness_status: 'ran',
+            estimate: { treatment_row: '| age | 0.1 | 0.0 | 0.0 |', produced_by: 'estimate' },
+            results: '| age | 0.1 |',
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    fireEvent.change(screen.getByLabelText(/研究问题/), { target: { value: '教育对收入的影响' } })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+    expect(await screen.findByTestId('chapters-me')).toBeInTheDocument()
+    await user.click(screen.getByTestId('chapters-me'))
+    await user.click(screen.getByTestId('pause-keep-results'))
+    await user.click(screen.getByTestId('outline-approve-btn'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/resume'))).toBe(true)
+    })
+    const resumeCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/resume'))!
+    expect(JSON.parse(String(resumeCall[1].body)).outline).toEqual([{ type: 'intro', title: '引言' }])
+    expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toBe(false)
+  })
+
+  test('I-decide paragraphs appear in generate-chapter render_kwargs', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/generate-chapter')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            chapter: { type: 'intro', title: '引言', content: '正文', status: 'generated' },
+            body_chapters: [{ type: 'intro', title: '引言', content: '正文', status: 'generated' }],
+          }),
+        })
+      }
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+            identification_failed: false,
+            identification_report: 'ok',
+            claim: 'association',
+            literature_source: 'mock',
+            robustness_status: 'ran',
+            estimate: { treatment_row: '| age | 0.1 | 0.0 | 0.0 |', produced_by: 'estimate' },
+            results: '| age | 0.1 |',
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    fireEvent.change(screen.getByLabelText(/研究问题/), { target: { value: '教育对收入的影响' } })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+    expect(await screen.findByTestId('paragraphs-me')).toBeInTheDocument()
+    await user.click(screen.getByTestId('paragraphs-me'))
+    fireEvent.change(screen.getByTestId('pause-paragraphs'), { target: { value: '5' } })
+    await user.click(screen.getByTestId('pause-apply'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toBe(true)
+    })
+    const genCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/generate-chapter'))!
+    const body = JSON.parse(String(genCall[1].body))
+    expect(body.render_kwargs.paragraphs).toBe(5)
+    expect(body.chapter).toEqual({ type: 'intro', title: '引言' })
+    expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/resume'))).toBe(false)
+  })
+
+  test('refine 发送 POSTs /regenerate with the typed instruction', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/regenerate')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            chapter: { type: 'intro', title: '引言', content: '改写后', status: 'generated' },
+            body_chapters: [{ type: 'intro', title: '引言', content: '改写后', status: 'generated' }],
+          }),
+        })
+      }
+      if (href.endsWith('/sessions/test-sess')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            exists: true,
+            claim: 'association',
+            literature_source: 'mock',
+            robustness_status: 'ran',
+            estimate: { treatment_row: '| age | 0.1 | 0.0 | 0.0 |' },
+            results: '| age | 0.1 |',
+            outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+            body_chapters: [{ type: 'intro', title: '引言', content: '原稿', status: 'generated' }],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age', question: '教育对收入的影响' },
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('refine-send-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('refine-send-btn').tagName).toBe('BUTTON')
+    await user.type(screen.getByTestId('refine-input'), '写短一点')
+    await user.click(screen.getByTestId('refine-send-btn'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/regenerate'))).toBe(true)
+    })
+    const regenCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/regenerate'))!
+    expect(JSON.parse(String(regenCall[1].body))).toEqual({
+      chapter_index: 0,
+      instruction: '写短一点',
+    })
+    expect(await screen.findByText('改写后')).toBeInTheDocument()
   })
 })

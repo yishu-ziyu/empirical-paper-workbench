@@ -103,6 +103,7 @@ class RegenerateRequest(BaseModel):
     """POST /sessions/{id}/regenerate 请求体。"""
 
     chapter_index: int = 0
+    instruction: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -301,15 +302,18 @@ async def regenerate_chapter_endpoint(
 ) -> RegenerateResponse:
     """重新生成当前章。
 
-    Request:  ``{"chapter_index": int}``
+    Request:  ``{"chapter_index": int, "instruction"?: str}``
     Response: ``{"chapter": {...含新版本...}, "body_chapters": [...]}``
 
-    设置 ``state['current_chapter_index']``，调 ``generate_chapter(state)``
-    节点，合并结果。
+    设置 ``state['current_chapter_index']``，可选把 ``instruction`` 写入
+    ``revision_suggestions[index]``，再调 ``generate_chapter(state)``。
+    空 instruction 仍重生成。
     """
     require_session_ownership(session_id, current_user)
     chapter_index = payload.chapter_index
-    state = facade.regenerate_chapter(session_id, chapter_index)
+    state = facade.regenerate_chapter(
+        session_id, chapter_index, instruction=payload.instruction
+    )
 
     body_chapters = state.get("body_chapters", []) or []
     idx = (

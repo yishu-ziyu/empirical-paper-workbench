@@ -59,21 +59,23 @@ def effect_from_fit(
     return coef, se, p, n
 
 
-def _fit(formula: str, df: Any, cluster: Optional[str]) -> Any:
+def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str]:
     try:
         import statspai
 
         kwargs: Dict[str, Any] = {"data": df}
         if cluster:
             kwargs["vcov"] = {"CRV1": cluster}
-        return statspai.feols(formula, **kwargs)
+        return statspai.feols(formula, **kwargs), "statspai.feols"
     except Exception:
         import statsmodels.formula.api as smf
 
+        # pyfixest FE syntax (`y ~ x | id + time`) is not statsmodels-legal.
+        sm_formula = str(formula).split("|", 1)[0].strip()
         fit_kwargs: Dict[str, Any] = {}
         if cluster is not None:
             fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
-        return smf.ols(formula, data=df).fit(**fit_kwargs)
+        return smf.ols(sm_formula, data=df).fit(**fit_kwargs), "statsmodels.ols"
 
 
 def _fmt(x: Optional[float]) -> str:
@@ -190,14 +192,14 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
-    fitted = _fit(str(formula), df, cluster)
+    fitted, estimator = _fit(str(formula), df, cluster)
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     treatment_row = f"| {treatment} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
     payload = {
         "status": "ok",
         "produced_by": "estimate",
-        "estimator": "statspai.feols",
+        "estimator": estimator,
         "method": str(spec.get("method") or "ols"),
         "formula": formula,
         "treatment": treatment,

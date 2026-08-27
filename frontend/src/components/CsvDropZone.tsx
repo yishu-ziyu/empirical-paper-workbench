@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useT } from '../lib/i18n'
 
 export interface CsvDropZoneProps {
@@ -7,17 +8,30 @@ export interface CsvDropZoneProps {
   onFile?: (file: File) => void
 }
 
+function isCsvFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.csv')
+}
+
 export function CsvDropZone({ uploading = false, uploadError = null, onBrowse, onFile }: CsvDropZoneProps) {
   const { t } = useT()
+  const [dropError, setDropError] = useState<string | null>(null)
+  const error = dropError || uploadError
 
   return (
     <div
+      data-testid="csv-drop-zone"
       className="rounded-2xl border border-dashed border-border bg-panel px-6 py-14 text-center"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault()
         const file = e.dataTransfer.files?.[0]
-        if (file && onFile) onFile(file)
+        if (!file) return
+        if (!isCsvFile(file)) {
+          setDropError(t('workbench.dropCsvOnly'))
+          return
+        }
+        setDropError(null)
+        onFile?.(file)
       }}
     >
       <svg className="mx-auto h-10 w-10 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
@@ -35,9 +49,9 @@ export function CsvDropZone({ uploading = false, uploadError = null, onBrowse, o
         {uploading ? t('app.uploading') : t('workbench.browse')}
       </button>
       <p className="mt-4 text-[11px] leading-5 text-muted">{t('workbench.dropWarn')}</p>
-      {uploadError && (
+      {error && (
         <p data-testid="upload-error" className="mt-2 text-[12px] text-danger">
-          {uploadError}
+          {error}
         </p>
       )}
     </div>

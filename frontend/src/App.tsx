@@ -692,7 +692,7 @@ function App() {
         <div className="flex items-center gap-3">
           <BrandMark />
         </div>
-        <div className="hidden items-center rounded-lg bg-bg p-0.5 sm:flex">
+        <div className="flex items-center rounded-lg bg-bg p-0.5">
           {([
             ['paper', t('workbench.tabPaper')],
             ['data', t('workbench.tabData')],

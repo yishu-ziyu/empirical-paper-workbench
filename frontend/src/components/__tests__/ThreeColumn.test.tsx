@@ -15,11 +15,17 @@ describe('ThreeColumn 桌面三栏', () => {
     expect(screen.getByTestId('outline-panel')).toBeInTheDocument()
     expect(screen.getByTestId('editor-panel')).toBeInTheDocument()
     expect(right).toContainElement(screen.getByTestId('paper-path'))
-    expect(right.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0/)
+    expect(right.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0|lg:block|lg:hidden/)
     expect(right.className).toMatch(/border-l/)
-    const main = right.parentElement
-    expect(main?.className).toMatch(/grid-cols-\[220px_minmax\(0,1fr\)_280px\]/)
-    expect(main?.className).toMatch(/min-w-\[760px\]/)
-    expect(main?.className).not.toMatch(/grid-cols-1/)
+    const main = screen.getByTestId('desk-columns')
+    expect(main).toBe(right.parentElement)
+    expect(main.className).toMatch(/desk-columns/)
+    expect(main.className).not.toMatch(/grid-cols-1|lg:grid-cols/)
+    expect(main).toHaveStyle({
+      display: 'grid',
+      gridTemplateColumns: '220px minmax(0, 1fr) 280px',
+      minWidth: '760px',
+    })
+    expect(right).toHaveStyle({ minWidth: '280px' })
   })
 })

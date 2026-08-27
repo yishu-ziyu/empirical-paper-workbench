@@ -34,7 +34,8 @@ export function CsvDropZone({ uploading = false, uploadError = null, onBrowse, o
         onFile?.(file)
       }}
     >
-      <p className="text-[15px] leading-7 text-ink/80">{t('workbench.dropBody')}</p>
+      <p className="text-[15px] font-medium tracking-tight text-ink">{t('guide.ingestKicker')}</p>
+      <p className="mt-1 text-[15px] leading-7 text-ink/80">{t('workbench.dropBody')}</p>
       <p className="mt-1 text-[12px] text-muted">{t('workbench.dropFormats')}</p>
       <div className="mt-5 flex items-center gap-2">
         <button

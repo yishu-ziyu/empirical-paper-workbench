@@ -111,4 +111,12 @@ body {
   .thread-card {
     @apply rounded-[20px] border border-black/[0.06] bg-white shadow-[0_8px_28px_rgba(24,21,21,0.045)];
   }
+
+  .source-tile {
+    @apply flex w-[6.75rem] flex-col items-center rounded-[18px] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(24,21,21,0.08)];
+  }
+
+  .code-card {
+    @apply overflow-x-auto rounded-[20px] bg-[#1c1b1a] px-4 py-3 font-mono text-[12px] leading-6 text-[#e8e4dc];
+  }
 }

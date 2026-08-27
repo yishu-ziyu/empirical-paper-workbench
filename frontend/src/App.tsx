@@ -55,7 +55,7 @@ type DeskSnapshot = {
   robustness_status?: string | null
   outline?: OutlineChapter[]
   body_chapters?: WrittenChapter[]
-  research_direction?: { method?: string; dv?: string; iv?: string } | null
+  research_direction?: { method?: string; dv?: string; iv?: string; question?: string } | null
 }
 
 function storeToken(token: string): void {
@@ -246,6 +246,8 @@ function App() {
       setDirectionSummary(summary)
       setDirectionOpen(false)
     }
+    const asked = data.research_direction?.question?.trim()
+    if (asked) setShapedQuestion(asked)
   }, [])
 
   useEffect(() => {
@@ -505,6 +507,7 @@ function App() {
         setDirectionSummary(summary)
         setDirectionOpen(false)
       }
+      if (data.question.trim()) setShapedQuestion(data.question)
       if (result.identification_failed) {
         showGlobalError(t('app.identBlocked'))
       }
@@ -879,6 +882,7 @@ function App() {
                 robustnessStatus={robustnessStatus}
                 writeBlockers={writeBlockers}
                 identificationFailed={identFailed}
+                question={shapedQuestion || null}
               />
             )}
             {identReport && (

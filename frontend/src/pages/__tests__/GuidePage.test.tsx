@@ -31,6 +31,9 @@ describe('GuidePage 进门介绍', () => {
     expect(screen.getByRole('heading', { name: '润色并导出' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '生成论文长什么样' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '从上传到导出，你都在场' })).toBeInTheDocument()
+    expect(screen.getByText('马上接上数据')).toBeInTheDocument()
+    expect(screen.getAllByText(/Word · LaTeX/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('OLS · DiD · IV · RD · SCM').length).toBeGreaterThan(0)
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
   })
 

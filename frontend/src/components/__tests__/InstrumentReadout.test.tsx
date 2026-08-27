@@ -28,6 +28,20 @@ describe('InstrumentReadout', () => {
     expect(screen.queryByTestId('readout-block')).not.toBeInTheDocument()
   })
 
+  test('question bubble and code card sit above the table', () => {
+    renderReadout(
+      <InstrumentReadout
+        claim="association"
+        question="年龄和收入是否相关？"
+        treatmentRow="| age | 0.1234 | 0.0456 | 0.0078 |"
+      />,
+    )
+    expect(screen.getByTestId('readout-question')).toHaveTextContent('年龄和收入是否相关？')
+    expect(screen.getByTestId('readout-code')).toHaveTextContent('age')
+    expect(screen.getByTestId('readout-code')).toHaveTextContent('0.1234')
+    expect(screen.getByTestId('readout-table')).toHaveTextContent('age')
+  })
+
   test('empty table tells the user results cannot be written', () => {
     renderReadout(<InstrumentReadout claim="association" />)
     expect(screen.getByTestId('readout-table-empty')).toBeInTheDocument()

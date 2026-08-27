@@ -214,6 +214,8 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('ident-report')).toHaveTextContent('识别诊断套餐')
     expect(screen.getByText('引言')).toBeInTheDocument()
     expect(screen.getByTestId('instrument-readout')).toBeInTheDocument()
+    expect(screen.getByTestId('readout-question')).toHaveTextContent('教育对收入的影响')
+    expect(screen.getByTestId('readout-code')).toHaveTextContent('0.1234')
     expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('age')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('0.1234')

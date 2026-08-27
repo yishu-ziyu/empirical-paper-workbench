@@ -69,6 +69,36 @@ def _find_translation(translations: List[Any], lang: str) -> Dict[str, Any]:
     return {}
 
 
+_OUTCOME_KEYS = ("outcome", "outcome_col", "dv")
+_TREATMENT_KEYS = ("treatment", "treatment_col", "iv")
+
+
+def _has_named_column(source: Any, keys: tuple[str, ...]) -> bool:
+    if not isinstance(source, dict):
+        return False
+    for key in keys:
+        raw = source.get(key)
+        if raw is not None and str(raw).strip():
+            return True
+    return False
+
+
+def _has_real_direction_columns(state: Any) -> bool:
+    """True only when direction/spec names a real outcome and treatment.
+
+    Empty sessions must not GET-autofill the translator's y ~ treat defaults.
+    """
+    spec = state.get("main_specification") if isinstance(state, dict) else None
+    rd = state.get("research_direction") if isinstance(state, dict) else None
+    has_outcome = _has_named_column(spec, _OUTCOME_KEYS) or _has_named_column(
+        rd, _OUTCOME_KEYS
+    )
+    has_treatment = _has_named_column(spec, _TREATMENT_KEYS) or _has_named_column(
+        rd, _TREATMENT_KEYS
+    )
+    return has_outcome and has_treatment
+
+
 class TranslateCodeResponse(BaseModel):
     ok: bool = True
     code_translations: List[Dict[str, Any]] = Field(default_factory=list)
@@ -114,7 +144,7 @@ async def export_code(
     Raises
     ------
     HTTPException
-        - 404: session 不存在，或 translate 后仍无对应语言
+        - 404: session 不存在，无 translations，或 direction 不足以 GET-autofill
         - 400: 不支持的 format
     """
     require_session_ownership(session_id, current_user)
@@ -129,8 +159,8 @@ async def export_code(
 
     state = facade.get_state(session_id)
     translations = state.get("code_translations") or []
-    if not translations:
-        # HITL write never runs translate_code. Fill on first download.
+    if not translations and _has_real_direction_columns(state):
+        # HITL write never runs translate_code. Fill only from a real spec.
         result = facade.run_translate_code(session_id)
         translations = result.get("code_translations") or []
     if not translations:

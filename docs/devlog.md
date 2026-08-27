@@ -69,8 +69,11 @@ runs/<session_id>/manifest.json    trace.jsonl   checkpoints/(+latest.json)
 
 **实弹验收**：查询"最低工资 就业 中国 双重差分"，从真实响应解析出
 20 条真实中国 DID 文献。启用方式：`LITERATURE_SOURCE=apodex` +
-`APODEX_API_KEY`（默认 base=https://api.apodex.ai/v1、模型
-apodex-1-0-deep-research）。免费窗口过期按 ADR-0011 整体拆除。
+`APODEX_API_KEY`（默认 base=https://api.apodex.ai/v1、模型 apodex-1.1）。
+**计费边界（用户勘误后实测）**：两周免费=Apodex 1.1 / 1.1 Mini 两核心模型;
+带 deep-research / deep-solve 后缀的属 Deep Research 计费线(限时 8 折,仍收费),
+适配器绝不以其为默认。另:1.1 思维链重,max_tokens 需 20000、超时 240s,
+数组可能只在 reasoning_content 里。免费窗口过期按 ADR-0011 整体拆除。
 已拒绝方案：MiniMax 兼管文献事实层（生成/证据须分权），详见 ADR。
 
 ### 验收数字（当日收盘）

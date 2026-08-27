@@ -38,3 +38,22 @@
 - 用 MiniMax 直接当深搜源：MiniMax 已是生成/评审通道的 LLM 供应商,再让它
   掌管文献事实层会把"生成"和"证据"压在同一供应商身上;违背核对分权。
 - 把 FrontierAgent 运行时接进来跑文献:组件太重,且文献检索不需要任务沙盒。
+
+## 勘误（2026-08-27 晚，用户指出计费边界后实测更正）
+
+平台横幅明确：**两周免费 = 核心模型 Apodex 1.1 / 1.1 Mini**；
+**Deep Research API 线全线 8 折（收费）**。本文初稿把
+`apodex-1-0-deep-research` 当免费档是错的。
+
+以 `GET /v1/models` 实测为准：
+
+| 计费 | 模型 |
+|---|---|
+| 免费 | `apodex-1.1`、`apodex-1.1-mini` |
+| 收费(8折) | `apodex-1-0-deep-research`、`apodex-1-0-deep-solve`、`apodex-1-1-deep-research`、`apodex-1-1-deep-solve` |
+
+适配器默认改为 **apodex-1.1**（绝不用计费线作默认）；补充工程事实：
+该模型思维链很重——6000 max_tokens 会在思考中途截断（finish_reason=length），
+需 20000；完整响应可超 60s，超时放宽至 240s（均可 env 调）。数组可能只出现
+在 reasoning_content 尾部，解析器一并扫描。实弹验收：4 条条目 year 全齐
+（含 Fang-Lin-Yang 2015），2 个 DOI。

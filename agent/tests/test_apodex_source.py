@@ -199,6 +199,29 @@ def test_parse_survives_concatenated_json_bodies(monkeypatch):
     assert [e["title"] for e in entries] == ["Mixed Body"]
 
 
+def test_parse_finds_array_in_reasoning_content(monkeypatch):
+    """免费模型思考很重、可能把最终数组只写在 reasoning_content（或被
+    max_tokens 截断在思考尾部）：收集器必须连 reasoning_content 一起扫。"""
+    from nodes.literature_sources import apodex
+
+    payload = {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {
+                    "content": "",
+                    "reasoning_content": (
+                        "planning... candidate list:\n"
+                        '[{"title":"From Thinking","year":2016,"authors":["Feng"]}]'
+                    ),
+                },
+            }
+        ]
+    }
+    entries = apodex.parse_entries(payload)
+    assert [e["title"] for e in entries] == ["From Thinking"]
+
+
 def test_parse_bad_json_raises_valueerror():
     from nodes.literature_sources import apodex
 

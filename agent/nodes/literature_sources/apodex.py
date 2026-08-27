@@ -18,7 +18,9 @@ import urllib.request
 from typing import Any, List
 
 FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
-HTTP_TIMEOUT_SECONDS = 60
+# 免费核心模型思维链很重，完整响应可达数分钟：默认 4 分钟，
+# 环境变量 APODEX_TIMEOUT_SECONDS 可调。
+HTTP_TIMEOUT_SECONDS = int(os.environ.get("APODEX_TIMEOUT_SECONDS") or 240)
 MAX_RESULTS = 20
 
 
@@ -32,8 +34,11 @@ def _base_url() -> str:
 
 
 def _model() -> str:
-    # 免费档实际开通的是深度研究模型（见平台创建 key 页示例）
-    return (os.environ.get("APODEX_MODEL") or "apodex-1-0-deep-research").strip()
+    """默认用两周免费的 核心 模型（平台横幅：Apodex 1.1 / 1.1 Mini
+    API 免费两周）。带 *deep-research / *deep-solve 后缀的属于
+    Deep Research 计费线（限时 8 折，仍收费），绝不作默认。
+    可用清单以 GET /v1/models 为准。"""
+    return (os.environ.get("APODEX_MODEL") or "apodex-1.1").strip()
 
 
 def _iter_top_level_objects(text: str):
@@ -54,10 +59,14 @@ def _iter_top_level_objects(text: str):
 
 
 def _collect_content_strings(node: Any, out: List[str]) -> None:
-    """递归收集所有名为 content 的字符串字段（chat.completion 形态）。"""
+    """递归收集 content / reasoning_content 字符串字段。
+
+    免费核心模型思考很重，截断场景下最终数组可能只存在于
+    reasoning_content 尾部——一并扫描。
+    """
     if isinstance(node, dict):
         for k, v in node.items():
-            if k == "content" and isinstance(v, str):
+            if k in ("content", "reasoning_content") and isinstance(v, str):
                 out.append(v)
             else:
                 _collect_content_strings(v, out)
@@ -220,6 +229,14 @@ def _assemble_sse(raw: bytes) -> str:
     return "".join(parts)
 
 
+def _max_tokens() -> int:
+    """免费核心模型思考很重（实测 6k 上限会在思维链中途截断），
+    两周窗口内这两个模型不产生费用，默认放宽到 20000；可用环境变量
+    APODEX_MAX_TOKENS 覆盖。"""
+    raw = (os.environ.get("APODEX_MAX_TOKENS") or "").strip()
+    return int(raw) if raw.isdigit() else 20000
+
+
 def apodex_search(query: str, api_key: str) -> List[dict[str, Any]]:
     """调 Apodex OpenAI 兼容端点做深搜，返回规范条目列表。
 
@@ -244,6 +261,7 @@ def apodex_search(query: str, api_key: str) -> List[dict[str, Any]]:
             ],
             "temperature": 0.2,
             "stream": False,
+            "max_tokens": _max_tokens(),
         }
     ).encode("utf-8")
     req = urllib.request.Request(

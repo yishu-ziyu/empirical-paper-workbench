@@ -276,29 +276,66 @@ export default function DeskPage({
 
         <label className="relative mt-12 block">
           <span className="sr-only">{t('desk.paperLabel')}</span>
-          <textarea
-            ref={paperRef}
-            data-testid="desk-paper"
-            value={text}
-            onChange={(e) => handleChange(e.target.value)}
-            placeholder={text ? '' : t('desk.placeholder')}
-            className={`w-full resize-none rounded-lg border bg-panel px-6 py-6 font-serif text-[18px] leading-8 text-ink outline-none transition-colors duration-200 placeholder:text-muted/55 focus:border-accent/40 ${
-              voiceStatus === 'listening' ? 'border-accent animate-listen' : 'border-border'
+          <div
+            className={`composer-shell ${
+              voiceStatus === 'listening' ? 'animate-listen ring-1 ring-accent/40' : ''
             }`}
-          />
+          >
+            <textarea
+              ref={paperRef}
+              data-testid="desk-paper"
+              value={text}
+              onChange={(e) => handleChange(e.target.value)}
+              placeholder={text ? '' : t('desk.placeholder')}
+              className="min-h-[140px] w-full resize-none rounded-[24px] bg-transparent px-5 pt-5 font-serif text-[18px] leading-8 text-ink outline-none placeholder:text-muted/55"
+            />
+            <div className="flex items-center gap-2 px-3 pb-3">
+              <button
+                type="button"
+                onClick={onPickData}
+                disabled={uploading}
+                aria-label={t('desk.haveData')}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                data-testid="desk-listen-btn"
+                onClick={toggleListen}
+                disabled={voiceStatus === 'unsupported'}
+                className={`rounded-full px-3.5 py-2 text-[13px] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  voiceStatus === 'listening'
+                    ? 'bg-accent text-white'
+                    : 'text-muted hover:bg-black/[0.04] hover:text-ink'
+                }`}
+              >
+                {listenLabel}
+              </button>
+              <span className="ml-auto text-[13px] text-muted">
+                {voiceStatus === 'listening'
+                  ? t('desk.listening')
+                  : busy
+                    ? t('desk.shaping')
+                    : ''}
+              </span>
+              {canShape && (
+                <button
+                  type="button"
+                  data-testid="desk-shape-btn"
+                  onClick={() => void askModel(text, turns)}
+                  disabled={busy}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  aria-label={t('desk.shape')}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </label>
-
-        <button
-          type="button"
-          onClick={onPickData}
-          disabled={uploading}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-panel px-4 py-4 text-[13px] text-muted transition-colors hover:border-accent/40 hover:text-ink disabled:opacity-50"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-          </svg>
-          {uploading ? t('app.uploading') : t('workbench.dropBody')}
-        </button>
 
         {!text && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -307,49 +344,13 @@ export default function DeskPage({
                 key={key}
                 type="button"
                 onClick={() => handleChange(t(key))}
-                className="rounded-full border border-border bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors duration-200 hover:border-ink/20 hover:bg-cream hover:text-ink"
+                className="rounded-full border border-black/[0.08] bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors duration-200 hover:bg-black/[0.03] hover:text-ink"
               >
                 {t(key)}
               </button>
             ))}
           </div>
         )}
-
-        <div className="mt-4 flex min-h-[36px] items-center justify-between gap-3">
-          <p className="text-[13px] text-muted">
-            {voiceStatus === 'listening'
-              ? t('desk.listening')
-              : busy
-                ? t('desk.shaping')
-                : ''}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="desk-listen-btn"
-              onClick={toggleListen}
-              disabled={voiceStatus === 'unsupported'}
-              className={`rounded-full px-4 py-2 text-[13px] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
-                voiceStatus === 'listening'
-                  ? 'bg-accent text-white'
-                  : 'text-muted hover:bg-panel hover:text-ink'
-              }`}
-            >
-              {listenLabel}
-            </button>
-            {canShape && (
-              <button
-                type="button"
-                data-testid="desk-shape-btn"
-                onClick={() => void askModel(text, turns)}
-                disabled={busy}
-                className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
-              >
-                {t('desk.shape')}
-              </button>
-            )}
-          </div>
-        </div>
 
         {uploadError && (
           <p data-testid="upload-error" className="mt-3 text-sm text-danger">
@@ -360,7 +361,7 @@ export default function DeskPage({
         {card && (
           <section
             data-testid="question-card"
-            className="animate-slide-up mt-8 rounded-xl border border-border bg-white p-6"
+            className="animate-slide-up thread-card mt-8 p-6"
           >
             <div className="flex items-start justify-end">
               <button

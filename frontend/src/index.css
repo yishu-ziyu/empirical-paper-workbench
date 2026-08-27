@@ -103,4 +103,12 @@ body {
   .journal-page {
     @apply bg-white px-8 py-10 font-serif text-[16.5px] leading-[1.9] text-ink sm:px-14 sm:py-14;
   }
+
+  .composer-shell {
+    @apply rounded-[24px] border border-black/[0.08] bg-white shadow-[0_12px_40px_rgba(24,21,21,0.07)];
+  }
+
+  .thread-card {
+    @apply rounded-[20px] border border-black/[0.06] bg-white shadow-[0_8px_28px_rgba(24,21,21,0.045)];
+  }
 }

@@ -166,7 +166,7 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     if (
         str(chapter_type) == "results"
         and isinstance(est, dict)
-        and est.get("status") == "ok"
+        and est.get("status") in ("ok", "degraded")
     ):
         table = (state.get("results") or "").strip()
         content = prose + "\n\n" + table if table else prose

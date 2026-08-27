@@ -81,7 +81,7 @@ export default function ReviewPanel({
   return (
     <div
       data-testid="review-panel"
-      className="border border-border rounded bg-paper shadow-sm"
+      className="rounded-xl border border-border bg-white shadow-sm"
     >
       {/* 头部：综合分 + 迭代轮次 + 自动决策 */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -193,7 +193,7 @@ export default function ReviewPanel({
           data-testid="review-btn-accept"
           disabled={submitting}
           onClick={() => submitDecision('accept')}
-          className="flex-1 rounded border border-accent bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-50"
+          className="flex-1 rounded bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
         >
           {autoPass ? t('review.accept') : t('review.acceptRegen')}
         </button>

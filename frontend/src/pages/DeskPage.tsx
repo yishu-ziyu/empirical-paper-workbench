@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import UnauthHeader from '../components/UnauthHeader'
 import { useT } from '../lib/i18n'
 import { discussDesk, speakDesk, transcribeDesk } from '../lib/deskDiscuss'
 import type { DeskCard, DeskTurn } from '../lib/deskDiscuss'
@@ -13,6 +14,7 @@ export interface DeskPageProps {
   uploading?: boolean
   uploadError?: string | null
   onLogin?: () => void
+  onRegister?: () => void
 }
 
 const IDLE_MS = 1400
@@ -44,8 +46,9 @@ export default function DeskPage({
   uploading = false,
   uploadError = null,
   onLogin,
+  onRegister,
 }: DeskPageProps) {
-  const { t, lang, setLang } = useT()
+  const { t } = useT()
   const [text, setText] = useState('')
   const [turns, setTurns] = useState<DeskTurn[]>([])
   const [card, setCard] = useState<DeskCard | null>(null)
@@ -249,43 +252,27 @@ export default function DeskPage({
 
   return (
     <div data-testid="desk-page" className="min-h-screen bg-bg text-ink">
-      <header className="flex items-center justify-between px-8 py-5">
-        <p className="text-[15px] tracking-tight text-ink">{t('app.title')}</p>
-        <div className="flex items-center gap-5 text-[13px] text-muted">
+      <UnauthHeader
+        onLogin={onLogin}
+        onRegister={onRegister}
+        extra={
           <button
             type="button"
             data-testid="upload-btn"
             onClick={onPickData}
             disabled={uploading}
-            className="transition-colors duration-200 hover:text-ink disabled:opacity-50"
+            className="text-[13px] text-muted transition-colors duration-200 hover:text-ink disabled:opacity-50"
           >
             {uploading ? t('app.uploading') : t('desk.haveData')}
           </button>
-          {onLogin && (
-            <button
-              type="button"
-              data-testid="open-login-btn"
-              onClick={onLogin}
-              className="transition-colors duration-200 hover:text-ink"
-            >
-              {t('app.login')}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
-            className="transition-colors duration-200 hover:text-ink"
-          >
-            {t('app.langSwitch')}
-          </button>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="mx-auto flex max-w-[560px] flex-col px-6 pb-24 pt-20 sm:pt-24">
-        <h1 className="font-serif text-[2.25rem] leading-tight tracking-tight text-ink sm:text-[2.5rem]">
+      <main className="mx-auto flex max-w-[640px] flex-col px-6 pb-24 pt-16 sm:pt-20">
+        <h1 className="font-serif text-[2.35rem] leading-tight tracking-tight text-ink sm:text-[2.75rem]">
           {t('desk.heading')}
         </h1>
-        <p className="mt-3 max-w-[28em] text-[15px] leading-7 text-muted">{t('desk.sub')}</p>
+        <p className="mt-4 max-w-[32em] text-[16px] leading-7 text-muted">{t('desk.sub')}</p>
 
         <label className="relative mt-10 block">
           <span className="sr-only">{t('desk.paperLabel')}</span>
@@ -295,7 +282,7 @@ export default function DeskPage({
             value={text}
             onChange={(e) => handleChange(e.target.value)}
             placeholder={text ? '' : t('desk.placeholder')}
-            className={`w-full resize-none rounded-xl border bg-white px-5 py-5 font-serif text-[17px] leading-8 text-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-muted/55 focus:border-ink/25 focus:shadow-[0_0_0_4px_rgba(26,26,26,0.06)] ${
+            className={`w-full resize-none rounded-lg border bg-panel px-5 py-5 font-serif text-[17px] leading-8 text-ink outline-none transition-colors duration-200 placeholder:text-muted/55 focus:border-accent/40 ${
               voiceStatus === 'listening' ? 'border-accent animate-listen' : 'border-border'
             }`}
           />
@@ -308,7 +295,7 @@ export default function DeskPage({
                 key={key}
                 type="button"
                 onClick={() => handleChange(t(key))}
-                className="rounded-full border border-border bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors duration-200 hover:border-ink/20 hover:bg-panel hover:text-ink"
+                className="rounded-full border border-border bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors duration-200 hover:border-ink/20 hover:bg-cream hover:text-ink"
               >
                 {t(key)}
               </button>
@@ -344,7 +331,7 @@ export default function DeskPage({
                 data-testid="desk-shape-btn"
                 onClick={() => void askModel(text, turns)}
                 disabled={busy}
-                className="rounded-full bg-ink px-4 py-2 text-[13px] text-paper transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
+                className="rounded-md bg-accent px-4 py-2 text-[13px] text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-40"
               >
                 {t('desk.shape')}
               </button>
@@ -353,7 +340,7 @@ export default function DeskPage({
         </div>
 
         {uploadError && (
-          <p data-testid="upload-error" className="mt-3 text-sm text-red-700">
+          <p data-testid="upload-error" className="mt-3 text-sm text-danger">
             {uploadError}
           </p>
         )}
@@ -450,7 +437,7 @@ export default function DeskPage({
                   type="button"
                   data-testid="desk-confirm-btn"
                   onClick={() => onConfirm(title)}
-                  className="rounded-full bg-ink px-4 py-2 text-[13px] text-paper transition-opacity duration-200 hover:opacity-90"
+                      className="rounded-md bg-accent px-4 py-2 text-[13px] text-white transition-opacity duration-200 hover:opacity-90"
                 >
                   {t('desk.confirm')}
                 </button>

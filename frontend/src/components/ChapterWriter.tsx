@@ -141,7 +141,7 @@ export default function ChapterWriter({
       ) : (
         <article
           data-testid="chapter-paper"
-          className="rounded border border-border bg-paper px-5 py-4 font-serif text-base leading-loose text-ink"
+          className="rounded-xl bg-[#faf8f4] px-6 py-5 font-serif text-base leading-loose text-ink"
         >
           {renderPaperMarkdown(displayContent)}
         </article>
@@ -194,7 +194,7 @@ export default function ChapterWriter({
             <button
               type="button"
               onClick={() => onApprove?.(chapter)}
-              className="rounded bg-accent px-3 py-1 text-xs text-white"
+              className="rounded-md bg-accent px-3 py-1 text-xs text-white"
             >
               {t('chapter.approve')}
             </button>

@@ -93,9 +93,6 @@ function App() {
   const [edaOpen, setEdaOpen] = useState(false)
   const [outline, setOutline] = useState<OutlineChapter[]>([])
 
-  const [leftOpen, setLeftOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(true)
-
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -655,19 +652,14 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-ink font-sans selection:bg-accent/20">
+    <div className="flex h-screen min-h-0 flex-col overflow-x-auto overflow-y-hidden bg-bg text-ink font-sans selection:bg-accent/20">
       {globalError && (
         <div data-testid="global-error-toast" className="fixed right-4 top-4 z-50 animate-slide-up rounded border border-danger/30 bg-panel px-4 py-2 text-sm text-danger">
           ⚠ {globalError}
         </div>
       )}
-      <header className="grid h-[56px] grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-5">
+      <header className="grid h-[56px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-5">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setLeftOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleLeft')}>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
           <BrandMark />
         </div>
         <div className="hidden items-center rounded-lg bg-bg p-0.5 sm:flex">
@@ -733,17 +725,10 @@ function App() {
             <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>
           )}
           <LangPills />
-          <button type="button" onClick={() => setRightOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleRight')}>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
         </div>
       </header>
 
       <ThreeColumn
-        leftOpen={leftOpen}
-        rightOpen={rightOpen}
         outline={
           <ErrorBoundary>
             <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{t('bench.chapters')}</h2>

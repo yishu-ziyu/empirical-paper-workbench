@@ -258,11 +258,25 @@ def test_bind_formats_key_references_from_literature_entries(recorder):
     state = make_write_ready_state(
         current_chapter_index=0,
         outline=[{"type": "lit_review", "title": "文献综述"}],
+        literature_entries=[
+            {
+                "title": "T",
+                "authors": ["A"],
+                "year": 2020,
+                "doi": "10.1/x",
+                "url": "https://doi.org/10.1/x",
+                "stance": "支持",
+                "abstract": "SECRET ABSTRACT",
+                "source": "mock",
+            }
+        ],
     )
     generate_chapter(state)
     _, user = recorder.calls[0]["args"]
-    assert "T" in user
-    assert "2020" in user
+    assert "A (2020). T." in user
+    assert "https://doi.org" not in user
+    assert "支持" not in user
+    assert "SECRET ABSTRACT" not in user
 
 
 def test_methods_bind_uses_association_system(recorder):

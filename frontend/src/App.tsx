@@ -10,6 +10,7 @@ import GuidePage from './pages/GuidePage'
 import DirectionForm from './components/DirectionForm'
 import type { DirectionFormData } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
+import type { LiteratureReadoutEntry } from './components/InstrumentReadout'
 import ChapterWriter from './components/ChapterWriter'
 import ChapterList from './components/ChapterList'
 import ReviewPanel from './components/ReviewPanel'
@@ -48,6 +49,7 @@ type DeskSnapshot = {
   results?: string | null
   estimate?: { treatment_row?: string | null } | null
   literature_source?: string | null
+  literature_entries?: LiteratureReadoutEntry[]
   write_blockers?: string[]
   robustness_status?: string | null
   outline?: OutlineChapter[]
@@ -151,6 +153,7 @@ function App() {
   const [treatmentRow, setTreatmentRow] = useState<string | null>(null)
   const [mainResults, setMainResults] = useState<string | null>(null)
   const [literatureSource, setLiteratureSource] = useState<string | null>(null)
+  const [literatureEntries, setLiteratureEntries] = useState<LiteratureReadoutEntry[]>([])
   const [robustnessStatus, setRobustnessStatus] = useState<string | null>(null)
   const [writeBlockers, setWriteBlockers] = useState<string[]>([])
   const [identFailed, setIdentFailed] = useState(false)
@@ -225,6 +228,9 @@ function App() {
     const row = data.estimate?.treatment_row
     setTreatmentRow(typeof row === 'string' && row ? row : null)
     setLiteratureSource(data.literature_source ?? null)
+    setLiteratureEntries(
+      Array.isArray(data.literature_entries) ? data.literature_entries : [],
+    )
     setWriteBlockers(Array.isArray(data.write_blockers) ? data.write_blockers : [])
     setIdentFailed(Boolean(data.identification_failed))
     setRobustnessStatus(data.robustness_status ?? null)
@@ -800,6 +806,7 @@ function App() {
                 treatmentRow={treatmentRow}
                 results={mainResults}
                 literatureSource={literatureSource}
+                literatureEntries={literatureEntries}
                 robustnessStatus={robustnessStatus}
                 writeBlockers={writeBlockers}
                 identificationFailed={identFailed}

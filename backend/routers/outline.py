@@ -83,6 +83,7 @@ async def set_direction_endpoint(
         estimate=fields.get("estimate"),
         claim=fields.get("claim"),
         literature_source=fields.get("literature_source"),
+        literature_entries=fields.get("literature_entries") or [],
         degradations=list(state.get("degradations") or []),
         write_blockers=list(fields.get("write_blockers") or []),
         robustness_status=fields.get("robustness_status"),

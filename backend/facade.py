@@ -116,6 +116,51 @@ except Exception:  # pragma: no cover
     load_charls_config_fn = None
 
 
+_STANCES = frozenset({"支持", "不支持", "说不清"})
+_DOI_URL_PREFIX = "https://doi.org/"
+
+
+def _public_doi_url(url: Any) -> str:
+    """读数台只放 https://doi.org/{doi}。其它网址丢掉。"""
+    text = str(url or "").strip()
+    if text.startswith(_DOI_URL_PREFIX) and text[len(_DOI_URL_PREFIX) :]:
+        return text
+    return ""
+
+
+def public_literature_entries(raw: Any) -> list[dict]:
+    """读数台用的文献列表：题录、DOI 网址、对研究方向的立场。不含摘要。"""
+    out: list[dict] = []
+    if not isinstance(raw, list):
+        return out
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        authors = entry.get("authors") or []
+        if isinstance(authors, str):
+            authors = [authors] if authors.strip() else []
+        elif isinstance(authors, (list, tuple)):
+            authors = [str(a) for a in authors if a]
+        else:
+            authors = [str(authors)]
+        year = entry.get("year")
+        try:
+            year_i = int(year) if year not in (None, "") else None
+        except (TypeError, ValueError):
+            year_i = None
+        item = {
+            "title": str(entry.get("title") or ""),
+            "authors": authors,
+            "year": year_i,
+            "url": _public_doi_url(entry.get("url")),
+        }
+        stance = str(entry.get("stance") or "").strip()
+        if stance in _STANCES:
+            item["stance"] = stance
+        out.append(item)
+    return out
+
+
 class AgentFacade:
     """Facade that wraps the agent layer for HTTP routers.
 
@@ -231,6 +276,9 @@ class AgentFacade:
             "results": state.get("results"),
             "estimate": state.get("estimate"),
             "literature_source": state.get("literature_source"),
+            "literature_entries": public_literature_entries(
+                state.get("literature_entries")
+            ),
             "write_blockers": blockers,
             "robustness_status": rob_status,
             "outline": outline,

@@ -5,6 +5,9 @@ from nodes.search_literature import (
     MAX_LITERATURE_ENTRIES,
     _build_query,
     _mock_search,
+    _parse_stances,
+    attach_stances,
+    doi_to_url,
     resolve_literature_source,
     search_literature,
 )
@@ -358,6 +361,8 @@ def test_search_literature_mock_default_unchanged():
     # mock 路径条目 source 应为 "mock"
     for e in result["literature_entries"]:
         assert e["source"] == "mock"
+        assert e["url"] == doi_to_url(e.get("doi"))
+        assert "stance" not in e
 
 
 def test_pytest_default_does_not_call_crossref(monkeypatch):
@@ -449,3 +454,73 @@ def test_search_literature_disabled_still_works():
     result = search_literature(state)
     assert result["literature_entries"] == []
     assert result["literature_source"] == "disabled"
+
+
+def test_doi_to_url_from_doi():
+    assert doi_to_url("10.1016/S0140-6736(03)13861-5") == (
+        "https://doi.org/10.1016/S0140-6736(03)13861-5"
+    )
+    assert doi_to_url("https://doi.org/10.1257/aer.20100000") == (
+        "https://doi.org/10.1257/aer.20100000"
+    )
+    assert doi_to_url("doi:10.1/abc") == "https://doi.org/10.1/abc"
+
+
+def test_doi_to_url_empty_without_doi():
+    assert doi_to_url(None) == ""
+    assert doi_to_url("") == ""
+    assert doi_to_url("not-a-doi") == ""
+
+
+def test_search_attaches_doi_url(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search",
+        lambda query: [
+            {"title": "Has DOI", "doi": "10.1000/has"},
+            {"title": "No DOI"},
+        ],
+    )
+    result = search_literature({"research_direction": "test"})
+    by_title = {e["title"]: e for e in result["literature_entries"]}
+    assert by_title["Has DOI"]["url"] == "https://doi.org/10.1000/has"
+    assert by_title["No DOI"]["url"] == ""
+
+
+def test_search_omits_stance_when_llm_unusable(monkeypatch):
+    monkeypatch.setattr(
+        "nodes.search_literature._mock_search",
+        lambda query: [{"title": "A", "doi": "10.1/a", "abstract": "摘要"}],
+    )
+    result = search_literature(
+        {"research_direction": {"question": "教育对收入的影响"}}
+    )
+    assert "stance" not in result["literature_entries"][0]
+    assert result.get("star_rating") is None
+    assert "claim" not in result
+    assert "write_blockers" not in result
+
+
+def test_parse_stances_requires_exact_length():
+    assert _parse_stances('["支持", "说不清"]', 2) == {0: "支持", 1: "说不清"}
+    assert _parse_stances('["支持"]', 2) == {}
+    assert _parse_stances("Mock LLM response", 1) == {}
+
+
+def test_attach_stances_writes_labels_from_llm(monkeypatch):
+    entries = [
+        {"title": "A", "abstract": "有关"},
+        {"title": "B", "abstract": "无关"},
+    ]
+    monkeypatch.setattr(
+        "llm.call_llm.call_llm",
+        lambda prompt, node_type="default": '["支持", "说不清"]',
+    )
+    attach_stances(entries, "教育对收入的影响")
+    assert entries[0]["stance"] == "支持"
+    assert entries[1]["stance"] == "说不清"
+
+
+def test_attach_stances_skips_when_no_question():
+    entries = [{"title": "A"}]
+    attach_stances(entries, "")
+    assert "stance" not in entries[0]

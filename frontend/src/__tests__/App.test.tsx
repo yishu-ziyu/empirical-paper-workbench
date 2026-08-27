@@ -131,6 +131,15 @@ describe('App 三栏布局', () => {
               identification_report: '当前方法没有对应的识别诊断套餐',
               claim: 'association',
               literature_source: 'mock',
+              literature_entries: [
+                {
+                  title: 'Returns to Education',
+                  authors: ['Zhang'],
+                  year: 2023,
+                  url: 'https://doi.org/10.1016/j.jceco.2023.001',
+                  stance: '支持',
+                },
+              ],
               robustness_status: 'ran',
               estimate: { treatment_row: '| age | 0.1234 | 0.0456 | 0.0078 |', produced_by: 'estimate' },
               results: '| age | 0.1234 | 0.0456 | 0.0078 |',
@@ -163,6 +172,12 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('readout-table')).toHaveTextContent('age')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('0.1234')
     expect(screen.getByTestId('readout-robust')).toHaveTextContent('已跑')
+    expect(screen.getByTestId('readout-literature-list')).toHaveTextContent(
+      'https://doi.org/10.1016/j.jceco.2023.001',
+    )
+    expect(screen.getByTestId('readout-literature-list')).toHaveTextContent(
+      '对研究方向：支持',
+    )
     expect(screen.getByTestId('write-chapter-results')).toBeInTheDocument()
     expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
   })
@@ -180,6 +195,15 @@ describe('App 三栏布局', () => {
               claim: 'association',
               star_rating: null,
               literature_source: 'mock',
+              literature_entries: [
+                {
+                  title: 'Returns to Education',
+                  authors: ['Zhang'],
+                  year: 2023,
+                  url: 'https://doi.org/10.1016/j.jceco.2023.001',
+                  stance: '支持',
+                },
+              ],
               robustness_status: 'ran',
               estimate: { treatment_row: '| treat | 0.08 | 0.05 | 0.12 |' },
               outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
@@ -199,6 +223,12 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('readout-table')).toHaveTextContent('treat')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('0.08')
     expect(screen.getByTestId('direction-summary')).toHaveTextContent('DiD')
+    expect(screen.getByTestId('readout-literature-list')).toHaveTextContent(
+      'https://doi.org/10.1016/j.jceco.2023.001',
+    )
+    expect(screen.getByTestId('readout-literature-list')).toHaveTextContent(
+      '对研究方向：支持',
+    )
     expect(screen.getByTestId('write-chapter-intro')).toBeInTheDocument()
     expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
   })

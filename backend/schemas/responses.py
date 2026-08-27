@@ -80,6 +80,16 @@ class CreateSessionResponse(BaseModel):
     session_id: str
 
 
+class LiteratureEntryResponse(BaseModel):
+    """读数台上的一条文献：题录 + 可选网址 + 对研究方向的立场。"""
+
+    title: str = ""
+    authors: List[str] = Field(default_factory=list)
+    year: Optional[int] = None
+    url: str = ""
+    stance: Optional[str] = None
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。"""
 
@@ -93,6 +103,7 @@ class SessionInfoResponse(BaseModel):
     results: Optional[str] = None
     estimate: Any = None
     literature_source: Optional[str] = None
+    literature_entries: List[LiteratureEntryResponse] = Field(default_factory=list)
     write_blockers: List[str] = Field(default_factory=list)
     robustness_status: Optional[str] = None
     outline: List[OutlineChapterResponse] = Field(default_factory=list)
@@ -117,6 +128,7 @@ class DirectionResponse(BaseModel):
     estimate: Any = None
     claim: Optional[str] = None
     literature_source: Optional[str] = None
+    literature_entries: List[LiteratureEntryResponse] = Field(default_factory=list)
     degradations: List[Any] = Field(default_factory=list)
     write_blockers: List[str] = Field(default_factory=list)
     robustness_status: Optional[str] = None

@@ -85,6 +85,8 @@ class LiteratureEntry(TypedDict, total=False):
     year: int
     abstract: str
     doi: Optional[str]
+    url: str  # 有 DOI 则 https://doi.org/{doi}，否则空串
+    stance: str  # 对研究方向：支持 / 不支持 / 说不清。失败则不写此键
     source: str  # "mock" | "semantic_scholar"
     relevance_score: float  # 0-1
 

@@ -38,6 +38,14 @@ def test_post_direction_runs_identification_without_blocking_ols(client):
         assert isinstance(data.get("estimate"), dict)
         assert data["estimate"].get("produced_by") == "estimate"
         assert data.get("claim") == "association"
+        entries = data.get("literature_entries") or []
+        assert isinstance(entries, list)
+        assert entries
+        assert "abstract" not in entries[0]
+        assert entries[0].get("url") == "" or entries[0]["url"].startswith(
+            "https://doi.org/"
+        )
+        assert entries[0].get("stance") in (None, "支持", "不支持", "说不清")
     finally:
         facade.drop_session(sid)
 
@@ -75,6 +83,13 @@ def test_post_direction_endpoint(uploaded_session, client):
     assert data["estimate"].get("status") == "ok"
     assert data.get("claim") == "association"
     assert data.get("literature_source")
+    entries = data.get("literature_entries") or []
+    assert isinstance(entries, list)
+    assert entries, "提交方向后读数台应带回检索到的文献"
+    first = entries[0]
+    assert "abstract" not in first
+    assert first.get("url") == "" or first["url"].startswith("https://doi.org/")
+    assert first.get("stance") in (None, "支持", "不支持", "说不清")
 
 
 def test_get_session_hydrates_instrument_after_direction(client):
@@ -86,6 +101,16 @@ def test_get_session_hydrates_instrument_after_direction(client):
             "claim": "association",
             "star_rating": None,
             "literature_source": "mock",
+            "literature_entries": [
+                {
+                    "title": "Returns to Education",
+                    "authors": ["Zhang"],
+                    "year": 2023,
+                    "doi": "10.1016/j.jceco.2023.001",
+                    "url": "https://doi.org/10.1016/j.jceco.2023.001",
+                    "stance": "支持",
+                }
+            ],
             "estimate": {
                 "treatment_row": "| age | 0.1234 | 0.0456 | 0.0078 |",
                 "produced_by": "estimate",
@@ -103,6 +128,11 @@ def test_get_session_hydrates_instrument_after_direction(client):
         assert data["claim"] == "association"
         assert data["star_rating"] is None
         assert data["literature_source"] == "mock"
+        assert data["literature_entries"][0]["url"] == (
+            "https://doi.org/10.1016/j.jceco.2023.001"
+        )
+        assert data["literature_entries"][0]["stance"] == "支持"
+        assert "abstract" not in data["literature_entries"][0]
         assert data["estimate"]["treatment_row"].startswith("| age")
         assert data["robustness_status"] == "ran"
         assert data["outline"][0]["type"] == "intro"

@@ -8,12 +8,21 @@ import {
   starHumanLabel,
 } from '../lib/readoutTable'
 
+export type LiteratureReadoutEntry = {
+  title?: string
+  authors?: string[]
+  year?: number | null
+  url?: string
+  stance?: string | null
+}
+
 export interface InstrumentReadoutProps {
   claim?: string | null
   starRating?: number | null
   treatmentRow?: string | null
   results?: string | null
   literatureSource?: string | null
+  literatureEntries?: LiteratureReadoutEntry[]
   robustnessStatus?: string | null
   writeBlockers?: string[]
   identificationFailed?: boolean
@@ -31,6 +40,7 @@ export default function InstrumentReadout({
   treatmentRow,
   results,
   literatureSource,
+  literatureEntries = [],
   robustnessStatus,
   writeBlockers = [],
   identificationFailed = false,
@@ -105,6 +115,56 @@ export default function InstrumentReadout({
           </p>
         )}
       </div>
+      {literatureEntries.length > 0 && (
+        <div className="mt-3" data-testid="readout-literature-list">
+          <div className="text-xs text-muted">文献</div>
+          <ul className="mt-1 space-y-2">
+            {literatureEntries.map((entry, index) => {
+              const authors = (entry.authors || []).join(', ')
+              const head = [authors, entry.year ? `(${entry.year})` : '']
+                .filter(Boolean)
+                .join(' ')
+              const stance =
+                entry.stance === '支持' ||
+                entry.stance === '不支持' ||
+                entry.stance === '说不清'
+                  ? entry.stance
+                  : null
+              const doiUrl =
+                entry.url &&
+                entry.url.startsWith('https://doi.org/') &&
+                entry.url.length > 'https://doi.org/'.length
+                  ? entry.url
+                  : ''
+              return (
+                <li
+                  key={`${entry.title || 'paper'}-${index}`}
+                  className="border-b border-border/60 py-1 last:border-0"
+                  data-testid="readout-literature-item"
+                >
+                  <div className="text-ink">
+                    {head ? `${head}. ` : ''}
+                    {entry.title || '无题名'}
+                  </div>
+                  {doiUrl ? (
+                    <a
+                      className="mt-0.5 block text-accent break-all"
+                      href={doiUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {doiUrl}
+                    </a>
+                  ) : null}
+                  {stance ? (
+                    <div className="mt-0.5 text-muted">对研究方向：{stance}</div>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
       {blocked && (
         <p
           data-testid="readout-block"

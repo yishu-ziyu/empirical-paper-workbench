@@ -11,10 +11,15 @@ crossref / semantic_scholar 失败降级 mock_degraded。
 """
 from __future__ import annotations
 
-from typing import Any, List
+import json
+import re
+from typing import Any, Dict, List, Mapping
 
 from protocols import LiteratureEntry, LiteratureOutput
 from state import EconPaperState
+
+_STANCES = ("支持", "不支持", "说不清")
+_STANCE_SET = frozenset(_STANCES)
 
 # 文献检索限长（Fitness Function）
 MAX_LITERATURE_ENTRIES = 20
@@ -56,6 +61,92 @@ def _build_query(research_direction: Any, title: str = "") -> str:
             elif isinstance(val, list):
                 parts.extend(str(v) for v in val if v)
     return " ".join(parts) if parts else "economics"
+
+
+def doi_to_url(doi: Any) -> str:
+    """有 DOI 才拼 https://doi.org/{doi}，否则空串。"""
+    raw = str(doi or "").strip()
+    if not raw:
+        return ""
+    lower = raw.lower()
+    if "doi.org/" in lower:
+        tail = raw.split("doi.org/", 1)[-1].lstrip("/")
+        return f"https://doi.org/{tail}" if tail else ""
+    if lower.startswith("doi:"):
+        raw = raw[4:].strip()
+    raw = raw.lstrip("/")
+    if raw.lower().startswith("10."):
+        return f"https://doi.org/{raw}"
+    return ""
+
+
+def _question_from_state(state: Mapping[str, Any]) -> str:
+    rd = state.get("research_direction")
+    if isinstance(rd, dict):
+        return str(rd.get("question") or "").strip()
+    if isinstance(rd, str):
+        return rd.strip()
+    return ""
+
+
+def _parse_stances(text: str, n: int) -> Dict[int, str]:
+    """从模型输出抽出每篇立场。对不上篇数或词不在三选一里则丢弃。"""
+    blob = (text or "").strip()
+    if not blob or n <= 0:
+        return {}
+    data: Any = None
+    try:
+        data = json.loads(blob)
+    except json.JSONDecodeError:
+        match = re.search(r"\[.*\]", blob, re.S)
+        if match:
+            try:
+                data = json.loads(match.group())
+            except json.JSONDecodeError:
+                data = None
+    if not isinstance(data, list) or len(data) != n:
+        return {}
+    out: Dict[int, str] = {}
+    for i, item in enumerate(data):
+        if isinstance(item, str):
+            stance = item.strip()
+        elif isinstance(item, dict):
+            stance = str(item.get("stance") or item.get("label") or "").strip()
+        else:
+            continue
+        if stance in _STANCE_SET:
+            out[i] = stance
+    return out
+
+
+def attach_stances(entries: List[LiteratureEntry], question: str) -> None:
+    """对照研究方向给每篇标立场。失败不加 stance，不改写章门。"""
+    if not question or not entries:
+        return
+    lines = []
+    for i, entry in enumerate(entries, start=1):
+        title = str(entry.get("title") or "").strip()
+        abstract = str(entry.get("abstract") or "").strip()[:400]
+        lines.append(f"{i}. {title}\n{abstract}")
+    prompt = (
+        "研究方向：\n"
+        f"{question}\n\n"
+        "下面每篇文献，只根据标题和摘要，判断它对这个研究方向是"
+        "「支持」「不支持」还是「说不清」。\n"
+        "对照的是研究方向，不是尚未写下的综述句子。\n\n"
+        + "\n\n".join(lines)
+        + "\n\n只返回 JSON 数组，长度必须等于文献篇数，"
+        "每项只能是 支持、不支持、说不清 之一。不要其它文字。"
+    )
+    try:
+        from llm.call_llm import call_llm
+
+        text = call_llm(prompt, node_type="default")
+    except Exception:
+        return
+    parsed = _parse_stances(text, len(entries))
+    for i, stance in parsed.items():
+        entries[i]["stance"] = stance
 
 
 def _mock_search(query: str) -> List[LiteratureEntry]:
@@ -160,7 +251,10 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
             unique.append(e)
 
     # 限长
-    unique = unique[:MAX_LITERATURE_ENTRIES]
+    unique = [dict(e) for e in unique[:MAX_LITERATURE_ENTRIES]]
+    for entry in unique:
+        entry["url"] = doi_to_url(entry.get("doi"))
+    attach_stances(unique, _question_from_state(state))
 
     return {
         "literature_entries": unique,

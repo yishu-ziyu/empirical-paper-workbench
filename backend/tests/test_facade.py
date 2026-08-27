@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pytest
 
-from facade import facade, AgentFacade
+from facade import facade, AgentFacade, public_literature_entries
 
 
 # ---------------------------------------------------------------------------
@@ -709,3 +709,33 @@ def test_fresh_facade_instance_starts_empty():
     f = AgentFacade()
     assert f._sessions == {}
     assert f.has_session("anything") is False
+
+
+def test_public_literature_entries_strips_abstract_and_non_doi_url():
+    """读数台：有 DOI 才给 doi.org 链接；摘要不外送；立场只三选一。"""
+    out = public_literature_entries(
+        [
+            {
+                "title": "Returns",
+                "authors": ["Zhang"],
+                "year": 2023,
+                "abstract": "secret",
+                "url": "https://doi.org/10.1016/j.jceco.2023.001",
+                "stance": "支持",
+            },
+            {
+                "title": "No DOI",
+                "authors": "Solo",
+                "year": "2010",
+                "url": "https://example.com/paper",
+                "stance": "maybe",
+            },
+        ]
+    )
+    assert "abstract" not in out[0]
+    assert out[0]["url"] == "https://doi.org/10.1016/j.jceco.2023.001"
+    assert out[0]["stance"] == "支持"
+    assert out[1]["authors"] == ["Solo"]
+    assert out[1]["year"] == 2010
+    assert out[1]["url"] == ""
+    assert "stance" not in out[1]

@@ -118,7 +118,7 @@ export default function DirectionForm({
     <form
       data-testid="direction-form"
       onSubmit={handleSubmit}
-      className="space-y-3"
+      className="space-y-4"
     >
       {columns.length > 0 ? (
         <p data-testid="data-columns" className="text-xs leading-5 text-muted">
@@ -270,7 +270,7 @@ export default function DirectionForm({
       <button
         type="submit"
         disabled={!canSubmit}
-        className="rounded bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-40"
+        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
       >
         {t('direction.submit')}
       </button>

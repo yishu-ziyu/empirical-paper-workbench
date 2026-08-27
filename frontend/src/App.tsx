@@ -661,7 +661,7 @@ function App() {
           ⚠ {globalError}
         </div>
       )}
-      <header className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-4 py-2.5">
+      <header className="grid h-[56px] grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-5">
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setLeftOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleLeft')}>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -670,7 +670,7 @@ function App() {
           </button>
           <BrandMark />
         </div>
-        <div className="hidden items-center rounded-full bg-bg p-0.5 sm:flex">
+        <div className="hidden items-center rounded-lg bg-bg p-0.5 sm:flex">
           {([
             ['paper', t('workbench.tabPaper')],
             ['data', t('workbench.tabData')],
@@ -684,7 +684,7 @@ function App() {
                 setWorkbenchTab(id)
                 if (id === 'data' && sessionId) setEdaOpen(true)
               }}
-              className={`rounded-full px-3 py-1 text-[12px] transition-colors duration-200 ${
+              className={`rounded-md px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
                 workbenchTab === id ? 'bg-accent text-white' : 'text-muted hover:text-ink'
               }`}
             >
@@ -692,14 +692,14 @@ function App() {
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-2.5">
           {sessionId ? (
             <span data-testid="session-ready" hidden />
           ) : (
             <span className="text-xs text-muted font-mono">{t('app.hint')}</span>
           )}
           <input ref={fileInputRef} type="file" accept=".csv" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
-          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
+          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
             {uploading && (
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                 <circle cx="12" cy="12" r="10" strokeDasharray="31.4 31.4" strokeLinecap="round" />
@@ -746,7 +746,7 @@ function App() {
         rightOpen={rightOpen}
         outline={
           <ErrorBoundary>
-            <h2 className="mb-3 text-xs uppercase tracking-wider text-muted font-mono">{t('bench.chapters')}</h2>
+            <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{t('bench.chapters')}</h2>
             {outline.length > 0 && !identFailed ? (
               <div data-testid="chapter-write-dock">
                 <p className="mb-2 text-xs leading-6 text-muted">{t('bench.pickChapter')}</p>
@@ -793,9 +793,10 @@ function App() {
         }
         editor={
           <ErrorBoundary>
+            <div className="mx-auto max-w-[46rem] px-6 py-10 sm:px-10">
             {workbenchTab === 'data' && (
               <section className="mb-6">
-                <h2 className="mb-3 font-serif text-lg text-ink">{t('workbench.dataTitle')}</h2>
+                <h2 className="mb-4 font-serif text-[1.35rem] text-ink">{t('workbench.dataTitle')}</h2>
                 <CsvDropZone
                   uploading={uploading}
                   onBrowse={() => fileInputRef.current?.click()}
@@ -811,25 +812,25 @@ function App() {
               </section>
             )}
             {workbenchTab === 'format' && (
-              <section className="mb-6 rounded border border-border bg-panel p-4">
+              <section className="mb-8 rounded-lg border border-border bg-panel p-6">
                 <h2 className="font-serif text-lg text-ink">{t('workbench.formatTitle')}</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">{t('workbench.formatBody')}</p>
               </section>
             )}
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
             {!hasReadout && (
-              <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowDirection')}
               </p>
             )}
             {hasReadout && !writtenChapter?.content && !writeBusy && (
-              <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowWrite')}
               </p>
             )}
-            <section data-testid="direction-section" className="mb-6 rounded border border-border bg-panel p-4">
+            <section data-testid="direction-section" className="mb-8 rounded-lg border border-border bg-panel p-6">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold">{t('app.directionTitle')}</h2>
+                <h2 className="font-serif text-[1.15rem] text-ink">{t('app.directionTitle')}</h2>
                 {!directionOpen && directionSummary ? (
                   <button
                     type="button"
@@ -885,8 +886,9 @@ function App() {
                 <ChapterWriter chapter={writtenChapter} sessionId={sessionId ?? undefined} onApprove={handleApprove} />
               </div>
             ) : (
-              <p className="text-sm leading-7 text-muted">{t('bench.paperEmpty')}</p>
+              <p className="font-serif text-[15px] leading-[1.8] text-muted">{t('bench.paperEmpty')}</p>
             )}
+            </div>
           </ErrorBoundary>
         }
         agent={

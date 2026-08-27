@@ -431,6 +431,38 @@ def test_extract_sections_does_not_splice_into_intro_or_methods():
     assert "未估计" in results["content"]
 
 
+def test_extract_sections_methods_codebook_is_not_spliced():
+    """方法 codebook `| 变量 | 含义 |` must not attract a coef-table splice."""
+    state = {
+        "main_specification": {
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        "estimate": {"formula": "income ~ age + treat", "treatment": "age"},
+    }
+    sections = _extract_sections(
+        [
+            {
+                "type": "methods",
+                "title": "方法",
+                "content": (
+                    "## 变量\n"
+                    "| 变量 | 含义 |\n"
+                    "|------|------|\n"
+                    "| age | 年龄 |\n"
+                    "| treat | 处理 |"
+                ),
+            }
+        ],
+        state,
+    )
+    body = sections[0]["content"]
+    assert "未估计" not in body
+    assert "系数" not in body
+    assert "含义" in body
+
+
 def test_escape_tex_protects_cite_and_unmatched_dollar():
     assert r"\cite{smith2020}" in _escape_tex_text(r"见 \cite{smith2020}。")
     assert r"\ref{tab:main}" in _escape_tex_text(r"见表 \ref{tab:main}")

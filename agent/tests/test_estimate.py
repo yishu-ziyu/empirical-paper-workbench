@@ -1,8 +1,10 @@
 """Main estimate writes a table the results chapter can cite."""
 from nodes.estimate import (
     _all_coefs,
+    _is_coef_header_line,
     _prefer_treatment_row,
     estimate,
+    looks_like_coef_table,
     splice_missing_table_rows,
     table_var_names,
 )
@@ -159,6 +161,39 @@ def test_splice_inserts_after_main_results_not_robustness():
     treat_at = out.index("| treat | 未估计 | — | — |")
     robust_at = out.index("| 子样本 | 0.01 |")
     assert main_end < treat_at < robust_at
+
+
+def test_codebook_variable_header_is_not_coef_table():
+    """`| 变量 | 含义 |` is a codebook, not a coef header."""
+    assert _is_coef_header_line("| 变量 | 含义 |") is False
+    assert looks_like_coef_table("| 变量 | 含义 |\n|------|------|\n| age | 年龄 |") is False
+    assert _is_coef_header_line("| 变量 | 系数 | SE | p |") is True
+
+
+def test_splice_still_fills_main_table_when_robustness_lists_names():
+    """A 稳健性 row named treat/age must not suppress the 主结果 insert."""
+    content = (
+        "# 主结果\n\n"
+        "| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        "| Intercept | 1.0000 | 0.1000 | 0.0001 |\n\n"
+        "## 稳健性\n\n"
+        "| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        "| age | -0.0500 | 0.0200 | 0.0200 |\n"
+        "| treat | 0.1000 | 0.0800 | 0.2200 |"
+    )
+    out = splice_missing_table_rows(
+        content,
+        {"formula": "income ~ age + treat", "treatment": "age", "controls": ["treat"]},
+        {"formula": "income ~ age + treat"},
+    )
+    main = out.split("## 稳健性")[0]
+    robust = out.split("## 稳健性")[1]
+    assert "| age | 未估计 | — | — |" in main
+    assert "| treat | 未估计 | — | — |" in main
+    assert "| age | -0.0500 | 0.0200 | 0.0200 |" in robust
+    assert main.index("| Intercept |") < main.index("| age | 未估计")
 
 
 def test_prefer_treatment_row_uses_fitted_numbers():

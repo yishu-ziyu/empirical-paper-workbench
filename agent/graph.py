@@ -94,6 +94,7 @@ def _get_checkpointer() -> Any:
         _CHECKPOINTER = _memory_saver()
         return _CHECKPOINTER
 
+    conn = None
     try:
         conn = psycopg.connect(
             url,
@@ -105,6 +106,11 @@ def _get_checkpointer() -> Any:
         _CHECKPOINTER = saver
         return _CHECKPOINTER
     except Exception as exc:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
         logger.warning(
             "Postgres checkpointer unavailable (%s); using MemorySaver",
             exc,

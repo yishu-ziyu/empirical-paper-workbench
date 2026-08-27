@@ -1,6 +1,9 @@
+import logging
 import os
+from typing import Any
 
 import psycopg
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 
@@ -58,37 +61,56 @@ def route_after_identification(state: EconPaperState) -> str | list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Database-backed checkpointer (PostgresSaver)
+# Checkpointer: PostgresSaver when CHECKPOINT_DB_URL is reachable,
+# MemorySaver when the URL is unset or the connection fails.
+# Local boot must not require a live Postgres.
 # ---------------------------------------------------------------------------
-_CHECKPOINTER: PostgresSaver | None = None
+logger = logging.getLogger(__name__)
+
+_CHECKPOINTER: Any = None
 
 
-def _get_checkpointer() -> PostgresSaver:
-    """Return the module-level PostgresSaver singleton.
+def _memory_saver() -> MemorySaver:
+    return MemorySaver()
 
-    Connection string is read from env ``CHECKPOINT_DB_URL`` with a
-    PostgreSQL default pointing at localhost.  Uses ``psycopg.connect``
-    directly (not ``PostgresSaver.from_conn_string``, which is a context
-    manager that closes the connection on exit — unsuitable for a module-
-    level singleton).  Tables are created on first call via ``setup()``.
+
+def _get_checkpointer() -> Any:
+    """Return the module-level checkpointer singleton.
+
+    - ``CHECKPOINT_DB_URL`` unset/empty → ``MemorySaver`` (local boot / tests).
+    - URL set and Postgres reachable → ``PostgresSaver`` (connection kept open
+      for the process; not ``from_conn_string``, which closes on exit).
+    - URL set but connect/setup fails → ``MemorySaver``.
+
+    Does not connect at import; first call builds the singleton.
     """
     global _CHECKPOINTER
     if _CHECKPOINTER is not None:
         return _CHECKPOINTER
 
-    url = os.getenv(
-        "CHECKPOINT_DB_URL",
-        "postgresql://mahaoxuan@localhost:5432/econpaper",
-    )
-    conn = psycopg.connect(
-        url,
-        autocommit=True,
-        prepare_threshold=0,
-    )
-    saver = PostgresSaver(conn)
-    saver.setup()  # create checkpoint/writes tables if missing
-    _CHECKPOINTER = saver
-    return _CHECKPOINTER
+    url = (os.getenv("CHECKPOINT_DB_URL") or "").strip()
+    if not url:
+        logger.info("CHECKPOINT_DB_URL unset; using MemorySaver")
+        _CHECKPOINTER = _memory_saver()
+        return _CHECKPOINTER
+
+    try:
+        conn = psycopg.connect(
+            url,
+            autocommit=True,
+            prepare_threshold=0,
+        )
+        saver = PostgresSaver(conn)
+        saver.setup()  # create checkpoint/writes tables if missing
+        _CHECKPOINTER = saver
+        return _CHECKPOINTER
+    except Exception as exc:
+        logger.warning(
+            "Postgres checkpointer unavailable (%s); using MemorySaver",
+            exc,
+        )
+        _CHECKPOINTER = _memory_saver()
+        return _CHECKPOINTER
 
 
 # ---------------------------------------------------------------------------
@@ -162,9 +184,10 @@ def build_graph():
 class _Graph:
     """对编译后 graph 的轻量封装。
 
-    checkpointer 要求调用时提供 thread_id；此处在不传 config 时
-    注入默认 thread_id，使 graph.invoke(...) 可直接跑通（开发阶段便利）。
-    底层编译后的 graph 仍携带 InMemorySaver。
+    默认惰性编译：``from graph import graph`` 不连接 Postgres。首次
+    invoke/stream/属性访问才 ``build_graph()``。checkpointer 要求调用时
+    提供 thread_id；此处在不传 config 时注入默认 thread_id，使
+    graph.invoke(...) 可直接跑通（开发阶段便利）。
 
     ADR-0004/0009 后 graph 节点数增加（search_literature / build_citation_graph
     / generate_references / review_chapter 迭代），LangGraph 默认 recursion_limit=25
@@ -178,8 +201,13 @@ class _Graph:
     }
     _RECURSION_LIMIT = 50
 
-    def __init__(self, compiled):
+    def __init__(self, compiled=None):
         self._compiled = compiled
+
+    def _ensure_compiled(self):
+        if self._compiled is None:
+            self._compiled = build_graph()
+        return self._compiled
 
     def _with_recursion_limit(self, config):
         """合并 recursion_limit 默认值到调用方 config（不覆盖显式设置）。"""
@@ -193,14 +221,23 @@ class _Graph:
 
     def invoke(self, input, config=None, **kwargs):
         config = self._with_recursion_limit(config)
-        return self._compiled.invoke(input, config=config, **kwargs)
+        return self._ensure_compiled().invoke(input, config=config, **kwargs)
 
     def stream(self, input, config=None, **kwargs):
         config = self._with_recursion_limit(config)
-        return self._compiled.stream(input, config=config, **kwargs)
+        return self._ensure_compiled().stream(input, config=config, **kwargs)
 
     def __getattr__(self, name):
-        return getattr(self._compiled, name)
+        return getattr(self._ensure_compiled(), name)
 
 
-graph = _Graph(build_graph())
+# Public handle. Compiling at import used to open Postgres and 503 /upload
+# when CHECKPOINT_DB_URL was unset. Compile on first use instead.
+graph = _Graph()
+
+
+def _reset_runtime() -> None:
+    """Drop cached checkpointer/graph so tests can change CHECKPOINT_DB_URL."""
+    global _CHECKPOINTER
+    _CHECKPOINTER = None
+    graph._compiled = None

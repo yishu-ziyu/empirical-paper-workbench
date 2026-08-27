@@ -56,7 +56,7 @@ export default function InstrumentReadout({
   const blocked = identificationFailed || writeBlockers.length > 0
 
   return (
-    <section data-testid="instrument-readout" className="mb-8 bg-panel px-1 py-2">
+    <section data-testid="instrument-readout" className="thread-card mb-8 px-5 py-5">
       <h2 className="border-t border-ink/25 pt-3 font-serif text-[1.35rem] font-semibold tracking-tight text-ink">
         {t('readout.section')}
       </h2>

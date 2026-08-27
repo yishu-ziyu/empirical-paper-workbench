@@ -1,25 +1,33 @@
 import { useT } from '../lib/i18n'
+import {
+  journalCaption,
+  journalNotes,
+  journalTable,
+  journalTd,
+  journalTh,
+  journalTheadRow,
+} from '../lib/paperMarkdown'
 import { CLEAN_STEPS, PAPER_NODES } from '../lib/paperPath'
 
-/** Decorative SciSpace-style desk for the landing. No live testids. */
+/** Landing desk face: Julius upload/results chrome, locked CONTEXT rail. No live testids. */
 export default function WorkspacePreview() {
   const { t } = useT()
   const chapters = [t('chapter.type.intro'), t('chapter.type.methods'), t('chapter.type.results')]
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-cream">
-      <div className="flex items-center gap-2 border-b border-border bg-panel px-4 py-2.5">
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <span className="h-2.5 w-2.5 rounded-full bg-border" />
-        <div className="ml-3 flex items-center gap-1 rounded-full bg-bg p-0.5 text-[11px]">
+    <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-[#f7f7f5]">
+      <div className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e4e4e4]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e4e4e4]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e4e4e4]" />
+        <div className="ml-3 flex items-center gap-1 rounded-full bg-[#f3f3f3] p-0.5 text-[11px]">
           <span className="rounded-full bg-accent px-2.5 py-0.5 text-white">{t('workbench.tabPaper')}</span>
           <span className="px-2.5 py-0.5 text-muted">{t('workbench.tabData')}</span>
           <span className="px-2.5 py-0.5 text-muted">{t('workbench.tabFormat')}</span>
         </div>
       </div>
       <div className="grid min-h-[420px] grid-cols-1 lg:grid-cols-[200px_minmax(0,1fr)_240px]">
-        <aside className="hidden border-r border-border bg-cream p-4 lg:block">
+        <aside className="hidden border-r border-black/[0.06] bg-[#f7f7f5] p-4 lg:block">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('bench.chapters')}</p>
           <ul className="mt-3 space-y-1">
             {chapters.map((title, i) => (
@@ -34,29 +42,43 @@ export default function WorkspacePreview() {
             ))}
           </ul>
         </aside>
-        <section className="bg-bg px-6 py-8 sm:px-10">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('guide.previewKicker')}</p>
-          <h3 className="mt-3 font-serif text-[1.45rem] leading-snug text-ink">{t('guide.previewTitle')}</h3>
-          <p className="mt-2 text-[13px] text-muted">
-            {t('guide.previewMethod')} · {t('guide.previewClaim')}
-          </p>
-          <div className="mt-6 overflow-hidden rounded-md border border-border bg-panel font-mono text-[12px] leading-6">
-            <div className="grid grid-cols-4 bg-cream px-4 py-2 text-muted">
-              <span>var</span>
-              <span>coef</span>
-              <span>se</span>
-              <span>p</span>
-            </div>
-            <div className="grid grid-cols-4 px-4 py-2 text-ink">
-              <span>age</span>
-              <span>0.124</span>
-              <span>0.046</span>
-              <span>0.008</span>
-            </div>
+        <section className="flex flex-col bg-[#fbfbfa] px-5 py-6 sm:px-8">
+          <div className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 py-1.5 text-[12px] text-ink/80">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black/[0.06] text-[14px] leading-none">+</span>
+            course-panel.csv
           </div>
-          <p className="mt-5 font-serif text-[15px] leading-[1.8] text-ink/80">{t('guide.previewNote')}</p>
+          <div className="thread-card px-4 py-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('guide.previewKicker')}</p>
+            <h3 className="mt-2 font-serif text-[1.25rem] leading-snug text-ink">{t('guide.previewTitle')}</h3>
+            <p className="mt-1 text-[13px] text-muted">
+              {t('guide.previewMethod')} · {t('guide.previewClaim')}
+            </p>
+            <p className={`${journalCaption} mt-4`}>{t('readout.caption')}</p>
+            <table className={journalTable}>
+              <thead>
+                <tr className={journalTheadRow}>
+                  <th className={journalTh}>{t('readout.var')}</th>
+                  <th className={`${journalTh} text-center`}>(1)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b-[2.5px] border-ink even:bg-[#f6f6f6]">
+                  <td className={`${journalTd} font-semibold`}>age</td>
+                  <td className={`${journalTd} text-center font-serif tabular-nums`}>
+                    <span className="block">0.124***</span>
+                    <span className="block text-[12.5px] text-ink/60">(0.046)</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p className={journalNotes}>{t('guide.previewNote')}</p>
+          </div>
+          <div className="composer-shell mt-auto flex items-center gap-2 px-3 py-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none">+</span>
+            <span className="text-[13px] text-muted">{t('workbench.dropBody')}</span>
+          </div>
         </section>
-        <aside className="hidden border-l border-border bg-cream p-4 lg:block">
+        <aside className="hidden border-l border-black/[0.06] bg-[#f7f7f5] p-4 lg:block">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('bench.steps')}</p>
           <ol className="relative mt-3 ml-1.5 border-l border-border">
             {PAPER_NODES.map((id, i) => (

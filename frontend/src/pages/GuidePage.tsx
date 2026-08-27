@@ -116,35 +116,46 @@ export default function GuidePage({
           <p className="mt-3 max-w-[34em] text-[14px] leading-7 text-[#8a8a8a]">{t('guide.sub')}</p>
           <p className="mt-4 max-w-[34em] font-mono text-[12px] leading-6 text-[#8a8a8a]">{t('guide.statMethods')}</p>
 
-          <div className="mt-14 flex w-full max-w-[26rem] flex-col items-center gap-3 sm:max-w-none sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              data-testid="guide-upload-btn"
-              onClick={onPickData}
-              disabled={uploading}
-              className="w-full rounded-full bg-ink px-7 py-3 text-[15px] font-medium text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-50 sm:w-auto"
-            >
-              {uploading ? t('app.uploading') : t('guide.haveData')}
-            </button>
-            <button
-              type="button"
-              data-testid="guide-sample-btn"
-              onClick={onTrySample}
-              disabled={uploading}
-              className="w-full rounded-full border border-black/15 bg-white px-7 py-3 text-[15px] text-ink transition-colors duration-200 hover:bg-black/[0.03] disabled:opacity-50 sm:w-auto"
-            >
-              {t('guide.trySample')}
-            </button>
+          <div className="composer-shell mt-14 w-full max-w-[640px] p-4 text-left sm:p-5">
+            <p className="px-1 pb-4 text-[15px] leading-7 text-[#6b6b6b]">{t('guide.composerHint')}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onPickData}
+                disabled={uploading}
+                aria-label={t('guide.haveData')}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                data-testid="guide-sample-btn"
+                onClick={onTrySample}
+                disabled={uploading}
+                className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef] disabled:opacity-50"
+              >
+                {t('guide.trySample')}
+              </button>
+              <button
+                type="button"
+                data-testid="guide-write-paper"
+                onClick={onWritePaper}
+                className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef]"
+              >
+                {t('guide.writePaper')}
+              </button>
+              <button
+                type="button"
+                data-testid="guide-upload-btn"
+                onClick={onPickData}
+                disabled={uploading}
+                className="ml-auto flex h-10 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {uploading ? t('app.uploading') : t('guide.haveData')}
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            data-testid="guide-write-paper"
-            onClick={onWritePaper}
-            className="mt-8 text-[14px] text-[#8a8a8a] underline-offset-4 transition-colors duration-200 hover:text-ink hover:underline"
-          >
-            {t('guide.writePaper')}
-          </button>
 
           {uploadError && (
             <p data-testid="upload-error" className="mt-4 text-sm text-danger">

@@ -49,6 +49,14 @@ export type DirectionFormInitial = {
   controls?: string
   method?: string
   template?: string
+  instrument?: string
+  time_col?: string
+  id_col?: string
+  first_treat_col?: string
+  running_var?: string
+  cutoff?: number
+  unit_col?: string
+  treatment_time?: string
 }
 
 export interface DirectionFormProps {
@@ -71,14 +79,14 @@ export default function DirectionForm({
   const [controls, setControls] = useState(initial?.controls ?? '')
   const [method, setMethod] = useState(initial?.method ?? '')
   const [template, setTemplate] = useState(initial?.template ?? 'undergrad')
-  const [instrument, setInstrument] = useState('')
-  const [timeCol, setTimeCol] = useState('')
-  const [idCol, setIdCol] = useState('')
-  const [firstTreatCol, setFirstTreatCol] = useState('')
-  const [runningVar, setRunningVar] = useState('')
-  const [cutoff, setCutoff] = useState('')
-  const [unitCol, setUnitCol] = useState('')
-  const [treatmentTime, setTreatmentTime] = useState('')
+  const [instrument, setInstrument] = useState(initial?.instrument ?? '')
+  const [timeCol, setTimeCol] = useState(initial?.time_col ?? '')
+  const [idCol, setIdCol] = useState(initial?.id_col ?? '')
+  const [firstTreatCol, setFirstTreatCol] = useState(initial?.first_treat_col ?? '')
+  const [runningVar, setRunningVar] = useState(initial?.running_var ?? '')
+  const [cutoff, setCutoff] = useState(initial?.cutoff != null ? String(initial.cutoff) : '')
+  const [unitCol, setUnitCol] = useState(initial?.unit_col ?? '')
+  const [treatmentTime, setTreatmentTime] = useState(initial?.treatment_time ?? '')
   const kind = methodKind(method)
   const canSubmit = Boolean(question.trim() && dv.trim() && iv.trim() && method)
 

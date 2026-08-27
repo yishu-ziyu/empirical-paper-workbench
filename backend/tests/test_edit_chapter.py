@@ -3,7 +3,7 @@
 Pins the live Copaper refine contract:
 - POST /sessions/{id}/edit-chapter 接受 {chapter_index, instruction}
   → 把 instruction 写入 revision_suggestions → 调 generate_chapter
-  → 返回更新后的章节并持久化（后续导出读 content）
+  → 章节正文改写并落盘：随后 GET /sessions/{id} 与 doc-export 看到新正文
 - 同一路由也接受 {chapter_index, content}，把用户 markdown 落盘，
   status="edited"，versions[0] 为新正文（不调 LLM）
 - 未知 session_id / 越界 chapter_index 返回 404
@@ -15,6 +15,7 @@ test_regenerate.py 一样 monkeypatch 假节点，避免真 LLM。
 from __future__ import annotations
 
 import routers.chapter  # noqa: F401
+import routers.doc_export  # noqa: F401
 from facade import facade
 
 
@@ -28,6 +29,12 @@ def _seed_session(state: dict) -> str:
 
 def _state_one_chapter() -> dict:
     return {
+        "title_chapter": {
+            "type": "title",
+            "title": "教育回报率研究",
+            "content": "\\title{教育回报率研究}",
+            "status": "generated",
+        },
         "body_chapters": [
             {
                 "type": "intro",
@@ -43,6 +50,21 @@ def _state_one_chapter() -> dict:
     }
 
 
+def _mock_generate_with(new_content: str):
+    def mock_generate(s):
+        body_chapters = list(s.get("body_chapters", []))
+        idx = s.get("current_chapter_index", 0)
+        if 0 <= idx < len(body_chapters):
+            ch = dict(body_chapters[idx])
+            ch["content"] = new_content
+            ch["versions"] = [new_content] + list(ch.get("versions") or [])
+            ch["status"] = "generated"
+            body_chapters[idx] = ch
+        return {"body_chapters": body_chapters}
+
+    return mock_generate
+
+
 def test_edit_chapter_instruction_applies_via_generate_chapter(monkeypatch, client):
     """Live fail: POST {chapter_index, instruction} 走 generate_chapter 并改章。"""
     sid = _seed_session(_state_one_chapter())
@@ -51,17 +73,7 @@ def test_edit_chapter_instruction_applies_via_generate_chapter(monkeypatch, clie
     def mock_generate(s):
         captured["current_chapter_index"] = s.get("current_chapter_index")
         captured["revision_suggestions"] = list(s.get("revision_suggestions") or [])
-        body_chapters = list(s.get("body_chapters", []))
-        idx = s.get("current_chapter_index", 0)
-        if 0 <= idx < len(body_chapters):
-            ch = dict(body_chapters[idx])
-            new_content = "改短后的引言。"
-            versions = [new_content] + list(ch.get("versions") or [])
-            ch["content"] = new_content
-            ch["versions"] = versions
-            ch["status"] = "generated"
-            body_chapters[idx] = ch
-        return {"body_chapters": body_chapters}
+        return _mock_generate_with("改短后的引言。")(s)
 
     monkeypatch.setattr("facade.generate_chapter_node", mock_generate)
     monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
@@ -83,22 +95,15 @@ def test_edit_chapter_instruction_applies_via_generate_chapter(monkeypatch, clie
     facade.drop_session(sid)
 
 
-def test_edit_chapter_instruction_persists_for_later_export(monkeypatch, client):
-    """refine 后 session 状态更新，versions 端点可见新正文（导出读同一 content）。"""
+def test_edit_chapter_instruction_saved_on_get_session_and_doc_export(
+    monkeypatch, client
+):
+    """Firstmate lock: POST 之后 GET session 与 doc-export 必须看到新正文。"""
     sid = _seed_session(_state_one_chapter())
-
-    def mock_generate(s):
-        body_chapters = list(s.get("body_chapters", []))
-        idx = s.get("current_chapter_index", 0)
-        if 0 <= idx < len(body_chapters):
-            ch = dict(body_chapters[idx])
-            ch["content"] = "导出应包含这段。"
-            ch["versions"] = ["导出应包含这段。"] + list(ch.get("versions") or [])
-            ch["status"] = "generated"
-            body_chapters[idx] = ch
-        return {"body_chapters": body_chapters}
-
-    monkeypatch.setattr("facade.generate_chapter_node", mock_generate)
+    new_text = "改短后的引言，导出必须带上。"
+    monkeypatch.setattr(
+        "facade.generate_chapter_node", _mock_generate_with(new_text)
+    )
     monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     resp = client.post(
@@ -106,16 +111,28 @@ def test_edit_chapter_instruction_persists_for_later_export(monkeypatch, client)
         json={"chapter_index": 0, "instruction": "把引言第一段写短一点"},
     )
     assert resp.status_code == 200, resp.text
-    state = facade.get_state(sid)
-    assert state["body_chapters"][0]["content"] == "导出应包含这段。"
-    versions = client.get(f"/sessions/{sid}/chapters/0/versions")
-    assert versions.status_code == 200
-    assert versions.json()["count"] == 2
+    assert resp.json()["chapter"]["content"] == new_text
+
+    session = client.get(f"/sessions/{sid}")
+    assert session.status_code == 200, session.text
+    chapters = session.json()["body_chapters"]
+    assert chapters[0]["content"] == new_text
+    assert "原始引言第一段很长很长。" not in (chapters[0]["content"] or "")
+
+    tex = client.get(
+        f"/sessions/{sid}/doc-export",
+        params={"format": "tex", "template": "cn_journal"},
+    )
+    assert tex.status_code == 200, tex.text
+    assert new_text in tex.text
+    assert "原始引言第一段很长很长。" not in tex.text
     facade.drop_session(sid)
 
 
-def test_edit_chapter_content_persists_markdown_without_llm(monkeypatch, client):
-    """save-edit：{content} 落盘，不调 generate_chapter，status=edited。"""
+def test_edit_chapter_content_saved_on_get_session_and_doc_export(
+    monkeypatch, client
+):
+    """save-edit markdown 落盘后，刷新会话与导出都读到新正文。"""
     sid = _seed_session(_state_one_chapter())
     called = {"n": 0}
 
@@ -125,18 +142,26 @@ def test_edit_chapter_content_persists_markdown_without_llm(monkeypatch, client)
 
     monkeypatch.setattr("facade.generate_chapter_node", mock_generate)
 
-    edited = "## 研究背景\n\n教育回报。\n"
+    edited = "## 研究背景\n\n教育回报是课设题目。"
     resp = client.post(
         f"/sessions/{sid}/edit-chapter",
         json={"chapter_index": 0, "content": edited},
     )
     assert resp.status_code == 200, resp.text
     assert called["n"] == 0
-    ch = resp.json()["chapter"]
-    assert ch["content"] == edited
-    assert ch["status"] == "edited"
-    assert ch["versions"][0] == edited
-    assert facade.get_state(sid)["body_chapters"][0]["content"] == edited
+    assert resp.json()["chapter"]["content"] == edited
+    assert resp.json()["chapter"]["status"] == "edited"
+
+    session = client.get(f"/sessions/{sid}")
+    assert session.status_code == 200, session.text
+    assert session.json()["body_chapters"][0]["content"] == edited
+
+    tex = client.get(
+        f"/sessions/{sid}/doc-export",
+        params={"format": "tex", "template": "cn_journal"},
+    )
+    assert tex.status_code == 200, tex.text
+    assert "教育回报是课设题目。" in tex.text
     facade.drop_session(sid)
 
 

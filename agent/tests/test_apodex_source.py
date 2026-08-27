@@ -10,6 +10,8 @@
 - pytest 默认 mock，不受影响
 """
 
+import json
+
 import pytest
 
 from nodes.search_literature import search_literature
@@ -114,6 +116,87 @@ def test_parse_drops_titleless_and_coerces(monkeypatch):
     assert len(entries) == 1
     assert entries[0]["authors"] == ["Solo"]
     assert isinstance(entries[0]["year"], int)
+
+
+def test_search_assembles_sse_stream_when_server_streams(monkeypatch):
+    """服务端忽略 stream:false 强推 SSE 时，适配器自行拼装完整内容。"""
+    import io
+    from nodes.literature_sources import apodex
+
+    class _FakeResp:
+        headers = {"content-type": "text/event-stream"}
+        def __init__(self, data):
+            self._buf = io.BytesIO(data)
+        def read(self):
+            return self._buf.read()
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    sse = (
+        'data: {"choices":[{"delta":{"content":"```json\\n"}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"[{\\\"title\\\":\\\"Deep Paper\\\",\\\"authors\\\":[\\\"Ada\\\"],\\\"year\\\":2020}]"}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"\\n```"}}]}\n\n'
+        "data: [DONE]\n\n"
+    ).encode("utf-8")
+
+    captured = {}
+    def _fake_urlopen(req, timeout=None):
+        captured["body"] = json.loads(req.data.decode())
+        return _FakeResp(sse)
+
+    monkeypatch.setattr(
+        "nodes.literature_sources.apodex.urllib.request.urlopen", _fake_urlopen
+    )
+    entries = apodex.apodex_search("q", "k-test")
+    assert captured["body"]["stream"] is False, "应显式请求非流式"
+    assert entries == [
+        {
+            "title": "Deep Paper",
+            "authors": ["Ada"],
+            "year": 2020,
+            "source": "apodex",
+            "relevance_score": 1.0,
+        }
+    ]
+
+
+def test_parse_extracts_array_from_prose_prefix(monkeypatch):
+    """模型无视指令包了 prose/围栏：数组在正文中也要被找到。"""
+    from nodes.literature_sources import apodex
+
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        "下面是代表性文献：\n\n"
+                        '```json\n[{"title":"Real One","year":2011,'
+                        '"authors":["Du"]}]\n```\n'
+                    )
+                }
+            }
+        ]
+    }
+    entries = apodex.parse_entries(payload)
+    assert [e["title"] for e in entries] == ["Real One"]
+
+
+def test_parse_survives_concatenated_json_bodies(monkeypatch):
+    """多段 JSON 连排（流式 chunk 与完整对象混排）不炸，取含数组的对象。"""
+    import json as _json
+    from nodes.literature_sources import apodex
+
+    obj_a = {"id": "c1", "object": "chat.completion.chunk", "choices": []}
+    obj_b = {
+        "choices": [
+            {"message": {"content": '[{"title":"Mixed Body","year":2008,"authors":["Li"]}]'}}
+        ]
+    }
+    blob = "  " + _json.dumps(obj_a) + "\n\n" + _json.dumps(obj_b)
+    entries = apodex.parse_entries({"choices": [{"message": {"content": blob}}]})
+    assert [e["title"] for e in entries] == ["Mixed Body"]
 
 
 def test_parse_bad_json_raises_valueerror():

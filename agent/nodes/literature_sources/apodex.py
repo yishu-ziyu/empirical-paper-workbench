@@ -32,7 +32,98 @@ def _base_url() -> str:
 
 
 def _model() -> str:
-    return (os.environ.get("APODEX_MODEL") or "apodex-1.1").strip()
+    # 免费档实际开通的是深度研究模型（见平台创建 key 页示例）
+    return (os.environ.get("APODEX_MODEL") or "apodex-1-0-deep-research").strip()
+
+
+def _iter_top_level_objects(text: str):
+    """依次产出连排 JSON 文本里的每个完整对象（Extra-data 安全）。"""
+    decoder = json.JSONDecoder()
+    i = 0
+    while True:
+        b = text.find("{", i)
+        if b == -1:
+            return
+        try:
+            obj, end = decoder.raw_decode(text, b)
+        except json.JSONDecodeError:
+            i = b + 1
+            continue
+        yield obj
+        i = end
+
+
+def _collect_content_strings(node: Any, out: List[str]) -> None:
+    """递归收集所有名为 content 的字符串字段（chat.completion 形态）。"""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == "content" and isinstance(v, str):
+                out.append(v)
+            else:
+                _collect_content_strings(v, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_content_strings(item, out)
+
+
+def _scan_arrays(text: str):
+    """单段文本扫所有合法顶层数组。空数组不算命中（噪声如 choices:[]），
+    但记录出现过；全部为空时返回 [] 由调用方判语义。"""
+    decoder = json.JSONDecoder()
+    best: list | None = None
+    saw_any = False
+    i = 0
+    while True:
+        b = text.find("[", i)
+        if b == -1:
+            return best if best is not None else ([] if saw_any else None)
+        try:
+            obj, end = decoder.raw_decode(text, b)
+        except json.JSONDecodeError:
+            i = b + 1
+            continue
+        i = end
+        if not isinstance(obj, list):
+            continue
+        saw_any = True
+        if obj and (best is None or len(obj) > len(best)):
+            best = obj
+
+
+def _is_entry_array(arr: Any) -> bool:
+    """文献数组：成员是带非空 title 字符串的 dict（数量过半即认）。"""
+    if not isinstance(arr, list) or not arr:
+        return False
+    dicts = [x for x in arr if isinstance(x, dict)]
+    if len(dicts) < max(1, len(arr) // 2):
+        return False
+    titled = sum(1 for x in dicts if str(x.get("title") or "").strip())
+    return titled >= max(1, len(dicts) // 2)
+
+
+def _best_array_among(texts: List[str]) -> list | None:
+    """优先选"像文献数组"的候选；没有才退回最大普通数组；全空返回 []。"""
+    best_shaped: list | None = None
+    best_plain: list | None = None
+    saw_any = False
+    for t in texts:
+        found = _scan_arrays(t or "")
+        if found is None:
+            continue
+        for arr in ([found] if not isinstance(found, list) else [found]):
+            if not isinstance(arr, list):
+                continue
+            saw_any = True
+            if _is_entry_array(arr):
+                if best_shaped is None or len(arr) > len(best_shaped):
+                    best_shaped = arr
+            elif arr and (best_plain is None or len(arr) > len(best_plain)):
+                best_plain = arr
+    if best_shaped is not None:
+        return best_shaped
+    if best_plain is not None:
+        return best_plain
+    return [] if saw_any else None
 
 
 def parse_entries(payload: dict[str, Any]) -> List[dict[str, Any]]:
@@ -48,12 +139,21 @@ def parse_entries(payload: dict[str, Any]) -> List[dict[str, Any]]:
     message = (choices[0] or {}).get("message") or {}
     raw = str(message.get("content") or "")
     cleaned = FENCE_RE.sub("", raw).strip()
-    start, end = cleaned.find("["), cleaned.rfind("]")
-    if start == -1 or end == -1 or end <= start:
+    # 深研模型可能无视"只输出数组"的指令：内容混 prose / 围栏 / 连排
+    # JSON。候选文本 = 整段 + 所有递归收集到的 content 字符串；
+    # 各自扫合法顶层数组，取元素最多的那份——宁解析，不因形态炸掉。
+    candidates = [cleaned]
+    inner: List[str] = []
+    _collect_content_strings({"choices": choices}, inner)
+    # 连排 JSON 体：逐个解出顶层对象再收里面的 content（转义内层数组只有
+    # 解析后才可见）
+    for obj in _iter_top_level_objects(cleaned):
+        _collect_content_strings(obj, inner)
+    candidates.extend(inner)
+    best = _best_array_among(candidates)
+    if not isinstance(best, list):
         raise ValueError("apodex: no JSON array in content")
-    items = json.loads(cleaned[start : end + 1])
-    if not isinstance(items, list):
-        raise ValueError("apodex: content is not an array")
+    items = best
 
     entries: List[dict[str, Any]] = []
     for item in items[:MAX_RESULTS]:
@@ -88,10 +188,43 @@ def parse_entries(payload: dict[str, Any]) -> List[dict[str, Any]]:
     return entries
 
 
+def _assemble_sse(raw: bytes) -> str:
+    """把 text/event-stream 的增量 chunk 拼成完整 assistant 内容。
+
+    只认 data: 行；跳过 [DONE] 与不含 content 的 delta（如
+    reasoning_steps 思维流）；非 SSE JSON 体原样返回文本（交上层解析）。
+    """
+    text = raw.decode("utf-8", errors="replace")
+    stripped = text.lstrip()
+    if not stripped.startswith("data:") and not stripped.startswith("event:"):
+        return text
+    parts: List[str] = []
+    for line in stripped.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload_text = line[len("data:"):].strip()
+        if not payload_text or payload_text == "[DONE]":
+            continue
+        try:
+            chunk = json.loads(payload_text)
+        except json.JSONDecodeError:
+            continue
+        choices = chunk.get("choices") or []
+        if not choices:
+            continue
+        delta = (choices[0] or {}).get("delta") or {}
+        piece = delta.get("content")
+        if isinstance(piece, str):
+            parts.append(piece)
+    return "".join(parts)
+
+
 def apodex_search(query: str, api_key: str) -> List[dict[str, Any]]:
     """调 Apodex OpenAI 兼容端点做深搜，返回规范条目列表。
 
     网络/HTTP/解析任何一环失败都抛 RuntimeError，由节点层统一降级。
+    服务端可能无视 stream:false 强推 SSE——两种响应形态都能吃。
     """
     body = json.dumps(
         {
@@ -110,6 +243,7 @@ def apodex_search(query: str, api_key: str) -> List[dict[str, Any]]:
                 {"role": "user", "content": f"Find key papers about: {query}"},
             ],
             "temperature": 0.2,
+            "stream": False,
         }
     ).encode("utf-8")
     req = urllib.request.Request(
@@ -123,8 +257,16 @@ def apodex_search(query: str, api_key: str) -> List[dict[str, Any]]:
     )
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raw = resp.read()
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError:
+            payload = {
+                "choices": [
+                    {"message": {"content": _assemble_sse(raw)}}
+                ]
+            }
+    except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"apodex search failed: {exc}") from exc
     try:
         return parse_entries(payload)

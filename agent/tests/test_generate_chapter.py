@@ -345,6 +345,25 @@ def test_results_appends_tool_table_when_estimate_ok(recorder):
     assert state["estimate"]["treatment_row"] in ch["content"]
 
 
+def test_results_appends_degraded_fe_dropped_line(recorder):
+    """Degraded pooled-OLS fallback still splices the table, including the FE line."""
+    ready = make_write_ready_state()
+    estimate = dict(ready["estimate"])
+    estimate["status"] = "degraded"
+    estimate["estimator"] = "statsmodels.ols"
+    table = "# 主结果\n\nFE dropped; pooled OLS\n\n| treat | 0.1 | 0.1 | 0.1 |"
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "results", "title": "结果"}],
+        estimate=estimate,
+        results=table,
+    )
+    result = generate_chapter(state)
+    content = result["body_chapters"][0]["content"]
+    assert "FE dropped; pooled OLS" in content
+    assert "| treat |" in content
+
+
 def test_results_skips_splice_when_estimate_not_ok(recorder):
     """estimate.status 不是 ok：只写 prose，不拼表。"""
     ready = make_write_ready_state()

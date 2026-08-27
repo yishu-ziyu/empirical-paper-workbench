@@ -3,6 +3,20 @@
 > 记录产品每一步真实进展。规则：一条一个日期，写了什么、为什么、验收数字、
 > 还欠什么。决策性内容不在这里展开，指向 docs/adr/ 对应条目。
 
+## 2026-08-27（夜）—— 分支大清理：全仓只留 main
+
+合流后的分支考古（`git branch -a` + `git cherry` 内容级比对）收尾：
+
+- **删**：6 条零损失空壳（squash 合并的原型分支、north-star 存档、
+  本地 backup）+ 4 条真实分支（转 tag 后删除，见下）
+- **tag 存档**（内容永久可达，非分支不占位）：
+  - `archive/blind-hitl-review-panel`——盲审 UX 2 补丁，与核对分权
+    理念同源，收编时从此起步
+  - `archive/ship-empirical-paper-runtime`——老运行时线尖端（490 补丁）
+  - `archive/yishuship-review-line`——shipped 管线尖端（484 补丁）
+  - `archive/concurrent-stance-wip`——并发会话未提交现场（456 行）
+- 终态：本地与远端均只有 `main` 一条分支。
+
 ## 2026-08-27 —— 北极星落地日：从"陪聊半成品"到"替你干完 + 每一步可查"
 
 今日基调：确立产品北极星——**替你干完 + 每一步可查**（功能取舍判据：

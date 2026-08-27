@@ -1,5 +1,11 @@
 """Main estimate writes a table the results chapter can cite."""
-from nodes.estimate import estimate, splice_missing_table_rows, table_var_names
+from nodes.estimate import (
+    _all_coefs,
+    _prefer_treatment_row,
+    estimate,
+    splice_missing_table_rows,
+    table_var_names,
+)
 
 
 def test_estimate_empty_without_spec():
@@ -112,6 +118,88 @@ def test_splice_missing_table_rows_adds_treat_omitted():
     assert table_var_names(
         {"treatment": "age", "controls": ["treat"], "formula": "income ~ age + treat"}
     ) == ["age", "treat"]
+
+
+def test_table_var_names_controls_string_not_chars():
+    names = table_var_names({"treatment": "age", "controls": "treat"})
+    assert names == ["age", "treat"]
+    names = table_var_names({"treatment": "age", "controls": "treat, year"})
+    assert names == ["age", "treat", "year"]
+    assert "t" not in names
+
+
+def test_table_var_names_skips_junk_rhs():
+    names = table_var_names(
+        {"treatment": "age", "controls": ["treat"]},
+        "income ~ age + treat + I(age**2) + i.year",
+    )
+    assert names == ["age", "treat"]
+    assert "I" not in names
+    assert "i.year" not in names
+    assert "age**2" not in names
+
+
+def test_splice_inserts_after_main_results_not_robustness():
+    content = (
+        "# 主结果\n\n"
+        "| 变量 | 系数 | SE | p |\n"
+        "|------|------|----|---|\n"
+        "| age | -0.0687 | 0.0100 | 0.0010 |\n\n"
+        "## 稳健性\n\n"
+        "| 设定 | 系数 |\n"
+        "|------|------|\n"
+        "| 子样本 | 0.01 |"
+    )
+    out = splice_missing_table_rows(
+        content,
+        {"formula": "income ~ age + treat", "treatment": "age", "controls": ["treat"]},
+        {"formula": "income ~ age + treat"},
+    )
+    main_end = out.index("| age | -0.0687 | 0.0100 | 0.0010 |")
+    treat_at = out.index("| treat | 未估计 | — | — |")
+    robust_at = out.index("| 子样本 | 0.01 |")
+    assert main_end < treat_at < robust_at
+
+
+def test_prefer_treatment_row_uses_fitted_numbers():
+    row, rows = _prefer_treatment_row(
+        "age",
+        -0.0687,
+        0.0083,
+        0.0,
+        ["| age | 未估计 | — | — |", "| treat | 0.2031 | 0.1461 | 0.1789 |"],
+    )
+    assert row == "| age | -0.0687 | 0.0083 | 0.0000 |"
+    assert rows[0] == row
+    assert "未估计" not in row
+
+
+def test_all_coefs_isolates_per_name_failures():
+    class _Index(dict):
+        index = ["age", "treat"]
+
+        def __init__(self):
+            super().__init__(age=-0.06, treat=0.2)
+
+    class _BadSE:
+        def __getitem__(self, name):
+            if name == "age":
+                raise KeyError(name)
+            return 0.1
+
+    class Fit:
+        def __init__(self):
+            self.params = _Index()
+            self.bse = _BadSE()
+            self.pvalues = {"age": 0.01, "treat": 0.18}
+
+        def to_dict(self):
+            raise RuntimeError("no dict")
+
+    coefs = _all_coefs(Fit())
+    assert coefs["treat"] == (0.2, 0.1, 0.18)
+    assert coefs["age"][0] == -0.06
+    assert coefs["age"][1] is None
 
 
 def test_results_chapter_user_prompt_contains_estimate(tmp_path, mock_llm_for):

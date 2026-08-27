@@ -55,9 +55,10 @@ describe('PaperPath 右栏步骤', () => {
       canExport: false,
     })
     expect(derived.nodes.upload_data).toBe('completed')
-    expect(derived.nodes.clean_data).toBe('completed')
+    expect(derived.nodes.clean_data).toBe('pending')
     expect(derived.nodes.set_direction).toBe('paused')
-    expect(derived.clean.profiling).toBe('completed')
+    expect(derived.clean.profiling).toBe('pending')
+    expect(derived.clean.audit).toBe('pending')
   })
 
   test('pauses generate_chapter until the chapter is written or approved', () => {

@@ -72,6 +72,7 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('paper-path-set_direction')).toHaveAttribute('data-status', 'paused')
     for (const id of CLEAN_STEPS) {
       expect(rightPane).toContainElement(screen.getByTestId(`clean-step-${id}`))
+      expect(screen.getByTestId(`clean-step-${id}`)).toHaveAttribute('data-status', 'pending')
     }
     expect(screen.getByTestId('workbench-tab-paper')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-tab-data')).toBeInTheDocument()
@@ -81,6 +82,27 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('paper-path-search_literature')).not.toBeInTheDocument()
     expect(screen.queryByTestId('paper-path-eda')).not.toBeInTheDocument()
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
+  })
+
+  test('Format 页有导出 CTA；路径 translate_code / export_docx 打开现有对话框', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('workbench-tab-format'))
+    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('format-export-doc-btn')).toHaveTextContent('导出论文')
+    expect(screen.getByTestId('format-export-code-btn')).toHaveTextContent('导出代码')
+
+    fireEvent.click(screen.getByTestId('paper-path-translate_code').querySelector('button')!)
+    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('code-export-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('code-export-close'))
+
+    fireEvent.click(screen.getByTestId('paper-path-export_docx').querySelector('button')!)
+    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
+    expect(screen.getByTestId('doc-export-dialog')).toBeInTheDocument()
   })
 
   test('上传 CSV 成功后 sessionId 从 response 获取并显示', async () => {

@@ -115,9 +115,6 @@ export function derivePaperPath(state: PaperPathState): {
       const next = CLEAN_STEPS.find((id) => clean[id] === 'pending')
       if (next) clean[next] = 'active'
     }
-  } else if (state.hasSession) {
-    for (const id of CLEAN_STEPS) clean[id] = 'completed'
-    cleanData = 'completed'
   } else if (state.uploading) {
     clean.profiling = 'active'
     cleanData = 'active'

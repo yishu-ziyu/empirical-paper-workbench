@@ -59,23 +59,36 @@ def effect_from_fit(
     return coef, se, p, n
 
 
-def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str]:
+def _fit_statsmodels(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+    """Pooled OLS. Formula is the spec actually passed to statsmodels, not pyfixest FE."""
+    import statsmodels.formula.api as smf
+
+    sm_formula = str(formula).split("|", 1)[0].strip()
+    fit_kwargs: Dict[str, Any] = {}
+    if cluster is not None:
+        fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
+    return smf.ols(sm_formula, data=df).fit(**fit_kwargs), "statsmodels.ols", sm_formula
+
+
+def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+    """Fit feols when StatsPAI is installed.
+
+    Statsmodels fallback is missing-package only (``ImportError``). Any other
+    feols failure propagates so the caller can keep ``status=error``.
+    Returns ``(fit, estimator, formula_used)``.
+    """
     try:
         import statspai
+    except ImportError:
+        return _fit_statsmodels(formula, df, cluster)
 
-        kwargs: Dict[str, Any] = {"data": df}
-        if cluster:
-            kwargs["vcov"] = {"CRV1": cluster}
-        return statspai.feols(formula, **kwargs), "statspai.feols"
-    except Exception:
-        import statsmodels.formula.api as smf
-
-        # pyfixest FE syntax (`y ~ x | id + time`) is not statsmodels-legal.
-        sm_formula = str(formula).split("|", 1)[0].strip()
-        fit_kwargs: Dict[str, Any] = {}
-        if cluster is not None:
-            fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
-        return smf.ols(sm_formula, data=df).fit(**fit_kwargs), "statsmodels.ols"
+    kwargs: Dict[str, Any] = {"data": df}
+    if cluster:
+        kwargs["vcov"] = {"CRV1": cluster}
+    try:
+        return statspai.feols(formula, **kwargs), "statspai.feols", str(formula)
+    except ImportError:
+        return _fit_statsmodels(formula, df, cluster)
 
 
 def _fmt(x: Optional[float]) -> str:
@@ -192,7 +205,7 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
-    fitted, estimator = _fit(str(formula), df, cluster)
+    fitted, estimator, fit_formula = _fit(str(formula), df, cluster)
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     treatment_row = f"| {treatment} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
@@ -201,7 +214,7 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
         "produced_by": "estimate",
         "estimator": estimator,
         "method": str(spec.get("method") or "ols"),
-        "formula": formula,
+        "formula": fit_formula,
         "treatment": treatment,
         "treatment_row": treatment_row,
         "n": n,

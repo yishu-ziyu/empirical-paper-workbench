@@ -10,9 +10,9 @@
 5. ``convert_docx`` 优先 ``pandoc``；缺失或失败时写最小 OOXML ``.docx``
 6. 返回 ``{"latex_source", "pdf_path", "docx_path", "degraded"}``
 
-降级策略：``latexmk`` 不可用时 ``pdf_path=None``；docx 在 pandoc 与
-OOXML fallback 都失败时才为 None。``degraded=True`` 若任一路径失败，
-但 ``latex_source`` 始终可用。测试通过
+降级策略：``latexmk`` 不可用时 ``pdf_path=None``。docx 在 pandoc 缺失时
+仍写 OOXML，但 ``degraded=True``。仅当转换完全失败时 ``docx_path=None``。
+``latex_source`` 始终可用。测试通过
 ``monkeypatch.setattr("nodes.export_docx.compile_pdf", fake)`` 替换编译函数，
 故 ``compile_pdf`` / ``convert_docx`` 必须是模块级函数。
 """
@@ -243,11 +243,43 @@ def _xml_escape(text: str) -> str:
 
 
 def _strip_tex_markup(text: str) -> str:
+    """Drop TeX commands but keep brace prose (\\textbf{结果} → 结果)."""
     text = re.sub(r"(?<!\\)%.*", "", text)
     text = re.sub(r"\\(?:begin|end)\{[^}]+\}", "", text)
     text = re.sub(r"\\(?:maketitle|tableofcontents)\b", "", text)
-    text = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?(?:\{[^}]*\})?", "", text)
+    text = re.sub(
+        r"\\(?:label|cite|citep|citet|ref|pageref|footnote)\*?\{[^}]*\}",
+        "",
+        text,
+    )
+    keep_arg = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
+    prev = None
+    while prev != text:
+        prev = text
+        text = keep_arg.sub(r"\1", text)
+    text = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", "", text)
     return text.replace("\\%", "%").replace("\\&", "&").strip()
+
+
+def _prelude_section(raw: str) -> Optional[dict]:
+    """Pre-\\section body (abstract / leftover) as a docx section."""
+    if not raw or not raw.strip():
+        return None
+    abs_m = re.search(
+        r"\\begin\{abstract\}(.*?)\\end\{abstract\}", raw, flags=re.S | re.I
+    )
+    if abs_m:
+        content = _strip_tex_markup(abs_m.group(1))
+        leftover = _strip_tex_markup(raw[: abs_m.start()] + raw[abs_m.end() :])
+        if leftover:
+            content = f"{content}\n{leftover}" if content else leftover
+        if content:
+            return {"title": "摘要", "content": content}
+        return None
+    content = _strip_tex_markup(raw)
+    if not content:
+        return None
+    return {"title": "摘要", "content": content}
 
 
 def _sections_from_tex(tex_source: str) -> Tuple[str, List[dict]]:
@@ -260,6 +292,9 @@ def _sections_from_tex(tex_source: str) -> Tuple[str, List[dict]]:
         body = body.split("\\end{document}", 1)[0]
     parts = re.split(r"\\section\{([^}]*)\}", body)
     sections: List[dict] = []
+    prelude = _prelude_section(parts[0] if parts else "")
+    if prelude:
+        sections.append(prelude)
     for i in range(1, len(parts), 2):
         content = parts[i + 1] if i + 1 < len(parts) else ""
         sections.append(
@@ -324,6 +359,7 @@ def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
 
     成功返回 docx 绝对路径；pandoc 与 fallback 都失败时返回 None。
     """
+    convert_docx.used_ooxml_fallback = False
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     tex_path = out / "paper.tex"
@@ -346,6 +382,7 @@ def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
                 timeout=120,
             )
             if docx_path.exists() and docx_path.stat().st_size > 0:
+                convert_docx.used_ooxml_fallback = False
                 return str(docx_path)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             pass
@@ -355,6 +392,7 @@ def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
         _write_simple_docx(docx_path, title, sections)
     except OSError:
         return None
+    convert_docx.used_ooxml_fallback = True
     return str(docx_path) if docx_path.exists() else None
 
 
@@ -407,9 +445,12 @@ def export_docx(state: EconPaperState) -> ExportDocxOutput:
         pass
 
     pdf_path = compile_pdf(tex_source, output_dir)
+    if hasattr(convert_docx, "used_ooxml_fallback"):
+        convert_docx.used_ooxml_fallback = False
     docx_path = convert_docx(tex_source, output_dir)
+    ooxml_fallback = bool(getattr(convert_docx, "used_ooxml_fallback", False))
 
-    degraded = pdf_path is None or docx_path is None
+    degraded = pdf_path is None or docx_path is None or ooxml_fallback
 
     return {
         "latex_source": tex_source,

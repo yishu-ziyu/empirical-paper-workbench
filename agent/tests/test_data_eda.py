@@ -34,6 +34,41 @@ def test_compute_csv_eda_from_castle_like_csv(tmp_path):
     assert "CHARLS" not in table
 
 
+def test_compute_csv_eda_caps_wide_columns(tmp_path):
+    from engine.data_eda import _EDA_COL_CAP
+
+    n_cols = _EDA_COL_CAP + 5
+    names = [f"c{i}" for i in range(n_cols)]
+    csv_path = tmp_path / "wide.csv"
+    csv_path.write_text(
+        ",".join(names) + "\n" + ",".join("1" for _ in names) + "\n",
+        encoding="utf-8",
+    )
+    summary, table = compute_csv_eda({"csv_path": str(csv_path)})
+    assert f"1 行 × {n_cols} 列" in summary
+    assert f"上限 {_EDA_COL_CAP}" in summary
+    assert "| c0 |" in table
+    assert f"| c{_EDA_COL_CAP} |" not in table
+    assert "CHARLS" not in summary
+
+
+def test_bind_skips_csv_eda_unless_data_desc(monkeypatch):
+    called = []
+
+    def fake_eda(_state):
+        called.append(1)
+        return "S", "T"
+
+    monkeypatch.setattr("engine.bind.compute_csv_eda", fake_eda)
+    intro = bind_chapter_kwargs({"csv_path": "/tmp/x.csv"}, {"type": "intro"})
+    assert called == []
+    assert intro["data_summary"] == ""
+    assert intro["eda_results"] == ""
+    desc = bind_chapter_kwargs({"csv_path": "/tmp/x.csv"}, {"type": "data_desc"})
+    assert called == [1]
+    assert desc["eda_results"] == "T"
+
+
 def test_bind_chapter_kwargs_uses_csv_eda(tmp_path):
     csv_path = tmp_path / "castle.csv"
     csv_path.write_text(

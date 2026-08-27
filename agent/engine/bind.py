@@ -45,7 +45,9 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
     diag = state.get("identification_diag") or {}
     if not isinstance(diag, Mapping):
         diag = {}
-    data_summary, eda_results = compute_csv_eda(state)
+    data_summary, eda_results = "", ""
+    if str(spec.get("type") or "") == "data_desc":
+        data_summary, eda_results = compute_csv_eda(state)
     return {
         "research_question": rd.get("question") or state.get("research_question") or "",
         "method": spec.get("method") or rd.get("method") or "",

@@ -61,9 +61,9 @@ def route_after_identification(state: EconPaperState) -> str | list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Checkpointer: PostgresSaver when CHECKPOINT_DB_URL is reachable,
-# MemorySaver when the URL is unset or the connection fails.
-# Local boot must not require a live Postgres.
+# Checkpointer: MemorySaver only when CHECKPOINT_DB_URL is unset/empty.
+# URL set → PostgresSaver. Connect/setup failure fails loudly (no MemorySaver
+# cache). Local boot must not require a live Postgres.
 # ---------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def _get_checkpointer() -> Any:
     - ``CHECKPOINT_DB_URL`` unset/empty → ``MemorySaver`` (local boot / tests).
     - URL set and Postgres reachable → ``PostgresSaver`` (connection kept open
       for the process; not ``from_conn_string``, which closes on exit).
-    - URL set but connect/setup fails → ``MemorySaver``.
+    - URL set but connect/setup fails → raise; do not cache MemorySaver.
 
     Does not connect at import; first call builds the singleton.
     """
@@ -105,18 +105,17 @@ def _get_checkpointer() -> Any:
         saver.setup()  # create checkpoint/writes tables if missing
         _CHECKPOINTER = saver
         return _CHECKPOINTER
-    except Exception as exc:
+    except Exception:
         if conn is not None:
             try:
                 conn.close()
             except Exception:
                 pass
-        logger.warning(
-            "Postgres checkpointer unavailable (%s); using MemorySaver",
-            exc,
+        logger.exception(
+            "CHECKPOINT_DB_URL is set but Postgres checkpointer failed; "
+            "not falling back to MemorySaver"
         )
-        _CHECKPOINTER = _memory_saver()
-        return _CHECKPOINTER
+        raise
 
 
 # ---------------------------------------------------------------------------

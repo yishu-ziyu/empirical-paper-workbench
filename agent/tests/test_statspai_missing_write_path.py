@@ -68,8 +68,9 @@ def test_set_direction_and_prewrite_survive_missing_statspai(tmp_path, monkeypat
     )
     estimate = state.get("estimate") or {}
     assert estimate.get("produced_by") == "estimate"
-    assert estimate.get("status") in {"ok", "error", "degraded"}
-    assert estimate.get("estimator") != "statspai.feols"
+    assert estimate.get("status") == "ok"
+    assert estimate.get("estimator") == "statsmodels.ols"
+    assert estimate.get("treatment_row")
     outline = state.get("outline") or []
     assert len(outline) == 6
     assert {ch.get("type") for ch in outline} >= {

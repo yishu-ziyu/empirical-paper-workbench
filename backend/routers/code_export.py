@@ -1,5 +1,9 @@
 """REST endpoints for code file export (T-09).
 
+POST /sessions/{session_id}/translate-code
+    跑 agent ``translate_code``，把 ``code_translations`` 写入 session。
+    HITL 写章路径不会自动进该节点，所以必须显式调用。
+
 GET /sessions/{session_id}/code-export?format=py|do|R|m
     返回对应格式的代码文件下载（Content-Disposition: attachment）。
 
@@ -23,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_session_ownership
 from facade import facade
@@ -62,6 +67,28 @@ def _find_translation(translations: List[Any], lang: str) -> Dict[str, Any]:
         if isinstance(t, dict) and t.get("lang") == lang:
             return t
     return {}
+
+
+class TranslateCodeResponse(BaseModel):
+    ok: bool = True
+    code_translations: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@router.post(
+    "/sessions/{session_id}/translate-code",
+    response_model=TranslateCodeResponse,
+)
+async def translate_code_endpoint(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> TranslateCodeResponse:
+    """Run translate_code so GET /code-export can return Stata / R files."""
+    require_session_ownership(session_id, current_user)
+    result = facade.run_translate_code(session_id)
+    return TranslateCodeResponse(
+        ok=True,
+        code_translations=list(result.get("code_translations") or []),
+    )
 
 
 @router.get("/sessions/{session_id}/code-export")

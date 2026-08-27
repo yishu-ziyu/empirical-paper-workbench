@@ -329,6 +329,138 @@ def _translate_line_to_eviews(line: str) -> str:
     return f"' {line}"
 
 
+def _as_controls(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return [str(part).strip() for part in value if str(part).strip()]
+
+
+def _first_text(*sources: Any, keys: tuple[str, ...], default: str = "") -> str:
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for key in keys:
+            raw = src.get(key)
+            if raw is None:
+                continue
+            text = str(raw).strip()
+            if text:
+                return text
+    return default
+
+
+def _direction_model(state: EconPaperState) -> dict[str, Any]:
+    """Read outcome / treatment / panel columns from direction or spec."""
+    spec = state.get("main_specification")
+    rd = state.get("research_direction")
+    spec = spec if isinstance(spec, dict) else {}
+    rd = rd if isinstance(rd, dict) else {}
+    csv_path = state.get("csv_path") or "data.csv"
+    csv_name = Path(str(csv_path)).name or "data.csv"
+    outcome = _first_text(spec, rd, keys=("outcome", "outcome_col", "dv"), default="y")
+    treatment = _first_text(
+        spec, rd, keys=("treatment", "treatment_col", "iv"), default="treat"
+    )
+    id_col = _first_text(spec, rd, keys=("id_col", "id", "unit_col", "unit"))
+    time_col = _first_text(spec, rd, keys=("time_col", "time", "year"))
+    controls = _as_controls(spec.get("controls")) or _as_controls(rd.get("controls"))
+    skip = {outcome, treatment, id_col, time_col}
+    controls = [col for col in controls if col not in skip]
+    return {
+        "csv": csv_name,
+        "outcome": outcome,
+        "treatment": treatment,
+        "controls": controls,
+        "id_col": id_col,
+        "time_col": time_col,
+        "panel": bool(id_col and time_col),
+    }
+
+
+def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
+    """Usable Stata xtreg/reghdfe + R fixest/felm when chapters have no Python."""
+    y = model["outcome"]
+    treat = model["treatment"]
+    controls = model["controls"]
+    rhs_space = " ".join([treat, *controls])
+    rhs_plus = " + ".join([treat, *controls])
+    csv = model["csv"]
+    note = (
+        "Chapter text had no ```python fences. "
+        "Script is built from the session research direction, not StatsPAI."
+    )
+
+    py_formula = f"{y} ~ {rhs_plus}"
+    py = (
+        '"""Auto-generated Python script from research direction.\n\n'
+        f"{note}\n"
+        '"""\n'
+        "import pandas as pd\n"
+        "import statsmodels.formula.api as smf\n\n"
+        f'df = pd.read_csv("{csv}")\n'
+        f'model = smf.ols("{py_formula}", data=df).fit()\n'
+        "print(model.summary())\n"
+    )
+
+    stata = [
+        "* Auto-generated Stata script from research direction",
+        f"* {note}",
+        "clear all",
+        f'import delimited "{csv}", clear',
+    ]
+    if model["panel"]:
+        i, t = model["id_col"], model["time_col"]
+        stata.extend(
+            [
+                f"xtset {i} {t}",
+                f"xtreg {y} {rhs_space}, fe vce(cluster {i})",
+                f"reghdfe {y} {rhs_space}, absorb({i} {t}) vce(cluster {i})",
+            ]
+        )
+    else:
+        stata.append(f"regress {y} {rhs_space}")
+
+    r = [
+        "# Auto-generated R script from research direction",
+        f"# {note}",
+        "library(fixest)",
+        "library(lfe)",
+        f'df <- read.csv("{csv}")',
+    ]
+    if model["panel"]:
+        i, t = model["id_col"], model["time_col"]
+        fe = f"{i} + {t}"
+        r.extend(
+            [
+                f"model_feols <- feols({y} ~ {rhs_plus} | {fe}, data = df, cluster = ~{i})",
+                f"model_felm <- felm({y} ~ {rhs_plus} | {fe} | 0 | {i}, data = df)",
+                "summary(model_feols)",
+            ]
+        )
+    else:
+        r.extend(
+            [
+                f"model <- lm({y} ~ {rhs_plus}, data = df)",
+                "summary(model)",
+            ]
+        )
+
+    eviews = [
+        "' Auto-generated EViews script from research direction",
+        f"' {note}",
+        f"import {csv}",
+        f"ls {y} c {rhs_space}",
+    ]
+    return {
+        "py": py,
+        "stata": "\n".join(stata) + "\n",
+        "r": "\n".join(r) + "\n",
+        "eviews": "\n".join(eviews) + "\n",
+    }
+
+
 def _translate_block(python_code: str, lang: str) -> str:
     """整段 Python 代码翻译成目标语言。"""
     if not python_code.strip():
@@ -368,29 +500,39 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
     """
     python_code = _collect_python(state)
 
-    py_code = (
-        '"""Auto-generated Python script (econpaper T-09).\n\n'
-        '由 body_chapters 与 cleaning audit 合并而来。\n'
-        '"""\n\n'
-        + (python_code if python_code.strip() else "# 无 Python 代码\n")
-    )
+    if python_code.strip():
+        py_code = (
+            '"""Auto-generated Python script (econpaper T-09).\n\n'
+            "由 body_chapters 与 cleaning audit 合并而来。\n"
+            '"""\n\n'
+            + python_code
+        )
+        translations: list[dict] = [
+            {"lang": "py", "code": py_code, "filename": "analysis.py"},
+            {
+                "lang": "stata",
+                "code": _translate_block(python_code, "stata"),
+                "filename": "analysis.do",
+            },
+            {
+                "lang": "r",
+                "code": _translate_block(python_code, "r"),
+                "filename": "analysis.R",
+            },
+            {
+                "lang": "eviews",
+                "code": _translate_block(python_code, "eviews"),
+                "filename": "analysis.m",
+            },
+        ]
+        return {"code_translations": translations}
 
-    translations: list[dict] = [
-        {"lang": "py", "code": py_code, "filename": "analysis.py"},
-        {
-            "lang": "stata",
-            "code": _translate_block(python_code, "stata"),
-            "filename": "analysis.do",
-        },
-        {
-            "lang": "r",
-            "code": _translate_block(python_code, "r"),
-            "filename": "analysis.R",
-        },
-        {
-            "lang": "eviews",
-            "code": _translate_block(python_code, "eviews"),
-            "filename": "analysis.m",
-        },
-    ]
-    return {"code_translations": translations}
+    scripts = _scripts_from_direction(_direction_model(state))
+    return {
+        "code_translations": [
+            {"lang": "py", "code": scripts["py"], "filename": "analysis.py"},
+            {"lang": "stata", "code": scripts["stata"], "filename": "analysis.do"},
+            {"lang": "r", "code": scripts["r"], "filename": "analysis.R"},
+            {"lang": "eviews", "code": scripts["eviews"], "filename": "analysis.m"},
+        ]
+    }

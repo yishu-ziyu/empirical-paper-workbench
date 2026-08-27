@@ -47,7 +47,11 @@ export default function WorkspacePreview() {
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black/[0.06] text-[14px] leading-none">+</span>
             course-panel.csv
           </div>
-          <div className="thread-card px-4 py-4">
+          <p className="ml-auto max-w-[22em] rounded-[20px] bg-ink px-4 py-2.5 text-[13px] leading-6 text-white">
+            {t('guide.previewQuestion')}
+          </p>
+          <pre className="code-card mt-3">age          0.124***    (0.046)</pre>
+          <div className="thread-card mt-3 px-4 py-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{t('guide.previewKicker')}</p>
             <h3 className="mt-2 font-serif text-[1.25rem] leading-snug text-ink">{t('guide.previewTitle')}</h3>
             <p className="mt-1 text-[13px] text-muted">
@@ -72,6 +76,10 @@ export default function WorkspacePreview() {
               </tbody>
             </table>
             <p className={journalNotes}>{t('guide.previewNote')}</p>
+          </div>
+          <div className="thread-card mt-3 px-4 py-4">
+            <p className="font-serif text-[14px] leading-7 text-ink/85">1. {t('readout.lead')}</p>
+            <p className="mt-2 text-[13px] leading-6 text-muted">{t('guide.statMethods')}</p>
           </div>
           <div className="composer-shell mt-auto flex items-center gap-2 px-3 py-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none">+</span>

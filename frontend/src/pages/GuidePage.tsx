@@ -54,6 +54,24 @@ function StepIcon({ n }: { n: string }) {
   )
 }
 
+function SourceIcon({ kind }: { kind: 'csv' | 'sample' | 'methods' }) {
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f4f4f2] text-accent">
+      <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden>
+        {kind === 'csv' && (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 6.75h17M3.5 12h17M3.5 17.25h17M8 6.75v10.5" />
+        )}
+        {kind === 'sample' && (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M7 3.75h7.5L19 8.25v12H7A1.5 1.5 0 015.5 18.75V5.25A1.5 1.5 0 017 3.75zM14.5 3.75V8.25H19" />
+        )}
+        {kind === 'methods' && (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19V10.5M12 19V5M19.5 19v-6" />
+        )}
+      </svg>
+    </span>
+  )
+}
+
 function FeatureIcon({ n }: { n: string }) {
   return (
     <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
@@ -115,46 +133,70 @@ export default function GuidePage({
           <p className="mt-8 max-w-[38em] text-[15px] leading-7 text-[#6b6b6b]">{t('guide.lead')}</p>
           <p className="mt-3 max-w-[34em] text-[14px] leading-7 text-[#8a8a8a]">{t('guide.sub')}</p>
           <p className="mt-4 max-w-[34em] font-mono text-[12px] leading-6 text-[#8a8a8a]">{t('guide.statMethods')}</p>
+          <p className="mt-1 max-w-[34em] font-mono text-[12px] leading-6 text-[#8a8a8a]">
+            {t('guide.statExport')} · {t('guide.statCode')}
+          </p>
 
-          <div className="composer-shell mt-14 w-full max-w-[640px] p-4 text-left sm:p-5">
-            <p className="px-1 pb-4 text-[15px] leading-7 text-[#6b6b6b]">{t('guide.composerHint')}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onPickData}
-                disabled={uploading}
-                aria-label={t('guide.haveData')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
-              >
-                +
-              </button>
-              <button
-                type="button"
-                data-testid="guide-sample-btn"
-                onClick={onTrySample}
-                disabled={uploading}
-                className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef] disabled:opacity-50"
-              >
-                {t('guide.trySample')}
-              </button>
-              <button
-                type="button"
-                data-testid="guide-write-paper"
-                onClick={onWritePaper}
-                className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef]"
-              >
-                {t('guide.writePaper')}
-              </button>
-              <button
-                type="button"
-                data-testid="guide-upload-btn"
-                onClick={onPickData}
-                disabled={uploading}
-                className="ml-auto flex h-10 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                {uploading ? t('app.uploading') : t('guide.haveData')}
-              </button>
+          <div className="mt-14 w-full max-w-[680px] rounded-[32px] bg-[#f5f5f3] px-4 py-8 sm:px-8">
+            <p className="text-center text-[1.05rem] font-medium tracking-tight text-ink">{t('guide.ingestKicker')}</p>
+            <p className="mt-1 text-center text-[13px] text-[#8a8a8a]">{t('guide.ingestSub')}</p>
+            <div className="composer-shell mt-6 p-4 text-left sm:p-5">
+              <p className="px-1 pb-4 text-[15px] leading-7 text-[#6b6b6b]">{t('guide.composerHint')}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onPickData}
+                  disabled={uploading}
+                  aria-label={t('guide.haveData')}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  data-testid="guide-sample-btn"
+                  onClick={onTrySample}
+                  disabled={uploading}
+                  className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef] disabled:opacity-50"
+                >
+                  {t('guide.trySample')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="guide-write-paper"
+                  onClick={onWritePaper}
+                  className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef]"
+                >
+                  {t('guide.writePaper')}
+                </button>
+                <button
+                  type="button"
+                  data-testid="guide-upload-btn"
+                  onClick={onPickData}
+                  disabled={uploading}
+                  className="ml-auto flex h-10 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {uploading ? t('app.uploading') : t('guide.haveData')}
+                </button>
+              </div>
             </div>
+            <ul className="mt-6 flex flex-wrap justify-center gap-3">
+              <li className="source-tile">
+                <SourceIcon kind="csv" />
+                <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceCsv')}</p>
+                <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('workbench.dropFormats')}</p>
+              </li>
+              <li className="source-tile">
+                <SourceIcon kind="sample" />
+                <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.sourceSample')}</p>
+                <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('guide.trySample')}</p>
+              </li>
+              <li className="source-tile">
+                <SourceIcon kind="methods" />
+                <p className="mt-3 text-[12px] font-medium text-ink">{t('guide.statMethodsLabel')}</p>
+                <p className="mt-1 text-center text-[10px] leading-4 text-[#8a8a8a]">{t('guide.statMethods')}</p>
+              </li>
+            </ul>
           </div>
 
           {uploadError && (

@@ -562,8 +562,9 @@ class AgentFacade:
             from engine.readiness import TRUTH_KEYS
         except Exception:
             TRUTH_KEYS = frozenset()
+        _blocked_render_keys = frozenset({"workspace", "csv_path", "user_id"})
         for k, v in (render_kwargs or {}).items():
-            if k in TRUTH_KEYS:
+            if k in TRUTH_KEYS or k in _blocked_render_keys:
                 continue
             if k not in state or state.get(k) in (None, ""):
                 state[k] = v
@@ -607,18 +608,6 @@ class AgentFacade:
         state = {**state, **result}
         if result.get("write_blocked"):
             self.save_state(session_id, state)
-            try:
-                run_store.snapshot_state(
-                    session_id, f"{node_name}_blocked", state
-                )
-                run_store.append_event(
-                    session_id,
-                    f"{node_name}_blocked",
-                    status="blocked",
-                    detail={"blockers": list(result.get("write_blockers") or [])},
-                )
-            except Exception:
-                pass
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -969,6 +958,33 @@ class AgentFacade:
             hitl_reviewer=reviewer,
             hitl_comment=comment,
         )
+        from nodes.learning_labels import collect_learning_labels
+
+        state = self.update_state(
+            session_id,
+            learning_labels=collect_learning_labels(state),
+        )
+        try:
+            from nodes.label_store import (
+                ARM_HUMAN,
+                REVIEWER_HUMAN,
+                append_event,
+                event_from_decision,
+            )
+
+            append_event(
+                event_from_decision(
+                    {**state, "session_id": session_id},
+                    decision=decision,
+                    reviewer=reviewer,
+                    comment=comment,
+                    reviewer_kind=REVIEWER_HUMAN,
+                    ab_arm=ARM_HUMAN,
+                )
+            )
+        except Exception:
+            # 落盘失败不挡决策；测试会直接打 label_store。
+            pass
 
         # 人工评审决策落 trace（"可查"磁盘件：谁在什么时候放行/打回了哪章）
         self.record_event(

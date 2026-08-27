@@ -1,6 +1,6 @@
 """Authentication utilities: password hashing, JWT, and dependency injection.
 
-Uses bcrypt for password hashing and python-jose for JWT tokens.
+Uses passlib (bcrypt) for password hashing and python-jose for JWT tokens.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from models.user import User
 # ---------------------------------------------------------------------------
 
 # bcrypt 算法本身只加密前 72 字节(passlib 时代静默截断)。bcrypt 5.x 起
-# 对超长输入直接抛错,这里手动截断,保持与既有 $2b$ 哈希可互相验证。
+# 对超长输入直接抛错，这里手动截断，保持与既有 $2b$ 哈希可互相验证。
 _BCRYPT_MAX_SECRET_BYTES = 72
 
 
@@ -40,7 +40,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return bcrypt.checkpw(secret, hashed_password.encode("utf-8"))
     except ValueError:
-        # 非法哈希串按"密码不匹配"处理,而不是让请求 500。
+        # 非法哈希串按"密码不匹配"处理，而不是让请求 500。
         return False
 
 
@@ -121,6 +121,14 @@ async def get_optional_user(
     return await _resolve_user(token, db, required=False)
 
 
+async def get_user_from_token(
+    token: Optional[str],
+    db: AsyncSession,
+) -> Optional[User]:
+    """Resolve a user from a raw token string (WebSocket query / subprotocol)."""
+    return await _resolve_user(token, db, required=False)
+
+
 async def _resolve_user(
     token: Optional[str],
     db: AsyncSession,
@@ -166,3 +174,55 @@ async def _resolve_user(
             )
         return None
     return user
+
+
+# ---------------------------------------------------------------------------
+# Session ownership + debug-gated auth
+# ---------------------------------------------------------------------------
+
+
+def require_session_ownership(session_id: str, user: Optional[User]) -> None:
+    """Enforce session existence and ownership on session-scoped routes.
+
+    - Session missing → 404
+    - Session has owner_id → require authenticated user and user.id == owner_id
+      (401 if unauthenticated, 403 if a different user)
+    - Session has no owner (anonymous) AND DEBUG is false → 401
+    - Session has no owner AND DEBUG is true → allow (local demo)
+    """
+    from facade import facade
+
+    if not facade.has_session(session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    owner_id = facade.get_session_owner(session_id)
+    if owner_id is not None:
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for this session",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if user.id != owner_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not own this session",
+            )
+        return
+
+    if not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required for this session",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def require_auth_unless_debug(user: Optional[User]) -> None:
+    """Require an authenticated user when DEBUG is false (desk / demo routes)."""
+    if user is None and not settings.DEBUG:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

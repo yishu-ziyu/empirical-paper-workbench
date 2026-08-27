@@ -13,9 +13,13 @@ HITL 是 ADR 0004 自动评审的叠加层（hitl_review_enabled 默认 False）
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Optional
 
+from fastapi import APIRouter, Depends
+
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.review import (
     ReviewDecisionRequest,
     ReviewDecisionResponse,
@@ -31,7 +35,10 @@ _REGISTERED = False
     "/sessions/{session_id}/review",
     response_model=ReviewInfoResponse,
 )
-async def get_review(session_id: str) -> ReviewInfoResponse:
+async def get_review(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> ReviewInfoResponse:
     """返回当前章的评审信息。
 
     Response: ``{chapter_index, feedback, suggestions, score, rubric,
@@ -40,6 +47,7 @@ async def get_review(session_id: str) -> ReviewInfoResponse:
 
     无评审数据时返回 200 + 空字段（非 404），让前端渲染空态。
     """
+    require_session_ownership(session_id, current_user)
     info = facade.get_review(session_id)
     return ReviewInfoResponse(
         chapter_index=info["chapter_index"],
@@ -61,7 +69,9 @@ async def get_review(session_id: str) -> ReviewInfoResponse:
     response_model=ReviewDecisionResponse,
 )
 async def submit_review_decision(
-    session_id: str, payload: ReviewDecisionRequest
+    session_id: str,
+    payload: ReviewDecisionRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> ReviewDecisionResponse:
     """接收人工评审决策，写入 state。
 
@@ -71,6 +81,7 @@ async def submit_review_decision(
     - ``accept`` / ``force_pass`` → ``next_action="proceed"``
     - ``reject`` → 触发 ``facade.regenerate_chapter``，``next_action="regenerate"``
     """
+    require_session_ownership(session_id, current_user)
     result = facade.submit_review_decision(
         session_id,
         decision=payload.decision,

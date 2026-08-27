@@ -20,14 +20,16 @@ The router is registered in ``main.py`` via ``app.include_router(eda_router)``.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import EdaResponse
 
 router = APIRouter()
@@ -143,7 +145,11 @@ def _run_missing(df: pd.DataFrame) -> dict:
     "/sessions/{session_id}/eda",
     response_model=EdaResponse,
 )
-async def run_eda(session_id: str, payload: EdaRequest) -> EdaResponse:
+async def run_eda(
+    session_id: str,
+    payload: EdaRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> EdaResponse:
     """Run an EDA action on the session's dataset.
 
     Request body: ``{"action": "describe"|"corr"|"plot"|"scatter"|"regression"|"missing"}``.
@@ -156,6 +162,7 @@ async def run_eda(session_id: str, payload: EdaRequest) -> EdaResponse:
     各 action 的具体 shape；``EdaResponse`` 用 ``extra="allow"`` 保留
     describe / corr / missing 的原始字段）。
     """
+    require_session_ownership(session_id, current_user)
     action = payload.action
     if action not in _VALID_ACTIONS:
         raise HTTPException(status_code=400, detail=f"Invalid action: {action!r}")

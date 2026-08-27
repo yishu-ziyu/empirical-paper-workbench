@@ -8,7 +8,8 @@
 5. Content-Disposition: attachment; filename="analysis.<ext>"
 6. 未知 session_id → 404
 7. 不支持的 format → 400
-8. session 无 code_translations → GET 先跑 translate_code 再下载
+8. session 无 code_translations 且无真实方向列 → 404（不编造 y ~ treat）
+   有 outcome+treatment 时 GET 可先跑 translate_code
 """
 from __future__ import annotations
 
@@ -134,16 +135,33 @@ def test_export_unsupported_format_returns_400(client):
     assert resp.status_code == 400
 
 
-def test_export_empty_translations_runs_translate_then_returns_file(client):
-    """HITL never filled code_translations: GET still returns a real file."""
+def test_export_empty_translations_without_direction_returns_404(client):
+    """No translations and no real direction columns: 404, do not invent y ~ treat."""
     sid = _seed_session_without_translations()
     try:
         resp = client.get(f"/sessions/{sid}/code-export", params={"format": "py"})
-        assert resp.status_code == 200, resp.text
-        assert "analysis.py" in resp.headers.get("content-disposition", "")
+        assert resp.status_code == 404
+        assert "y ~ treat" not in resp.text
         state = facade.get_state(sid)
-        langs = {t["lang"] for t in (state.get("code_translations") or [])}
-        assert langs == {"py", "stata", "r", "eviews"}
+        assert not (state.get("code_translations") or [])
+    finally:
+        facade.drop_session(sid)
+
+
+def test_export_question_only_direction_does_not_autofill(client):
+    """A question without outcome+treatment is not a real spec."""
+    import uuid
+
+    sid = f"test-hollow-direction-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {"research_direction": {"question": "something about crime", "method": "did"}},
+    )
+    try:
+        resp = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert resp.status_code == 404
+        state = facade.get_state(sid)
+        assert not (state.get("code_translations") or [])
     finally:
         facade.drop_session(sid)
 

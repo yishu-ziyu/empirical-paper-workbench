@@ -64,12 +64,16 @@ def test_connect_failure_fails_loud_without_memory_cache(
     )
     graph_mod._reset_runtime()
 
-    def boom(*_args, **_kwargs):
+    captured: dict = {}
+
+    def boom(*_args, **kwargs):
+        captured.update(kwargs)
         raise OSError("connection refused")
 
     monkeypatch.setattr(graph_mod.psycopg, "connect", boom)
     with pytest.raises(OSError, match="connection refused"):
         graph_mod._get_checkpointer()
+    assert captured.get("connect_timeout") == 5
     assert graph_mod._CHECKPOINTER is None
 
 

@@ -32,7 +32,7 @@ if os.path.isdir(_TEX_BIN) and _TEX_BIN not in os.environ.get("PATH", ""):
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
-from nodes.estimate import splice_missing_table_rows
+from nodes.estimate import looks_like_coef_table, splice_missing_table_rows
 from protocols import ExportDocxOutput
 from state import EconPaperState
 
@@ -103,21 +103,49 @@ def _escape_tex_plain(text: str) -> str:
         .replace("}", r"\}")
         .replace("~", r"\textasciitilde{}")
         .replace("^", r"\textasciicircum{}")
+        .replace("$", r"\$")
     )
 
 
+_CITE_RE = re.compile(r"\\(cite|ref|eqref)\{[^}]*\}")
+_MATH_BOLD_RE = re.compile(
+    r"(\$\$[^$]+\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*)"
+)
+
+
 def _escape_tex_text(text: str) -> str:
-    """Escape prose; keep `$math$` and turn `**bold**` into ``\\textbf``."""
-    chunks = re.split(r"(\$[^$\n]+\$|\*\*[^*]+\*\*)", text)
+    """Escape markdown prose. Keep ``$…$`` / ``$$…$$`` and ``\\cite``/``\\ref``/``\\eqref``.
+
+    Bodies are markdown-only: unmatched ``$`` is escaped so it cannot open math.
+    Already-emitted cite/ref commands are held out so escaping does not break them.
+    """
+    held: List[str] = []
+
+    def _hold(match: re.Match[str]) -> str:
+        held.append(match.group(0))
+        return f"\x00CITE{len(held) - 1}\x00"
+
+    protected = _CITE_RE.sub(_hold, text)
+    chunks = _MATH_BOLD_RE.split(protected)
     out: List[str] = []
     for chunk in chunks:
-        if chunk.startswith("$") and chunk.endswith("$") and len(chunk) >= 2:
+        if chunk.startswith("$$") and chunk.endswith("$$") and len(chunk) >= 4:
+            out.append(chunk)
+        elif (
+            chunk.startswith("$")
+            and chunk.endswith("$")
+            and len(chunk) >= 2
+            and not chunk.startswith("$$")
+        ):
             out.append(chunk)
         elif chunk.startswith("**") and chunk.endswith("**") and len(chunk) >= 4:
             out.append(r"\textbf{" + _escape_tex_plain(chunk[2:-2]) + "}")
         else:
             out.append(_escape_tex_plain(chunk))
-    return "".join(out)
+    merged = "".join(out)
+    for i, original in enumerate(held):
+        merged = merged.replace(f"\x00CITE{i}\x00", original)
+    return merged
 
 
 def _is_md_table_line(line: str) -> bool:
@@ -227,13 +255,14 @@ def _extract_sections(
             continue
         title = (ch.get("title") or "").strip()
         if not title:
-            title = str(ch.get("type") or "").strip()
-        if not title:
-            continue
-        content = splice_missing_table_rows(content, spec, estimate)
+            # Body with no title: keep the text. Prefer type, else 未命名.
+            title = str(ch.get("type") or "").strip() or "未命名"
+        chapter_type = str(ch.get("type") or "")
+        if chapter_type == "results" or looks_like_coef_table(content):
+            content = splice_missing_table_rows(content, spec, estimate)
         sections.append(
             {
-                "title": title,
+                "title": _escape_tex_text(title),
                 "content": markdown_to_latex(content, section_title=title),
             }
         )

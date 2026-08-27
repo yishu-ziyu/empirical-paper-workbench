@@ -18,6 +18,7 @@ import re
 import pytest
 
 from nodes.export_docx import (
+    _escape_tex_text,
     _extract_sections,
     export_docx,
     markdown_to_latex,
@@ -383,6 +384,72 @@ def test_extract_sections_skips_empty_untitled_pads():
     assert "\\subsection{研究背景}" in sections[0]["content"]
 
 
+def test_extract_sections_keeps_body_without_title_as_unnamed():
+    """Body with no title/type is kept as 未命名, not dropped."""
+    sections = _extract_sections(
+        [{"content": "这段没有标题，但有正文。"}]
+    )
+    assert len(sections) == 1
+    assert sections[0]["title"] == "未命名"
+    assert "这段没有标题，但有正文。" in sections[0]["content"]
+
+
+def test_extract_sections_does_not_splice_into_intro_or_methods():
+    """Coef-table splice is results-only; 引言/方法 stay table-free."""
+    state = {
+        "main_specification": {
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        "estimate": {"formula": "income ~ age + treat", "treatment": "age"},
+    }
+    sections = _extract_sections(
+        [
+            {"type": "intro", "title": "引言", "content": "研究问题。"},
+            {"type": "methods", "title": "方法", "content": "OLS。"},
+            {
+                "type": "results",
+                "title": "结果",
+                "content": (
+                    "# 主结果\n\n"
+                    "| 变量 | 系数 | SE | p |\n"
+                    "|------|------|----|---|\n"
+                    "| age | -0.0687 | 0.0100 | 0.0010 |"
+                ),
+            },
+        ],
+        state,
+    )
+    intro, methods, results = sections
+    assert "未估计" not in intro["content"]
+    assert "treat" not in intro["content"]
+    assert "tabular" not in intro["content"]
+    assert "未估计" not in methods["content"]
+    assert "treat" not in methods["content"]
+    assert "treat" in results["content"]
+    assert "未估计" in results["content"]
+
+
+def test_escape_tex_protects_cite_and_unmatched_dollar():
+    assert r"\cite{smith2020}" in _escape_tex_text(r"见 \cite{smith2020}。")
+    assert r"\ref{tab:main}" in _escape_tex_text(r"见表 \ref{tab:main}")
+    assert r"\eqref{eq:1}" in _escape_tex_text(r"式 \eqref{eq:1}")
+    assert r"\$100" in _escape_tex_text("约 $100")
+    assert "$$a+b$$" in _escape_tex_text("展示 $$a+b$$ 式")
+    assert r"50\%" in _escape_tex_text("A & B_50%")
+
+
+def test_extract_sections_escapes_title_specials():
+    sections = _extract_sections(
+        [{"type": "intro", "title": "收入_50% & #1", "content": "正文。"}]
+    )
+    assert r"50\%" in sections[0]["title"]
+    assert r"\&" in sections[0]["title"]
+    assert r"\#1" in sections[0]["title"]
+    assert r"\_" in sections[0]["title"]
+
+
 def test_extract_sections_injects_omitted_treat_row():
     """Table that only has age must grow a treat row marked 未估计."""
     chapters = [
@@ -465,4 +532,11 @@ def test_export_docx_takeable_paper_no_markdown_or_untitled(tmp_path, monkeypatc
     assert "在 1\\% 水平上显著。" in tex
     assert "treat" in tex
     assert "未估计" in tex
+    assert "\\toprule" in tex
     assert tex.count("\\section{") >= 3
+    intro = tex.split("\\section{方法}")[0]
+    methods = tex.split("\\section{方法}")[1].split("\\section{结果}")[0]
+    assert "未估计" not in intro
+    assert "未估计" not in methods
+    assert "\\begin{tabular}" not in intro
+    assert "\\begin{tabular}" not in methods

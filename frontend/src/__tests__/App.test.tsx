@@ -587,7 +587,7 @@ describe('App 三栏布局', () => {
   test('refresh hydrates controls and csv meta into info-confirm', async () => {
     sessionStorage.setItem(
       'econpaper_csv_meta',
-      JSON.stringify({ name: 'macro.csv', rows: 42, cols: 8 }),
+      JSON.stringify({ sessionId: 'test-sess', name: 'macro.csv', rows: 42, cols: 8 }),
     )
     localStorage.setItem('econpaper_session_id', 'test-sess')
     const mockFetch = vi.fn().mockImplementation((url: string) => {
@@ -734,6 +734,221 @@ describe('App 三栏布局', () => {
     expect(JSON.parse(String(mockFetch.mock.calls[resumeIdx][1].body)).outline).toEqual([
       { type: 'intro', title: '引言' },
     ])
+    expect(JSON.parse(String(mockFetch.mock.calls[genIdx][1].body)).chapter).toEqual({
+      type: 'intro',
+      title: '引言',
+    })
+  })
+
+  test('locked I-decide Apply does not re-POST /resume and writes the current chapter', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.includes('/resume')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ok: true,
+              outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+            }),
+        })
+      }
+      if (href.includes('/generate-chapter')) {
+        const body = JSON.parse(String(init?.body || '{}')) as { chapter?: { type: string; title: string } }
+        const ch = body.chapter || { type: 'intro', title: '引言' }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chapter: { type: ch.type, title: ch.title, content: `${ch.type}正文`, status: 'generated' },
+            }),
+        })
+      }
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+              research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+              identification_failed: false,
+              identification_report: 'ok',
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.1 |', produced_by: 'estimate' },
+              results: '| age | 0.1 |',
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    fireEvent.change(screen.getByLabelText(/研究问题/), { target: { value: '教育对收入的影响' } })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+    expect(await screen.findByTestId('chapters-me')).toBeInTheDocument()
+    await user.click(screen.getByTestId('chapters-me'))
+    await user.click(screen.getByTestId('outline-approve-btn'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/resume'))).toHaveLength(1)
+    })
+    await user.click(screen.getByTestId('pause-apply'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(1)
+    })
+    expect(JSON.parse(String(
+      mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/generate-chapter'))![1].body,
+    )).chapter.type).toBe('intro')
+    expect(await screen.findByText('intro正文')).toBeInTheDocument()
+    await user.click(screen.getByTestId('write-chapter-results'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(2)
+    })
+    expect(await screen.findByText('results正文')).toBeInTheDocument()
+    await user.click(screen.getByTestId('paragraphs-me'))
+    fireEvent.change(screen.getByTestId('pause-paragraphs'), { target: { value: '5' } })
+    await user.click(screen.getByTestId('pause-apply'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(3)
+    })
+    const genCalls = mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))
+    const lastBody = JSON.parse(String(genCalls[2][1].body))
+    expect(lastBody.chapter).toEqual({ type: 'results', title: '结果' })
+    expect(lastBody.render_kwargs).toEqual({ paragraphs: 5 })
+    expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/resume'))).toHaveLength(1)
+  })
+
+  test('refresh I-decide Apply on last written chapter does not regenerate intro', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.includes('/generate-chapter')) {
+        const body = JSON.parse(String(init?.body || '{}')) as { chapter?: { type: string; title: string } }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chapter: {
+                type: body.chapter?.type,
+                title: body.chapter?.title,
+                content: '新写',
+                status: 'generated',
+              },
+            }),
+        })
+      }
+      if (href.endsWith('/sessions/test-sess')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.1 |' },
+              results: '| age | 0.1 |',
+              outline: [{ type: 'intro', title: '引言' }, { type: 'results', title: '结果' }],
+              body_chapters: [
+                { type: 'intro', title: '引言', content: '引言已写', status: 'generated' },
+                { type: 'results', title: '结果', content: '结果已写', status: 'generated' },
+              ],
+              research_direction: { method: 'OLS', dv: 'income', iv: 'age', question: '教育对收入的影响' },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('pause-apply')).toBeInTheDocument()
+    expect(screen.getByTestId('chapter-pause')).toHaveTextContent('配置第 2 部分')
+    await user.click(screen.getByTestId('pause-apply'))
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toBe(true)
+    })
+    const genCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/generate-chapter'))!
+    expect(JSON.parse(String(genCall[1].body)).chapter).toEqual({ type: 'results', title: '结果' })
+    expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/resume'))).toBe(false)
+  })
+
+  test('csv meta from another session does not hydrate info-dataset', async () => {
+    sessionStorage.setItem(
+      'econpaper_csv_meta',
+      JSON.stringify({ sessionId: 'old-sess', name: 'macro.csv', rows: 42, cols: 8 }),
+    )
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/test-sess')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.1 |' },
+              results: '| age | 0.1 |',
+              outline: [{ type: 'intro', title: '引言' }],
+              research_direction: {
+                method: 'OLS',
+                dv: 'income',
+                iv: 'age',
+                controls: ['gdp'],
+                question: '教育对收入的影响',
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('info-dataset')).toBeInTheDocument()
+    expect(screen.getByTestId('info-dataset')).toHaveTextContent('CSV')
+    expect(screen.getByTestId('info-dataset')).not.toHaveTextContent('macro.csv')
+  })
+
+  test('logout clears csv meta so a later session cannot inherit the file', async () => {
+    const user = userEvent.setup()
+    sessionStorage.setItem(
+      'econpaper_csv_meta',
+      JSON.stringify({ sessionId: 'test-sess', name: 'macro.csv', rows: 42, cols: 8 }),
+    )
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/test-sess')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.1 |' },
+              outline: [{ type: 'intro', title: '引言' }],
+              research_direction: { method: 'OLS', dv: 'income', iv: 'age', question: 'q' },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('info-dataset')).toHaveTextContent('macro.csv')
+    await user.click(screen.getByRole('button', { name: '退出' }))
+    expect(sessionStorage.getItem('econpaper_csv_meta')).toBeNull()
   })
 
   test('writeBusy blocks a second generate-chapter POST', async () => {

@@ -797,9 +797,29 @@ function App() {
               </section>
             )}
             {workbenchTab === 'format' && (
-              <section className="mb-8 rounded-lg border border-border bg-panel p-6">
+              <section data-testid="format-pane" className="mb-8 rounded-lg border border-border bg-panel p-6">
                 <h2 className="font-serif text-lg text-ink">{t('workbench.formatTitle')}</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">{t('workbench.formatBody')}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    data-testid="format-export-doc-btn"
+                    onClick={() => setDocExportOpen(true)}
+                    disabled={!sessionId || !canExport}
+                    className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
+                  >
+                    {t('app.exportDoc')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="format-export-code-btn"
+                    onClick={() => setCodeExportOpen(true)}
+                    disabled={!sessionId || !canExport}
+                    className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
+                  >
+                    {t('app.exportCode')}
+                  </button>
+                </div>
               </section>
             )}
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
@@ -901,8 +921,12 @@ function App() {
                 if (id === 'upload_data' || id === 'clean_data') {
                   setWorkbenchTab('data')
                   if (sessionId) setEdaOpen(true)
-                } else if (id === 'translate_code' || id === 'export_docx') {
+                } else if (id === 'translate_code') {
                   setWorkbenchTab('format')
+                  if (sessionId) setCodeExportOpen(true)
+                } else if (id === 'export_docx') {
+                  setWorkbenchTab('format')
+                  if (sessionId) setDocExportOpen(true)
                 } else {
                   setWorkbenchTab('paper')
                 }

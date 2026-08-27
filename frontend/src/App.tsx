@@ -14,6 +14,7 @@ import DirectionForm from './components/DirectionForm'
 import type { DirectionFormData } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
 import WriteLoop from './components/WriteLoop'
+import type { PausePayload } from './components/WriteLoop'
 import ChapterWriter from './components/ChapterWriter'
 import ChapterList from './components/ChapterList'
 import ReviewPanel from './components/ReviewPanel'
@@ -165,6 +166,7 @@ function App() {
   const [writeBusy, setWriteBusy] = useState(false)
   const [writtenChapters, setWrittenChapters] = useState<WrittenChapter[]>([])
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0)
+  const [outlineLocked, setOutlineLocked] = useState(false)
 
   const showGlobalError = useCallback((message: string) => {
     setGlobalError(message)
@@ -529,6 +531,7 @@ function App() {
       }
       if (data.question.trim()) setShapedQuestion(data.question)
       setDirectionRecord(data)
+      setOutlineLocked(false)
       if (result.identification_failed) {
         showGlobalError(t('app.identBlocked'))
       }
@@ -539,7 +542,11 @@ function App() {
     }
   }, [ensureSession, applyDeskSnapshot, showGlobalError, t])
 
-  const handleWriteChapter = useCallback(async (chapterType: string, title: string) => {
+  const handleWriteChapter = useCallback(async (
+    chapterType: string,
+    title: string,
+    renderKwargs?: Record<string, number>,
+  ) => {
     if (!sessionId) {
       showGlobalError(t('app.needSession'))
       return
@@ -550,7 +557,10 @@ function App() {
       const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ chapter: { type: chapterType, title } }),
+        body: JSON.stringify({
+          chapter: { type: chapterType, title },
+          ...(renderKwargs && Object.keys(renderKwargs).length ? { render_kwargs: renderKwargs } : {}),
+        }),
       })
       const payload = await resp.json().catch(() => ({}))
       if (resp.status === 409) {
@@ -589,10 +599,70 @@ function App() {
     void handleWriteChapter(ch.type, ch.title)
   }, [outline, writtenChapters, identFailed, handleWriteChapter, showGlobalError, t])
 
-  const handleApplyGenerate = useCallback(() => {
-    const idx = outline.findIndex((ch) => !writtenChapters.some((item) => item.type === ch.type && item.content))
-    handleSelectChapter(idx >= 0 ? idx : currentChapterIndex)
-  }, [outline, writtenChapters, currentChapterIndex, handleSelectChapter])
+  const handleApplyGenerate = useCallback((payload?: PausePayload) => {
+    const list = payload?.outline?.length ? payload.outline : outline
+    if (!list.length) return
+    const useIdx = Math.min(Math.max(0, currentChapterIndex), list.length - 1)
+    const ch = list[useIdx]
+    setCurrentChapterIndex(useIdx)
+    void handleWriteChapter(ch.type, ch.title, payload?.render_kwargs)
+  }, [outline, currentChapterIndex, handleWriteChapter])
+
+  const handleApproveOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ outline: nextOutline }),
+      })
+      const result = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      if (Array.isArray(result.outline) && result.outline.length) {
+        setOutline(result.outline)
+      } else {
+        setOutline(nextOutline)
+      }
+      setOutlineLocked(true)
+      setCurrentChapterIndex(0)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    }
+  }, [sessionId, showGlobalError, t])
+
+  const handleRefine = useCallback(async (instruction: string) => {
+    if (!sessionId) return
+    setWriteBusy(true)
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          chapter_index: Math.max(0, currentChapterIndex),
+          instruction,
+        }),
+      })
+      const payload = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      if (Array.isArray(payload.body_chapters)) {
+        setWrittenChapters(
+          payload.body_chapters.filter(
+            (c: components['schemas']['ChapterResponse']) => c.content,
+          ),
+        )
+      } else if (payload.chapter) {
+        markChapterUpdated(payload.chapter)
+      }
+      await refreshReview(sessionId)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setWriteBusy(false)
+    }
+  }, [sessionId, currentChapterIndex, markChapterUpdated, refreshReview, showGlobalError])
 
   const handleDocExport = useCallback(async (format: 'tex' | 'pdf' | 'docx', template: string) => {
     if (!sessionId) return
@@ -876,17 +946,21 @@ function App() {
               rows={csvRows}
               cols={csvCols ?? (dataColumns.length || null)}
               direction={directionRecord}
+              outline={outline}
+              outlineLocked={outlineLocked}
               hasDirection={Boolean(directionSummary)}
               hasOutline={outline.length > 0 && !identFailed}
               hasChapter={Boolean(writtenChapter?.content)}
               isResultsPart={outline[currentChapterIndex]?.type === 'results'}
               partIndex={currentChapterIndex + 1}
               agentPct={writeBusy ? 10 : directionBusy || uploading ? 0 : null}
+              writeBusy={writeBusy}
               onAddMore={() => setDirectionOpen(true)}
               onGoPart1={() => setWorkbenchTab('paper')}
               onApplyGenerate={handleApplyGenerate}
               onReviseOutline={() => setDirectionOpen(true)}
-              onApproveOutline={handleApplyGenerate}
+              onApproveOutline={handleApproveOutline}
+              onRefine={handleRefine}
             />
             <section data-testid="direction-section" className="mb-8 rounded-lg border border-border bg-panel p-6">
               <div className="mb-3 flex items-center justify-between gap-3">

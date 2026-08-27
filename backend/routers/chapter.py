@@ -30,6 +30,7 @@ from models.user import User
 from schemas.responses import (
     ApproveChapterResponse,
     ChapterResponse,
+    EditChapterResponse,
     GenerateChapterResponse,
     RegenerateResponse,
     RollbackResponse,
@@ -103,6 +104,19 @@ class RegenerateRequest(BaseModel):
     """POST /sessions/{id}/regenerate 请求体。"""
 
     chapter_index: int = 0
+
+
+class EditChapterRequest(BaseModel):
+    """POST /sessions/{id}/edit-chapter 请求体。
+
+    一条路由两种意图（T-08c / Copaper 写后 refine）：
+    - ``instruction``：把用户指令应用到当前章（走 generate_chapter）
+    - ``content``：把用户编辑后的 markdown 落盘（不调 LLM）
+    """
+
+    chapter_index: int = 0
+    instruction: Optional[str] = None
+    content: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +336,53 @@ async def regenerate_chapter_endpoint(
         chapter=_to_chapter_response(chapter),
         body_chapters=[_to_chapter_response(c) for c in body_chapters],
         **_review_response_fields(state),
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/edit-chapter",
+    response_model=EditChapterResponse,
+)
+async def edit_chapter_endpoint(
+    session_id: str,
+    payload: EditChapterRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> EditChapterResponse:
+    """按用户指令改写当前章，或把用户 markdown 落盘。
+
+    Request:  ``{"chapter_index": int, "instruction": str?}``
+              或 ``{"chapter_index": int, "content": str?}``
+    Response: ``{"chapter": {...}, "body_chapters": [...]}``
+
+    ``instruction`` 写入 ``revision_suggestions`` 后走
+    ``generate_chapter``（与 regenerate 同一条写管线）。
+    ``content`` 直接 prepend 新版本，``status="edited"``。
+    """
+    require_session_ownership(session_id, current_user)
+    chapter_index = payload.chapter_index
+    state = facade.edit_chapter(
+        session_id,
+        chapter_index,
+        instruction=payload.instruction,
+        content=payload.content,
+    )
+
+    body_chapters = state.get("body_chapters", []) or []
+    idx = (
+        chapter_index
+        if isinstance(chapter_index, int) and 0 <= chapter_index < len(body_chapters)
+        else (len(body_chapters) - 1)
+    )
+    chapter = body_chapters[idx] if body_chapters else {}
+    review_fields = (
+        _review_response_fields(state)
+        if (payload.instruction or "").strip()
+        else {}
+    )
+    return EditChapterResponse(
+        chapter=_to_chapter_response(chapter),
+        body_chapters=[_to_chapter_response(c) for c in body_chapters],
+        **review_fields,
     )
 
 

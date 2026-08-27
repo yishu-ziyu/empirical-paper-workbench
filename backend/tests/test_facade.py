@@ -6,7 +6,7 @@ names that the facade looks up at call time. This verifies:
 1. Session lifecycle (create / has / get / save / update / seed / drop).
 2. Graph invocation (run_upload_pipeline) stores final state + csv_path.
 3. Single-node calls (set_direction_and_outline, resume_outline,
-   generate_chapter, regenerate_chapter, rollback_chapter, export_document)
+   generate_chapter, regenerate_chapter, edit_chapter, rollback_chapter, export_document)
    call the right node, persist state, and return the new state / result.
 4. Cleaning step calls (transform_variables, filter_sample, balance_panel)
    delegate to the step class with the right config.
@@ -517,6 +517,64 @@ def test_regenerate_chapter_sets_index_and_calls_node(monkeypatch):
 
     assert captured["current_chapter_index"] == 2
     assert result["body_chapters"] == [{"content": "new"}]
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_instruction_sets_revision_and_regenerates(monkeypatch):
+    """edit_chapter(instruction) writes revision_suggestions then generate_chapter."""
+    captured = {}
+
+    def fake_generate_chapter(state):
+        captured["current_chapter_index"] = state.get("current_chapter_index")
+        captured["revision_suggestions"] = list(state.get("revision_suggestions") or [])
+        return {"body_chapters": [{"content": "refined", "status": "generated"}]}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+
+    sid = "test-edit-instr"
+    facade.seed_state(
+        sid,
+        {
+            "body_chapters": [
+                {"type": "intro", "content": "old intro", "versions": ["old intro"]}
+            ]
+        },
+    )
+    result = facade.edit_chapter(sid, 0, instruction="把引言第一段写短一点")
+
+    assert captured["current_chapter_index"] == 0
+    assert "把引言第一段写短一点" in captured["revision_suggestions"][0]
+    assert "old intro" in captured["revision_suggestions"][0]
+    assert result["body_chapters"][0]["content"] == "refined"
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_content_does_not_call_generate(monkeypatch):
+    """edit_chapter(content) persists markdown without generate_chapter."""
+    calls = []
+
+    def fake_generate_chapter(state):
+        calls.append(state)
+        return {}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+
+    sid = "test-edit-content"
+    facade.seed_state(
+        sid,
+        {
+            "body_chapters": [
+                {"type": "intro", "content": "old", "versions": ["old"]}
+            ]
+        },
+    )
+    result = facade.edit_chapter(sid, 0, content="## 研究背景\n\n短。\n")
+    assert calls == []
+    ch = result["body_chapters"][0]
+    assert ch["content"] == "## 研究背景\n\n短。\n"
+    assert ch["status"] == "edited"
+    assert ch["versions"][0] == "## 研究背景\n\n短。\n"
     facade.drop_session(sid)
 
 

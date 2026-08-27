@@ -8,7 +8,7 @@
 5. Content-Disposition: attachment; filename="analysis.<ext>"
 6. 未知 session_id → 404
 7. 不支持的 format → 400
-8. session 无 code_translations → 404（提示先跑翻译）
+8. session 无 code_translations → GET 先跑 translate_code 再下载
 """
 from __future__ import annotations
 
@@ -134,15 +134,63 @@ def test_export_unsupported_format_returns_400(client):
     assert resp.status_code == 400
 
 
-def test_export_no_translations_returns_404(client):
-    """session 无 code_translations 时返回 404 + 提示。"""
+def test_export_empty_translations_runs_translate_then_returns_file(client):
+    """HITL never filled code_translations: GET still returns a real file."""
     sid = _seed_session_without_translations()
-    resp = client.get(f"/sessions/{sid}/code-export", params={"format": "py"})
-    assert resp.status_code == 404
+    try:
+        resp = client.get(f"/sessions/{sid}/code-export", params={"format": "py"})
+        assert resp.status_code == 200, resp.text
+        assert "analysis.py" in resp.headers.get("content-disposition", "")
+        state = facade.get_state(sid)
+        langs = {t["lang"] for t in (state.get("code_translations") or [])}
+        assert langs == {"py", "stata", "r", "eviews"}
+    finally:
+        facade.drop_session(sid)
+
+
+def test_get_do_and_R_without_prior_post(client):
+    """Castle-style session: GET do|R works with empty code_translations."""
+    import uuid
+
+    sid = f"test-lazy-translate-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/castle.csv",
+            "research_direction": {
+                "question": "post on l_homicide",
+                "dv": "l_homicide",
+                "iv": "post",
+                "controls": ["l_prison"],
+                "method": "did",
+                "id_col": "sid",
+                "time_col": "year",
+            },
+            "body_chapters": [
+                {"type": "results", "content": "no python fences in this chapter"}
+            ],
+        },
+    )
+    try:
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "xtreg" in do.text
+        assert "reghdfe" in do.text
+        assert "l_homicide" in do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "feols" in r_resp.text
+        assert "felm" in r_resp.text
+        assert "l_homicide" in r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+    finally:
+        facade.drop_session(sid)
 
 
 def test_post_translate_code_fills_export(client):
-    """Empty translations 404; POST /translate-code then GET do|R return text."""
+    """POST /translate-code writes code_translations; GET do|R return text."""
     import uuid
 
     sid = f"test-translate-hook-{uuid.uuid4()}"
@@ -165,9 +213,6 @@ def test_post_translate_code_fills_export(client):
         },
     )
     try:
-        empty = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
-        assert empty.status_code == 404
-
         posted = client.post(f"/sessions/{sid}/translate-code")
         assert posted.status_code == 200, posted.text
         body = posted.json()
@@ -190,6 +235,13 @@ def test_post_translate_code_fills_export(client):
         assert "analysis.R" in r_resp.headers.get("content-disposition", "")
     finally:
         facade.drop_session(sid)
+
+
+def test_openapi_lists_post_translate_code(client):
+    """Published app contract includes POST /sessions/{id}/translate-code."""
+    spec = client.app.openapi()
+    path = spec["paths"].get("/sessions/{session_id}/translate-code") or {}
+    assert "post" in path
 
 
 def test_export_default_format_is_py(client):

@@ -114,7 +114,7 @@ async def export_code(
     Raises
     ------
     HTTPException
-        - 404: session 不存在，或 session 无 code_translations
+        - 404: session 不存在，或 translate 后仍无对应语言
         - 400: 不支持的 format
     """
     require_session_ownership(session_id, current_user)
@@ -130,11 +130,15 @@ async def export_code(
     state = facade.get_state(session_id)
     translations = state.get("code_translations") or []
     if not translations:
+        # HITL write never runs translate_code. Fill on first download.
+        result = facade.run_translate_code(session_id)
+        translations = result.get("code_translations") or []
+    if not translations:
         raise HTTPException(
             status_code=404,
             detail=(
                 "No code translations in this session. "
-                "Run the paper pipeline (translate_code node) first."
+                "POST /sessions/{id}/translate-code first."
             ),
         )
 

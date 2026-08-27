@@ -1,3 +1,4 @@
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 // 代码导出对话框 (T-09)
@@ -49,7 +50,7 @@ const FORMATS: FormatConfig[] = [
 
 // 触发浏览器下载：fetch 拿 blob → createObjectURL → click 隐藏 <a>
 async function downloadCode(sessionId: string, format: string): Promise<void> {
-  const url = `http://localhost:8000/sessions/${sessionId}/code-export?format=${format}`
+  const url = `${API_BASE}/sessions/${sessionId}/code-export?format=${format}`
   const resp = await fetch(url, { method: 'GET' })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')

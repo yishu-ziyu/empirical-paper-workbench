@@ -560,6 +560,51 @@ function App() {
     void handleWriteChapter(ch.type, ch.title)
   }, [outline, writtenChapters, identFailed, handleWriteChapter, showGlobalError, t])
 
+  const handleSaveEdit = useCallback(
+    async (content: string) => {
+      if (!sessionId) return
+      const chapter =
+        (outline[currentChapterIndex]
+          ? writtenChapters.find((ch) => ch.type === outline[currentChapterIndex].type)
+          : writtenChapters[writtenChapters.length - 1]) ?? null
+      if (!chapter) return
+      const chapterIndex =
+        chapter.chapter_index ??
+        outline.findIndex((item) => item.type === chapter.type)
+      try {
+        const resp = await fetch(`${API_BASE}/sessions/${sessionId}/edit-chapter`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            chapter_index: Math.max(0, chapterIndex),
+            content,
+          }),
+        })
+        const payload = await resp.json().catch(() => ({}))
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+        if (Array.isArray(payload.body_chapters)) {
+          setWrittenChapters(
+            payload.body_chapters.filter(
+              (c: components['schemas']['ChapterResponse']) => c.content,
+            ),
+          )
+        } else if (payload.chapter) {
+          markChapterUpdated(payload.chapter)
+        }
+      } catch (err) {
+        showGlobalError(err instanceof Error ? err.message : String(err))
+      }
+    },
+    [
+      sessionId,
+      outline,
+      currentChapterIndex,
+      writtenChapters,
+      markChapterUpdated,
+      showGlobalError,
+    ],
+  )
+
   const handleDocExport = useCallback(async (format: 'tex' | 'pdf' | 'docx', template: string) => {
     if (!sessionId) return
     try {
@@ -820,7 +865,14 @@ function App() {
               </p>
             ) : writtenChapter?.content ? (
               <div className="mb-6">
-                <ChapterWriter chapter={writtenChapter} sessionId={sessionId ?? undefined} onApprove={handleApprove} />
+                <ChapterWriter
+                  chapter={writtenChapter}
+                  sessionId={sessionId ?? undefined}
+                  chapterIndex={writtenChapter.chapter_index ?? currentChapterIndex}
+                  versions={writtenChapter.versions}
+                  onApprove={handleApprove}
+                  onSaveEdit={handleSaveEdit}
+                />
               </div>
             ) : (
               <p className="text-sm leading-7 text-muted">{t('bench.paperEmpty')}</p>

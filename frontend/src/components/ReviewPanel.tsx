@@ -6,6 +6,7 @@
 // 类型：从 types/api.ts import（遵循 ADR 0003 codegen 规范，不手写 API 响应 interface）
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -58,7 +59,7 @@ export default function ReviewPanel({
     setError(null)
     try {
       const resp = await fetch(
-        `http://localhost:8000/sessions/${sessionId}/review/decision`,
+        `${API_BASE}/sessions/${sessionId}/review/decision`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

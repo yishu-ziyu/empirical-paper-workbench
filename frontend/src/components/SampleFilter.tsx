@@ -2,6 +2,7 @@
 // 列 / 操作符 / 值 → 添加条件 → 应用筛选 → POST /sessions/{id}/filter → 显示前后样本量
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -13,8 +14,6 @@ export interface SampleFilterProps {
 }
 
 const OPERATORS = ['>=', '<=', '>', '<', '==', '!=']
-
-const API_BASE = 'http://localhost:8000'
 
 function parseVal(raw: string): string | number {
   const n = Number(raw)

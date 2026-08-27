@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import UnauthHeader from '../components/UnauthHeader'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
-
-const API_BASE = 'http://localhost:8000'
 
 interface LoginPageProps {
   onLogin: (token: string) => void

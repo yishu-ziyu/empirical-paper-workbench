@@ -25,9 +25,19 @@ class Settings:
     # --- CORS ---
     CORS_ORIGINS: list[str] = [
         origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:5174,http://127.0.0.1:5174",
+        ).split(",")
         if origin.strip()
     ]
+    # Vite may bind 5173, 5174, preview 4173, etc. Same-origin /api proxy is
+    # the desk path; this regex covers leftover cross-origin calls from local Vite.
+    CORS_ORIGIN_REGEX: str | None = os.getenv(
+        "CORS_ORIGIN_REGEX",
+        r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    ) or None
 
     # --- Uploads ---
     UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "./uploads"))

@@ -20,6 +20,7 @@ import DocExportDialog from './components/DocExportDialog'
 import CodeExportDialog from './components/CodeExportDialog'
 import ReviewGateDialog from './components/ReviewGateDialog'
 import RunTracePanel from './components/RunTracePanel'
+import { API_BASE } from './lib/apiBase'
 import { useT } from './lib/i18n'
 import type { components } from './types/api'
 
@@ -28,7 +29,6 @@ const LS_TOKEN_KEY = 'econpaper_access_token'
 const LS_GUIDE_KEY = 'econpaper_seen_guide'
 const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
-const API_BASE = 'http://localhost:8000'
 const SAMPLE_CSV = '/samples/course-panel.csv'
 const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',

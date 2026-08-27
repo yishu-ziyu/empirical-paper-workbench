@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
+import { API_BASE } from '../lib/apiBase'
 import { CLEAN_STEPS, PAPER_NODES } from '../lib/paperPath'
 
 function renderWithI18n(ui: React.ReactElement) {
@@ -118,6 +119,8 @@ describe('App 三栏布局', () => {
     expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(1)
     const uploadCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/upload'))
     expect(uploadCall).toBeDefined()
+    expect(String(uploadCall![0])).toBe(`${API_BASE}/upload`)
+    expect(String(uploadCall![0])).not.toMatch(/localhost:8000|127\.0\.0\.1:8000/)
     const [, init] = uploadCall!
     expect(init.method).toBe('POST')
     expect(init.body).toBeInstanceOf(FormData)
@@ -289,6 +292,11 @@ describe('App 三栏布局', () => {
     expect(screen.getByLabelText(/模板/i)).toHaveValue('undergrad')
     expect(screen.getByTestId('data-columns')).toHaveTextContent('income')
     expect(screen.getByLabelText(/研究问题/i)).toHaveValue('这份课设样例里，年龄和收入是否相关？')
+    const sampleCsvCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/samples/course-panel.csv'))
+    const sampleUpload = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/upload'))
+    expect(String(sampleCsvCall![0])).toBe('/samples/course-panel.csv')
+    expect(String(sampleUpload![0])).toBe(`${API_BASE}/upload`)
+    expect(String(sampleUpload![0])).not.toMatch(/localhost:8000|127\.0\.0\.1:8000/)
   })
 
   test('刷新后仍保留课设样例预填', async () => {

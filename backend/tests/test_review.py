@@ -312,6 +312,66 @@ def test_post_decision_reject_degrades_when_regenerate_unavailable(client, monke
     assert state["hitl_decision"] == "reject"
 
 
+def test_post_decision_reject_writes_negative_learning_label(client, monkeypatch):
+    """人点否决 → 写一条负标签，且标签里没有分数。"""
+    sid = _seed_session(_make_reviewed_state(score_pass=True))
+
+    def _fake_regenerate(self_inner, session_id, chapter_index):
+        return self_inner.get_state(session_id)
+
+    monkeypatch.setattr(
+        "facade.AgentFacade.regenerate_chapter", _fake_regenerate
+    )
+    resp = client.post(
+        f"/sessions/{sid}/review/decision",
+        json={"decision": "reject"},
+    )
+    assert resp.status_code == 200, resp.text
+    state = facade.get_state(sid)
+    labels = state.get("learning_labels") or []
+    assert any(
+        item.get("source") == "hitl_reject" and item.get("polarity") == "negative"
+        for item in labels
+    )
+    for item in labels:
+        assert "score" not in item
+        assert "reward" not in item
+        assert "review_score" not in item
+
+
+def test_post_decision_accept_writes_positive_learning_label(client):
+    """人点通过 → 写一条正标签。"""
+    sid = _seed_session(_make_reviewed_state(score_pass=True))
+    resp = client.post(
+        f"/sessions/{sid}/review/decision",
+        json={"decision": "accept"},
+    )
+    assert resp.status_code == 200, resp.text
+    state = facade.get_state(sid)
+    labels = state.get("learning_labels") or []
+    assert any(
+        item.get("source") == "hitl_accept" and item.get("polarity") == "positive"
+        for item in labels
+    )
+    for item in labels:
+        assert "score" not in item
+        assert "reward" not in item
+
+
+def test_post_decision_force_pass_is_not_true_accept_label(client):
+    """强制通过不是真通过，不写 hitl_accept。"""
+    sid = _seed_session(_make_reviewed_state(score_pass=False))
+    resp = client.post(
+        f"/sessions/{sid}/review/decision",
+        json={"decision": "force_pass"},
+    )
+    assert resp.status_code == 200, resp.text
+    state = facade.get_state(sid)
+    sources = [item.get("source") for item in (state.get("learning_labels") or [])]
+    assert "hitl_accept" not in sources
+    assert "hitl_reject" not in sources
+
+
 # ---------------------------------------------------------------------------
 # 批次 1b：写章调用之后 GET /review，不是只读手写 state
 # ---------------------------------------------------------------------------

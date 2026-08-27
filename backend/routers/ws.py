@@ -11,16 +11,39 @@ before any ``done`` status.
 from __future__ import annotations
 
 import asyncio
+from typing import Optional
 
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from auth import get_user_from_token, require_session_ownership
+from database import get_db
 from facade import facade
+from models.user import User
 
 router = APIRouter()
 
 
+def _token_from_websocket(ws: WebSocket) -> Optional[str]:
+    """Read a JWT from ``?token=`` or the first WebSocket subprotocol."""
+    token = ws.query_params.get("token")
+    if token:
+        return token
+    header = ws.headers.get("sec-websocket-protocol")
+    if not header:
+        return None
+    parts = [p.strip() for p in header.split(",") if p.strip()]
+    if not parts:
+        return None
+    if parts[0].lower() == "bearer" and len(parts) > 1:
+        return parts[1]
+    return parts[0]
+
+
 @router.websocket("/sessions/{session_id}/stream")
-async def stream(ws: WebSocket, session_id: str):
+async def stream(
+    ws: WebSocket, session_id: str, db: AsyncSession = Depends(get_db)
+):
     """Stream status + chapter chunks for a session over WebSocket.
 
     Timing contract: the graph runs to completion synchronously inside
@@ -34,12 +57,22 @@ async def stream(ws: WebSocket, session_id: str):
     call must stay inside the try/except below so failures push an
     ``error`` frame instead of crashing the socket.
     """
-    await ws.accept()
+    requested = []
+    header = ws.headers.get("sec-websocket-protocol")
+    if header:
+        requested = [p.strip() for p in header.split(",") if p.strip()]
+    if requested:
+        await ws.accept(subprotocol=requested[0])
+    else:
+        await ws.accept()
     try:
-        if not facade.has_session(session_id):
-            await ws.send_json(
-                {"type": "error", "message": "Session not found"}
-            )
+        token = _token_from_websocket(ws)
+        user: Optional[User] = None
+        try:
+            user = await get_user_from_token(token, db)
+            require_session_ownership(session_id, user)
+        except HTTPException as exc:
+            await ws.send_json({"type": "error", "message": exc.detail})
             return
 
         state = facade.get_state(session_id)

@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
-from auth import get_optional_user, get_current_user
+from auth import get_optional_user, get_current_user, require_session_ownership
 from config import settings
 from facade import facade
 from models.user import User
@@ -33,27 +33,24 @@ from schemas.responses import (
 router = APIRouter()
 
 
-def _require_session_ownership(session_id: str, user: Optional[User]) -> None:
-    """Check that the session exists and the user owns it.
+def _max_upload_bytes() -> int:
+    return settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-    Anonymous sessions (no user_id) are accessible without authentication
-    for backward compatibility. User-owned sessions require the owner to
-    be authenticated.
-    """
-    if not facade.has_session(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
 
-    owner_id = facade.get_session_owner(session_id)
-    if owner_id is not None:
-        # Session is owned — require authentication + matching user
-        if user is None:
-            raise HTTPException(
-                status_code=401, detail="Authentication required for this session"
-            )
-        if user.id != owner_id:
-            raise HTTPException(
-                status_code=403, detail="You do not own this session"
-            )
+def _reject_if_content_length_too_large(request: Request, max_bytes: int) -> None:
+    """Reject oversized bodies from Content-Length before reading the file."""
+    raw = request.headers.get("content-length")
+    if not raw:
+        return
+    try:
+        length = int(raw)
+    except ValueError:
+        return
+    if length > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +60,7 @@ def _require_session_ownership(session_id: str, user: Optional[User]) -> None:
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload(
+    request: Request,
     file: UploadFile = File(...),
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> UploadResponse:
@@ -71,11 +69,14 @@ async def upload(
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files supported")
 
+    max_bytes = _max_upload_bytes()
+    _reject_if_content_length_too_large(request, max_bytes)
+
     # 2. Read and parse the CSV with pandas.
     content = await file.read()
 
     # Enforce max upload size before parsing.
-    if len(content) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+    if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,
             detail=f"CSV exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
@@ -181,22 +182,21 @@ async def get_session_info(
     Used by the frontend to verify a saved sessionId is still valid
     after a page refresh (localStorage recovery flow).
     """
-    exists = facade.has_session(session_id)
+    require_session_ownership(session_id, current_user)
     has_dataset = False
     extra: dict = {}
-    if exists:
-        try:
-            csv_path = facade.get_csv_path(session_id)
-            has_dataset = bool(csv_path)
-        except Exception:
-            has_dataset = False
-        try:
-            extra = facade.instrument_fields(facade.get_state(session_id))
-        except Exception:
-            extra = {}
+    try:
+        csv_path = facade.get_csv_path(session_id)
+        has_dataset = bool(csv_path)
+    except Exception:
+        has_dataset = False
+    try:
+        extra = facade.instrument_fields(facade.get_state(session_id))
+    except Exception:
+        extra = {}
     return SessionInfoResponse(
         session_id=session_id,
-        exists=exists,
+        exists=True,
         has_dataset=has_dataset,
         **extra,
     )
@@ -208,7 +208,7 @@ async def delete_session(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """Delete a session owned by the current user."""
-    _require_session_ownership(session_id, current_user)
+    require_session_ownership(session_id, current_user)
     facade.delete_session(session_id)
     return {"ok": True, "session_id": session_id}
 
@@ -224,8 +224,7 @@ async def get_degradation(
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> dict:
     """Return degradation records for a session."""
-    if not facade.has_session(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    require_session_ownership(session_id, current_user)
     degradations = facade.get_degradations(session_id)
     return {"session_id": session_id, "degradations": degradations}
 
@@ -240,10 +239,9 @@ async def export(
 
     When S3 is configured, the export file is uploaded to S3 and the response
     redirects to a presigned download URL.  Without S3, returns the content
-    inline as ``PlainTextResponse`` (Stage D 文件下载端点豁免)。
+    inline as ``PlainTextResponse`` (Stage D 文件下载端点豁免）。
     """
-    if not facade.has_session(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    require_session_ownership(session_id, current_user)
 
     state = facade.get_state(session_id)
 

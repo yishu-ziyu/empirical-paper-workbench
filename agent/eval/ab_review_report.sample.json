@@ -1,0 +1,34 @@
+{
+  "n": 30,
+  "by_arm": {
+    "blind": {
+      "n": 15,
+      "reject_rate": 0.6,
+      "agree_with_auto": 0.8
+    },
+    "see_auto": {
+      "n": 15,
+      "reject_rate": 0.8,
+      "agree_with_auto": 1.0
+    }
+  },
+  "by_persona": {
+    "applied_micro": {
+      "n": 10,
+      "reject_rate": 0.7,
+      "agree_with_auto": 0.9
+    },
+    "econometrician": {
+      "n": 10,
+      "reject_rate": 0.7,
+      "agree_with_auto": 0.9
+    },
+    "journal_referee": {
+      "n": 10,
+      "reject_rate": 0.7,
+      "agree_with_auto": 0.9
+    }
+  },
+  "rubber_stamp": 0.2,
+  "n_events": 30
+}

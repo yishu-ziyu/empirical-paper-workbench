@@ -14,10 +14,6 @@ build/
 uploads/
 backend/uploads/
 
-# Run 工件目录（trace/checkpoints/outputs，运行时生成，不入版本控制）
-runs/
-backend/runs/
-
 # S3 缓存
 backend/uploads/.s3_cache/
 
@@ -25,7 +21,15 @@ backend/uploads/.s3_cache/
 .env
 !.env.docker
 
+# 运行时学习标签（对照报告的样例可入库，原始 jsonl 不入库）
+data/*.jsonl
+backend/data/*.jsonl
+
 # 运行时 SQLite（不要把本地会话库提交上去）
 *.db
 *.db-journal
+*.sqlite3
 
+# Run 工件目录（trace/checkpoints/outputs，运行时生成，不入版本控制）
+runs/
+backend/runs/

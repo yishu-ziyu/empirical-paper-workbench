@@ -425,12 +425,18 @@ def test_generate_chapter_merges_render_kwargs(monkeypatch):
             "research_question": "Q1",
             "data_summary": "D1",
             "results": "FAKE TABLE",
+            "workspace": "/tmp/evil",
+            "csv_path": "/etc/passwd",
+            "user_id": 999,
         },
     )
     state = facade.get_state(sid)
     assert state["research_question"] == "Q1"
     assert state["data_summary"] == "D1"
     assert state.get("results") != "FAKE TABLE"
+    assert state.get("workspace") != "/tmp/evil"
+    assert state.get("csv_path") != "/etc/passwd"
+    assert state.get("user_id") != 999
     facade.drop_session(sid)
 
 

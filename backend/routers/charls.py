@@ -14,12 +14,14 @@ attach this router to ``main.app`` (mirrors the eda.py pattern in T-03).
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import CharlsConfirmResponse, CharlsDetectResponse
 
 router = APIRouter()
@@ -29,13 +31,17 @@ router = APIRouter()
     "/sessions/{session_id}/charls/detect",
     response_model=CharlsDetectResponse,
 )
-async def detect_charls(session_id: str) -> CharlsDetectResponse:
+async def detect_charls(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> CharlsDetectResponse:
     """Run the profiling dataset-type detector on the session CSV.
 
     Returns ``{dataset_type, charls_config?}``. ``charls_config`` is the
     parsed ``charls.yaml`` and is only included when the dataset is
     detected as CHARLS.
     """
+    require_session_ownership(session_id, current_user)
     data = facade.detect_charls(session_id)
     return CharlsDetectResponse(**data)
 
@@ -53,7 +59,9 @@ class CharlsConfirmRequest(BaseModel):
     response_model=CharlsConfirmResponse,
 )
 async def confirm_charls(
-    session_id: str, payload: CharlsConfirmRequest
+    session_id: str,
+    payload: CharlsConfirmRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> CharlsConfirmResponse:
     """Persist the user-confirmed CHARLS wizard config into session state.
 
@@ -61,6 +69,7 @@ async def confirm_charls(
     downstream nodes (clean_data sub-steps, eda, outline) can read
     readable variable names instead of raw CHARLS codes.
     """
+    require_session_ownership(session_id, current_user)
     charls_config = facade.confirm_charls(
         session_id,
         variable_mapping=payload.variable_mapping,

@@ -17,11 +17,15 @@ does not need to be modified (T-05 file-boundary constraint).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from schemas.responses import (
     BalanceResponse,
     FilterResultResponse,
@@ -76,7 +80,9 @@ class BalanceRequest(BaseModel):
     response_model=TransformResponse,
 )
 async def run_transform(
-    session_id: str, payload: TransformRequest
+    session_id: str,
+    payload: TransformRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> TransformResponse:
     """Apply variable recoding & construction (sub-step 5).
 
@@ -87,6 +93,7 @@ async def run_transform(
     The flat ``type``/``column`` is translated into the nested config that
     ``cleaning.transform.transform`` expects.
     """
+    require_session_ownership(session_id, current_user)
     vtype = payload.type
     column = payload.column
     # 透传 extra 字段（method / n / other_column / treat_col / post_col / name）
@@ -136,12 +143,15 @@ def _build_transform_config(vtype: str, column: str, payload: dict) -> dict:
     response_model=FilterResultResponse,
 )
 async def run_filter(
-    session_id: str, payload: FilterRequest
+    session_id: str,
+    payload: FilterRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> FilterResultResponse:
     """Apply sample filtering (sub-step 6).
 
     Request body: ``{"conditions": [{"col": str, "op": str, "val": Any}, ...]}``
     """
+    require_session_ownership(session_id, current_user)
     conditions = [c.model_dump() for c in payload.conditions]
     datasets = await run_in_threadpool(
         facade.filter_sample, session_id, conditions
@@ -168,7 +178,9 @@ async def run_filter(
     response_model=BalanceResponse,
 )
 async def run_balance(
-    session_id: str, payload: BalanceRequest
+    session_id: str,
+    payload: BalanceRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> BalanceResponse:
     """Check panel balance (sub-step 7).
 
@@ -181,6 +193,7 @@ async def run_balance(
     ``unbalanced`` 字段（只有 ``balanced`` / ``n_periods`` /
     ``attrition_rate``）。
     """
+    require_session_ownership(session_id, current_user)
     if not payload.panel_id or not payload.time_col:
         raise HTTPException(
             status_code=400, detail="panel_id and time_col are required"

@@ -19,12 +19,14 @@ the endpoint without touching ``main.py`` (per T-09 file boundaries).
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 
 router = APIRouter()
 _REGISTERED = False
@@ -63,7 +65,11 @@ def _find_translation(translations: List[Any], lang: str) -> Dict[str, Any]:
 
 
 @router.get("/sessions/{session_id}/code-export")
-async def export_code(session_id: str, format: str = "py"):
+async def export_code(
+    session_id: str,
+    format: str = "py",
+    current_user: Optional[User] = Depends(get_optional_user),
+):
     """导出代码文件。
 
     Parameters
@@ -84,6 +90,7 @@ async def export_code(session_id: str, format: str = "py"):
         - 404: session 不存在，或 session 无 code_translations
         - 400: 不支持的 format
     """
+    require_session_ownership(session_id, current_user)
     if format not in _FORMAT_TO_LANG:
         raise HTTPException(
             status_code=400,

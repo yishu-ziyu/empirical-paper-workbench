@@ -17,10 +17,14 @@ Router self-registration：与 chapter.py 一致，import 时把 router 挂到
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
+from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 
 router = APIRouter()
 _REGISTERED = False
@@ -34,9 +38,13 @@ _DOCX_MEDIA_TYPE = (
 
 @router.get("/sessions/{session_id}/doc-export")
 async def export_document(
-    session_id: str, format: str = "tex", template: str = "cn_journal"
+    session_id: str,
+    format: str = "tex",
+    template: str = "cn_journal",
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """导出文档：format=tex|pdf|docx，template=4 模板之一。"""
+    require_session_ownership(session_id, current_user)
     result = facade.export_document(session_id, template)
 
     if format == "tex":

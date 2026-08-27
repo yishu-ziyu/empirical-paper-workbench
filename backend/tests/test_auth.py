@@ -118,14 +118,13 @@ class TestRegister:
         assert resp.status_code == 422
 
     def test_register_invalid_email(self, client):
-        """POST /auth/register accepts any string as email (field is str not EmailStr)."""
+        """POST /auth/register with a non-email string returns 422."""
         resp = _register(
             client,
             email=f"not-an-email-{uuid.uuid4().hex[:8]}",
             username=_unique_username(),
         )
-        # Should succeed (201) since validation passes on str fields
-        assert resp.status_code == 201
+        assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -314,8 +313,11 @@ class TestSessionOwnership:
         session_ids_b = [s["session_id"] for s in sessions_resp.json()]
         assert session_id_a not in session_ids_b
 
-    def test_anonymous_session_visible_without_auth(self, client, sample_csv_path):
-        """Anonymous upload creates a session accessible without auth."""
+    def test_anonymous_session_ops_unauthorized_when_debug_false(
+        self, client, sample_csv_path, monkeypatch
+    ):
+        """Anonymous session ops in DEBUG=false return 401."""
+        monkeypatch.setattr("config.settings.DEBUG", False)
         with open(sample_csv_path, "rb") as f:
             resp = client.post(
                 "/upload",
@@ -324,10 +326,59 @@ class TestSessionOwnership:
         assert resp.status_code == 200
         session_id = resp.json()["session_id"]
 
-        # Anonymous session should be accessible via GET without auth
         info_resp = client.get(f"/sessions/{session_id}")
-        assert info_resp.status_code == 200
-        assert info_resp.json()["exists"] is True
+        assert info_resp.status_code == 401
+
+        eda_resp = client.post(
+            f"/sessions/{session_id}/eda", json={"action": "describe"}
+        )
+        assert eda_resp.status_code == 401
+
+        export_resp = client.get(
+            f"/sessions/{session_id}/export", params={"format": "tex"}
+        )
+        assert export_resp.status_code == 401
+
+    def test_user_b_cannot_operate_on_user_a_session(self, client, sample_csv_path):
+        """User B cannot generate-chapter / EDA / export user A's session."""
+        token_a = _register_and_login(client)
+        token_b = _register_and_login(client)
+        with open(sample_csv_path, "rb") as f:
+            resp = client.post(
+                "/upload",
+                files={"file": ("sample.csv", f, "text/csv")},
+                headers={"Authorization": f"Bearer {token_a}"},
+            )
+        assert resp.status_code == 200
+        session_id = resp.json()["session_id"]
+
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+
+        gen = client.post(
+            f"/sessions/{session_id}/generate-chapter",
+            json={"chapter": {"type": "intro", "title": "引言"}},
+            headers=headers_b,
+        )
+        assert gen.status_code == 403
+
+        eda = client.post(
+            f"/sessions/{session_id}/eda",
+            json={"action": "describe"},
+            headers=headers_b,
+        )
+        assert eda.status_code == 403
+
+        export = client.get(
+            f"/sessions/{session_id}/export",
+            params={"format": "tex"},
+            headers=headers_b,
+        )
+        assert export.status_code == 403
+
+        # Owner can still read/export their own session.
+        own = client.get(f"/sessions/{session_id}", headers=headers_a)
+        assert own.status_code == 200
 
     def test_owned_session_requires_auth_to_delete(self, client, sample_csv_path):
         """Deleting an owned session without auth returns 401."""

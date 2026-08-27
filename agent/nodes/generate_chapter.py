@@ -25,6 +25,7 @@ from __future__ import annotations
 from typing import Any
 
 from engine.bind import bind_chapter_kwargs
+from engine.data_eda import compute_csv_eda
 from engine.readiness import paper_ready_to_write, resolve_slot
 from prompts import get_prompt
 from protocols import GenerateChapterOutput
@@ -142,7 +143,9 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     bound = bind_chapter_kwargs(state, chapter_spec)
     for key, value in bound.items():
         current = kwargs.get(key, "")
-        if key not in kwargs or current in ("", None):
+        # CSV describe is the data_desc truth source when the file parsed.
+        csv_truth = key in ("data_summary", "eda_results") and value not in ("", None)
+        if csv_truth or key not in kwargs or current in ("", None):
             kwargs[key] = value
     system, user = prompt_mod.render(**kwargs)
 
@@ -168,6 +171,9 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     ):
         table = (state.get("results") or "").strip()
         content = prose + "\n\n" + table if table else prose
+    elif str(chapter_type) == "data_desc":
+        _, eda_table = compute_csv_eda(state)
+        content = prose + "\n\n" + eda_table if eda_table.strip() else prose
     else:
         content = prose
 

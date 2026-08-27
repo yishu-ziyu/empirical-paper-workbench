@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
+from engine.data_eda import compute_csv_eda
 from engine.readiness import claim_mode
 
 
@@ -44,6 +45,7 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
     diag = state.get("identification_diag") or {}
     if not isinstance(diag, Mapping):
         diag = {}
+    data_summary, eda_results = compute_csv_eda(state)
     return {
         "research_question": rd.get("question") or state.get("research_question") or "",
         "method": spec.get("method") or rd.get("method") or "",
@@ -54,4 +56,6 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
         "star_rating": state.get("star_rating"),
         "claim": claim_mode(state),
         "identification_report": diag.get("report") or "",
+        "data_summary": data_summary,
+        "eda_results": eda_results,
     }

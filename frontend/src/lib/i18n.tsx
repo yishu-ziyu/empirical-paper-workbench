@@ -280,6 +280,23 @@ const zh = {
   'review.acceptRegen': '接受重生成',
   'review.reject': '拒绝重生成',
   'review.forcePass': '强制通过',
+  // 审批硬证据门（review_gate）
+  'reviewGate.title': '本章未通过核对',
+  'reviewGate.scoreLine': '综合分 {score} · 通过线 {threshold}',
+  'reviewGate.body': '未经核对的句子不得静默进入论文。你可以打回重写，或确认后果后强行放行——放行记录会永久保留在运行档案中。',
+  'reviewGate.feedbackLabel': '评审意见',
+  'reviewGate.regen': '打回重写',
+  'reviewGate.force': '强行放行',
+  'reviewGate.confirmForce': '我知道后果，仍然放行',
+  'reviewGate.close': '返回修改',
+  'reviewGate.noScore': '尚无评分',
+  // 运行档案 trace
+  'trace.title': '运行档案',
+  'trace.refresh': '刷新',
+  'trace.empty': '暂无运行记录',
+  'trace.done': '完成',
+  // 绕过徽标
+  'chapter.bypassedBadge': '已绕过核对',
   'review.submitError': '决策提交失败：',
 
   // SampleFilter
@@ -416,6 +433,7 @@ const en: typeof zh = {
   'guide.nowAgain': 'How it works',
 
   'desk.heading': 'Put down whatever is in your head.',
+  'desk.asked': 'You asked',
   'desk.sub': 'It can be messy. I will ask one thing and shape it into a research question.',
   'desk.paperLabel': 'Write your idea here',
   'desk.placeholder': 'Start with any sentence…',
@@ -609,6 +627,20 @@ const en: typeof zh = {
   'review.acceptRegen': 'Accept & Regenerate',
   'review.reject': 'Reject & Regenerate',
   'review.forcePass': 'Force Pass',
+  'reviewGate.title': 'Chapter failed review',
+  'reviewGate.scoreLine': 'Score {score} · threshold {threshold}',
+  'reviewGate.body': 'Unverified sentences cannot silently enter the paper. Send it back for another draft, or force-pass after acknowledging — a bypass record is kept permanently in the run archive.',
+  'reviewGate.feedbackLabel': 'Reviewer notes',
+  'reviewGate.regen': 'Send back',
+  'reviewGate.force': 'Force pass',
+  'reviewGate.confirmForce': 'I understand — force pass anyway',
+  'reviewGate.close': 'Back to editing',
+  'reviewGate.noScore': 'Not scored yet',
+  'trace.title': 'Run archive',
+  'trace.refresh': 'Refresh',
+  'trace.empty': 'No runs recorded yet',
+  'trace.done': 'done',
+  'chapter.bypassedBadge': 'Bypassed review',
   'review.submitError': 'Decision submission failed: ',
 
   'filter.title': 'Sample Filter',

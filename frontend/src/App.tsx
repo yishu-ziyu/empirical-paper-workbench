@@ -15,6 +15,8 @@ import ChapterList from './components/ChapterList'
 import ReviewPanel from './components/ReviewPanel'
 import DocExportDialog from './components/DocExportDialog'
 import CodeExportDialog from './components/CodeExportDialog'
+import ReviewGateDialog from './components/ReviewGateDialog'
+import RunTracePanel from './components/RunTracePanel'
 import { useT } from './lib/i18n'
 import type { components } from './types/api'
 
@@ -132,6 +134,13 @@ function App() {
   const degradationsPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [review, setReview] = useState<ReviewInfo | null>(null)
+  // 审批硬证据门：409 后弹出的未过审信息（分数 + 阈值 + 章节引用）
+  const [gateInfo, setGateInfo] = useState<{
+    chapter: components['schemas']['ChapterResponse']
+    score: number | null
+    threshold: number
+  } | null>(null)
+  const [gateBusy, setGateBusy] = useState(false)
   const [docExportOpen, setDocExportOpen] = useState(false)
   const [codeExportOpen, setCodeExportOpen] = useState(false)
   const [directionBusy, setDirectionBusy] = useState(false)
@@ -283,6 +292,124 @@ function App() {
     if (!sessionId) return
     refreshReview(sessionId)
   }, [sessionId, refreshReview])
+
+  // ── 审批硬证据门（review_gate）────────────────────────────────
+  // 北极星：未经核对的章节不许静默进入论文。批准按钮 → 后端 409 时
+  // 弹 ReviewGateDialog，只有显式 force 才能旁路，且留下永久痕迹。
+
+  const markChapterUpdated = useCallback(
+    (chapter: components['schemas']['ChapterResponse']) => {
+      setWrittenChapters((prev) => {
+        const idx = prev.findIndex((item) => item.type === chapter.type)
+        if (idx === -1) return [...prev, chapter]
+        const next = [...prev]
+        next[idx] = chapter
+        return next
+      })
+    },
+    [],
+  )
+
+  const postApprove = useCallback(
+    async (
+      chapter: components['schemas']['ChapterResponse'],
+      force: boolean,
+    ) => {
+      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/approve-chapter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          // 精确指定章节类型：后端缺省只批"最后一章"，这里不依赖该假设
+          ...(chapter.type ? { chapter_type: chapter.type } : {}),
+          ...(force ? { force: true } : {}),
+        }),
+      })
+      const payload = await resp.json().catch(() => ({}))
+      return { status: resp.status, payload }
+    },
+    [sessionId],
+  )
+
+  const handleApprove = useCallback(
+    async (chapter: components['schemas']['ChapterResponse']) => {
+      if (!sessionId) return
+      try {
+        const { status, payload } = await postApprove(chapter, false)
+        if (status === 409) {
+          const detail =
+            payload.detail && typeof payload.detail === 'object'
+              ? payload.detail
+              : {}
+          if (detail.review_gate) {
+            setGateInfo({
+              chapter,
+              score: typeof detail.score === 'number' ? detail.score : null,
+              threshold:
+                typeof detail.threshold === 'number' ? detail.threshold : 0.7,
+            })
+            return
+          }
+          showGlobalError(payload.detail?.detail || t('bench.writeBlocked'))
+          return
+        }
+        if (status >= 400 || !payload.ok) throw new Error(`HTTP ${status}`)
+        markChapterUpdated(payload.chapter)
+        await refreshReview(sessionId)
+      } catch (err) {
+        showGlobalError(err instanceof Error ? err.message : String(err))
+      }
+    },
+    [sessionId, postApprove, markChapterUpdated, refreshReview, showGlobalError, t],
+  )
+
+  const handleGateRegenerate = useCallback(async () => {
+    if (!gateInfo || !sessionId) return
+    const chapterIndex =
+      gateInfo.chapter.chapter_index ??
+      outline.findIndex((item) => item.type === gateInfo.chapter.type)
+    setGateBusy(true)
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          chapter_index: Math.max(0, chapterIndex),
+        }),
+      })
+      const payload = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      // regenerate 返回整列表；覆盖本地缓存保持一致
+      if (Array.isArray(payload.body_chapters)) {
+        setWrittenChapters(
+          payload.body_chapters.filter(
+            (c: components['schemas']['ChapterResponse']) => c.content,
+          ),
+        )
+      }
+      setGateInfo(null)
+      await refreshReview(sessionId)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setGateBusy(false)
+    }
+  }, [gateInfo, sessionId, outline, refreshReview, showGlobalError])
+
+  const handleGateForce = useCallback(async () => {
+    if (!gateInfo || !sessionId) return
+    setGateBusy(true)
+    try {
+      const { status, payload } = await postApprove(gateInfo.chapter, true)
+      if (status >= 400 || !payload.ok) throw new Error(`HTTP ${status}`)
+      markChapterUpdated(payload.chapter)
+      setGateInfo(null)
+      await refreshReview(sessionId)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setGateBusy(false)
+    }
+  }, [gateInfo, sessionId, postApprove, markChapterUpdated, refreshReview, showGlobalError])
 
   const markGuideSeen = useCallback(() => {
     localStorage.setItem(LS_GUIDE_KEY, '1')
@@ -693,7 +820,7 @@ function App() {
               </p>
             ) : writtenChapter?.content ? (
               <div className="mb-6">
-                <ChapterWriter chapter={writtenChapter} sessionId={sessionId ?? undefined} />
+                <ChapterWriter chapter={writtenChapter} sessionId={sessionId ?? undefined} onApprove={handleApprove} />
               </div>
             ) : (
               <p className="text-sm leading-7 text-muted">{t('bench.paperEmpty')}</p>
@@ -714,10 +841,26 @@ function App() {
                 {degradations[0].node}: {degradations[0].reason}
               </p>
             )}
+            {sessionId && <RunTracePanel sessionId={sessionId} />}
           </ErrorBoundary>
         }
       />
 
+      {gateInfo && (
+        <ReviewGateDialog
+          score={gateInfo.score}
+          threshold={gateInfo.threshold}
+          feedback={
+            review && review.chapter_index === gateInfo.chapter.chapter_index
+              ? review.feedback || ''
+              : ''
+          }
+          busy={gateBusy}
+          onRegenerate={handleGateRegenerate}
+          onForce={handleGateForce}
+          onClose={() => setGateInfo(null)}
+        />
+      )}
       {docExportOpen && sessionId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
           <DocExportDialog

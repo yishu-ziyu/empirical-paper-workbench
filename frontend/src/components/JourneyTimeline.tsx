@@ -36,7 +36,6 @@ function getStatusTextColor(status: JourneyStage['status']): string {
 }
 
 export default function JourneyTimeline({
-  sessionId,
   currentStage,
   stages,
   onStageClick,

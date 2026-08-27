@@ -21,6 +21,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { useT } from '../lib/i18n'
 import { renderPaperMarkdown } from '../lib/paperMarkdown'
 import VersionHistory from './VersionHistory'
+import ApprovalBadge from './ApprovalBadge'
 import type { components } from '../types/api'
 // TODO(T-07 followup): 安装 @codemirror/lang-markdown + @codemirror/language-data
 // 后启用 markdown 语法高亮：
@@ -119,6 +120,7 @@ export default function ChapterWriter({
           {t(`chapter.type.${chapter.type}`)}
         </span>
         <h3 className="text-sm font-semibold">{chapter.title}</h3>
+        <ApprovalBadge chapter={chapter} />
       </div>
 
       {isEditing || isStreaming ? (

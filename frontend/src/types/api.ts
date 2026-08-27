@@ -658,6 +658,12 @@ export interface components {
             versions?: string[];
             /** Chapter Index */
             chapter_index?: number | null;
+            /**
+             * Approved Forced
+             * 后端 extra 字段（评审未过审时 force 放行的永久痕迹），
+             * 手工补进生成类型——下次 openapi codegen 如已包含可移除本行。
+             */
+            approved_forced?: boolean | null;
         } & {
             [key: string]: unknown;
         };

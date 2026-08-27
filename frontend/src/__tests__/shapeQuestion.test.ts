@@ -8,7 +8,7 @@ describe('shapeQuestion', () => {
   })
 
   test('一次只补一个缺口', () => {
-    expect(nextPrompt({}).id).toBe('compare')
+    expect(nextPrompt({})!.id).toBe('compare')
     expect(nextPrompt({ compare: 'policy' })?.id).toBe('outcome')
     expect(nextPrompt({ compare: 'policy', outcome: 'work' })).toBeNull()
   })

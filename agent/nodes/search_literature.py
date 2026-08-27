@@ -5,7 +5,8 @@
 
 pytest / ECONPAPER_LLM=mock 走 mock 文献库。
 运行时最后一档是 Crossref（取代 ADR-0010「默认 mock」）。
-literature_source 可切：mock / crossref / semantic_scholar / disabled。
+literature_source 可切：mock / crossref / semantic_scholar / apodex /
+disabled。apodex 为两周免费 API 耗材实验，无 key / 失败降级 mock_degraded。
 crossref / semantic_scholar 失败降级 mock_degraded。
 """
 from __future__ import annotations
@@ -106,7 +107,23 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
     # 按 literature_source 分发。pytest 默认 mock；运行时默认 crossref。
     # crossref / semantic_scholar 失败一律降级 mock_degraded。
     effective_source = source
-    if source == "semantic_scholar":
+    if source == "apodex":
+        from nodes.literature_sources.apodex import (
+            get_api_key_from_env,
+            apodex_search,
+        )
+
+        api_key = get_api_key_from_env()
+        if not api_key:
+            entries = _mock_search(query)
+            effective_source = "mock_degraded"
+        else:
+            try:
+                entries = apodex_search(query, api_key)
+            except RuntimeError:
+                entries = _mock_search(query)
+                effective_source = "mock_degraded"
+    elif source == "semantic_scholar":
         from nodes.literature_sources.semantic_scholar import (
             get_api_key_from_env,
             semantic_scholar_search,

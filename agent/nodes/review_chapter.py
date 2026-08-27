@@ -570,6 +570,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
         method=method,
         methods_method=_methods_method_from_outline(state),
         citation_indices=state.get("citation_indices"),
+        literature_entries=state.get("literature_entries"),
         claim=claim,
         **structure_kwargs,
     )

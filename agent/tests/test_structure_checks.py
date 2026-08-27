@@ -119,6 +119,95 @@ def test_lit_review_empty_index_bracket_still_fails():
     assert "invented_citation" in failures
 
 
+# ---------------------------------------------------------------------------
+# 引用可回溯（北极星：综述每条引用必须指回真实条目）
+# ---------------------------------------------------------------------------
+
+def _traceback_entries():
+    """两级条目：[1]=Smith 2019 (doi 10.1/a)，[2]=Lee 2021 (doi 10.1/b)。"""
+    return [
+        {"title": "Minimum Wages", "authors": ["Smith"], "year": 2019, "doi": "10.1/a"},
+        {"title": "Education Returns", "authors": ["Lee"], "year": 2021, "doi": "10.1/b"},
+    ]
+
+
+def test_lit_review_citation_year_mismatch_fails():
+    """[N] 在表内，但叙述年份与条目元数据不符 → 张冠李戴，必须拦下。"""
+    failures = check_structure(
+        "lit_review",
+        "Smith (2020) [1] 指出最低工资的就业效应显著为负。",
+        citation_indices={"10.1/a": 1},
+        literature_entries=_traceback_entries(),
+    )
+    assert "citation_year_mismatch" in failures
+
+
+def test_lit_review_citation_matching_entry_passes():
+    """[N]、作者、年份与条目一致 → 不新增任何结构失败。"""
+    failures = check_structure(
+        "lit_review",
+        "Smith (2019) [1] 指出最低工资的就业效应存在争议。",
+        citation_indices={"10.1/a": 1},
+        literature_entries=_traceback_entries(),
+    )
+    assert "citation_year_mismatch" not in failures
+    assert "invented_citation" not in failures
+
+
+def test_lit_review_bracket_without_author_year_still_ok():
+    """只有 [N] 无作者-年份叙述（如「已有研究 [1]」）→ 无从比对，不误杀。"""
+    failures = check_structure(
+        "lit_review",
+        "关于该问题，已有研究 [1] 给出了不同估计。",
+        citation_indices={"10.1/a": 1},
+        literature_entries=_traceback_entries(),
+    )
+    assert "citation_year_mismatch" not in failures
+
+
+def test_lit_review_multi_marker_second_sentence_mismatch_fails():
+    """同段多引用：第二句的 [2] 叙述 2019，但条目是 2021 → 失败。"""
+    text = (
+        "Smith (2019) [1] 指出就业效应存在争议。"
+        "Lee (2019) [2] 则发现教育回报显著。"
+    )
+    failures = check_structure(
+        "lit_review",
+        text,
+        citation_indices={"10.1/a": 1, "10.1/b": 2},
+        literature_entries=_traceback_entries(),
+    )
+    assert "citation_year_mismatch" in failures
+
+
+def test_lit_review_nonempty_table_unattributed_author_year_fails():
+    """表非空时，作者-年份出现在没有任何合法 [N] 的句子里 → 无从核对。"""
+    text = (
+        "Wong (2015) 认为数字化冲击被低估。"      # 该句无任何 [N]
+        "Smith (2019) [1] 则持相反意见。"
+    )
+    failures = check_structure(
+        "lit_review",
+        text,
+        citation_indices={"10.1/a": 1},
+        literature_entries=_traceback_entries(),
+    )
+    assert "invented_citation" in failures
+
+
+def test_results_checks_ignore_literature_kwarg():
+    """其他章节类型不受新参数影响。"""
+    failures = check_structure(
+        "results",
+        "income ~ age 的 OLS 结果见表 2。",
+        method="OLS",
+        methods_method="OLS",
+        citation_indices={"10.1/a": 1},
+        literature_entries=_traceback_entries(),
+    )
+    assert "citation_year_mismatch" not in failures
+
+
 def test_results_method_must_match_methods_chapter():
     """results 另起一个 method 词 → 失败。"""
     failures = check_structure(

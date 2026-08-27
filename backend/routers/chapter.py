@@ -223,6 +223,19 @@ async def approve_chapter_endpoint(
     body_chapters[target_idx] = approved_chapter
     facade.update_state(session_id, body_chapters=body_chapters)
 
+    # 审批动作落 trace：normal 通过 / force 旁路一目了然（"可查"磁盘件）
+    facade.record_event(
+        session_id,
+        "approve_chapter",
+        status="forced" if not passed else "ok",
+        detail={
+            "chapter_index": target_idx,
+            "score": score,
+            "threshold": _REVIEW_SCORE_THRESHOLD,
+            "reviewer_bypassed_review": (not passed) or None,
+        },
+    )
+
     return ApproveChapterResponse(
         ok=True,
         chapter=_to_chapter_response(body_chapters[target_idx]),

@@ -33,6 +33,9 @@ class Settings:
 
     # --- Uploads ---
     UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "./uploads"))
+
+    # --- Run 工件目录（trace/checkpoints/outputs，"每一步可查"的磁盘载体）---
+    RUNS_DIR: str = os.getenv("RUNS_DIR", "./runs")
     MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
 
     # --- LangGraph checkpointing (PostgreSQL) ---

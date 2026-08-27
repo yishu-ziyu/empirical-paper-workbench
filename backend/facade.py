@@ -18,10 +18,14 @@ these names propagates immediately.
 from __future__ import annotations
 
 import os
+import shutil
+import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Iterator, List, Optional
 
+import run_store
 from config import settings
 from fastapi import HTTPException
 
@@ -151,6 +155,11 @@ class AgentFacade:
         if session_id is None:
             session_id = str(uuid.uuid4())
         self._sessions[session_id] = {"user_id": user_id}
+        # Run 工件目录：会话创建即建档（trace/checkpoints/outputs 的根）
+        try:
+            run_store.write_manifest(session_id, user_id=user_id)
+        except Exception:
+            pass  # 工件记录失败不阻断主流程
         return session_id
 
     def has_session(self, session_id: str) -> bool:
@@ -172,10 +181,16 @@ class AgentFacade:
         ]
 
     def delete_session(self, session_id: str) -> bool:
-        """Delete a session. Returns True if it existed, False otherwise."""
+        """Delete a session. Returns True if it existed, False otherwise.
+
+        会话删除同时清掉磁盘上的 run 工件目录（隐私优先：删就是删，
+        不留残余的 trace/快照）。
+        """
         if session_id in self._sessions:
             del self._sessions[session_id]
+            shutil.rmtree(run_store.run_dir(session_id), ignore_errors=True)
             return True
+        shutil.rmtree(run_store.run_dir(session_id), ignore_errors=True)
         return False
 
     @staticmethod
@@ -331,6 +346,54 @@ class AgentFacade:
         self.save_state(session_id, state)
 
     # ------------------------------------------------------------------
+    # Run 工件追踪（trace / checkpoints，见 run_store.py）
+    # ------------------------------------------------------------------
+    def _tracked(
+        self,
+        session_id: str,
+        node: str,
+        snapshot_label: Optional[str] = None,
+    ) -> Any:
+        """计时追踪一个节点执行段：ok/error 事件 + 可选 state 快照。
+
+        用法::
+
+            with self._tracked(sid, "generate_chapter", "generate_chapter") as t:
+                result = generate_chapter_node(state)
+                t.set_detail(chapter_index=...)
+        """
+        return run_store.TrackedStep(
+            session_id,
+            node,
+            snapshot_label=snapshot_label,
+            get_state_fn=lambda: self._sessions.get(session_id, {}).get("state")
+            or {},
+        )
+
+    def record_event(
+        self,
+        session_id: str,
+        node: str,
+        status: str = "ok",
+        duration_ms: float | None = None,
+        detail: dict | None = None,
+    ) -> None:
+        """公开事件入口：router 层的一次关键动作（如审批）也进 trace。"""
+        try:
+            run_store.append_event(
+                session_id, node, status=status, duration_ms=duration_ms,
+                detail=detail,
+            )
+        except Exception:
+            pass
+
+    def _workspace_dir(self, session_id: str) -> str:
+        """run 目录下的 workspace 路径（节点产物 tex/pdf/清洗 sidecar 的家）。"""
+        ws = run_store.ensure_run_dir(session_id) / "workspace"
+        ws.mkdir(parents=True, exist_ok=True)
+        return str(ws)
+
+    # ------------------------------------------------------------------
     # Graph invocation (upload pipeline)
     # ------------------------------------------------------------------
     def run_upload_pipeline(self, session_id: str, csv_path: str) -> dict:
@@ -348,11 +411,36 @@ class AgentFacade:
             "session_id": session_id,
             "csv_path": str(csv_path),
             "uploaded_datasets": [{"path": str(csv_path), "format": "csv"}],
+            # 节点产物（清洗 sidecar / 导出 tex-pdf-docx）落进 run 目录，
+            # 不再散落在 tempfile 里随风而逝。
+            "workspace": self._workspace_dir(session_id),
         }
-        final_state = _graph.invoke(
-            initial_state,
-            config={"configurable": {"thread_id": session_id}},
-        )
+        try:
+            run_store.write_manifest(
+                session_id, source_csv=str(csv_path)
+            )
+        except Exception:
+            pass
+        with self._tracked(
+            session_id, "upload_pipeline", "upload_pipeline"
+        ) as t:
+            final_state = _graph.invoke(
+                initial_state,
+                config={"configurable": {"thread_id": session_id}},
+            )
+            if isinstance(final_state, dict):
+                t.set_detail(
+                    cleaning_steps=len(
+                        (
+                            (final_state.get("cleaning_report") or {}).get(
+                                "steps"
+                            )
+                            or []
+                        )
+                    )
+                    or None,
+                    degraded=bool(final_state.get("degradations")) or None,
+                )
         # Persist final state + csv_path on the entry. Preserve the existing
         # ``user_id`` if set (F10: session ownership).
         existing = self._sessions.get(session_id, {})
@@ -389,8 +477,17 @@ class AgentFacade:
             csv_path = entry.get("csv_path")
             if csv_path:
                 state["csv_path"] = csv_path
-        state = run_prewrite(state)
-        self.save_state(session_id, state)
+        if not state.get("workspace"):
+            state["workspace"] = self._workspace_dir(session_id)
+        with self._tracked(session_id, "prewrite", "prewrite") as t:
+            try:
+                state = run_prewrite(state)
+                t.set_detail(
+                    star_rating=state.get("star_rating"),
+                    claim=state.get("claim"),
+                )
+            finally:
+                self.save_state(session_id, state)
         return state
 
     def run_identification_verify(self, session_id: str) -> dict:
@@ -471,10 +568,15 @@ class AgentFacade:
             if k not in state or state.get(k) in (None, ""):
                 state[k] = v
         try:
-            result = generate_chapter_node(state)
+            with self._tracked(session_id, "generate_chapter") as t:
+                result = generate_chapter_node(state)
+                blockers = result.get("write_blockers") or []
+                t.set_detail(chapter_type=chapter.get("type"), write_blocked=bool(result.get("write_blocked")), blockers=blockers or None)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        return self._persist_after_chapter(session_id, state, result)
+        return self._persist_after_chapter(
+            session_id, state, result, node_name="generate_chapter"
+        )
 
     def regenerate_chapter(self, session_id: str, chapter_index: int) -> dict:
         """Re-run generate_chapter on the given chapter index."""
@@ -486,17 +588,37 @@ class AgentFacade:
         state = self.get_state(session_id)
         state = {**state, "current_chapter_index": chapter_index}
         try:
-            result = generate_chapter_node(state)
+            with self._tracked(session_id, "regenerate_chapter") as t:
+                result = generate_chapter_node(state)
+                t.set_detail(chapter_index=chapter_index)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        return self._persist_after_chapter(session_id, state, result)
+        return self._persist_after_chapter(
+            session_id, state, result, node_name="regenerate_chapter"
+        )
 
     def _persist_after_chapter(
-        self, session_id: str, state: dict, result: dict
+        self,
+        session_id: str,
+        state: dict,
+        result: dict,
+        node_name: str = "generate_chapter",
     ) -> dict:
         state = {**state, **result}
         if result.get("write_blocked"):
             self.save_state(session_id, state)
+            try:
+                run_store.snapshot_state(
+                    session_id, f"{node_name}_blocked", state
+                )
+                run_store.append_event(
+                    session_id,
+                    f"{node_name}_blocked",
+                    status="blocked",
+                    detail={"blockers": list(result.get("write_blockers") or [])},
+                )
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -507,6 +629,33 @@ class AgentFacade:
         if review_chapter_node is not None:
             reviewed = review_chapter_node(state)
             state = {**state, **reviewed}
+            # "可查"落盘：评审分数 / 接地失败 / 降级与否进 trace，state 落快照
+            try:
+                scores = list(reviewed.get("review_scores") or [])
+                run_store.append_event(
+                    session_id,
+                    "review_chapter",
+                    status="ok",
+                    detail={
+                        "parent_node": node_name,
+                        "score": scores[-1] if scores else None,
+                        "grounding_failures": list(
+                            state.get("grounding_failures") or []
+                        )
+                        or None,
+                        "review_source": state.get("review_source"),
+                        "degraded": bool(
+                            reviewed.get("review_degraded")
+                            or state.get("review_degraded")
+                        )
+                        or None,
+                    },
+                )
+                run_store.snapshot_state(
+                    session_id, f"{node_name}_reviewed", state
+                )
+            except Exception:
+                pass
             if reviewed.get("review_degraded") or reviewed.get("review_source") == "mock_fallback":
                 reason = "review_llm_unparseable_or_error"
                 for item in reviewed.get("degradations") or []:
@@ -538,13 +687,15 @@ class AgentFacade:
             "rollback_chapter_index": chapter_index,
             "rollback_version_index": version_index,
         }
-        try:
-            result = rollback_chapter_node(state)
-        except (IndexError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-        state = {**state, **result}
-        self.save_state(session_id, state)
-        return state
+        with self._tracked(session_id, "rollback_chapter", "rollback") as t:
+            t.set_detail(chapter_index=chapter_index, version_index=version_index)
+            try:
+                result = rollback_chapter_node(state)
+            except (IndexError, ValueError) as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
+            state = {**state, **result}
+            self.save_state(session_id, state)
+            return state
 
     def export_document(self, session_id: str, template: str) -> dict:
         """Run export_docx node and return the result dict.
@@ -558,12 +709,41 @@ class AgentFacade:
                 detail="export_docx node not available (agent module missing)",
             )
         state = self.get_state(session_id)
+        if not state.get("workspace"):
+            state["workspace"] = self._workspace_dir(session_id)
         state = {**state, "export_template": template}
-        result = export_docx_node(state)
-        # Persist the export_template + result back to state so subsequent
-        # requests see the rendered paths.
-        state = {**state, **result}
-        self.save_state(session_id, state)
+        with self._tracked(
+            session_id, "export_docx", "export", 
+        ) as t:
+            result = export_docx_node(state)
+            t.set_detail(
+                template=template,
+                degraded=bool(result.get("degraded")) or None,
+                pdf_path=result.get("pdf_path"),
+                docx_path=result.get("docx_path"),
+            )
+            state = {**state, **result}
+            self.save_state(session_id, state)
+            # 导出产物登记为持久交付物：复制进 outputs/export/
+            try:
+                produced = [
+                    Path(p)
+                    for p in (
+                        result.get("pdf_path"),
+                        result.get("docx_path"),
+                    )
+                    if p
+                ]
+                # paper.tex 是始终存在的产物（degraded 时 pdf/docx 缺，
+                # 但 LaTeX 源码永远可用——见 CONTEXT 的降级语义），一并归档。
+                tex_candidate = Path(state.get("workspace") or "") / "paper.tex"
+                if tex_candidate.is_file():
+                    produced.append(tex_candidate)
+                copied = run_store.register_export(session_id, produced)
+                if copied:
+                    t.set_detail(archived=[c["name"] for c in copied])
+            except Exception:
+                pass
         return result
 
     # ------------------------------------------------------------------
@@ -788,6 +968,14 @@ class AgentFacade:
             hitl_decision=decision,
             hitl_reviewer=reviewer,
             hitl_comment=comment,
+        )
+
+        # 人工评审决策落 trace（"可查"磁盘件：谁在什么时候放行/打回了哪章）
+        self.record_event(
+            session_id,
+            "review_decision",
+            status=decision,
+            detail={"chapter_index": chapter_index, "reviewer": reviewer},
         )
 
         # reject → 触发重生成；accept / force_pass → proceed

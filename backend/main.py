@@ -165,6 +165,7 @@ from routers.eda import router as eda_router  # noqa: E402
 from routers.outline import router as outline_router  # noqa: E402
 from routers.progress import router as progress_router  # noqa: E402
 from routers.review import router as review_router  # noqa: E402
+from routers.runs import router as runs_router  # noqa: E402
 from routers.sample import router as sample_router  # noqa: E402
 from routers.sessions import router as sessions_router  # noqa: E402
 from routers.ws import router as ws_router  # noqa: E402
@@ -183,3 +184,4 @@ app.include_router(code_export_router)
 app.include_router(doc_export_router)
 app.include_router(progress_router)
 app.include_router(review_router)
+app.include_router(runs_router)

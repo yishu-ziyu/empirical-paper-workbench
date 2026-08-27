@@ -36,6 +36,13 @@
 - **translate_code** — Python 代码翻译为 Stata / R / EViews，写入 `code_translations`。
 - **export_docx** — LaTeX 模板渲染 + PDF 编译 + docx 转换，从 `title_chapter` + `body_chapters` 提取内容。
 
+## Run 工件（每一步可查的磁盘载体）
+
+- **Run Directory** — `runs/<session_id>/`，会话创建即建档。四件套：`manifest.json`（来源 CSV、导出清单）、`trace.jsonl`（追加式事件流，一次节点执行=一行 JSON：节点名/状态/毫秒耗时/detail）、`checkpoints/`（关键步骤后的完整 state 快照 + `latest.json`）、`workspace/`（清洗 sidecar、clean.py/do、导出 tex/pdf/docx 的实际产出地）。
+- **Trace Event** — trace.jsonl 里的一行。状态三种：ok / error / blocked；人工动作也是事件（approve_chapter 的 status 为 ok|forced、review_decision 的 status 为 accept|reject|force_pass），绕过核对必留 `reviewer_bypassed_review: true`。
+- **Outputs Export 归档** — 每次导出把 pdf/docx/paper.tex 复制进 `outputs/export/` 作为"当时交付的那一份"，源文件后续被覆盖不影响旧副本。
+- **RunStore fail-open** — 工件写入失败永不阻断主流程（run_store.py 全部吞异常）。查证入口：GET `/sessions/{id}/artifacts` 与 GET `/sessions/{id}/trace`。
+
 ## 导出
 
 - **Export Template** — LaTeX 模板名，四选一：`cn_journal` / `undergraduate` / `master_thesis` / `english_submission`。

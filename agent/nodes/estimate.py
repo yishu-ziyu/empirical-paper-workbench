@@ -84,32 +84,55 @@ def _fmt(x: Optional[float]) -> str:
 OMITTED_CELL = "未估计"
 
 _RHS_SKIP = {"", "1", "0"}
+_SIMPLE_VAR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_COEF_HEADER_MARKERS = ("系数", "coef", "se", "p")
+
+
+def _as_name_list(raw: Any) -> List[str]:
+    """List of variable names. A string is one token or comma/space-split, not chars."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [part.strip() for part in re.split(r"[,;\s]+", raw) if part.strip()]
+    names: List[str] = []
+    for item in raw:
+        names.extend(_as_name_list(item))
+    return names
+
+
+def _rhs_simple_names(formula: str) -> List[str]:
+    """Simple identifiers on the RHS. Skip I(), i.year, interactions."""
+    if "~" not in formula:
+        return []
+    rhs = formula.split("~", 1)[1]
+    rhs = rhs.split("|", 1)[0]
+    names: List[str] = []
+    for tok in rhs.split("+"):
+        name = tok.strip()
+        if name in _RHS_SKIP or not _SIMPLE_VAR.match(name):
+            continue
+        names.append(name)
+    return names
 
 
 def table_var_names(spec: Dict[str, Any], formula: Optional[str] = None) -> List[str]:
-    """Treatment first, then controls / formula RHS. Never invent names."""
+    """Treatment first, then controls / simple formula RHS. Never invent names."""
     names: List[str] = []
     treatment = spec.get("treatment") or spec.get("treatment_col")
     if treatment:
         names.append(str(treatment))
-    for raw in spec.get("controls") or []:
-        name = str(raw).strip()
-        if name and name not in names:
+    for name in _as_name_list(spec.get("controls")):
+        if name not in names:
             names.append(name)
     src = formula or spec.get("formula") or spec.get("feols_formula") or ""
-    if "~" in str(src):
-        rhs = str(src).split("~", 1)[1]
-        rhs = rhs.split("|", 1)[0]
-        rhs = re.sub(r"\([^)]*\)", " ", rhs)
-        for tok in rhs.split("+"):
-            name = tok.strip()
-            if name and name not in names and name not in _RHS_SKIP:
-                names.append(name)
+    for name in _rhs_simple_names(str(src)):
+        if name not in names:
+            names.append(name)
     return names
 
 
 def _all_coefs(fit: Any) -> Dict[str, tuple]:
-    """name → (coef, se, p) from a StatsPAI / statsmodels fit. Missing keys stay out."""
+    """name → (coef, se, p). One bad SE/p does not drop the rest."""
     out: Dict[str, tuple] = {}
     try:
         payload = fit.to_dict()
@@ -125,20 +148,37 @@ def _all_coefs(fit: Any) -> Dict[str, tuple]:
         pass
     try:
         params = fit.params
-        se_src = getattr(fit, "bse", None)
-        if se_src is None:
-            se_src = getattr(fit, "std_errors", None)
-        pvalues = getattr(fit, "pvalues", None)
-        index = getattr(params, "index", params)
-        for name in index:
-            key = str(name)
-            if key in out:
-                continue
-            se = None if se_src is None else float(se_src[name])
-            pval = None if pvalues is None else float(pvalues[name])
-            out[key] = (float(params[name]), se, pval)
     except Exception:
-        pass
+        return out
+    se_src = getattr(fit, "bse", None)
+    if se_src is None:
+        se_src = getattr(fit, "std_errors", None)
+    pvalues = getattr(fit, "pvalues", None)
+    try:
+        index = getattr(params, "index", params)
+    except Exception:
+        return out
+    for name in index:
+        key = str(name)
+        if key in out:
+            continue
+        try:
+            coef = float(params[name])
+        except Exception:
+            continue
+        se = None
+        pval = None
+        try:
+            if se_src is not None:
+                se = float(se_src[name])
+        except Exception:
+            se = None
+        try:
+            if pvalues is not None:
+                pval = float(pvalues[name])
+        except Exception:
+            pval = None
+        out[key] = (coef, se, pval)
     return out
 
 
@@ -153,20 +193,89 @@ def row_for_name(name: str, coefs: Optional[Dict[str, tuple]] = None) -> str:
     return f"| {name} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
 
 
+def _prefer_treatment_row(
+    treatment: str,
+    coef: Optional[float],
+    se: Optional[float],
+    p: Optional[float],
+    table_rows: List[str],
+) -> tuple[str, List[str]]:
+    """Use effect_from_fit numbers for the treatment row when they exist."""
+    rows = list(table_rows)
+    if coef is not None or se is not None or p is not None:
+        fitted = f"| {treatment} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
+        for i, row in enumerate(rows):
+            if row.startswith(f"| {treatment} |"):
+                rows[i] = fitted
+                return fitted, rows
+        rows.insert(0, fitted)
+        return fitted, rows
+    for row in rows:
+        if row.startswith(f"| {treatment} |"):
+            return row, rows
+    omitted = f"| {treatment} | {OMITTED_CELL} | — | — |"
+    return omitted, rows
+
+
 def _table_rows_from_fit(
     fit: Any, spec: Dict[str, Any], formula: Optional[str], treatment: str
 ) -> List[str]:
     coefs = _all_coefs(fit)
+    extracted = effect_from_fit(fit, treatment)
+    if treatment and any(v is not None for v in extracted[:3]):
+        coefs[str(treatment)] = extracted[:3]
     names = table_var_names(spec, formula)
     if treatment and treatment not in names:
         names.insert(0, str(treatment))
     return [row_for_name(name, coefs) for name in names]
 
 
+def _is_coef_header_line(line: str) -> bool:
+    if "|" not in line:
+        return False
+    cells = [c.strip().lower() for c in line.strip().strip("|").split("|")]
+    if not cells:
+        return False
+    if cells[0] in {"变量", "variable"}:
+        return True
+    return any(mark in cells for mark in _COEF_HEADER_MARKERS)
+
+
+def looks_like_coef_table(content: str) -> bool:
+    return any(_is_coef_header_line(line) for line in (content or "").splitlines())
+
+
+def _main_results_table_end(lines: List[str]) -> int:
+    """Last line index of the 主结果 coef table, not a later robustness table."""
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^#+\s*主结果\s*$", line.strip()):
+            start = i
+            break
+    if start is None:
+        for i, line in enumerate(lines):
+            if _is_coef_header_line(line):
+                start = i
+                break
+    if start is None:
+        return -1
+    last = -1
+    seen_table = False
+    for i in range(start, len(lines)):
+        stripped = lines[i].strip()
+        if stripped.startswith("|") and stripped.count("|") >= 2:
+            seen_table = True
+            last = i
+            continue
+        if seen_table:
+            break
+    return last
+
+
 def splice_missing_table_rows(
     content: str, spec: Dict[str, Any], estimate: Dict[str, Any]
 ) -> str:
-    """Insert omitted/real rows for formula vars the markdown table dropped."""
+    """Insert omitted/real rows after the main-results table only."""
     if not content:
         return content
     formula = estimate.get("formula") or spec.get("formula") or spec.get("feols_formula")
@@ -187,13 +296,9 @@ def splice_missing_table_rows(
     if not extras:
         return content
     lines = content.splitlines()
-    last_table = -1
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("|") and stripped.count("|") >= 2:
-            last_table = i
-    if last_table >= 0:
-        lines[last_table + 1 : last_table + 1] = extras
+    insert_at = _main_results_table_end(lines)
+    if insert_at >= 0:
+        lines[insert_at + 1 : insert_at + 1] = extras
         return "\n".join(lines)
     header = [
         "| 变量 | 系数 | SE | p |",
@@ -318,9 +423,8 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
-    treatment_row = next(
-        (row for row in table_rows if row.startswith(f"| {treatment} |")),
-        f"| {treatment} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |",
+    treatment_row, table_rows = _prefer_treatment_row(
+        str(treatment), coef, se, p, table_rows
     )
     payload = {
         "status": "ok",
@@ -354,9 +458,8 @@ def _estimate_iv(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
-    treatment_row = next(
-        (row for row in table_rows if row.startswith(f"| {treatment} |")),
-        f"| {treatment} | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |",
+    treatment_row, table_rows = _prefer_treatment_row(
+        str(treatment), coef, se, p, table_rows
     )
     payload = {
         "status": "ok",

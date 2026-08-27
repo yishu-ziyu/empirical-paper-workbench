@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
+import { CLEAN_STEPS, PAPER_NODES } from '../lib/paperPath'
 
 function renderWithI18n(ui: React.ReactElement) {
   return render(ui, { wrapper: I18nProvider })
@@ -57,14 +58,16 @@ describe('App 三栏布局', () => {
     localStorage.setItem('econpaper_session_id', 'test-sess')
     renderWithI18n(<App />)
     expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
-    expect(screen.getByTestId('paper-path-upload_data')).toBeInTheDocument()
-    expect(screen.getByTestId('paper-path-clean_data')).toBeInTheDocument()
+    const rightPane = screen.getByTestId('agent-panel')
+    expect(rightPane).toContainElement(screen.getByTestId('paper-path'))
+    expect(rightPane.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0/)
+    for (const id of PAPER_NODES) {
+      expect(rightPane).toContainElement(screen.getByTestId(`paper-path-${id}`))
+    }
     expect(screen.getByTestId('paper-path-set_direction')).toHaveAttribute('data-status', 'paused')
-    expect(screen.getByTestId('paper-path-generate_chapter')).toBeInTheDocument()
-    expect(screen.getByTestId('paper-path-translate_code')).toBeInTheDocument()
-    expect(screen.getByTestId('paper-path-export_docx')).toBeInTheDocument()
-    expect(screen.getByTestId('clean-step-profiling')).toBeInTheDocument()
-    expect(screen.getByTestId('clean-step-audit')).toBeInTheDocument()
+    for (const id of CLEAN_STEPS) {
+      expect(rightPane).toContainElement(screen.getByTestId(`clean-step-${id}`))
+    }
     expect(screen.getByTestId('workbench-tab-paper')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-tab-data')).toBeInTheDocument()
     expect(screen.getByTestId('workbench-tab-format')).toBeInTheDocument()

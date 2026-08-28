@@ -14,12 +14,16 @@ r"""T-10 RED tests for export_docx 节点 + LaTeX 模板.
 from __future__ import annotations
 
 import re
+from pathlib import Path
+import zipfile
 
 import pytest
 
 from nodes.export_docx import (
     _escape_tex_text,
     _extract_sections,
+    _strip_tex_markup,
+    convert_docx,
     export_docx,
     markdown_to_latex,
     normalize_template,
@@ -572,3 +576,63 @@ def test_export_docx_takeable_paper_no_markdown_or_untitled(tmp_path, monkeypatc
     assert "未估计" not in methods
     assert "\\begin{tabular}" not in intro
     assert "\\begin{tabular}" not in methods
+
+
+def test_convert_docx_without_pandoc_writes_ooxml(tmp_path, monkeypatch):
+    """pandoc 缺失时仍写出可下载的 .docx（OOXML zip），含章节正文。"""
+    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    tex = (
+        "\\title{Castle paper}\n"
+        "\\begin{document}\n"
+        "\\section{数据描述}\n"
+        "l_homicide 均值见下表\n"
+        "\\end{document}\n"
+    )
+    path = convert_docx(tex, str(tmp_path))
+    assert path
+    out = Path(path)
+    assert out.exists()
+    assert out.read_bytes()[:2] == b"PK"
+    with zipfile.ZipFile(out) as zf:
+        text = zf.read("word/document.xml").decode("utf-8")
+    assert "Castle paper" in text
+    assert "数据描述" in text
+    assert "l_homicide" in text
+
+
+def test_strip_tex_markup_keeps_textbf_contents():
+    assert _strip_tex_markup(r"\textbf{结果} 显著") == "结果 显著"
+    assert "结果" in _strip_tex_markup(r"本节给出\textbf{结果}。")
+
+
+def test_convert_docx_includes_abstract_and_textbf(tmp_path, monkeypatch):
+    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    tex = (
+        "\\title{Castle paper}\n"
+        "\\begin{document}\n"
+        "\\begin{abstract}\n"
+        "摘要正文 castle\n"
+        "\\end{abstract}\n"
+        "\\section{结果}\n"
+        "\\textbf{结果} 显著\n"
+        "\\end{document}\n"
+    )
+    path = convert_docx(tex, str(tmp_path))
+    assert path
+    with zipfile.ZipFile(path) as zf:
+        text = zf.read("word/document.xml").decode("utf-8")
+    assert "摘要正文 castle" in text
+    assert "结果" in text
+    assert "显著" in text
+
+
+def test_export_docx_ooxml_fallback_is_degraded(tmp_path, monkeypatch):
+    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    state = _full_state(workspace=str(tmp_path), abstract="摘要可见")
+    result = export_docx(state)
+    assert result["docx_path"]
+    assert result["degraded"] is True
+    with zipfile.ZipFile(result["docx_path"]) as zf:
+        text = zf.read("word/document.xml").decode("utf-8")
+    assert "摘要可见" in text

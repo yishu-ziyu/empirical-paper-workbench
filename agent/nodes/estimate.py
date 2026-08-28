@@ -10,11 +10,14 @@ IV 主表必须是 ``statspai.ivreg``，禁止用 ``iv_diag`` 当主表。
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from design.spec import norm_method
 from protocols import EstimateOutput
 from state import EconPaperState
+
+_FE_DROPPED_LINE = "FE dropped; pooled OLS"
 
 
 def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
@@ -60,21 +63,36 @@ def effect_from_fit(
     return coef, se, p, n
 
 
-def _fit(formula: str, df: Any, cluster: Optional[str]) -> Any:
+def _fit_statsmodels(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+    """Pooled OLS. Formula is the spec actually passed to statsmodels, not pyfixest FE."""
+    import statsmodels.formula.api as smf
+
+    sm_formula = str(formula).split("|", 1)[0].strip()
+    fit_kwargs: Dict[str, Any] = {}
+    if cluster is not None:
+        fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
+    return smf.ols(sm_formula, data=df).fit(**fit_kwargs), "statsmodels.ols", sm_formula
+
+
+def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+    """Fit feols when StatsPAI is installed.
+
+    Statsmodels fallback is missing-package only (``ImportError``). Any other
+    feols failure propagates so the caller can keep ``status=error``.
+    Returns ``(fit, estimator, formula_used)``.
+    """
     try:
         import statspai
+    except ImportError:
+        return _fit_statsmodels(formula, df, cluster)
 
-        kwargs: Dict[str, Any] = {"data": df}
-        if cluster:
-            kwargs["vcov"] = {"CRV1": cluster}
-        return statspai.feols(formula, **kwargs)
-    except Exception:
-        import statsmodels.formula.api as smf
-
-        fit_kwargs: Dict[str, Any] = {}
-        if cluster is not None:
-            fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
-        return smf.ols(formula, data=df).fit(**fit_kwargs)
+    kwargs: Dict[str, Any] = {"data": df}
+    if cluster:
+        kwargs["vcov"] = {"CRV1": cluster}
+    try:
+        return statspai.feols(formula, **kwargs), "statspai.feols", str(formula)
+    except ImportError:
+        return _fit_statsmodels(formula, df, cluster)
 
 
 def _fmt(x: Optional[float]) -> str:
@@ -352,6 +370,8 @@ def _ok_table(payload: Dict[str, Any]) -> str:
         "",
         f"估计器：`{payload['estimator']}`",
     ]
+    if payload.get("status") == "degraded":
+        lines.append(_FE_DROPPED_LINE)
     if formula:
         lines.append(f"公式：`{formula}`")
     if payload.get("n") is not None:
@@ -366,6 +386,32 @@ def _ok_table(payload: Dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines)
+
+
+def _wanted_fixed_effects(spec: Dict[str, Any], formula: str) -> bool:
+    if norm_method(spec.get("method")) == "did":
+        return True
+    return "|" in str(formula)
+
+
+def _fe_dropped_degradation() -> dict:
+    return {
+        "node": "estimate",
+        "reason": "fe_dropped_pooled_ols",
+        "fallback": "statsmodels.ols",
+        "visible": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _merge_degradations(state: EconPaperState, result: EstimateOutput) -> EstimateOutput:
+    extra = result.get("degradations")
+    if not extra:
+        return result
+    return {
+        **result,
+        "degradations": list(state.get("degradations") or []) + list(extra),
+    }
 
 
 def _method_of(state: EconPaperState, spec: Dict[str, Any]) -> Optional[str]:
@@ -436,19 +482,21 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
-    fitted = _fit(str(formula), df, cluster)
+    requested = str(formula)
+    fitted, estimator, fit_formula = _fit(requested, df, cluster)
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
     treatment_row, table_rows = _prefer_treatment_row(
         str(treatment), coef, se, p, table_rows
     )
+    dropped_fe = _wanted_fixed_effects(spec, requested) and estimator == "statsmodels.ols"
     payload = {
-        "status": "ok",
+        "status": "degraded" if dropped_fe else "ok",
         "produced_by": "estimate",
-        "estimator": "statspai.feols",
+        "estimator": estimator,
         "method": str(spec.get("method") or "ols"),
-        "formula": formula,
+        "formula": fit_formula,
         "treatment": treatment,
         "treatment_row": treatment_row,
         "table_rows": table_rows,
@@ -458,7 +506,10 @@ def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput
         "p": p,
         "cluster": cluster,
     }
-    return {"results": _ok_table(payload), "estimate": payload}
+    out: EstimateOutput = {"results": _ok_table(payload), "estimate": payload}
+    if dropped_fe:
+        out["degradations"] = [_fe_dropped_degradation()]
+    return out
 
 
 def _estimate_iv(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
@@ -626,7 +677,15 @@ def _estimate_did(df: Any, spec: Dict[str, Any], state: EconPaperState) -> Estim
         out = _estimate_ols(df, spec, str(formula))
     except Exception as exc:
         return _error(f"主估计失败：{exc}", error=str(exc), method="did", formula=str(formula))
-    out["estimate"]["method"] = "did"
+    est = out["estimate"]
+    # Requested DiD; do not pair method=did with status=ok on pooled OLS.
+    if est.get("estimator") == "statsmodels.ols":
+        est["status"] = "degraded"
+        if _FE_DROPPED_LINE not in (out.get("results") or ""):
+            out["results"] = _ok_table(est)
+        if not out.get("degradations"):
+            out["degradations"] = [_fe_dropped_degradation()]
+    est["method"] = "did"
     return out
 
 
@@ -706,14 +765,15 @@ def estimate(state: EconPaperState) -> EstimateOutput:
 
     try:
         if method == "iv":
-            return _estimate_iv(df, spec, str(formula))
-        if method == "rd":
-            return _estimate_rd(df, spec)
-        if method == "scm":
-            return _estimate_scm(df, spec)
-        if method == "did":
-            return _estimate_did(df, spec, state)
-        return _estimate_ols(df, spec, str(formula))
+            result = _estimate_iv(df, spec, str(formula))
+        elif method == "rd":
+            result = _estimate_rd(df, spec)
+        elif method == "scm":
+            result = _estimate_scm(df, spec)
+        elif method == "did":
+            result = _estimate_did(df, spec, state)
+        else:
+            result = _estimate_ols(df, spec, str(formula))
     except Exception as exc:
         return _error(
             f"主估计失败：{exc}",
@@ -721,6 +781,7 @@ def estimate(state: EconPaperState) -> EstimateOutput:
             method=method,
             formula=str(formula) if formula else None,
         )
+    return _merge_degradations(state, result)
 
 
 __all__ = ["estimate", "effect_from_fit"]

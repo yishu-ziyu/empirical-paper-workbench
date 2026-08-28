@@ -961,6 +961,8 @@ export interface components {
              * @default 0
              */
             chapter_index: number;
+            /** User refine instruction; empty string still regenerates. */
+            instruction?: string | null;
         };
         /**
          * RegenerateResponse

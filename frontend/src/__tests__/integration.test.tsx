@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
+import { API_BASE } from '../lib/apiBase'
 
 function renderWithI18n(ui: React.ReactElement) {
   return render(ui, { wrapper: I18nProvider })
@@ -30,8 +31,6 @@ class MockWebSocket {
     this.readyState = 3
   }
 }
-
-const API_BASE = 'http://localhost:8000'
 
 beforeEach(() => {
   MockWebSocket.instances = []

@@ -115,4 +115,28 @@ describe('DirectionForm 研究方向输入', () => {
     expect(screen.getByLabelText(/模板/i)).toHaveValue('undergrad')
     expect(screen.getByTestId('data-columns')).toHaveTextContent('income')
   })
+
+  test('DiD extras hydrate from initial so 要求修改 does not wipe them', () => {
+    renderWithI18n(
+      <DirectionForm
+        onSubmit={() => {}}
+        initial={{
+          question: '政策',
+          dv: 'oop',
+          iv: 'treat',
+          controls: 'age, income',
+          method: 'DiD',
+          template: 'undergrad',
+          time_col: 'year',
+          id_col: 'id',
+          first_treat_col: 'g',
+        }}
+      />,
+    )
+    expect(screen.getByLabelText(/控制变量/i)).toHaveValue('age, income')
+    expect(screen.getByTestId('method-selector')).toHaveValue('DiD')
+    expect(screen.getByLabelText(/时间列/i)).toHaveValue('year')
+    expect(screen.getByLabelText(/个体列/i)).toHaveValue('id')
+    expect(screen.getByLabelText(/队列列/i)).toHaveValue('g')
+  })
 })

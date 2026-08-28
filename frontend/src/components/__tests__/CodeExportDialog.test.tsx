@@ -24,6 +24,7 @@ const baseProps: CodeExportDialogProps = {
 
 describe('CodeExportDialog 代码导出对话框', () => {
   beforeEach(() => {
+    localStorage.setItem('econpaper_access_token', 'test-token-for-auth')
     // Mock fetch for download triggering
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -93,7 +94,10 @@ describe('CodeExportDialog 代码导出对话框', () => {
     await user.click(buttons[0]) // Python
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('format=py'),
-      expect.any(Object),
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token-for-auth' }),
+      }),
     )
   })
 

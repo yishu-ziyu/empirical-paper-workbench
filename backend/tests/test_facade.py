@@ -522,6 +522,26 @@ def test_regenerate_chapter_sets_index_and_calls_node(monkeypatch):
     facade.drop_session(sid)
 
 
+def test_regenerate_chapter_writes_instruction(monkeypatch):
+    """Optional instruction is stored on revision_suggestions[index]."""
+    captured = {}
+
+    def fake_generate_chapter(state):
+        captured["revision_suggestions"] = state.get("revision_suggestions")
+        captured["current_chapter_index"] = state.get("current_chapter_index")
+        return {"body_chapters": [{"content": "new"}]}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+
+    sid = "test-regen-instruction"
+    facade.seed_state(sid, {})
+    facade.regenerate_chapter(sid, 0, instruction="写短一点")
+    assert captured["current_chapter_index"] == 0
+    assert captured["revision_suggestions"][0] == "写短一点"
+    facade.drop_session(sid)
+
+
 def test_edit_chapter_instruction_sets_revision_and_regenerates(monkeypatch):
     """edit_chapter(instruction) writes revision_suggestions then generate_chapter."""
     captured = {}

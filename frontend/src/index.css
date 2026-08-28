@@ -23,6 +23,10 @@ body,
   height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -32,12 +36,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Selection highlight ── */
 ::selection {
   background-color: rgba(47, 107, 79, 0.22);
 }
-
-/* ── Keyframe animations ── */
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -64,8 +65,6 @@ body {
   50%  { opacity: 1; }
   100% { transform: scaleX(1); opacity: 0.6; }
 }
-
-/* ── Utility animation classes ── */
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
@@ -98,4 +97,40 @@ body {
 
 .animate-listen {
   animation: listen-ring 1.6s ease-out infinite;
+}
+
+@layer components {
+  /* DESIGN lock: 左栏章节 / 中栏纸 / 右栏步骤. Never stack; never wait on lg. */
+  .desk-columns {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
+    min-width: 760px;
+    min-height: 0;
+  }
+
+  .desk-preview-columns {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr) 240px;
+    min-height: 420px;
+  }
+
+  .journal-page {
+    @apply bg-white px-8 py-10 font-serif text-[16.5px] leading-[1.9] text-ink sm:px-14 sm:py-14;
+  }
+
+  .composer-shell {
+    @apply rounded-[24px] border border-black/[0.08] bg-white shadow-[0_12px_40px_rgba(24,21,21,0.07)];
+  }
+
+  .thread-card {
+    @apply rounded-[20px] border border-black/[0.06] bg-white shadow-[0_8px_28px_rgba(24,21,21,0.045)];
+  }
+
+  .source-tile {
+    @apply flex w-[6.75rem] flex-col items-center rounded-[18px] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(24,21,21,0.08)];
+  }
+
+  .code-card {
+    @apply overflow-x-auto rounded-[20px] bg-[#1c1b1a] px-4 py-3 font-mono text-[12px] leading-6 text-[#e8e4dc];
+  }
 }

@@ -5,9 +5,8 @@
 // - 数据源头见 backend/run_store.py；每次导出/审批/评审都会留痕
 
 import { useCallback, useEffect, useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
-
-const API_BASE = 'http://localhost:8000'
 
 interface TraceEvent {
   ts: string

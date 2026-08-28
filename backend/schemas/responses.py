@@ -188,6 +188,13 @@ class VersionsResponse(BaseModel):
     versions: List[ChapterVersionItem] = Field(default_factory=list)
 
 
+class TranslateCodeResponse(BaseModel):
+    """POST /sessions/{id}/translate-code 返回体。"""
+
+    ok: bool = True
+    code_translations: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # progress.py
 # ---------------------------------------------------------------------------

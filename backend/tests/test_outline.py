@@ -12,6 +12,62 @@ import pytest
 from facade import facade
 
 
+def test_post_direction_did_missing_statspai_returns_outline(client, tmp_path, monkeypatch):
+    """Scout fail: DiD POST /direction must not 500 when `import statspai` raises."""
+    import sys
+
+    csv = tmp_path / "panel.csv"
+    csv.write_text(
+        "y,treat,year,id\n"
+        "1.0,0,2000,1\n"
+        "1.2,0,2001,1\n"
+        "2.0,1,2000,2\n"
+        "2.4,1,2001,2\n"
+        "1.1,0,2000,3\n"
+        "1.3,0,2001,3\n"
+        "2.1,1,2000,4\n"
+        "2.5,1,2001,4\n",
+        encoding="utf-8",
+    )
+    real_import = __import__
+
+    def blocked(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "statspai" or (isinstance(name, str) and name.startswith("statspai.")):
+            raise ModuleNotFoundError("No module named 'statspai'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", blocked)
+    monkeypatch.delitem(sys.modules, "statspai", raising=False)
+
+    sid = "test-direction-did-no-statspai"
+    facade.seed_state(sid, {"csv_path": str(csv)})
+    try:
+        resp = client.post(
+            f"/sessions/{sid}/direction",
+            json={
+                "question": "treat on y",
+                "dv": "y",
+                "iv": "treat",
+                "controls": [],
+                "method": "did",
+                "template": "cn_journal",
+                "time_col": "year",
+                "id_col": "id",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["identification_failed"] is False
+        assert len(data["outline"]) == 6
+        assert any(
+            item.get("reason") == "statspai_unavailable"
+            for item in (data.get("degradations") or [])
+        )
+        assert data.get("estimate", {}).get("produced_by") == "estimate"
+    finally:
+        facade.drop_session(sid)
+
+
 def test_post_direction_runs_identification_without_blocking_ols(client):
     """坐着写路径：提交方向会跑识别；OLS 无套餐不截断，仍出大纲。"""
     sid = "test-direction-ident"

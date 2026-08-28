@@ -49,6 +49,14 @@ export type DirectionFormInitial = {
   controls?: string
   method?: string
   template?: string
+  instrument?: string
+  time_col?: string
+  id_col?: string
+  first_treat_col?: string
+  running_var?: string
+  cutoff?: number
+  unit_col?: string
+  treatment_time?: string
 }
 
 export interface DirectionFormProps {
@@ -71,14 +79,14 @@ export default function DirectionForm({
   const [controls, setControls] = useState(initial?.controls ?? '')
   const [method, setMethod] = useState(initial?.method ?? '')
   const [template, setTemplate] = useState(initial?.template ?? 'undergrad')
-  const [instrument, setInstrument] = useState('')
-  const [timeCol, setTimeCol] = useState('')
-  const [idCol, setIdCol] = useState('')
-  const [firstTreatCol, setFirstTreatCol] = useState('')
-  const [runningVar, setRunningVar] = useState('')
-  const [cutoff, setCutoff] = useState('')
-  const [unitCol, setUnitCol] = useState('')
-  const [treatmentTime, setTreatmentTime] = useState('')
+  const [instrument, setInstrument] = useState(initial?.instrument ?? '')
+  const [timeCol, setTimeCol] = useState(initial?.time_col ?? '')
+  const [idCol, setIdCol] = useState(initial?.id_col ?? '')
+  const [firstTreatCol, setFirstTreatCol] = useState(initial?.first_treat_col ?? '')
+  const [runningVar, setRunningVar] = useState(initial?.running_var ?? '')
+  const [cutoff, setCutoff] = useState(initial?.cutoff != null ? String(initial.cutoff) : '')
+  const [unitCol, setUnitCol] = useState(initial?.unit_col ?? '')
+  const [treatmentTime, setTreatmentTime] = useState(initial?.treatment_time ?? '')
   const kind = methodKind(method)
   const canSubmit = Boolean(question.trim() && dv.trim() && iv.trim() && method)
 
@@ -118,7 +126,7 @@ export default function DirectionForm({
     <form
       data-testid="direction-form"
       onSubmit={handleSubmit}
-      className="space-y-3"
+      className="space-y-4"
     >
       {columns.length > 0 ? (
         <p data-testid="data-columns" className="text-xs leading-5 text-muted">
@@ -132,7 +140,7 @@ export default function DirectionForm({
           aria-label={t('direction.question')}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          className="mt-1 w-full rounded border border-border p-2"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
@@ -141,7 +149,7 @@ export default function DirectionForm({
           aria-label={t('direction.dv')}
           value={dv}
           onChange={(e) => setDv(e.target.value)}
-          className="mt-1 w-full rounded border border-border p-2"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
@@ -150,7 +158,7 @@ export default function DirectionForm({
           aria-label={t('direction.iv')}
           value={iv}
           onChange={(e) => setIv(e.target.value)}
-          className="mt-1 w-full rounded border border-border p-2"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
@@ -159,7 +167,7 @@ export default function DirectionForm({
           aria-label={t('direction.controls')}
           value={controls}
           onChange={(e) => setControls(e.target.value)}
-          className="mt-1 w-full rounded border border-border p-2"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <div className="block">
@@ -173,7 +181,7 @@ export default function DirectionForm({
             aria-label={t('direction.instrument')}
             value={instrument}
             onChange={(e) => setInstrument(e.target.value)}
-            className="mt-1 w-full rounded border border-border p-2"
+            className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
           />
         </label>
       )}
@@ -185,7 +193,7 @@ export default function DirectionForm({
               aria-label={t('direction.timeCol')}
               value={timeCol}
               onChange={(e) => setTimeCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -194,7 +202,7 @@ export default function DirectionForm({
               aria-label={t('direction.idCol')}
               value={idCol}
               onChange={(e) => setIdCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -203,7 +211,7 @@ export default function DirectionForm({
               aria-label={t('direction.firstTreatCol')}
               value={firstTreatCol}
               onChange={(e) => setFirstTreatCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
@@ -216,7 +224,7 @@ export default function DirectionForm({
               aria-label={t('direction.runningVar')}
               value={runningVar}
               onChange={(e) => setRunningVar(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -225,7 +233,7 @@ export default function DirectionForm({
               aria-label={t('direction.cutoff')}
               value={cutoff}
               onChange={(e) => setCutoff(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
@@ -238,7 +246,7 @@ export default function DirectionForm({
               aria-label={t('direction.unitCol')}
               value={unitCol}
               onChange={(e) => setUnitCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -247,7 +255,7 @@ export default function DirectionForm({
               aria-label={t('direction.treatmentTime')}
               value={treatmentTime}
               onChange={(e) => setTreatmentTime(e.target.value)}
-              className="mt-1 w-full rounded border border-border p-2"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
@@ -258,7 +266,7 @@ export default function DirectionForm({
           aria-label={t('direction.template')}
           value={template}
           onChange={(e) => setTemplate(e.target.value)}
-          className="mt-1 w-full rounded border border-border p-2"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         >
           {TEMPLATES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -270,7 +278,7 @@ export default function DirectionForm({
       <button
         type="submit"
         disabled={!canSubmit}
-        className="rounded bg-accent px-3 py-1 text-sm text-white disabled:opacity-40"
+        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
       >
         {t('direction.submit')}
       </button>

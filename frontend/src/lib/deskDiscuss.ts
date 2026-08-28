@@ -1,3 +1,5 @@
+import { API_BASE } from './apiBase'
+
 export type DeskOption = {
   id: string
   label: string
@@ -21,8 +23,6 @@ export type DeskCard = {
   ready: boolean
   source: 'llm' | 'heuristic'
 }
-
-const API_BASE = 'http://localhost:8000'
 
 export async function transcribeDesk(blob: Blob): Promise<string> {
   const body = new FormData()

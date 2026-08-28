@@ -29,7 +29,7 @@ export default function MethodSelector({
         aria-label={t('direction.method')}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        className="mt-1 w-full rounded border border-border p-2"
+        className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
       >
         <option value="">{t('method.select')}</option>
         {ENGINE_METHODS.map((m) => (

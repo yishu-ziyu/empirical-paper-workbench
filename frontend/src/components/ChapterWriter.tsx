@@ -2,7 +2,7 @@
 // - 中栏用 CodeMirror 6 渲染流式 markdown（chunks 数组拼接）
 // - 章节类型 badge（6 色：intro=蓝 / lit_review=紫 / data_desc=绿 /
 //   methods=橙 / results=红 / conclusion=灰）
-// - status === 'generated' 显示 4 按钮：重新生成 / 回滚 / {t('chapter.edit')} / {t('chapter.approve')}
+// - status === 'generated' | 'edited' 显示 4 按钮：重新生成 / 回滚 / {t('chapter.edit')} / {t('chapter.approve')}
 // - status === 'streaming' 显示加载提示，不显示按钮
 // - 回滚下拉：点"回滚"显示版本历史（VersionHistory 组件），选择版本 → onRollback
 // - {t('chapter.edit')}模式：点"{t('chapter.edit')}" → CodeMirror 可{t('chapter.edit')} + 按钮变"{t('chapter.save')}"；点"{t('chapter.save')}" → onSaveEdit
@@ -48,8 +48,8 @@ export interface ChapterWriterProps {
   versions?: string[]
   /** T-08c: 选择版本回滚回调（集成阶段调 POST /sessions/{id}/rollback） */
   onRollback?: (versionIndex: number) => void
-  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter） */
-  onSaveEdit?: (content: string) => void
+  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter）。失败请 reject，组件会留在编辑态保住草稿。 */
+  onSaveEdit?: (content: string) => void | Promise<void>
 }
 
 const BADGE_CLASS = 'bg-paper text-muted border border-border'
@@ -86,7 +86,7 @@ export default function ChapterWriter({
   }, [chunks, chapter.content])
 
   const isStreaming = chapter.status === 'streaming'
-  const isGenerated = chapter.status === 'generated'
+  const showToolbar = chapter.status === 'generated' || chapter.status === 'edited'
 
   // {t('chapter.edit')}模式显示的内容：{t('chapter.edit')}中用 editedContent，否则用 content
   const displayContent = isEditing ? editedContent : content
@@ -97,10 +97,14 @@ export default function ChapterWriter({
     setIsEditing(true)
   }
 
-  // {t('chapter.save')}{t('chapter.edit')}
-  const handleSaveEdit = () => {
-    setIsEditing(false)
-    onSaveEdit?.(editedContent)
+  // {t('chapter.save')}{t('chapter.edit')}：POST 成功才退出编辑，失败保住草稿。
+  const handleSaveEdit = async () => {
+    try {
+      await onSaveEdit?.(editedContent)
+      setIsEditing(false)
+    } catch {
+      // keep isEditing + editedContent
+    }
   }
 
   // 选择版本回滚
@@ -157,7 +161,7 @@ export default function ChapterWriter({
       )}
 
       {/* 完成后审批按钮（4 按钮） */}
-      {isGenerated && (
+      {showToolbar && (
         <div className="space-y-2">
           <div className="flex gap-2">
             <button

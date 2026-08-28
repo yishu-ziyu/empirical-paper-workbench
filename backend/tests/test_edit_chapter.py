@@ -129,6 +129,35 @@ def test_edit_chapter_instruction_saved_on_get_session_and_doc_export(
     facade.drop_session(sid)
 
 
+def test_edit_chapter_instruction_can_write_new_review(monkeypatch, client):
+    """instruction 路径走 generate_chapter，允许写入新评审。"""
+    sid = _seed_session(
+        {
+            **_state_one_chapter(),
+            "review_scores": [0.95],
+            "review_feedback": ["旧评审"],
+        }
+    )
+
+    def mock_review(state):
+        return {"review_scores": [0.81], "review_feedback": ["改写后新评审"]}
+
+    monkeypatch.setattr(
+        "facade.generate_chapter_node", _mock_generate_with("改短后的引言。")
+    )
+    monkeypatch.setattr("facade.review_chapter_node", mock_review)
+
+    resp = client.post(
+        f"/sessions/{sid}/edit-chapter",
+        json={"chapter_index": 0, "instruction": "把引言第一段写短一点"},
+    )
+    assert resp.status_code == 200, resp.text
+    state = facade.get_state(sid)
+    assert state["review_scores"][0] == 0.81
+    assert state["review_feedback"][0] == "改写后新评审"
+    facade.drop_session(sid)
+
+
 def test_edit_chapter_content_saved_on_get_session_and_doc_export(
     monkeypatch, client
 ):
@@ -162,6 +191,98 @@ def test_edit_chapter_content_saved_on_get_session_and_doc_export(
     )
     assert tex.status_code == 200, tex.text
     assert "教育回报是课设题目。" in tex.text
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_content_clears_review_so_approve_cannot_pass(client):
+    """save-edit 清掉该章评审；approve 不得凭编辑前分数通过。"""
+    sid = _seed_session(
+        {
+            **_state_one_chapter(),
+            "review_scores": [0.95],
+            "review_feedback": ["编辑前已过审。"],
+            "review_chapter_index": 0,
+        }
+    )
+    edited = "## 研究背景\n\n用户改过的引言。"
+    resp = client.post(
+        f"/sessions/{sid}/edit-chapter",
+        json={"chapter_index": 0, "content": edited},
+    )
+    assert resp.status_code == 200, resp.text
+
+    state = facade.get_state(sid)
+    scores = list(state.get("review_scores") or [])
+    feedback = list(state.get("review_feedback") or [])
+    assert scores, "review_scores 应对齐章节，清空该槽而非整表删除"
+    assert scores[0] in (None, "")
+    assert feedback[0] in (None, "")
+
+    review = client.get(f"/sessions/{sid}/review")
+    assert review.status_code == 200, review.text
+    assert review.json()["auto_decision"] == "fail"
+    assert review.json()["score"] in (0, 0.0)
+
+    blocked = client.post(f"/sessions/{sid}/approve-chapter", json={})
+    assert blocked.status_code == 409, blocked.text
+    detail = blocked.json()["detail"]
+    assert detail["review_gate"] is True
+    assert detail["needs_force"] is True
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_content_preserves_other_chapter_review(client):
+    """只清被编辑章的评审槽，邻章分数不动。"""
+    sid = _seed_session(
+        {
+            "body_chapters": [
+                {
+                    "type": "intro",
+                    "title": "引言",
+                    "content": "引言原文。",
+                    "versions": ["引言原文。"],
+                    "status": "generated",
+                    "chapter_index": 0,
+                },
+                {
+                    "type": "methods",
+                    "title": "方法",
+                    "content": "方法原文。",
+                    "versions": ["方法原文。"],
+                    "status": "generated",
+                    "chapter_index": 1,
+                },
+            ],
+            "outline": [
+                {"type": "intro", "title": "引言"},
+                {"type": "methods", "title": "方法"},
+            ],
+            "current_chapter_index": 2,
+            "review_scores": [0.95, 0.91],
+            "review_feedback": ["引言过审。", "方法过审。"],
+        }
+    )
+    resp = client.post(
+        f"/sessions/{sid}/edit-chapter",
+        json={"chapter_index": 0, "content": "改过的引言。"},
+    )
+    assert resp.status_code == 200, resp.text
+    state = facade.get_state(sid)
+    assert list(state["review_scores"])[0] in (None, "")
+    assert list(state["review_scores"])[1] == 0.91
+    assert list(state["review_feedback"])[1] == "方法过审。"
+
+    methods_ok = client.post(
+        f"/sessions/{sid}/approve-chapter",
+        json={"chapter_type": "methods"},
+    )
+    assert methods_ok.status_code == 200, methods_ok.text
+
+    intro_blocked = client.post(
+        f"/sessions/{sid}/approve-chapter",
+        json={"chapter_type": "intro"},
+    )
+    assert intro_blocked.status_code == 409, intro_blocked.text
     facade.drop_session(sid)
 
 

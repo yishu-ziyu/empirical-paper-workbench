@@ -506,16 +506,18 @@ def test_regenerate_chapter_sets_index_and_calls_node(monkeypatch):
 
     def fake_generate_chapter(state):
         captured["current_chapter_index"] = state.get("current_chapter_index")
+        captured["current_chapter"] = state.get("current_chapter")
         return {"body_chapters": [{"content": "new"}]}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
     monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-regen"
-    facade.seed_state(sid, {})
+    facade.seed_state(sid, {"current_chapter": {"type": "methods"}})
     result = facade.regenerate_chapter(sid, 2)
 
     assert captured["current_chapter_index"] == 2
+    assert captured["current_chapter"] is None
     assert result["body_chapters"] == [{"content": "new"}]
     facade.drop_session(sid)
 

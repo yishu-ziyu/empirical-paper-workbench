@@ -94,6 +94,11 @@ except Exception:  # pragma: no cover
     export_docx_node = None
 
 try:
+    from nodes.translate_code import translate_code as translate_code_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    translate_code_node = None
+
+try:
     from cleaning.transform import TransformStep as TransformStepCls  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
     TransformStepCls = None
@@ -511,6 +516,21 @@ class AgentFacade:
             "star_rating": result.get("star_rating", 0),
             "identification_failed": result.get("identification_failed") is True,
         }
+
+    def run_translate_code(self, session_id: str) -> dict:
+        """Run translate_code and persist code_translations for /code-export."""
+        if translate_code_node is None:
+            raise HTTPException(
+                status_code=503,
+                detail="translate_code node not available",
+            )
+        state = self.get_state(session_id)
+        with self._tracked(session_id, "translate_code", "translate_code") as t:
+            result = translate_code_node(state)
+            state = {**state, **result}
+            self.save_state(session_id, state)
+            t.set_detail(n=len(result.get("code_translations") or []))
+        return result
 
     def run_robustness_check(self, session_id: str) -> dict:
         """Run full robustness battery after main estimation.

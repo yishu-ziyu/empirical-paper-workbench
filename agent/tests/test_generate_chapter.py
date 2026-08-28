@@ -114,6 +114,59 @@ def test_generate_chapter_unknown_type_raises(recorder):
         generate_chapter(state)
 
 
+def test_data_desc_appends_describe_table_from_csv(recorder, tmp_path):
+    """Hollow LLM prose still gets a real describe table from the session CSV."""
+    csv_path = tmp_path / "castle.csv"
+    csv_path.write_text(
+        "l_homicide,post,sid,year\n"
+        "1.2,0,1,1980\n"
+        "1.4,0,1,1981\n"
+        "2.1,1,2,1980\n"
+        "2.4,1,2,1981\n",
+        encoding="utf-8",
+    )
+    state = make_write_ready_state(
+        current_chapter_index=2,
+        csv_path=str(csv_path),
+        data_summary="",
+        eda_results="",
+    )
+    result = generate_chapter(state)
+    content = result["body_chapters"][2]["content"]
+    assert "l_homicide" in content
+    assert "post" in content
+    assert "表 1" in content
+    _, user = recorder.calls[0]["args"]
+    assert "l_homicide" in user
+    assert "4 行" in user
+    assert "表 1" in user
+
+
+def test_data_desc_csv_eda_overrides_hollow_placeholders(recorder, tmp_path):
+    """Uploaded CSV, not a leftover CHARLS/HTTP stub, fills the data_desc prompt."""
+    csv_path = tmp_path / "castle.csv"
+    csv_path.write_text(
+        "l_homicide,post,sid,year\n"
+        "1.2,0,1,1980\n"
+        "1.4,0,1,1981\n"
+        "2.1,1,2,1980\n"
+        "2.4,1,2,1981\n",
+        encoding="utf-8",
+    )
+    state = make_write_ready_state(
+        current_chapter_index=2,
+        csv_path=str(csv_path),
+        data_summary="CHARLS 5 列 1000 行",
+        eda_results="hollow",
+    )
+    generate_chapter(state)
+    _, user = recorder.calls[0]["args"]
+    assert "CHARLS" not in user
+    assert "hollow" not in user
+    assert "l_homicide" in user
+    assert "4 行" in user
+
+
 # ---------------------------------------------------------------------------
 # 6 种 chapter_type 都能跑通
 # ---------------------------------------------------------------------------
@@ -290,6 +343,25 @@ def test_results_appends_tool_table_when_estimate_ok(recorder):
     assert ch["versions"][0] == ch["content"]
     assert "| age |" in ch["content"]
     assert state["estimate"]["treatment_row"] in ch["content"]
+
+
+def test_results_appends_degraded_fe_dropped_line(recorder):
+    """Degraded pooled-OLS fallback still splices the table, including the FE line."""
+    ready = make_write_ready_state()
+    estimate = dict(ready["estimate"])
+    estimate["status"] = "degraded"
+    estimate["estimator"] = "statsmodels.ols"
+    table = "# 主结果\n\nFE dropped; pooled OLS\n\n| treat | 0.1 | 0.1 | 0.1 |"
+    state = make_write_ready_state(
+        current_chapter_index=0,
+        outline=[{"type": "results", "title": "结果"}],
+        estimate=estimate,
+        results=table,
+    )
+    result = generate_chapter(state)
+    content = result["body_chapters"][0]["content"]
+    assert "FE dropped; pooled OLS" in content
+    assert "| treat |" in content
 
 
 def test_results_skips_splice_when_estimate_not_ok(recorder):

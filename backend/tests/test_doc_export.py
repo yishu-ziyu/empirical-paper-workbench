@@ -146,6 +146,22 @@ def test_doc_export_docx_returns_file(doc_session, client, monkeypatch, tmp_path
     assert "wordprocessingml" in ctype or "octet-stream" in ctype or "docx" in ctype
 
 
+def test_doc_export_docx_works_without_pandoc(doc_session, client, monkeypatch, tmp_path):
+    """Live bar: GET docx returns a Word file even when pandoc is missing."""
+    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    state = facade.get_state(doc_session)
+    state["workspace"] = str(tmp_path)
+    facade.save_state(doc_session, state)
+    resp = client.get(
+        f"/sessions/{doc_session}/doc-export",
+        params={"format": "docx"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.content[:2] == b"PK"
+    ctype = resp.headers.get("content-type", "").lower()
+    assert "wordprocessingml" in ctype or "octet-stream" in ctype or "docx" in ctype
+
+
 def test_doc_export_docx_unavailable_returns_503(doc_session, client, monkeypatch):
     """format=docx，docx_path=None → 503。"""
     monkeypatch.setattr(

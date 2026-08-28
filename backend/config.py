@@ -12,6 +12,17 @@ from pathlib import Path
 
 _DEFAULT_JWT = "dev-secret-key-do-not-use-in-production"
 _PLACEHOLDER_JWT = "change-this-to-a-random-secret-in-production"
+_LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+
+def _cors_origin_regex() -> str | None:
+    """Localhost-any-port regex is DEBUG-only. Production needs an explicit env."""
+    raw = os.getenv("CORS_ORIGIN_REGEX")
+    if raw is not None:
+        return raw.strip() or None
+    if os.getenv("DEBUG", "false").lower() == "true":
+        return _LOCAL_ORIGIN_REGEX
+    return None
 
 
 class Settings:
@@ -25,9 +36,16 @@ class Settings:
     # --- CORS ---
     CORS_ORIGINS: list[str] = [
         origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:5174,http://127.0.0.1:5174",
+        ).split(",")
         if origin.strip()
     ]
+    # Same-origin /api covers Vite :5174. Do not default a credentials-friendly
+    # localhost-any-port regex when DEBUG=false.
+    CORS_ORIGIN_REGEX: str | None = _cors_origin_regex()
 
     # --- Uploads ---
     UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "./uploads"))

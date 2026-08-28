@@ -250,4 +250,53 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /编辑/ })).not.toBeInTheDocument()
   })
+
+  test('点"保存"把进入编辑时的章节序号传给 onSaveEdit', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn()
+    renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, chapter_index: 0 }}
+        chapterIndex={0}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    await user.click(screen.getByRole('button', { name: /保存/ }))
+    expect(onSaveEdit).toHaveBeenCalledWith(expect.any(String), 0)
+  })
+
+  test('切换章节时退出编辑模式，不把草稿带到新章', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn()
+    const { rerender } = renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, chapter_index: 0 }}
+        chapterIndex={0}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    rerender(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{
+          type: 'methods',
+          title: '方法',
+          status: 'generated',
+          content: '方法正文不该被引言草稿覆盖。',
+          chapter_index: 3,
+        }}
+        chapterIndex={3}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /保存/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('chapter-paper').textContent).toContain('方法正文不该被引言草稿覆盖')
+    expect(onSaveEdit).not.toHaveBeenCalled()
+  })
 })

@@ -565,13 +565,16 @@ function App() {
     : writtenChapters[writtenChapters.length - 1] ?? null
 
   const handleSaveEdit = useCallback(
-    async (content: string) => {
-      if (!sessionId || !writtenChapter) {
+    async (content: string, boundIndex?: number) => {
+      if (!sessionId) {
         const err = new Error('无法保存：章节未就绪')
         showGlobalError(err.message)
         throw err
       }
-      const chapterIndex = writtenChapter.chapter_index ?? currentChapterIndex
+      const chapterIndex =
+        typeof boundIndex === 'number' && Number.isFinite(boundIndex) && boundIndex >= 0
+          ? boundIndex
+          : writtenChapter?.chapter_index ?? currentChapterIndex
       if (typeof chapterIndex !== 'number' || !Number.isFinite(chapterIndex) || chapterIndex < 0) {
         const err = new Error('无法保存：章节序号未知')
         showGlobalError(err.message)
@@ -864,6 +867,7 @@ function App() {
             ) : writtenChapter?.content ? (
               <div className="mb-6">
                 <ChapterWriter
+                  key={`${writtenChapter.type}:${writtenChapter.chapter_index ?? currentChapterIndex}`}
                   chapter={writtenChapter}
                   sessionId={sessionId ?? undefined}
                   chapterIndex={writtenChapter.chapter_index ?? currentChapterIndex}

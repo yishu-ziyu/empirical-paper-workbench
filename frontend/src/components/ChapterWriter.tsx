@@ -16,7 +16,7 @@
 // ChapterResponse。status 枚举由后端 OpenAPI 定义（generated | approved |
 // edited | rolled_back），前端本地临时态再加 streaming / done。
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { useT } from '../lib/i18n'
 import { renderPaperMarkdown } from '../lib/paperMarkdown'
@@ -48,8 +48,8 @@ export interface ChapterWriterProps {
   versions?: string[]
   /** T-08c: 选择版本回滚回调（集成阶段调 POST /sessions/{id}/rollback） */
   onRollback?: (versionIndex: number) => void
-  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter）。失败请 reject，组件会留在编辑态保住草稿。 */
-  onSaveEdit?: (content: string) => void | Promise<void>
+  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter）。失败请 reject，组件会留在编辑态保住草稿。第二个参数是进入编辑时的章节序号，避免切章后写到新选中的章。 */
+  onSaveEdit?: (content: string, chapterIndex?: number) => void | Promise<void>
 }
 
 const BADGE_CLASS = 'bg-paper text-muted border border-border'
@@ -66,8 +66,8 @@ export default function ChapterWriter({
   versions,
   onRollback,
   onSaveEdit,
-  // sessionId, chapterIndex — 接口保留供集成阶段直接 fetch 使用，
-  // 当前组件走回调模式（onRollback / onSaveEdit），不在此解构以避免未使用告警。
+  chapterIndex,
+  // sessionId — 接口保留供集成阶段直接 fetch 使用，当前组件走回调模式。
 }: ChapterWriterProps) {
   const { t } = useT()
   // {t('chapter.edit')}模式状态
@@ -76,6 +76,15 @@ export default function ChapterWriter({
   const [editedContent, setEditedContent] = useState('')
   // 回滚下拉显示状态
   const [showVersions, setShowVersions] = useState(false)
+  const boundChapterIndexRef = useRef<number | undefined>(chapterIndex)
+  const chapterIdentity = `${chapter.type}:${chapter.chapter_index ?? chapterIndex ?? ''}`
+
+  useEffect(() => {
+    setIsEditing(false)
+    setEditedContent('')
+    setShowVersions(false)
+    boundChapterIndexRef.current = chapterIndex
+  }, [chapterIdentity, chapterIndex])
 
   // chunks 非空时拼接显示（流式 append）；否则用 chapter.content
   const content = useMemo(() => {
@@ -93,6 +102,7 @@ export default function ChapterWriter({
 
   // 进入{t('chapter.edit')}模式
   const handleEnterEdit = () => {
+    boundChapterIndexRef.current = chapterIndex
     setEditedContent(content)
     setIsEditing(true)
   }
@@ -100,7 +110,7 @@ export default function ChapterWriter({
   // {t('chapter.save')}{t('chapter.edit')}：POST 成功才退出编辑，失败保住草稿。
   const handleSaveEdit = async () => {
     try {
-      await onSaveEdit?.(editedContent)
+      await onSaveEdit?.(editedContent, boundChapterIndexRef.current)
       setIsEditing(false)
     } catch {
       // keep isEditing + editedContent

@@ -619,13 +619,15 @@ describe('App 三栏布局', () => {
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
     expect(await screen.findByTestId('info-confirm')).toBeInTheDocument()
+    // U1: 到大纲阶段后信息卡默认折叠，先展开再断言
+    fireEvent.click(screen.getByTestId('info-expand'))
     expect(screen.getByTestId('info-controls')).toHaveTextContent('gdp, pop')
     expect(screen.getByTestId('info-dataset')).toHaveTextContent('macro.csv')
     expect(screen.getByTestId('info-dataset')).toHaveTextContent('42')
     expect(screen.getByTestId('info-dataset')).not.toHaveTextContent(/^CSV$/)
   })
 
-  test('是，再补充 remounts DirectionForm from directionRecord, not sample fallback', async () => {
+  test('补充研究信息 remounts DirectionForm from directionRecord, not sample fallback', async () => {
     const user = userEvent.setup()
     localStorage.setItem('econpaper_session_id', 'test-sess')
     const mockFetch = vi.fn().mockImplementation((url: string) => {
@@ -663,6 +665,8 @@ describe('App 三栏布局', () => {
     fireEvent.change(screen.getByLabelText(/控制变量/), { target: { value: 'age, gender' } })
     fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
     fireEvent.submit(screen.getByTestId('direction-form'))
+    // U1: 大纲阶段信息卡默认折叠，先展开
+    fireEvent.click(await screen.findByTestId('info-expand'))
     expect(await screen.findByTestId('info-add-more')).toBeInTheDocument()
     await user.click(screen.getByTestId('info-add-more'))
     expect(await screen.findByTestId('direction-form')).toBeInTheDocument()
@@ -913,6 +917,7 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('info-expand'))
     expect(await screen.findByTestId('info-dataset')).toBeInTheDocument()
     expect(screen.getByTestId('info-dataset')).toHaveTextContent('CSV')
     expect(screen.getByTestId('info-dataset')).not.toHaveTextContent('macro.csv')
@@ -946,8 +951,11 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('info-expand'))
     expect(await screen.findByTestId('info-dataset')).toHaveTextContent('macro.csv')
     await user.click(screen.getByRole('button', { name: '退出' }))
+    // B3: 退出后回落地/引导页，而不是停在空桌
+    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
     expect(sessionStorage.getItem('econpaper_csv_meta')).toBeNull()
   })
 

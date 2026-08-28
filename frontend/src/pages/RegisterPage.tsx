@@ -7,9 +7,10 @@ import { useT } from '../lib/i18n'
 interface RegisterPageProps {
   onRegister: (token: string) => void
   onSwitchToLogin: () => void
+  onHome?: () => void
 }
 
-export default function RegisterPage({ onRegister, onSwitchToLogin }: RegisterPageProps) {
+export default function RegisterPage({ onRegister, onSwitchToLogin, onHome }: RegisterPageProps) {
   const { t } = useT()
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -82,7 +83,7 @@ export default function RegisterPage({ onRegister, onSwitchToLogin }: RegisterPa
 
   return (
     <div className="min-h-screen bg-bg text-ink">
-      <UnauthHeader />
+      <UnauthHeader onHome={onHome} />
       <main className="mx-auto flex w-full max-w-[420px] flex-col px-6 pb-24 pt-24">
         <h1 className="font-serif text-[2rem] leading-tight tracking-tight text-ink">
           {t('register.subtitle')}
@@ -195,7 +196,7 @@ export default function RegisterPage({ onRegister, onSwitchToLogin }: RegisterPa
           <button
             type="submit"
             disabled={loading || done}
-            className={`w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:opacity-90 disabled:opacity-70 ${done ? 'animate-pop' : ''}`}
+            className={`w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:opacity-90 disabled:opacity-70 ${done ? 'animate-pop' : ''}`}
           >
             {done ? (
               <svg className="auth-check mx-auto" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">

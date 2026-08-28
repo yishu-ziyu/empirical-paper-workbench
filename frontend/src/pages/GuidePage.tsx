@@ -12,6 +12,7 @@ export interface GuidePageProps {
   onWritePaper: () => void
   onFile?: (file: File) => void
   onLogin?: () => void
+  headerExtra?: ReactNode
   onRegister?: () => void
 }
 
@@ -104,6 +105,7 @@ export default function GuidePage({
   onWritePaper,
   onFile,
   onLogin,
+  headerExtra,
   onRegister,
 }: GuidePageProps) {
   const { t } = useT()
@@ -125,6 +127,7 @@ export default function GuidePage({
   return (
     <div data-testid="guide-page" className="min-h-screen bg-white text-ink">
       <UnauthHeader
+        extra={headerExtra}
         onLogin={onLogin}
         onRegister={onRegister}
         onHow={() => scrollToId('how-it-works')}

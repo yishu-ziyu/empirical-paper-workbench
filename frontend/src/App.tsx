@@ -282,8 +282,11 @@ function App() {
     setAuthed(false)
     setSessionId(null)
     localStorage.removeItem(LS_KEY)
+    localStorage.removeItem(LS_GUIDE_KEY)
     forgetCsvMeta()
     setAuthPage(null)
+    setDeskOpen(false)
+    setSeenGuide(false)
   }, [forgetCsvMeta])
 
   // Reload restore: httpOnly cookies outlive the tab, so ask the server
@@ -953,10 +956,10 @@ function App() {
   })
 
   if (authPage === 'register') {
-    return <RegisterPage onRegister={handleLogin} onSwitchToLogin={() => setAuthPage('login')} />
+    return <RegisterPage onRegister={handleLogin} onSwitchToLogin={() => setAuthPage('login')} onHome={() => setAuthPage(null)} />
   }
   if (authPage === 'login') {
-    return <LoginPage onLogin={handleLogin} onSwitchToRegister={() => setAuthPage('register')} />
+    return <LoginPage onLogin={handleLogin} onSwitchToRegister={() => setAuthPage('register')} onHome={() => setAuthPage(null)} />
   }
 
   const firstScreenInput = (
@@ -977,8 +980,31 @@ function App() {
             markGuideSeen()
             setDeskOpen(true)
           }}
-          onLogin={() => setAuthPage('login')}
-          onRegister={() => setAuthPage('register')}
+          onLogin={authed ? undefined : () => setAuthPage('login')}
+          onRegister={authed ? undefined : () => setAuthPage('register')}
+          headerExtra={authed ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="guide-enter-desk"
+                onClick={() => {
+                  markGuideSeen()
+                  setDeskOpen(true)
+                }}
+                className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
+              >
+                {t('guide.enterDesk')}
+              </button>
+              <button
+                type="button"
+                data-testid="guide-logout"
+                onClick={handleLogout}
+                className="rounded-full border border-black/15 px-3 py-1.5 text-[13px] text-muted transition-colors hover:text-ink"
+              >
+                {t('app.logout')}
+              </button>
+            </div>
+          ) : undefined}
         />
       </>
     )
@@ -1157,6 +1183,7 @@ function App() {
                     type="button"
                     data-testid="format-export-doc-btn"
                     onClick={() => setDocExportOpen(true)}
+                    title={!sessionId || !canExport ? t('app.exportLockedHint') : undefined}
                     disabled={!sessionId || !canExport}
                     className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
                   >
@@ -1166,6 +1193,7 @@ function App() {
                     type="button"
                     data-testid="format-export-code-btn"
                     onClick={() => setCodeExportOpen(true)}
+                    title={!sessionId || !canExport ? t('app.exportLockedHint') : undefined}
                     disabled={!sessionId || !canExport}
                     className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
                   >
@@ -1188,11 +1216,25 @@ function App() {
                 {t('guide.nowWrite')}
               </p>
             )}
-            {hasReadout && Boolean(writtenChapter?.content) && (
-              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
-                {t('guide.nowExport')}
-              </p>
-            )}
+            {hasReadout && Boolean(writtenChapter?.content) && (() => {
+              const writtenTypes = new Set(writtenChapters.filter((c) => c.content).map((c) => c.type))
+              const pending = outline.find((ch) => !writtenTypes.has(ch.type))
+              if (pending) {
+                return (
+                  <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
+                    {t('guide.nowProgress')
+                      .replace('{done}', String(writtenTypes.size))
+                      .replace('{total}', String(outline.length))
+                      .replace('{title}', pending.title)}
+                  </p>
+                )
+              }
+              return (
+                <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
+                  {t('guide.nowExport')}
+                </p>
+              )
+            })()}
             <WriteLoop
               fileName={csvName}
               rows={csvRows}

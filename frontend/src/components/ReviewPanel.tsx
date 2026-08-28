@@ -105,6 +105,9 @@ export default function ReviewPanel({
           {t('review.roundLabel').replace('{0}', String(review.review_iteration)).replace('{1}', String(review.max_review_iterations))} · {t('review.scoreLabel').replace('{0}', review.score.toFixed(2))}
         </span>
       </div>
+      <p data-testid="review-plain-verdict" className="px-4 pb-2 text-[11.5px] leading-4 text-muted">
+        {(review.auto_decision === 'pass' ? t('review.plainPass') : t('review.plainFail')).replace('{0}', review.score.toFixed(2))}
+      </p>
       {(reviewSource || grounding.length > 0) && (
         <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted">
           {reviewSource ? (

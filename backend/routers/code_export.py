@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_session_ownership
 from facade import facade
@@ -79,6 +80,10 @@ def _find_translation(translations: List[Any], lang: str) -> Dict[str, Any]:
         if isinstance(t, dict) and t.get("lang") == lang:
             return t
     return {}
+
+
+_OUTCOME_KEYS = ("outcome", "outcome_col", "dv")
+_TREATMENT_KEYS = ("treatment", "treatment_col", "iv")
 
 
 def _has_named_column(source: Any, keys: tuple[str, ...]) -> bool:
@@ -135,6 +140,11 @@ def _has_python_source(state: Any) -> bool:
 def _can_rebuild_takeable(state: Any) -> bool:
     """Only run translate_code when it can emit real scripts, not stubs."""
     return _has_real_direction_columns(state) or _has_python_source(state)
+
+
+class TranslateCodeResponse(BaseModel):
+    ok: bool = True
+    code_translations: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 @router.post(

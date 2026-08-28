@@ -142,7 +142,9 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     bound = bind_chapter_kwargs(state, chapter_spec)
     for key, value in bound.items():
         current = kwargs.get(key, "")
-        if key not in kwargs or current in ("", None):
+        # CSV describe is the data_desc truth source when the file parsed.
+        csv_truth = key in ("data_summary", "eda_results") and value not in ("", None)
+        if csv_truth or key not in kwargs or current in ("", None):
             kwargs[key] = value
     system, user = prompt_mod.render(**kwargs)
 
@@ -164,10 +166,13 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     if (
         str(chapter_type) == "results"
         and isinstance(est, dict)
-        and est.get("status") == "ok"
+        and est.get("status") in ("ok", "degraded")
     ):
         table = (state.get("results") or "").strip()
         content = prose + "\n\n" + table if table else prose
+    elif str(chapter_type) == "data_desc":
+        eda_table = str(bound.get("eda_results") or "").strip()
+        content = prose + "\n\n" + eda_table if eda_table else prose
     else:
         content = prose
 

@@ -7,11 +7,12 @@
 2. 选择模板（``state['export_template']``，默认 ``cn_journal``）
 3. Jinja2 渲染模板 → LaTeX 源码
 4. ``compile_pdf`` 调 ``latexmk -xelatex`` 生成 PDF（subprocess）
-5. ``convert_docx`` 调 ``pandoc`` 把 .tex 转 .docx（subprocess）
+5. ``convert_docx`` 优先 ``pandoc``；缺失或失败时写最小 OOXML ``.docx``
 6. 返回 ``{"latex_source", "pdf_path", "docx_path", "degraded"}``
 
-降级策略：``latexmk`` / ``pandoc`` 不可用时对应路径返回 None，
-``degraded=True``，但 ``latex_source`` 始终可用。测试通过
+降级策略：``latexmk`` 不可用时 ``pdf_path=None``。docx 在 pandoc 缺失时
+仍写 OOXML，但 ``degraded=True``。仅当转换完全失败时 ``docx_path=None``。
+``latex_source`` 始终可用。测试通过
 ``monkeypatch.setattr("nodes.export_docx.compile_pdf", fake)`` 替换编译函数，
 故 ``compile_pdf`` / ``convert_docx`` 必须是模块级函数。
 """
@@ -22,8 +23,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 # macOS BasicTeX/Full TeX 安装在 /Library/TeX/texbin，uvicorn 进程可能 PATH 不含此目录
 _TEX_BIN = "/Library/TeX/texbin"
@@ -32,6 +34,7 @@ if os.path.isdir(_TEX_BIN) and _TEX_BIN not in os.environ.get("PATH", ""):
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
+from nodes.estimate import looks_like_coef_table, splice_missing_table_rows
 from protocols import ExportDocxOutput
 from state import EconPaperState
 
@@ -45,6 +48,19 @@ TEMPLATE_NAMES = {
     "master_thesis",
     "english_submission",
 }
+
+# Product / DirectionForm short names → canonical TEMPLATE_NAMES.
+# Sample write loop and MethodSelector send these aliases.
+TEMPLATE_ALIASES = {
+    "undergrad": "undergraduate",
+    "master": "master_thesis",
+    "en_submission": "english_submission",
+}
+
+
+def normalize_template(template_name: str) -> str:
+    """Map FE aliases onto canonical template files. Canonical names pass through."""
+    return TEMPLATE_ALIASES.get(template_name, template_name)
 
 # Jinja2 环境：不转义（LaTeX 源码原样输出），保留尾换行
 _env = Environment(
@@ -77,16 +93,179 @@ def _extract_title(title_chapter: Any) -> str:
     return "Untitled"
 
 
-def _extract_sections(body_chapters: List[Any]) -> List[dict]:
-    """取正文章节作为正文 sections（{title, content}）。"""
+def _escape_tex_plain(text: str) -> str:
+    """Escape LaTeX specials. `%` must not start a comment (truncates `在 1% …`)."""
+    return (
+        text.replace("\\", r"\textbackslash{}")
+        .replace("&", r"\&")
+        .replace("%", r"\%")
+        .replace("#", r"\#")
+        .replace("_", r"\_")
+        .replace("{", r"\{")
+        .replace("}", r"\}")
+        .replace("~", r"\textasciitilde{}")
+        .replace("^", r"\textasciicircum{}")
+        .replace("$", r"\$")
+    )
+
+
+_CITE_RE = re.compile(r"\\(cite|ref|eqref)\{[^}]*\}")
+_MATH_BOLD_RE = re.compile(
+    r"(\$\$[^$]+\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*)"
+)
+
+
+def _escape_tex_text(text: str) -> str:
+    """Escape markdown prose. Keep ``$…$`` / ``$$…$$`` and ``\\cite``/``\\ref``/``\\eqref``.
+
+    Bodies are markdown-only: unmatched ``$`` is escaped so it cannot open math.
+    Already-emitted cite/ref commands are held out so escaping does not break them.
+    """
+    held: List[str] = []
+
+    def _hold(match: re.Match[str]) -> str:
+        held.append(match.group(0))
+        return f"\x00CITE{len(held) - 1}\x00"
+
+    protected = _CITE_RE.sub(_hold, text)
+    chunks = _MATH_BOLD_RE.split(protected)
+    out: List[str] = []
+    for chunk in chunks:
+        if chunk.startswith("$$") and chunk.endswith("$$") and len(chunk) >= 4:
+            out.append(chunk)
+        elif (
+            chunk.startswith("$")
+            and chunk.endswith("$")
+            and len(chunk) >= 2
+            and not chunk.startswith("$$")
+        ):
+            out.append(chunk)
+        elif chunk.startswith("**") and chunk.endswith("**") and len(chunk) >= 4:
+            out.append(r"\textbf{" + _escape_tex_plain(chunk[2:-2]) + "}")
+        else:
+            out.append(_escape_tex_plain(chunk))
+    merged = "".join(out)
+    for i, original in enumerate(held):
+        merged = merged.replace(f"\x00CITE{i}\x00", original)
+    return merged
+
+
+def _is_md_table_line(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("|") and stripped.count("|") >= 2
+
+
+def _is_md_table_sep(line: str) -> bool:
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", c or "") for c in cells)
+
+
+def _md_table_to_latex(rows: List[str]) -> str:
+    parsed: List[List[str]] = []
+    for row in rows:
+        if _is_md_table_sep(row):
+            continue
+        cells = [c.strip() for c in row.strip().strip("|").split("|")]
+        if cells:
+            parsed.append(cells)
+    if not parsed:
+        return ""
+    ncol = max(len(r) for r in parsed)
+    lines = [r"\begin{tabular}{" + "l" * ncol + "}", r"\toprule"]
+    for i, cells in enumerate(parsed):
+        padded = cells + [""] * (ncol - len(cells))
+        lines.append(" & ".join(_escape_tex_text(c) for c in padded) + r" \\")
+        if i == 0:
+            lines.append(r"\midrule")
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}")
+    return "\n".join(lines)
+
+
+def markdown_to_latex(text: str, section_title: str = "") -> str:
+    """Turn chapter markdown into LaTeX so ATX hashes are not BodyText.
+
+    `# 主结果` / `## 模型设定` become subsections. A heading that repeats
+    the chapter ``\\section`` title is dropped. `%` is escaped so
+    ``在 1% 水平上`` is not cut off by a TeX comment.
+    """
+    source = (text or "").replace("\r\n", "\n")
+    lines = source.split("\n")
+    out: List[str] = []
+    i = 0
+    heading_re = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+    while i < len(lines):
+        raw = lines[i]
+        heading = heading_re.match(raw.strip())
+        if heading:
+            title = heading.group(2).strip()
+            if section_title and title == section_title:
+                i += 1
+                continue
+            level = len(heading.group(1))
+            if level == 1:
+                cmd = "subsection*"
+            elif level >= 3:
+                cmd = "subsubsection"
+            else:
+                cmd = "subsection"
+            out.append(f"\\{cmd}{{{_escape_tex_text(title)}}}")
+            i += 1
+            continue
+        if _is_md_table_line(raw) or _is_md_table_sep(raw):
+            block: List[str] = []
+            while i < len(lines) and (
+                _is_md_table_line(lines[i]) or _is_md_table_sep(lines[i])
+            ):
+                block.append(lines[i])
+                i += 1
+            converted = _md_table_to_latex(block)
+            if converted:
+                out.append(converted)
+            continue
+        if not raw.strip():
+            out.append("")
+            i += 1
+            continue
+        out.append(_escape_tex_text(raw))
+        i += 1
+    return "\n".join(out)
+
+
+def _extract_sections(
+    body_chapters: List[Any], state: Optional[dict] = None
+) -> List[dict]:
+    """正文章节 → ``{title, content}``. Skip empty outline pads.
+
+    Empty ``{}`` slots from generate_chapter's 6-way pad used to become
+    ``Untitled section`` Heading1s. Only chapters with body text are kept.
+    Content is markdown→LaTeX so leftover ``#`` / ``##`` do not survive.
+    """
+    state = state or {}
+    spec = state.get("main_specification") if isinstance(state, dict) else {}
+    estimate = state.get("estimate") if isinstance(state, dict) else {}
+    if not isinstance(spec, dict):
+        spec = {}
+    if not isinstance(estimate, dict):
+        estimate = {}
     sections: List[dict] = []
     for ch in body_chapters or []:
         if not isinstance(ch, dict):
             continue
+        content = ch.get("content") or ""
+        if not str(content).strip():
+            continue
+        title = (ch.get("title") or "").strip()
+        if not title:
+            # Body with no title: keep the text. Prefer type, else 未命名.
+            title = str(ch.get("type") or "").strip() or "未命名"
+        chapter_type = str(ch.get("type") or "")
+        if chapter_type == "results" or looks_like_coef_table(content):
+            content = splice_missing_table_rows(content, spec, estimate)
         sections.append(
             {
-                "title": (ch.get("title") or "").strip() or "Untitled section",
-                "content": ch.get("content") or "",
+                "title": _escape_tex_text(title),
+                "content": markdown_to_latex(content, section_title=title),
             }
         )
     return sections
@@ -144,8 +323,9 @@ def render_template(
 ) -> str:
     """用 Jinja2 把 title/author/chapters 填进 ``{template_name}.tex``。
 
-    未知模板名抛 ``ValueError``。
+    未知模板名抛 ``ValueError``。``undergrad`` 等产品别名先归一化。
     """
+    template_name = normalize_template(template_name)
     if template_name not in TEMPLATE_NAMES:
         raise ValueError(
             f"Unknown template: {template_name!r}; "
@@ -231,37 +411,166 @@ def compile_pdf(tex_source: str, output_dir: str) -> Optional[str]:
     return str(pdf_path) if pdf_path.exists() else None
 
 
-def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
-    """调 ``pandoc`` 把 .tex 转 .docx。
+def _xml_escape(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
-    成功返回 docx 绝对路径字符串；``pandoc`` 不存在或失败时返回 None。
-    """
-    if shutil.which("pandoc") is None:
+
+def _strip_tex_markup(text: str) -> str:
+    """Drop TeX commands but keep brace prose (\\textbf{结果} → 结果)."""
+    text = re.sub(r"(?<!\\)%.*", "", text)
+    text = re.sub(r"\\(?:begin|end)\{[^}]+\}", "", text)
+    text = re.sub(r"\\(?:maketitle|tableofcontents)\b", "", text)
+    text = re.sub(
+        r"\\(?:label|cite|citep|citet|ref|pageref|footnote)\*?\{[^}]*\}",
+        "",
+        text,
+    )
+    keep_arg = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
+    prev = None
+    while prev != text:
+        prev = text
+        text = keep_arg.sub(r"\1", text)
+    text = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", "", text)
+    return text.replace("\\%", "%").replace("\\&", "&").strip()
+
+
+def _prelude_section(raw: str) -> Optional[dict]:
+    """Pre-\\section body (abstract / leftover) as a docx section."""
+    if not raw or not raw.strip():
         return None
+    abs_m = re.search(
+        r"\\begin\{abstract\}(.*?)\\end\{abstract\}", raw, flags=re.S | re.I
+    )
+    if abs_m:
+        content = _strip_tex_markup(abs_m.group(1))
+        leftover = _strip_tex_markup(raw[: abs_m.start()] + raw[abs_m.end() :])
+        if leftover:
+            content = f"{content}\n{leftover}" if content else leftover
+        if content:
+            return {"title": "摘要", "content": content}
+        return None
+    content = _strip_tex_markup(raw)
+    if not content:
+        return None
+    return {"title": "摘要", "content": content}
 
+
+def _sections_from_tex(tex_source: str) -> Tuple[str, List[dict]]:
+    title_m = re.search(r"\\title\{([^}]*)\}", tex_source or "")
+    title = title_m.group(1).strip() if title_m else "Untitled"
+    body = tex_source or ""
+    if "\\begin{document}" in body:
+        body = body.split("\\begin{document}", 1)[1]
+    if "\\end{document}" in body:
+        body = body.split("\\end{document}", 1)[0]
+    parts = re.split(r"\\section\{([^}]*)\}", body)
+    sections: List[dict] = []
+    prelude = _prelude_section(parts[0] if parts else "")
+    if prelude:
+        sections.append(prelude)
+    for i in range(1, len(parts), 2):
+        content = parts[i + 1] if i + 1 < len(parts) else ""
+        sections.append(
+            {
+                "title": parts[i].strip() or "Untitled section",
+                "content": _strip_tex_markup(content),
+            }
+        )
+    return title, sections
+
+
+def _w_paragraph(text: str, *, heading: bool = False) -> str:
+    style = "<w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>" if heading else ""
+    return (
+        "<w:p>"
+        f"{style}"
+        "<w:r><w:t xml:space=\"preserve\">"
+        f"{_xml_escape(text)}"
+        "</w:t></w:r></w:p>"
+    )
+
+
+def _write_simple_docx(path: Path, title: str, sections: List[dict]) -> None:
+    """Write a minimal OOXML docx. No pandoc / python-docx required."""
+    paras = [_w_paragraph(title or "Untitled", heading=True)]
+    for section in sections:
+        paras.append(_w_paragraph(str(section.get("title") or ""), heading=True))
+        body = str(section.get("content") or "")
+        for line in body.splitlines() or [""]:
+            paras.append(_w_paragraph(line))
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{''.join(paras)}<w:sectPr/></w:body></w:document>"
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("word/document.xml", document_xml)
+
+
+def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
+    """tex → docx. Prefer pandoc; if missing or failing, write a simple OOXML file.
+
+    成功返回 docx 绝对路径；pandoc 与 fallback 都失败时返回 None。
+    """
+    convert_docx.used_ooxml_fallback = False
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     tex_path = out / "paper.tex"
     tex_path.write_text(tex_source, encoding="utf-8")
     docx_path = out / "paper.docx"
 
-    try:
-        subprocess.run(
-            [
-                "pandoc",
-                str(tex_path),
-                "-o",
-                str(docx_path),
-                "--from=latex",
-                "--to=docx",
-            ],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return None
+    if shutil.which("pandoc") is not None:
+        try:
+            subprocess.run(
+                [
+                    "pandoc",
+                    str(tex_path),
+                    "-o",
+                    str(docx_path),
+                    "--from=latex",
+                    "--to=docx",
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+            if docx_path.exists() and docx_path.stat().st_size > 0:
+                convert_docx.used_ooxml_fallback = False
+                return str(docx_path)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass
 
+    try:
+        title, sections = _sections_from_tex(tex_source)
+        _write_simple_docx(docx_path, title, sections)
+    except OSError:
+        return None
+    convert_docx.used_ooxml_fallback = True
     return str(docx_path) if docx_path.exists() else None
 
 
@@ -283,12 +592,12 @@ def export_docx(state: EconPaperState) -> ExportDocxOutput:
     ADR-0009: 若 ``state['references_list']`` 非空，在 ``\\end{document}`` 前追加
     ``\\begin{thebibliography}`` 环境。
     """
-    template_name = state.get("export_template") or "cn_journal"
+    template_name = normalize_template(state.get("export_template") or "cn_journal")
 
     title = _extract_title(state.get("title_chapter"))
     author = (state.get("author") or "").strip()
     abstract = state.get("abstract")
-    sections = _extract_sections(state.get("body_chapters", []) or [])
+    sections = _extract_sections(state.get("body_chapters", []) or [], state)
 
     tex_source = render_template(
         template_name,
@@ -314,9 +623,12 @@ def export_docx(state: EconPaperState) -> ExportDocxOutput:
         pass
 
     pdf_path = compile_pdf(tex_source, output_dir)
+    if hasattr(convert_docx, "used_ooxml_fallback"):
+        convert_docx.used_ooxml_fallback = False
     docx_path = convert_docx(tex_source, output_dir)
+    ooxml_fallback = bool(getattr(convert_docx, "used_ooxml_fallback", False))
 
-    degraded = pdf_path is None or docx_path is None
+    degraded = pdf_path is None or docx_path is None or ooxml_fallback
 
     return {
         "latex_source": tex_source,

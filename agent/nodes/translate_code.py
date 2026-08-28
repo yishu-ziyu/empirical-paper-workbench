@@ -23,8 +23,22 @@ import re
 from pathlib import Path
 from typing import Any
 
+from design.spec import norm_method
 from protocols import TranslateCodeOutput
 from state import EconPaperState
+
+# Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
+_PANEL_METHOD_KEYS = {
+    "panel",
+    "event",
+    "event-study",
+    "event_study",
+    "twfe",
+    "fe",
+    "fixed-effects",
+    "fixed-effect",
+    "fixed effects",
+}
 
 # Executable Python that can become a real estimator — not a cleaning audit.
 _REGRESSION_MARKERS = (
@@ -366,6 +380,31 @@ def _first_text(*sources: Any, keys: tuple[str, ...]) -> str:
     return ""
 
 
+def _method_is_panel(method: Any) -> bool:
+    """True for an explicit panel/DiD/event direction — not OLS."""
+    if norm_method(method) == "did":
+        return True
+    key = str(method or "").strip().lower()
+    if not key:
+        return False
+    collapsed = key.replace("_", "-").replace(" ", "-")
+    return key in _PANEL_METHOD_KEYS or collapsed in _PANEL_METHOD_KEYS
+
+
+def _guessed_column_fields(state: EconPaperState) -> set[str]:
+    """Fields filled by set_direction CSV guessing (reason=column_guessed)."""
+    out: set[str] = set()
+    for item in state.get("degradations") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("reason") != "column_guessed":
+            continue
+        field = str(item.get("field") or "").strip()
+        if field:
+            out.add(field)
+    return out
+
+
 def _python_is_takeable_regression(python: str) -> bool:
     """False for upload-only clean.py (DATA_PATH + step comments, no model)."""
     if not (python or "").strip():
@@ -397,8 +436,28 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
         return None
     csv_path = state.get("csv_path") or "data.csv"
     csv_name = Path(str(csv_path)).name or "data.csv"
-    id_col = _first_text(spec, rd, keys=("id_col", "id", "unit_col", "unit"))
-    time_col = _first_text(spec, rd, keys=("time_col", "time", "year"))
+    # Explicit panel dims only. Aliases `id`/`year` are enrich_direction copies
+    # of guessed CSV columns and must not decide TWFE by themselves.
+    id_col = _first_text(spec, rd, keys=("id_col", "unit_col"))
+    time_col = _first_text(spec, rd, keys=("time_col",))
+    guessed = _guessed_column_fields(state)
+    user_id = id_col if "id_col" not in guessed else ""
+    user_time = time_col if "time_col" not in guessed else ""
+    method = _first_text(spec, rd, keys=("method",))
+    method_panel = _method_is_panel(method)
+    if method_panel:
+        # Direction is panel/DiD: FE names may be guessed; the method is not.
+        if not id_col:
+            id_col = _first_text(spec, rd, keys=("id", "unit"))
+        if not time_col:
+            time_col = _first_text(spec, rd, keys=("time", "year"))
+        panel = bool(id_col and time_col)
+    else:
+        # OLS (or anything else): only user-supplied dims could be panel, and
+        # Firstmate kept OLS as pooled OLS — guessed id+year is not a panel.
+        panel = False
+        id_col = user_id
+        time_col = user_time
     controls = _as_controls(spec.get("controls")) or _as_controls(rd.get("controls"))
     skip = {outcome, treatment, id_col, time_col}
     controls = [col for col in controls if col not in skip]
@@ -412,13 +471,17 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
         "controls": controls,
         "id_col": id_col,
         "time_col": time_col,
-        "panel": bool(id_col and time_col),
+        "panel": panel,
         "formula": formula,
     }
 
 
 def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
-    """Usable Stata xtreg/reghdfe or regress + R feols/felm or lm when there is no takeable Python."""
+    """Usable scripts from named outcome+treatment.
+
+    OLS → Stata ``regress`` / R ``lm``. Panel/DiD/event → ``xtreg``/``reghdfe``
+    and ``feols``/``felm``. Guessed CSV id+year on an OLS direction stays OLS.
+    """
     y = model["outcome"]
     treat = model["treatment"]
     controls = model["controls"]

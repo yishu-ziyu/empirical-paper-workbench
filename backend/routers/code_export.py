@@ -2,7 +2,7 @@
 
 POST /sessions/{session_id}/translate-code
     跑 agent ``translate_code``，把 ``code_translations`` 写入 session。
-    HITL 写章路径不会自动进该节点，所以必须显式调用。
+    HITL 写章路径不会自动进该节点，所以必须显式调用（或由 GET 首次下载填充）。
 
 GET /sessions/{session_id}/code-export?format=py|do|R|m
     返回对应格式的代码文件下载（Content-Disposition: attachment）。
@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
+from schemas.responses import TranslateCodeResponse
 
 router = APIRouter()
 _REGISTERED = False
@@ -60,6 +61,18 @@ _CONTENT_TYPE: Dict[str, str] = {
     "eviews": "text/x-eviews",
 }
 
+_OUTCOME_KEYS = ("outcome", "outcome_col", "dv")
+_TREATMENT_KEYS = ("treatment", "treatment_col", "iv")
+
+# Placeholder output of translate_code when there is no Python and no named spec.
+_STUB_MARKERS = ("无 Python 代码可翻译", "无 Python 代码")
+_TAKEABLE_NEEDLES: Dict[str, tuple[str, ...]] = {
+    "stata": ("import delimited", "xtreg", "reghdfe", "regress "),
+    "r": ("read.csv", "feols", "felm", "lm("),
+    "py": ("read_csv", "smf.ols", "sm.OLS"),
+    "eviews": ("import ", "ls "),
+}
+
 
 def _find_translation(translations: List[Any], lang: str) -> Dict[str, Any]:
     """从 code_translations 列表里找指定 lang 的条目。"""
@@ -86,7 +99,7 @@ def _has_named_column(source: Any, keys: tuple[str, ...]) -> bool:
 def _has_real_direction_columns(state: Any) -> bool:
     """True only when direction/spec names a real outcome and treatment.
 
-    Empty sessions must not GET-autofill the translator's y ~ treat defaults.
+    Empty sessions must not GET-autofill a fabricated y ~ treat script.
     """
     spec = state.get("main_specification") if isinstance(state, dict) else None
     rd = state.get("research_direction") if isinstance(state, dict) else None
@@ -97,6 +110,36 @@ def _has_real_direction_columns(state: Any) -> bool:
         rd, _TREATMENT_KEYS
     )
     return has_outcome and has_treatment
+
+
+def _is_stub_code(code: Any) -> bool:
+    text = str(code or "").strip()
+    if not text:
+        return True
+    return any(marker in text for marker in _STUB_MARKERS)
+
+
+def _is_takeable(code: Any, lang: str) -> bool:
+    """True when the file is runnable Stata/R/Python, not an empty stub."""
+    text = str(code or "")
+    if _is_stub_code(text):
+        return False
+    needles = _TAKEABLE_NEEDLES.get(lang) or ()
+    return any(needle in text for needle in needles)
+
+
+def _has_python_source(state: Any) -> bool:
+    if not isinstance(state, dict):
+        return False
+    for ch in state.get("body_chapters") or []:
+        if isinstance(ch, dict) and "```python" in str(ch.get("content") or ""):
+            return True
+    return False
+
+
+def _can_rebuild_takeable(state: Any) -> bool:
+    """Only run translate_code when it can emit real scripts, not stubs."""
+    return _has_real_direction_columns(state) or _has_python_source(state)
 
 
 class TranslateCodeResponse(BaseModel):
@@ -144,7 +187,7 @@ async def export_code(
     Raises
     ------
     HTTPException
-        - 404: session 不存在，无 translations，或 direction 不足以 GET-autofill
+        - 404: session 不存在，或 no takeable translation (empty stubs are not files)
         - 400: 不支持的 format
     """
     require_session_ownership(session_id, current_user)
@@ -157,27 +200,24 @@ async def export_code(
             ),
         )
 
+    lang = _FORMAT_TO_LANG[format]
     state = facade.get_state(session_id)
     translations = state.get("code_translations") or []
-    if not translations and _has_real_direction_columns(state):
-        # HITL write never runs translate_code. Fill only from a real spec.
+    entry = _find_translation(translations, lang)
+    if not _is_takeable(entry.get("code"), lang) and _can_rebuild_takeable(state):
+        # HITL write never runs the graph translate_code node. Fill or replace
+        # stubs on first download when a real spec or Python fences exist.
         result = facade.run_translate_code(session_id)
         translations = result.get("code_translations") or []
-    if not translations:
+        entry = _find_translation(translations, lang)
+    if not _is_takeable(entry.get("code"), lang):
         raise HTTPException(
             status_code=404,
             detail=(
-                "No code translations in this session. "
-                "POST /sessions/{id}/translate-code first."
+                "No takeable code translation in this session. "
+                "POST /sessions/{id}/translate-code after generate, "
+                "or set a research direction with outcome and treatment."
             ),
-        )
-
-    lang = _FORMAT_TO_LANG[format]
-    entry = _find_translation(translations, lang)
-    if not entry:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No {lang!r} translation in session",
         )
 
     code = entry.get("code", "")

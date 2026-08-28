@@ -1,4 +1,4 @@
-"""T-09 RED tests for GET /sessions/{id}/code-export?format=py|do|R|m.
+"""T-09 / GS-E5 tests for GET /sessions/{id}/code-export and POST /translate-code.
 
 契约：
 1. GET /sessions/{id}/code-export?format=py → 返回 .py 文件
@@ -8,14 +8,18 @@
 5. Content-Disposition: attachment; filename="analysis.<ext>"
 6. 未知 session_id → 404
 7. 不支持的 format → 400
-8. session 无 code_translations 且无真实方向列 → 404（不编造 y ~ treat）
-   有 outcome+treatment 时 GET 可先跑 translate_code
+8. session 无 code_translations 且无真实方向列 / 未写章 → 404（不编造 y ~ treat）
+   有 outcome+treatment 或已 generate 时 GET 可先跑 translate_code
+9. POST /sessions/{id}/translate-code → 200 + 写入 code_translations
 """
 from __future__ import annotations
 
 # Importing the code_export router triggers its self-registration on main.app.
 import routers.code_export  # noqa: F401
 from facade import facade
+
+from cleaning.audit import AuditStep
+from conftest import make_write_ready_state
 
 
 def _seed_session_with_translations() -> str:
@@ -51,6 +55,61 @@ def _seed_session_with_translations() -> str:
         },
     )
     return sid
+
+
+_UPLOAD_CLEANING_NAMES = (
+    "profiling",
+    "merge",
+    "missing",
+    "outliers",
+    "transform",
+    "filter",
+    "balance",
+)
+
+
+def _upload_cleaning_report(tmp_path, csv_name: str = "course-panel.csv") -> tuple[dict, str]:
+    """Match POST /upload: 8 steps, audit at index 7, AuditStep clean.py on disk."""
+    csv_path = tmp_path / csv_name
+    csv_path.write_text(
+        "id,year,income,age\n1,2010,100,30\n2,2011,110,31\n",
+        encoding="utf-8",
+    )
+    prior = [
+        {"name": name, "status": "success", "report": {}}
+        for name in _UPLOAD_CLEANING_NAMES
+    ]
+    _, audit_report = AuditStep().run(
+        [{"path": str(csv_path)}],
+        {"workspace": str(tmp_path), "steps": prior},
+    )
+    return (
+        {
+            "steps": prior
+            + [{"name": "audit", "status": "success", "report": audit_report}]
+        },
+        str(csv_path),
+    )
+
+
+def _column_guessed_id_year() -> list[dict]:
+    """set_direction CSV-guess degradations for columns named id and year."""
+    return [
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "id_col",
+            "value": "id",
+            "visible": True,
+        },
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "time_col",
+            "value": "year",
+            "visible": True,
+        },
+    ]
 
 
 def _seed_session_without_translations() -> str:
@@ -162,19 +221,20 @@ def test_export_question_only_direction_does_not_autofill(client):
         assert resp.status_code == 404
         state = facade.get_state(sid)
         assert not (state.get("code_translations") or [])
+        assert "y ~ treat" not in (resp.text or "")
     finally:
         facade.drop_session(sid)
 
 
 def test_get_do_and_R_without_prior_post(client):
-    """Castle-style session: GET do|R works with empty code_translations."""
+    """Named outcome+treatment: GET do|R fills translations on first download."""
     import uuid
 
     sid = f"test-lazy-translate-{uuid.uuid4()}"
     facade.seed_state(
         sid,
         {
-            "csv_path": "/tmp/castle.csv",
+            "csv_path": "/tmp/user.csv",
             "research_direction": {
                 "question": "post on l_homicide",
                 "dv": "l_homicide",
@@ -196,6 +256,8 @@ def test_get_do_and_R_without_prior_post(client):
         assert "reghdfe" in do.text
         assert "l_homicide" in do.text
         assert "analysis.do" in do.headers.get("content-disposition", "")
+        assert "y ~ treat" not in do.text
+        assert "无 Python 代码可翻译" not in do.text
 
         r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
         assert r_resp.status_code == 200, r_resp.text
@@ -203,6 +265,7 @@ def test_get_do_and_R_without_prior_post(client):
         assert "felm" in r_resp.text
         assert "l_homicide" in r_resp.text
         assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+        assert "无 Python 代码可翻译" not in r_resp.text
     finally:
         facade.drop_session(sid)
 
@@ -215,7 +278,7 @@ def test_post_translate_code_fills_export(client):
     facade.seed_state(
         sid,
         {
-            "csv_path": "/tmp/castle.csv",
+            "csv_path": "/tmp/user.csv",
             "research_direction": {
                 "question": "post on l_homicide",
                 "dv": "l_homicide",
@@ -244,12 +307,182 @@ def test_post_translate_code_fills_export(client):
         assert "reghdfe" in do.text
         assert "l_homicide" in do.text
         assert "analysis.do" in do.headers.get("content-disposition", "")
+        assert "无 Python 代码可翻译" not in do.text
 
         r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
         assert r_resp.status_code == 200, r_resp.text
         assert "feols" in r_resp.text
         assert "felm" in r_resp.text
         assert "l_homicide" in r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+        assert "无 Python 代码可翻译" not in r_resp.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_after_generate_get_do_and_R_return_takeable_files(client):
+    """After generate, GET do|R is 200 with runnable Stata/R, not empty stubs."""
+    import uuid
+
+    sid = f"test-after-generate-{uuid.uuid4()}"
+    facade.seed_state(sid, make_write_ready_state())
+    try:
+        gen = client.post(
+            f"/sessions/{sid}/generate-chapter",
+            json={"chapter": {"type": "intro", "title": "引言"}},
+        )
+        assert gen.status_code == 200, gen.text
+
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+        assert "import delimited" in do.text
+        assert "regress " in do.text
+        assert "income" in do.text
+        assert "age" in do.text
+        assert "y ~ treat" not in do.text
+        assert "无 Python 代码可翻译" not in do.text
+        assert "无 Python 代码" not in do.text
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+        assert "read.csv" in r_resp.text
+        assert "lm(" in r_resp.text
+        assert "income" in r_resp.text
+        assert "age" in r_resp.text
+        assert "无 Python 代码可翻译" not in r_resp.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_get_does_not_return_empty_stub_files(client):
+    """Persisted placeholder translations are not served as 200 downloads."""
+    import uuid
+
+    sid = f"test-stub-not-served-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "code_translations": [
+                {
+                    "lang": "stata",
+                    "code": "* Auto-generated Stata script (econpaper T-09)\n* 无 Python 代码可翻译\n",
+                    "filename": "analysis.do",
+                },
+                {
+                    "lang": "r",
+                    "code": "# Auto-generated R script (econpaper T-09)\n# 无 Python 代码可翻译\n",
+                    "filename": "analysis.R",
+                },
+            ]
+        },
+    )
+    try:
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 404, do.text
+        assert "无 Python 代码可翻译" not in do.text
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 404, r_resp.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_get_replaces_stubs_when_direction_names_columns(client):
+    """Stubs + a real spec → GET rebuilds takeable Stata/R."""
+    import uuid
+
+    sid = f"test-replace-stubs-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/user.csv",
+            "research_direction": {"dv": "income", "iv": "age", "method": "ols"},
+            "code_translations": [
+                {
+                    "lang": "stata",
+                    "code": "* 无 Python 代码可翻译\n",
+                    "filename": "analysis.do",
+                },
+                {
+                    "lang": "r",
+                    "code": "# 无 Python 代码可翻译\n",
+                    "filename": "analysis.R",
+                },
+            ],
+        },
+    )
+    try:
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "regress " in do.text
+        assert "income" in do.text
+        assert "无 Python 代码可翻译" not in do.text
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "lm(" in r_resp.text
+        assert "无 Python 代码可翻译" not in r_resp.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_upload_ols_guessed_id_year_exports_regress_not_xtreg(client, tmp_path):
+    """OLS + guessed id/year + upload clean.py: GET do|R are pooled OLS.
+
+    Cleaning-audit Python must not produce comment-only files, and guessed
+    CSV id+year must not silently emit TWFE.
+    """
+    import uuid
+
+    cleaning_report, csv_path = _upload_cleaning_report(tmp_path)
+    audit_src = (tmp_path / "clean.py").read_text(encoding="utf-8")
+    assert "df = pd.read_csv(DATA_PATH)" in audit_src
+
+    sid = f"test-upload-ols-export-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": csv_path,
+            "cleaning_report": cleaning_report,
+            "research_direction": {
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+                "id": "id",
+                "year": "year",
+            },
+            "degradations": _column_guessed_id_year(),
+        },
+    )
+    try:
+        posted = client.post(f"/sessions/{sid}/translate-code")
+        assert posted.status_code == 200, posted.text
+
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "import delimited" in do.text
+        assert "regress " in do.text
+        assert "income" in do.text
+        assert "age" in do.text
+        assert "xtreg" not in do.text
+        assert "reghdfe" not in do.text
+        assert "Cleaning steps applied" not in do.text
+        assert "无 Python 代码可翻译" not in do.text
+        assert "y ~ treat" not in do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "read.csv" in r_resp.text
+        assert "lm(" in r_resp.text
+        assert "income" in r_resp.text
+        assert "age" in r_resp.text
+        assert "feols" not in r_resp.text
+        assert "felm" not in r_resp.text
+        assert "无 Python 代码可翻译" not in r_resp.text
         assert "analysis.R" in r_resp.headers.get("content-disposition", "")
     finally:
         facade.drop_session(sid)

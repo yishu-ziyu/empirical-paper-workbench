@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+from cleaning.audit import AuditStep
 from nodes.translate_code import translate_code
 
 from conftest import make_state
@@ -43,6 +44,45 @@ def _state_with_chapters_python() -> dict:
         }
     ]
     return make_state(body_chapters=body_chapters)
+
+
+_UPLOAD_CLEANING_NAMES = (
+    "profiling",
+    "merge",
+    "missing",
+    "outliers",
+    "transform",
+    "filter",
+    "balance",
+)
+
+
+def _upload_cleaning_report(tmp_path, csv_name: str = "course-panel.csv") -> tuple[dict, str]:
+    """Seed cleaning_report the way POST /upload's AuditStep writes it.
+
+    clean.py is ``df = pd.read_csv(DATA_PATH)`` plus step comments — not a
+    regression script, and not the older dropna fixture.
+    """
+    csv_path = tmp_path / csv_name
+    csv_path.write_text(
+        "id,year,income,age\n1,2010,100,30\n2,2011,110,31\n",
+        encoding="utf-8",
+    )
+    prior = [
+        {"name": name, "status": "success", "report": {}}
+        for name in _UPLOAD_CLEANING_NAMES
+    ]
+    _, audit_report = AuditStep().run(
+        [{"path": str(csv_path)}],
+        {"workspace": str(tmp_path), "steps": prior},
+    )
+    return (
+        {
+            "steps": prior
+            + [{"name": "audit", "status": "success", "report": audit_report}]
+        },
+        str(csv_path),
+    )
 
 
 def _state_with_cleaning_audit(tmp_path) -> dict:
@@ -327,6 +367,77 @@ def test_translate_code_direction_without_python_fences_emits_panel_scripts():
     assert "无 Python 代码可翻译" not in by_lang["stata"]
     assert "无 Python 代码" not in by_lang["py"]
     assert "y ~ treat" not in by_lang["stata"]
+
+
+def test_translate_code_ols_with_guessed_id_year_emits_regress_not_xtreg():
+    """OLS stays pooled OLS even when set_direction guessed CSV id+year."""
+    result = translate_code(
+        {
+            "csv_path": "/tmp/course-panel.csv",
+            "research_direction": {
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+            },
+        }
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "import delimited" in by_lang["stata"]
+    assert "regress income age" in by_lang["stata"]
+    assert "xtreg" not in by_lang["stata"]
+    assert "reghdfe" not in by_lang["stata"]
+    assert "read.csv" in by_lang["r"]
+    assert "lm(" in by_lang["r"]
+    assert "feols" not in by_lang["r"]
+    assert "felm" not in by_lang["r"]
+    assert "无 Python 代码可翻译" not in by_lang["stata"]
+
+
+def test_translate_code_upload_clean_py_plus_ols_emits_direction_scripts(
+    tmp_path,
+):
+    """Upload-only clean.py must not starve the estimate translator.
+
+    POST /upload writes a DATA_PATH audit trail. Direction names
+    outcome+treatment (OLS). Stata/R must be regress/lm, not comments, not TWFE.
+    """
+    cleaning_report, csv_path = _upload_cleaning_report(tmp_path)
+    clean_py = tmp_path / "clean.py"
+    audit_src = clean_py.read_text(encoding="utf-8")
+    assert "df = pd.read_csv(DATA_PATH)" in audit_src
+    assert "smf.ols" not in audit_src
+    assert "OLS" not in audit_src
+
+    result = translate_code(
+        make_state(
+            csv_path=csv_path,
+            cleaning_report=cleaning_report,
+            research_direction={
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+            },
+        )
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "import delimited" in by_lang["stata"]
+    assert "regress income age" in by_lang["stata"]
+    assert "xtreg" not in by_lang["stata"]
+    assert "reghdfe" not in by_lang["stata"]
+    assert "Cleaning steps applied" not in by_lang["stata"]
+    assert "read.csv" in by_lang["r"]
+    assert "lm(" in by_lang["r"]
+    assert "feols" not in by_lang["r"]
+    assert "felm" not in by_lang["r"]
+    assert "无 Python 代码可翻译" not in by_lang["stata"]
+    assert "无 Python 代码" not in by_lang["py"]
+    assert 'smf.ols("income ~ age"' in by_lang["py"]
 
 
 def test_translate_code_empty_state_does_not_invent_y_treat():

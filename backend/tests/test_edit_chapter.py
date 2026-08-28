@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import routers.chapter  # noqa: F401
 import routers.doc_export  # noqa: F401
+from conftest import make_write_ready_state
 from facade import facade
 
 
@@ -92,6 +93,60 @@ def test_edit_chapter_instruction_applies_via_generate_chapter(monkeypatch, clie
     assert captured["revision_suggestions"]
     assert "把引言第一段写短一点" in captured["revision_suggestions"][0]
     assert "原始引言第一段很长很长。" in captured["revision_suggestions"][0]
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_instruction_honors_index_not_leftover_current_chapter(
+    mock_llm_for, monkeypatch, client
+):
+    """generate A then B, then refine A: A changes, B does not.
+
+    Does not mock generate_chapter / resolve_slot. Leftover current_chapter
+    from POST /generate-chapter would otherwise rewrite B.
+    """
+    recorder = mock_llm_for("generate_chapter", return_value="INTRO_A 研究背景")
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+
+    sid = _seed_session(make_write_ready_state())
+    gen_a = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "intro", "title": "引言"}},
+    )
+    assert gen_a.status_code == 200, gen_a.text
+    recorder.return_value = "METHODS_B 识别策略"
+    gen_b = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "methods", "title": "方法"}},
+    )
+    assert gen_b.status_code == 200, gen_b.text
+
+    state = facade.get_state(sid)
+    leftover = state.get("current_chapter") or {}
+    assert leftover.get("type") == "methods"
+    methods_before = next(
+        c for c in state["body_chapters"] if isinstance(c, dict) and c.get("type") == "methods"
+    )
+    intro_before = next(
+        c for c in state["body_chapters"] if isinstance(c, dict) and c.get("type") == "intro"
+    )
+    assert methods_before["content"] == "METHODS_B 识别策略"
+    assert intro_before["content"] == "INTRO_A 研究背景"
+
+    recorder.return_value = "INTRO_A_REFINED 研究背景"
+    resp = client.post(
+        f"/sessions/{sid}/edit-chapter",
+        json={"chapter_index": 0, "instruction": "把引言第一段写短一点"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    after = facade.get_state(sid)["body_chapters"]
+    intro_after = next(c for c in after if isinstance(c, dict) and c.get("type") == "intro")
+    methods_after = next(
+        c for c in after if isinstance(c, dict) and c.get("type") == "methods"
+    )
+    assert intro_after["content"] == "INTRO_A_REFINED 研究背景"
+    assert methods_after["content"] == "METHODS_B 识别策略"
+    assert resp.json()["chapter"]["type"] == "intro"
     facade.drop_session(sid)
 
 

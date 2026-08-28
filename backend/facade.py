@@ -587,7 +587,13 @@ class AgentFacade:
                 detail="generate_chapter node not available",
             )
         state = self.get_state(session_id)
-        state = {**state, "current_chapter_index": chapter_index}
+        # resolve_slot prefers leftover current_chapter (set by POST
+        # /generate-chapter). Index-based rewrite must honor this index.
+        state = {
+            **state,
+            "current_chapter_index": chapter_index,
+            "current_chapter": None,
+        }
         try:
             with self._tracked(session_id, "regenerate_chapter") as t:
                 result = generate_chapter_node(state)

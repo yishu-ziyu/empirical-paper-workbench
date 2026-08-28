@@ -85,6 +85,26 @@ def _upload_cleaning_report(tmp_path, csv_name: str = "course-panel.csv") -> tup
     )
 
 
+def _column_guessed_id_year() -> list[dict]:
+    """set_direction CSV-guess degradations for columns named id and year."""
+    return [
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "id_col",
+            "value": "id",
+            "visible": True,
+        },
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "time_col",
+            "value": "year",
+            "visible": True,
+        },
+    ]
+
+
 def _state_with_cleaning_audit(tmp_path) -> dict:
     """构造一个带 cleaning_report.steps[7] (audit) 的 state（clean.py 文件存在）。"""
     clean_py = tmp_path / "clean.py"
@@ -369,21 +389,9 @@ def test_translate_code_direction_without_python_fences_emits_panel_scripts():
     assert "y ~ treat" not in by_lang["stata"]
 
 
-def test_translate_code_upload_clean_py_plus_direction_emits_takeable_scripts(
-    tmp_path,
-):
-    """Upload-only clean.py must not starve the estimate translator.
-
-    POST /upload writes a DATA_PATH audit trail. Direction names
-    outcome+treatment. Stata/R must be takeable, not comment-only audit.
-    """
+def test_translate_code_ols_guessed_id_year_emits_regress_not_xtreg(tmp_path):
+    """OLS stays pooled OLS when set_direction guessed CSV id+year."""
     cleaning_report, csv_path = _upload_cleaning_report(tmp_path)
-    clean_py = tmp_path / "clean.py"
-    audit_src = clean_py.read_text(encoding="utf-8")
-    assert "df = pd.read_csv(DATA_PATH)" in audit_src
-    assert "smf.ols" not in audit_src
-    assert "OLS" not in audit_src
-
     result = translate_code(
         make_state(
             csv_path=csv_path,
@@ -395,20 +403,27 @@ def test_translate_code_upload_clean_py_plus_direction_emits_takeable_scripts(
                 "method": "OLS",
                 "id_col": "id",
                 "time_col": "year",
+                "id": "id",
+                "year": "year",
             },
+            degradations=_column_guessed_id_year(),
         )
     )
     by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
     stata = by_lang["stata"]
     r_code = by_lang["r"]
     assert "import delimited" in stata
-    assert any(n in stata for n in ("regress ", "xtreg", "reghdfe")), stata
+    assert "regress income age" in stata
+    assert "xtreg" not in stata
+    assert "reghdfe" not in stata
     assert "Cleaning steps applied" not in stata
     assert "read.csv" in r_code
-    assert any(n in r_code for n in ("lm(", "feols", "felm")), r_code
+    assert "lm(" in r_code
+    assert "feols" not in r_code
+    assert "felm" not in r_code
     assert "无 Python 代码可翻译" not in stata
     assert "无 Python 代码" not in by_lang["py"]
-    assert "smf.ols" in by_lang["py"]
+    assert 'smf.ols("income ~ age"' in by_lang["py"]
 
 
 def test_translate_code_empty_state_does_not_invent_y_treat():

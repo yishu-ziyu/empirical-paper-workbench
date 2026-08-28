@@ -289,6 +289,56 @@ def test_translate_code_unknown_python_does_not_crash():
     assert len(result["code_translations"]) == 4
 
 
+def test_translate_code_direction_without_python_fences_emits_panel_scripts():
+    """Named panel direction, no ```python fences: usable xtreg/reghdfe + feols/felm."""
+    result = translate_code(
+        {
+            "csv_path": "/tmp/user.csv",
+            "research_direction": {
+                "question": "post on l_homicide",
+                "dv": "l_homicide",
+                "iv": "post",
+                "controls": ["l_prison"],
+                "method": "did",
+                "id_col": "sid",
+                "time_col": "year",
+            },
+            "body_chapters": [
+                {"type": "results", "content": "散文结果章，没有代码块。"}
+            ],
+        }
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "xtreg" in by_lang["stata"]
+    assert "reghdfe" in by_lang["stata"]
+    assert "l_homicide" in by_lang["stata"]
+    assert "post" in by_lang["stata"]
+    assert "sid" in by_lang["stata"]
+    assert "feols" in by_lang["r"]
+    assert "felm" in by_lang["r"]
+    assert "l_homicide" in by_lang["r"]
+    assert "C(sid)" in by_lang["py"]
+    assert "C(year)" in by_lang["py"]
+    assert 'smf.ols("l_homicide ~ post + l_prison", data=df)' not in by_lang["py"]
+    assert "TWFE" in by_lang["py"]
+    assert "TWFE" in by_lang["stata"]
+    assert "TWFE" in by_lang["r"]
+    assert "MISMATCH" in by_lang["eviews"]
+    assert "无 Python 代码可翻译" not in by_lang["stata"]
+    assert "无 Python 代码" not in by_lang["py"]
+    assert "y ~ treat" not in by_lang["stata"]
+
+
+def test_translate_code_empty_state_does_not_invent_y_treat():
+    """Empty state keeps placeholder langs; does not fabricate y ~ treat."""
+    result = translate_code({})
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "无 Python 代码可翻译" in by_lang["stata"]
+    assert "y ~ treat" not in by_lang["stata"]
+    assert "y ~ treat" not in by_lang["r"]
+    assert "y ~ treat" not in by_lang["py"]
+
+
 def test_translate_code_chapter_without_code_block():
     """章节内容里没有 Python 代码块时不报错。"""
     state = make_state(

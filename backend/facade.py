@@ -94,6 +94,11 @@ except Exception:  # pragma: no cover
     export_docx_node = None
 
 try:
+    from nodes.translate_code import translate_code as translate_code_node  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover
+    translate_code_node = None
+
+try:
     from cleaning.transform import TransformStep as TransformStepCls  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover
     TransformStepCls = None
@@ -528,6 +533,25 @@ class AgentFacade:
         self.save_state(session_id, state)
         return result
 
+    def run_translate_code(self, session_id: str) -> dict:
+        """Run translate_code and persist code_translations for /code-export.
+
+        The HITL write path never enters the LangGraph translate_code node, so
+        HTTP must call this hook (POST /translate-code or GET /code-export).
+        """
+        if translate_code_node is None:
+            raise HTTPException(
+                status_code=503,
+                detail="translate_code node not available",
+            )
+        state = self.get_state(session_id)
+        with self._tracked(session_id, "translate_code", "translate_code") as t:
+            result = translate_code_node(state)
+            state = {**state, **result}
+            self.save_state(session_id, state)
+            t.set_detail(n=len(result.get("code_translations") or []))
+        return result
+
     def resume_outline(
         self, session_id: str, user_adjusted_outline: Any
     ) -> dict:
@@ -659,6 +683,14 @@ class AgentFacade:
                     visible=True,
                 )
         self.save_state(session_id, state)
+        # Write loop ends with downloadable Stata/R: fill translations after a
+        # successful chapter write. Fail-open so a translate miss does not 500
+        # generate-chapter; GET /code-export can still fill on first download.
+        try:
+            translated = self.run_translate_code(session_id)
+            state = {**state, **translated}
+        except Exception:
+            pass
         return state
 
     def rollback_chapter(

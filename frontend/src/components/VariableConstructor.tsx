@@ -2,7 +2,7 @@
 // 类型下拉 + 列名输入 → POST /sessions/{id}/transform → 显示已构造变量列表
 
 import { useState } from 'react'
-import { API_BASE } from '../lib/apiBase'
+import { API_BASE, apiFetch } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -33,7 +33,7 @@ export function VariableConstructor({ sessionId }: VariableConstructorProps) {
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/transform`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/transform`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: vtype, column }),

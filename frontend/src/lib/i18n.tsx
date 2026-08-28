@@ -182,7 +182,6 @@ const zh = {
   'path.clean.audit': 'audit · 留痕',
 
   'desk.heading': '从一句话到一篇实证论文',
-  'desk.sub': '乱写也行。会不会，写完这篇论文你就知道了。',
   'desk.paperLabel': '把想法写在这里',
   'desk.placeholder': '例：导师让我用 CHARLS 做点养老的，不知道从哪问起',
   'desk.trust': '先看见估计 · 每一章停下确认 · 不编造数据',
@@ -698,7 +697,6 @@ const en: typeof zh = {
 
   'desk.heading': 'From one sentence to an empirical paper',
   'desk.asked': 'You asked',
-  'desk.sub': 'Messy is fine. Whatever the answer is, you will know it once the paper is done.',
   'desk.paperLabel': 'Write your idea here',
   'desk.placeholder': 'e.g. My advisor wants CHARLS retirement research — where do I start?',
   'desk.trust': 'See the estimate first · Every chapter pauses · No fabricated numbers',

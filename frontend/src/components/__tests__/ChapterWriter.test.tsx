@@ -4,7 +4,7 @@
 // 1. 用 CodeMirror 6 渲染 markdown 内容（流式 append 不重渲）
 // 2. 章节类型 badge（6 色：intro=蓝 / lit_review=紫 / data_desc=绿 /
 //    methods=橙 / results=红 / conclusion=灰）
-// 3. status === 'generated' 后显示三个按钮：重新生成 / 编辑 / 通过
+// 3. status === 'generated' 后显示三个按钮：重新生成 / 编辑 / 批准本章
 // 4. onRegenerate / onApprove 回调正确触发
 //
 // jsdom 限制：CodeMirror 6 在 jsdom 下不完全渲染（缺 ResizeObserver /
@@ -80,11 +80,11 @@ describe('ChapterWriter 章节写作器', () => {
     }
   })
 
-  test('status=generated 时显示 重新生成 / 编辑 / 通过 三按钮', () => {
+  test('status=generated 时显示 重新生成 / 编辑 / 批准本章 三按钮', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /批准本章/ })).toBeInTheDocument()
   })
 
   test('status=streaming 时不显示审批按钮（仅显示加载提示）', () => {
@@ -95,16 +95,16 @@ describe('ChapterWriter 章节写作器', () => {
       />,
     )
     expect(screen.queryByRole('button', { name: /重新生成/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /通过/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /批准本章/ })).not.toBeInTheDocument()
     // 应有 streaming / 加载提示
     expect(screen.getByTestId('chapter-streaming-hint')).toBeInTheDocument()
   })
 
-  test('点击"通过"按钮触发 onApprove', async () => {
+  test('点击"批准本章"按钮触发 onApprove', async () => {
     const user = userEvent.setup()
     const onApprove = vi.fn()
     renderWithI18n(<ChapterWriter {...baseProps} onApprove={onApprove} />)
-    await user.click(screen.getByRole('button', { name: /通过/ }))
+    await user.click(screen.getByRole('button', { name: /批准本章/ }))
     expect(onApprove).toHaveBeenCalledTimes(1)
   })
 
@@ -143,7 +143,7 @@ describe('ChapterWriter 章节写作器', () => {
 // T-08c 扩展测试：4 按钮 + 回滚下拉 + 编辑模式
 //
 // 契约（任务规格 §T-08c）：
-// 1. status=generated 显示 4 按钮：重新生成 / 回滚 / 编辑 / 通过
+// 1. status=generated 显示 4 按钮：重新生成 / 回滚 / 编辑 / 批准本章
 // 2. 回滚下拉：点"回滚"显示版本列表，选择版本触发 onRollback(index)
 // 3. 编辑模式：点"编辑"切换为可编辑 + 显示"保存"按钮，点"保存"触发 onSaveEdit
 describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => {
@@ -153,15 +153,15 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     '# 引言\n本文从人力资本理论出发，探讨教育年限对收入的边际效应。',
   ]
 
-  test('status=generated 时显示 4 按钮（重新生成 / 回滚 / 编辑 / 通过）', () => {
+  test('status=generated 时显示 4 按钮（重新生成 / 回滚 / 编辑 / 批准本章）', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /回滚/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /批准本章/ })).toBeInTheDocument()
   })
 
-  test('status=edited 时仍显示 HITL 工具栏（重新生成 / 回滚 / 编辑 / 通过）', () => {
+  test('status=edited 时仍显示 HITL 工具栏（重新生成 / 回滚 / 编辑 / 批准本章）', () => {
     renderWithI18n(
       <ChapterWriter
         {...baseProps}
@@ -171,7 +171,7 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /回滚/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /批准本章/ })).toBeInTheDocument()
   })
 
   test('默认不显示版本历史下拉', () => {

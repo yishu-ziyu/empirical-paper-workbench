@@ -126,3 +126,60 @@ def test_regenerate_unknown_session_returns_404(client):
         json={"chapter_index": 0},
     )
     assert resp.status_code == 404
+
+
+def test_regenerate_accepts_instruction(monkeypatch, client):
+    """instruction 写入 revision_suggestions 后再跑 generate_chapter。"""
+    sid = _seed_session(_state_one_chapter())
+    captured = {}
+
+    def mock_generate(s):
+        captured["revision_suggestions"] = s.get("revision_suggestions")
+        body_chapters = list(s.get("body_chapters", []))
+        idx = s.get("current_chapter_index", 0)
+        if 0 <= idx < len(body_chapters):
+            ch = dict(body_chapters[idx])
+            ch["content"] = "按意见改写"
+            ch["status"] = "regenerated"
+            body_chapters[idx] = ch
+        return {"body_chapters": body_chapters}
+
+    monkeypatch.setattr("facade.generate_chapter_node", mock_generate)
+
+    resp = client.post(
+        f"/sessions/{sid}/regenerate",
+        json={"chapter_index": 0, "instruction": "写短一点"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert captured["revision_suggestions"][0] == "写短一点"
+    assert resp.json()["chapter"]["content"] == "按意见改写"
+
+
+def test_regenerate_empty_instruction_still_runs(monkeypatch, client):
+    """空 instruction 仍重生成，且不覆盖已有 revision_suggestions。"""
+    sid = _seed_session({
+        **_state_one_chapter(),
+        "revision_suggestions": ["原建议"],
+    })
+    captured = {}
+
+    def mock_generate(s):
+        captured["revision_suggestions"] = s.get("revision_suggestions")
+        body_chapters = list(s.get("body_chapters", []))
+        idx = s.get("current_chapter_index", 0)
+        if 0 <= idx < len(body_chapters):
+            ch = dict(body_chapters[idx])
+            ch["content"] = "empty-ok"
+            ch["status"] = "regenerated"
+            body_chapters[idx] = ch
+        return {"body_chapters": body_chapters}
+
+    monkeypatch.setattr("facade.generate_chapter_node", mock_generate)
+
+    resp = client.post(
+        f"/sessions/{sid}/regenerate",
+        json={"chapter_index": 0, "instruction": ""},
+    )
+    assert resp.status_code == 200, resp.text
+    assert captured["revision_suggestions"] == ["原建议"]
+    assert resp.json()["chapter"]["content"] == "empty-ok"

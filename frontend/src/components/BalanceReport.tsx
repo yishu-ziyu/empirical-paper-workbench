@@ -6,6 +6,7 @@
 // 修复漂移 1：字段名 balanced_n/unbalanced_n → balanced/unbalanced，新增 n_periods。
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -14,8 +15,6 @@ type BalanceResponse = components['schemas']['BalanceResponse']
 export interface BalanceReportProps {
   sessionId: string
 }
-
-const API_BASE = 'http://localhost:8000'
 
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(0)}%`

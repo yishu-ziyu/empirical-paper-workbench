@@ -60,6 +60,7 @@ export function LangSwitch() {
 }
 
 export interface UnauthHeaderProps {
+  onHome?: () => void
   onLogin?: () => void
   onRegister?: () => void
   onHow?: () => void
@@ -69,6 +70,7 @@ export interface UnauthHeaderProps {
 }
 
 export default function UnauthHeader({
+  onHome,
   onLogin,
   onRegister,
   onHow,
@@ -82,7 +84,13 @@ export default function UnauthHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-white/90 backdrop-blur-md">
       <div className="mx-auto grid h-[64px] max-w-[1120px] grid-cols-[1fr_auto] items-center gap-4 px-6 md:grid-cols-[1fr_auto_1fr]">
+        {onHome ? (
+        <button type="button" onClick={onHome} className="cursor-pointer text-left">
+          <BrandMark />
+        </button>
+      ) : (
         <BrandMark />
+      )}
         {hasNav && (
           <nav className="hidden items-center gap-8 text-[14px] text-[#5c5c5c] md:flex">
             {onHow && (

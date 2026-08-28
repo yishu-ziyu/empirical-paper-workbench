@@ -144,7 +144,7 @@ export default function DirectionForm({
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.dv')}</span>
+        <span className="block text-xs text-muted" title={t('direction.dvHint')}>{t('direction.dv')}</span>
         <input
           aria-label={t('direction.dv')}
           value={dv}
@@ -153,7 +153,7 @@ export default function DirectionForm({
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.iv')}</span>
+        <span className="block text-xs text-muted" title={t('direction.ivHint')}>{t('direction.iv')}</span>
         <input
           aria-label={t('direction.iv')}
           value={iv}
@@ -162,7 +162,7 @@ export default function DirectionForm({
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.controls')}</span>
+        <span className="block text-xs text-muted" title={t('direction.controlsHint')}>{t('direction.controls')}</span>
         <input
           aria-label={t('direction.controls')}
           value={controls}

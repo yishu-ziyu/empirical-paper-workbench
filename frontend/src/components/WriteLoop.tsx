@@ -137,6 +137,7 @@ export default function WriteLoop({
   const [tableCount, setTableCount] = useState(1)
   const [figureCount, setFigureCount] = useState(1)
   const [refine, setRefine] = useState('')
+  const [showInfoFull, setShowInfoFull] = useState(false)
   const controls = Array.isArray(direction?.controls)
     ? direction?.controls.join(', ')
     : direction?.controls || '—'
@@ -182,6 +183,24 @@ export default function WriteLoop({
 
       {hasDirection ? (
         <section data-testid="info-confirm" className="thread-card px-4 py-4">
+          {hasOutline && !showInfoFull ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+              <span className="font-medium text-accent">✓</span>
+              <span className="text-ink">{t('write.infoTitle')}</span>
+              <span className="text-muted">
+                {direction?.dv || '—'} ~ {direction?.iv || '—'} · {direction?.method || 'OLS'}
+              </span>
+              <button
+                type="button"
+                data-testid="info-expand"
+                onClick={() => setShowInfoFull(true)}
+                className="ml-auto text-muted underline-offset-2 hover:text-ink hover:underline"
+              >
+                {t('write.addMore')}
+              </button>
+            </div>
+          ) : (
+          <>
           <h3 className="font-serif text-[1.05rem] text-ink">{t('write.infoTitle')}</h3>
           <dl className="mt-3 space-y-2 text-[12px] leading-5">
             <div>
@@ -237,6 +256,8 @@ export default function WriteLoop({
               {t('write.goPart1')}
             </button>
           </div>
+          </>
+          )}
         </section>
       ) : null}
 
@@ -341,33 +362,32 @@ export default function WriteLoop({
             data-testid="pause-apply"
             onClick={() => onApplyGenerate?.(pausePayload())}
             disabled={writeBusy}
-            className="mt-4 rounded-full bg-accent px-3.5 py-1.5 text-[12px] text-white disabled:opacity-40"
+            className="mt-4 rounded-full border border-black/[0.12] px-3.5 py-1.5 text-[12px] text-ink transition-colors duration-200 hover:bg-black/[0.03] disabled:opacity-40"
           >
             {t('write.apply')}
           </button>
+          {hasOutline && !outlineLocked ? (
+            <div data-testid="outline-approve" className="mt-3 flex flex-wrap gap-2 border-t border-black/[0.06] pt-3">
+              <button
+                type="button"
+                data-testid="outline-approve-btn"
+                disabled={!onApproveOutline || writeBusy}
+                onClick={() => onApproveOutline?.(currentOutline)}
+                className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] text-white disabled:opacity-40"
+              >
+                {t('write.approveOutline')}
+              </button>
+              <button
+                type="button"
+                data-testid="outline-revise-btn"
+                onClick={onReviseOutline}
+                className="rounded-full border border-black/[0.08] px-3 py-1.5 text-[12px]"
+              >
+                {t('write.reviseOutline')}
+              </button>
+            </div>
+          ) : null}
         </section>
-      ) : null}
-
-      {hasOutline && !outlineLocked ? (
-        <div data-testid="outline-approve" className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            data-testid="outline-revise-btn"
-            onClick={onReviseOutline}
-            className="rounded-full border border-black/[0.08] px-3 py-1.5 text-[12px]"
-          >
-            {t('write.reviseOutline')}
-          </button>
-          <button
-            type="button"
-            data-testid="outline-approve-btn"
-            disabled={!onApproveOutline || writeBusy}
-            onClick={() => onApproveOutline?.(currentOutline)}
-            className="rounded-full bg-accent px-3.5 py-1.5 text-[12px] text-white disabled:opacity-40"
-          >
-            {t('write.approveOutline')}
-          </button>
-        </div>
       ) : null}
 
       {hasChapter ? (

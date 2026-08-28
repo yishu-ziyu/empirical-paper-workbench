@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import get_user_from_token, require_session_ownership
+from auth import ACCESS_COOKIE, get_user_from_token, require_session_ownership
 from database import get_db
 from facade import facade
 from models.user import User
@@ -29,6 +29,10 @@ def _token_from_websocket(ws: WebSocket) -> Optional[str]:
     token = ws.query_params.get("token")
     if token:
         return token
+    # Same-origin WS handshake carries the httpOnly access cookie.
+    cookie_token = ws.cookies.get(ACCESS_COOKIE)
+    if cookie_token:
+        return cookie_token
     header = ws.headers.get("sec-websocket-protocol")
     if not header:
         return None

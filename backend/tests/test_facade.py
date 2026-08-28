@@ -686,6 +686,70 @@ def test_export_document_503_when_node_missing(monkeypatch):
     facade.drop_session("test-exp-503")
 
 
+def test_run_translate_code_calls_node_and_persists(monkeypatch):
+    """run_translate_code writes code_translations into session state."""
+    captured = {}
+
+    def fake_translate(state):
+        captured["saw_state"] = True
+        return {
+            "code_translations": [
+                {"lang": "stata", "code": "regress y x\n", "filename": "analysis.do"},
+            ]
+        }
+
+    monkeypatch.setattr("facade.translate_code_node", fake_translate)
+
+    sid = "test-translate-code"
+    facade.seed_state(sid, {"research_direction": {"dv": "y", "iv": "x"}})
+    result = facade.run_translate_code(sid)
+
+    assert captured["saw_state"] is True
+    assert result["code_translations"][0]["lang"] == "stata"
+    assert facade.get_state(sid)["code_translations"][0]["filename"] == "analysis.do"
+    facade.drop_session(sid)
+
+
+def test_run_translate_code_503_when_node_missing(monkeypatch):
+    """run_translate_code raises 503 when translate_code_node is None."""
+    monkeypatch.setattr("facade.translate_code_node", None)
+    facade.seed_state("test-translate-503", {})
+    with pytest.raises(Exception) as exc_info:
+        facade.run_translate_code("test-translate-503")
+    assert exc_info.value.status_code == 503
+    facade.drop_session("test-translate-503")
+
+
+def test_generate_chapter_fills_code_translations(monkeypatch):
+    """Successful generate fills Stata/R translations for /code-export."""
+    monkeypatch.setattr(
+        "facade.generate_chapter_node",
+        lambda state: {"body_chapters": [state["current_chapter"]]},
+    )
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+    monkeypatch.setattr(
+        "facade.translate_code_node",
+        lambda state: {
+            "code_translations": [
+                {"lang": "stata", "code": "regress income age\n", "filename": "analysis.do"},
+                {"lang": "r", "code": "lm(income ~ age, data=df)\n", "filename": "analysis.R"},
+            ]
+        },
+    )
+
+    sid = "test-gen-fills-code"
+    facade.seed_state(
+        sid,
+        {"research_direction": {"dv": "income", "iv": "age", "method": "ols"}},
+    )
+    result = facade.generate_chapter(sid, {"type": "intro", "title": "引言"})
+    langs = {t["lang"] for t in result["code_translations"]}
+    assert "stata" in langs
+    assert "r" in langs
+    assert facade.get_state(sid)["code_translations"]
+    facade.drop_session(sid)
+
+
 # ---------------------------------------------------------------------------
 # Cleaning step calls
 # ---------------------------------------------------------------------------

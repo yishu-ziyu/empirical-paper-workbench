@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+from cleaning.audit import AuditStep
 from nodes.translate_code import translate_code
 
 from conftest import make_state
@@ -43,6 +44,65 @@ def _state_with_chapters_python() -> dict:
         }
     ]
     return make_state(body_chapters=body_chapters)
+
+
+_UPLOAD_CLEANING_NAMES = (
+    "profiling",
+    "merge",
+    "missing",
+    "outliers",
+    "transform",
+    "filter",
+    "balance",
+)
+
+
+def _upload_cleaning_report(tmp_path, csv_name: str = "course-panel.csv") -> tuple[dict, str]:
+    """Seed cleaning_report the way POST /upload's AuditStep writes it.
+
+    clean.py is ``df = pd.read_csv(DATA_PATH)`` plus step comments — not a
+    regression script, and not the older dropna fixture.
+    """
+    csv_path = tmp_path / csv_name
+    csv_path.write_text(
+        "id,year,income,age\n1,2010,100,30\n2,2011,110,31\n",
+        encoding="utf-8",
+    )
+    prior = [
+        {"name": name, "status": "success", "report": {}}
+        for name in _UPLOAD_CLEANING_NAMES
+    ]
+    _, audit_report = AuditStep().run(
+        [{"path": str(csv_path)}],
+        {"workspace": str(tmp_path), "steps": prior},
+    )
+    return (
+        {
+            "steps": prior
+            + [{"name": "audit", "status": "success", "report": audit_report}]
+        },
+        str(csv_path),
+    )
+
+
+def _column_guessed_id_year() -> list[dict]:
+    """set_direction CSV-guess degradations for columns named id and year."""
+    return [
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "id_col",
+            "value": "id",
+            "visible": True,
+        },
+        {
+            "node": "set_direction",
+            "reason": "column_guessed",
+            "field": "time_col",
+            "value": "year",
+            "visible": True,
+        },
+    ]
 
 
 def _state_with_cleaning_audit(tmp_path) -> dict:
@@ -290,10 +350,10 @@ def test_translate_code_unknown_python_does_not_crash():
 
 
 def test_translate_code_direction_without_python_fences_emits_panel_scripts():
-    """Castle-style direction, no ```python fences: usable xtreg/reghdfe + feols/felm."""
+    """Named panel direction, no ```python fences: usable xtreg/reghdfe + feols/felm."""
     result = translate_code(
         {
-            "csv_path": "/tmp/castle.csv",
+            "csv_path": "/tmp/user.csv",
             "research_direction": {
                 "question": "post on l_homicide",
                 "dv": "l_homicide",
@@ -326,6 +386,54 @@ def test_translate_code_direction_without_python_fences_emits_panel_scripts():
     assert "MISMATCH" in by_lang["eviews"]
     assert "无 Python 代码可翻译" not in by_lang["stata"]
     assert "无 Python 代码" not in by_lang["py"]
+    assert "y ~ treat" not in by_lang["stata"]
+
+
+def test_translate_code_ols_guessed_id_year_emits_regress_not_xtreg(tmp_path):
+    """OLS stays pooled OLS when set_direction guessed CSV id+year."""
+    cleaning_report, csv_path = _upload_cleaning_report(tmp_path)
+    result = translate_code(
+        make_state(
+            csv_path=csv_path,
+            cleaning_report=cleaning_report,
+            research_direction={
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+                "id": "id",
+                "year": "year",
+            },
+            degradations=_column_guessed_id_year(),
+        )
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    stata = by_lang["stata"]
+    r_code = by_lang["r"]
+    assert "import delimited" in stata
+    assert "regress income age" in stata
+    assert "xtreg" not in stata
+    assert "reghdfe" not in stata
+    assert "Cleaning steps applied" not in stata
+    assert "read.csv" in r_code
+    assert "lm(" in r_code
+    assert "feols" not in r_code
+    assert "felm" not in r_code
+    assert "无 Python 代码可翻译" not in stata
+    assert "无 Python 代码" not in by_lang["py"]
+    assert 'smf.ols("income ~ age"' in by_lang["py"]
+
+
+def test_translate_code_empty_state_does_not_invent_y_treat():
+    """Empty state keeps placeholder langs; does not fabricate y ~ treat."""
+    result = translate_code({})
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "无 Python 代码可翻译" in by_lang["stata"]
+    assert "y ~ treat" not in by_lang["stata"]
+    assert "y ~ treat" not in by_lang["r"]
+    assert "y ~ treat" not in by_lang["py"]
 
 
 def test_translate_code_chapter_without_code_block():

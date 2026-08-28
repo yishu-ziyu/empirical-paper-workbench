@@ -23,8 +23,27 @@ import re
 from pathlib import Path
 from typing import Any
 
+from design.spec import norm_method
 from protocols import TranslateCodeOutput
 from state import EconPaperState
+
+# Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
+_PANEL_METHOD_KEYS = {"did", "panel", "twfe", "fe"}
+
+# Executable Python that can become a real estimator — not a cleaning audit.
+_REGRESSION_MARKERS = (
+    "smf.ols",
+    "sm.OLS",
+    "statsmodels",
+    "linearmodels",
+    "feols",
+    "felm",
+    ".fit(",
+    "OLS(",
+    "regress ",
+    "xtreg",
+    "reghdfe",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +356,7 @@ def _as_controls(value: Any) -> list[str]:
     return [str(part).strip() for part in value if str(part).strip()]
 
 
-def _first_text(*sources: Any, keys: tuple[str, ...], default: str = "") -> str:
+def _first_text(*sources: Any, keys: tuple[str, ...]) -> str:
     for src in sources:
         if not isinstance(src, dict):
             continue
@@ -348,26 +367,57 @@ def _first_text(*sources: Any, keys: tuple[str, ...], default: str = "") -> str:
             text = str(raw).strip()
             if text:
                 return text
-    return default
+    return ""
 
 
-def _direction_model(state: EconPaperState) -> dict[str, Any]:
-    """Read outcome / treatment / panel columns from direction or spec."""
+def _method_is_panel(method: Any) -> bool:
+    """True for did / panel / twfe / fe only — not OLS, not guessed CSV columns."""
+    if norm_method(method) == "did":
+        return True
+    key = str(method or "").strip().lower()
+    return key in _PANEL_METHOD_KEYS
+
+
+def _python_is_takeable_regression(python: str) -> bool:
+    """False for upload-only clean.py (DATA_PATH + step comments, no model)."""
+    if not (python or "").strip():
+        return False
+    code_lines: list[str] = []
+    for line in python.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        code_lines.append(stripped)
+    blob = "\n".join(code_lines)
+    if any(marker in blob for marker in _REGRESSION_MARKERS):
+        return True
+    for line in code_lines:
+        if " ~ " in line:
+            return True
+    return False
+
+
+def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
+    """Named outcome + treatment from direction/spec, or None (do not invent y/treat)."""
     spec = state.get("main_specification")
     rd = state.get("research_direction")
     spec = spec if isinstance(spec, dict) else {}
     rd = rd if isinstance(rd, dict) else {}
+    outcome = _first_text(spec, rd, keys=("outcome", "outcome_col", "dv"))
+    treatment = _first_text(spec, rd, keys=("treatment", "treatment_col", "iv"))
+    if not outcome or not treatment:
+        return None
     csv_path = state.get("csv_path") or "data.csv"
     csv_name = Path(str(csv_path)).name or "data.csv"
-    outcome = _first_text(spec, rd, keys=("outcome", "outcome_col", "dv"), default="y")
-    treatment = _first_text(
-        spec, rd, keys=("treatment", "treatment_col", "iv"), default="treat"
-    )
     id_col = _first_text(spec, rd, keys=("id_col", "id", "unit_col", "unit"))
     time_col = _first_text(spec, rd, keys=("time_col", "time", "year"))
     controls = _as_controls(spec.get("controls")) or _as_controls(rd.get("controls"))
     skip = {outcome, treatment, id_col, time_col}
     controls = [col for col in controls if col not in skip]
+    estimate = state.get("estimate")
+    estimate = estimate if isinstance(estimate, dict) else {}
+    formula = str(estimate.get("formula") or spec.get("formula") or "").strip()
+    method = _first_text(spec, rd, keys=("method",))
     return {
         "csv": csv_name,
         "outcome": outcome,
@@ -375,12 +425,17 @@ def _direction_model(state: EconPaperState) -> dict[str, Any]:
         "controls": controls,
         "id_col": id_col,
         "time_col": time_col,
-        "panel": bool(id_col and time_col),
+        "panel": _method_is_panel(method),
+        "formula": formula,
     }
 
 
 def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
-    """Usable Stata xtreg/reghdfe + R fixest/felm when chapters have no Python."""
+    """Usable scripts from named outcome+treatment.
+
+    OLS → Stata ``regress`` / R ``lm``. Panel/DiD/event → ``xtreg``/``reghdfe``
+    and ``feols``/``felm``. Guessed CSV id+year on an OLS direction stays OLS.
+    """
     y = model["outcome"]
     treat = model["treatment"]
     controls = model["controls"]
@@ -409,8 +464,9 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
             f"({y} ~ {rhs_plus} | {i} + {t}) used in Python/Stata/R."
         )
     else:
-        spec_note = f"Common spec: pooled OLS {y} ~ {rhs_plus}."
-        py_formula = f"{y} ~ {rhs_plus}"
+        fitted = model.get("formula") or f"{y} ~ {rhs_plus}"
+        spec_note = f"Common spec: pooled OLS {fitted}."
+        py_formula = fitted
         py_fit = f'model = smf.ols("{py_formula}", data=df).fit()'
         eviews_note = spec_note
 
@@ -486,6 +542,46 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _empty_translations() -> list[dict]:
+    """Placeholder 4 langs when there is no Python and no named spec."""
+    return [
+        {
+            "lang": "py",
+            "code": (
+                '"""Auto-generated Python script (econpaper T-09).\n\n'
+                "由 body_chapters 与 cleaning audit 合并而来。\n"
+                '"""\n\n'
+                "# 无 Python 代码\n"
+            ),
+            "filename": "analysis.py",
+        },
+        {
+            "lang": "stata",
+            "code": (
+                "* Auto-generated Stata script (econpaper T-09)\n"
+                "* 无 Python 代码可翻译\n"
+            ),
+            "filename": "analysis.do",
+        },
+        {
+            "lang": "r",
+            "code": (
+                "# Auto-generated R script (econpaper T-09)\n"
+                "# 无 Python 代码可翻译\n"
+            ),
+            "filename": "analysis.R",
+        },
+        {
+            "lang": "eviews",
+            "code": (
+                "' Auto-generated EViews script (econpaper T-09)\n"
+                "' 无 Python 代码可翻译\n"
+            ),
+            "filename": "analysis.m",
+        },
+    ]
+
+
 def _translate_block(python_code: str, lang: str) -> str:
     """整段 Python 代码翻译成目标语言。"""
     if not python_code.strip():
@@ -524,6 +620,13 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
     固定 4 条：py / stata / r / eviews。
     """
     python_code = _collect_python(state)
+    model = _direction_model(state)
+
+    # Upload-only clean.py is collected Python but not a regression. Translating
+    # it yields comment-only Stata/R (read_csv(DATA_PATH) has no string path).
+    # Named outcome+treatment then wins so GET ?format=do|R can be takeable.
+    if python_code.strip() and not _python_is_takeable_regression(python_code):
+        python_code = "" if model is not None else python_code
 
     if python_code.strip():
         py_code = (
@@ -552,7 +655,10 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
         ]
         return {"code_translations": translations}
 
-    scripts = _scripts_from_direction(_direction_model(state))
+    if model is None:
+        return {"code_translations": _empty_translations()}
+
+    scripts = _scripts_from_direction(model)
     return {
         "code_translations": [
             {"lang": "py", "code": scripts["py"], "filename": "analysis.py"},

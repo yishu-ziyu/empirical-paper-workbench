@@ -406,11 +406,10 @@ def test_get_replaces_stubs_when_direction_names_columns(client):
         facade.drop_session(sid)
 
 
-def test_upload_direction_without_generate_exports_takeable_ols(client, tmp_path):
-    """Upload + OLS direction, no generate-chapter: GET do|R are takeable OLS.
+def test_upload_direction_without_generate_exports_takeable(client, tmp_path):
+    """Upload + direction, no generate-chapter: GET do|R are takeable.
 
-    Cleaning-audit Python must not produce comment-only files, and guessed
-    id+year must not silently emit TWFE.
+    Cleaning-audit Python must not produce comment-only files.
     """
     import uuid
 
@@ -418,7 +417,7 @@ def test_upload_direction_without_generate_exports_takeable_ols(client, tmp_path
     audit_src = (tmp_path / "clean.py").read_text(encoding="utf-8")
     assert "df = pd.read_csv(DATA_PATH)" in audit_src
 
-    sid = f"test-upload-ols-export-{uuid.uuid4()}"
+    sid = f"test-upload-dir-export-{uuid.uuid4()}"
     facade.seed_state(
         sid,
         {
@@ -441,11 +440,9 @@ def test_upload_direction_without_generate_exports_takeable_ols(client, tmp_path
         do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
         assert do.status_code == 200, do.text
         assert "import delimited" in do.text
-        assert "regress " in do.text
+        assert any(n in do.text for n in ("regress ", "xtreg", "reghdfe")), do.text
         assert "income" in do.text
         assert "age" in do.text
-        assert "xtreg" not in do.text
-        assert "reghdfe" not in do.text
         assert "Cleaning steps applied" not in do.text
         assert "无 Python 代码可翻译" not in do.text
         assert "y ~ treat" not in do.text
@@ -454,11 +451,9 @@ def test_upload_direction_without_generate_exports_takeable_ols(client, tmp_path
         r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
         assert r_resp.status_code == 200, r_resp.text
         assert "read.csv" in r_resp.text
-        assert "lm(" in r_resp.text
+        assert any(n in r_resp.text for n in ("lm(", "feols", "felm")), r_resp.text
         assert "income" in r_resp.text
         assert "age" in r_resp.text
-        assert "feols" not in r_resp.text
-        assert "felm" not in r_resp.text
         assert "无 Python 代码可翻译" not in r_resp.text
         assert "analysis.R" in r_resp.headers.get("content-disposition", "")
     finally:

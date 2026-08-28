@@ -23,21 +23,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from design.spec import norm_method
 from protocols import TranslateCodeOutput
 from state import EconPaperState
-
-# TWFE only when the user picked a panel/DiD method. Guessed CSV columns
-# named id/year (set_direction) must not silently upgrade OLS to xtreg/feols.
-_PANEL_METHOD_KEYS = {
-    "panel",
-    "twfe",
-    "fe",
-    "fixed-effects",
-    "fixed-effect",
-    "fixed effects",
-    "fixed_effects",
-}
 
 # Executable Python that can become a real estimator — not a cleaning audit.
 _REGRESSION_MARKERS = (
@@ -379,16 +366,6 @@ def _first_text(*sources: Any, keys: tuple[str, ...]) -> str:
     return ""
 
 
-def _method_is_panel(method: Any) -> bool:
-    """True only for an explicit panel/DiD direction — not OLS with id+year."""
-    if norm_method(method) == "did":
-        return True
-    key = str(method or "").strip().lower()
-    if not key:
-        return False
-    return key in _PANEL_METHOD_KEYS or key.replace("_", "-") in _PANEL_METHOD_KEYS
-
-
 def _python_is_takeable_regression(python: str) -> bool:
     """False for upload-only clean.py (DATA_PATH + step comments, no model)."""
     if not (python or "").strip():
@@ -428,8 +405,6 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
     estimate = state.get("estimate")
     estimate = estimate if isinstance(estimate, dict) else {}
     formula = str(estimate.get("formula") or spec.get("formula") or "").strip()
-    method = _first_text(spec, rd, keys=("method",))
-    panel = _method_is_panel(method) and bool(id_col and time_col)
     return {
         "csv": csv_name,
         "outcome": outcome,
@@ -437,17 +412,13 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
         "controls": controls,
         "id_col": id_col,
         "time_col": time_col,
-        "panel": panel,
+        "panel": bool(id_col and time_col),
         "formula": formula,
     }
 
 
 def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
-    """Usable scripts from named outcome+treatment.
-
-    OLS → Stata ``regress`` / R ``lm``. Panel/DiD → ``xtreg``/``reghdfe``
-    and ``feols``/``felm``. Guessed id+year on an OLS direction stays OLS.
-    """
+    """Usable Stata xtreg/reghdfe or regress + R feols/felm or lm when there is no takeable Python."""
     y = model["outcome"]
     treat = model["treatment"]
     controls = model["controls"]
@@ -636,7 +607,7 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
 
     # Upload-only clean.py is collected Python but not a regression. Translating
     # it yields comment-only Stata/R (read_csv(DATA_PATH) has no string path).
-    # Named outcome+treatment then wins so GET ?format=do|R can be takeable OLS.
+    # Named outcome+treatment then wins so GET ?format=do|R can be takeable.
     if python_code.strip() and not _python_is_takeable_regression(python_code):
         python_code = "" if model is not None else python_code
 

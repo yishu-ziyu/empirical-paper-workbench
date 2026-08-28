@@ -566,7 +566,9 @@ def test_edit_chapter_content_does_not_call_generate(monkeypatch):
         {
             "body_chapters": [
                 {"type": "intro", "content": "old", "versions": ["old"]}
-            ]
+            ],
+            "review_scores": [0.95],
+            "review_feedback": ["过审"],
         },
     )
     result = facade.edit_chapter(sid, 0, content="## 研究背景\n\n短。\n")
@@ -575,6 +577,8 @@ def test_edit_chapter_content_does_not_call_generate(monkeypatch):
     assert ch["content"] == "## 研究背景\n\n短。\n"
     assert ch["status"] == "edited"
     assert ch["versions"][0] == "## 研究背景\n\n短。\n"
+    assert result["review_scores"][0] in (None, "")
+    assert result["review_feedback"][0] in (None, "")
     facade.drop_session(sid)
 
 

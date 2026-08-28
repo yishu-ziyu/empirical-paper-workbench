@@ -219,9 +219,12 @@ async def approve_chapter_endpoint(
     # - score < REVIEW_SCORE_THRESHOLD → 评审未通过
     # - force=True 是唯一旁路，且章节会带上 approved_forced 标记
     review_scores = list(state.get("review_scores") or [])
-    if target_idx < len(review_scores):
-        score = float(review_scores[target_idx])
-    else:
+    raw_score = (
+        review_scores[target_idx] if target_idx < len(review_scores) else None
+    )
+    try:
+        score = float(raw_score) if raw_score is not None else None
+    except (TypeError, ValueError):
         score = None
     passed = score is not None and score >= _REVIEW_SCORE_THRESHOLD
     if not passed and not payload.force:

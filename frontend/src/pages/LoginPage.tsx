@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import UnauthHeader from '../components/UnauthHeader'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
-
-const API_BASE = 'http://localhost:8000'
 
 interface LoginPageProps {
   onLogin: (token: string) => void
@@ -43,18 +43,17 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
   }
 
   return (
-    <div data-testid="login-page" className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold font-serif text-ink">
-            {t('app.title')}
-          </h1>
-          <p className="mt-1 text-sm text-muted">{t('login.subtitle')}</p>
-        </div>
+    <div data-testid="login-page" className="min-h-screen bg-bg text-ink">
+      <UnauthHeader onRegister={onSwitchToRegister} />
+      <main className="mx-auto flex w-full max-w-[420px] flex-col px-6 pb-24 pt-24">
+        <h1 className="font-serif text-[2rem] leading-tight tracking-tight text-ink">
+          {t('login.subtitle')}
+        </h1>
+        <p className="mt-2 text-[14px] text-muted">{t('app.title')}</p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="mt-10 space-y-4">
           <div>
-            <label htmlFor="login-email" className="block text-xs font-medium text-muted mb-1">
+            <label htmlFor="login-email" className="block text-[12px] text-muted mb-1.5">
               {t('login.email')}
             </label>
             <input
@@ -63,13 +62,13 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded border border-border bg-white px-3 py-2 text-sm text-ink outline-none transition-colors duration-200 focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-colors duration-200 focus:border-ink/30"
               placeholder={t('login.emailPlaceholder')}
             />
           </div>
 
           <div>
-            <label htmlFor="login-password" className="block text-xs font-medium text-muted mb-1">
+            <label htmlFor="login-password" className="block text-[12px] text-muted mb-1.5">
               {t('login.password')}
             </label>
             <input
@@ -79,13 +78,13 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full rounded border border-border bg-white px-3 py-2 text-sm text-ink outline-none transition-colors duration-200 focus:border-accent focus:ring-1 focus:ring-accent"
+              className="w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition-colors duration-200 focus:border-ink/30"
               placeholder={t('login.passwordPlaceholder')}
             />
           </div>
 
           {error && (
-            <div className="rounded border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">
+            <div className="rounded-lg border border-danger/20 bg-danger/5 px-3 py-2 text-xs text-danger">
               {error}
             </div>
           )}
@@ -93,23 +92,23 @@ export default function LoginPage({ onLogin, onSwitchToRegister }: LoginPageProp
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded bg-accent px-4 py-2 text-sm text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50"
+            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {loading ? t('login.signingIn') : t('login.signIn')}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-muted">
+        <p className="mt-6 text-center text-[13px] text-muted">
           {t('login.noAccount')}{' '}
           <button
             type="button"
             onClick={onSwitchToRegister}
-            className="text-accent transition-colors duration-200 hover:text-accent/80"
+            className="text-ink underline-offset-4 transition-colors duration-200 hover:underline"
           >
             {t('login.createOne')}
           </button>
         </p>
-      </div>
+      </main>
     </div>
   )
 }

@@ -7,9 +7,14 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DeskPage from './pages/DeskPage'
 import GuidePage from './pages/GuidePage'
+import { BrandMark, LangPills } from './components/UnauthHeader'
+import { CsvDropZone } from './components/CsvDropZone'
+import PaperPath from './components/PaperPath'
 import DirectionForm from './components/DirectionForm'
-import type { DirectionFormData } from './components/DirectionForm'
+import type { DirectionFormData, DirectionFormInitial } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
+import WriteLoop from './components/WriteLoop'
+import type { PausePayload } from './components/WriteLoop'
 import ChapterWriter from './components/ChapterWriter'
 import ChapterList from './components/ChapterList'
 import ReviewPanel from './components/ReviewPanel'
@@ -17,6 +22,7 @@ import DocExportDialog from './components/DocExportDialog'
 import CodeExportDialog from './components/CodeExportDialog'
 import ReviewGateDialog from './components/ReviewGateDialog'
 import RunTracePanel from './components/RunTracePanel'
+import { API_BASE } from './lib/apiBase'
 import { useT } from './lib/i18n'
 import type { components } from './types/api'
 
@@ -25,7 +31,7 @@ const LS_TOKEN_KEY = 'econpaper_access_token'
 const LS_GUIDE_KEY = 'econpaper_seen_guide'
 const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
-const API_BASE = 'http://localhost:8000'
+const LS_CSV_KEY = 'econpaper_csv_meta'
 const SAMPLE_CSV = '/samples/course-panel.csv'
 const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',
@@ -52,7 +58,22 @@ type DeskSnapshot = {
   robustness_status?: string | null
   outline?: OutlineChapter[]
   body_chapters?: WrittenChapter[]
-  research_direction?: { method?: string; dv?: string; iv?: string } | null
+  research_direction?: {
+    method?: string
+    dv?: string
+    iv?: string
+    question?: string
+    controls?: string[] | string
+    template?: string
+    instrument?: string
+    time_col?: string
+    id_col?: string
+    first_treat_col?: string
+    running_var?: string
+    cutoff?: number
+    unit_col?: string
+    treatment_time?: string
+  } | null
 }
 
 function storeToken(token: string): void {
@@ -78,8 +99,81 @@ function directionLine(rd: { method?: string; dv?: string; iv?: string } | null 
   return method || null
 }
 
+function asControlList(raw: unknown): string[] | undefined {
+  if (Array.isArray(raw)) return raw.filter((item): item is string => typeof item === 'string')
+  if (typeof raw === 'string') {
+    const parts = raw.split(',').map((item) => item.trim()).filter(Boolean)
+    return parts
+  }
+  return undefined
+}
+
+function readCsvMeta(sessionId: string | null): { name: string | null; rows: number | null; cols: number | null } {
+  try {
+    if (!sessionId) return { name: null, rows: null, cols: null }
+    const raw = sessionStorage.getItem(LS_CSV_KEY)
+    if (!raw) return { name: null, rows: null, cols: null }
+    const parsed = JSON.parse(raw) as { sessionId?: unknown; name?: unknown; rows?: unknown; cols?: unknown }
+    if (parsed.sessionId !== sessionId) return { name: null, rows: null, cols: null }
+    return {
+      name: typeof parsed.name === 'string' ? parsed.name : null,
+      rows: typeof parsed.rows === 'number' ? parsed.rows : null,
+      cols: typeof parsed.cols === 'number' ? parsed.cols : null,
+    }
+  } catch {
+    return { name: null, rows: null, cols: null }
+  }
+}
+
+function writeCsvMeta(
+  sessionId: string,
+  name: string | null,
+  rows: number | null,
+  cols: number | null,
+): void {
+  sessionStorage.setItem(LS_CSV_KEY, JSON.stringify({ sessionId, name, rows, cols }))
+}
+
+function chapterIndexForApply(
+  accepted: { type: string }[],
+  opts: {
+    freshIDecide: boolean
+    iDecideLocked: boolean
+    currentType?: string
+    currentIndex: number
+  },
+): number {
+  if (!accepted.length) return 0
+  if (opts.freshIDecide) return 0
+  if (opts.iDecideLocked && opts.currentType) {
+    const idx = accepted.findIndex((ch) => ch.type === opts.currentType)
+    return idx >= 0 ? idx : 0
+  }
+  return Math.min(Math.max(0, opts.currentIndex), accepted.length - 1)
+}
+
+function toDirectionInitial(record: DirectionFormData | null): DirectionFormInitial | undefined {
+  if (!record) return undefined
+  return {
+    question: record.question,
+    dv: record.dv,
+    iv: record.iv,
+    controls: Array.isArray(record.controls) ? record.controls.join(', ') : record.controls,
+    method: record.method,
+    template: record.template,
+    instrument: record.instrument,
+    time_col: record.time_col,
+    id_col: record.id_col,
+    first_treat_col: record.first_treat_col,
+    running_var: record.running_var,
+    cutoff: record.cutoff,
+    unit_col: record.unit_col,
+    treatment_time: record.treatment_time,
+  }
+}
+
 function App() {
-  const { t, lang, setLang } = useT()
+  const { t } = useT()
 
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(LS_TOKEN_KEY))
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
@@ -89,9 +183,6 @@ function App() {
   })
   const [edaOpen, setEdaOpen] = useState(false)
   const [outline, setOutline] = useState<OutlineChapter[]>([])
-
-  const [leftOpen, setLeftOpen] = useState(true)
-  const [rightOpen, setRightOpen] = useState(true)
 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -125,6 +216,10 @@ function App() {
       return []
     }
   })
+  const [csvName, setCsvName] = useState<string | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).name)
+  const [csvRows, setCsvRows] = useState<number | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).rows)
+  const [csvCols, setCsvCols] = useState<number | null>(() => readCsvMeta(localStorage.getItem(LS_KEY)).cols)
+  const [directionRecord, setDirectionRecord] = useState<DirectionFormData | null>(null)
 
   const [globalError, setGlobalError] = useState<string | null>(null)
   const globalErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -143,6 +238,7 @@ function App() {
   const [gateBusy, setGateBusy] = useState(false)
   const [docExportOpen, setDocExportOpen] = useState(false)
   const [codeExportOpen, setCodeExportOpen] = useState(false)
+  const [workbenchTab, setWorkbenchTab] = useState<'paper' | 'data' | 'format'>('paper')
   const [directionBusy, setDirectionBusy] = useState(false)
   const [directionOpen, setDirectionOpen] = useState(true)
   const [directionSummary, setDirectionSummary] = useState<string | null>(null)
@@ -157,8 +253,10 @@ function App() {
   const [identReport, setIdentReport] = useState<string | null>(null)
   const [writingType, setWritingType] = useState<string | null>(null)
   const [writeBusy, setWriteBusy] = useState(false)
+  const writeBusyRef = useRef(false)
   const [writtenChapters, setWrittenChapters] = useState<WrittenChapter[]>([])
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0)
+  const [outlineLocked, setOutlineLocked] = useState(false)
 
   const showGlobalError = useCallback((message: string) => {
     setGlobalError(message)
@@ -171,13 +269,21 @@ function App() {
     setAuthToken(token)
   }, [])
 
+  const forgetCsvMeta = useCallback(() => {
+    sessionStorage.removeItem(LS_CSV_KEY)
+    setCsvName(null)
+    setCsvRows(null)
+    setCsvCols(null)
+  }, [])
+
   const handleLogout = useCallback(() => {
     clearToken()
     setAuthToken(null)
     setSessionId(null)
     localStorage.removeItem(LS_KEY)
+    forgetCsvMeta()
     setAuthPage(null)
-  }, [])
+  }, [forgetCsvMeta])
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
@@ -187,9 +293,10 @@ function App() {
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
+    forgetCsvMeta()
     setSessionId(data.session_id)
     return data.session_id as string
-  }, [sessionId])
+  }, [sessionId, forgetCsvMeta])
 
   const refreshReview = useCallback(async (sid: string) => {
     try {
@@ -204,7 +311,7 @@ function App() {
     }
   }, [])
 
-  const applyDeskSnapshot = useCallback((data: DeskSnapshot) => {
+  const applyDeskSnapshot = useCallback((data: DeskSnapshot, sid?: string | null) => {
     if (data.exists === false) return
     const hasDesk = Boolean(
       data.claim ||
@@ -239,12 +346,39 @@ function App() {
         const idx = data.outline?.findIndex((item) => item.type === lastWithText.type) ?? -1
         if (idx >= 0) setCurrentChapterIndex(idx)
       }
+      if (data.body_chapters.some((ch) => ch.content)) setOutlineLocked(true)
     }
     const summary = directionLine(data.research_direction)
     if (summary) {
       setDirectionSummary(summary)
       setDirectionOpen(false)
     }
+    const asked = data.research_direction?.question?.trim()
+    if (asked) setShapedQuestion(asked)
+    if (data.research_direction) {
+      const rd = data.research_direction
+      const controls = asControlList(rd.controls)
+      setDirectionRecord((prev) => ({
+        question: asked || prev?.question || '',
+        dv: rd.dv || prev?.dv || '',
+        iv: rd.iv || prev?.iv || '',
+        controls: controls ?? prev?.controls ?? [],
+        method: rd.method || prev?.method || '',
+        template: rd.template || prev?.template || 'undergrad',
+        instrument: rd.instrument || prev?.instrument,
+        time_col: rd.time_col || prev?.time_col,
+        id_col: rd.id_col || prev?.id_col,
+        first_treat_col: rd.first_treat_col || prev?.first_treat_col,
+        running_var: rd.running_var || prev?.running_var,
+        cutoff: rd.cutoff ?? prev?.cutoff,
+        unit_col: rd.unit_col || prev?.unit_col,
+        treatment_time: rd.treatment_time || prev?.treatment_time,
+      }))
+    }
+    const csv = readCsvMeta(sid ?? localStorage.getItem(LS_KEY))
+    if (csv.name) setCsvName(csv.name)
+    if (csv.rows != null) setCsvRows(csv.rows)
+    if (csv.cols != null) setCsvCols(csv.cols)
   }, [])
 
   useEffect(() => {
@@ -256,12 +390,13 @@ function App() {
         if (!data.exists) {
           localStorage.removeItem(LS_KEY)
           setSessionId(null)
+          forgetCsvMeta()
           return
         }
-        applyDeskSnapshot(data)
+        applyDeskSnapshot(data, saved)
       })
       .catch(() => {})
-  }, [applyDeskSnapshot])
+  }, [applyDeskSnapshot, forgetCsvMeta])
 
   useEffect(() => {
     if (sessionId) {
@@ -426,19 +561,29 @@ function App() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
       const cols = data.dataset_meta?.columns
+      let colCount: number | null = null
       if (Array.isArray(cols) && cols.every((item: unknown) => typeof item === 'string')) {
         setDataColumns(cols)
         sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(cols))
+        colCount = cols.length
+        setCsvCols(colCount)
       } else {
         try {
           const header = (await file.slice(0, 2048).text()).split(/\r?\n/).find(Boolean) || ''
           const parsed = header.split(',').map((name) => name.trim()).filter(Boolean)
           setDataColumns(parsed)
           sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(parsed))
+          colCount = parsed.length
+          setCsvCols(colCount)
         } catch {
           setDataColumns([])
         }
       }
+      setCsvName(file.name)
+      const rowCount = data.dataset_meta?.rows
+      const rows = typeof rowCount === 'number' ? rowCount : null
+      setCsvRows(rows)
+      writeCsvMeta(data.session_id, file.name, rows, colCount)
       markGuideSeen()
       setSessionId(data.session_id)
     } catch (err) {
@@ -449,13 +594,17 @@ function App() {
     }
   }, [markGuideSeen])
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const takeCsv = useCallback(async (file: File) => {
     sessionStorage.removeItem(LS_SAMPLE_KEY)
     setSampleDirection(null)
     await uploadCsv(file)
   }, [uploadCsv])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await takeCsv(file)
+  }, [takeCsv])
 
   const handleTrySample = useCallback(async () => {
     setUploading(true)
@@ -491,7 +640,7 @@ function App() {
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const result = await resp.json()
-      applyDeskSnapshot(result)
+      applyDeskSnapshot(result, sid)
       if (result.identification_report) {
         setIdentReport(formatIdentReport(result.star_rating, result.identification_report))
       }
@@ -500,6 +649,9 @@ function App() {
         setDirectionSummary(summary)
         setDirectionOpen(false)
       }
+      if (data.question.trim()) setShapedQuestion(data.question)
+      setDirectionRecord(data)
+      setOutlineLocked(false)
       if (result.identification_failed) {
         showGlobalError(t('app.identBlocked'))
       }
@@ -510,44 +662,67 @@ function App() {
     }
   }, [ensureSession, applyDeskSnapshot, showGlobalError, t])
 
-  const handleWriteChapter = useCallback(async (chapterType: string, title: string) => {
+  const runGenerateChapter = useCallback(async (
+    chapterType: string,
+    title: string,
+    renderKwargs?: Record<string, number>,
+  ) => {
     if (!sessionId) {
       showGlobalError(t('app.needSession'))
       return
     }
+    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        chapter: { type: chapterType, title },
+        ...(renderKwargs && Object.keys(renderKwargs).length ? { render_kwargs: renderKwargs } : {}),
+      }),
+    })
+    const payload = await resp.json().catch(() => ({}))
+    if (resp.status === 409) {
+      const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail : payload
+      const blockers = Array.isArray(detail.write_blockers) ? detail.write_blockers : []
+      setWriteBlockers(blockers)
+      showGlobalError(t('bench.writeBlocked'))
+      return
+    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    if (payload.chapter) {
+      setWrittenChapters((prev) => {
+        const next = prev.filter((ch) => ch.type !== payload.chapter.type)
+        return [...next, payload.chapter]
+      })
+    }
+    setWriteBlockers([])
+    await refreshReview(sessionId)
+  }, [sessionId, refreshReview, showGlobalError, t])
+
+  const handleWriteChapter = useCallback(async (
+    chapterType: string,
+    title: string,
+    renderKwargs?: Record<string, number>,
+  ) => {
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    if (writeBusyRef.current) return
+    writeBusyRef.current = true
     setWriteBusy(true)
     setWritingType(chapterType)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ chapter: { type: chapterType, title } }),
-      })
-      const payload = await resp.json().catch(() => ({}))
-      if (resp.status === 409) {
-        const detail = payload.detail && typeof payload.detail === 'object' ? payload.detail : payload
-        const blockers = Array.isArray(detail.write_blockers) ? detail.write_blockers : []
-        setWriteBlockers(blockers)
-        showGlobalError(t('bench.writeBlocked'))
-        return
-      }
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      if (payload.chapter) {
-        setWrittenChapters((prev) => {
-          const next = prev.filter((ch) => ch.type !== payload.chapter.type)
-          return [...next, payload.chapter]
-        })
-      }
-      setWriteBlockers([])
-      await refreshReview(sessionId)
+      await runGenerateChapter(chapterType, title, renderKwargs)
     } catch (err) {
       showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
     } finally {
+      writeBusyRef.current = false
       setWriteBusy(false)
     }
-  }, [sessionId, refreshReview, showGlobalError, t])
+  }, [sessionId, runGenerateChapter, showGlobalError, t])
 
   const handleSelectChapter = useCallback((index: number) => {
+    if (writeBusyRef.current) return
     const ch = outline[index]
     if (!ch) return
     setCurrentChapterIndex(index)
@@ -609,6 +784,123 @@ function App() {
     [sessionId, writtenChapter, currentChapterIndex, review, markChapterUpdated, showGlobalError],
   )
 
+  const postResumeOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return null
+    }
+    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ outline: nextOutline }),
+    })
+    const result = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const accepted =
+      Array.isArray(result.outline) && result.outline.length ? result.outline : nextOutline
+    setOutline(accepted)
+    setOutlineLocked(true)
+    setCurrentChapterIndex(0)
+    return accepted as PausePayload['outline']
+  }, [sessionId, showGlobalError, t])
+
+  const handleApplyGenerate = useCallback(async (payload?: PausePayload) => {
+    if (writeBusyRef.current) return
+    const list = payload?.outline?.length ? payload.outline : outline
+    if (!list.length) return
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    writeBusyRef.current = true
+    setWriteBusy(true)
+    try {
+      const freshIDecide = payload?.decideChapters === 'me' && !outlineLocked
+      let accepted = list
+      if (freshIDecide) {
+        const resumed = await postResumeOutline(list)
+        if (resumed?.length) accepted = resumed
+      }
+      const useIdx = chapterIndexForApply(accepted, {
+        freshIDecide,
+        iDecideLocked: payload?.decideChapters === 'me' && outlineLocked,
+        currentType: outline[currentChapterIndex]?.type,
+        currentIndex: currentChapterIndex,
+      })
+      const ch = accepted[useIdx]
+      if (!ch) return
+      setCurrentChapterIndex(useIdx)
+      setWritingType(ch.type)
+      await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
+    } finally {
+      writeBusyRef.current = false
+      setWriteBusy(false)
+    }
+  }, [
+    outline,
+    outlineLocked,
+    currentChapterIndex,
+    sessionId,
+    postResumeOutline,
+    runGenerateChapter,
+    showGlobalError,
+    t,
+  ])
+
+  const handleApproveOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
+    if (writeBusyRef.current) return
+    if (!sessionId) {
+      showGlobalError(t('app.needSession'))
+      return
+    }
+    writeBusyRef.current = true
+    setWriteBusy(true)
+    try {
+      await postResumeOutline(nextOutline)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      writeBusyRef.current = false
+      setWriteBusy(false)
+    }
+  }, [sessionId, postResumeOutline, showGlobalError, t])
+
+  const handleRefine = useCallback(async (instruction: string) => {
+    if (!sessionId) return
+    if (writeBusyRef.current) return
+    writeBusyRef.current = true
+    setWriteBusy(true)
+    try {
+      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          chapter_index: Math.max(0, currentChapterIndex),
+          instruction,
+        }),
+      })
+      const payload = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      if (Array.isArray(payload.body_chapters)) {
+        setWrittenChapters(
+          payload.body_chapters.filter(
+            (c: components['schemas']['ChapterResponse']) => c.content,
+          ),
+        )
+      } else if (payload.chapter) {
+        markChapterUpdated(payload.chapter)
+      }
+      await refreshReview(sessionId)
+    } catch (err) {
+      showGlobalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      writeBusyRef.current = false
+      setWriteBusy(false)
+    }
+  }, [sessionId, currentChapterIndex, markChapterUpdated, refreshReview, showGlobalError])
+
   const handleDocExport = useCallback(async (format: 'tex' | 'pdf' | 'docx', template: string) => {
     if (!sessionId) return
     try {
@@ -661,12 +953,14 @@ function App() {
           uploading={uploading}
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
+          onFile={(file) => { void takeCsv(file) }}
           onTrySample={() => { void handleTrySample() }}
           onWritePaper={() => {
             markGuideSeen()
             setDeskOpen(true)
           }}
           onLogin={() => setAuthPage('login')}
+          onRegister={() => setAuthPage('register')}
         />
       </>
     )
@@ -681,6 +975,7 @@ function App() {
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
           onLogin={() => setAuthPage('login')}
+          onRegister={() => setAuthPage('register')}
           onConfirm={(title) => {
             setShapedQuestion(title)
             setDeskOpen(false)
@@ -691,29 +986,46 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg text-ink font-sans selection:bg-accent/20">
+    <div className="flex h-screen min-h-0 flex-col overflow-x-auto overflow-y-hidden bg-bg text-ink font-sans selection:bg-accent/20">
       {globalError && (
         <div data-testid="global-error-toast" className="fixed right-4 top-4 z-50 animate-slide-up rounded border border-danger/30 bg-panel px-4 py-2 text-sm text-danger">
           ⚠ {globalError}
         </div>
       )}
-      <header className="flex items-center justify-between border-b border-border bg-cream px-6 py-3">
+      <header className="grid h-[56px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-5">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setLeftOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleLeft')}>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-semibold tracking-tight font-serif">{t('app.title')}</h1>
+          <BrandMark />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center rounded-lg bg-bg p-0.5">
+          {([
+            ['paper', t('workbench.tabPaper')],
+            ['data', t('workbench.tabData')],
+            ['format', t('workbench.tabFormat')],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              data-testid={`workbench-tab-${id}`}
+              onClick={() => {
+                setWorkbenchTab(id)
+                if (id === 'data' && sessionId) setEdaOpen(true)
+              }}
+              className={`rounded-md px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
+                workbenchTab === id ? 'bg-accent text-white' : 'text-muted hover:text-ink'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2.5">
           {sessionId ? (
             <span data-testid="session-ready" hidden />
           ) : (
             <span className="text-xs text-muted font-mono">{t('app.hint')}</span>
           )}
           <input ref={fileInputRef} type="file" accept=".csv" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
-          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1 text-xs text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
+          <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
             {uploading && (
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                 <circle cx="12" cy="12" r="10" strokeDasharray="31.4 31.4" strokeLinecap="round" />
@@ -744,23 +1056,16 @@ function App() {
           {authToken ? (
             <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
           ) : (
-            <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.login')}</button>
+            <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>
           )}
-          <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.langSwitch')}</button>
-          <button type="button" onClick={() => setRightOpen((v) => !v)} className="text-muted hover:text-ink transition-colors duration-200 lg:hidden" aria-label={t('app.toggleRight')}>
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
+          <LangPills />
         </div>
       </header>
 
       <ThreeColumn
-        leftOpen={leftOpen}
-        rightOpen={rightOpen}
         outline={
           <ErrorBoundary>
-            <h2 className="mb-3 text-xs uppercase tracking-wider text-muted font-mono">{t('bench.chapters')}</h2>
+            <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">{t('bench.chapters')}</h2>
             {outline.length > 0 && !identFailed ? (
               <div data-testid="chapter-write-dock">
                 <p className="mb-2 text-xs leading-6 text-muted">{t('bench.pickChapter')}</p>
@@ -788,10 +1093,17 @@ function App() {
               <p className="text-xs leading-6 text-muted">{t('bench.noChapters')}</p>
             )}
             <div className="mt-6 border-t border-border pt-4">
-              {edaOpen && sessionId ? (
-                <EdaSidebar sessionId={sessionId} onClose={() => setEdaOpen(false)} />
-              ) : sessionId ? (
-                <button onClick={() => setEdaOpen(true)} className="text-sm text-accent transition-colors duration-200 hover:text-accent/80">{t('bench.openData')}</button>
+              {sessionId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkbenchTab('data')
+                    setEdaOpen(true)
+                  }}
+                  className="text-sm text-accent transition-colors duration-200 hover:text-accent/80"
+                >
+                  {t('bench.openData')}
+                </button>
               ) : (
                 <p className="text-xs text-muted">{t('app.uploadToExplore')}</p>
               )}
@@ -800,20 +1112,93 @@ function App() {
         }
         editor={
           <ErrorBoundary>
+            <div className="mx-auto max-w-[46rem] px-6 py-10 sm:px-10">
+            {workbenchTab === 'data' && (
+              <section className="mb-6">
+                <h2 className="mb-4 font-serif text-[1.35rem] text-ink">{t('workbench.dataTitle')}</h2>
+                <CsvDropZone
+                  uploading={uploading}
+                  onBrowse={() => fileInputRef.current?.click()}
+                  onFile={(file) => { void takeCsv(file) }}
+                />
+                {sessionId && edaOpen ? (
+                  <div className="mt-4">
+                    <EdaSidebar sessionId={sessionId} onClose={() => setEdaOpen(false)} />
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-muted">{t('workbench.dataEmpty')}</p>
+                )}
+              </section>
+            )}
+            {workbenchTab === 'format' && (
+              <section data-testid="format-pane" className="mb-8 rounded-lg border border-border bg-panel p-6">
+                <h2 className="font-serif text-lg text-ink">{t('workbench.formatTitle')}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">{t('workbench.formatBody')}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    data-testid="format-export-doc-btn"
+                    onClick={() => setDocExportOpen(true)}
+                    disabled={!sessionId || !canExport}
+                    className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
+                  >
+                    {t('app.exportDoc')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="format-export-code-btn"
+                    onClick={() => setCodeExportOpen(true)}
+                    disabled={!sessionId || !canExport}
+                    className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
+                  >
+                    {t('app.exportCode')}
+                  </button>
+                </div>
+              </section>
+            )}
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
+            <p data-testid="product-journey" className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+              {t('bench.journey')}
+            </p>
             {!hasReadout && (
-              <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowDirection')}
               </p>
             )}
             {hasReadout && !writtenChapter?.content && !writeBusy && (
-              <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                 {t('guide.nowWrite')}
               </p>
             )}
-            <section data-testid="direction-section" className="mb-6 rounded border border-border bg-panel p-4">
+            {hasReadout && Boolean(writtenChapter?.content) && (
+              <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
+                {t('guide.nowExport')}
+              </p>
+            )}
+            <WriteLoop
+              fileName={csvName}
+              rows={csvRows}
+              cols={csvCols ?? (dataColumns.length || null)}
+              direction={directionRecord}
+              outline={outline}
+              outlineLocked={outlineLocked}
+              hasDirection={Boolean(directionSummary)}
+              hasOutline={outline.length > 0 && !identFailed}
+              hasChapter={Boolean(writtenChapter?.content)}
+              isResultsPart={outline[currentChapterIndex]?.type === 'results'}
+              partIndex={currentChapterIndex + 1}
+              agentPct={writeBusy ? 10 : directionBusy || uploading ? 0 : null}
+              writeBusy={writeBusy}
+              onAddMore={() => setDirectionOpen(true)}
+              onGoPart1={() => setWorkbenchTab('paper')}
+              onApplyGenerate={handleApplyGenerate}
+              onReviseOutline={() => setDirectionOpen(true)}
+              onApproveOutline={handleApproveOutline}
+              onRefine={handleRefine}
+            />
+            <section data-testid="direction-section" className="mb-8 rounded-lg border border-border bg-panel p-6">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold">{t('app.directionTitle')}</h2>
+                <h2 className="font-serif text-[1.15rem] text-ink">{t('app.directionTitle')}</h2>
                 {!directionOpen && directionSummary ? (
                   <button
                     type="button"
@@ -829,7 +1214,7 @@ function App() {
                 <DirectionForm
                   onSubmit={handleDirectionSubmit}
                   initialQuestion={shapedQuestion}
-                  initial={sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
+                  initial={toDirectionInitial(directionRecord) ?? sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
                   columns={dataColumns}
                 />
               ) : (
@@ -849,6 +1234,7 @@ function App() {
                 robustnessStatus={robustnessStatus}
                 writeBlockers={writeBlockers}
                 identificationFailed={identFailed}
+                question={shapedQuestion || null}
               />
             )}
             {identReport && (
@@ -877,16 +1263,45 @@ function App() {
                 />
               </div>
             ) : (
-              <p className="text-sm leading-7 text-muted">{t('bench.paperEmpty')}</p>
+              <p className="font-serif text-[15px] leading-[1.8] text-muted">{t('bench.paperEmpty')}</p>
             )}
+            </div>
           </ErrorBoundary>
         }
         agent={
           <ErrorBoundary>
+            <PaperPath
+              uploading={uploading}
+              hasSession={Boolean(sessionId)}
+              hasDirection={Boolean(directionSummary)}
+              directionOpen={directionOpen}
+              hasReadout={hasReadout}
+              hasOutline={outline.length > 0}
+              writing={writeBusy}
+              hasChapter={Boolean(writtenChapter?.content)}
+              awaitingApprove={writtenChapter?.status === 'generated'}
+              canExport={canExport}
+              onSelect={(id) => {
+                if (id === 'upload_data' || id === 'clean_data') {
+                  setWorkbenchTab('data')
+                  if (sessionId) setEdaOpen(true)
+                } else if (id === 'translate_code') {
+                  setWorkbenchTab('format')
+                  if (sessionId) setCodeExportOpen(true)
+                } else if (id === 'export_docx') {
+                  setWorkbenchTab('format')
+                  if (sessionId) setDocExportOpen(true)
+                } else {
+                  setWorkbenchTab('paper')
+                }
+              }}
+            />
             {sessionId && review ? (
-              <ReviewPanel sessionId={sessionId} review={review} onDecision={() => refreshReview(sessionId)} />
+              <div className="mt-4">
+                <ReviewPanel sessionId={sessionId} review={review} onDecision={() => refreshReview(sessionId)} />
+              </div>
             ) : (
-              <p data-testid="review-idle" className="text-xs leading-6 text-muted">
+              <p data-testid="review-idle" className="mt-4 text-xs leading-6 text-muted">
                 {hasReadout ? t('bench.reviewAfterWrite') : t('bench.reviewAfterDirection')}
               </p>
             )}

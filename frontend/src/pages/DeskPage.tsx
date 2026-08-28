@@ -270,8 +270,7 @@ export default function DeskPage({
         <h1 className="font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.1rem]">
           {t('desk.heading')}
         </h1>
-        <p className="mt-5 max-w-[34em] text-[17px] leading-8 text-muted">{t('desk.sub')}</p>
-        <p className="mt-3 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
+        <p className="mt-5 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
 
         <label className="relative mt-12 block">
           <span className="sr-only">{t('desk.paperLabel')}</span>

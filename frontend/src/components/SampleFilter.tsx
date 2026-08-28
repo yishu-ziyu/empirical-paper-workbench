@@ -2,7 +2,7 @@
 // 列 / 操作符 / 值 → 添加条件 → 应用筛选 → POST /sessions/{id}/filter → 显示前后样本量
 
 import { useState } from 'react'
-import { API_BASE } from '../lib/apiBase'
+import { API_BASE, apiFetch } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -41,7 +41,7 @@ export function SampleFilter({ sessionId }: SampleFilterProps) {
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/filter`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conditions }),

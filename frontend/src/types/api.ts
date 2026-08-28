@@ -175,11 +175,12 @@ export interface paths {
          * Regenerate Chapter Endpoint
          * @description 重新生成当前章。
          *
-         *     Request:  ``{"chapter_index": int}``
+         *     Request:  ``{"chapter_index": int, "instruction"?: str}``
          *     Response: ``{"chapter": {...含新版本...}, "body_chapters": [...]}``
          *
-         *     设置 ``state['current_chapter_index']``，调 ``generate_chapter(state)``
-         *     节点，合并结果。
+         *     设置 ``state['current_chapter_index']``，可选把 ``instruction`` 写入
+         *     ``revision_suggestions[index]``，再调 ``generate_chapter(state)``。
+         *     空 instruction 仍重生成。
          */
         post: operations["regenerate_chapter_endpoint_sessions__session_id__regenerate_post"];
         delete?: never;
@@ -242,6 +243,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/translate-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Code Endpoint
+         * @description Run translate_code so GET /code-export can return Stata / R files.
+         */
+        post: operations["translate_code_endpoint_sessions__session_id__translate_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/code-export": {
         parameters: {
             query?: never;
@@ -268,7 +289,7 @@ export interface paths {
          *     Raises
          *     ------
          *     HTTPException
-         *         - 404: session 不存在，或 session 无 code_translations
+         *         - 404: session 不存在，无 translations，或 direction 不足以 GET-autofill
          *         - 400: 不支持的 format
          */
         get: operations["export_code_sessions__session_id__code_export_get"];
@@ -300,36 +321,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sessions/{session_id}/eda": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Eda
-         * @description Run an EDA action on the session's dataset.
-         *
-         *     Request body: ``{"action": "describe"|"corr"|"plot"|"scatter"|"regression"|"missing"}``.
-         *     - ``describe`` → ``{columns, rows}`` per-variable stats table.
-         *     - ``corr``     → ``{variables, matrix}`` Pearson correlation matrix.
-         *     - ``missing``  → ``{columns, rows}`` missing-value report.
-         *     - ``plot`` / ``scatter`` / ``regression`` → placeholder (later tickets).
-         *
-         *     Stage D：返回 ``EdaResponse``（``action`` + ``result``，``result`` 承载
-         *     各 action 的具体 shape；``EdaResponse`` 用 ``extra="allow"`` 保留
-         *     describe / corr / missing 的原始字段）。
-         */
-        post: operations["run_eda_sessions__session_id__eda_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/sessions/{session_id}/progress": {
         parameters: {
             query?: never;
@@ -350,6 +341,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/journey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Journey
+         * @description 返回 8 阶段研究旅程进度（收敛版，去掉了无节点的"表格图形"站）。
+         *
+         *     每个阶段状态：``pending`` / ``active`` / ``completed`` / ``interrupt``。
+         *     currentStage 为正在进行的阶段；若 state 为空，降级为第 0 站 active、
+         *     其余 pending，不抛错。
+         */
+        get: operations["get_journey_sessions__session_id__journey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/review": {
         parameters: {
             query?: never;
@@ -362,7 +377,8 @@ export interface paths {
          * @description 返回当前章的评审信息。
          *
          *     Response: ``{chapter_index, feedback, suggestions, score, rubric,
-         *                  review_iteration, max_review_iterations, auto_decision}``
+         *                  review_iteration, max_review_iterations, auto_decision,
+         *                  review_source, review_degraded, grounding_failures}``
          *
          *     无评审数据时返回 200 + 空字段（非 404），让前端渲染空态。
          */
@@ -395,6 +411,49 @@ export interface paths {
          *     - ``reject`` → 触发 ``facade.regenerate_chapter``，``next_action="regenerate"``
          */
         post: operations["submit_review_decision_sessions__session_id__review_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Artifacts
+         * @description 列出某 session 的 run 目录：manifest + 文件树。
+         *
+         *     会话不存在 → 404；会话存在但尚无 run 目录（还没跑过任何被追踪的
+         *     步骤）→ exists=False + 空清单，前端渲染空态。
+         */
+        get: operations["get_artifacts_sessions__session_id__artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Trace
+         * @description 返回 trace.jsonl 的尾部事件流（默认最近 50 条）。
+         */
+        get: operations["get_trace_sessions__session_id__trace_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -479,6 +538,186 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register
+         * @description Register a new user account.
+         *
+         *     Raises 409 if the email or username is already taken. When
+         *     ``HIDE_REGISTRATION_EXISTENCE`` is enabled (with the email-verification
+         *     flow, later ticket), duplicates get a generic 201 instead so the
+         *     endpoint cannot be used to enumerate accounts.
+         */
+        post: operations["register_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description Authenticate a user and set the httpOnly cookie pair.
+         *
+         *     Guarded twice: per-IP window (production) and per-account lockout
+         *     (5 consecutive failures → 10 min). Failure messages never distinguish
+         *     "no such email" from "wrong password".
+         */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Me
+         * @description Return the currently authenticated user's profile.
+         */
+        get: operations["get_me_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Token
+         * @description Rotate the refresh cookie and mint a fresh access token.
+         *
+         *     Strictly cookie-based: the old refresh token is revoked (single use),
+         *     so a stolen refresh token dies on first legitimate rotation. Legacy
+         *     Bearer-only clients get 401 and simply log in again.
+         */
+        post: operations["refresh_token_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Log out: revoke the presented refresh token and clear cookies.
+         *
+         *     The access cookie dies here and now; any other tab holds at most a
+         *     15-minute access token, after which the revoked refresh cannot renew.
+         */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/identification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Identification */
+        post: operations["run_identification_sessions__session_id__identification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/robustness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Robustness */
+        post: operations["run_robustness_sessions__session_id__robustness_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/eda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Eda
+         * @description Run an EDA action on the session's dataset.
+         *
+         *     Request body: ``{"action": "describe"|"corr"|"plot"|"scatter"|"regression"|"missing"}``.
+         *     - ``describe`` → ``{columns, rows}`` per-variable stats table.
+         *     - ``corr``     → ``{variables, matrix}`` Pearson correlation matrix.
+         *     - ``missing``  → ``{columns, rows}`` missing-value report.
+         *     - ``plot`` / ``scatter`` / ``regression`` → placeholder (later tickets).
+         *
+         *     Stage D：返回 ``EdaResponse``（``action`` + ``result``，``result`` 承载
+         *     各 action 的具体 shape；``EdaResponse`` 用 ``extra="allow"`` 保留
+         *     describe / corr / missing 的原始字段）。
+         */
+        post: operations["run_eda_sessions__session_id__eda_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -506,13 +745,66 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Sessions
+         * @description Return all sessions owned by the current user.
+         */
+        get: operations["list_sessions_sessions_get"];
         put?: never;
         /**
          * Create Session
          * @description Create an empty session (no upload).
+         *
+         *     If the user is authenticated, the session is owned by that user.
          */
         post: operations["create_session_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Info
+         * @description Return session existence and basic info.
+         *
+         *     Used by the frontend to verify a saved sessionId is still valid
+         *     after a page refresh (localStorage recovery flow).
+         */
+        get: operations["get_session_info_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Session
+         * @description Delete a session owned by the current user.
+         */
+        delete: operations["delete_session_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/degradation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Degradation
+         * @description Return degradation records for a session.
+         */
+        get: operations["get_degradation_sessions__session_id__degradation_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -530,10 +822,28 @@ export interface paths {
          * Export
          * @description Export a session's paper in the requested format.
          *
-         *     Note: returns ``PlainTextResponse`` (non-JSON), so no ``response_model``
-         *     is declared (Stage D 文件下载端点豁免)。
+         *     When S3 is configured, the export file is uploaded to S3 and the response
+         *     redirects to a presigned download URL.  Without S3, returns the content
+         *     inline as ``PlainTextResponse`` (Stage D 文件下载端点豁免）。
          */
         get: operations["export_sessions__session_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Labels */
+        get: operations["export_labels_labels_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -553,7 +863,7 @@ export interface paths {
         put?: never;
         /**
          * Set Direction Endpoint
-         * @description 接受研究方向 → set_direction → generate_outline → 返回 outline。
+         * @description 接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。
          */
         post: operations["set_direction_endpoint_sessions__session_id__direction_post"];
         delete?: never;
@@ -582,6 +892,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/desk/discuss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discuss Desk */
+        post: operations["discuss_desk_desk_discuss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/desk/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transcribe Desk */
+        post: operations["transcribe_desk_desk_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/desk/speak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Speak Desk */
+        post: operations["speak_desk_desk_speak_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -593,6 +954,11 @@ export interface components {
         ApproveChapterRequest: {
             /** Chapter Type */
             chapter_type?: string | null;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /**
          * ApproveChapterResponse
@@ -604,6 +970,27 @@ export interface components {
             chapter: components["schemas"]["ChapterResponse"];
             /** Body Chapters */
             body_chapters?: components["schemas"]["ChapterResponse"][];
+        };
+        /** ArtifactFile */
+        ArtifactFile: {
+            /** Path */
+            path: string;
+            /** Bytes */
+            bytes: number;
+        };
+        /** ArtifactsResponse */
+        ArtifactsResponse: {
+            /** Session Id */
+            session_id: string;
+            /** Exists */
+            exists: boolean;
+            /** Manifest */
+            manifest?: Record<string, never> | null;
+            /**
+             * Files
+             * @default []
+             */
+            files: components["schemas"]["ArtifactFile"][];
         };
         /**
          * BalanceRequest
@@ -652,6 +1039,14 @@ export interface components {
              */
             attrition_rate: number;
         };
+        /** Body_transcribe_desk_desk_transcribe_post */
+        Body_transcribe_desk_desk_transcribe_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
         /** Body_upload_upload_post */
         Body_upload_upload_post: {
             /**
@@ -686,12 +1081,6 @@ export interface components {
             versions?: string[];
             /** Chapter Index */
             chapter_index?: number | null;
-            /**
-             * Approved Forced
-             * 后端 extra 字段（评审未过审时 force 放行的永久痕迹），
-             * 手工补进生成类型——下次 openapi codegen 如已包含可移除本行。
-             */
-            approved_forced?: boolean | null;
         } & {
             [key: string]: unknown;
         };
@@ -788,9 +1177,90 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /** DeskDiscussRequest */
+        DeskDiscussRequest: {
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Turns */
+            turns?: components["schemas"]["DeskTurn"][];
+        };
+        /** DeskDiscussResponse */
+        DeskDiscussResponse: {
+            /** Reflection */
+            reflection: string;
+            /** Title */
+            title: string;
+            /** Heard */
+            heard?: string[];
+            /** Comparison */
+            comparison: string;
+            /** Outcome */
+            outcome: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+            /** Options */
+            options?: components["schemas"]["DeskOption"][];
+            /**
+             * Explain
+             * @default
+             */
+            explain: string;
+            /**
+             * Ready
+             * @default false
+             */
+            ready: boolean;
+            /**
+             * Source
+             * @default heuristic
+             */
+            source: string;
+        };
+        /** DeskOption */
+        DeskOption: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** DeskSpeakRequest */
+        DeskSpeakRequest: {
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
+        /** DeskTurn */
+        DeskTurn: {
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+        };
         /**
          * DirectionRequest
          * @description POST /sessions/{id}/direction 请求体。
+         *
+         *     方法列（time_col / instrument / running 等）必须能进门。
+         *     extra=allow：未列名的别名键也保留，交给 set_direction 投影。
          */
         DirectionRequest: {
             /** Question */
@@ -808,6 +1278,42 @@ export interface components {
              * @default cn_journal
              */
             template: string;
+            /** Claim */
+            claim?: string | null;
+            /** Time Col */
+            time_col?: string | null;
+            /** Id Col */
+            id_col?: string | null;
+            /** First Treat Col */
+            first_treat_col?: string | null;
+            /** Instrument */
+            instrument?: string | null;
+            /** Instrument Col */
+            instrument_col?: string | null;
+            /** Instruments */
+            instruments?: string[] | null;
+            /** Endogenous Col */
+            endogenous_col?: string | null;
+            /** Running */
+            running?: string | null;
+            /** Running Var */
+            running_var?: string | null;
+            /** Cutoff */
+            cutoff?: number | null;
+            /** Unit Col */
+            unit_col?: string | null;
+            /** Treated Unit */
+            treated_unit?: unknown | null;
+            /** Treatment Time */
+            treatment_time?: unknown | null;
+            /** Cluster */
+            cluster?: string | null;
+            /** Cluster Levels */
+            cluster_levels?: string[];
+            /** Heterogeneity Groups */
+            heterogeneity_groups?: string[];
+        } & {
+            [key: string]: unknown;
         };
         /**
          * DirectionResponse
@@ -818,6 +1324,29 @@ export interface components {
             outline?: components["schemas"]["OutlineChapterResponse"][];
             /** Research Direction */
             research_direction?: unknown;
+            /** Star Rating */
+            star_rating?: number | null;
+            /**
+             * Identification Failed
+             * @default false
+             */
+            identification_failed: boolean;
+            /** Identification Report */
+            identification_report?: string | null;
+            /** Results */
+            results?: string | null;
+            /** Estimate */
+            estimate?: unknown;
+            /** Claim */
+            claim?: string | null;
+            /** Literature Source */
+            literature_source?: string | null;
+            /** Degradations */
+            degradations?: unknown[];
+            /** Write Blockers */
+            write_blockers?: string[];
+            /** Robustness Status */
+            robustness_status?: string | null;
         };
         /**
          * EdaRequest
@@ -845,6 +1374,50 @@ export interface components {
             result?: unknown;
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * EditChapterRequest
+         * @description POST /sessions/{id}/edit-chapter 请求体。
+         *
+         *     一条路由两种意图（T-08c / Copaper 写后 refine）：
+         *     - ``instruction``：把用户指令应用到当前章（走 generate_chapter）
+         *     - ``content``：把用户编辑后的 markdown 落盘（不调 LLM）
+         */
+        EditChapterRequest: {
+            /**
+             * Chapter Index
+             * @default 0
+             */
+            chapter_index: number;
+            /** Instruction */
+            instruction?: string | null;
+            /** Content */
+            content?: string | null;
+        };
+        /**
+         * EditChapterResponse
+         * @description POST /sessions/{id}/edit-chapter 返回体。
+         *
+         *     与 regenerate 同形：改过的章 + 全表。instruction 走 generate_chapter
+         *     时附带评审字段；content 落盘不审，评审字段为空。
+         */
+        EditChapterResponse: {
+            chapter: components["schemas"]["ChapterResponse"];
+            /** Body Chapters */
+            body_chapters?: components["schemas"]["ChapterResponse"][];
+            /** Score */
+            score?: number | null;
+            /** Auto Decision */
+            auto_decision?: string | null;
+            /** Review Source */
+            review_source?: string | null;
+            /**
+             * Review Degraded
+             * @default false
+             */
+            review_degraded: boolean;
+            /** Grounding Failures */
+            grounding_failures?: string[];
         };
         /**
          * FilterConditionItem
@@ -897,11 +1470,124 @@ export interface components {
             chapter: components["schemas"]["ChapterResponse"];
             /** Body Chapters */
             body_chapters?: components["schemas"]["ChapterResponse"][];
+            /** Score */
+            score?: number | null;
+            /** Auto Decision */
+            auto_decision?: string | null;
+            /** Review Source */
+            review_source?: string | null;
+            /**
+             * Review Degraded
+             * @default false
+             */
+            review_degraded: boolean;
+            /** Grounding Failures */
+            grounding_failures?: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IdentificationResponse */
+        IdentificationResponse: {
+            /** Passed */
+            passed: boolean;
+            /** Star Rating */
+            star_rating?: number | null;
+            /**
+             * Identification Failed
+             * @default false
+             */
+            identification_failed: boolean;
+            /** Diagnosis */
+            diagnosis?: Record<string, never>;
+        };
+        /**
+         * JourneyResponse
+         * @description GET /sessions/{id}/journey 返回体：8 阶段旅程整体进度。
+         *
+         *     阶段（0-index）：
+         *     0 选题 1 文献 2 数据清洗 3 识别策略 4 估计建模 5 稳健性审计 6 写作评审 7 降AIGC导出
+         *     可介入：{0, 2, 3, 5, 6}
+         */
+        JourneyResponse: {
+            /** Currentstage */
+            currentStage: number;
+            /** Stages */
+            stages?: components["schemas"]["JourneyStageItem"][];
+        };
+        /**
+         * JourneyStageItem
+         * @description 8 阶段研究旅程的单个阶段状态。
+         */
+        JourneyStageItem: {
+            /** Status */
+            status: string;
+            /**
+             * Canintervene
+             * @default false
+             */
+            canIntervene: boolean;
+        };
+        /** LabelEventResponse */
+        LabelEventResponse: {
+            /** Event Id */
+            event_id: string;
+            /** Ts */
+            ts: string;
+            /** Session Id */
+            session_id?: string | null;
+            /** Chapter Index */
+            chapter_index?: number | null;
+            /** Chapter Type */
+            chapter_type?: string | null;
+            /** Reviewer */
+            reviewer?: string | null;
+            /** Reviewer Kind */
+            reviewer_kind: string;
+            /** Persona */
+            persona?: string | null;
+            /** Ab Arm */
+            ab_arm: string;
+            /** Decision */
+            decision: string;
+            /** Comment */
+            comment?: string | null;
+            /** Auto Decision */
+            auto_decision?: string | null;
+            /** Agreed With Auto */
+            agreed_with_auto?: boolean | null;
+            /** Labels */
+            labels?: Record<string, never>[];
+            /** Packet Id */
+            packet_id?: string | null;
+            /** Judge Source */
+            judge_source?: string | null;
+        };
+        /** LabelExportResponse */
+        LabelExportResponse: {
+            /** N */
+            n: number;
+            /** Events */
+            events: components["schemas"]["LabelEventResponse"][];
+            /** Summary */
+            summary: Record<string, never>;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** LogoutResponse */
+        LogoutResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
         };
         /**
          * OutlineChapterResponse
@@ -961,7 +1647,7 @@ export interface components {
              * @default 0
              */
             chapter_index: number;
-            /** User refine instruction; empty string still regenerates. */
+            /** Instruction */
             instruction?: string | null;
         };
         /**
@@ -972,30 +1658,28 @@ export interface components {
             chapter: components["schemas"]["ChapterResponse"];
             /** Body Chapters */
             body_chapters?: components["schemas"]["ChapterResponse"][];
-        };
-        /**
-         * EditChapterRequest
-         * @description POST /sessions/{id}/edit-chapter 请求体。
-         */
-        EditChapterRequest: {
+            /** Score */
+            score?: number | null;
+            /** Auto Decision */
+            auto_decision?: string | null;
+            /** Review Source */
+            review_source?: string | null;
             /**
-             * Chapter Index
-             * @default 0
+             * Review Degraded
+             * @default false
              */
-            chapter_index: number;
-            /** Instruction */
-            instruction?: string | null;
-            /** Content */
-            content?: string | null;
+            review_degraded: boolean;
+            /** Grounding Failures */
+            grounding_failures?: string[];
         };
-        /**
-         * EditChapterResponse
-         * @description POST /sessions/{id}/edit-chapter 返回体。
-         */
-        EditChapterResponse: {
-            chapter: components["schemas"]["ChapterResponse"];
-            /** Body Chapters */
-            body_chapters?: components["schemas"]["ChapterResponse"][];
+        /** RegisterRequest */
+        RegisterRequest: {
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
         };
         /**
          * ResumeRequest
@@ -1061,6 +1745,15 @@ export interface components {
             max_review_iterations: number;
             /** Auto Decision */
             auto_decision: string;
+            /** Review Source */
+            review_source?: string | null;
+            /**
+             * Review Degraded
+             * @default false
+             */
+            review_degraded: boolean;
+            /** Grounding Failures */
+            grounding_failures?: string[];
         };
         /**
          * ReviewRubricResponse
@@ -1077,6 +1770,13 @@ export interface components {
             contribution?: number | null;
             /** Readability */
             readability?: number | null;
+        };
+        /** RobustnessResponse */
+        RobustnessResponse: {
+            /** Robustness Results */
+            robustness_results?: Record<string, never>;
+            /** Spec Curve */
+            spec_curve?: Record<string, never> | null;
         };
         /**
          * RollbackRequest
@@ -1104,6 +1804,91 @@ export interface components {
             body_chapters?: components["schemas"]["ChapterResponse"][];
         };
         /**
+         * SessionInfoResponse
+         * @description GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。
+         */
+        SessionInfoResponse: {
+            /** Session Id */
+            session_id: string;
+            /** Exists */
+            exists: boolean;
+            /**
+             * Has Dataset
+             * @default false
+             */
+            has_dataset: boolean;
+            /** Claim */
+            claim?: string | null;
+            /** Star Rating */
+            star_rating?: number | null;
+            /**
+             * Identification Failed
+             * @default false
+             */
+            identification_failed: boolean;
+            /** Identification Report */
+            identification_report?: string | null;
+            /** Results */
+            results?: string | null;
+            /** Estimate */
+            estimate?: unknown;
+            /** Literature Source */
+            literature_source?: string | null;
+            /** Write Blockers */
+            write_blockers?: string[];
+            /** Robustness Status */
+            robustness_status?: string | null;
+            /** Outline */
+            outline?: components["schemas"]["OutlineChapterResponse"][];
+            /** Body Chapters */
+            body_chapters?: components["schemas"]["ChapterResponse"][];
+            /** Research Direction */
+            research_direction?: unknown;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /**
+             * Access Token
+             * @default
+             */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+        };
+        /** TraceEvent */
+        TraceEvent: {
+            /** Ts */
+            ts: string;
+            /** Node */
+            node: string;
+            /** Status */
+            status: string;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** Detail */
+            detail?: Record<string, never> | null;
+        };
+        /** TraceResponse */
+        TraceResponse: {
+            /** Session Id */
+            session_id: string;
+            /** Total Returned */
+            total_returned: number;
+            /**
+             * Events
+             * @default []
+             */
+            events: components["schemas"]["TraceEvent"][];
+        };
+        /**
          * TransformRequest
          * @description POST /sessions/{id}/transform 请求体（flat form）。
          */
@@ -1129,6 +1914,16 @@ export interface components {
             /** Constructed Vars */
             constructed_vars?: string[];
         };
+        /** TranslateCodeResponse */
+        TranslateCodeResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Code Translations */
+            code_translations?: Record<string, never>[];
+        };
         /**
          * UploadResponse
          * @description POST /upload 返回体。
@@ -1137,6 +1932,24 @@ export interface components {
             /** Session Id */
             session_id: string;
             dataset_meta: components["schemas"]["DatasetMetaResponse"];
+        };
+        /** UserResponse */
+        UserResponse: {
+            /** Id */
+            id: number;
+            /** Uuid */
+            uuid: string;
+            /** Email */
+            email: string;
+            /** Username */
+            username: string;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1485,6 +2298,37 @@ export interface operations {
             };
         };
     };
+    translate_code_endpoint_sessions__session_id__translate_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_code_sessions__session_id__code_export_get: {
         parameters: {
             query?: {
@@ -1552,41 +2396,6 @@ export interface operations {
             };
         };
     };
-    run_eda_sessions__session_id__eda_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EdaRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EdaResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_progress_sessions__session_id__progress_get: {
         parameters: {
             query?: never;
@@ -1605,6 +2414,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgressResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_journey_sessions__session_id__journey_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1671,6 +2511,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifacts_sessions__session_id__artifacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trace_sessions__session_id__trace_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1789,6 +2693,229 @@ export interface operations {
             };
         };
     };
+    register_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_me_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    refresh_token_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+        };
+    };
+    run_identification_sessions__session_id__identification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_robustness_sessions__session_id__robustness_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RobustnessResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_eda_sessions__session_id__eda_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EdaRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EdaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_upload_post: {
         parameters: {
             query?: never;
@@ -1822,6 +2949,26 @@ export interface operations {
             };
         };
     };
+    list_sessions_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfoResponse"][];
+                };
+            };
+        };
+    };
     create_session_sessions_post: {
         parameters: {
             query?: never;
@@ -1838,6 +2985,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreateSessionResponse"];
+                };
+            };
+        };
+    };
+    get_session_info_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_degradation_sessions__session_id__degradation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1862,6 +3102,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_labels_labels_get: {
+        parameters: {
+            query?: {
+                session_id?: string | null;
+                reviewer_kind?: string | null;
+                ab_arm?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelExportResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1932,6 +3205,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discuss_desk_desk_discuss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeskDiscussRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeskDiscussResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_desk_desk_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_transcribe_desk_desk_transcribe_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    speak_desk_desk_speak_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeskSpeakRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

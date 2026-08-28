@@ -8,7 +8,8 @@ import { I18nProvider } from '../lib/i18n'
 function renderDesk(props: Partial<ComponentProps<typeof DeskPage>> = {}) {
   return render(
     <I18nProvider>
-      <DeskPage onConfirm={vi.fn()} onPickData={vi.fn()} {...props} />
+      <DeskPage
+      authed onConfirm={vi.fn()} onPickData={vi.fn()} {...props} />
     </I18nProvider>,
   )
 }

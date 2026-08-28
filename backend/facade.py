@@ -692,7 +692,18 @@ class AgentFacade:
         chapter["versions"] = versions
         chapter["chapter_index"] = chapter_index
         body_chapters[chapter_index] = chapter
-        state = {**state, "body_chapters": body_chapters}
+        updates: dict = {"body_chapters": body_chapters}
+        # Drop the pre-edit review so approve cannot pass on a stale score.
+        # Instruction refine goes through generate_chapter and may write a new one.
+        for key, empty in (
+            ("review_scores", None),
+            ("review_feedback", ""),
+        ):
+            items = list(state.get(key) or [])
+            if 0 <= chapter_index < len(items):
+                items[chapter_index] = empty
+                updates[key] = items
+        state = {**state, **updates}
         with self._tracked(session_id, "edit_chapter") as t:
             t.set_detail(chapter_index=chapter_index, mode="content")
             self.save_state(session_id, state)
@@ -976,16 +987,22 @@ class AgentFacade:
             if chapter_index < len(review_feedback)
             else ""
         )
+        if not isinstance(feedback, str):
+            feedback = "" if feedback is None else str(feedback)
         suggestions = (
             revision_suggestions[chapter_index]
             if chapter_index < len(revision_suggestions)
             else ""
         )
-        score = (
+        raw_score = (
             review_scores[chapter_index]
             if chapter_index < len(review_scores)
-            else 0.0
+            else None
         )
+        try:
+            score = float(raw_score) if raw_score is not None else 0.0
+        except (TypeError, ValueError):
+            score = 0.0
         raw_rubric = (
             review_rubrics[chapter_index]
             if chapter_index < len(review_rubrics)

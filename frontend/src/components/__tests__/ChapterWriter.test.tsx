@@ -161,6 +161,19 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
   })
 
+  test('status=edited 时仍显示 HITL 工具栏（重新生成 / 回滚 / 编辑 / 通过）', () => {
+    renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, status: 'edited' }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /回滚/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
+  })
+
   test('默认不显示版本历史下拉', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
     expect(screen.queryByTestId('version-history')).not.toBeInTheDocument()
@@ -224,5 +237,17 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     await user.click(screen.getByRole('button', { name: /编辑/ }))
     await user.click(screen.getByRole('button', { name: /保存/ }))
     expect(onSaveEdit).toHaveBeenCalledTimes(1)
+  })
+
+  test('onSaveEdit 失败时留在编辑模式保住草稿', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn().mockRejectedValue(new Error('POST failed'))
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} onSaveEdit={onSaveEdit} />)
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /保存/ }))
+    expect(onSaveEdit).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /编辑/ })).not.toBeInTheDocument()
   })
 })

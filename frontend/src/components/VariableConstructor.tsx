@@ -2,6 +2,7 @@
 // 类型下拉 + 列名输入 → POST /sessions/{id}/transform → 显示已构造变量列表
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -19,8 +20,6 @@ const TYPES: { id: string; label: string }[] = [
   { id: 'interaction', label: '交互项' },
   { id: 'policy_dummy', label: '政策虚拟变量' },
 ]
-
-const API_BASE = 'http://localhost:8000'
 
 export function VariableConstructor({ sessionId }: VariableConstructorProps) {
   const { t } = useT()

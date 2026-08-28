@@ -161,6 +161,19 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
   })
 
+  test('status=edited 时仍显示 HITL 工具栏（重新生成 / 回滚 / 编辑 / 通过）', () => {
+    renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, status: 'edited' }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /重新生成/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /回滚/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /通过/ })).toBeInTheDocument()
+  })
+
   test('默认不显示版本历史下拉', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} versions={versions} />)
     expect(screen.queryByTestId('version-history')).not.toBeInTheDocument()
@@ -224,5 +237,66 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
     await user.click(screen.getByRole('button', { name: /编辑/ }))
     await user.click(screen.getByRole('button', { name: /保存/ }))
     expect(onSaveEdit).toHaveBeenCalledTimes(1)
+  })
+
+  test('onSaveEdit 失败时留在编辑模式保住草稿', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn().mockRejectedValue(new Error('POST failed'))
+    renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} onSaveEdit={onSaveEdit} />)
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /保存/ }))
+    expect(onSaveEdit).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /编辑/ })).not.toBeInTheDocument()
+  })
+
+  test('点"保存"把进入编辑时的章节序号传给 onSaveEdit', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn()
+    renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, chapter_index: 0 }}
+        chapterIndex={0}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    await user.click(screen.getByRole('button', { name: /保存/ }))
+    expect(onSaveEdit).toHaveBeenCalledWith(expect.any(String), 0)
+  })
+
+  test('切换章节时退出编辑模式，不把草稿带到新章', async () => {
+    const user = userEvent.setup()
+    const onSaveEdit = vi.fn()
+    const { rerender } = renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{ ...introChapter, chapter_index: 0 }}
+        chapterIndex={0}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /编辑/ }))
+    expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument()
+    rerender(
+      <ChapterWriter
+        {...baseProps}
+        chapter={{
+          type: 'methods',
+          title: '方法',
+          status: 'generated',
+          content: '方法正文不该被引言草稿覆盖。',
+          chapter_index: 3,
+        }}
+        chapterIndex={3}
+        onSaveEdit={onSaveEdit}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /编辑/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /保存/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('chapter-paper').textContent).toContain('方法正文不该被引言草稿覆盖')
+    expect(onSaveEdit).not.toHaveBeenCalled()
   })
 })

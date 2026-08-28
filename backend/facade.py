@@ -517,6 +517,21 @@ class AgentFacade:
             "identification_failed": result.get("identification_failed") is True,
         }
 
+    def run_translate_code(self, session_id: str) -> dict:
+        """Run translate_code and persist code_translations for /code-export."""
+        if translate_code_node is None:
+            raise HTTPException(
+                status_code=503,
+                detail="translate_code node not available",
+            )
+        state = self.get_state(session_id)
+        with self._tracked(session_id, "translate_code", "translate_code") as t:
+            result = translate_code_node(state)
+            state = {**state, **result}
+            self.save_state(session_id, state)
+            t.set_detail(n=len(result.get("code_translations") or []))
+        return result
+
     def run_robustness_check(self, session_id: str) -> dict:
         """Run full robustness battery after main estimation.
 
@@ -603,7 +618,12 @@ class AgentFacade:
             session_id, state, result, node_name="generate_chapter"
         )
 
-    def regenerate_chapter(self, session_id: str, chapter_index: int) -> dict:
+    def regenerate_chapter(
+        self,
+        session_id: str,
+        chapter_index: int,
+        instruction: Optional[str] = None,
+    ) -> dict:
         """Re-run generate_chapter on the given chapter index."""
         if generate_chapter_node is None:
             raise HTTPException(
@@ -611,7 +631,19 @@ class AgentFacade:
                 detail="generate_chapter node not available",
             )
         state = self.get_state(session_id)
-        state = {**state, "current_chapter_index": chapter_index}
+        # resolve_slot prefers leftover current_chapter (set by POST
+        # /generate-chapter). Index-based rewrite must honor this index.
+        state = {
+            **state,
+            "current_chapter_index": chapter_index,
+            "current_chapter": None,
+        }
+        if instruction:
+            suggestions = list(state.get("revision_suggestions") or [])
+            while len(suggestions) <= chapter_index:
+                suggestions.append("")
+            suggestions[chapter_index] = instruction
+            state = {**state, "revision_suggestions": suggestions}
         try:
             with self._tracked(session_id, "regenerate_chapter") as t:
                 result = generate_chapter_node(state)
@@ -621,6 +653,117 @@ class AgentFacade:
         return self._persist_after_chapter(
             session_id, state, result, node_name="regenerate_chapter"
         )
+
+    def edit_chapter(
+        self,
+        session_id: str,
+        chapter_index: int,
+        instruction: Optional[str] = None,
+        content: Optional[str] = None,
+    ) -> dict:
+        """Apply a chat refine or persist a user markdown edit.
+
+        One write path: instruction → ``revision_suggestions`` then
+        ``generate_chapter`` (same as regenerate). content → prepend a
+        new version and set status ``edited`` (no LLM).
+        """
+        instruction_text = (instruction or "").strip()
+        content_text = content if content is None else str(content)
+        if not instruction_text and content_text is None:
+            raise HTTPException(
+                status_code=400,
+                detail="instruction or content is required",
+            )
+        if not instruction_text and not str(content_text or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="instruction or content is required",
+            )
+
+        state = self.get_state(session_id)
+        body_chapters = list(state.get("body_chapters") or [])
+        if chapter_index < 0 or chapter_index >= len(body_chapters):
+            raise HTTPException(status_code=404, detail="Chapter index out of range")
+        existing = body_chapters[chapter_index]
+        if not isinstance(existing, dict) or not (existing.get("content") or existing.get("type")):
+            raise HTTPException(status_code=404, detail="Chapter not found")
+
+        if instruction_text:
+            return self._refine_chapter(
+                session_id, chapter_index, instruction_text, state, existing
+            )
+        markdown = str(content_text)
+        if not markdown.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="instruction or content is required",
+            )
+        return self._persist_chapter_edit(
+            session_id, chapter_index, markdown, state, existing
+        )
+
+    def _refine_chapter(
+        self,
+        session_id: str,
+        chapter_index: int,
+        instruction: str,
+        state: dict,
+        existing: dict,
+    ) -> dict:
+        """Stuff the user instruction into revision_suggestions, then regenerate."""
+        suggestions = list(state.get("revision_suggestions") or [])
+        while len(suggestions) <= chapter_index:
+            suggestions.append("")
+        current_md = existing.get("content") or ""
+        if current_md:
+            suggestions[chapter_index] = (
+                f"{instruction}\n\n当前章节正文（请在此基础上修改，输出完整 markdown）：\n{current_md}"
+            )
+        else:
+            suggestions[chapter_index] = instruction
+        self.save_state(
+            session_id, {**state, "revision_suggestions": suggestions}
+        )
+        return self.regenerate_chapter(session_id, chapter_index)
+
+    def _persist_chapter_edit(
+        self,
+        session_id: str,
+        chapter_index: int,
+        content: str,
+        state: dict,
+        existing: dict,
+    ) -> dict:
+        """Persist user markdown as a new version. Export reads ``content``."""
+        body_chapters = list(state.get("body_chapters") or [])
+        chapter = dict(existing)
+        versions = list(chapter.get("versions") or [])
+        previous = chapter.get("content")
+        if not versions and previous:
+            versions = [previous]
+        if not versions or versions[0] != content:
+            versions = [content] + versions
+        chapter["content"] = content
+        chapter["status"] = "edited"
+        chapter["versions"] = versions
+        chapter["chapter_index"] = chapter_index
+        body_chapters[chapter_index] = chapter
+        updates: dict = {"body_chapters": body_chapters}
+        # Drop the pre-edit review so approve cannot pass on a stale score.
+        # Instruction refine goes through generate_chapter and may write a new one.
+        for key, empty in (
+            ("review_scores", None),
+            ("review_feedback", ""),
+        ):
+            items = list(state.get(key) or [])
+            if 0 <= chapter_index < len(items):
+                items[chapter_index] = empty
+                updates[key] = items
+        state = {**state, **updates}
+        with self._tracked(session_id, "edit_chapter") as t:
+            t.set_detail(chapter_index=chapter_index, mode="content")
+            self.save_state(session_id, state)
+        return state
 
     def _persist_after_chapter(
         self,
@@ -908,16 +1051,22 @@ class AgentFacade:
             if chapter_index < len(review_feedback)
             else ""
         )
+        if not isinstance(feedback, str):
+            feedback = "" if feedback is None else str(feedback)
         suggestions = (
             revision_suggestions[chapter_index]
             if chapter_index < len(revision_suggestions)
             else ""
         )
-        score = (
+        raw_score = (
             review_scores[chapter_index]
             if chapter_index < len(review_scores)
-            else 0.0
+            else None
         )
+        try:
+            score = float(raw_score) if raw_score is not None else 0.0
+        except (TypeError, ValueError):
+            score = 0.0
         raw_rubric = (
             review_rubrics[chapter_index]
             if chapter_index < len(review_rubrics)

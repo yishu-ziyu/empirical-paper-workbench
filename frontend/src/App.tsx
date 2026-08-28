@@ -260,6 +260,7 @@ function App() {
     // Identity is the server session cookie; the token argument is a
     // Bearer-era leftover and is ignored.
     setAuthed(true)
+    setAuthPage(null)
   }, [])
 
   const forgetCsvMeta = useCallback(() => {

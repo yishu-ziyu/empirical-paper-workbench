@@ -18,6 +18,7 @@ from __future__ import annotations
 import routers.code_export  # noqa: F401
 from facade import facade
 
+from cleaning.audit import AuditStep
 from conftest import make_write_ready_state
 
 
@@ -54,6 +55,41 @@ def _seed_session_with_translations() -> str:
         },
     )
     return sid
+
+
+_UPLOAD_CLEANING_NAMES = (
+    "profiling",
+    "merge",
+    "missing",
+    "outliers",
+    "transform",
+    "filter",
+    "balance",
+)
+
+
+def _upload_cleaning_report(tmp_path, csv_name: str = "course-panel.csv") -> tuple[dict, str]:
+    """Match POST /upload: 8 steps, audit at index 7, AuditStep clean.py on disk."""
+    csv_path = tmp_path / csv_name
+    csv_path.write_text(
+        "id,year,income,age\n1,2010,100,30\n2,2011,110,31\n",
+        encoding="utf-8",
+    )
+    prior = [
+        {"name": name, "status": "success", "report": {}}
+        for name in _UPLOAD_CLEANING_NAMES
+    ]
+    _, audit_report = AuditStep().run(
+        [{"path": str(csv_path)}],
+        {"workspace": str(tmp_path), "steps": prior},
+    )
+    return (
+        {
+            "steps": prior
+            + [{"name": "audit", "status": "success", "report": audit_report}]
+        },
+        str(csv_path),
+    )
 
 
 def _seed_session_without_translations() -> str:
@@ -366,6 +402,65 @@ def test_get_replaces_stubs_when_direction_names_columns(client):
         assert r_resp.status_code == 200, r_resp.text
         assert "lm(" in r_resp.text
         assert "无 Python 代码可翻译" not in r_resp.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_upload_direction_without_generate_exports_takeable_ols(client, tmp_path):
+    """Upload + OLS direction, no generate-chapter: GET do|R are takeable OLS.
+
+    Cleaning-audit Python must not produce comment-only files, and guessed
+    id+year must not silently emit TWFE.
+    """
+    import uuid
+
+    cleaning_report, csv_path = _upload_cleaning_report(tmp_path)
+    audit_src = (tmp_path / "clean.py").read_text(encoding="utf-8")
+    assert "df = pd.read_csv(DATA_PATH)" in audit_src
+
+    sid = f"test-upload-ols-export-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": csv_path,
+            "cleaning_report": cleaning_report,
+            "research_direction": {
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+            },
+        },
+    )
+    try:
+        posted = client.post(f"/sessions/{sid}/translate-code")
+        assert posted.status_code == 200, posted.text
+
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "import delimited" in do.text
+        assert "regress " in do.text
+        assert "income" in do.text
+        assert "age" in do.text
+        assert "xtreg" not in do.text
+        assert "reghdfe" not in do.text
+        assert "Cleaning steps applied" not in do.text
+        assert "无 Python 代码可翻译" not in do.text
+        assert "y ~ treat" not in do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "read.csv" in r_resp.text
+        assert "lm(" in r_resp.text
+        assert "income" in r_resp.text
+        assert "age" in r_resp.text
+        assert "feols" not in r_resp.text
+        assert "felm" not in r_resp.text
+        assert "无 Python 代码可翻译" not in r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
     finally:
         facade.drop_session(sid)
 

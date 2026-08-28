@@ -23,7 +23,7 @@ describe('LoginPage', () => {
     renderWithI18n(<LoginPage onLogin={() => {}} onSwitchToRegister={() => {}} />)
 
     expect(screen.getByLabelText(/邮箱|email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/密码|password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^密码$|^password$/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /登录|sign in/i })).toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('LoginPage', () => {
     renderWithI18n(<LoginPage onLogin={onLogin} onSwitchToRegister={() => {}} />)
 
     fireEvent.change(screen.getByLabelText(/邮箱|email/i), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByLabelText(/密码|password/i), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText(/^密码$|^password$/i), { target: { value: 'secret123' } })
     fireEvent.click(screen.getByRole('button', { name: /登录|sign in/i }))
 
     await waitFor(() => {
@@ -70,7 +70,7 @@ describe('LoginPage', () => {
     renderWithI18n(<LoginPage onLogin={() => {}} onSwitchToRegister={() => {}} />)
 
     fireEvent.change(screen.getByLabelText(/邮箱|email/i), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByLabelText(/密码|password/i), { target: { value: 'wrong' } })
+    fireEvent.change(screen.getByLabelText(/^密码$|^password$/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /登录|sign in/i }))
 
     await waitFor(() => {
@@ -85,7 +85,7 @@ describe('LoginPage', () => {
     renderWithI18n(<LoginPage onLogin={() => {}} onSwitchToRegister={() => {}} />)
 
     fireEvent.change(screen.getByLabelText(/邮箱|email/i), { target: { value: 'test@example.com' } })
-    fireEvent.change(screen.getByLabelText(/密码|password/i), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText(/^密码$|^password$/i), { target: { value: 'secret123' } })
     fireEvent.click(screen.getByRole('button', { name: /登录|sign in/i }))
 
     await waitFor(() => {
@@ -156,7 +156,7 @@ describe('RegisterPage', () => {
     fireEvent.change(screen.getByLabelText(/确认密码|confirm password/i), { target: { value: '12345' } })
     fireEvent.click(screen.getByRole('button', { name: /创建账户|create account/i }))
 
-    expect(screen.getByText(/至少需要 6 个字符|at least 6 characters/i)).toBeInTheDocument()
+    expect(screen.getByText(/至少需要 8 个字符|at least 8 characters/i)).toBeInTheDocument()
   })
 
   test('calls onRegister after successful registration + login', async () => {

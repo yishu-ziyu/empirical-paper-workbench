@@ -22,12 +22,11 @@ import DocExportDialog from './components/DocExportDialog'
 import CodeExportDialog from './components/CodeExportDialog'
 import ReviewGateDialog from './components/ReviewGateDialog'
 import RunTracePanel from './components/RunTracePanel'
-import { API_BASE } from './lib/apiBase'
+import { API_BASE, apiFetch } from './lib/apiBase'
 import { useT } from './lib/i18n'
 import type { components } from './types/api'
 
 const LS_KEY = 'econpaper_session_id'
-const LS_TOKEN_KEY = 'econpaper_access_token'
 const LS_GUIDE_KEY = 'econpaper_seen_guide'
 const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
@@ -76,17 +75,10 @@ type DeskSnapshot = {
   } | null
 }
 
-function storeToken(token: string): void {
-  localStorage.setItem(LS_TOKEN_KEY, token)
-}
-
-function clearToken(): void {
-  localStorage.removeItem(LS_TOKEN_KEY)
-}
-
+// Auth rides on the httpOnly cookie pair: same-origin fetch sends it
+// automatically. authHeaders() survives only so legacy call sites compile.
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(LS_TOKEN_KEY)
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return {}
 }
 
 function directionLine(rd: { method?: string; dv?: string; iv?: string } | null | undefined): string | null {
@@ -175,7 +167,7 @@ function toDirectionInitial(record: DirectionFormData | null): DirectionFormInit
 function App() {
   const { t } = useT()
 
-  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem(LS_TOKEN_KEY))
+  const [authed, setAuthed] = useState(false)
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
 
   const [sessionId, setSessionId] = useState<string | null>(() => {
@@ -264,9 +256,11 @@ function App() {
     globalErrorTimerRef.current = setTimeout(() => setGlobalError(null), 8000)
   }, [])
 
-  const handleLogin = useCallback((token: string) => {
-    storeToken(token)
-    setAuthToken(token)
+  const handleLogin = useCallback((_token: string) => {
+    // Identity is the server session cookie; the token argument is a
+    // Bearer-era leftover and is ignored.
+    setAuthed(true)
+    setAuthPage(null)
   }, [])
 
   const forgetCsvMeta = useCallback(() => {
@@ -277,17 +271,41 @@ function App() {
   }, [])
 
   const handleLogout = useCallback(() => {
-    clearToken()
-    setAuthToken(null)
+    // Server revokes the refresh token and clears both cookies.
+    void (async () => {
+      try {
+        await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+      } catch {
+        /* local logout proceeds regardless */
+      }
+    })()
+    setAuthed(false)
     setSessionId(null)
     localStorage.removeItem(LS_KEY)
     forgetCsvMeta()
     setAuthPage(null)
   }, [forgetCsvMeta])
 
+  // Reload restore: httpOnly cookies outlive the tab, so ask the server
+  // who we are instead of trusting a localStorage token.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/auth/me`)
+        if (!cancelled && r && r.ok) setAuthed(true)
+      } catch {
+        /* stay anonymous */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const ensureSession = useCallback(async (): Promise<string> => {
     if (sessionId) return sessionId
-    const resp = await fetch(`${API_BASE}/sessions`, {
+    const resp = await apiFetch(`${API_BASE}/sessions`, {
       method: 'POST',
       headers: authHeaders(),
     })
@@ -300,7 +318,7 @@ function App() {
 
   const refreshReview = useCallback(async (sid: string) => {
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sid}/review`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sid}/review`, {
         headers: authHeaders(),
       })
       if (!resp.ok) return
@@ -384,7 +402,7 @@ function App() {
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY)
     if (!saved) return
-    fetch(`${API_BASE}/sessions/${saved}`, { headers: authHeaders() })
+    apiFetch(`${API_BASE}/sessions/${saved}`, { headers: authHeaders() })
       .then((res) => res.json())
       .then((data: DeskSnapshot & { exists: boolean }) => {
         if (!data.exists) {
@@ -409,7 +427,7 @@ function App() {
     if (!sessionId) { setDegradations([]); setDegraded(false); return }
     const fetchDegradations = async () => {
       try {
-        const resp = await fetch(`${API_BASE}/sessions/${sessionId}/degradation`)
+        const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/degradation`)
         if (resp.ok) {
           const data = await resp.json()
           const degs = data.degradations || []
@@ -450,7 +468,7 @@ function App() {
       chapter: components['schemas']['ChapterResponse'],
       force: boolean,
     ) => {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/approve-chapter`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/approve-chapter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
@@ -504,7 +522,7 @@ function App() {
       outline.findIndex((item) => item.type === gateInfo.chapter.type)
     setGateBusy(true)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
@@ -557,7 +575,7 @@ function App() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', headers: authHeaders(), body: formData })
+      const resp = await apiFetch(`${API_BASE}/upload`, { method: 'POST', headers: authHeaders(), body: formData })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
       const cols = data.dataset_meta?.columns
@@ -633,7 +651,7 @@ function App() {
     setDirectionBusy(true)
     try {
       const sid = await ensureSession()
-      const resp = await fetch(`${API_BASE}/sessions/${sid}/direction`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sid}/direction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(data),
@@ -671,7 +689,7 @@ function App() {
       showGlobalError(t('app.needSession'))
       return
     }
-    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
+    const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/generate-chapter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
@@ -756,7 +774,7 @@ function App() {
         throw err
       }
       try {
-        const resp = await fetch(`${API_BASE}/sessions/${sessionId}/edit-chapter`, {
+        const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/edit-chapter`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
@@ -789,7 +807,7 @@ function App() {
       showGlobalError(t('app.needSession'))
       return null
     }
-    const resp = await fetch(`${API_BASE}/sessions/${sessionId}/resume`, {
+    const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/resume`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ outline: nextOutline }),
@@ -873,7 +891,7 @@ function App() {
     writeBusyRef.current = true
     setWriteBusy(true)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
@@ -1053,7 +1071,7 @@ function App() {
               {t('guide.nowAgain')}
             </button>
           )}
-          {authToken ? (
+          {authed ? (
             <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
           ) : (
             <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>

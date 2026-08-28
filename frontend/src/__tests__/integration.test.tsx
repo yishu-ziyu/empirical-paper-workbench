@@ -170,11 +170,11 @@ describe('前端集成测试', () => {
     expect(await screen.findByTestId('instrument-readout')).toBeInTheDocument()
     expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
 
+    // Cookie-era transport: identity rides on httpOnly cookies, so the
+    // call carries credentials instead of an Authorization header.
     expect(mockFetch).toHaveBeenCalledWith(
       `${API_BASE}/sessions/test-789`,
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token-for-auth' }),
-      }),
+      expect.objectContaining({ credentials: 'include' }),
     )
     expect(MockWebSocket.instances.length).toBe(0)
   })

@@ -599,7 +599,12 @@ class AgentFacade:
             session_id, state, result, node_name="generate_chapter"
         )
 
-    def regenerate_chapter(self, session_id: str, chapter_index: int) -> dict:
+    def regenerate_chapter(
+        self,
+        session_id: str,
+        chapter_index: int,
+        instruction: Optional[str] = None,
+    ) -> dict:
         """Re-run generate_chapter on the given chapter index."""
         if generate_chapter_node is None:
             raise HTTPException(
@@ -608,6 +613,12 @@ class AgentFacade:
             )
         state = self.get_state(session_id)
         state = {**state, "current_chapter_index": chapter_index}
+        if instruction:
+            suggestions = list(state.get("revision_suggestions") or [])
+            while len(suggestions) <= chapter_index:
+                suggestions.append("")
+            suggestions[chapter_index] = instruction
+            state = {**state, "revision_suggestions": suggestions}
         try:
             with self._tracked(session_id, "regenerate_chapter") as t:
                 result = generate_chapter_node(state)

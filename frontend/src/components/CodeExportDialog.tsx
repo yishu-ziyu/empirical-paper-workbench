@@ -1,3 +1,4 @@
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 // 代码导出对话框 (T-09)
@@ -48,9 +49,16 @@ const FORMATS: FormatConfig[] = [
 ]
 
 // 触发浏览器下载：fetch 拿 blob → createObjectURL → click 隐藏 <a>
+const LS_TOKEN_KEY = 'econpaper_access_token'
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem(LS_TOKEN_KEY)
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function downloadCode(sessionId: string, format: string): Promise<void> {
-  const url = `http://localhost:8000/sessions/${sessionId}/code-export?format=${format}`
-  const resp = await fetch(url, { method: 'GET' })
+  const url = `${API_BASE}/sessions/${sessionId}/code-export?format=${format}`
+  const resp = await fetch(url, { method: 'GET', headers: authHeaders() })
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`下载失败 (${resp.status}): ${text}`)

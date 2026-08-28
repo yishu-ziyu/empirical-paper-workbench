@@ -7,11 +7,12 @@
 2. 选择模板（``state['export_template']``，默认 ``cn_journal``）
 3. Jinja2 渲染模板 → LaTeX 源码
 4. ``compile_pdf`` 调 ``latexmk -xelatex`` 生成 PDF（subprocess）
-5. ``convert_docx`` 调 ``pandoc`` 把 .tex 转 .docx（subprocess）
+5. ``convert_docx`` 优先 ``pandoc``；缺失或失败时写最小 OOXML ``.docx``
 6. 返回 ``{"latex_source", "pdf_path", "docx_path", "degraded"}``
 
-降级策略：``latexmk`` / ``pandoc`` 不可用时对应路径返回 None，
-``degraded=True``，但 ``latex_source`` 始终可用。测试通过
+降级策略：``latexmk`` 不可用时 ``pdf_path=None``。docx 在 pandoc 缺失时
+仍写 OOXML，但 ``degraded=True``。仅当转换完全失败时 ``docx_path=None``。
+``latex_source`` 始终可用。测试通过
 ``monkeypatch.setattr("nodes.export_docx.compile_pdf", fake)`` 替换编译函数，
 故 ``compile_pdf`` / ``convert_docx`` 必须是模块级函数。
 """
@@ -22,8 +23,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 # macOS BasicTeX/Full TeX 安装在 /Library/TeX/texbin，uvicorn 进程可能 PATH 不含此目录
 _TEX_BIN = "/Library/TeX/texbin"
@@ -409,37 +411,166 @@ def compile_pdf(tex_source: str, output_dir: str) -> Optional[str]:
     return str(pdf_path) if pdf_path.exists() else None
 
 
-def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
-    """调 ``pandoc`` 把 .tex 转 .docx。
+def _xml_escape(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
-    成功返回 docx 绝对路径字符串；``pandoc`` 不存在或失败时返回 None。
-    """
-    if shutil.which("pandoc") is None:
+
+def _strip_tex_markup(text: str) -> str:
+    """Drop TeX commands but keep brace prose (\\textbf{结果} → 结果)."""
+    text = re.sub(r"(?<!\\)%.*", "", text)
+    text = re.sub(r"\\(?:begin|end)\{[^}]+\}", "", text)
+    text = re.sub(r"\\(?:maketitle|tableofcontents)\b", "", text)
+    text = re.sub(
+        r"\\(?:label|cite|citep|citet|ref|pageref|footnote)\*?\{[^}]*\}",
+        "",
+        text,
+    )
+    keep_arg = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
+    prev = None
+    while prev != text:
+        prev = text
+        text = keep_arg.sub(r"\1", text)
+    text = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", "", text)
+    return text.replace("\\%", "%").replace("\\&", "&").strip()
+
+
+def _prelude_section(raw: str) -> Optional[dict]:
+    """Pre-\\section body (abstract / leftover) as a docx section."""
+    if not raw or not raw.strip():
         return None
+    abs_m = re.search(
+        r"\\begin\{abstract\}(.*?)\\end\{abstract\}", raw, flags=re.S | re.I
+    )
+    if abs_m:
+        content = _strip_tex_markup(abs_m.group(1))
+        leftover = _strip_tex_markup(raw[: abs_m.start()] + raw[abs_m.end() :])
+        if leftover:
+            content = f"{content}\n{leftover}" if content else leftover
+        if content:
+            return {"title": "摘要", "content": content}
+        return None
+    content = _strip_tex_markup(raw)
+    if not content:
+        return None
+    return {"title": "摘要", "content": content}
 
+
+def _sections_from_tex(tex_source: str) -> Tuple[str, List[dict]]:
+    title_m = re.search(r"\\title\{([^}]*)\}", tex_source or "")
+    title = title_m.group(1).strip() if title_m else "Untitled"
+    body = tex_source or ""
+    if "\\begin{document}" in body:
+        body = body.split("\\begin{document}", 1)[1]
+    if "\\end{document}" in body:
+        body = body.split("\\end{document}", 1)[0]
+    parts = re.split(r"\\section\{([^}]*)\}", body)
+    sections: List[dict] = []
+    prelude = _prelude_section(parts[0] if parts else "")
+    if prelude:
+        sections.append(prelude)
+    for i in range(1, len(parts), 2):
+        content = parts[i + 1] if i + 1 < len(parts) else ""
+        sections.append(
+            {
+                "title": parts[i].strip() or "Untitled section",
+                "content": _strip_tex_markup(content),
+            }
+        )
+    return title, sections
+
+
+def _w_paragraph(text: str, *, heading: bool = False) -> str:
+    style = "<w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>" if heading else ""
+    return (
+        "<w:p>"
+        f"{style}"
+        "<w:r><w:t xml:space=\"preserve\">"
+        f"{_xml_escape(text)}"
+        "</w:t></w:r></w:p>"
+    )
+
+
+def _write_simple_docx(path: Path, title: str, sections: List[dict]) -> None:
+    """Write a minimal OOXML docx. No pandoc / python-docx required."""
+    paras = [_w_paragraph(title or "Untitled", heading=True)]
+    for section in sections:
+        paras.append(_w_paragraph(str(section.get("title") or ""), heading=True))
+        body = str(section.get("content") or "")
+        for line in body.splitlines() or [""]:
+            paras.append(_w_paragraph(line))
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{''.join(paras)}<w:sectPr/></w:body></w:document>"
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        "</Types>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("word/document.xml", document_xml)
+
+
+def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
+    """tex → docx. Prefer pandoc; if missing or failing, write a simple OOXML file.
+
+    成功返回 docx 绝对路径；pandoc 与 fallback 都失败时返回 None。
+    """
+    convert_docx.used_ooxml_fallback = False
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     tex_path = out / "paper.tex"
     tex_path.write_text(tex_source, encoding="utf-8")
     docx_path = out / "paper.docx"
 
-    try:
-        subprocess.run(
-            [
-                "pandoc",
-                str(tex_path),
-                "-o",
-                str(docx_path),
-                "--from=latex",
-                "--to=docx",
-            ],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return None
+    if shutil.which("pandoc") is not None:
+        try:
+            subprocess.run(
+                [
+                    "pandoc",
+                    str(tex_path),
+                    "-o",
+                    str(docx_path),
+                    "--from=latex",
+                    "--to=docx",
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+            if docx_path.exists() and docx_path.stat().st_size > 0:
+                convert_docx.used_ooxml_fallback = False
+                return str(docx_path)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass
 
+    try:
+        title, sections = _sections_from_tex(tex_source)
+        _write_simple_docx(docx_path, title, sections)
+    except OSError:
+        return None
+    convert_docx.used_ooxml_fallback = True
     return str(docx_path) if docx_path.exists() else None
 
 
@@ -492,9 +623,12 @@ def export_docx(state: EconPaperState) -> ExportDocxOutput:
         pass
 
     pdf_path = compile_pdf(tex_source, output_dir)
+    if hasattr(convert_docx, "used_ooxml_fallback"):
+        convert_docx.used_ooxml_fallback = False
     docx_path = convert_docx(tex_source, output_dir)
+    ooxml_fallback = bool(getattr(convert_docx, "used_ooxml_fallback", False))
 
-    degraded = pdf_path is None or docx_path is None
+    degraded = pdf_path is None or docx_path is None or ooxml_fallback
 
     return {
         "latex_source": tex_source,

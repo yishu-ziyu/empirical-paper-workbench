@@ -244,7 +244,7 @@ describe('App auth flow', () => {
     console.error('localStorage.getItem calls:', calls)
     getItemSpy.mockRestore()
     expect(screen.getByTestId('guide-page')).toBeInTheDocument()
-    expect(screen.getByText(/econpaper/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/econpaper/i).length).toBeGreaterThan(0)
   })
 
   test('renders main app when token exists in localStorage', async () => {

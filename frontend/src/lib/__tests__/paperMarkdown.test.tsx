@@ -27,4 +27,38 @@ describe('paperMarkdown', () => {
     expect(container.querySelector('strong')?.textContent).toBe('粗体')
     expect(container.textContent).not.toContain('**')
   })
+
+  test('promotes a standalone regression line to a numbered equation block', () => {
+    const { container } = render(
+      <div>
+        {renderPaperMarkdown(
+          '## 计量模型\n\n$Y_i = \\alpha + \\beta age_i + \\varepsilon_i$\n\n系数读作相关。',
+        )}
+      </div>,
+    )
+    const eq = container.querySelector('[data-testid="paper-equation"]')
+    expect(eq).toBeTruthy()
+    expect(eq?.textContent).toContain('Y_i')
+    expect(eq?.textContent).toContain('(1)')
+    expect(eq?.textContent).not.toContain('$')
+  })
+
+  test('renders pipe tables as booktabs with notes', () => {
+    const md = [
+      '表 1 — 主估计',
+      '',
+      '| 变量 | (1) |',
+      '| --- | --- |',
+      '| age | 0.124*** |',
+      '',
+      '注：括号内为标准误。',
+    ].join('\n')
+    const { container } = render(<div>{renderPaperMarkdown(md)}</div>)
+    const table = container.querySelector('[data-testid="paper-table"]')
+    expect(table).toBeTruthy()
+    expect(table?.textContent).toContain('age')
+    expect(table?.textContent).toContain('0.124')
+    expect(container.querySelector('figcaption')?.textContent).toBe('表 1 — 主估计')
+    expect(container.textContent).toContain('括号内为标准误')
+  })
 })

@@ -15,6 +15,7 @@ export interface DeskPageProps {
   uploadError?: string | null
   onLogin?: () => void
   onRegister?: () => void
+  authed?: boolean
 }
 
 const IDLE_MS = 1400
@@ -47,6 +48,7 @@ export default function DeskPage({
   uploadError = null,
   onLogin,
   onRegister,
+  authed,
 }: DeskPageProps) {
   const { t } = useT()
   const [text, setText] = useState('')
@@ -69,6 +71,16 @@ export default function DeskPage({
 
   const title = titleOverride ?? card?.title ?? ''
   const canShape = text.trim().length >= 6
+
+  // 未登录点「开始」会先去注册/登录；想法暂存 sessionStorage，回来即恢复
+  useEffect(() => {
+    const draft = sessionStorage.getItem('desk_idea_draft')
+    if (draft && !text) {
+      handleChange(draft)
+      sessionStorage.removeItem('desk_idea_draft')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function growPaper() {
     const el = paperRef.current
@@ -252,27 +264,14 @@ export default function DeskPage({
 
   return (
     <div data-testid="desk-page" className="min-h-screen bg-bg text-ink">
-      <UnauthHeader
-        onLogin={onLogin}
-        onRegister={onRegister}
-        extra={
-          <button
-            type="button"
-            data-testid="upload-btn"
-            onClick={onPickData}
-            disabled={uploading}
-            className="text-[13px] text-muted transition-colors duration-200 hover:text-ink disabled:opacity-50"
-          >
-            {uploading ? t('app.uploading') : t('desk.haveData')}
-          </button>
-        }
-      />
+      <UnauthHeader onLogin={onLogin} onRegister={onRegister} />
 
       <main className="mx-auto flex max-w-[720px] flex-col px-6 pb-24 pt-16 sm:pt-20">
         <h1 className="font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.1rem]">
           {t('desk.heading')}
         </h1>
         <p className="mt-5 max-w-[34em] text-[17px] leading-8 text-muted">{t('desk.sub')}</p>
+        <p className="mt-3 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
 
         <label className="relative mt-12 block">
           <span className="sr-only">{t('desk.paperLabel')}</span>
@@ -312,27 +311,28 @@ export default function DeskPage({
               >
                 {listenLabel}
               </button>
-              <span className="ml-auto text-[13px] text-muted">
-                {voiceStatus === 'listening'
-                  ? t('desk.listening')
-                  : busy
-                    ? t('desk.shaping')
-                    : ''}
-              </span>
-              {canShape && (
-                <button
-                  type="button"
-                  data-testid="desk-shape-btn"
-                  onClick={() => void askModel(text, turns)}
-                  disabled={busy}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                  aria-label={t('desk.shape')}
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
-                  </svg>
-                </button>
+              {voiceStatus === 'listening' && (
+                <span className="text-[13px] text-muted">{t('desk.listening')}</span>
               )}
+              <button
+                type="button"
+                data-testid="desk-shape-btn"
+                onClick={() => {
+                  if (!canShape || busy) return
+                  if (!authed) {
+                    // 边界态：未登录先注册/登录，想法暂存 sessionStorage，回来即恢复
+                    sessionStorage.setItem('desk_idea_draft', text)
+                    onLogin?.()
+                    return
+                  }
+                  void askModel(text, turns)
+                }}
+                disabled={!canShape || busy}
+                className="ml-auto rounded-full bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label={t('desk.shape')}
+              >
+                {busy ? t('desk.shaping') : t('desk.shape')} →
+              </button>
             </div>
           </div>
         </label>
@@ -350,6 +350,21 @@ export default function DeskPage({
               </button>
             ))}
           </div>
+        )}
+
+        {!text && (
+          <p className="mt-5 text-[13px] text-muted">
+            {t('desk.haveDataQ')}{' '}
+            <button
+              type="button"
+              data-testid="desk-upload-inline"
+              onClick={onPickData}
+              disabled={uploading}
+              className="text-ink underline underline-offset-4 transition-colors hover:opacity-80 disabled:opacity-50"
+            >
+              {uploading ? t('app.uploading') : t('desk.uploadCta')}
+            </button>
+          </p>
         )}
 
         {uploadError && (

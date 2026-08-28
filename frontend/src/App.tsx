@@ -1015,6 +1015,7 @@ function App() {
       <>
         {firstScreenInput}
         <DeskPage
+          authed={authed}
           uploading={uploading}
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}

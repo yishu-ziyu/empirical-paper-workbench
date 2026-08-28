@@ -134,3 +134,22 @@ body {
     @apply overflow-x-auto rounded-[20px] bg-[#1c1b1a] px-4 py-3 font-mono text-[12px] leading-6 text-[#e8e4dc];
   }
 }
+
+/* Auth micro-interactions */
+@keyframes auth-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.animate-shake { animation: auth-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+
+@keyframes auth-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.animate-pop { animation: auth-pop 0.3s ease-out both; }
+
+@keyframes auth-check-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+.auth-check path { stroke-dasharray: 24; animation: auth-check-draw 0.35s ease-out 0.05s forwards; }

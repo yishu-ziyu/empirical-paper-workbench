@@ -3,7 +3,7 @@
 // 数据流：按钮点击 → fetch POST → {columns, rows} 表格 或 {variables, matrix} 热力矩阵
 
 import { useState } from 'react'
-import { API_BASE } from '../lib/apiBase'
+import { API_BASE, apiFetch } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 export interface EdaSidebarProps {
@@ -71,7 +71,7 @@ export function EdaSidebar({ sessionId, onClose, charlsDetected, onOpenCharlsWiz
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/eda`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/eda`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),

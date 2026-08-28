@@ -1,4 +1,4 @@
-import { API_BASE } from './apiBase'
+import { API_BASE, apiFetch } from './apiBase'
 
 export type DeskOption = {
   id: string
@@ -27,14 +27,14 @@ export type DeskCard = {
 export async function transcribeDesk(blob: Blob): Promise<string> {
   const body = new FormData()
   body.append('file', blob, 'clip.webm')
-  const resp = await fetch(`${API_BASE}/desk/transcribe`, { method: 'POST', body })
+  const resp = await apiFetch(`${API_BASE}/desk/transcribe`, { method: 'POST', body })
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   const data = await resp.json()
   return String(data.text || '').trim()
 }
 
 export async function speakDesk(text: string): Promise<HTMLAudioElement> {
-  const resp = await fetch(`${API_BASE}/desk/speak`, {
+  const resp = await apiFetch(`${API_BASE}/desk/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
@@ -48,7 +48,7 @@ export async function speakDesk(text: string): Promise<HTMLAudioElement> {
 }
 
 export async function discussDesk(notes: string, turns: DeskTurn[] = []): Promise<DeskCard> {
-  const resp = await fetch(`${API_BASE}/desk/discuss`, {
+  const resp = await apiFetch(`${API_BASE}/desk/discuss`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ notes, turns }),

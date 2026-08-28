@@ -13,15 +13,20 @@ r"""T-10 RED tests for export_docx 节点 + LaTeX 模板.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 import zipfile
 
 import pytest
 
 from nodes.export_docx import (
+    _escape_tex_text,
+    _extract_sections,
     _strip_tex_markup,
     convert_docx,
     export_docx,
+    markdown_to_latex,
+    normalize_template,
     render_template,
     TEMPLATE_NAMES,
 )
@@ -34,11 +39,12 @@ _TITLE = "教育回报率研究"
 
 def _full_state(**overrides) -> dict:
     """构造一个含 title_chapter + body_chapters 的 state（基于根 conftest 工厂）。"""
-    return make_state(
-        title_chapter=make_title_chapter(_TITLE),
-        body_chapters=make_body_chapters(),
-        **overrides,
-    )
+    payload = {
+        "title_chapter": make_title_chapter(_TITLE),
+        "body_chapters": make_body_chapters(),
+    }
+    payload.update(overrides)
+    return make_state(**payload)
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +96,43 @@ def test_render_template_unknown_name_raises():
     """未知模板名抛 ValueError。"""
     with pytest.raises(ValueError):
         render_template("nonexistent", title="T", author="A", chapters=[])
+
+
+@pytest.mark.parametrize(
+    "alias,canonical",
+    [
+        ("undergrad", "undergraduate"),
+        ("master", "master_thesis"),
+        ("en_submission", "english_submission"),
+        ("undergraduate", "undergraduate"),
+        ("cn_journal", "cn_journal"),
+    ],
+)
+def test_normalize_template_aliases(alias, canonical):
+    """DirectionForm / sample write-loop aliases map onto TEMPLATE_NAMES."""
+    assert normalize_template(alias) == canonical
+
+
+def test_render_template_undergrad_alias_matches_undergraduate():
+    """template=undergrad renders the undergraduate template, not ValueError."""
+    kwargs = dict(
+        title="T",
+        author="A",
+        chapters=[{"title": "S", "content": "C"}],
+    )
+    aliased = render_template("undergrad", **kwargs)
+    canonical = render_template("undergraduate", **kwargs)
+    assert aliased == canonical
+    assert "本科毕业论文模板" in aliased
+
+
+def test_export_docx_undergrad_alias_from_state(tmp_path, monkeypatch):
+    """state.export_template='undergrad' must not raise; uses undergraduate.tex."""
+    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("nodes.export_docx.convert_docx", lambda tex, outdir: None)
+    result = export_docx(_full_state(export_template="undergrad"))
+    assert "本科毕业论文模板" in result["latex_source"]
+    assert "\\begin{document}" in result["latex_source"]
 
 
 def test_render_template_cn_journal_uses_ctex():
@@ -299,6 +342,240 @@ def test_append_bibliography_empty_returns_unchanged():
     from nodes.export_docx import _append_bibliography
     tex = "\\begin{document}\n\\end{document}"
     assert _append_bibliography(tex, []) == tex
+
+
+def test_markdown_to_latex_strips_atx_and_zhujieguo():
+    """## / # 主结果 become subsections; hashes must not remain as BodyText."""
+    md = (
+        "## 引言\n\n"
+        "研究背景。\n\n"
+        "## 模型设定\n"
+        "## 计量模型\n"
+        "## 解释边界\n"
+        "# 主结果\n"
+    )
+    tex = markdown_to_latex(md, section_title="引言")
+    assert "## 引言" not in tex
+    assert "## 模型设定" not in tex
+    assert "# 主结果" not in tex
+    assert "\\subsection{模型设定}" in tex
+    assert "\\subsection*{主结果}" in tex
+    assert "\\subsection{引言}" not in tex
+
+
+def test_markdown_to_latex_keeps_percent_sentence():
+    """`在 1%` must not be eaten by a TeX comment."""
+    tex = markdown_to_latex("年龄系数为负，在 1% 水平上显著。")
+    assert "在 1\\% 水平上显著。" in tex
+    assert re.search(r"在 1%(?!\\)", tex) is None
+
+
+def test_extract_sections_skips_empty_untitled_pads():
+    """generate_chapter pads 6 slots; empty ones must not become Untitled section."""
+    chapters = [
+        {"type": "intro", "title": "引言", "content": "## 研究背景\n正文。"},
+        {},
+        {},
+        {"type": "methods", "title": "方法", "content": "## 模型设定\n设定。"},
+        {"type": "results", "title": "结果", "content": "解读。"},
+        {},
+    ]
+    sections = _extract_sections(chapters)
+    titles = [s["title"] for s in sections]
+    assert titles == ["引言", "方法", "结果"]
+    assert "Untitled section" not in titles
+    assert "## 研究背景" not in sections[0]["content"]
+    assert "\\subsection{研究背景}" in sections[0]["content"]
+
+
+def test_extract_sections_keeps_body_without_title_as_unnamed():
+    """Body with no title/type is kept as 未命名, not dropped."""
+    sections = _extract_sections(
+        [{"content": "这段没有标题，但有正文。"}]
+    )
+    assert len(sections) == 1
+    assert sections[0]["title"] == "未命名"
+    assert "这段没有标题，但有正文。" in sections[0]["content"]
+
+
+def test_extract_sections_does_not_splice_into_intro_or_methods():
+    """Coef-table splice is results-only; 引言/方法 stay table-free."""
+    state = {
+        "main_specification": {
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        "estimate": {"formula": "income ~ age + treat", "treatment": "age"},
+    }
+    sections = _extract_sections(
+        [
+            {"type": "intro", "title": "引言", "content": "研究问题。"},
+            {"type": "methods", "title": "方法", "content": "OLS。"},
+            {
+                "type": "results",
+                "title": "结果",
+                "content": (
+                    "# 主结果\n\n"
+                    "| 变量 | 系数 | SE | p |\n"
+                    "|------|------|----|---|\n"
+                    "| age | -0.0687 | 0.0100 | 0.0010 |"
+                ),
+            },
+        ],
+        state,
+    )
+    intro, methods, results = sections
+    assert "未估计" not in intro["content"]
+    assert "treat" not in intro["content"]
+    assert "tabular" not in intro["content"]
+    assert "未估计" not in methods["content"]
+    assert "treat" not in methods["content"]
+    assert "treat" in results["content"]
+    assert "未估计" in results["content"]
+
+
+def test_extract_sections_methods_codebook_is_not_spliced():
+    """方法 codebook `| 变量 | 含义 |` must not attract a coef-table splice."""
+    state = {
+        "main_specification": {
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        "estimate": {"formula": "income ~ age + treat", "treatment": "age"},
+    }
+    sections = _extract_sections(
+        [
+            {
+                "type": "methods",
+                "title": "方法",
+                "content": (
+                    "## 变量\n"
+                    "| 变量 | 含义 |\n"
+                    "|------|------|\n"
+                    "| age | 年龄 |\n"
+                    "| treat | 处理 |"
+                ),
+            }
+        ],
+        state,
+    )
+    body = sections[0]["content"]
+    assert "未估计" not in body
+    assert "系数" not in body
+    assert "含义" in body
+
+
+def test_escape_tex_protects_cite_and_unmatched_dollar():
+    assert r"\cite{smith2020}" in _escape_tex_text(r"见 \cite{smith2020}。")
+    assert r"\ref{tab:main}" in _escape_tex_text(r"见表 \ref{tab:main}")
+    assert r"\eqref{eq:1}" in _escape_tex_text(r"式 \eqref{eq:1}")
+    assert r"\$100" in _escape_tex_text("约 $100")
+    assert "$$a+b$$" in _escape_tex_text("展示 $$a+b$$ 式")
+    assert r"50\%" in _escape_tex_text("A & B_50%")
+
+
+def test_extract_sections_escapes_title_specials():
+    sections = _extract_sections(
+        [{"type": "intro", "title": "收入_50% & #1", "content": "正文。"}]
+    )
+    assert r"50\%" in sections[0]["title"]
+    assert r"\&" in sections[0]["title"]
+    assert r"\#1" in sections[0]["title"]
+    assert r"\_" in sections[0]["title"]
+
+
+def test_extract_sections_injects_omitted_treat_row():
+    """Table that only has age must grow a treat row marked 未估计."""
+    chapters = [
+        {
+            "type": "results",
+            "title": "结果",
+            "content": (
+                "年龄系数为负，在 1% 水平上显著。\n\n"
+                "# 主结果\n\n"
+                "| 变量 | 系数 | SE | p |\n"
+                "|------|------|----|---|\n"
+                "| age | -0.0687 | 0.0100 | 0.0010 |"
+            ),
+        }
+    ]
+    state = {
+        "main_specification": {
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        "estimate": {"formula": "income ~ age + treat", "treatment": "age"},
+    }
+    sections = _extract_sections(chapters, state)
+    body = sections[0]["content"]
+    assert "Untitled section" not in body
+    assert "# 主结果" not in body
+    assert "在 1\\% 水平上显著。" in body
+    assert "treat" in body
+    assert "未估计" in body
+    assert "-0.0687" in body
+
+
+def test_export_docx_takeable_paper_no_markdown_or_untitled(tmp_path, monkeypatch):
+    """Live-shaped intro/methods/results export: no hashes, no empty H1, % survives."""
+    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("nodes.export_docx.convert_docx", lambda tex, outdir: None)
+    state = _full_state(
+        export_template="undergrad",
+        main_specification={
+            "formula": "income ~ age + treat",
+            "treatment": "age",
+            "controls": ["treat"],
+        },
+        estimate={"formula": "income ~ age + treat", "treatment": "age"},
+        body_chapters=[
+            {
+                "type": "intro",
+                "title": "引言",
+                "content": "## 引言\n\n课设研究年龄与收入。\n",
+            },
+            {},
+            {},
+            {
+                "type": "methods",
+                "title": "方法",
+                "content": "## 模型设定\n## 计量模型\n## 解释边界\nOLS。\n",
+            },
+            {
+                "type": "results",
+                "title": "结果",
+                "content": (
+                    "## 基准回归\n年龄系数为负，在 1% 水平上显著。\n\n"
+                    "## 稳健性\n稳健。\n\n"
+                    "## 异质性\n异质。\n\n"
+                    "# 主结果\n\n"
+                    "| 变量 | 系数 | SE | p |\n"
+                    "|------|------|----|---|\n"
+                    "| age | -0.0687 | 0.0100 | 0.0010 |"
+                ),
+            },
+            {},
+        ],
+    )
+    result = export_docx(state)
+    tex = result["latex_source"]
+    assert "Untitled section" not in tex
+    assert "## " not in tex
+    assert "# 主结果" not in tex
+    assert "在 1\\% 水平上显著。" in tex
+    assert "treat" in tex
+    assert "未估计" in tex
+    assert "\\toprule" in tex
+    assert tex.count("\\section{") >= 3
+    intro = tex.split("\\section{方法}")[0]
+    methods = tex.split("\\section{方法}")[1].split("\\section{结果}")[0]
+    assert "未估计" not in intro
+    assert "未估计" not in methods
+    assert "\\begin{tabular}" not in intro
+    assert "\\begin{tabular}" not in methods
 
 
 def test_convert_docx_without_pandoc_writes_ooxml(tmp_path, monkeypatch):

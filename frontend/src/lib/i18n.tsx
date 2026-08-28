@@ -219,6 +219,10 @@ const zh = {
   'login.signingIn': '登录中...',
   'login.noAccount': '没有账户？',
   'login.createOne': '创建一个',
+  'login.showPassword': '显示密码',
+  'login.hidePassword': '隐藏密码',
+  'login.capsLock': '大写锁定已开启',
+  'register.passwordHint': '至少 8 位；别用常见密码',
 
   // RegisterPage
   'register.subtitle': '创建账户',
@@ -236,7 +240,7 @@ const zh = {
   'register.signIn': '登录',
   'register.validateEmail': '请输入有效的邮箱地址',
   'register.validateUsername': '用户名为必填项',
-  'register.validatePassword': '密码至少需要 6 个字符',
+  'register.validatePassword': '密码至少需要 8 个字符',
   'register.validatePasswordMatch': '两次密码不一致',
 
   // Editor
@@ -718,6 +722,10 @@ const en: typeof zh = {
   'login.signingIn': 'Signing in...',
   'login.noAccount': "Don't have an account?",
   'login.createOne': 'Create one',
+  'login.showPassword': 'Show password',
+  'login.hidePassword': 'Hide password',
+  'login.capsLock': 'Caps Lock is on',
+  'register.passwordHint': 'At least 8 characters; avoid common passwords',
 
   'register.subtitle': 'Create your account',
   'register.email': 'Email',
@@ -734,7 +742,7 @@ const en: typeof zh = {
   'register.signIn': 'Sign in',
   'register.validateEmail': 'Please enter a valid email address',
   'register.validateUsername': 'Username is required',
-  'register.validatePassword': 'Password must be at least 6 characters',
+  'register.validatePassword': 'Password must be at least 8 characters',
   'register.validatePasswordMatch': 'Passwords do not match',
 
   'editor.title': 'Editor',

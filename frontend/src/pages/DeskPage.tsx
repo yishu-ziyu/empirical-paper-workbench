@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import UnauthHeader from '../components/UnauthHeader'
 import { useT } from '../lib/i18n'
 import { discussDesk, speakDesk, transcribeDesk } from '../lib/deskDiscuss'
 import type { DeskCard, DeskTurn } from '../lib/deskDiscuss'
@@ -61,6 +60,7 @@ export default function DeskPage({
   const [asking, setAsking] = useState(false)
   const [askText, setAskText] = useState('')
   const [asked, setAsked] = useState('')
+  const [agentPane, setAgentPane] = useState<'shape' | 'clean' | 'estimate' | 'write'>('shape')
   const paperRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<number | null>(null)
   const mediaRef = useRef<MediaRecorder | null>(null)
@@ -262,17 +262,81 @@ export default function DeskPage({
           ? t('desk.voiceDenied')
           : t('desk.listen')
 
+  const paneTitle =
+    agentPane === 'clean'
+      ? '清洗 8 步 · audit 留痕'
+      : agentPane === 'estimate'
+        ? '估计门 · 主表会出现在这里'
+        : agentPane === 'write'
+          ? '按章写作 · 串行 HITL'
+          : '方向凝练 · 可追溯'
+
   return (
-    <div data-testid="desk-page" className="min-h-screen bg-bg text-ink">
-      <UnauthHeader onLogin={onLogin} onRegister={onRegister} />
+    <div data-testid="desk-page" className="flex h-screen min-h-0 bg-white text-ink">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-black/[0.06] p-3">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink font-serif text-[15px] text-white">
+            e
+          </span>
+        </div>
+        <button
+          type="button"
+          className="mb-3 flex items-center gap-2 rounded-[10px] bg-[#f7f8fa] px-3 py-2 text-left text-[13.5px]"
+        >
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#4e5969] text-[12px] leading-none">
+            +
+          </span>
+          新论文
+        </button>
+        <p className="px-2 pb-1 pt-2 text-[12px] text-[#86909c]">论文</p>
+        <div className="min-h-0 flex-1 overflow-y-auto text-[13.5px]">
+          <div className="rounded-lg bg-[#f2f3f5] px-2.5 py-1.5 font-medium">
+            {title || t('desk.heading')}
+          </div>
+          <div className="px-2.5 py-1.5 text-[#4e5969]">课设样例：年龄与收入</div>
+        </div>
+        <p className="px-2 pb-1 pt-3 text-[12px] text-[#86909c]">数据</p>
+        <button
+          type="button"
+          onClick={onPickData}
+          disabled={uploading}
+          className="rounded-lg px-2.5 py-1.5 text-left text-[13.5px] hover:bg-[#f7f8fa] disabled:opacity-50"
+        >
+          ＋ {uploading ? t('app.uploading') : t('desk.uploadCta')}
+        </button>
+        <div className="mt-auto flex items-center gap-2 border-t border-black/[0.06] pt-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[12px] text-white">
+            e
+          </span>
+          <span className="text-[13px] font-medium">econpaper</span>
+        </div>
+      </aside>
 
-      <main className="mx-auto flex max-w-[720px] flex-col px-6 pb-24 pt-16 sm:pt-20">
-        <h1 className="font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.1rem]">
-          {t('desk.heading')}
-        </h1>
-        <p className="mt-5 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] px-6">
+          <p className="text-[14px] font-medium">{title || t('desk.heading')}</p>
+          <div className="flex items-center gap-3 text-[13px]">
+            {onLogin && (
+              <button type="button" onClick={onLogin} className="text-muted hover:text-ink">
+                {t('app.login')}
+              </button>
+            )}
+            {onRegister && (
+              <button
+                type="button"
+                onClick={onRegister}
+                className="rounded-full bg-ink px-3 py-1.5 text-white"
+              >
+                {t('app.register')}
+              </button>
+            )}
+          </div>
+        </header>
 
-        <label className="relative mt-12 block">
+        <main className="min-h-0 flex-1 overflow-y-auto px-8 pb-8 pt-6">
+        <p className="mb-6 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
+
+        <label className="relative block">
           <span className="sr-only">{t('desk.paperLabel')}</span>
           <div
             className={`composer-shell ${
@@ -472,7 +536,97 @@ export default function DeskPage({
             )}
           </section>
         )}
-      </main>
+
+        {card && (
+          <div className="mt-6 space-y-2" data-testid="agent-queue">
+            <p className="text-[13px] text-muted">每一步一个 agent。点开，右边是它的工作台。写章串行，不并行代写整篇。</p>
+            {(
+              [
+                ['shape', '问', '方向凝练', '乱问 → Y/X/方法'],
+                ['clean', '洗', '清洗 8 步', '数据进来之后才跑'],
+                ['estimate', '估', '估计门', '主表先于正文'],
+                ['write', '章', 'Write Queue · 6 章串行', '没有主表，结果章锁定'],
+              ] as const
+            ).map(([id, mark, name, hint]) => (
+              <button
+                key={id}
+                type="button"
+                data-testid={`agent-row-${id}`}
+                onClick={() => setAgentPane(id)}
+                className={`flex w-full items-center gap-3 rounded-[14px] border px-3.5 py-3 text-left text-[13.5px] ${
+                  agentPane === id ? 'border-ink/20 bg-[#f2f3f5]' : 'border-black/[0.08] bg-white'
+                }`}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[12px]">
+                  {mark}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{name}</span>
+                  <span className="mt-0.5 block text-[12px] text-muted">{hint}</span>
+                </span>
+                <span className="text-muted">›</span>
+              </button>
+            ))}
+          </div>
+        )}
+        </main>
+      </div>
+
+      <aside className="flex w-[400px] shrink-0 flex-col border-l border-black/[0.06]" data-testid="agent-window">
+        <div className="border-b border-black/[0.06] px-4 py-3">
+          <p className="font-mono text-[14px] font-bold">econpaper Computer</p>
+          <p className="mt-1 text-[13px] text-muted">{paneTitle}</p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[13.5px] leading-7">
+          {agentPane === 'shape' && (
+            <>
+              <p className="mb-3 text-[12px] text-muted">用户原话不会被丢掉。agent 只补可估计的骨架。</p>
+              {card ? (
+                <dl className="space-y-2">
+                  <div>
+                    <dt className="text-[12px] text-muted">问题</dt>
+                    <dd>{title || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[12px] text-muted">线索</dt>
+                    <dd>{card.heard.join(' · ') || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[12px] text-muted">比较 / 结果</dt>
+                    <dd>
+                      {card.comparison} · {card.outcome}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="text-muted">先把一句话倒进中间。开始之后，设定会出现在这里。</p>
+              )}
+            </>
+          )}
+          {agentPane === 'clean' && (
+            <ul className="space-y-1 text-muted">
+              <li>profiling · 契约</li>
+              <li>missing · 缺失值</li>
+              <li>outliers · 异常值</li>
+              <li>audit · clean.py 留痕</li>
+              <li className="pt-2">CSV 进来之后这些才会亮。</li>
+            </ul>
+          )}
+          {agentPane === 'estimate' && (
+            <p className="text-muted">还没有估计。数据进来之后，系数先于正文。结果章必须引用这张表。</p>
+          )}
+          {agentPane === 'write' && (
+            <ol className="space-y-1 text-muted">
+              <li>01 引言 · 排队</li>
+              <li>02 文献综述 · 排队</li>
+              <li>03 数据描述 · 排队</li>
+              <li>04 方法 · 排队</li>
+              <li>05 结果 · 锁（没有主表不能写）</li>
+              <li>06 结论 · 排队</li>
+            </ol>
+          )}
+        </div>
+      </aside>
     </div>
   )
 }

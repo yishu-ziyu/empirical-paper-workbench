@@ -735,6 +735,55 @@ function App() {
     void handleWriteChapter(ch.type, ch.title)
   }, [outline, writtenChapters, identFailed, handleWriteChapter, showGlobalError, t])
 
+  const writtenChapter = outline[currentChapterIndex]
+    ? writtenChapters.find((ch) => ch.type === outline[currentChapterIndex].type) ?? null
+    : writtenChapters[writtenChapters.length - 1] ?? null
+
+  const handleSaveEdit = useCallback(
+    async (content: string, boundIndex?: number) => {
+      if (!sessionId) {
+        const err = new Error('无法保存：章节未就绪')
+        showGlobalError(err.message)
+        throw err
+      }
+      const chapterIndex =
+        typeof boundIndex === 'number' && Number.isFinite(boundIndex) && boundIndex >= 0
+          ? boundIndex
+          : writtenChapter?.chapter_index ?? currentChapterIndex
+      if (typeof chapterIndex !== 'number' || !Number.isFinite(chapterIndex) || chapterIndex < 0) {
+        const err = new Error('无法保存：章节序号未知')
+        showGlobalError(err.message)
+        throw err
+      }
+      try {
+        const resp = await fetch(`${API_BASE}/sessions/${sessionId}/edit-chapter`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            chapter_index: chapterIndex,
+            content,
+          }),
+        })
+        const payload = await resp.json().catch(() => ({}))
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+        if (Array.isArray(payload.body_chapters)) {
+          setWrittenChapters(
+            payload.body_chapters.filter(
+              (c: components['schemas']['ChapterResponse']) => c.content,
+            ),
+          )
+        } else if (payload.chapter) {
+          markChapterUpdated(payload.chapter)
+        }
+        if (review?.chapter_index === chapterIndex) setReview(null)
+      } catch (err) {
+        showGlobalError(err instanceof Error ? err.message : String(err))
+        throw err
+      }
+    },
+    [sessionId, writtenChapter, currentChapterIndex, review, markChapterUpdated, showGlobalError],
+  )
+
   const postResumeOutline = useCallback(async (nextOutline: PausePayload['outline']) => {
     if (!sessionId) {
       showGlobalError(t('app.needSession'))
@@ -875,9 +924,6 @@ function App() {
 
   const hasReadout = Boolean(claim || treatmentRow || literatureSource || identFailed || robustnessStatus)
   const canExport = writtenChapters.some((ch) => Boolean(ch.content))
-  const writtenChapter = outline[currentChapterIndex]
-    ? writtenChapters.find((ch) => ch.type === outline[currentChapterIndex].type) ?? null
-    : writtenChapters[writtenChapters.length - 1] ?? null
   const railItems = outline.map((ch) => {
     const written = writtenChapters.find((item) => item.type === ch.type)
     return {
@@ -1206,7 +1252,15 @@ function App() {
               </p>
             ) : writtenChapter?.content ? (
               <div className="mb-6">
-                <ChapterWriter chapter={writtenChapter} sessionId={sessionId ?? undefined} onApprove={handleApprove} />
+                <ChapterWriter
+                  key={`${writtenChapter.type}:${writtenChapter.chapter_index ?? currentChapterIndex}`}
+                  chapter={writtenChapter}
+                  sessionId={sessionId ?? undefined}
+                  chapterIndex={writtenChapter.chapter_index ?? currentChapterIndex}
+                  versions={writtenChapter.versions}
+                  onApprove={handleApprove}
+                  onSaveEdit={handleSaveEdit}
+                />
               </div>
             ) : (
               <p className="font-serif text-[15px] leading-[1.8] text-muted">{t('bench.paperEmpty')}</p>

@@ -188,6 +188,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/edit-chapter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit Chapter Endpoint
+         * @description 按用户指令改写当前章，或把用户 markdown 落盘。
+         *
+         *     Request:  ``{"chapter_index": int, "instruction": str?}``
+         *               或 ``{"chapter_index": int, "content": str?}``
+         *     Response: ``{"chapter": {...}, "body_chapters": [...]}``
+         *
+         *     ``instruction`` 写入 ``revision_suggestions`` 后走
+         *     ``generate_chapter``（与 regenerate 同一条写管线）。
+         *     ``content`` 直接 prepend 新版本，``status="edited"``。
+         */
+        post: operations["edit_chapter_endpoint_sessions__session_id__edit_chapter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/chapters/{chapter_index}/versions": {
         parameters: {
             query?: never;
@@ -946,6 +974,30 @@ export interface components {
             body_chapters?: components["schemas"]["ChapterResponse"][];
         };
         /**
+         * EditChapterRequest
+         * @description POST /sessions/{id}/edit-chapter 请求体。
+         */
+        EditChapterRequest: {
+            /**
+             * Chapter Index
+             * @default 0
+             */
+            chapter_index: number;
+            /** Instruction */
+            instruction?: string | null;
+            /** Content */
+            content?: string | null;
+        };
+        /**
+         * EditChapterResponse
+         * @description POST /sessions/{id}/edit-chapter 返回体。
+         */
+        EditChapterResponse: {
+            chapter: components["schemas"]["ChapterResponse"];
+            /** Body Chapters */
+            body_chapters?: components["schemas"]["ChapterResponse"][];
+        };
+        /**
          * ResumeRequest
          * @description POST /sessions/{id}/resume 请求体。
          */
@@ -1353,6 +1405,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegenerateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_chapter_endpoint_sessions__session_id__edit_chapter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditChapterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditChapterResponse"];
                 };
             };
             /** @description Validation Error */

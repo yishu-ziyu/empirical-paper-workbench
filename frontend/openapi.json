@@ -339,6 +339,56 @@
         }
       }
     },
+    "/sessions/{session_id}/edit-chapter": {
+      "post": {
+        "summary": "Edit Chapter Endpoint",
+        "description": "按用户指令改写当前章，或把用户 markdown 落盘。\n\nRequest:  ``{\"chapter_index\": int, \"instruction\": str?}``\n          或 ``{\"chapter_index\": int, \"content\": str?}``\nResponse: ``{\"chapter\": {...}, \"body_chapters\": [...]}``\n\n``instruction`` 写入 ``revision_suggestions`` 后走\n``generate_chapter``（与 regenerate 同一条写管线）。\n``content`` 直接 prepend 新版本，``status=\"edited\"``。",
+        "operationId": "edit_chapter_endpoint_sessions__session_id__edit_chapter_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditChapterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditChapterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/chapters/{chapter_index}/versions": {
       "get": {
         "summary": "Get Versions",
@@ -1778,6 +1828,60 @@
         ],
         "title": "RegenerateResponse",
         "description": "POST /sessions/{id}/regenerate 返回体。"
+      },
+      "EditChapterRequest": {
+        "properties": {
+          "chapter_index": {
+            "type": "integer",
+            "title": "Chapter Index",
+            "default": 0
+          },
+          "instruction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruction"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "title": "EditChapterRequest",
+        "description": "POST /sessions/{id}/edit-chapter 请求体。"
+      },
+      "EditChapterResponse": {
+        "properties": {
+          "chapter": {
+            "$ref": "#/components/schemas/ChapterResponse"
+          },
+          "body_chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterResponse"
+            },
+            "type": "array",
+            "title": "Body Chapters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter"
+        ],
+        "title": "EditChapterResponse",
+        "description": "POST /sessions/{id}/edit-chapter 返回体。"
       },
       "ResumeRequest": {
         "properties": {

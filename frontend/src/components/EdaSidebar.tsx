@@ -3,6 +3,7 @@
 // 数据流：按钮点击 → fetch POST → {columns, rows} 表格 或 {variables, matrix} 热力矩阵
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 export interface EdaSidebarProps {
@@ -53,8 +54,6 @@ const ACTIONS: { id: string; label: string }[] = [
   { id: 'regression', label: '回归诊断' },
   { id: 'missing', label: '缺失值' },
 ]
-
-const API_BASE = 'http://localhost:8000'
 
 function renderCell(value: unknown): string {
   if (value === null || value === undefined) return ''

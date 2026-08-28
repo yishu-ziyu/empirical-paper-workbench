@@ -3,7 +3,7 @@
 - GET /sessions/{id}/doc-export?format=tex|pdf|docx&template=<name>
     format=tex  → LaTeX 源码（application/x-tex）
     format=pdf  → PDF 文件（application/pdf），latexmk 不可用时 503
-    format=docx → Word 文件，pandoc 不可用时 503
+    format=docx → Word 文件；转换失败时 503
     template ∈ {cn_journal, undergraduate, master_thesis, english_submission}
     别名：undergrad → undergraduate，master → master_thesis，
     en_submission → english_submission

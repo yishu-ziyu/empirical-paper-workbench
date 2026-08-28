@@ -106,11 +106,11 @@ def _run_clustering(
     if not levels:
         return []
 
-    import statspai
-
     results: List[Dict[str, Any]] = []
     for level in levels:
         try:
+            import statspai
+
             res = statspai.feols(formula, data=df, vcov={"CRV1": level})
         except Exception as exc:
             # pyfixest 未安装时 feols 抛 ImportError，降级到 statsmodels 聚类
@@ -157,7 +157,6 @@ def _run_heterogeneity(
     # 从公式中提取 outcome 与处理变量（用于拼交互项）
     if "~" not in formula:
         return []
-    import statspai
 
     outcome, rhs = formula.split("~", 1)
     outcome = outcome.strip()
@@ -169,6 +168,8 @@ def _run_heterogeneity(
         interaction_formula = f"{outcome} ~ {treatment} + {group} + {treatment}:{group}"
         interaction_var = f"{treatment}:{group}"
         try:
+            import statspai
+
             res = statspai.feols(interaction_formula, data=df)
         except Exception as exc:
             # pyfixest 未安装时 feols 抛 ImportError，降级到 statsmodels 交互

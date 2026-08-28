@@ -24,8 +24,11 @@ jinja2==3.1.6
 psycopg[binary]==3.2.3
 statsmodels==0.14.6
 langgraph-checkpoint-postgres==2.0.19
-# StatsPAI is the local checkout, same as agent venv:
+# Optional extra (not required): pip install statspai
+# Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
+# Sibling checkout (same as agent venv):
 #   pip install --ignore-scripts -e ../StatsPAI
+# A missing install must not 500 POST /direction; nodes degrade.
 
 # --- S3 / 对象存储 ---
 boto3>=1.35.0

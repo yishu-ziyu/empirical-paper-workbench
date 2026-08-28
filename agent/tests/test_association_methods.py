@@ -85,3 +85,5 @@ def test_bind_chapter_kwargs_is_truth_source():
     assert bound["robustness_table"] == "# 稳健性"
     assert bound["identification_report"]
     assert bound["star_rating"] is None
+    assert bound["data_summary"] == ""
+    assert bound["eda_results"] == ""

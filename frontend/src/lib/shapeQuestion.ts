@@ -15,6 +15,7 @@ export type ClarifyPrompt = {
 }
 
 export type QuestionDraft = {
+  intent: 'research' | 'conversation'
   title: string
   comparison: string
   outcome: string
@@ -29,17 +30,6 @@ export type ShapeAnswers = {
   outcome?: string
   who?: string
 }
-
-const SIGNALS: { id: string; label: string; pattern: RegExp }[] = [
-  { id: 'charls', label: 'CHARLS', pattern: /charls|中国健康与养老|养老追踪/i },
-  { id: 'cfps', label: 'CFPS', pattern: /cfps|家庭追踪/i },
-  { id: 'cgss', label: 'CGSS', pattern: /cgss|综合社会调查/i },
-  { id: 'pension', label: '养老', pattern: /养老|退休|养老金|并轨/ },
-  { id: 'digital', label: '数字经济', pattern: /数字经济|数字化|互联网/ },
-  { id: 'wage', label: '最低工资', pattern: /最低工资|调薪|工资/ },
-  { id: 'reproduce', label: '想复现一篇', pattern: /复现|那篇|看了篇|模仿/ },
-  { id: 'advisor', label: '导师给的方向', pattern: /导师|老师让|作业|开题/ },
-]
 
 const COMPARE_OPTIONS: ClarifyOption[] = [
   { id: 'policy', label: '政策有没有效果' },
@@ -65,11 +55,21 @@ const OUTCOME_TEXT: Record<string, string> = {
   health: '看健康或消费',
 }
 
-export function extractHeard(text: string): HeardItem[] {
-  return SIGNALS.filter((item) => item.pattern.test(text)).map(({ id, label }) => ({
-    id,
-    label,
-  }))
+const CONVERSATION_REPLY =
+  '你好！你可以随便说一句最近想研究的现象或问题，我会陪你一步步把它变成可检验的研究问题。如果已经有数据，也可以直接上传。'
+
+// Conservative degraded-mode boundary: generic research language only, never
+// domain-specific templates or inferred variables.
+const RESEARCH_INTENT_PATTERN =
+  /研究|论文|课题|导师|老师让|开题|复现|数据|问什么|能发|是否|有没有|会不会|影响|效应|关系|相关|导致|提高|降低|差异|变化|比较|research|study|whether|effect|impact|relationship|data/i
+
+export function hasResearchIntent(text: string): boolean {
+  return RESEARCH_INTENT_PATTERN.test(text.replace(/\s+/g, ' ').trim())
+}
+
+function userIntentTitle(text: string): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim()
+  return cleaned || '这还是一个方向，还不是一个可以估计的问题。'
 }
 
 export function nextPrompt(answers: ShapeAnswers): ClarifyPrompt | null {
@@ -90,45 +90,10 @@ export function nextPrompt(answers: ShapeAnswers): ClarifyPrompt | null {
   return null
 }
 
-function pickTitle(text: string, heard: HeardItem[], answers: ShapeAnswers): string {
-  const ids = new Set(heard.map((item) => item.id))
-  const compare = answers.compare
-  const outcome = answers.outcome
-
-  if (ids.has('pension')) {
-    if (compare === 'who') return '养老金变化之后，临近退休的人是不是比更年轻的人更早离开劳动力市场？'
-    if (outcome === 'health') return '养老金变化之后，老年人的消费和健康有没有跟着变？'
-    return '养老金并轨之后，临近退休的人是不是更早离开劳动力市场？'
-  }
-  if (ids.has('digital')) {
-    if (compare === 'gap' || outcome === 'wage') return '数字经济发展有没有拉大不同技能工人的工资差距？'
-    return '数字经济发展之后，企业的用工和工资发生了什么变化？'
-  }
-  if (ids.has('wage')) {
-    return '最低工资上调之后，低技能工人的就业是不是下降了？'
-  }
-  if (ids.has('reproduce')) {
-    return '把那篇论文的问题放到中国数据上，重新问一遍。'
-  }
-
-  const cleaned = text
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[。！？.!?]+$/, '')
-  if (cleaned.length >= 12 && cleaned.length <= 48) return `${cleaned}？`
-  if (cleaned.length > 48) return `${cleaned.slice(0, 36)}…？`
-  return '这还是一个方向，还不是一个可以估计的问题。'
-}
-
-export function reflect(text: string, heard: HeardItem[], answers: ShapeAnswers): string {
-  const names = heard.map((item) => item.label)
-  if (names.length === 0) {
-    return text.trim()
-      ? '我听到了一些念头，但还抓不住一个可以估计的对象。'
-      : '你先说，我听着。'
-  }
+export function reflect(text: string, answers: ShapeAnswers): string {
+  if (!text.trim()) return '你先说，我听着。'
   if (!answers.compare) {
-    return `我听到了${names.join('、')}。现在比较像一个方向，还不太像一个问题。`
+    return '我先保留你的原话。现在只确认要比较什么。'
   }
   if (!answers.outcome) {
     return `比较这边有了：${COMPARE_TEXT[answers.compare]}。还差结果看什么。`
@@ -137,19 +102,30 @@ export function reflect(text: string, heard: HeardItem[], answers: ShapeAnswers)
 }
 
 export function shapeQuestion(text: string, answers: ShapeAnswers = {}): QuestionDraft {
-  const heard = extractHeard(text)
+  if (!hasResearchIntent(text)) {
+    return {
+      intent: 'conversation',
+      title: '',
+      comparison: '还没定',
+      outcome: '还没定',
+      heard: [],
+      missing: [],
+      ready: false,
+      reflection: CONVERSATION_REPLY,
+    }
+  }
   const missing: string[] = []
   if (!answers.compare) missing.push('还不知道要比较什么')
   if (!answers.outcome) missing.push('还不知道结果看什么')
-  if (heard.length === 0) missing.push('还听不太清具体对象')
 
   return {
-    title: pickTitle(text, heard, answers),
+    intent: 'research',
+    title: userIntentTitle(text),
     comparison: answers.compare ? COMPARE_TEXT[answers.compare] : '还没定',
     outcome: answers.outcome ? OUTCOME_TEXT[answers.outcome] : '还没定',
-    heard,
+    heard: [],
     missing,
     ready: Boolean(answers.compare && answers.outcome),
-    reflection: reflect(text, heard, answers),
+    reflection: reflect(text, answers),
   }
 }

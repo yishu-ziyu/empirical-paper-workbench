@@ -15,6 +15,7 @@ fastapi，纯函数，输入 state 返回待合并的 dict，与现有节点风�
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from state import EconPaperState
@@ -52,6 +53,32 @@ def _norm_method(method: Optional[str]) -> Optional[str]:
     return _METHOD_ALIASES.get(key)
 
 
+def _load_statspai(
+    diagnostics: List[Dict[str, Any]],
+    report_lines: List[str],
+    test: str,
+) -> Any:
+    """Load StatsPAI. A missing package is a recorded skip, not an exception.
+
+    Identification diagnostics have no pandas stand-in. Do not invent
+    Bacon / IV / McCrary / SCM results when the library is absent.
+    """
+    try:
+        import statspai
+        return statspai
+    except ImportError as exc:
+        diagnostics.append({
+            "test": test,
+            "status": "error",
+            "reason": "statspai_unavailable",
+            "error": str(exc),
+        })
+        report_lines.append(
+            "StatsPAI 未安装，跳过识别诊断，不编造因果检验结果。"
+        )
+        return None
+
+
 def _diag_did(
     df: Any,
     d: Dict[str, Any],
@@ -72,12 +99,41 @@ def _diag_did(
         report_lines.append("DiD: 缺少 outcome/treatment/time/id 列配置，跳过 Goodman-Bacon 分解。")
         return False
 
-    import statspai
+    statspai = _load_statspai(diagnostics, report_lines, "bacon_decomposition")
+    if statspai is None:
+        return False
+
+    required_columns = [outcome, treatment, time_col, id_col]
+    missing_columns = [
+        column for column in required_columns if column not in df.columns
+    ]
+    if missing_columns:
+        diagnostics.append({
+            "test": "bacon_decomposition",
+            "status": "skipped",
+            "reason": "数据缺少必需列",
+            "missing_columns": missing_columns,
+        })
+        report_lines.append(
+            "DiD: 数据缺少必需列 " + ", ".join(missing_columns) + "，跳过分解。"
+        )
+        return False
+    analysis_df = df.dropna(subset=required_columns)
+    rows_dropped_missing = int(len(df) - len(analysis_df))
+    sample_meta = {
+        "n_obs": int(len(analysis_df)),
+        "rows_dropped_missing": rows_dropped_missing,
+    }
+    if rows_dropped_missing:
+        report_lines.append(
+            "Goodman-Bacon 完整样本过滤: "
+            f"删除必需列缺失的 {rows_dropped_missing} 行。"
+        )
 
     passed = True
     try:
         bacon = statspai.bacon_decomposition(
-            df, y=outcome, treat=treatment, time=time_col, id=id_col
+            analysis_df, y=outcome, treat=treatment, time=time_col, id=id_col
         )
         negative_share = float(bacon.get("negative_weight_share", 0.0) or 0.0)
         already_share = float(
@@ -93,6 +149,7 @@ def _diag_did(
             "already_treated_control_weight_share": already_share,
             "forbidden_weight_share": forbidden_share,
             "n_comparisons": bacon.get("n_comparisons"),
+            **sample_meta,
         })
         report_lines.append(
             f"Goodman-Bacon 分解: TWFE β={bacon.get('beta_twfe'):.3f}, "
@@ -110,6 +167,7 @@ def _diag_did(
             "test": "bacon_decomposition",
             "status": "error",
             "error": str(exc),
+            **sample_meta,
         })
         report_lines.append(f"Goodman-Bacon 分解失败: {exc}")
 
@@ -117,8 +175,9 @@ def _diag_did(
     if d.get("treatment_group_col") or d.get("first_treat_col"):
         g_col = d.get("treatment_group_col") or d.get("first_treat_col")
         try:
+            cs_df = analysis_df.dropna(subset=[g_col])
             cs = statspai.callaway_santanna(
-                df, y=outcome, g=g_col, t=time_col, i=id_col
+                cs_df, y=outcome, g=g_col, t=time_col, i=id_col
             )
             cs_ok = float(getattr(cs, "pvalue", 0.0) or 0.0) < MANIPULATION_ALPHA
             diagnostics.append({
@@ -161,7 +220,9 @@ def _diag_iv(
         report_lines.append("IV: 缺少 outcome/endogenous/instrument 列配置，跳过诊断。")
         return False
 
-    import statspai
+    statspai = _load_statspai(diagnostics, report_lines, "iv_diag")
+    if statspai is None:
+        return False
 
     passed = True
     f_stat: Optional[float] = None
@@ -256,7 +317,9 @@ def _diag_rd(
         report_lines.append("RD: 缺少 running_var 配置，跳过密度检验。")
         return False
 
-    import statspai
+    statspai = _load_statspai(diagnostics, report_lines, "mccrary_test")
+    if statspai is None:
+        return False
 
     passed = True
     try:
@@ -348,7 +411,9 @@ def _diag_scm(
         report_lines.append("SCM: 缺少 outcome/unit/time/treatment_time 配置，跳过安慰剂检验。")
         return False
 
-    import statspai
+    statspai = _load_statspai(diagnostics, report_lines, "synth_time_placebo")
+    if statspai is None:
+        return False
 
     passed = True
     try:
@@ -533,7 +598,7 @@ def identification_verify(state: EconPaperState) -> Dict[str, Any]:
             report += "\n⚠️ 0星：识别策略完全不可信，流程已截断，请调整研究设计后重试。"
         elif star_rating <= 2:
             report += "\n⚠️ 存在识别风险，已标注并在后续步骤中披露。"
-    return {
+    out: Dict[str, Any] = {
         "identification_diag": {
             "strategy": method,
             "diagnostics": diagnostics,
@@ -544,6 +609,17 @@ def identification_verify(state: EconPaperState) -> Dict[str, Any]:
         "identification_failed": star_rating == 0,
         "star_rating": star_rating,
     }
+    if any(item.get("reason") == "statspai_unavailable" for item in diagnostics):
+        out["degradations"] = list(state.get("degradations") or []) + [
+            {
+                "node": "identification_verify",
+                "reason": "statspai_unavailable",
+                "fallback": "skip_diagnostics",
+                "visible": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        ]
+    return out
 
 
 __all__ = ["identification_verify"]

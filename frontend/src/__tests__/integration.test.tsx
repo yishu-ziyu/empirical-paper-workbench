@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
+import { API_BASE } from '../lib/apiBase'
 
 function renderWithI18n(ui: React.ReactElement) {
   return render(ui, { wrapper: I18nProvider })
@@ -30,8 +31,6 @@ class MockWebSocket {
     this.readyState = 3
   }
 }
-
-const API_BASE = 'http://localhost:8000'
 
 beforeEach(() => {
   MockWebSocket.instances = []
@@ -63,7 +62,7 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('home-page')).toBeInTheDocument()
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
 
     // 触发文件上传
     const fileInput = screen.getByTestId('file-input') as HTMLInputElement
@@ -117,7 +116,6 @@ describe('前端集成测试', () => {
     await waitFor(() => {
       expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByTestId('direction-chat-to-form'))
     fireEvent.change(screen.getByLabelText(/研究问题/), {
       target: { value: '教育对收入的影响' },
     })
@@ -172,11 +170,11 @@ describe('前端集成测试', () => {
     expect(await screen.findByTestId('instrument-readout')).toBeInTheDocument()
     expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
 
+    // Cookie-era transport: identity rides on httpOnly cookies, so the
+    // call carries credentials instead of an Authorization header.
     expect(mockFetch).toHaveBeenCalledWith(
       `${API_BASE}/sessions/test-789`,
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token-for-auth' }),
-      }),
+      expect.objectContaining({ credentials: 'include' }),
     )
     expect(MockWebSocket.instances.length).toBe(0)
   })

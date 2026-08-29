@@ -147,42 +147,42 @@ export function latexToHtml(latex: string): string {
   // ── 8. 数学环境 ──
   html = html.replace(
     /\\begin\{equation\*\}/g,
-    '<div class="my-2 p-2 bg-panel rounded text-center font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 flex items-center justify-center rounded-lg bg-[#f3f3f3] px-5 py-3.5 text-center font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{equation\*\}/g, '</div>')
   html = html.replace(
     /\\begin\{equation\}/g,
-    '<div class="my-2 p-2 bg-panel rounded text-center font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 flex items-center justify-center rounded-lg bg-[#f3f3f3] px-5 py-3.5 text-center font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{equation\}/g, '</div>')
   html = html.replace(
     /\\begin\{align\*\}/g,
-    '<div class="my-2 p-2 bg-panel rounded font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 rounded-lg bg-[#f3f3f3] px-5 py-3.5 font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{align\*\}/g, '</div>')
   html = html.replace(
     /\\begin\{align\}/g,
-    '<div class="my-2 p-2 bg-panel rounded font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 rounded-lg bg-[#f3f3f3] px-5 py-3.5 font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{align\}/g, '</div>')
   html = html.replace(
     /\\begin\{gather\*\}/g,
-    '<div class="my-2 p-2 bg-panel rounded font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 rounded-lg bg-[#f3f3f3] px-5 py-3.5 font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{gather\*\}/g, '</div>')
   html = html.replace(
     /\\begin\{gather\}/g,
-    '<div class="my-2 p-2 bg-panel rounded font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 rounded-lg bg-[#f3f3f3] px-5 py-3.5 font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\\end\{gather\}/g, '</div>')
   html = html.replace(
     /\\\[\s*/g,
-    '<div class="my-2 p-2 bg-panel rounded text-center font-mono text-sm overflow-x-auto">'
+    '<div class="my-6 flex items-center justify-center rounded-lg bg-[#f3f3f3] px-5 py-3.5 text-center font-mono text-sm overflow-x-auto">'
   )
   html = html.replace(/\s*\\\]/g, '</div>')
   html = html.replace(
     /\$\$([\s\S]*?)\$\$/g,
-    '<div class="my-2 p-2 bg-panel rounded text-center font-mono text-sm">$1</div>'
+    '<div class="my-6 rounded-lg bg-[#f3f3f3] px-5 py-3.5 text-center font-mono text-sm">$1</div>'
   )
   html = html.replace(
     /\$([^$\n]*?)\$/g,

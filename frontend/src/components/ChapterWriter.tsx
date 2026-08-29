@@ -2,7 +2,7 @@
 // - 中栏用 CodeMirror 6 渲染流式 markdown（chunks 数组拼接）
 // - 章节类型 badge（6 色：intro=蓝 / lit_review=紫 / data_desc=绿 /
 //   methods=橙 / results=红 / conclusion=灰）
-// - status === 'generated' 显示 4 按钮：重新生成 / 回滚 / {t('chapter.edit')} / {t('chapter.approve')}
+// - status === 'generated' | 'edited' 显示 4 按钮：重新生成 / 回滚 / {t('chapter.edit')} / {t('chapter.approve')}
 // - status === 'streaming' 显示加载提示，不显示按钮
 // - 回滚下拉：点"回滚"显示版本历史（VersionHistory 组件），选择版本 → onRollback
 // - {t('chapter.edit')}模式：点"{t('chapter.edit')}" → CodeMirror 可{t('chapter.edit')} + 按钮变"{t('chapter.save')}"；点"{t('chapter.save')}" → onSaveEdit
@@ -16,7 +16,7 @@
 // ChapterResponse。status 枚举由后端 OpenAPI 定义（generated | approved |
 // edited | rolled_back），前端本地临时态再加 streaming / done。
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { useT } from '../lib/i18n'
 import { renderPaperMarkdown } from '../lib/paperMarkdown'
@@ -48,8 +48,8 @@ export interface ChapterWriterProps {
   versions?: string[]
   /** T-08c: 选择版本回滚回调（集成阶段调 POST /sessions/{id}/rollback） */
   onRollback?: (versionIndex: number) => void
-  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter） */
-  onSaveEdit?: (content: string) => void
+  /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter）。失败请 reject，组件会留在编辑态保住草稿。第二个参数是进入编辑时的章节序号，避免切章后写到新选中的章。 */
+  onSaveEdit?: (content: string, chapterIndex?: number) => void | Promise<void>
 }
 
 const BADGE_CLASS = 'bg-paper text-muted border border-border'
@@ -66,8 +66,8 @@ export default function ChapterWriter({
   versions,
   onRollback,
   onSaveEdit,
-  // sessionId, chapterIndex — 接口保留供集成阶段直接 fetch 使用，
-  // 当前组件走回调模式（onRollback / onSaveEdit），不在此解构以避免未使用告警。
+  chapterIndex,
+  // sessionId — 接口保留供集成阶段直接 fetch 使用，当前组件走回调模式。
 }: ChapterWriterProps) {
   const { t } = useT()
   // {t('chapter.edit')}模式状态
@@ -76,6 +76,15 @@ export default function ChapterWriter({
   const [editedContent, setEditedContent] = useState('')
   // 回滚下拉显示状态
   const [showVersions, setShowVersions] = useState(false)
+  const boundChapterIndexRef = useRef<number | undefined>(chapterIndex)
+  const chapterIdentity = `${chapter.type}:${chapter.chapter_index ?? chapterIndex ?? ''}`
+
+  useEffect(() => {
+    setIsEditing(false)
+    setEditedContent('')
+    setShowVersions(false)
+    boundChapterIndexRef.current = chapterIndex
+  }, [chapterIdentity, chapterIndex])
 
   // chunks 非空时拼接显示（流式 append）；否则用 chapter.content
   const content = useMemo(() => {
@@ -86,21 +95,26 @@ export default function ChapterWriter({
   }, [chunks, chapter.content])
 
   const isStreaming = chapter.status === 'streaming'
-  const isGenerated = chapter.status === 'generated'
+  const showToolbar = chapter.status === 'generated' || chapter.status === 'edited'
 
   // {t('chapter.edit')}模式显示的内容：{t('chapter.edit')}中用 editedContent，否则用 content
   const displayContent = isEditing ? editedContent : content
 
   // 进入{t('chapter.edit')}模式
   const handleEnterEdit = () => {
+    boundChapterIndexRef.current = chapterIndex
     setEditedContent(content)
     setIsEditing(true)
   }
 
-  // {t('chapter.save')}{t('chapter.edit')}
-  const handleSaveEdit = () => {
-    setIsEditing(false)
-    onSaveEdit?.(editedContent)
+  // {t('chapter.save')}{t('chapter.edit')}：POST 成功才退出编辑，失败保住草稿。
+  const handleSaveEdit = async () => {
+    try {
+      await onSaveEdit?.(editedContent, boundChapterIndexRef.current)
+      setIsEditing(false)
+    } catch {
+      // keep isEditing + editedContent
+    }
   }
 
   // 选择版本回滚
@@ -141,7 +155,7 @@ export default function ChapterWriter({
       ) : (
         <article
           data-testid="chapter-paper"
-          className="rounded border border-border bg-paper px-5 py-4 font-serif text-base leading-loose text-ink"
+          className="journal-page"
         >
           {renderPaperMarkdown(displayContent)}
         </article>
@@ -157,7 +171,7 @@ export default function ChapterWriter({
       )}
 
       {/* 完成后审批按钮（4 按钮） */}
-      {isGenerated && (
+      {showToolbar && (
         <div className="space-y-2">
           <div className="flex gap-2">
             <button
@@ -194,7 +208,7 @@ export default function ChapterWriter({
             <button
               type="button"
               onClick={() => onApprove?.(chapter)}
-              className="rounded bg-accent px-3 py-1 text-xs text-white"
+              className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white"
             >
               {t('chapter.approve')}
             </button>

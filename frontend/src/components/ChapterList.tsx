@@ -46,20 +46,18 @@ export default function ChapterList({
             type="button"
             data-testid="chapter-list-item"
             onClick={() => onSelectChapter(idx)}
-            className={`flex items-center gap-2 rounded border-l-2 px-3 py-2 text-left font-serif transition-colors ${
+            className={`flex items-center gap-2 rounded-md border-l-2 px-3 py-2.5 text-left font-serif transition-colors ${
               isCurrent
                 ? 'border-accent bg-accent/5 text-accent'
                 : 'border-transparent text-ink hover:bg-panel'
             }`}
           >
-            {/* 状态图标 */}
             <span
               data-testid="chapter-status-icon"
               className="w-4 text-center text-xs"
             >
               {statusIcon(ch.status ?? '')}
             </span>
-
             <span className="flex-1 truncate text-sm">{ch.title}</span>
           </button>
         )

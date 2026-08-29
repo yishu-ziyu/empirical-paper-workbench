@@ -86,6 +86,7 @@ async def set_direction_endpoint(
         identification_report=fields.get("identification_report"),
         results=fields.get("results"),
         estimate=fields.get("estimate"),
+        cleaning_report=fields.get("cleaning_report"),
         claim=fields.get("claim"),
         literature_source=fields.get("literature_source"),
         degradations=list(state.get("degradations") or []),

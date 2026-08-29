@@ -8,6 +8,11 @@ In the red stage the endpoint does not exist, so every test fails on the
 status-code assertion (404 from FastAPI's default not-found handler).
 """
 from io import BytesIO
+from pathlib import Path
+
+COURSE_PANEL_CSV = (
+    Path(__file__).resolve().parents[2] / "frontend" / "public" / "samples" / "course-panel.csv"
+)
 
 import pandas as pd
 
@@ -118,6 +123,33 @@ def test_upload_rejects_binary_garbage(client):
     assert resp.status_code == 400, (
         f"expected 400 for binary garbage, got {resp.status_code}"
     )
+
+
+def test_upload_course_panel_returns_200_without_checkpoint_db(client, monkeypatch):
+    """POST /upload must return 200 when CHECKPOINT_DB_URL is unset (GS-E1).
+
+    Compiling PostgresSaver at graph import used to make facade._graph None
+    and this endpoint 503 with 'LangGraph graph not available'.
+    """
+    monkeypatch.delenv("CHECKPOINT_DB_URL", raising=False)
+    from graph import _reset_runtime
+
+    _reset_runtime()
+    assert COURSE_PANEL_CSV.is_file(), f"missing sample CSV: {COURSE_PANEL_CSV}"
+    with open(COURSE_PANEL_CSV, "rb") as f:
+        resp = client.post(
+            "/upload",
+            files={"file": ("course-panel.csv", f, "text/csv")},
+        )
+    assert resp.status_code == 200, (
+        f"expected 200 without Postgres, got {resp.status_code}: {resp.text}"
+    )
+    data = resp.json()
+    assert isinstance(data.get("session_id"), str) and data["session_id"]
+    meta = data.get("dataset_meta")
+    assert isinstance(meta, dict)
+    for key in ("columns", "rows", "dtypes", "missing_count"):
+        assert key in meta, f"dataset_meta missing key: {key}"
 
 
 def test_upload_detects_missing_values(client, sample_csv_path):

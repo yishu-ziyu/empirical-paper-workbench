@@ -12,6 +12,7 @@ export type DeskTurn = {
 }
 
 export type DeskCard = {
+  intent: 'research' | 'conversation'
   reflection: string
   title: string
   heard: string[]
@@ -56,6 +57,7 @@ export async function discussDesk(notes: string, turns: DeskTurn[] = []): Promis
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   const data = await resp.json()
   return {
+    intent: data.intent === 'conversation' ? 'conversation' : 'research',
     reflection: String(data.reflection || ''),
     title: String(data.title || ''),
     heard: Array.isArray(data.heard) ? data.heard.map(String) : [],

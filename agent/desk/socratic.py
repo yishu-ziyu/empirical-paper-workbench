@@ -6,11 +6,13 @@ import re
 from typing import Any
 
 from desk.heuristic import heuristic_discuss
+from desk.shape_question import CONVERSATION_REPLY, has_research_intent, user_intent_title
 from llm.call_llm import call_llm
 
-SYSTEM = """你是实证经济学研究的讨论者，不是聊天机器人。
-用苏格拉底方式：把念头收成一句问句，再只追问一件事。
-不要写论文，不要给大纲，不要解释你在做什么，不要复述用户原话。
+SYSTEM = """你是实证经济学研究产品里的对话助手。
+先判断用户有没有表达研究意图。问候、闲聊、测试文字或还没有研究含义的输入，应自然回应并邀请用户说出研究现象；不要强行生成论文问题。
+只有存在研究意图时，才用苏格拉底方式围绕用户原话追问一件事。
+不要写论文，不要给大纲，不要解释你在做什么，也不要替用户改写研究问题。
 只输出一个 JSON 对象，不要 Markdown。"""
 
 
@@ -31,13 +33,14 @@ def _prompt(notes: str, turns: list[dict[str, str]]) -> str:
 
 请输出：
 {{
-  "title": "正在成形的研究问题，必须是一句完整问句",
+  "intent": "research 或 conversation",
+  "reflection": "对用户当前输入的自然回应，不超过两句",
   "question": "下一句只问一件缺的事，不超过 20 个字；问题已可估计则为空字符串",
   "options": [{{"id": "a", "label": "短选项"}}],
   "explain": "仅当用户在问选项是什么意思时，用一两句人话解释；否则必须是空字符串",
   "ready": false
 }}
-要求：options 最多 3 个，label 不超过 8 个字，不要括号和举例；ready 为 true 时 question 为空、options 为空；用中文。"""
+要求：intent 为 conversation 时，question 和 options 必须为空、ready 必须为 false；不要改写或补全用户的研究问题；options 最多 3 个，label 不超过 8 个字，不要括号和举例；ready 为 true 时 question 为空、options 为空；用中文。"""
 
 
 def _extract_json(raw: str) -> dict[str, Any] | None:
@@ -56,6 +59,23 @@ def _extract_json(raw: str) -> dict[str, Any] | None:
 
 
 def _normalize(data: dict[str, Any], notes: str) -> dict[str, Any]:
+    intent = str(data.get("intent") or "").strip().lower()
+    if intent not in {"research", "conversation"}:
+        intent = "research" if has_research_intent(notes) else "conversation"
+    if intent == "conversation":
+        return {
+            "intent": "conversation",
+            "reflection": str(data.get("reflection") or "").strip() or CONVERSATION_REPLY,
+            "title": "",
+            "heard": [],
+            "comparison": "还没定",
+            "outcome": "还没定",
+            "question": "",
+            "options": [],
+            "explain": "",
+            "ready": False,
+            "source": "llm",
+        }
     options_in = data.get("options") or []
     options: list[dict[str, str]] = []
     for idx, item in enumerate(options_in[:3]):
@@ -72,10 +92,11 @@ def _normalize(data: dict[str, Any], notes: str) -> dict[str, Any]:
     question = "" if ready else str(data.get("question") or "").strip()
     if ready:
         options = []
-    title = str(data.get("title") or "").strip()
-    if not title:
-        title = heuristic_discuss(notes, [])["title"]
+    # The user's wording is the source of truth. Model output may guide the
+    # discussion, but it must not silently replace the research intent.
+    title = user_intent_title(notes)
     return {
+        "intent": "research",
         "reflection": str(data.get("reflection") or "").strip() or "我先听你把念头说完整。",
         "title": title,
         "heard": heard,

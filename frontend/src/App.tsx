@@ -33,6 +33,7 @@ const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
 const LS_CSV_KEY = 'econpaper_csv_meta'
 const SAMPLE_CSV = '/samples/course-panel.csv'
+const DEV_AUTH_BYPASS = import.meta.env.DEV && import.meta.env.VITE_DEV_SKIP_AUTH === 'true'
 const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',
   dv: 'income',
@@ -169,7 +170,7 @@ function toDirectionInitial(record: DirectionFormData | null): DirectionFormInit
 function App() {
   const { t } = useT()
 
-  const [authed, setAuthed] = useState(false)
+  const [authed, setAuthed] = useState(DEV_AUTH_BYPASS)
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
 
   const [sessionId, setSessionId] = useState<string | null>(() => {
@@ -986,9 +987,9 @@ function App() {
             markGuideSeen()
             setDeskOpen(true)
           }}
-          onLogin={authed ? undefined : () => setAuthPage('login')}
-          onRegister={authed ? undefined : () => setAuthPage('register')}
-          headerExtra={authed ? (
+          onLogin={authed || DEV_AUTH_BYPASS ? undefined : () => setAuthPage('login')}
+          onRegister={authed || DEV_AUTH_BYPASS ? undefined : () => setAuthPage('register')}
+          headerExtra={authed && !DEV_AUTH_BYPASS ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1025,8 +1026,8 @@ function App() {
           uploading={uploading}
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
-          onLogin={() => setAuthPage('login')}
-          onRegister={() => setAuthPage('register')}
+          onLogin={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('login')}
+          onRegister={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('register')}
           onConfirm={(title) => {
             setShapedQuestion(title)
             setDeskOpen(false)
@@ -1104,10 +1105,12 @@ function App() {
               {t('guide.nowAgain')}
             </button>
           )}
-          {authed ? (
-            <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
-          ) : (
-            <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>
+          {!DEV_AUTH_BYPASS && (
+            authed ? (
+              <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
+            ) : (
+              <button data-testid="open-login-btn" onClick={() => setAuthPage('login')} className="text-xs text-muted transition-colors duration-200 hover:text-ink">{t('app.login')}</button>
+            )
           )}
           <LangPills />
         </div>

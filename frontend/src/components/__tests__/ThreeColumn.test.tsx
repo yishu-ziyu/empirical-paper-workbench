@@ -1,9 +1,11 @@
-import { describe, test, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, test, expect } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import ThreeColumn from '../ThreeColumn'
 
 describe('ThreeColumn 桌面三栏', () => {
-  test('left chapters, center paper, right steps — never collapsed', () => {
+  beforeEach(() => localStorage.clear())
+
+  test('左右功能保留，并允许用户收起或调整宽度', () => {
     render(
       <ThreeColumn
         outline={<p>chapters</p>}
@@ -15,17 +17,18 @@ describe('ThreeColumn 桌面三栏', () => {
     expect(screen.getByTestId('outline-panel')).toBeInTheDocument()
     expect(screen.getByTestId('editor-panel')).toBeInTheDocument()
     expect(right).toContainElement(screen.getByTestId('paper-path'))
-    expect(right.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0|lg:block|lg:hidden/)
+    expect(right).toHaveAttribute('data-open', 'true')
     expect(right.className).toMatch(/border-l/)
     const main = screen.getByTestId('desk-columns')
-    expect(main).toBe(right.parentElement)
-    expect(main.className).toMatch(/desk-columns/)
-    expect(main.className).not.toMatch(/grid-cols-1|lg:grid-cols/)
-    expect(main).toHaveStyle({
-      display: 'grid',
-      gridTemplateColumns: '220px minmax(0, 1fr) 280px',
-      minWidth: '760px',
-    })
-    expect(right).toHaveStyle({ minWidth: '280px' })
+    expect(main).toContainElement(right)
+    expect(screen.getByTestId('outline-panel')).toHaveStyle({ width: '220px' })
+    expect(right).toHaveStyle({ width: '280px' })
+
+    fireEvent.keyDown(screen.getByTestId('left-resize-handle'), { key: 'ArrowRight' })
+    expect(screen.getByTestId('outline-panel')).toHaveStyle({ width: '232px' })
+
+    fireEvent.click(screen.getByTestId('right-collapse-btn'))
+    expect(right).toHaveClass('hidden')
+    expect(screen.getByTestId('right-expand-btn')).toBeInTheDocument()
   })
 })

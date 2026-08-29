@@ -13,3 +13,8 @@ statsmodels==0.14.4
 # --- LangGraph checkpointer（graph.py 使用 PostgresSaver）---
 psycopg[binary]==3.2.3
 langgraph-checkpoint-postgres==2.0.19
+
+# --- Phase A：估计 Agent（Pydantic AI + OpenAI 兼容通道 + 沙箱内核）---
+pydantic-ai-slim[openai]==2.35.3   # 安装时会把 pydantic 升到 >=2.12
+jupyter_client==8.10.0             # 持久 IPython 内核沙箱（dev 主后端）
+ipykernel==7.3.0

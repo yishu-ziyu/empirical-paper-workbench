@@ -1,0 +1,36 @@
+{
+  "task_id": "undergrad_did_01",
+  "version": "1.0",
+  "title": "本科论文任务基线：政策 X 对个体收入的影响（DiD）",
+  "research_question": "政策 X 试点对个体收入的影响有多大？",
+  "story": "某省 2015 年起在部分县市试点政策 X，试点名单按 2014 年底随机抽签确定。现有 2010-2017 年 200 个个体的面板数据，请评估政策 X 对收入的因果效应。",
+  "method": "did",
+  "dv": "income",
+  "treatment": "treat",
+  "controls": ["age", "educ"],
+  "id_col": "id",
+  "time_col": "year",
+  "cluster": "",
+  "data_file": "dataset.csv",
+  "distractor_controls": ["shoe_size", "rainfall"],
+  "expected": {
+    "att": 2.5,
+    "tolerance": 0.6,
+    "min_stars": 2
+  },
+  "rubric_file": "rubric.json",
+  "dataset_generation": {
+    "script": "gen_dataset.py",
+    "seed": 20260828,
+    "n_units": 200,
+    "n_periods": 8,
+    "years": [2010, 2017],
+    "treat_year": 2015,
+    "true_att": 2.5,
+    "residual_sd": 2.5,
+    "unit_fe_sd": 120.0,
+    "missing": "age/educ 各列独立 5% MCAR（有意不放 income：StatsPAI bacon_decomposition 对 y 含 NaN 会静默返回 beta_twfe=0.0，见 gen_dataset.py 文件头注释）",
+    "note": "first_treat 列仅存档（处理组 2015 / 对照组 0），默认不进 research_direction；dataset.csv 必须保持纯 CSV，注释只能放在 gen_dataset.py 文件头，因为 upload_data / identification_verify / estimate 都用裸 pd.read_csv 读文件"
+  },
+  "notes": "公共处理时点设计，Goodman-Bacon forbidden 权重=0，固定管线走 TWFE（statspai.feols）。控制变量只给 age/educ 两个真变量，shoe_size/rainfall 是无关干扰列，供 agent 模式考察是否会乱加控制。"
+}

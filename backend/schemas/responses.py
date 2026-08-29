@@ -92,6 +92,7 @@ class SessionInfoResponse(BaseModel):
     identification_report: Optional[str] = None
     results: Optional[str] = None
     estimate: Any = None
+    cleaning_report: Any = None
     literature_source: Optional[str] = None
     write_blockers: List[str] = Field(default_factory=list)
     robustness_status: Optional[str] = None

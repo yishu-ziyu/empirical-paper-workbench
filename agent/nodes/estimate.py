@@ -6,14 +6,25 @@ RD ``rdrobust`` / SCM ``synth``。
 
 IV 主表必须是 ``statspai.ivreg``，禁止用 ``iv_diag`` 当主表。
 缺工具变量或方法列：``status=error``，不准编假系数。
+
+Phase A（估计 Agent 臂）：``config.ESTIMATE_AGENT_ENABLED`` 开启且 LLM
+provider 可用时，先走 ``engine.estimate_agent``（Pydantic AI + 沙箱真实跑
+回归）；任何异常都回退到本模块的固定分派（``_estimate_fixed``），并按
+facade.record_degradation 的条目模式把回退记录进 estimate payload。
+输出 state 键始终只有 ``results`` / ``estimate``。
 """
 from __future__ import annotations
 
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from design.spec import norm_method
 from protocols import EstimateOutput
 from state import EconPaperState
+
+logger = logging.getLogger(__name__)
 
 
 def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
@@ -373,8 +384,11 @@ def _estimate_did(df: Any, spec: Dict[str, Any], state: EconPaperState) -> Estim
     return out
 
 
-def estimate(state: EconPaperState) -> EstimateOutput:
-    """跑主设定，写出结果章能引用的表。"""
+def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
+    """固定分派路径（Phase A 前的 estimate 原逻辑，未改动）。
+
+    按 method 分派到 StatsPAI；Provider/Agent 不可用或异常时的回退通道。
+    """
     spec = state.get("main_specification") or {}
     if not isinstance(spec, dict):
         spec = {}
@@ -464,6 +478,72 @@ def estimate(state: EconPaperState) -> EstimateOutput:
             method=method,
             formula=str(formula) if formula else None,
         )
+
+
+def _estimate_agent_enabled() -> bool:
+    """读 agent/config.ESTIMATE_AGENT_ENABLED（env ECONPAPER_ESTIMATE_AGENT 可覆盖）。
+
+    agent/ 与 backend/ 都可能挂在 sys.path 上（backend/main.py 刻意让
+    backend/config.py 优先，避免同名覆盖），裸 ``import config`` 会命中
+    backend/config.py。因此：先看已加载模块有没有该旗标，没有再按路径
+    显式加载 agent/config.py 并缓存。
+    """
+    import importlib.util
+    import sys
+
+    loaded = sys.modules.get("config")
+    if loaded is not None and hasattr(loaded, "ESTIMATE_AGENT_ENABLED"):
+        return bool(loaded.ESTIMATE_AGENT_ENABLED)
+    cached = sys.modules.get("_econpaper_agent_config")
+    if cached is not None:
+        return bool(cached.ESTIMATE_AGENT_ENABLED)
+    cfg_path = Path(__file__).resolve().parents[1] / "config.py"
+    try:
+        spec = importlib.util.spec_from_file_location("_econpaper_agent_config", cfg_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["_econpaper_agent_config"] = module
+        spec.loader.exec_module(module)
+        return bool(module.ESTIMATE_AGENT_ENABLED)
+    except Exception:
+        logger.warning("读取 ESTIMATE_AGENT_ENABLED 失败，按关闭处理", exc_info=True)
+        return False
+
+
+def estimate(state: EconPaperState) -> EstimateOutput:
+    """跑主设定，写出结果章能引用的表。
+
+    Phase A：开关开启且 provider 可用 -> 先走估计 Agent（沙箱真实跑回归）；
+    Agent 返回 None（mock / 未配 key）或任何异常 -> 回退 ``_estimate_fixed``，
+    异常时在 estimate payload 里追加 degradation 条目（沿用
+    ``facade.record_degradation`` 的 {node, reason, fallback, visible,
+    timestamp} 模式）。输出 state 键与固定分派完全一致。
+    """
+    agent_error: Optional[str] = None
+    if _estimate_agent_enabled():
+        try:
+            from engine.estimate_agent import run_estimate_agent
+
+            agent_out = run_estimate_agent(state)
+            if agent_out is not None:
+                return agent_out
+        except Exception as exc:
+            agent_error = str(exc) or type(exc).__name__
+            logger.warning("estimate agent 失败，回退固定分派: %s", exc, exc_info=True)
+    out = _estimate_fixed(state)
+    if agent_error is not None:
+        payload = out.get("estimate")
+        if isinstance(payload, dict):
+            payload["degradations"] = list(payload.get("degradations") or []) + [
+                {
+                    "node": "run_estimate",
+                    "reason": f"estimate_agent_failed: {agent_error}",
+                    "fallback": "fixed_dispatch",
+                    "visible": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            ]
+    return out
 
 
 __all__ = ["estimate", "effect_from_fit"]

@@ -63,7 +63,7 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('home-page')).toBeInTheDocument()
 
     // 触发文件上传
     const fileInput = screen.getByTestId('file-input') as HTMLInputElement
@@ -117,6 +117,7 @@ describe('前端集成测试', () => {
     await waitFor(() => {
       expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
+    fireEvent.click(screen.getByTestId('direction-chat-to-form'))
     fireEvent.change(screen.getByLabelText(/研究问题/), {
       target: { value: '教育对收入的影响' },
     })

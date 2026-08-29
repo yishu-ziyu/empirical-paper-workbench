@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-from llm.router import LLMRouter, LLMConfig
-from llm.call_llm import call_llm
+from agent.llm.router import LLMRouter, LLMConfig
+from agent.llm.call_llm import call_llm
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ def test_from_env_uses_minimax_outside_pytest(monkeypatch):
     monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
     monkeypatch.setenv("MINIMAX_MODEL", "MiniMax-M3")
     monkeypatch.setenv("MINIMAX_OPENAI_BASE_URL", "https://api.minimaxi.com/v1")
-    monkeypatch.setattr("llm.router.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.router.in_pytest", lambda: False)
     config = LLMConfig.from_env("GENERATE")
     assert config.provider == "minimax"
     assert config.model == "MiniMax-M3"
@@ -169,7 +169,7 @@ def test_from_env_uses_minimax_outside_pytest(monkeypatch):
 def test_econpaper_llm_mock_wins_outside_pytest(monkeypatch):
     monkeypatch.setenv("ECONPAPER_LLM", "mock")
     monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
-    monkeypatch.setattr("llm.router.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.router.in_pytest", lambda: False)
     config = LLMConfig.from_env("GENERATE")
     assert config.provider == "mock"
 

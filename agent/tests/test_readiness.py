@@ -1,5 +1,5 @@
 """Per-chapter write gate and claim mode."""
-from engine.readiness import (
+from agent.engine.readiness import (
     TRUTH_KEYS,
     claim_mode,
     estimate_ran,

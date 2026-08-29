@@ -67,7 +67,7 @@ def _is_qe_hi_column(col: str) -> bool:
 
 def _load_charls_config() -> dict:
     try:
-        from dataset_profiles import load_profile  # noqa: PLC0415
+        from ..dataset_profiles import load_profile  # noqa: PLC0415
     except ImportError:
         return {}
     cfg = load_profile("charls")

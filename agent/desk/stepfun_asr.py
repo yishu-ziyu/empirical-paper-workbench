@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from llm.ssot import load_ssot
+from ..llm.ssot import load_ssot
 
 DEFAULT_ASR_URL = "https://api.stepfun.com/step_plan/v1/audio/asr/sse"
 DEFAULT_ASR_MODEL = "stepaudio-2.5-asr"

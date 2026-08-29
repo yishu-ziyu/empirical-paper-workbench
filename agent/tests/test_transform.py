@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from cleaning.transform import TransformStep
+from agent.cleaning.transform import TransformStep
 
 
 # --------------------------------------------------------------------------- #

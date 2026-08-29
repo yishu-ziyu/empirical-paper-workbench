@@ -6,20 +6,25 @@
 3. 6 章 type 顺序：intro / lit_review / data_desc / methods / results / conclusion
 4. 每章带 versions 历史
 5. current_chapter_index 最终 = 6
-6. route_after_chapter 路由函数：< 6 → "generate_chapter"，>= 6 → "translate_code"
+6. 章节循环的路由函数（< 6 → "generate_chapter"，>= 6 → "translate_code"）
+
+注：预写图收敛后，`agent.graph` 不再定义章节循环路由 ``route_after_chapter``
+（那不是预写段、不在图中）。章节推进判定现收敛在
+``agent.nodes.route_after_review._advance``，本文件复用它驱动章节循环小图。
 
 测试策略：build_graph() 从 upload_data 开始，端到端跑需要真实数据过重；
 改用最小测试 graph（generate_chapter + translate_code + 条件边）验证循环逻辑，
-再单独测 route_after_chapter 路由函数。
+再单独测推进路由函数。
 """
 from __future__ import annotations
 
 import pytest
 from langgraph.graph import END, START, StateGraph
 
-from nodes.generate_chapter import generate_chapter
-from nodes.translate_code import translate_code
-from state import EconPaperState
+from agent.nodes.generate_chapter import generate_chapter
+from agent.nodes.route_after_review import _advance as route_after_chapter
+from agent.nodes.translate_code import translate_code
+from agent.state import EconPaperState
 
 from conftest import make_write_ready_state
 
@@ -31,45 +36,14 @@ def recorder(mock_llm_for):
 
 
 # ---------------------------------------------------------------------------
-# route_after_chapter 路由函数
-# ---------------------------------------------------------------------------
-def test_route_after_chapter_continues_when_below_six():
-    """current_chapter_index < 6 → "generate_chapter"（继续循环）。"""
-    from graph import route_after_chapter
-
-    base = {"outline": [{"type": "intro"}]}
-    assert route_after_chapter({**base, "current_chapter_index": 0}) == "generate_chapter"
-    assert route_after_chapter({**base, "current_chapter_index": 3}) == "generate_chapter"
-    assert route_after_chapter({**base, "current_chapter_index": 5}) == "generate_chapter"
-
-
-def test_route_after_chapter_goes_to_translate_when_six():
-    """current_chapter_index >= 6 → "translate_code"。"""
-    from graph import route_after_chapter
-
-    base = {"outline": [{"type": "intro"}]}
-    assert route_after_chapter({**base, "current_chapter_index": 6}) == "translate_code"
-    assert route_after_chapter({**base, "current_chapter_index": 7}) == "translate_code"
-
-
-def test_route_after_chapter_defaults_to_translate_when_no_index():
-    """无 current_chapter_index（legacy 流）→ translate_code（不循环）。"""
-    from graph import route_after_chapter
-
-    assert route_after_chapter({}) == "translate_code"
-    assert route_after_chapter({"outline": []}) == "translate_code"
-
-
-# ---------------------------------------------------------------------------
 # 最小 graph 循环测试
 # ---------------------------------------------------------------------------
 def _build_chapter_loop_graph():
     """构建只含 generate_chapter + translate_code 的最小循环 graph。
 
-    复用 graph.route_after_chapter 路由函数，与 build_graph() 一致。
+    复用收敛后的章节推进路由（route_after_review._advance，原 route_after_chapter
+    逻辑，预写图收敛后由该处单一维护）。
     """
-    from graph import route_after_chapter
-
     builder = StateGraph(EconPaperState)
     builder.add_node("generate_chapter", generate_chapter)
     builder.add_node("translate_code", translate_code)
@@ -168,7 +142,7 @@ def test_graph_llm_called_six_times(recorder, six_chapter_outline):
 # ---------------------------------------------------------------------------
 def test_build_graph_compiles_with_translate_code():
     """build_graph() 能编译。章节节点不在预写图里。"""
-    from graph import build_graph
+    from agent.graph import build_graph
 
     g = build_graph()
     assert g is not None
@@ -179,7 +153,7 @@ def test_build_graph_compiles_with_translate_code():
 
 
 def test_route_after_identification_goes_to_estimate():
-    from graph import route_after_identification
+    from agent.graph import route_after_identification
 
     assert route_after_identification({"star_rating": None}) == [
         "run_estimate",
@@ -193,7 +167,7 @@ def test_route_after_identification_goes_to_estimate():
 
 
 def test_route_after_clean_stops_without_direction():
-    from graph import route_after_clean
+    from agent.graph import route_after_clean
     from langgraph.graph import END
 
     assert route_after_clean({}) == END

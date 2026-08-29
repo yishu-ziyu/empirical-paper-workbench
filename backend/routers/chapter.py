@@ -43,7 +43,7 @@ _REGISTERED = False
 # 评审通过阈值：与 agent/nodes/review_chapter.REVIEW_SCORE_THRESHOLD 同源。
 # agent 模块缺失时退回默认值，保持与 facade 的 try/except 导入风格一致。
 try:
-    from nodes.review_chapter import (
+    from agent.nodes.review_chapter import (
         REVIEW_SCORE_THRESHOLD as _REVIEW_SCORE_THRESHOLD,
     )
 except Exception:  # pragma: no cover

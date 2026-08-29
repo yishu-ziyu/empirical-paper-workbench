@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from state import EconPaperState
+from ..state import EconPaperState
 
 # 弱工具变量 first-stage F 阈值（Stock & Yogo 经验值）
 WEAK_IV_F_THRESHOLD = 10.0

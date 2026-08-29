@@ -11,8 +11,8 @@
 """
 from __future__ import annotations
 
-from cleaning.audit import AuditStep
-from nodes.translate_code import translate_code
+from agent.cleaning.audit import AuditStep
+from agent.nodes.translate_code import translate_code
 
 from conftest import make_state
 

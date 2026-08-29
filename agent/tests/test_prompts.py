@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from prompts import get_prompt
+from agent.prompts import get_prompt
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ def test_render_revision_defaults_are_empty_not_none():
 # 章节特化 system prompt 内容契约（任务规格 §T-07）
 # ---------------------------------------------------------------------------
 def test_intro_strip_contribution_drops_heading_block():
-    from prompts.intro import strip_contribution
+    from agent.prompts.intro import strip_contribution
 
     raw = (
         "## 研究背景\n背景。\n\n"

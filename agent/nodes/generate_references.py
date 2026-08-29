@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any, List
 
-from protocols import ReferencesOutput
-from state import EconPaperState
+from ..protocols import ReferencesOutput
+from ..state import EconPaperState
 
 
 def _format_apa(entry: Any) -> str:

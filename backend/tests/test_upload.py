@@ -132,7 +132,7 @@ def test_upload_course_panel_returns_200_without_checkpoint_db(client, monkeypat
     and this endpoint 503 with 'LangGraph graph not available'.
     """
     monkeypatch.delenv("CHECKPOINT_DB_URL", raising=False)
-    from graph import _reset_runtime
+    from agent.graph import _reset_runtime
 
     _reset_runtime()
     assert COURSE_PANEL_CSV.is_file(), f"missing sample CSV: {COURSE_PANEL_CSV}"

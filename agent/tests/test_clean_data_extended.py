@@ -12,7 +12,7 @@ workspace fixture 由根 conftest.py 提供（ADR-0003 Stage C）。
 import pandas as pd
 import pytest
 
-from nodes.clean_data import clean_data
+from agent.nodes.clean_data import clean_data
 
 from conftest import make_state
 
@@ -214,7 +214,7 @@ def test_clean_data_promotes_cleaned_path_for_downstream_nodes(csv_full, workspa
 
 def test_clean_data_does_not_winsorize_design_columns(tmp_path, workspace):
     """Identifiers and binary treatment columns must survive outlier cleaning."""
-    raw_path = tmp_path / "design.csv"
+    raw_path = tmp_path / "agent.design.csv"
     original = pd.DataFrame(
         {
             "id": [*range(1, 21), 999],

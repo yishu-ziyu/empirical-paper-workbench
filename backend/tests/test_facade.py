@@ -292,22 +292,22 @@ def _patch_prewrite_nodes(monkeypatch, calls, *, star_rating=3):
         calls.append("generate_outline")
         return {"outline": [{"type": "intro"}]}
 
-    monkeypatch.setattr("nodes.set_direction.set_direction", fake_set_direction)
+    monkeypatch.setattr("agent.nodes.set_direction.set_direction", fake_set_direction)
     monkeypatch.setattr(
-        "nodes.identification_verify.identification_verify", fake_identify
+        "agent.nodes.identification_verify.identification_verify", fake_identify
     )
-    monkeypatch.setattr("nodes.estimate.estimate", fake_estimate)
+    monkeypatch.setattr("agent.nodes.estimate.estimate", fake_estimate)
     monkeypatch.setattr(
-        "nodes.robustness_check.robustness_check", fake_robustness
-    )
-    monkeypatch.setattr(
-        "nodes.search_literature.search_literature", fake_search
+        "agent.nodes.robustness_check.robustness_check", fake_robustness
     )
     monkeypatch.setattr(
-        "nodes.citation_graph.build_citation_graph", fake_citation
+        "agent.nodes.search_literature.search_literature", fake_search
     )
-    monkeypatch.setattr("nodes.generate_title.generate_title", fake_title)
-    monkeypatch.setattr("nodes.generate_outline.generate_outline", fake_outline)
+    monkeypatch.setattr(
+        "agent.nodes.citation_graph.build_citation_graph", fake_citation
+    )
+    monkeypatch.setattr("agent.nodes.generate_title.generate_title", fake_title)
+    monkeypatch.setattr("agent.nodes.generate_outline.generate_outline", fake_outline)
 
 
 def test_set_direction_and_outline_calls_both_nodes(monkeypatch):

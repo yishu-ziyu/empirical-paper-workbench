@@ -1,5 +1,5 @@
-from desk.heuristic import heuristic_discuss
-from desk.socratic import discuss
+from agent.desk.heuristic import heuristic_discuss
+from agent.desk.socratic import discuss
 
 
 def test_heuristic_asks_one_thing():
@@ -68,7 +68,7 @@ def test_discuss_falls_back_when_llm_is_mock():
 
 
 def test_discuss_ask_requires_model_explain(monkeypatch):
-    monkeypatch.setattr("desk.socratic.call_llm", lambda *args, **kwargs: "not-json")
+    monkeypatch.setattr("agent.desk.socratic.call_llm", lambda *args, **kwargs: "not-json")
     try:
         discuss(
             "导师让我用 CHARLS 做点养老的",
@@ -94,7 +94,7 @@ def test_discuss_uses_llm_json(monkeypatch):
         ],
         "ready": False,
     }
-    monkeypatch.setattr("desk.socratic.call_llm", lambda *args, **kwargs: __import__("json").dumps(payload))
+    monkeypatch.setattr("agent.desk.socratic.call_llm", lambda *args, **kwargs: __import__("json").dumps(payload))
     result = discuss("导师让我用 CHARLS 做点养老的")
     assert result["source"] == "llm"
     assert result["question"]
@@ -112,7 +112,7 @@ def test_discuss_honors_llm_conversation_intent(monkeypatch):
         "ready": False,
     }
     monkeypatch.setattr(
-        "desk.socratic.call_llm",
+        "agent.desk.socratic.call_llm",
         lambda *args, **kwargs: __import__("json").dumps(payload),
     )
 
@@ -133,7 +133,7 @@ def test_discuss_rejects_llm_title_that_replaces_explicit_outcome(monkeypatch):
         "ready": False,
     }
     monkeypatch.setattr(
-        "desk.socratic.call_llm",
+        "agent.desk.socratic.call_llm",
         lambda *args, **kwargs: __import__("json").dumps(payload),
     )
 

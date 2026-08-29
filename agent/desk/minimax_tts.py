@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 
-from llm.ssot import load_ssot
+from ..llm.ssot import load_ssot
 
 DEFAULT_VOICE_ID = "shangqiuzi_v3_20260717"
 DEFAULT_MODEL = "speech-2.8-hd"

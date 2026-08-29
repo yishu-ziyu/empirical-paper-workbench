@@ -1,14 +1,14 @@
 """#6: 结构层纯函数。关键词不够过 0.7。"""
 from __future__ import annotations
 
-from nodes.review_chapter import REVIEW_SCORE_THRESHOLD, review_chapter
-from nodes.review_sources.mock_review import mock_review_llm
-from nodes.review_sources.structure_checks import (
+from agent.nodes.review_chapter import REVIEW_SCORE_THRESHOLD, review_chapter
+from agent.nodes.review_sources.mock_review import mock_review_llm
+from agent.nodes.review_sources.structure_checks import (
     STRUCTURE_SCORE_CAP,
     apply_structure_cap,
     check_structure,
 )
-from protocols import ReviewRubric
+from agent.protocols import ReviewRubric
 
 from conftest import make_state
 

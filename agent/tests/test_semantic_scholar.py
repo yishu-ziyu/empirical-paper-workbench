@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from nodes.literature_sources.semantic_scholar import (
+from agent.nodes.literature_sources.semantic_scholar import (
     MAX_RESULTS,
     SEMANTIC_SCHOLAR_BASE,
     get_api_key_from_env,
@@ -62,7 +62,7 @@ def test_search_returns_entries():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -97,7 +97,7 @@ def test_search_passes_api_key_header():
     """有 api_key 时请求头含 x-api-key。"""
     mock_papers = []
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -116,7 +116,7 @@ def test_search_url_contains_query_and_fields():
     """请求 URL 含 query/limit/fields 参数。"""
     mock_papers = []
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -139,7 +139,7 @@ def test_search_url_contains_query_and_fields():
 def test_search_empty_query_returns_empty():
     """空 query 返回空列表（不调 API）。"""
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         result = semantic_scholar_search("")
         assert result == []
@@ -165,7 +165,7 @@ def test_search_no_api_key_works():
         }
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -184,7 +184,7 @@ def test_search_max_results_capped_at_max():
     """max_results 超过 MAX_RESULTS 时被截断为 MAX_RESULTS。"""
     mock_papers = []
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -205,7 +205,7 @@ def test_search_max_results_capped_at_max():
 def test_search_api_error_raises_runtime_error():
     """API 调用失败（网络错误）抛 RuntimeError。"""
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
         side_effect=Exception("network error"),
     ):
         with pytest.raises(RuntimeError, match="Semantic Scholar API"):
@@ -224,7 +224,7 @@ def test_search_http_error_raises_runtime_error():
         fp=None,
     )
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
         side_effect=http_err,
     ):
         with pytest.raises(RuntimeError, match="Semantic Scholar API"):
@@ -238,7 +238,7 @@ def test_search_json_decode_error_raises_runtime_error():
     mock_resp.__enter__ = lambda self: self
     mock_resp.__exit__ = lambda *args: None
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen",
         return_value=mock_resp,
     ):
         with pytest.raises(RuntimeError, match="Semantic Scholar API"):
@@ -248,7 +248,7 @@ def test_search_json_decode_error_raises_runtime_error():
 def test_search_empty_data_returns_empty():
     """API 返回空 data 列表时返回空。"""
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             {"total": 0, "data": []}
@@ -260,7 +260,7 @@ def test_search_empty_data_returns_empty():
 def test_search_missing_data_key_returns_empty():
     """API 响应缺少 data 键时返回空。"""
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen({"total": 0})
         result = semantic_scholar_search("query")
@@ -284,7 +284,7 @@ def test_relevance_score_decreasing():
         for i in range(5)
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -313,7 +313,7 @@ def test_relevance_score_floor_0_3():
         for i in range(20)
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -343,7 +343,7 @@ def test_each_entry_has_required_fields():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -377,7 +377,7 @@ def test_authors_filter_empty_names():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -400,7 +400,7 @@ def test_missing_year_defaults_to_zero():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -423,7 +423,7 @@ def test_missing_abstract_defaults_to_empty():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)
@@ -446,7 +446,7 @@ def test_missing_title_defaults_to_empty():
         },
     ]
     with patch(
-        "nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
+        "agent.nodes.literature_sources.semantic_scholar.urllib.request.urlopen"
     ) as mock_urlopen:
         mock_urlopen.return_value = _make_mock_urlopen(
             _mock_api_response(mock_papers)

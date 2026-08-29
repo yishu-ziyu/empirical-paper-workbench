@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
-import graph as graph_mod
+import agent.graph as graph_mod
 
 
 @pytest.fixture
@@ -126,17 +126,17 @@ def test_build_graph_compiles_without_postgres(monkeypatch, reset_graph_runtime)
 
 
 def test_from_graph_import_graph_without_live_postgres():
-    """``from graph import graph`` must not require a live Postgres."""
-    agent_dir = str(Path(__file__).resolve().parents[1])
+    """``from agent.graph import graph`` must not require a live Postgres."""
+    project_root = str(Path(__file__).resolve().parents[2])
     env = os.environ.copy()
     env.pop("CHECKPOINT_DB_URL", None)
     existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = agent_dir + (os.pathsep + existing if existing else "")
+    env["PYTHONPATH"] = project_root + (os.pathsep + existing if existing else "")
     code = (
-        "from graph import graph\n"
+        "from agent.graph import graph\n"
         "assert graph is not None\n"
         "assert getattr(graph, '_compiled', 'missing') is None\n"
-        "from graph import _get_checkpointer\n"
+        "from agent.graph import _get_checkpointer\n"
         "from langgraph.checkpoint.memory import MemorySaver\n"
         "assert isinstance(_get_checkpointer(), MemorySaver)\n"
         "print('import-ok')\n"

@@ -5,7 +5,7 @@
 在沙箱里对清洗后的数据**真实地**跑回归，再映射回与固定分派完全一致的
 state 契约（``{"results": 表, "estimate": payload}``）。
 
-启用条件（estimate 节点先看 ``config.ESTIMATE_AGENT_ENABLED``，再看这里）：
+启用条件（estimate 节点先看 ``upstream.ESTIMATE_AGENT_ENABLED``，再看这里）：
 - provider 为 OpenAI 兼容通道（minimax / openai）且配了 api_key；
 - provider=="mock" 或未配 key 时 ``run_estimate_agent`` 返回 None，
   由节点静默走固定分派（不算 degradation）。
@@ -25,9 +25,9 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 
-from engine.sandbox import SandboxResult, SandboxSession, SubprocessSession, open_session
-from llm.router import MINIMAX_BASE_URL, router
-from state import EconPaperState
+from .sandbox import SandboxResult, SandboxSession, SubprocessSession, open_session
+from ..llm.router import MINIMAX_BASE_URL, router
+from ..state import EconPaperState
 
 logger = logging.getLogger(__name__)
 
@@ -399,7 +399,7 @@ def _usage_limits():
 
 def _method_of(state: EconPaperState, spec: dict) -> str:
     """与 nodes.estimate._method_of 同语义（engine 层不反向依赖 nodes）。"""
-    from design.spec import norm_method  # noqa: PLC0415
+    from ..design.spec import norm_method  # noqa: PLC0415
 
     raw = spec.get("method")
     if not raw:

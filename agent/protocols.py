@@ -13,7 +13,7 @@
 """
 from typing import Any, Dict, List, Mapping, Optional, TypeVar, TypedDict
 
-from state import Chapter, DatasetMeta
+from .state import Chapter, DatasetMeta
 
 # NodeResult 协议类型：所有节点返回值的基类型
 # 用 Mapping[str, Any] 作为 bound，兼容 LangGraph 的 partial state dict 语义

@@ -5,9 +5,9 @@ import json
 import re
 from typing import Any
 
-from desk.heuristic import heuristic_discuss
-from desk.shape_question import CONVERSATION_REPLY, has_research_intent, user_intent_title
-from llm.call_llm import call_llm
+from .heuristic import heuristic_discuss
+from .shape_question import CONVERSATION_REPLY, has_research_intent, user_intent_title
+from ..llm.call_llm import call_llm
 
 SYSTEM = """你是实证经济学研究产品里的对话助手。
 先判断用户有没有表达研究意图。问候、闲聊、测试文字或还没有研究含义的输入，应自然回应并邀请用户说出研究现象；不要强行生成论文问题。

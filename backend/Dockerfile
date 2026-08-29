@@ -22,8 +22,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY agent/    ./agent/
 
-# 把 agent 目录加到 Python path（与 backend/main.py 的 sys.path.append 一致）
-ENV PYTHONPATH="/app/agent:${PYTHONPATH}"
+# 项目根 /app + backend 目录加入 Python path：
+# - /app          使 `import agent`（/app/agent 包）/ `import backend`（命名空间包）唯一解析
+# - /app/backend  使 backend 各模块底部 `from config import settings` 唯一命中 /app/backend/config.py
+# 均无需进程级 sys.path 拼接，依赖 import 路径而非顺序。
+ENV PYTHONPATH="/app:/app/backend:${PYTHONPATH}"
 
 # ------------------------------------------------------------------
 # 运行时

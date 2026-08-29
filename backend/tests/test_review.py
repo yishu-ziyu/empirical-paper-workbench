@@ -431,8 +431,8 @@ def test_generate_chapter_bad_review_json_get_review_is_mock_fallback(
             return SimpleNamespace(provider="anthropic", model="claude")
         return SimpleNamespace(provider="mock", model="default")
 
-    monkeypatch.setattr("nodes.review_chapter.invoke_review_llm", boom)
-    monkeypatch.setattr("llm.router.router.get_config", fake_config)
+    monkeypatch.setattr("agent.nodes.review_chapter.invoke_review_llm", boom)
+    monkeypatch.setattr("agent.llm.router.router.get_config", fake_config)
 
     sid = f"test-review-fallback-{uuid.uuid4()}"
     facade.seed_state(sid, make_write_ready_state())

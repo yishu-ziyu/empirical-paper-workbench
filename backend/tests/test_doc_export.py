@@ -148,7 +148,7 @@ def test_doc_export_docx_returns_file(doc_session, client, monkeypatch, tmp_path
 
 def test_doc_export_docx_works_without_pandoc(doc_session, client, monkeypatch, tmp_path):
     """Live bar: GET docx returns a Word file even when pandoc is missing."""
-    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", lambda name: None)
     state = facade.get_state(doc_session)
     state["workspace"] = str(tmp_path)
     facade.save_state(doc_session, state)
@@ -275,9 +275,9 @@ def test_doc_export_undergrad_alias_returns_docx(
     docx = tmp_path / "paper.docx"
     docx.write_bytes(b"PK\x03\x04real-docx-bytes")
 
-    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None)
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: str(docx)
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: str(docx)
     )
 
     resp = client.get(

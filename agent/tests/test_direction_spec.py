@@ -1,5 +1,5 @@
 """Research direction normalizes into the spec downstream nodes read."""
-from design.spec import DirectionSpec, slug_for_topic
+from agent.design.spec import DirectionSpec, slug_for_topic
 
 
 def test_from_direction_dict_builds_main_specification():
@@ -163,7 +163,7 @@ def test_direction_request_allows_method_columns():
 
 
 def test_set_direction_projects_charls_then_panel_then_user_wins():
-    from nodes.set_direction import set_direction
+    from agent.nodes.set_direction import set_direction
 
     from_charls = set_direction(
         {
@@ -222,7 +222,7 @@ def test_set_direction_projects_charls_then_panel_then_user_wins():
 
 def test_set_direction_guesses_exact_year_id_columns(tmp_path):
     import pandas as pd
-    from nodes.set_direction import set_direction
+    from agent.nodes.set_direction import set_direction
 
     csv_path = tmp_path / "panel.csv"
     pd.DataFrame({"year": [2010], "id": [1], "y": [1.0], "d": [0]}).to_csv(

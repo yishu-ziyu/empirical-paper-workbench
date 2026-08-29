@@ -23,8 +23,13 @@ import re
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
-from protocols import ReviewOutput, ReviewRubric
-from state import EconPaperState
+from ..protocols import ReviewOutput, ReviewRubric
+from ..prompts.review import (
+    ASSOCIATION_CLAIM_INSTRUCTION,
+    CAUSAL_CLAIM_INSTRUCTION,
+    assemble_review_prompt,
+)
+from ..state import EconPaperState
 
 # 评审通过阈值（运行时常量，不入 state）
 REVIEW_SCORE_THRESHOLD = 0.7
@@ -176,17 +181,14 @@ def invoke_review_llm(
     claim: str = "",
 ) -> dict:
     """非 mock 评审通道。要求 JSON ``{rubric, feedback, suggestions}``。"""
-    from llm.call_llm import call_llm as unified_call
+    from ..llm.call_llm import call_llm as unified_call
 
     claim_block = _review_claim_instruction(claim)
-    prompt = (
-        "你是经济学论文审稿人。只输出 JSON，不要 markdown。"
-        "字段：rubric{endogeneity,identification,robustness,contribution,readability}"
-        "（每维 0 到 1）、feedback、suggestions。\n"
-        f"{claim_block}\n"
-        f"研究方向：{research_direction}\n"
-        f"文献条数：{len(literature_entries or [])}\n"
-        f"章节正文：\n{chapter_content}"
+    prompt = assemble_review_prompt(
+        claim_block,
+        research_direction,
+        len(literature_entries or []),
+        chapter_content,
     )
     raw = unified_call(prompt, node_type="review")
     parsed = _parse_review_json(raw)
@@ -248,8 +250,8 @@ def call_review_llm(
     - provider == "anthropic" / "openai" → 走 invoke_review_llm；
       JSON 解析失败降级回 mock，不把 graph 打费
     """
-    from llm.router import router
-    from nodes.review_sources.mock_review import mock_review_llm
+    from ..llm.router import router
+    from .review_sources.mock_review import mock_review_llm
 
     config = router.get_config("review")
 
@@ -337,7 +339,7 @@ def _claim_of(state: EconPaperState) -> str:
         if isinstance(user_claim, str) and user_claim.strip():
             return user_claim.strip()
     try:
-        from engine.readiness import claim_mode
+        from ..engine.readiness import claim_mode
 
         return claim_mode(state) or ""
     except Exception:
@@ -345,21 +347,9 @@ def _claim_of(state: EconPaperState) -> str:
 
 
 def _review_claim_instruction(claim: str) -> str:
-    course = (
-        "这是本科课程论文，不是期刊投稿。"
-        "不得因为没有边际贡献、三条贡献、政策贡献或学术增量而扣 contribution。"
-        "contribution 只看题目有没有写清楚、有没有按课设作答。"
-    )
     if _is_association_claim(claim):
-        return (
-            course
-            + "本文主张模式是 association（条件相关，不是因果识别）。"
-            "不得因为没有 IV、RDD、DID、工具变量或识别策略而扣 "
-            "identification / endogeneity / contribution。"
-            "这些方法不是本篇的要求。"
-            "只检查：有没有把相关写成因果；论述是否清楚。"
-        )
-    return course + "识别策略按课设深度来看，不要按核心刊标准。"
+        return ASSOCIATION_CLAIM_INSTRUCTION
+    return CAUSAL_CLAIM_INSTRUCTION
 
 
 def _is_association_claim(claim: str) -> bool:
@@ -560,7 +550,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
     if claim == "association" and _has_forbidden_causal_claim(chapter_content):
         grounding_failures.append("causal_claim_forbidden")
     if chapter_type == "results":
-        from nodes.review_sources.grounding import check_grounding
+        from .review_sources.grounding import check_grounding
 
         grounding_failures.extend(check_grounding(state, chapter_content))
 
@@ -583,11 +573,11 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
     else:
         method = str(state.get("method") or "")
 
-    from nodes.review_sources.structure_checks import (
+    from .review_sources.structure_checks import (
         apply_structure_cap,
         check_structure,
     )
-    from nodes.review_sources.threat_cards import (
+    from .review_sources.threat_cards import (
         active_threat_cards,
         apply_threat_caps,
     )
@@ -667,7 +657,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
     snapshot["review_degraded"] = review_degraded
     if penalty_fields.get("literature_entries") is not None:
         snapshot["literature_entries"] = penalty_fields["literature_entries"]
-    from nodes.learning_labels import collect_learning_labels
+    from .learning_labels import collect_learning_labels
 
     penalty_fields["learning_labels"] = collect_learning_labels(snapshot)
 

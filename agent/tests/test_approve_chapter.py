@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.approve_chapter import approve_chapter
+from agent.nodes.approve_chapter import approve_chapter
 
 from conftest import make_state, make_body_chapters
 

@@ -5,8 +5,8 @@ import json
 import re
 from typing import Any, Dict, Optional
 
-from eval.personas import system_prompt
-from nodes.review_sources.structure_checks import is_keyword_stuffed, is_overclaim
+from .personas import system_prompt
+from ..nodes.review_sources.structure_checks import is_keyword_stuffed, is_overclaim
 
 _CITE_RE = re.compile(r"\[(\d+)\]")
 _DECISION_RE = re.compile(r"\b(accept|reject)\b", re.IGNORECASE)
@@ -144,8 +144,8 @@ def llm_judge(
 ) -> Optional[Dict[str, str]]:
     """有真模型就问；失败返回 None，由规则兜底。"""
     try:
-        from llm.call_llm import call_llm
-        from llm.router import router
+        from ..llm.call_llm import call_llm
+        from ..llm.router import router
     except Exception:
         return None
     config = router.get_config("review")

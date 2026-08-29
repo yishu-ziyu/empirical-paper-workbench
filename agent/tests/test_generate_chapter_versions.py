@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.generate_chapter import generate_chapter
+from agent.nodes.generate_chapter import generate_chapter
 
 from conftest import make_write_ready_state
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.review_chapter import (
+from agent.nodes.review_chapter import (
     REVIEW_SCORE_THRESHOLD,
     apply_association_review_guard,
     _compute_composite_score,
@@ -24,7 +24,7 @@ from nodes.review_chapter import (
     invoke_review_llm,
     review_chapter,
 )
-from protocols import ReviewRubric
+from agent.protocols import ReviewRubric
 
 from conftest import make_state, make_write_ready_state
 
@@ -97,7 +97,7 @@ def test_review_idx_out_of_range_returns_empty():
 def test_review_normal_pass(monkeypatch):
     """正常评审，分数 >= threshold，通过。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     state = make_state(
@@ -124,7 +124,7 @@ def test_review_normal_pass(monkeypatch):
 def test_review_low_score_triggers_rollback(monkeypatch):
     """低分触发回退，current_chapter_index 回退，review_iteration +1。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(LOW_SCORE_RUBRIC),
     )
     state = make_state(
@@ -146,7 +146,7 @@ def test_review_low_score_triggers_rollback(monkeypatch):
 def test_review_low_score_second_iteration(monkeypatch):
     """第二次低分回退，review_iteration 从 1 → 2。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(LOW_SCORE_RUBRIC),
     )
     state = make_state(
@@ -170,7 +170,7 @@ def test_review_low_score_second_iteration(monkeypatch):
 def test_review_max_iteration_forced_pass(monkeypatch):
     """达 max_review_iterations 时强制通过（不回退）。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(LOW_SCORE_RUBRIC),
     )
     state = make_state(
@@ -194,7 +194,7 @@ def test_review_max_iteration_forced_pass(monkeypatch):
 def test_review_max_iteration_hard_cap_3(monkeypatch):
     """max_review_iterations=5 时硬上限截断为 3。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(LOW_SCORE_RUBRIC),
     )
     state = make_state(
@@ -313,7 +313,7 @@ def test_composite_score_placeholder_0_5():
 def test_review_new_chapter_resets_iteration(monkeypatch):
     """新章节检测：review_chapter_index != idx 时重置 review_iteration=0。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     state = make_state(
@@ -335,7 +335,7 @@ def test_review_new_chapter_resets_iteration(monkeypatch):
 def test_review_same_chapter_keeps_iteration(monkeypatch):
     """同一章节重评审：review_chapter_index == idx 时保留 review_iteration。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(LOW_SCORE_RUBRIC),
     )
     state = make_state(
@@ -359,7 +359,7 @@ def test_review_same_chapter_keeps_iteration(monkeypatch):
 def test_review_writes_to_correct_index(monkeypatch):
     """评审结果写到正确的 idx 位置（第 2 章 → index 1）。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC, feedback="第2章反馈"),
     )
     state = make_state(
@@ -379,7 +379,7 @@ def test_review_writes_to_correct_index(monkeypatch):
 def test_review_preserves_existing_review_lists(monkeypatch):
     """评审新章节时保留已有章节的评审结果。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC, feedback="第2章反馈"),
     )
     state = make_state(
@@ -407,7 +407,7 @@ def test_review_preserves_existing_review_lists(monkeypatch):
 def test_association_forbidden_claim_caps_score_and_rolls_back(monkeypatch):
     """命中禁用主张：grounding_failures 含码，综合分封顶 0.50 并回炉。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     content = (
@@ -442,7 +442,7 @@ def test_association_forbidden_claim_caps_score_and_rolls_back(monkeypatch):
 def test_allowed_causal_phrases_do_not_trigger_forbidden(monkeypatch):
     """允许句不记 causal_claim_forbidden。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     content = (
@@ -476,7 +476,7 @@ def test_allowed_causal_phrases_do_not_trigger_forbidden(monkeypatch):
 def test_causal_claim_other_forbidden_substrings(monkeypatch):
     """因果效应显著 / 识别策略成立 / 解决内生性 同样回炉。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     for phrase in ("因果效应显著", "识别策略成立", "解决内生性"):
@@ -544,7 +544,7 @@ def test_association_methods_fixture_passes_without_rollback():
 def test_association_live_llm_cannot_fail_for_missing_iv(monkeypatch):
     """现场 LLM 按缺 IV/RDD 打低分时，相关引言不得自动不通过。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(
             {
                 "endogeneity": 0.1,
@@ -584,7 +584,7 @@ def test_association_live_llm_cannot_fail_for_missing_iv(monkeypatch):
 def test_association_intro_low_contribution_does_not_auto_fail(monkeypatch):
     """相关引言贡献分偏低、但未写成因果时，不得自动不通过。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(
             {
                 "endogeneity": 0.9,
@@ -651,7 +651,7 @@ def test_invoke_review_prompt_states_association(monkeypatch):
             '"feedback":"ok","suggestions":"ok"}'
         )
 
-    monkeypatch.setattr("llm.call_llm.call_llm", fake_call)
+    monkeypatch.setattr("agent.llm.call_llm.call_llm", fake_call)
     invoke_review_llm(None, "正文", ReviewRubric(), "dir", [], claim="association")
     assert "association" in seen["prompt"]
     assert "不得因为没有" in seen["prompt"]
@@ -691,7 +691,7 @@ def _results_ready(content: str, **overrides) -> dict:
 def test_results_grounding_pass_does_not_rollback(monkeypatch):
     """真 treatment_row、无另造处理行：不因接地失败回退。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     content = (
@@ -712,7 +712,7 @@ def test_results_grounding_pass_does_not_rollback(monkeypatch):
 def test_results_invented_number_caps_and_rolls_back(monkeypatch):
     """另造 | age | 0.9999 | 或 | treat | 0.9999 |：invented_number，封顶回炉。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     for fake in ("| age | 0.9999 |", "| treat | 0.9999 |"):
@@ -730,7 +730,7 @@ def test_results_invented_number_caps_and_rolls_back(monkeypatch):
 def test_results_missing_treatment_row_caps_and_rolls_back(monkeypatch):
     """缺 treatment_row 子串：missing_estimate_number，封顶回炉。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     content = "本节报告 OLS 主估计，但没有贴出主表。" + ("论" * 80)
@@ -743,7 +743,7 @@ def test_results_missing_treatment_row_caps_and_rolls_back(monkeypatch):
 def test_intro_and_methods_do_not_require_estimate_table(monkeypatch):
     """引言 / 方法章：不因没表而报 missing_estimate_number。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: _mock_llm_return(HIGH_SCORE_RUBRIC),
     )
     methods_content = (

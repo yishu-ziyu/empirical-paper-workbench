@@ -5,11 +5,11 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graph import (
+from agent.graph import (
     route_after_identification,
     wire_prewrite_edges,
 )
-from state import EconPaperState
+from agent.state import EconPaperState
 
 from conftest import make_state, make_write_ready_state
 
@@ -90,8 +90,8 @@ def test_generate_title_runs_once_after_fanin(monkeypatch):
             }
         }
 
-    monkeypatch.setattr("graph.generate_title", fake_title)
-    import graph as graph_mod
+    monkeypatch.setattr("agent.graph.generate_title", fake_title)
+    import agent.graph as graph_mod
 
     graph = _stub_prewrite_graph(calls, title_fn=graph_mod.generate_title)
     state = make_write_ready_state(star_rating=2)
@@ -140,7 +140,7 @@ def test_zero_star_goes_to_hitl_not_estimate_or_literature():
 
 def test_production_graph_waiting_edge_joins_title():
     """生产图用 waiting_edges 扇入 generate_title，不是两条独立边。"""
-    from graph import build_graph
+    from agent.graph import build_graph
 
     compiled = build_graph()
     waiting = compiled.builder.waiting_edges

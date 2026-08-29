@@ -1,3 +1,17 @@
+"""预写段 LangGraph 图。
+
+本图**只覆盖预写段**（upload → clean → set_direction → identification →
+estimate∥literature → robustness∥citation → title → outline）。章节生成 /
+评审 / 导出等后续阶段**不在图中**，由 backend Facade 以 HITL 单点调用驱动
+（如 ``facade.set_direction_and_outline`` 走 ``run_prewrite``、``generate_chapter``
+节点按章就绪检查）。因此状态机里没有 ``generate_chapter`` / ``review_chapter`` /
+``export_docx`` 等节点，也没有章节循环条件路由。
+
+预写步骤的顺序规则（nodes 与顺序）统一来自 ``engine.prewrite.PRWRITE_SEQUENCE``：
+- 本模块的 ``wire_prewrite_edges`` 用它的 ``dependencies`` 派生图边（并行扇入等）；
+- ``engine.prewrite.run_prewrite``（Facade HITL 路径）按同一清单串行执行，
+  二者收敛到单一真相，不再各自维护一份顺序。
+"""
 import logging
 import os
 from typing import Any
@@ -7,38 +21,22 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 
-from nodes.clean_data import clean_data
-from nodes.citation_graph import build_citation_graph
-from nodes.estimate import estimate
-from nodes.generate_outline import generate_outline
-from nodes.generate_title import generate_title
-from nodes.hitl_pause import hitl_pause
-from nodes.identification_verify import identification_verify
-from nodes.robustness_check import robustness_check
-from nodes.search_literature import search_literature
-from nodes.set_direction import set_direction
-from nodes.upload_data import upload_data
-from state import EconPaperState
-
-# 6 章固定 type 顺序（与 generate_outline 产出一致）
-CHAPTER_TYPES = ["intro", "lit_review", "data_desc", "methods", "results", "conclusion"]
-
-
-def route_after_chapter(state: EconPaperState) -> str:
-    """generate_chapter 后的条件边路由（T-08a）。
-
-    state-driven 简化（不调 interrupt，同 T-04/T-06/T-07）：
-    - 无 outline 或无 current_chapter_index（legacy 流）→ translate_code（不循环）
-    - ``current_chapter_index`` < 6 → 回到 ``generate_chapter``（生成下一章）
-    - ``current_chapter_index`` >= 6 → 进入 ``translate_code``（6 章全部完成）
-    """
-    outline = state.get("outline")
-    idx = state.get("current_chapter_index")
-    if not outline or idx is None:
-        return "translate_code"
-    if idx < len(CHAPTER_TYPES):
-        return "generate_chapter"
-    return "translate_code"
+from .engine.prewrite import PRWRITE_SEQUENCE, PRWRITE_NODES
+from .nodes.clean_data import clean_data
+from .nodes.hitl_pause import hitl_pause
+from .nodes.upload_data import upload_data
+# 以下预写节点名保留在模块命名空间，作为测试 monkeypatch 接缝
+# （如 tests/test_graph_fanin.py 的 ``agent.graph.generate_title``）。
+# 真正的节点注册来自 PRWRITE_NODES（单一真相），此处只作兼容别名。
+from .nodes.citation_graph import build_citation_graph
+from .nodes.estimate import estimate
+from .nodes.generate_outline import generate_outline
+from .nodes.generate_title import generate_title
+from .nodes.identification_verify import identification_verify
+from .nodes.robustness_check import robustness_check
+from .nodes.search_literature import search_literature
+from .nodes.set_direction import set_direction
+from .state import EconPaperState
 
 
 def route_after_clean(state: EconPaperState) -> str:
@@ -120,9 +118,11 @@ def _get_checkpointer() -> Any:
 # ---------------------------------------------------------------------------
 
 def wire_prewrite_edges(builder: StateGraph) -> None:
-    """预写边：识别后估计∥文献，两边结束后只进一次 generate_title。
+    """预写边，拓扑派生自 ``PRWRITE_SEQUENCE``。
 
-    扇入必须用 add_edge([a, b], join)。两条独立边会让标题跑两次。
+    识别后 estimate∥search_literature 并行、robustness_check∥build_citation_graph
+    并行，两边结束后只进一次 generate_title。扇入必须用 add_edge([a, b], join)，
+    两条独立边会让标题跑两次。
     """
     builder.add_edge(START, "upload_data")
     builder.add_edge("upload_data", "clean_data")
@@ -134,7 +134,28 @@ def wire_prewrite_edges(builder: StateGraph) -> None:
             END: END,
         },
     )
-    builder.add_edge("set_direction", "identification_verify")
+
+    # 预写核心边：全部派生自 PRWRITE_SEQUENCE（单一真相）。两类由本图
+    # 特有的结构接管，不在普通 `add_edge` 里重复：
+    #  - identification_verify 的出边走条件路由（estimate∥literature / hitl_pause）；
+    #  - generate_title 的入边合成等待边（waiting_edges），避免标题跑两次。
+    _waiting: dict[str, list[str]] = {}
+    for node_id, _fn, deps in PRWRITE_SEQUENCE:
+        for dep in deps:
+            # identification_verify 的出边由条件路由表达，不建普通边。
+            if dep == "identification_verify":
+                continue
+            _waiting.setdefault(node_id, []).append(dep)
+
+    # generate_title 是多前驱扇入点 → 用 waiting_edges 合成，不用独立边。
+    for _node_id, preds in _waiting.items():
+        joined = list(preds)
+        if _node_id == "generate_title":
+            builder.add_edge(joined, _node_id)
+        else:
+            for pred in joined:
+                builder.add_edge(pred, _node_id)
+
     builder.add_conditional_edges(
         "identification_verify",
         route_after_identification,
@@ -145,36 +166,24 @@ def wire_prewrite_edges(builder: StateGraph) -> None:
         },
     )
     builder.add_edge("hitl_pause", "identification_verify")
-    builder.add_edge("run_estimate", "robustness_check")
-    builder.add_edge("search_literature", "build_citation_graph")
-    builder.add_edge(
-        ["robustness_check", "build_citation_graph"],
-        "generate_title",
-    )
-    builder.add_edge("generate_title", "generate_outline")
     builder.add_edge("generate_outline", END)
 
 
 def build_graph():
     """预写图：上传清洗后无方向即停；有方向则识别后估计∥文献，再标题→大纲。
 
+    预写节点与顺序统一来自 ``engine.prewrite.PRWRITE_SEQUENCE``（单一真相，
+    Facade 的 ``run_prewrite`` 走同一条清单）。本函数只补上传／清洗／HITL 暂停
+    等命令行式路径不承载的节点与边。
     章节、评审、导出不编进这张图，由 Facade 调用。
-    Facade 的 run_prewrite 仍串行，本函数只改图边。
     """
     builder = StateGraph(EconPaperState)
 
     builder.add_node("upload_data", upload_data)
     builder.add_node("clean_data", clean_data)
-    builder.add_node("set_direction", set_direction)
-    builder.add_node("identification_verify", identification_verify)
+    for node_id, callable_fn in PRWRITE_NODES.items():
+        builder.add_node(node_id, callable_fn)
     builder.add_node("hitl_pause", hitl_pause)
-    # Node id cannot equal a state key (LangGraph). State still uses `estimate`.
-    builder.add_node("run_estimate", estimate)
-    builder.add_node("robustness_check", robustness_check)
-    builder.add_node("search_literature", search_literature)
-    builder.add_node("build_citation_graph", build_citation_graph)
-    builder.add_node("generate_title", generate_title)
-    builder.add_node("generate_outline", generate_outline)
 
     wire_prewrite_edges(builder)
 

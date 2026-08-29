@@ -1,8 +1,8 @@
 """CSV describe for the data_desc chapter. No invented CHARLS rows."""
 from __future__ import annotations
 
-from engine.bind import bind_chapter_kwargs
-from engine.data_eda import compute_csv_eda
+from agent.engine.bind import bind_chapter_kwargs
+from agent.engine.data_eda import compute_csv_eda
 
 
 def test_compute_csv_eda_missing_path_is_empty():
@@ -35,7 +35,7 @@ def test_compute_csv_eda_from_castle_like_csv(tmp_path):
 
 
 def test_compute_csv_eda_caps_wide_columns(tmp_path):
-    from engine.data_eda import _EDA_COL_CAP
+    from agent.engine.data_eda import _EDA_COL_CAP
 
     n_cols = _EDA_COL_CAP + 5
     names = [f"c{i}" for i in range(n_cols)]
@@ -59,7 +59,7 @@ def test_bind_skips_csv_eda_unless_data_desc(monkeypatch):
         called.append(1)
         return "S", "T"
 
-    monkeypatch.setattr("engine.bind.compute_csv_eda", fake_eda)
+    monkeypatch.setattr("agent.engine.bind.compute_csv_eda", fake_eda)
     intro = bind_chapter_kwargs({"csv_path": "/tmp/x.csv"}, {"type": "intro"})
     assert called == []
     assert intro["data_summary"] == ""

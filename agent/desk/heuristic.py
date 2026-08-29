@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from desk.shape_question import next_prompt, shape_question
+from .shape_question import next_prompt, shape_question
 
 
 def _answers_from_turns(turns: list[dict[str, str]]) -> dict[str, str]:

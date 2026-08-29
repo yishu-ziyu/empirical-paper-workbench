@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from nodes.literature_sources.mock_corpus import (
+from agent.nodes.literature_sources.mock_corpus import (
     filter_by_query,
     mock_literature_corpus,
 )

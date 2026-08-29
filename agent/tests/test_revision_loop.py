@@ -1,8 +1,8 @@
 """#3: 重生成必须读 revision_suggestions，首轮不能出现 None。"""
 from __future__ import annotations
 
-from nodes.generate_chapter import generate_chapter
-from nodes.review_chapter import review_chapter
+from agent.nodes.generate_chapter import generate_chapter
+from agent.nodes.review_chapter import review_chapter
 
 from conftest import make_state, make_write_ready_state
 

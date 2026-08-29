@@ -5,7 +5,7 @@ association：写相关 / 条件关联。
 """
 from __future__ import annotations
 
-from prompts.revision import REVISION_BLOCK, fill_revision
+from .revision import REVISION_BLOCK, fill_revision
 
 _CAUSAL_METHODS = {"did", "iv", "rd", "rdd", "scm"}
 

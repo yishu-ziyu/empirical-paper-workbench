@@ -1,153 +1,73 @@
-"""ADR-0003 Stage B: AgentFacade.
+"""ADR-0003 Stage B：AgentFacade（facade 收敛重构后的薄门面包）。
 
-The facade decouples HTTP routers from the agent layer (LangGraph graph
-+ node functions + cleaning steps). Routers depend only on the facade;
-the facade is the single place that imports ``graph``, ``nodes.X``, and
-``cleaning.X``.
+对路由层与测试层，公共 API 完全不变：
+- ``from facade import facade``（单例）
+- ``from facade import AgentFacade``
+- ``monkeypatch.setattr("facade.<node_name>", ...)`` 在方法调用时替换节点函数
+  仍生效（``facade`` 包把 agent 节点/清洗类 re-export 到自身命名空间，节点方法
+  以裸全局名解析，测试的 monkeypatch 能立刻传播）。
 
-Single module-level instance: ``facade = AgentFacade()``. Routers do
-``from facade import facade`` and call methods on it.
+职责拆分（每个模块一句话）：
+- ``_deps``         —— agent 依赖加载器：直接 import graph/节点/清洗类并快速失败。
+- ``session_store`` —— 会话元数据 + state 的进程内单一真相，负责增删改查/CSV/降级日志。
+- ``desk_client``   —— desk 能力（讨论/设计对话/语音）封装。
+- 本文件（AgentFacade）—— 薄门面：组合上述协作者，编排 graph.invoke 与单节点
+  HITL / 清洗 / 评审 / CHARLS / run 工件。
 
-Test patches: tests that previously patched ``routers.X.node_func`` should
-patch the corresponding ``facade.<func>_node`` module-level name below
-(e.g. ``facade.rollback_chapter_node``, ``facade.export_docx_node``,
-``facade.generate_chapter_node``). Each facade method looks up its node
-function via module globals at call time, so ``monkeypatch.setattr`` on
-these names propagates immediately.
+约束保持：不新增第三方依赖；对外方法签名、返回结构、错误码不变。
 """
 from __future__ import annotations
 
-import os
 import shutil
-import time
 import uuid
-import logging
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any, Iterator, List, Optional
 
 import run_store
-from config import settings
 from fastapi import HTTPException
 
-# ---------------------------------------------------------------------------
-# Agent imports. Defensive so module load does not crash if agent deps
-# are missing (e.g. partial CI build, agent/ not yet on sys.path).
-# ---------------------------------------------------------------------------
-try:
-    from graph import graph as _graph  # type: ignore[import-not-found]
-except Exception as _exc:  # pragma: no cover - agent deps missing in some envs
-    _graph = None
-    logging.getLogger(__name__).warning("agent graph import failed: %s", _exc)
-
-try:
-    from nodes.set_direction import set_direction as set_direction_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    set_direction_node = None
-
-try:
-    from nodes.generate_outline import generate_outline as generate_outline_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    generate_outline_node = None
-
-try:
-    from nodes.identification_verify import identification_verify as identification_verify_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    identification_verify_node = None
-
-try:
-    from nodes.estimate import estimate as estimate_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    estimate_node = None
-
-try:
-    from nodes.robustness_check import robustness_check as robustness_check_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    robustness_check_node = None
-
-try:
-    from nodes.generate_chapter import generate_chapter as generate_chapter_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    generate_chapter_node = None
-
-try:
-    from nodes.review_chapter import review_chapter as review_chapter_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    review_chapter_node = None
-
-try:
-    from nodes.search_literature import search_literature as search_literature_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    search_literature_node = None
-
-try:
-    from nodes.citation_graph import build_citation_graph as build_citation_graph_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    build_citation_graph_node = None
-
-try:
-    from nodes.rollback import rollback_chapter as rollback_chapter_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover - rollback node optional
-    rollback_chapter_node = None
-
-try:
-    from nodes.export_docx import export_docx as export_docx_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    export_docx_node = None
-
-try:
-    from nodes.translate_code import translate_code as translate_code_node  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    translate_code_node = None
-
-try:
-    from cleaning.transform import TransformStep as TransformStepCls  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    TransformStepCls = None
-
-try:
-    from cleaning.filter import FilterStep as FilterStepCls  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    FilterStepCls = None
-
-try:
-    from cleaning.balance import BalanceStep as BalanceStepCls  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    BalanceStepCls = None
-
-try:
-    from cleaning.profiling import _detect_dataset_type as detect_dataset_type_fn  # type: ignore[import-not-found]
-    from cleaning.profiling import _load_charls_config as load_charls_config_fn  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    detect_dataset_type_fn = None
-    load_charls_config_fn = None
+from . import desk_client
+from ._deps import (
+    BalanceStepCls,
+    FilterStepCls,
+    TransformStepCls,
+    build_citation_graph_node,
+    detect_dataset_type_fn,
+    estimate_node,
+    export_docx_node,
+    generate_chapter_node,
+    generate_outline_node,
+    graph as _graph,
+    identification_verify_node,
+    load_charls_config_fn,
+    review_chapter_node,
+    robustness_check_node,
+    rollback_chapter_node,
+    search_literature_node,
+    set_direction_node,
+    translate_code_node,
+)
+from .session_store import SessionStore
 
 
 class AgentFacade:
-    """Facade that wraps the agent layer for HTTP routers.
+    """组合 SessionStore / desk_client / graph 与各 agent 节点的薄门面。
 
-    Routers should depend only on this facade — they must not import
-    ``graph``, ``nodes.X``, or ``cleaning.X`` directly. The facade:
-
-    1. Owns the in-memory session store (``_sessions``) and exposes
-       ``get_state`` / ``save_state`` / ``get_csv_path`` helpers.
-    2. Wraps ``graph.invoke`` for the upload pipeline.
-    3. Wraps each single-node direct call (state-driven HITL pattern).
-    4. Wraps the cleaning step ``run()`` calls.
+    节点函数通过 facade 包命名空间的裸全局名在调用时解析，因此
+    ``monkeypatch.setattr("facade.<node_name>", ...)`` 能即时替换。
     """
 
     def __init__(self) -> None:
-        # Session metadata store (csv_path, charls_config, etc.).
-        # The LangGraph State itself is persisted in Postgres via the
-        # checkpointer — this dict only holds thin metadata needed by
-        # HTTP routers that does not flow through the graph.
-        self._sessions: dict = {}
-        # Degradation log (F7): each entry is
-        # {node, reason, fallback, timestamp}
-        self._degradations: dict[str, list[dict]] = {}
+        # 会话元数据 + state 的单一真相（Task 4：以 in-memory store 为显式存储，
+        # 不再对 LangGraph checkpointer 做隐式回退）。
+        self._store: SessionStore = SessionStore()
+        # 保留旧引用：self._sessions / self._degradations 指向 store 同名 dict，
+        # 让既有代码（facade._sessions[sid]["state"]）与测试断言语义不变。
+        self._sessions: dict = self._store.sessions
+        self._degradations: dict[str, list[dict]] = self._store.degradations
 
     # ------------------------------------------------------------------
-    # Session lifecycle
+    # Session 生命周期（编排 store + run 工件目录）
     # ------------------------------------------------------------------
     def create_session(
         self,
@@ -156,12 +76,11 @@ class AgentFacade:
     ) -> str:
         """Create an empty session and return its id.
 
-        If ``user_id`` is provided, the session is owned by that user.
-        Anonymous sessions (no user_id) are created for unauthenticated uploads.
+        匿名会话（无 user_id）用于未登录上传。
         """
         if session_id is None:
             session_id = str(uuid.uuid4())
-        self._sessions[session_id] = {"user_id": user_id}
+        self._store.create(session_id, user_id)
         # Run 工件目录：会话创建即建档（trace/checkpoints/outputs 的根）
         try:
             run_store.write_manifest(session_id, user_id=user_id)
@@ -170,36 +89,28 @@ class AgentFacade:
         return session_id
 
     def has_session(self, session_id: str) -> bool:
-        return session_id in self._sessions
+        return self._store.has(session_id)
 
     def get_session_owner(self, session_id: str) -> Optional[int]:
         """Return the user_id that owns this session, or None if anonymous."""
-        entry = self._sessions.get(session_id)
-        if entry is None:
-            return None
-        return entry.get("user_id")
+        return self._store.get_owner(session_id)
 
     def list_sessions_by_user(self, user_id: int) -> list[str]:
         """Return all session IDs owned by the given user."""
-        return [
-            sid
-            for sid, entry in self._sessions.items()
-            if entry.get("user_id") == user_id
-        ]
+        return self._store.list_by_user(user_id)
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session. Returns True if it existed, False otherwise.
 
-        会话删除同时清掉磁盘上的 run 工件目录（隐私优先：删就是删，
-        不留残余的 trace/快照）。
+        会话删除同时清掉磁盘上的 run 工件目录（隐私优先：删就是删）。
         """
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            shutil.rmtree(run_store.run_dir(session_id), ignore_errors=True)
-            return True
+        existed = self._store.delete(session_id)
         shutil.rmtree(run_store.run_dir(session_id), ignore_errors=True)
-        return False
+        return existed
 
+    # ------------------------------------------------------------------
+    # State 访问（薄代理 → SessionStore 单一真相）
+    # ------------------------------------------------------------------
     @staticmethod
     def instrument_fields(state: dict) -> dict:
         """Desk readout + outline/chapters the UI can rehydrate after refresh."""
@@ -249,109 +160,37 @@ class AgentFacade:
     def get_state(self, session_id: str) -> dict:
         """Return the state dict for a session (404 if missing).
 
-        Precedence:
-        1. In-memory ``_sessions`` entry (used by the single-node call
-           pattern: ``set_direction_and_outline`` / ``generate_chapter``).
-        2. Postgres checkpointer (used by the full graph pipeline:
-           ``run_upload_pipeline``). This is a fallback so that the
-           single-node pattern always sees its own state, not the
-           stale graph-invoked state from the checkpointer.
+        Task 4：单一读取路径只读进程内 store，不再回退 LangGraph checkpointer。
         """
-        if session_id in self._sessions:
-            return self._sessions[session_id].get("state", {}) or {}
-        # Fallback to the Postgres checkpointer (full-graph sessions).
-        if _graph is not None:
-            try:
-                config = {"configurable": {"thread_id": session_id}}
-                checkpoint = _graph.get_state(config)
-                if checkpoint and checkpoint.values:
-                    # Mirror into in-memory for subsequent reads.
-                    self._sessions[session_id] = {"state": dict(checkpoint.values)}
-                    return dict(checkpoint.values)
-            except Exception:
-                pass
-        raise HTTPException(status_code=404, detail="Session not found")
+        return self._store.get_state(session_id)
 
     def save_state(self, session_id: str, state: dict) -> None:
-        """Overwrite the session state (in-memory metadata only).
-
-        The LangGraph state is persisted by the checkpointer automatically
-        during graph.invoke() — this method is kept for the thin metadata
-        layer (csv_path, charls_config, etc.) that routers need.
-        """
-        if session_id not in self._sessions:
-            raise HTTPException(status_code=404, detail="Session not found")
-        self._sessions[session_id]["state"] = state
+        """Overwrite the session state (in-memory store only)."""
+        self._store.save_state(session_id, state)
 
     def update_state(self, session_id: str, **fields) -> dict:
         """Merge fields into the session state and return the new state."""
-        state = self.get_state(session_id)
-        state = {**state, **fields}
-        self.save_state(session_id, state)
-        return state
+        return self._store.update_state(session_id, **fields)
 
     def get_session_entry(self, session_id: str) -> dict:
         """Return the raw session entry (metadata + csv_path etc.)."""
-        if session_id not in self._sessions:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return self._sessions[session_id]
+        return self._store.get_entry(session_id)
 
     def get_csv_path(self, session_id: str) -> str:
-        """Resolve the CSV path stored for this session.
-
-        If the local file does not exist but an S3 object is available,
-        download it to the local cache transparently.
-        """
-        entry = self.get_session_entry(session_id)
-        csv_path = entry.get("csv_path")
-        if not csv_path:
-            state = entry.get("state", {}) or {}
-            datasets = state.get("uploaded_datasets", []) or []
-            if datasets and datasets[0].get("path"):
-                csv_path = datasets[0]["path"]
-        if not csv_path:
-            raise HTTPException(
-                status_code=400, detail="No dataset path in session"
-            )
-
-        # 本地文件不存在时，尝试从 S3 缓存拉取
-        if not os.path.exists(csv_path) and settings.S3_ENDPOINT_URL:
-            try:
-                from storage.s3 import s3_fs as _s3_fs
-                s3_remote = f"{session_id}/data.csv"
-                if _s3_fs.exists(s3_remote):
-                    cache_dir = Path(settings.S3_CACHE_DIR)
-                    cache_dir.mkdir(parents=True, exist_ok=True)
-                    local_cache = cache_dir / f"{session_id}.csv"
-                    _s3_fs.download_to_file(s3_remote, local_cache)
-                    csv_path = str(local_cache)
-                    # 更新 entry 的 csv_path 指向缓存
-                    entry["csv_path"] = csv_path
-            except Exception:
-                pass  # 降级：使用原始路径（会触发下游 404）
-
-        return csv_path
+        """Resolve the CSV path stored for this session (S3 cache fallback)."""
+        return self._store.get_csv_path(session_id)
 
     def set_csv_path(self, session_id: str, csv_path: str) -> None:
         """Persist the CSV path on the session entry."""
-        if session_id not in self._sessions:
-            self._sessions[session_id] = {"state": {}}
-        self._sessions[session_id]["csv_path"] = csv_path
+        self._store.set_csv_path(session_id, csv_path)
 
     def get_datasets(self, session_id: str) -> list:
         """Return the dataset list for a session (wrapped for cleaning)."""
-        entry = self.get_session_entry(session_id)
-        csv_path = entry.get("csv_path")
-        if csv_path:
-            return [{"path": csv_path}]
-        state = entry.get("state", {}) or {}
-        return list(state.get("uploaded_datasets", []) or [])
+        return self._store.get_datasets(session_id)
 
     def save_datasets(self, session_id: str, datasets: list) -> None:
         """Persist updated dataset meta back into the session state."""
-        state = self.get_state(session_id)
-        state["uploaded_datasets"] = datasets
-        self.save_state(session_id, state)
+        self._store.save_datasets(session_id, datasets)
 
     # ------------------------------------------------------------------
     # Run 工件追踪（trace / checkpoints，见 run_store.py）
@@ -362,14 +201,7 @@ class AgentFacade:
         node: str,
         snapshot_label: Optional[str] = None,
     ) -> Any:
-        """计时追踪一个节点执行段：ok/error 事件 + 可选 state 快照。
-
-        用法::
-
-            with self._tracked(sid, "generate_chapter", "generate_chapter") as t:
-                result = generate_chapter_node(state)
-                t.set_detail(chapter_index=...)
-        """
+        """计时追踪一个节点执行段：ok/error 事件 + 可选 state 快照。"""
         return run_store.TrackedStep(
             session_id,
             node,
@@ -419,8 +251,6 @@ class AgentFacade:
             "session_id": session_id,
             "csv_path": str(csv_path),
             "uploaded_datasets": [{"path": str(csv_path), "format": "csv"}],
-            # 节点产物（清洗 sidecar / 导出 tex-pdf-docx）落进 run 目录，
-            # 不再散落在 tempfile 里随风而逝。
             "workspace": self._workspace_dir(session_id),
         }
         try:
@@ -472,7 +302,7 @@ class AgentFacade:
                 detail="outline nodes not available (agent module missing)",
             )
         try:
-            from engine.prewrite import run_prewrite
+            from agent.engine.prewrite import run_prewrite
         except Exception as exc:
             raise HTTPException(
                 status_code=503,
@@ -521,7 +351,10 @@ class AgentFacade:
         }
 
     def run_translate_code(self, session_id: str) -> dict:
-        """Run translate_code and persist code_translations for /code-export."""
+        """Run translate_code and persist code_translations for /code-export.
+
+        原 facade.py 曾有重复定义，此处收敛为唯一一份（Task 3）。
+        """
         if translate_code_node is None:
             raise HTTPException(
                 status_code=503,
@@ -549,25 +382,6 @@ class AgentFacade:
         result = robustness_check_node(state)
         state = {**state, **result}
         self.save_state(session_id, state)
-        return result
-
-    def run_translate_code(self, session_id: str) -> dict:
-        """Run translate_code and persist code_translations for /code-export.
-
-        The HITL write path never enters the LangGraph translate_code node, so
-        HTTP must call this hook (POST /translate-code or GET /code-export).
-        """
-        if translate_code_node is None:
-            raise HTTPException(
-                status_code=503,
-                detail="translate_code node not available",
-            )
-        state = self.get_state(session_id)
-        with self._tracked(session_id, "translate_code", "translate_code") as t:
-            result = translate_code_node(state)
-            state = {**state, **result}
-            self.save_state(session_id, state)
-            t.set_detail(n=len(result.get("code_translations") or []))
         return result
 
     def resume_outline(
@@ -601,7 +415,7 @@ class AgentFacade:
         state = self.get_state(session_id)
         state = {**state, "current_chapter": chapter}
         try:
-            from engine.readiness import TRUTH_KEYS
+            from agent.engine.readiness import TRUTH_KEYS
         except Exception:
             TRUTH_KEYS = frozenset()
         _blocked_render_keys = frozenset({"workspace", "csv_path", "user_id"})
@@ -664,12 +478,7 @@ class AgentFacade:
         instruction: Optional[str] = None,
         content: Optional[str] = None,
     ) -> dict:
-        """Apply a chat refine or persist a user markdown edit.
-
-        One write path: instruction → ``revision_suggestions`` then
-        ``generate_chapter`` (same as regenerate). content → prepend a
-        new version and set status ``edited`` (no LLM).
-        """
+        """Apply a chat refine or persist a user markdown edit."""
         instruction_text = (instruction or "").strip()
         content_text = content if content is None else str(content)
         if not instruction_text and content_text is None:
@@ -753,7 +562,6 @@ class AgentFacade:
         body_chapters[chapter_index] = chapter
         updates: dict = {"body_chapters": body_chapters}
         # Drop the pre-edit review so approve cannot pass on a stale score.
-        # Instruction refine goes through generate_chapter and may write a new one.
         for key, empty in (
             ("review_scores", None),
             ("review_feedback", ""),
@@ -788,7 +596,6 @@ class AgentFacade:
         if review_chapter_node is not None:
             reviewed = review_chapter_node(state)
             state = {**state, **reviewed}
-            # "可查"落盘：评审分数 / 接地失败 / 降级与否进 trace，state 落快照
             try:
                 scores = list(reviewed.get("review_scores") or [])
                 run_store.append_event(
@@ -830,8 +637,7 @@ class AgentFacade:
                 )
         self.save_state(session_id, state)
         # Write loop ends with downloadable Stata/R: fill translations after a
-        # successful chapter write. Fail-open so a translate miss does not 500
-        # generate-chapter; GET /code-export can still fill on first download.
+        # successful chapter write. Fail-open so a translate miss does not 500.
         try:
             translated = self.run_translate_code(session_id)
             state = {**state, **translated}
@@ -865,11 +671,7 @@ class AgentFacade:
             return state
 
     def export_document(self, session_id: str, template: str) -> dict:
-        """Run export_docx node and return the result dict.
-
-        The result carries ``latex_source`` / ``pdf_path`` / ``docx_path``
-        / ``degraded``. The template is written into state before the call.
-        """
+        """Run export_docx node and return the result dict."""
         if export_docx_node is None:
             raise HTTPException(
                 status_code=503,
@@ -880,7 +682,7 @@ class AgentFacade:
             state["workspace"] = self._workspace_dir(session_id)
         state = {**state, "export_template": template}
         with self._tracked(
-            session_id, "export_docx", "export", 
+            session_id, "export_docx", "export",
         ) as t:
             result = export_docx_node(state)
             t.set_detail(
@@ -891,8 +693,9 @@ class AgentFacade:
             )
             state = {**state, **result}
             self.save_state(session_id, state)
-            # 导出产物登记为持久交付物：复制进 outputs/export/
             try:
+                from pathlib import Path
+
                 produced = [
                     Path(p)
                     for p in (
@@ -901,8 +704,6 @@ class AgentFacade:
                     )
                     if p
                 ]
-                # paper.tex 是始终存在的产物（degraded 时 pdf/docx 缺，
-                # 但 LaTeX 源码永远可用——见 CONTEXT 的降级语义），一并归档。
                 tex_candidate = Path(state.get("workspace") or "") / "paper.tex"
                 if tex_candidate.is_file():
                     produced.append(tex_candidate)
@@ -966,12 +767,7 @@ class AgentFacade:
     # CHARLS detection / confirm
     # ------------------------------------------------------------------
     def detect_charls(self, session_id: str) -> dict:
-        """Run the profiling detector on the session CSV.
-
-        Returns ``{dataset_type, charls_config?}``. ``charls_config`` is the
-        parsed ``charls.yaml`` and is only included when the dataset is
-        detected as CHARLS.
-        """
+        """Run the profiling detector on the session CSV."""
         if detect_dataset_type_fn is None:
             raise HTTPException(
                 status_code=503,
@@ -1020,19 +816,7 @@ class AgentFacade:
     # ADR-0007: HITL 人工评审
     # ------------------------------------------------------------------
     def get_review(self, session_id: str) -> dict:
-        """读当前 review_chapter 的最新评审结果，投影成单章评审信息。
-
-        从 state 读 review_feedback / revision_suggestions / review_scores /
-        review_rubrics / review_chapter_index / review_iteration /
-        max_review_iterations，按 review_chapter_index（缺失时回退
-        current_chapter_index - 1）取当前章的评审 slice。
-
-        auto_decision 由后端计算（score >= 0.7 → "pass"，否则 "fail"），
-        与 review_chapter.REVIEW_SCORE_THRESHOLD 保持一致。
-
-        无评审数据时返回空默认值（feedback="", score=0.0, auto_decision="fail"），
-        让前端渲染空态而非报错。
-        """
+        """读当前 review_chapter 的最新评审结果，投影成单章评审信息。"""
         state = self.get_state(session_id)
 
         review_feedback = state.get("review_feedback", []) or []
@@ -1080,7 +864,6 @@ class AgentFacade:
         review_iteration = state.get("review_iteration", 0)
         max_review_iterations = state.get("max_review_iterations", 2)
 
-        # auto_decision 由后端计算（阈值与 review_chapter.REVIEW_SCORE_THRESHOLD 一致）
         auto_decision = "pass" if score >= 0.7 else "fail"
 
         return {
@@ -1104,17 +887,7 @@ class AgentFacade:
         reviewer: Optional[str] = None,
         comment: Optional[str] = None,
     ) -> dict:
-        """写人工决策到 state，reject 时触发重生成。
-
-        1. 校验 decision 合法性（accept / reject / force_pass）
-        2. 写 hitl_decision / hitl_reviewer / hitl_comment 到 state
-        3. 确定操作章索引（review_chapter_index，回退 current_chapter_index - 1）
-        4. decision == "reject" 时调 regenerate_chapter 重生成该章
-        5. 返回 {ok, decision, chapter_index, next_action}
-
-        Fitness Function：不写 review_feedback / review_scores / review_rubrics
-        （ADR 0004 评审字段只由 review_chapter 节点写）。
-        """
+        """写人工决策到 state，reject 时触发重生成。"""
         valid_decisions = {"accept", "reject", "force_pass"}
         if decision not in valid_decisions:
             raise HTTPException(
@@ -1142,14 +915,14 @@ class AgentFacade:
             hitl_reviewer=reviewer,
             hitl_comment=comment,
         )
-        from nodes.learning_labels import collect_learning_labels
+        from agent.nodes.learning_labels import collect_learning_labels
 
         state = self.update_state(
             session_id,
             learning_labels=collect_learning_labels(state),
         )
         try:
-            from nodes.label_store import (
+            from agent.nodes.label_store import (
                 ARM_HUMAN,
                 REVIEWER_HUMAN,
                 append_event,
@@ -1170,7 +943,7 @@ class AgentFacade:
             # 落盘失败不挡决策；测试会直接打 label_store。
             pass
 
-        # 人工评审决策落 trace（"可查"磁盘件：谁在什么时候放行/打回了哪章）
+        # 人工评审决策落 trace
         self.record_event(
             session_id,
             "review_decision",
@@ -1183,8 +956,7 @@ class AgentFacade:
             try:
                 self.regenerate_chapter(session_id, chapter_index)
             except HTTPException as exc:
-                # regenerate_chapter 不可用时不阻塞 decision 写入，
-                # 由前端调既有 /regenerate 端点完成重生成（降级）
+                # regenerate_chapter 不可用时不阻塞 decision 写入
                 if exc.status_code == 503:
                     pass
                 else:
@@ -1201,7 +973,7 @@ class AgentFacade:
         }
 
     # ------------------------------------------------------------------
-    # Degradation tracking (F7: 异常处理与降级 UX)
+    # Degradation tracking (F7) —— 薄代理 → SessionStore
     # ------------------------------------------------------------------
     def record_degradation(
         self,
@@ -1211,60 +983,51 @@ class AgentFacade:
         fallback: str,
         visible: bool = False,
     ) -> None:
-        """Record a degradation event for a session.
-
-        Called by cleaning nodes and other parts of the pipeline when
-        the primary method fails and a fallback is used.
-        """
-        if session_id not in self._degradations:
-            self._degradations[session_id] = []
-        from datetime import datetime, timezone
-
-        self._degradations[session_id].append({
-            "node": node,
-            "reason": reason,
-            "fallback": fallback,
-            "visible": visible,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        """Record a degradation event for a session."""
+        self._store.record_degradation(
+            session_id, node, reason, fallback, visible=visible
+        )
 
     def get_degradations(self, session_id: str) -> list[dict]:
         """Return the degradation log for a session."""
-        return self._degradations.get(session_id, [])
-
-    def discuss_desk(self, notes: str, turns: list[dict] | None = None) -> dict:
-        """空桌讨论：走统一 LLM 通道，失败时启发式降级。"""
-        try:
-            from desk.socratic import discuss
-        except Exception as exc:  # pragma: no cover
-            raise HTTPException(status_code=503, detail=f"desk discuss unavailable: {exc}") from exc
-        return discuss(notes, turns or [])
-
-    def transcribe_desk(self, raw: bytes, filename: str = "clip.webm") -> dict:
-        try:
-            from desk.stepfun_asr import transcribe_upload
-        except Exception as exc:  # pragma: no cover
-            raise HTTPException(status_code=503, detail=f"desk asr unavailable: {exc}") from exc
-        text = transcribe_upload(raw, filename=filename)
-        return {"text": text, "source": "stepfun"}
-
-    def speak_desk(self, text: str) -> bytes:
-        try:
-            from desk.minimax_tts import synthesize
-        except Exception as exc:  # pragma: no cover
-            raise HTTPException(status_code=503, detail=f"desk tts unavailable: {exc}") from exc
-        return synthesize(text)
+        return self._store.get_degradations(session_id)
 
     # ------------------------------------------------------------------
-    # Test helpers
+    # Desk（薄代理 → desk_client）
+    # ------------------------------------------------------------------
+    def discuss_desk(self, notes: str, turns: list[dict] | None = None) -> dict:
+        """空桌讨论：走统一 LLM 通道，失败时启发式降级。"""
+        return desk_client.discuss_desk(notes, turns or [])
+
+    def design_chat_desk(
+        self,
+        notes: str,
+        turns: list[dict],
+        columns: list[str],
+    ) -> dict:
+        """设计对话：把念头聊成研究设定卡（dv/iv/controls/method 逐轮抽齐）。
+
+        Task 5：取代 routers/desk.py 直接 ``from agent.desk.design_chat import
+        design_chat`` 的旁路，统一从 facade 入口触达 agent。
+        """
+        return desk_client.design_chat_desk(notes, turns, columns)
+
+    def transcribe_desk(self, raw: bytes, filename: str = "clip.webm") -> dict:
+        return desk_client.transcribe_desk(raw, filename=filename)
+
+    def speak_desk(self, text: str) -> bytes:
+        return desk_client.speak_desk(text)
+
+    # ------------------------------------------------------------------
+    # Test helpers（薄代理 → SessionStore）
     # ------------------------------------------------------------------
     def seed_state(self, session_id: str, state: dict) -> None:
         """Test helper: directly inject state into the session store."""
-        self._sessions[session_id] = {"state": state}
+        self._store.seed(session_id, state)
 
     def drop_session(self, session_id: str) -> None:
         """Test helper: remove a session from the store."""
-        self._sessions.pop(session_id, None)
+        self._store.drop(session_id)
 
 
 # Module-level singleton: routers import this.

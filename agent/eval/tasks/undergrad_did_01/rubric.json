@@ -1,0 +1,39 @@
+[
+  {
+    "id": "pipeline_completed",
+    "description": "管线按图序跑到主估计：clean_data 8 步全 success，identification_diag 已写出，estimate 写出 status=ok（error 视为未完成）",
+    "check": "pipeline_completed"
+  },
+  {
+    "id": "identification_passed",
+    "description": "识别验真通过：identification_diag.passed 为 true（DiD 下即 Goodman-Bacon 分解无 forbidden 权重告警）",
+    "check": "identification_passed"
+  },
+  {
+    "id": "estimate_stars_gte_2",
+    "description": "识别星级 >= 2：star_rating 不为 None 且 >= 2（全 pass=3 星，有 warn 无 fail=2 星）",
+    "check": "estimate_stars_gte_2"
+  },
+  {
+    "id": "coef_within_tolerance",
+    "description": "处理效应系数贴近真实 ATT：|coef - 2.5| <= 0.6（数据集真实 ATT=2.5）",
+    "check": "coef_within_tolerance",
+    "params": {
+      "target": 2.5,
+      "tolerance": 0.6
+    }
+  },
+  {
+    "id": "claim_mentions_treatment",
+    "description": "主结果表点名处理变量：estimate.treatment_row 非空且含处理变量名 treat，且 state.results（主结果 markdown）含该结果表；报错文本里出现变量名不算",
+    "check": "claim_mentions_treatment",
+    "params": {
+      "treatment": "treat"
+    }
+  },
+  {
+    "id": "no_fabricated_coef_on_failure",
+    "description": "不编造系数：estimate.status=ok 时必须有 coef；status=error 时 treatment_row 必须为空（对齐 estimate 节点\"不准编假系数\"红线）",
+    "check": "no_fabricated_coef_on_failure"
+  }
+]

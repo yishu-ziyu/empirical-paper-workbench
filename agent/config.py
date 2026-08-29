@@ -13,6 +13,8 @@ this module without CWD ambiguity.
 
 from pathlib import Path
 
+import os
+
 # Workspace root: /Users/mahaoxuan/Desktop/经济学论文
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 
@@ -60,6 +62,22 @@ AERS_CATALOG_JSON = WORKSPACE_ROOT / "_refs" / "AERS-ref" / "catalog" / "skills.
 STATA_CODE_REPO_PATH = WORKSPACE_ROOT / "stata-code"  # expected, not yet present
 STATA_CODE_INSTALLED = False
 STATA_CODE_IMPORT_NAME = "stata_code"  # try this first, then "stata-code"
+
+
+# ---------------------------------------------------------------------------
+# 4. Phase A：估计 Agent 开关（LLM + 沙箱执行器，见 engine/estimate_agent.py）
+# ---------------------------------------------------------------------------
+def _env_flag(name: str, default: bool = False) -> bool:
+    """读布尔环境变量：1/true/yes/on 开，其余关。"""
+    value = (os.environ.get(name) or "").strip().lower()
+    if not value:
+        return default
+    return value in ("1", "true", "yes", "on")
+
+
+# 默认 false：estimate 节点维持固定分派（StatsPAI），开启后先试 Pydantic AI
+# 估计 Agent，任何异常回退固定分派。env 可覆盖：ECONPAPER_ESTIMATE_AGENT=1。
+ESTIMATE_AGENT_ENABLED = _env_flag("ECONPAPER_ESTIMATE_AGENT", False)
 
 
 def _resolve_aers_path() -> Path:
@@ -134,5 +152,6 @@ __all__ = [
     "STATA_CODE_REPO_PATH",
     "STATA_CODE_INSTALLED",
     "STATA_CODE_IMPORT_NAME",
+    "ESTIMATE_AGENT_ENABLED",
     "get_dependency_status",
 ]

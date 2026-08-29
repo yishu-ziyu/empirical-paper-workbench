@@ -243,7 +243,7 @@ describe('App auth flow', () => {
     const calls = getItemSpy.mock.calls.map(c => c[0])
     console.error('localStorage.getItem calls:', calls)
     getItemSpy.mockRestore()
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('home-page')).toBeInTheDocument()
     expect(screen.getByText(/econpaper/i)).toBeInTheDocument()
   })
 
@@ -261,7 +261,7 @@ describe('App auth flow', () => {
     renderWithI18n(<App />)
     // With token, should show main app (upload button, outline, etc.)
     await waitFor(() => {
-      expect(screen.getByTestId('guide-upload-btn')).toBeInTheDocument()
+      expect(screen.getByTestId('home-upload-btn')).toBeInTheDocument()
     })
   })
 })

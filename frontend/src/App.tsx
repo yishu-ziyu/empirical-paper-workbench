@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import EdaSidebar from './components/EdaSidebar'
 import type { OutlineChapter } from './components/Outline'
+import StepTimeline from './components/StepTimeline'
+import DirectionChat from './components/DirectionChat'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import ThreeColumn from './components/ThreeColumn'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
-import DeskPage from './pages/DeskPage'
-import GuidePage from './pages/GuidePage'
+import HomePage from './pages/HomePage'
 import DirectionForm from './components/DirectionForm'
 import type { DirectionFormData } from './components/DirectionForm'
 import InstrumentReadout from './components/InstrumentReadout'
@@ -22,7 +23,6 @@ import type { components } from './types/api'
 
 const LS_KEY = 'econpaper_session_id'
 const LS_TOKEN_KEY = 'econpaper_access_token'
-const LS_GUIDE_KEY = 'econpaper_seen_guide'
 const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 const LS_COLS_KEY = 'econpaper_data_columns'
 const API_BASE = 'http://localhost:8000'
@@ -46,7 +46,8 @@ type DeskSnapshot = {
   identification_failed?: boolean
   identification_report?: string | null
   results?: string | null
-  estimate?: { treatment_row?: string | null } | null
+  estimate?: Record<string, any> | null
+  cleaning_report?: Record<string, any> | null
   literature_source?: string | null
   write_blockers?: string[]
   robustness_status?: string | null
@@ -96,8 +97,6 @@ function App() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [deskOpen, setDeskOpen] = useState(() => !localStorage.getItem(LS_KEY))
-  const [seenGuide, setSeenGuide] = useState(() => localStorage.getItem(LS_GUIDE_KEY) === '1')
   const [shapedQuestion, setShapedQuestion] = useState(() => {
     try {
       const raw = sessionStorage.getItem(LS_SAMPLE_KEY)
@@ -144,6 +143,8 @@ function App() {
   const [docExportOpen, setDocExportOpen] = useState(false)
   const [codeExportOpen, setCodeExportOpen] = useState(false)
   const [directionBusy, setDirectionBusy] = useState(false)
+  const [estimateMeta, setEstimateMeta] = useState<Record<string, any> | null>(null)
+  const [cleaningReport, setCleaningReport] = useState<Record<string, any> | null>(null)
   const [directionOpen, setDirectionOpen] = useState(true)
   const [directionSummary, setDirectionSummary] = useState<string | null>(null)
   const [claim, setClaim] = useState<string | null>(null)
@@ -228,6 +229,8 @@ function App() {
     setWriteBlockers(Array.isArray(data.write_blockers) ? data.write_blockers : [])
     setIdentFailed(Boolean(data.identification_failed))
     setRobustnessStatus(data.robustness_status ?? null)
+    setEstimateMeta((data.estimate as Record<string, any> | null) ?? null)
+    setCleaningReport((data.cleaning_report as Record<string, any> | null) ?? null)
     if (data.identification_report) setIdentReport(data.identification_report)
     if (Array.isArray(data.outline) && data.outline.length) {
       setOutline(data.outline)
@@ -266,7 +269,6 @@ function App() {
   useEffect(() => {
     if (sessionId) {
       localStorage.setItem(LS_KEY, sessionId)
-      setDeskOpen(false)
     }
   }, [sessionId])
 
@@ -411,11 +413,6 @@ function App() {
     }
   }, [gateInfo, sessionId, postApprove, markChapterUpdated, refreshReview, showGlobalError])
 
-  const markGuideSeen = useCallback(() => {
-    localStorage.setItem(LS_GUIDE_KEY, '1')
-    setSeenGuide(true)
-  }, [])
-
   const uploadCsv = useCallback(async (file: File) => {
     setUploading(true)
     setUploadError(null)
@@ -439,7 +436,6 @@ function App() {
           setDataColumns([])
         }
       }
-      markGuideSeen()
       setSessionId(data.session_id)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed')
@@ -447,7 +443,7 @@ function App() {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [markGuideSeen])
+  }, [])
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -604,41 +600,19 @@ function App() {
   }
 
   const firstScreenInput = (
-    <input ref={fileInputRef} type="file" accept=".csv" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
+    <input ref={fileInputRef} type="file" accept=".csv,.dta,.xlsx,.xls" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
   )
 
-  if (!sessionId && !seenGuide) {
+  if (!sessionId) {
     return (
       <>
         {firstScreenInput}
-        <GuidePage
+        <HomePage
           uploading={uploading}
           uploadError={uploadError}
           onPickData={() => fileInputRef.current?.click()}
           onTrySample={() => { void handleTrySample() }}
-          onWritePaper={() => {
-            markGuideSeen()
-            setDeskOpen(true)
-          }}
           onLogin={() => setAuthPage('login')}
-        />
-      </>
-    )
-  }
-
-  if (deskOpen && !sessionId) {
-    return (
-      <>
-        {firstScreenInput}
-        <DeskPage
-          uploading={uploading}
-          uploadError={uploadError}
-          onPickData={() => fileInputRef.current?.click()}
-          onLogin={() => setAuthPage('login')}
-          onConfirm={(title) => {
-            setShapedQuestion(title)
-            setDeskOpen(false)
-          }}
         />
       </>
     )
@@ -666,7 +640,7 @@ function App() {
           ) : (
             <span className="text-xs text-muted font-mono">{t('app.hint')}</span>
           )}
-          <input ref={fileInputRef} type="file" accept=".csv" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
+          <input ref={fileInputRef} type="file" accept=".csv,.dta,.xlsx,.xls" data-testid="file-input" onChange={handleFileSelect} className="hidden" />
           <button data-testid="upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1 text-xs text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50">
             {uploading && (
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -675,26 +649,13 @@ function App() {
             )}
             {uploading ? t('app.uploading') : t('app.upload')}
           </button>
-          <button data-testid="export-doc-btn" onClick={() => setDocExportOpen(true)} disabled={!canExport} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:opacity-40">
+          <button data-testid="export-doc-btn" onClick={() => setDocExportOpen(true)} disabled={!canExport} title={canExport ? undefined : t('app.exportLockedHint')} aria-disabled={!canExport} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">
             {t('app.exportDoc')}
           </button>
-          <button data-testid="export-code-btn" onClick={() => setCodeExportOpen(true)} disabled={!canExport} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:opacity-40">
+          <button data-testid="export-code-btn" onClick={() => setCodeExportOpen(true)} disabled={!canExport} title={canExport ? undefined : t('app.exportLockedHint')} aria-disabled={!canExport} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">
             {t('app.exportCode')}
           </button>
           {uploadError && <span data-testid="upload-error" className="rounded bg-panel px-2 py-0.5 text-xs text-danger">{uploadError}</span>}
-          {!sessionId && (
-            <button
-              type="button"
-              data-testid="open-guide-btn"
-              onClick={() => {
-                localStorage.removeItem(LS_GUIDE_KEY)
-                setSeenGuide(false)
-              }}
-              className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
-            >
-              {t('guide.nowAgain')}
-            </button>
-          )}
           {authToken ? (
             <button onClick={handleLogout} className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink">{t('app.logout')}</button>
           ) : (
@@ -755,6 +716,19 @@ function App() {
         editor={
           <ErrorBoundary>
             {degraded && <div data-testid="degradation-banner" className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning">{t('app.degradedBanner')}</div>}
+            <StepTimeline
+              sessionId={sessionId}
+              directionSummary={directionSummary}
+              cleaningReport={cleaningReport}
+              estimate={estimateMeta}
+              estimateBusy={directionBusy}
+              hasReadout={hasReadout}
+              identFailed={identFailed}
+              outline={outline}
+              currentChapterIndex={currentChapterIndex}
+              writtenChapters={writtenChapters}
+              writeBusy={writeBusy}
+            />
             {!hasReadout && (
               <p data-testid="now-hint" className="mb-4 font-serif text-sm leading-7 text-ink">
                 {t('guide.nowDirection')}
@@ -780,11 +754,14 @@ function App() {
                 ) : null}
               </div>
               {directionOpen ? (
-                <DirectionForm
-                  onSubmit={handleDirectionSubmit}
-                  initialQuestion={shapedQuestion}
-                  initial={sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
+                <DirectionChat
                   columns={dataColumns}
+                  fillHeight
+                  hasData={dataColumns.length > 0}
+                  initialNotes={shapedQuestion}
+                  initial={sampleDirection ?? (shapedQuestion ? { question: shapedQuestion } : undefined)}
+                  onSubmit={handleDirectionSubmit}
+                  busy={directionBusy}
                 />
               ) : (
                 <p data-testid="direction-summary" className="text-sm text-ink">
@@ -794,6 +771,7 @@ function App() {
               {directionBusy && <p className="mt-2 text-xs text-muted">{t('app.directionWorking')}</p>}
             </section>
             {hasReadout && (
+              <div data-testid="estimate-readout">
               <InstrumentReadout
                 claim={claim}
                 starRating={starRating}
@@ -804,6 +782,7 @@ function App() {
                 writeBlockers={writeBlockers}
                 identificationFailed={identFailed}
               />
+              </div>
             )}
             {identReport && (
               <details className="mb-4 rounded border border-border bg-paper px-3 py-2">

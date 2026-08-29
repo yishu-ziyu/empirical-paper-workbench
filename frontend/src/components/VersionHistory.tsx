@@ -1,70 +1,49 @@
+/* 章节版本历史下拉：选一个历史版本回滚（rollback）。
+ * 契约由消费方 ChapterWriter 决定：versions 为版本标识字符串数组。
+ * Hallmark · design-system: DESIGN.md · designed-as-app
+ */
 import { useT } from '../lib/i18n'
-
-// 版本历史下拉 (T-08c)
-// - 显示所有版本列表（版本索引 + 前 50 字预览）
-// - 当前版本高亮（accent）
-// - 点击选择 → 触发 onSelectVersion(index)
-// 设计：Editorial Academic Refined — 衬线字体 + 暖色调
 
 export interface VersionHistoryProps {
   versions: string[]
   onSelectVersion: (index: number) => void
-  currentVersionIndex?: number
 }
 
-// 取前 50 字作为预览
-function preview(text: string): string {
-  const clean = text.replace(/\n/g, ' ').trim()
-  if (clean.length <= 50) return clean
-  return clean.slice(0, 50) + '…'
+function clip(v: string): string {
+  return v.length > 24 ? `${v.slice(0, 24)}…` : v
 }
 
-export default function VersionHistory({
-  versions,
-  onSelectVersion,
-  currentVersionIndex,
-}: VersionHistoryProps) {
+export default function VersionHistory({ versions, onSelectVersion }: VersionHistoryProps) {
   const { t } = useT()
+  if (!versions.length) {
+    return (
+      <p data-testid="version-history-empty" className="text-xs leading-5 text-muted">
+        {t('versionHistory.empty')}
+      </p>
+    )
+  }
   return (
-    <div
-      data-testid="version-history"
-      className="border border-border rounded bg-paper shadow-sm"
-    >
-      {versions.length === 0 ? (
-        <div className="p-3 text-center font-serif text-xs text-muted">
-          {t('version.empty')}
-        </div>
-      ) : (
-        <ul className="divide-y divide-border">
-          {versions.map((ver, idx) => {
-            const isCurrent = idx === currentVersionIndex
-            return (
-              <li key={idx}>
-                <button
-                  type="button"
-                  data-testid="version-item"
-                  onClick={() => onSelectVersion(idx)}
-                  className={`flex w-full flex-col gap-1 px-3 py-2 text-left font-serif text-xs transition-colors hover:bg-panel ${
-                    isCurrent
-                      ? 'border-l-2 border-accent bg-accent/5'
-                      : 'border-l-2 border-transparent'
-                  }`}
-                >
-                  <span
-                    className={`font-semibold ${
-                      isCurrent ? 'text-accent' : 'text-ink'
-                    }`}
-                  >
-                    {t('version.label')} {idx}
-                    {isCurrent && t('version.current')}
-                  </span>
-                  <span className="text-muted line-clamp-2">{preview(ver)}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+    <div data-testid="version-history" className="rounded border border-border bg-panel p-2">
+      <p className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted">
+        {t('versionHistory.title')}
+      </p>
+      <ul className="flex flex-col gap-1">
+        {versions.map((v, idx) => (
+          <li key={`${v.slice(0, 16)}-${idx}`}>
+            <button
+              type="button"
+              data-testid="version-item"
+              onClick={() => onSelectVersion(idx)}
+              className="w-full rounded px-2 py-1.5 text-left text-xs text-ink transition-colors duration-150 hover:bg-accent/10"
+            >
+              <span className="mr-2 font-mono text-[11px] text-muted">
+                v{versions.length - idx}
+              </span>
+              {clip(v.split('\n')[0] ?? v)}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

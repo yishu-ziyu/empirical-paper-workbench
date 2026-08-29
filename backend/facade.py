@@ -21,6 +21,7 @@ import os
 import shutil
 import time
 import uuid
+import logging
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, List, Optional
@@ -35,8 +36,9 @@ from fastapi import HTTPException
 # ---------------------------------------------------------------------------
 try:
     from graph import graph as _graph  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover - agent deps missing in some envs
+except Exception as _exc:  # pragma: no cover - agent deps missing in some envs
     _graph = None
+    logging.getLogger(__name__).warning("agent graph import failed: %s", _exc)
 
 try:
     from nodes.set_direction import set_direction as set_direction_node  # type: ignore[import-not-found]
@@ -230,6 +232,7 @@ class AgentFacade:
             "identification_report": report,
             "results": state.get("results"),
             "estimate": state.get("estimate"),
+            "cleaning_report": state.get("cleaning_report"),
             "literature_source": state.get("literature_source"),
             "write_blockers": blockers,
             "robustness_status": rob_status,

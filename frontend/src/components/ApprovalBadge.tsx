@@ -1,26 +1,31 @@
-// 审批绕过徽标（北极星"可查"的 UI 面）
-// 契约参照 shadcn/ui Badge 的变体体系（destructive pill），配色走项目
-// 既有设计令牌（--danger），不引新依赖。
-// 只在一件事上出现：章节评审未过审、被人显式 force 放行
-// （后端留下 approved_forced: true 的永久痕迹）。
-
+/* 章节审批状态徽章：approved=已批准（绿）/ generated=待批准（告警金）/
+ * edited=已编辑（墨）/ rolled_back=已回滚（弱化）。
+ * DESIGN.md 徽章规范：当前/可点=绿淡底绿字；告警金=写不了/需注意。不用阴影。
+ * Hallmark · design-system: DESIGN.md · designed-as-app
+ */
 import { useT } from '../lib/i18n'
-import type { components } from '../types/api'
 
-type Chapter = components['schemas']['ChapterResponse']
+export interface ApprovalBadgeProps {
+  chapter: { status?: string; approved?: boolean }
+}
 
-export default function ApprovalBadge({ chapter }: { chapter: Chapter }) {
+const STYLES: Record<string, { cls: string; key: string }> = {
+  approved: { cls: 'bg-accent/10 text-accent', key: 'badge.approved' },
+  generated: { cls: 'bg-warning/10 text-warning', key: 'badge.pending' },
+  edited: { cls: 'bg-ink/5 text-ink', key: 'badge.edited' },
+  rolled_back: { cls: 'bg-muted/10 text-muted', key: 'badge.rolledBack' },
+}
+
+export default function ApprovalBadge({ chapter }: ApprovalBadgeProps) {
   const { t } = useT()
-  if (!chapter.approved_forced) return null
+  const status = chapter.approved ? 'approved' : (chapter.status ?? 'generated')
+  const style = STYLES[status] ?? STYLES.generated
   return (
     <span
-      data-testid="approval-bypassed-badge"
-      title={t('reviewGate.title')}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-[11px] font-medium text-danger"
+      data-testid="approval-badge"
+      className={`inline-block rounded px-1.5 py-0.5 font-mono text-[11px] leading-4 ${style.cls}`}
     >
-      {/* 实心圆点：异常态的第一眼信号 */}
-      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-danger" />
-      {t('chapter.bypassedBadge')}
+      {t(style.key)}
     </span>
   )
 }

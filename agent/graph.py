@@ -79,7 +79,7 @@ def _get_checkpointer() -> PostgresSaver:
     url = os.getenv(
         "CHECKPOINT_DB_URL",
         "postgresql://mahaoxuan@localhost:5432/econpaper",
-    )
+    ) or "postgresql://mahaoxuan@localhost:5432/econpaper"
     conn = psycopg.connect(
         url,
         autocommit=True,

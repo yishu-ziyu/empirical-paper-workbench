@@ -99,3 +99,97 @@ body {
 .animate-listen {
   animation: listen-ring 1.6s ease-out infinite;
 }
+
+/* ── Reduced motion: 动效全部坍缩为瞬时 ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Focus ring（DESIGN.md：焦点环用绿，2px，永不做动画） ── */
+:focus-visible {
+  outline: 2px solid rgba(47, 107, 79, 0.55);
+  outline-offset: 1px;
+}
+
+/* ── 首页图纸层（寓意：识别策略图纸还在画；手法借 design-notes/living/laper） ── */
+@keyframes blueprint-pattern-draw {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes blueprint-line-draw-y {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes blueprint-line-draw-x {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes blueprint-pin-draw {
+  0%, 55% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.blueprint-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: radial-gradient(rgba(24, 21, 21, 0.16) 1px, transparent 1px);
+  background-size: 8px 8px;
+  clip-path: inset(0 0 100% 0);
+}
+.is-play .blueprint-dots {
+  animation: blueprint-pattern-draw 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+.blueprint-rail-y {
+  position: absolute;
+  top: 0;
+  left: 58%;
+  width: 1px;
+  height: 100%;
+  background: rgba(24, 21, 21, 0.14);
+  clip-path: inset(0 0 100% 0);
+}
+.blueprint-rail-x {
+  position: absolute;
+  top: 34%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(24, 21, 21, 0.1);
+  clip-path: inset(0 100% 0 0);
+}
+.is-play .blueprint-rail-y { animation: blueprint-line-draw-y 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.is-play .blueprint-rail-x { animation: blueprint-line-draw-x 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
+.blueprint-pin {
+  position: absolute;
+  top: 34%;
+  left: 58%;
+  width: 8px;
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid rgba(24, 21, 21, 0.3);
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.is-play .blueprint-pin { animation: blueprint-pin-draw 0.76s ease-out 0.9s both; }
+.blueprint-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 34% at 22% 16%, rgba(47, 107, 79, 0.08) 0%, transparent 70%),
+    radial-gradient(36% 44% at 78% 10%, rgba(47, 107, 79, 0.05) 0%, transparent 70%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .blueprint-dots, .blueprint-rail-y, .blueprint-rail-x, .blueprint-pin {
+    animation: none !important;
+    clip-path: none !important;
+    opacity: 1;
+  }
+}

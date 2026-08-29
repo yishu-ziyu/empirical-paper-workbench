@@ -18,22 +18,22 @@ describe('App 三栏布局', () => {
     vi.unstubAllGlobals()
   })
 
-  test('无 session 时先进入引导，不摊开工作台', () => {
+  test('无 session 时先进对话首页，不摊开工作台', () => {
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
-    expect(screen.getByTestId('guide-steps')).toBeInTheDocument()
-    expect(screen.getByTestId('guide-upload-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('home-page')).toBeInTheDocument()
+    expect(screen.getByTestId('direction-chat-input')).toBeInTheDocument()
+    expect(screen.getByTestId('home-upload-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('home-sample-btn')).toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
     expect(screen.queryByTestId('desk-page')).not.toBeInTheDocument()
   })
 
-  test('引导里点先写在纸上才进入空桌', () => {
+  test('首页里点上传即打开文件选择（对话不换页）', () => {
     renderWithI18n(<App />)
-    fireEvent.click(screen.getByTestId('guide-write-paper'))
-    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
-    expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('home-upload-btn'))
+    expect(screen.getByTestId('file-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('desk-page')).not.toBeInTheDocument()
   })
 
   test('未上传时不显示 EdaSidebar', () => {
@@ -71,7 +71,7 @@ describe('App 三栏布局', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('home-page')).toBeInTheDocument()
 
     // 触发文件选择 → 模拟选择 CSV
     const fileInput = screen.getByTestId('file-input')
@@ -145,6 +145,7 @@ describe('App 三栏布局', () => {
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
 
+    fireEvent.click(screen.getByTestId('direction-chat-to-form'))
     fireEvent.change(screen.getByLabelText(/研究问题/), {
       target: { value: '教育对收入的影响' },
     })
@@ -216,7 +217,7 @@ describe('App 三栏布局', () => {
     await waitFor(() => {
       expect(screen.getByText(/上传中\.\.\./i)).toBeInTheDocument()
     })
-    expect(screen.getByTestId('guide-upload-btn')).toBeDisabled()
+    expect(screen.getByTestId('home-upload-btn')).toBeDisabled()
   })
 
   test('课设样例预填方向并显示列名', async () => {
@@ -253,10 +254,12 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
-    fireEvent.click(screen.getByTestId('guide-sample-btn'))
+    fireEvent.click(screen.getByTestId('home-sample-btn'))
     await waitFor(() => {
-      expect(screen.getByTestId('direction-form')).toBeInTheDocument()
+      expect(screen.getByTestId('direction-design-card')).toBeInTheDocument()
     })
+    fireEvent.click(screen.getByTestId('direction-chat-to-form'))
+    expect(screen.getByTestId('direction-form')).toBeInTheDocument()
     expect(screen.getByLabelText(/因变量/i)).toHaveValue('income')
     expect(screen.getByLabelText(/自变量/i)).toHaveValue('age')
     expect(screen.getByTestId('method-selector')).toHaveValue('OLS')
@@ -290,6 +293,7 @@ describe('App 三栏布局', () => {
       }),
     )
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('direction-chat-to-form'))
     expect(await screen.findByLabelText(/因变量/i)).toHaveValue('income')
     expect(screen.getByTestId('method-selector')).toHaveValue('OLS')
     expect(screen.getByTestId('data-columns')).toHaveTextContent('income')

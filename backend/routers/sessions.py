@@ -37,6 +37,28 @@ def _max_upload_bytes() -> int:
     return settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 
+def _read_tabular_upload(content: bytes, filename: str) -> pd.DataFrame:
+    """按文件内容识别格式并读成 DataFrame（CSV / Stata .dta / Excel .xlsx）。
+
+    内容嗅探优先、文件名兜底：xlsx 是 zip 容器（PK 头），Stata 117+ 有
+    ``<stata_dta>`` 文本头，旧版 dta（≤115）只能靠后缀兜底；其余按 CSV
+    处理并做 GBK 回退（中文 Excel 导出的 CSV 默认 GBK）。
+    """
+    if content[:2] == b"PK":
+        return pd.read_excel(io.BytesIO(content), sheet_name=0)
+    if content[:11] == b"<stata_dta>":
+        return pd.read_stata(io.BytesIO(content))
+    if filename.lower().endswith(".dta"):
+        return pd.read_stata(io.BytesIO(content))
+    last_exc: Exception | None = None
+    for enc in ("utf-8-sig", "gb18030"):
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding=enc)
+        except UnicodeDecodeError as exc:
+            last_exc = exc
+    raise ValueError(f"unrecognized or corrupted data file: {last_exc}") from last_exc
+
+
 def _reject_if_content_length_too_large(request: Request, max_bytes: int) -> None:
     """Reject oversized bodies from Content-Length before reading the file."""
     raw = request.headers.get("content-length")
@@ -49,7 +71,7 @@ def _reject_if_content_length_too_large(request: Request, max_bytes: int) -> Non
     if length > max_bytes:
         raise HTTPException(
             status_code=413,
-            detail=f"CSV exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
+            detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
         )
 
 
@@ -64,27 +86,36 @@ async def upload(
     file: UploadFile = File(...),
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> UploadResponse:
-    """Accept a CSV upload, parse dataset meta, run the graph, store state."""
-    # 1. Validate CSV by filename suffix.
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files supported")
-
+    """Accept a CSV / Stata (.dta) / Excel (.xlsx) upload, parse meta, run the graph."""
     max_bytes = _max_upload_bytes()
     _reject_if_content_length_too_large(request, max_bytes)
 
-    # 2. Read and parse the CSV with pandas.
+    # 1. Read the raw upload and enforce the size limit before parsing.
     content = await file.read()
-
-    # Enforce max upload size before parsing.
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,
-            detail=f"CSV exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
+            detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB}MB upload limit",
         )
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    # 2. Parse by content sniffing (CSV / .dta / .xlsx, GBK fallback for CSV).
     try:
-        df = pd.read_csv(io.BytesIO(content))
+        df = _read_tabular_upload(content, file.filename or "")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {exc}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported or corrupted data file: {exc}",
+        )
+    if len(df.columns) == 0:
+        raise HTTPException(status_code=400, detail="No columns detected in file")
+
+    # 2b. Normalize to a canonical in-house CSV so every downstream stage
+    #     (profiling, cleaning, code export) only ever faces a CSV.
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
 
     # 3. Compute dataset meta directly from the dataframe (independent of the
     #    agent layer, so the upload contract holds even with placeholder nodes).
@@ -96,17 +127,17 @@ async def upload(
     user_id = current_user.id if current_user else None
     facade.create_session(session_id=session_id, user_id=user_id)
 
-    # 5. Persist the uploaded CSV to the upload dir.
+    # 5. Persist the normalized CSV to the upload dir.
     upload_dir = Path(settings.UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
     csv_path = upload_dir / f"{session_id}.csv"
-    csv_path.write_bytes(content)
+    csv_path.write_bytes(csv_bytes)
 
     # 5b. Sync to S3 (only if S3_ENDPOINT_URL is configured).
     if settings.S3_ENDPOINT_URL:
         s3_remote_path = f"{session_id}/data.csv"
         try:
-            s3_fs.upload_bytes(content, s3_remote_path)
+            s3_fs.upload_bytes(csv_bytes, s3_remote_path)
         except Exception:
             # S3 不可用时降级到本地存储（F7 降级模式）
             facade.record_degradation(

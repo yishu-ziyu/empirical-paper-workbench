@@ -1,9 +1,9 @@
 """#7: CHARLS 威胁卡。两期禁用交错 DID。"""
 from __future__ import annotations
 
-from nodes.generate_chapter import generate_chapter
-from nodes.review_chapter import review_chapter
-from nodes.review_sources.threat_cards import (
+from agent.nodes.generate_chapter import generate_chapter
+from agent.nodes.review_chapter import review_chapter
+from agent.nodes.review_sources.threat_cards import (
     active_threat_cards,
     apply_threat_caps,
     load_threat_cards,

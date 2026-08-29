@@ -13,9 +13,9 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from cleaning.balance import BalanceStep
-from cleaning.missing import MissingStep
-from cleaning.outliers import OutliersStep
+from agent.cleaning.balance import BalanceStep
+from agent.cleaning.missing import MissingStep
+from agent.cleaning.outliers import OutliersStep
 
 
 # =========================================================================== #
@@ -118,7 +118,7 @@ def test_outliers_fallback_when_statspai_raises(csv_with_numeric, tmp_path, capl
 
     with (
         patch.dict(sys.modules, {"statspai": mock_statspai}),
-        caplog.at_level(logging.WARNING, logger="cleaning.outliers"),
+        caplog.at_level(logging.WARNING, logger="agent.cleaning.outliers"),
     ):
         result_datasets, report = OutliersStep().run(ds, config)
 
@@ -156,7 +156,7 @@ def test_outliers_fallback_when_statspai_not_importable(csv_with_numeric, tmp_pa
     old_statspai = sys.modules.pop("statspai", None)
 
     try:
-        with caplog.at_level(logging.WARNING, logger="cleaning.outliers"):
+        with caplog.at_level(logging.WARNING, logger="agent.cleaning.outliers"):
             result_datasets, report = OutliersStep().run(ds, config)
     finally:
         if had_statspai:
@@ -203,7 +203,7 @@ def test_missing_mice_fallback_when_statspai_raises(csv_with_missing, tmp_path, 
 
     with (
         patch.dict(sys.modules, {"statspai": mock_statspai}),
-        caplog.at_level(logging.WARNING, logger="cleaning.missing"),
+        caplog.at_level(logging.WARNING, logger="agent.cleaning.missing"),
     ):
         result_datasets, report = MissingStep().run(ds, config)
 

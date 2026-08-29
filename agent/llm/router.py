@@ -10,7 +10,7 @@
 import os
 from typing import Optional, Dict
 
-from llm.ssot import in_pytest, load_ssot
+from .ssot import in_pytest, load_ssot
 
 MINIMAX_BASE_URL = "https://api.minimaxi.com/v1"
 MINIMAX_MODEL = "MiniMax-M3"

@@ -1,5 +1,5 @@
 """set_direction writes a runnable specification from the direction form."""
-from nodes.set_direction import set_direction
+from agent.nodes.set_direction import set_direction
 
 
 def test_set_direction_writes_main_specification():

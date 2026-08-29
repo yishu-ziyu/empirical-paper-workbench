@@ -1,5 +1,5 @@
 """ADR-0010: Crossref is a first-class literature source with mock fallback."""
-from nodes.search_literature import search_literature
+from agent.nodes.search_literature import search_literature
 
 
 def test_crossref_source_maps_entries(monkeypatch):
@@ -15,7 +15,7 @@ def test_crossref_source_maps_entries(monkeypatch):
         }
     ]
     monkeypatch.setattr(
-        "nodes.literature_sources.crossref.crossref_search",
+        "agent.nodes.literature_sources.crossref.crossref_search",
         lambda query, **kwargs: fake,
     )
     result = search_literature(
@@ -31,7 +31,7 @@ def test_crossref_error_degrades_to_mock(monkeypatch):
         raise RuntimeError("network down")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.crossref.crossref_search",
+        "agent.nodes.literature_sources.crossref.crossref_search",
         _boom,
     )
     result = search_literature(

@@ -11,8 +11,8 @@ generate_outline 是 agent 节点，测试归 agent/tests/）。
 HITL 简化策略: generate_outline 不调 interrupt()；从 state 读
 user_adjusted_outline。
 """
-from nodes.generate_outline import generate_outline
-from nodes.set_direction import set_direction
+from agent.nodes.generate_outline import generate_outline
+from agent.nodes.set_direction import set_direction
 
 from conftest import make_state
 
@@ -91,8 +91,8 @@ def test_outline_call_llm_delegates_to_unified(monkeypatch):
         seen["node_type"] = node_type
         return "Live outline"
 
-    monkeypatch.setattr("llm.call_llm.call_llm", fake_unified)
-    from nodes.generate_outline import call_llm
+    monkeypatch.setattr("agent.llm.call_llm.call_llm", fake_unified)
+    from agent.nodes.generate_outline import call_llm
 
     assert call_llm("p") == "Live outline"
     assert seen["node_type"] == "outline"

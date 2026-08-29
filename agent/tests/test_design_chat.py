@@ -1,5 +1,5 @@
 """设计对话：启发式回退路径的确定性测试（不真调 LLM）。"""
-from desk.design_chat import design_chat, heuristic_design_chat
+from agent.desk.design_chat import design_chat, heuristic_design_chat
 
 
 def test_heuristic_extracts_columns_from_notes():
@@ -12,7 +12,7 @@ def test_heuristic_extracts_columns_from_notes():
 
 def test_design_chat_mock_provider_falls_back(monkeypatch):
     """mock 通道（无 LLM）时 design_chat 走启发式，不抛异常。"""
-    import llm.call_llm as call_llm_mod
+    import agent.llm.call_llm as call_llm_mod
 
     def fake_llm(*a, **kw):
         raise RuntimeError("mock provider 没有真模型")

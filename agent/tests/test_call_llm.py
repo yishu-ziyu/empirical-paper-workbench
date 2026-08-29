@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from llm.call_llm import call_llm
-from llm.router import LLMConfig
+from agent.llm.call_llm import call_llm
+from agent.llm.router import LLMConfig
 
 
 class _FakeResp:
@@ -36,7 +36,7 @@ def test_call_llm_posts_chat_completions(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "llm.call_llm.router.get_config",
+        "agent.llm.call_llm.router.get_config",
         lambda node: LLMConfig(
             provider="minimax",
             model="MiniMax-M3",
@@ -44,7 +44,7 @@ def test_call_llm_posts_chat_completions(monkeypatch):
             base_url="https://api.minimaxi.com/v1",
         ),
     )
-    monkeypatch.setattr("llm.call_llm.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agent.llm.call_llm.urllib.request.urlopen", fake_urlopen)
 
     text = call_llm("hi", node_type="title", system="sys")
     assert text == "Hello from model"
@@ -59,7 +59,7 @@ def test_call_llm_posts_chat_completions(monkeypatch):
 
 def test_call_llm_strips_think_blocks(monkeypatch):
     monkeypatch.setattr(
-        "llm.call_llm.router.get_config",
+        "agent.llm.call_llm.router.get_config",
         lambda node: LLMConfig(
             provider="minimax",
             model="MiniMax-M3",
@@ -68,7 +68,7 @@ def test_call_llm_strips_think_blocks(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "llm.call_llm.urllib.request.urlopen",
+        "agent.llm.call_llm.urllib.request.urlopen",
         lambda req, timeout=0: _FakeResp(
             {
                 "choices": [
@@ -86,7 +86,7 @@ def test_call_llm_strips_think_blocks(monkeypatch):
 
 def test_call_llm_extracts_list_content(monkeypatch):
     monkeypatch.setattr(
-        "llm.call_llm.router.get_config",
+        "agent.llm.call_llm.router.get_config",
         lambda node: LLMConfig(
             provider="minimax",
             model="MiniMax-M3",
@@ -95,7 +95,7 @@ def test_call_llm_extracts_list_content(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "llm.call_llm.urllib.request.urlopen",
+        "agent.llm.call_llm.urllib.request.urlopen",
         lambda req, timeout=0: _FakeResp(
             {
                 "choices": [
@@ -128,7 +128,7 @@ def test_call_llm_http_error_raises(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "llm.call_llm.router.get_config",
+        "agent.llm.call_llm.router.get_config",
         lambda node: LLMConfig(
             provider="minimax",
             model="MiniMax-M3",
@@ -136,6 +136,6 @@ def test_call_llm_http_error_raises(monkeypatch):
             base_url="https://api.minimaxi.com/v1",
         ),
     )
-    monkeypatch.setattr("llm.call_llm.urllib.request.urlopen", boom)
+    monkeypatch.setattr("agent.llm.call_llm.urllib.request.urlopen", boom)
     with pytest.raises(RuntimeError, match="LLM HTTP 401"):
         call_llm("p", node_type="title")

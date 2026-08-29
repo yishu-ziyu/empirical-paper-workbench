@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from dataset_profiles import load_profile
+from ...dataset_profiles import load_profile
 
 _CARDS_PATH = (
     Path(__file__).resolve().parents[2] / "dataset_profiles" / "threat_cards.yaml"

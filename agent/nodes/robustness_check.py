@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from design.spec import norm_method
-from state import EconPaperState
+from ..design.spec import norm_method
+from ..state import EconPaperState
 
 
 def _coef_of(result: Any, var: str) -> Optional[float]:
@@ -671,7 +671,7 @@ def robustness_check(state: EconPaperState) -> Dict[str, Any]:
     spec_curve = None
     if not cs_main and method not in {"iv", "rd", "scm"}:
         try:
-            from design.spec_curve import run_spec_curve_from_state
+            from ..design.spec_curve import run_spec_curve_from_state
 
             spec_curve = run_spec_curve_from_state(
                 {

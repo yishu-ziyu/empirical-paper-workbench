@@ -5,14 +5,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from nodes.generate_chapter import call_llm as generate_call_llm
-from nodes.review_chapter import (
+from agent.nodes.generate_chapter import call_llm as generate_call_llm
+from agent.nodes.review_chapter import (
     _compute_composite_score,
     call_review_llm,
     review_chapter,
     weights_for_chapter,
 )
-from protocols import ReviewRubric
+from agent.protocols import ReviewRubric
 
 from conftest import make_state
 
@@ -87,10 +87,10 @@ def test_generate_non_mock_uses_invoke(monkeypatch):
         return "REAL-GENERATE"
 
     monkeypatch.setattr(
-        "nodes.generate_chapter.invoke_generate_llm", fake_invoke
+        "agent.nodes.generate_chapter.invoke_generate_llm", fake_invoke
     )
     monkeypatch.setattr(
-        "llm.router.router.get_config",
+        "agent.llm.router.router.get_config",
         lambda node: SimpleNamespace(provider="anthropic", model="claude"),
     )
     assert generate_call_llm("S", "U") == "REAL-GENERATE"
@@ -116,9 +116,9 @@ def test_review_non_mock_uses_invoke(monkeypatch):
             "suggestions": "from-real",
         }
 
-    monkeypatch.setattr("nodes.review_chapter.invoke_review_llm", fake_invoke)
+    monkeypatch.setattr("agent.nodes.review_chapter.invoke_review_llm", fake_invoke)
     monkeypatch.setattr(
-        "llm.router.router.get_config",
+        "agent.llm.router.router.get_config",
         lambda node: SimpleNamespace(provider="openai", model="gpt-4"),
     )
     result = call_review_llm("正文", ReviewRubric(), "dir", [])
@@ -132,9 +132,9 @@ def test_review_bad_json_falls_back_to_mock(monkeypatch):
     def boom(config, content, rubric, direction, literature, claim=""):
         raise ValueError("bad json")
 
-    monkeypatch.setattr("nodes.review_chapter.invoke_review_llm", boom)
+    monkeypatch.setattr("agent.nodes.review_chapter.invoke_review_llm", boom)
     monkeypatch.setattr(
-        "llm.router.router.get_config",
+        "agent.llm.router.router.get_config",
         lambda node: SimpleNamespace(provider="anthropic", model="claude"),
     )
     result = call_review_llm("短文本", ReviewRubric(), "", [])

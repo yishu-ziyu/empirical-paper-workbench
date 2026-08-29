@@ -6,8 +6,8 @@ and passes/fails correctly.
 """
 import pytest
 import pandas as pd
-from nodes.identification_verify import identification_verify
-from state import EconPaperState
+from agent.nodes.identification_verify import identification_verify
+from agent.state import EconPaperState
 
 
 def test_identification_verify_missing_input():

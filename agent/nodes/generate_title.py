@@ -1,5 +1,5 @@
-from protocols import GenerateTitleOutput
-from state import EconPaperState
+from ..protocols import GenerateTitleOutput
+from ..state import EconPaperState
 
 
 def call_llm(prompt: str) -> str:
@@ -9,7 +9,7 @@ def call_llm(prompt: str) -> str:
     测试通过 ``monkeypatch.setattr(nodes.generate_title, "call_llm", ...)``
     替换为 fake，故必须是模块级函数。
     """
-    from llm.call_llm import call_llm as unified_call
+    from ..llm.call_llm import call_llm as unified_call
 
     return unified_call(prompt, node_type="title")
 

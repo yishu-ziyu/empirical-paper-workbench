@@ -11,8 +11,6 @@
 - charls_csv / generic_csv / workspace: 跨文件复用的数据 fixture
 """
 import os
-import sys
-from pathlib import Path
 
 # Backend tests import config at collection time. Local/demo tests rely on
 # anonymous sessions; production (DEBUG=false) rejects those with 401.
@@ -23,20 +21,6 @@ os.environ.setdefault(
 )
 
 import pytest
-
-# 确保能 import agent 和 backend 模块
-_PROJECT_ROOT = Path(__file__).parent
-_AGENT_DIR = _PROJECT_ROOT / "agent"
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-
-# 项目根目录上 sys.path，使测试文件可 `from conftest import make_state` 等工厂
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
-# agent 用扁平 import，需要 agent/ 在 sys.path
-if str(_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENT_DIR))
-if str(_BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_DIR))
 
 
 def make_state(**overrides) -> dict:
@@ -212,9 +196,9 @@ def mock_llm_for(monkeypatch):
         recorder = _MockLLMRecorder()
         recorder.return_value = return_value
         module_map = {
-            "generate_title": "nodes.generate_title",
-            "generate_outline": "nodes.generate_outline",
-            "generate_chapter": "nodes.generate_chapter",
+            "generate_title": "agent.nodes.generate_title",
+            "generate_outline": "agent.nodes.generate_outline",
+            "generate_chapter": "agent.nodes.generate_chapter",
         }
         if node_name not in module_map:
             raise ValueError(

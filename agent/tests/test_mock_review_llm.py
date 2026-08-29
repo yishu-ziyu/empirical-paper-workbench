@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.review_sources.mock_review import mock_review_llm
-from protocols import ReviewRubric
+from agent.nodes.review_sources.mock_review import mock_review_llm
+from agent.protocols import ReviewRubric
 
 
 # ---------------------------------------------------------------------------

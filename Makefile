@@ -50,13 +50,13 @@ test:
 
 # 验证 graph 可 import（agent 冒烟测试）
 smoke-agent:
-	cd agent && . .venv/bin/activate && python -c "from graph import graph; print('graph ok:', graph)"
+	cd agent && . .venv/bin/activate && python -c "from agent.graph import graph; print('graph ok:', graph)"
 
 # 验证 frontend / backend / agent 三件套都活
 verify: smoke-agent
 	@echo "[verify] frontend port 5173"; curl -sS -o /dev/null -w "%{http_code}\n" http://localhost:5173 || echo "frontend not running"
 	@echo "[verify] backend /health"; curl -sS http://localhost:8000/health || echo "backend not running"
-	@echo "[verify] agent import"; cd agent && python -c "from graph import graph; print('graph ok')" || echo "agent import failed"
+	@echo "[verify] agent import"; cd agent && python -c "from agent.graph import graph; print('graph ok')" || echo "agent import failed"
 
 clean:
 	rm -rf frontend/node_modules frontend/dist backend/.venv agent/.venv
@@ -98,8 +98,7 @@ gen-api:
 	@echo "[gen-api] 导出 openapi.json from backend"
 	@cd backend && . .venv/bin/activate 2>/dev/null || true; \
 	python3 -c "\
-import json, sys; \
-sys.path.insert(0, '.'); sys.path.append('../agent'); \
+import json; \
 from main import app; \
 open('../frontend/openapi.json', 'w').write(json.dumps(app.openapi(), indent=2, ensure_ascii=False)); \
 print('[gen-api] openapi.json exported, schemas:', len(app.openapi().get('components', {}).get('schemas', {})))"

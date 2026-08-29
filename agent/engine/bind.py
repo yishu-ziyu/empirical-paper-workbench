@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from engine.data_eda import compute_csv_eda
-from engine.readiness import claim_mode
+from .data_eda import compute_csv_eda
+from .readiness import claim_mode
 
 
 def format_entries(entries: Iterable[Any]) -> str:

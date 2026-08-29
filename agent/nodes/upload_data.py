@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from protocols import UploadDataOutput
-from state import EconPaperState
+from ..protocols import UploadDataOutput
+from ..state import EconPaperState
 
 
 def upload_data(state: EconPaperState) -> UploadDataOutput:

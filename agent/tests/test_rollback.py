@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.rollback import rollback_chapter
+from agent.nodes.rollback import rollback_chapter
 
 from conftest import make_state, make_body_chapters
 

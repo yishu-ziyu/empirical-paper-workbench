@@ -23,7 +23,7 @@ data), which preserves the T-02 contract pinned by
 import pandas as pd
 import pytest
 
-from nodes.clean_data import clean_data
+from agent.nodes.clean_data import clean_data
 
 from conftest import make_state
 

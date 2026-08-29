@@ -1,5 +1,5 @@
-from desk.minimax_tts import _tts_config
-from desk.stepfun_asr import parse_asr_sse
+from agent.desk.minimax_tts import _tts_config
+from agent.desk.stepfun_asr import parse_asr_sse
 
 
 def test_parse_asr_sse_done_event():

@@ -18,7 +18,7 @@ from __future__ import annotations
 import routers.code_export  # noqa: F401
 from facade import facade
 
-from cleaning.audit import AuditStep
+from agent.cleaning.audit import AuditStep
 from conftest import make_write_ready_state
 
 

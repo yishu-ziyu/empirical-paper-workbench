@@ -1,8 +1,8 @@
 """#11: 学习标签只从真事件收，禁止把 mock 综合分当奖励。"""
 from __future__ import annotations
 
-from nodes.citation_graph import build_citation_graph
-from nodes.learning_labels import (
+from agent.nodes.citation_graph import build_citation_graph
+from agent.nodes.learning_labels import (
     CITATION_GROUNDED,
     CITATION_UNGROUNDED,
     DEGRADATION,
@@ -13,9 +13,9 @@ from nodes.learning_labels import (
     collect_learning_labels,
     _label,
 )
-from nodes.literature_sources import semantic_scholar
-from nodes.review_chapter import review_chapter
-from nodes.search_literature import search_literature
+from agent.nodes.literature_sources import semantic_scholar
+from agent.nodes.review_chapter import review_chapter
+from agent.nodes.search_literature import search_literature
 
 from conftest import make_state
 
@@ -171,7 +171,7 @@ def test_grounded_citation_with_doi_is_positive():
 
 def test_did_search_logs_method_anchor(monkeypatch):
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search",
+        "agent.nodes.search_literature._mock_search",
         lambda query: [
             {
                 "title": "Unrelated",
@@ -230,7 +230,7 @@ def _chapter():
 
 def test_review_retry_does_not_count_as_capped_fail(monkeypatch):
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: {
             "rubric": LOW_SCORE_RUBRIC,
             "feedback": "差",
@@ -255,7 +255,7 @@ def test_review_retry_does_not_count_as_capped_fail(monkeypatch):
 
 def test_review_at_cap_emits_capped_fail_without_score(monkeypatch):
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *a, **k: {
             "rubric": LOW_SCORE_RUBRIC,
             "feedback": "差",

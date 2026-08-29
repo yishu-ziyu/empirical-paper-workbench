@@ -37,10 +37,9 @@ def get_prompt(chapter_type: str) -> ModuleType:
             f"Unknown chapter_type: {chapter_type!r}. "
             f"Valid types: {sorted(_CHAPTER_TYPE_TO_MODULE)}"
         )
-    # 同 package 下相对导入；用 importlib 确保 chapter_type 来自用户输入时安全
-    return importlib.import_module(
-        f"prompts.{_CHAPTER_TYPE_TO_MODULE[chapter_type]}"
-    )
+    # 同 package（agent.prompts）下相对导入；用 importlib 确保 chapter_type 来自
+    # 用户输入时安全。基于 __package__ 构造，无需进程级 sys.path 拼接。
+    return importlib.import_module(f".{_CHAPTER_TYPE_TO_MODULE[chapter_type]}", __package__)
 
 
 __all__ = ["get_prompt"]

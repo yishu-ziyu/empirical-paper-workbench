@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes.route_after_review import route_after_review
+from agent.nodes.route_after_review import route_after_review
 
 from conftest import make_state
 

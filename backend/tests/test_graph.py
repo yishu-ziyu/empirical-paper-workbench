@@ -8,9 +8,9 @@ generate_title 节点测试已迁移至 agent/tests/test_generate_title.py
 - upload_data parses CSV into dataset_meta written into state.uploaded_datasets
 - clean_data detects missing values and writes missing_count (does NOT handle them)
 """
-from graph import build_graph, graph
-from nodes.clean_data import clean_data
-from nodes.upload_data import upload_data
+from agent.graph import build_graph, graph
+from agent.nodes.clean_data import clean_data
+from agent.nodes.upload_data import upload_data
 
 from conftest import make_state
 
@@ -45,7 +45,7 @@ def test_graph_has_three_nodes():
 
 
 def test_route_after_identification_goes_to_estimate():
-    from graph import route_after_identification
+    from agent.graph import route_after_identification
 
     assert route_after_identification({"star_rating": None}) == [
         "run_estimate",
@@ -59,7 +59,7 @@ def test_route_after_identification_goes_to_estimate():
 
 
 def test_route_after_clean_stops_without_direction():
-    from graph import route_after_clean
+    from agent.graph import route_after_clean
     from langgraph.graph import END
 
     assert route_after_clean({}) == END

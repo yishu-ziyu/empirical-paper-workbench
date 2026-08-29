@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from prompts.revision import REVISION_BLOCK, fill_revision
+from .revision import REVISION_BLOCK, fill_revision
 
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【数据描述】章节。"

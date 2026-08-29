@@ -1,5 +1,5 @@
 """Main estimate writes a table the results chapter can cite."""
-from nodes.estimate import (
+from agent.nodes.estimate import (
     _all_coefs,
     _is_coef_header_line,
     _prefer_treatment_row,
@@ -52,8 +52,10 @@ def test_estimate_writes_treatment_row(tmp_path):
 def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
     """income ~ age + treat: treat gets a real row, never invented DiD."""
     import pandas as pd
+    from pathlib import Path
 
-    df = pd.read_csv("frontend/public/samples/course-panel.csv")
+    repo_root = Path(__file__).resolve().parents[2]
+    df = pd.read_csv(repo_root / "frontend/public/samples/course-panel.csv")
     csv_path = tmp_path / "course.csv"
     df.to_csv(csv_path, index=False)
     out = estimate(
@@ -240,7 +242,7 @@ def test_all_coefs_isolates_per_name_failures():
 def test_results_chapter_user_prompt_contains_estimate(tmp_path, mock_llm_for):
     """结果章拿到的是主估计表，不是空占位。"""
     import pandas as pd
-    from nodes.generate_chapter import generate_chapter
+    from agent.nodes.generate_chapter import generate_chapter
 
     df = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [0, 1, 0, 1]})
     csv_path = tmp_path / "main.csv"

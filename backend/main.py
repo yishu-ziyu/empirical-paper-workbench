@@ -3,22 +3,13 @@
 from __future__ import annotations
 
 import logging
-import sys
 import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
-
-# 把 econpaper/agent/ 加到 sys.path 末尾，让 `from graph import graph` / `from nodes...` 可用。
-# 用 append 而非 insert：backend/ 必须优先（避免 agent/config.py 覆盖 backend/config.py）。
-# 测试环境由 backend/tests/conftest.py 做同样的事。
-_AGENT_DIR = Path(__file__).resolve().parent.parent / "agent"
-if str(_AGENT_DIR) not in sys.path:
-    sys.path.append(str(_AGENT_DIR))
 
 from config import settings
 
@@ -34,8 +25,8 @@ async def lifespan(app: FastAPI):
     await create_tables()
 
     try:
-        from llm.ssot import load_ssot
-        from llm.router import router as llm_router
+        from agent.llm.ssot import load_ssot
+        from agent.llm.router import router as llm_router
 
         load_ssot()
         llm_router.reload()

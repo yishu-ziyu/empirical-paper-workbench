@@ -8,7 +8,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_auth_unless_debug
-from desk.design_chat import design_chat
 from facade import facade
 from models.user import User
 
@@ -112,7 +111,7 @@ async def desk_design_chat(
     if not body.notes.strip() and not body.turns:
         raise HTTPException(status_code=400, detail="empty notes")
     try:
-        result = design_chat(
+        result = facade.design_chat_desk(
             body.notes,
             [t.model_dump() for t in body.turns],
             body.columns,

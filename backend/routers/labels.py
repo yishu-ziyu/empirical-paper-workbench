@@ -16,7 +16,7 @@ async def export_labels(
     reviewer_kind: Optional[str] = Query(default=None),
     ab_arm: Optional[str] = Query(default=None),
 ) -> LabelExportResponse:
-    from nodes.label_store import read_events, summarize
+    from agent.nodes.label_store import read_events, summarize
 
     events = read_events(
         session_id=session_id,

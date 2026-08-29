@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from nodes.review_sources.structure_checks import check_structure
+from ..nodes.review_sources.structure_checks import check_structure
 
 _CITATION_INDICES = {
     "10.1093/restud/rdaa084": 1,

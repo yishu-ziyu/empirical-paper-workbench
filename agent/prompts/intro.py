@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 
-from prompts.revision import REVISION_BLOCK, fill_revision
+from .revision import REVISION_BLOCK, fill_revision
 
 _CONTRIB_SECTION = re.compile(
     r"(?:^|\n)##[ \t]*贡献[^\n]*\n(?:.*?)(?=\n## |\Z)",

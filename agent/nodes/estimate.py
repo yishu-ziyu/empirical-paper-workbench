@@ -16,14 +16,15 @@ facade.record_degradation 的条目模式把回退记录进 estimate payload。
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from design.spec import norm_method
-from protocols import EstimateOutput
-from state import EconPaperState
+from ..design.spec import norm_method
+from ..protocols import EstimateOutput
+from ..state import EconPaperState
 
 logger = logging.getLogger(__name__)
 _FE_DROPPED_LINE = "FE dropped; pooled OLS"
@@ -797,33 +798,21 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
 
 
 def _estimate_agent_enabled() -> bool:
-    """读 agent/config.ESTIMATE_AGENT_ENABLED（env ECONPAPER_ESTIMATE_AGENT 可覆盖）。
+    """读 ECONPAPER_ESTIMATE_AGENT env（agent/upstream 默认 false，env 可覆盖）。
 
-    agent/ 与 backend/ 都可能挂在 sys.path 上（backend/main.py 刻意让
-    backend/config.py 优先，避免同名覆盖），裸 ``import config`` 会命中
-    backend/config.py。因此：先看已加载模块有没有该旗标，没有再按路径
-    显式加载 agent/config.py 并缓存。
+    agent 现在是正规包（`from agent.upstream import ...`），不再有 agent/config.py
+    与 backend/config.py 的同名冲突，也不再需要进程级 sys.path 拼接。
+    每次动态读 env，便于测试用 monkeypatch 翻转开关。
     """
-    import importlib.util
-    import sys
+    value = (os.environ.get("ECONPAPER_ESTIMATE_AGENT") or "").strip().lower()
+    if not value:
+        try:
+            from ..upstream import ESTIMATE_AGENT_ENABLED
 
-    loaded = sys.modules.get("config")
-    if loaded is not None and hasattr(loaded, "ESTIMATE_AGENT_ENABLED"):
-        return bool(loaded.ESTIMATE_AGENT_ENABLED)
-    cached = sys.modules.get("_econpaper_agent_config")
-    if cached is not None:
-        return bool(cached.ESTIMATE_AGENT_ENABLED)
-    cfg_path = Path(__file__).resolve().parents[1] / "config.py"
-    try:
-        spec = importlib.util.spec_from_file_location("_econpaper_agent_config", cfg_path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["_econpaper_agent_config"] = module
-        spec.loader.exec_module(module)
-        return bool(module.ESTIMATE_AGENT_ENABLED)
-    except Exception:
-        logger.warning("读取 ESTIMATE_AGENT_ENABLED 失败，按关闭处理", exc_info=True)
-        return False
+            return bool(ESTIMATE_AGENT_ENABLED)
+        except Exception:
+            return False
+    return value in ("1", "true", "yes", "on")
 
 
 def estimate(state: EconPaperState) -> EstimateOutput:
@@ -838,7 +827,7 @@ def estimate(state: EconPaperState) -> EstimateOutput:
     agent_error: Optional[str] = None
     if _estimate_agent_enabled():
         try:
-            from engine.estimate_agent import run_estimate_agent
+            from ..engine.estimate_agent import run_estimate_agent
 
             agent_out = run_estimate_agent(state)
             if agent_out is not None:

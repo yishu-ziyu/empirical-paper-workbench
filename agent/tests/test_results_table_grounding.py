@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from conftest import make_write_ready_state
-from nodes.generate_chapter import generate_chapter
+from agent.nodes.generate_chapter import generate_chapter
 
 RESULTS_OUTLINE = [{"type": "results", "title": "结果"}]
 
@@ -30,7 +30,7 @@ def test_invented_treatment_row_is_invented_number(mock_llm_for):
 
     同文的 N / 常数项不得单独构成失败原因。
     """
-    from nodes.review_sources.grounding import check_grounding
+    from agent.nodes.review_sources.grounding import check_grounding
 
     prose = (
         "解读如下。\n\n"
@@ -51,7 +51,7 @@ def test_invented_treatment_row_is_invented_number(mock_llm_for):
 
 def test_n_and_intercept_do_not_fail_grounding_alone():
     """真 treatment_row + N + 常数项：不得报 invented_number / missing_estimate_number。"""
-    from nodes.review_sources.grounding import check_grounding
+    from agent.nodes.review_sources.grounding import check_grounding
 
     state = make_write_ready_state(outline=RESULTS_OUTLINE)
     row = state["estimate"]["treatment_row"]

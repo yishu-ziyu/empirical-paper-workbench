@@ -54,6 +54,7 @@ class DeskDesignChatResponse(BaseModel):
 
 
 class DeskDiscussResponse(BaseModel):
+    intent: str = "research"
     reflection: str
     title: str
     heard: List[str] = Field(default_factory=list)
@@ -77,6 +78,7 @@ async def discuss_desk(
         [item.model_dump() for item in body.turns],
     )
     return DeskDiscussResponse(
+        intent=str(result.get("intent") or "research"),
         reflection=result.get("reflection") or "",
         title=result.get("title") or "",
         heard=list(result.get("heard") or []),

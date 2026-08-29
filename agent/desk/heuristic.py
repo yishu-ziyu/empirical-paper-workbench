@@ -22,13 +22,22 @@ def heuristic_discuss(notes: str, turns: list[dict[str, str]] | None = None) -> 
     draft = shape_question(notes, _answers_from_turns(turns))
     prompt = next_prompt(_answers_from_turns(turns))
     return {
+        "intent": draft["intent"],
         "reflection": draft["reflection"],
         "title": draft["title"],
         "heard": [item["label"] for item in draft["heard"]],
         "comparison": draft["comparison"],
         "outcome": draft["outcome"],
-        "question": "" if draft["ready"] or not prompt else prompt["question"],
-        "options": [] if draft["ready"] or not prompt else prompt["options"],
+        "question": (
+            ""
+            if draft["intent"] == "conversation" or draft["ready"] or not prompt
+            else prompt["question"]
+        ),
+        "options": (
+            []
+            if draft["intent"] == "conversation" or draft["ready"] or not prompt
+            else prompt["options"]
+        ),
         "explain": "",
         "ready": draft["ready"],
         "source": "heuristic",

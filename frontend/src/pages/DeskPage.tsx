@@ -6,6 +6,7 @@ import { nextPrompt, shapeQuestion } from '../lib/shapeQuestion'
 import type { ShapeAnswers } from '../lib/shapeQuestion'
 import { appendTranscript } from '../lib/voice'
 import type { VoiceStatus } from '../lib/voice'
+import ResizableWorkspace from '../components/ResizableWorkspace'
 
 export interface DeskPageProps {
   onConfirm: (title: string) => void
@@ -27,6 +28,7 @@ function localCard(notes: string, answers: ShapeAnswers): DeskCard {
   const draft = shapeQuestion(notes, answers)
   const prompt = nextPrompt(answers)
   return {
+    intent: draft.intent,
     reflection: draft.reflection,
     title: draft.title,
     heard: draft.heard.map((item) => item.label),
@@ -51,6 +53,7 @@ export default function DeskPage({
 }: DeskPageProps) {
   const { t } = useT()
   const [text, setText] = useState('')
+  const [conversationHistory, setConversationHistory] = useState<Array<{ user: string; assistant: string }>>([])
   const [turns, setTurns] = useState<DeskTurn[]>([])
   const [card, setCard] = useState<DeskCard | null>(null)
   const [titleOverride, setTitleOverride] = useState<string | null>(null)
@@ -70,7 +73,8 @@ export default function DeskPage({
   const requestRef = useRef(0)
 
   const title = titleOverride ?? card?.title ?? ''
-  const canShape = text.trim().length >= 6
+  const canShape = text.trim().length > 0
+  const conversational = card?.intent === 'conversation'
 
   // 未登录点「开始」会先去注册/登录；想法暂存 sessionStorage，回来即恢复
   useEffect(() => {
@@ -86,7 +90,7 @@ export default function DeskPage({
     const el = paperRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.max(220, el.scrollHeight)}px`
+    el.style.height = `${Math.min(160, Math.max(56, el.scrollHeight))}px`
   }
 
   async function askModel(notes: string, nextTurns: DeskTurn[]) {
@@ -122,7 +126,7 @@ export default function DeskPage({
   function handleChange(value: string) {
     setText(value)
     if (timerRef.current) window.clearTimeout(timerRef.current)
-    if (value.trim().length < 6) {
+    if (!value.trim()) {
       setCard(null)
       setTurns([])
       setTitleOverride(null)
@@ -174,7 +178,8 @@ export default function DeskPage({
       const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' })
       const heard = await transcribeDesk(blob)
       if (!heard) return
-      handleChange(appendTranscript(text, heard))
+      if (card) setAskText((current) => appendTranscript(current, heard))
+      else handleChange(appendTranscript(text, heard))
     } catch {
       setVoiceStatus('unsupported')
     } finally {
@@ -242,7 +247,7 @@ export default function DeskPage({
 
   useEffect(() => {
     growPaper()
-  }, [text])
+  }, [askText, card, text])
 
   useEffect(() => {
     paperRef.current?.focus()
@@ -271,93 +276,304 @@ export default function DeskPage({
           ? '按章写作 · 串行 HITL'
           : '方向凝练 · 可追溯'
 
-  return (
-    <div data-testid="desk-page" className="flex h-screen min-h-0 bg-white text-ink">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-black/[0.06] p-3">
-        <div className="mb-3 flex items-center justify-between px-1">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink font-serif text-[15px] text-white">
-            e
-          </span>
-        </div>
-        <button
-          type="button"
-          className="mb-3 flex items-center gap-2 rounded-[10px] bg-[#f7f8fa] px-3 py-2 text-left text-[13.5px]"
-        >
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#4e5969] text-[12px] leading-none">
-            +
-          </span>
-          新论文
-        </button>
-        <p className="px-2 pb-1 pt-2 text-[12px] text-[#86909c]">论文</p>
-        <div className="min-h-0 flex-1 overflow-y-auto text-[13.5px]">
-          <div className="rounded-lg bg-[#f2f3f5] px-2.5 py-1.5 font-medium">
-            {title || t('desk.heading')}
-          </div>
-          <div className="px-2.5 py-1.5 text-[#4e5969]">课设样例：年龄与收入</div>
-        </div>
-        <p className="px-2 pb-1 pt-3 text-[12px] text-[#86909c]">数据</p>
-        <button
-          type="button"
-          onClick={onPickData}
-          disabled={uploading}
-          className="rounded-lg px-2.5 py-1.5 text-left text-[13.5px] hover:bg-[#f7f8fa] disabled:opacity-50"
-        >
-          ＋ {uploading ? t('app.uploading') : t('desk.uploadCta')}
-        </button>
-        <div className="mt-auto flex items-center gap-2 border-t border-black/[0.06] pt-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[12px] text-white">
-            e
-          </span>
-          <span className="text-[13px] font-medium">econpaper</span>
-        </div>
-      </aside>
+  const agentRows = [
+    ['shape', '问', '方向凝练', '乱问 → Y/X/方法'],
+    ['clean', '洗', '清洗 8 步', '数据进来之后才跑'],
+    ['estimate', '估', '估计门', '主表先于正文'],
+    ['write', '章', 'Write Queue · 6 章串行', '没有主表，结果章锁定'],
+  ] as const
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] px-6">
-          <p className="text-[14px] font-medium">{title || t('desk.heading')}</p>
-          <div className="flex items-center gap-3 text-[13px]">
-            {onLogin && (
-              <button type="button" onClick={onLogin} className="text-muted hover:text-ink">
-                {t('app.login')}
-              </button>
-            )}
-            {onRegister && (
-              <button
-                type="button"
-                onClick={onRegister}
-                className="rounded-full bg-ink px-3 py-1.5 text-white"
-              >
-                {t('app.signUp')}
-              </button>
-            )}
-          </div>
-        </header>
+  function sendComposer() {
+    if (busy) return
+    if (card?.intent === 'conversation') {
+      const next = askText.trim()
+      if (!next) return
+      setConversationHistory((history) => [
+        ...history,
+        { user: text, assistant: card.reflection },
+      ])
+      setText(next)
+      setAskText('')
+      setTurns([])
+      setCard(null)
+      setAsked('')
+      setTitleOverride(null)
+      void askModel(next, [])
+      return
+    }
+    if (card) {
+      askAboutOptions()
+      setAskText('')
+      return
+    }
+    if (!canShape) return
+    if (!authed) {
+      sessionStorage.setItem('desk_idea_draft', text)
+      onLogin?.()
+      return
+    }
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    void askModel(text, turns)
+  }
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-8 pb-8 pt-6">
-        <p className="mb-6 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
+  const leftPane = (
+    <div className="flex h-full min-h-0 flex-col p-3">
+      <div className="mb-3 flex items-center justify-between px-1">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink font-serif text-[15px] text-white">
+          e
+        </span>
+      </div>
+      <button
+        type="button"
+        className="mb-3 flex items-center gap-2 rounded-[10px] bg-[#f7f8fa] px-3 py-2 text-left text-[13.5px]"
+      >
+        <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#4e5969] text-[12px] leading-none">
+          +
+        </span>
+        新论文
+      </button>
+      <p className="px-2 pb-1 pt-2 text-[12px] text-[#86909c]">论文</p>
+      <div className="min-h-0 flex-1 overflow-y-auto text-[13.5px]">
+        <div className="rounded-lg bg-[#f2f3f5] px-2.5 py-1.5 font-medium">
+          {title || t('desk.heading')}
+        </div>
+        <div className="px-2.5 py-1.5 text-[#4e5969]">课设样例：年龄与收入</div>
+      </div>
+      <p className="px-2 pb-1 pt-3 text-[12px] text-[#86909c]">数据</p>
+      <button
+        type="button"
+        onClick={onPickData}
+        disabled={uploading}
+        className="rounded-lg px-2.5 py-1.5 text-left text-[13.5px] hover:bg-[#f7f8fa] disabled:opacity-50"
+      >
+        ＋ {uploading ? t('app.uploading') : t('desk.uploadCta')}
+      </button>
+      <div className="mt-auto flex items-center gap-2 border-t border-black/[0.06] pt-2.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[12px] text-white">
+          e
+        </span>
+        <span className="text-[13px] font-medium">econpaper</span>
+      </div>
+    </div>
+  )
 
-        <label className="relative block">
-          <span className="sr-only">{t('desk.paperLabel')}</span>
+  const centerPane = (
+    <div className="flex h-full min-h-0 flex-col bg-[#fffefb]">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] px-6">
+        <p className="truncate text-[14px] font-medium">{title || t('desk.heading')}</p>
+        <div className="flex items-center gap-3 text-[13px]">
+          {onLogin && (
+            <button type="button" onClick={onLogin} className="text-muted hover:text-ink">
+              {t('app.login')}
+            </button>
+          )}
+          {onRegister && (
+            <button
+              type="button"
+              onClick={onRegister}
+              className="rounded-full bg-ink px-3 py-1.5 text-white"
+            >
+              {t('app.signUp')}
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main data-testid="desk-conversation" className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex min-h-full w-full max-w-[780px] flex-col px-6 pb-8 pt-7 sm:px-10">
+          <p className="mb-8 text-[12.5px] tracking-wide text-[#8a8a8a]">✓ {t('desk.trust')}</p>
+
+          {!text && (
+            <section className="my-auto pb-16" data-testid="desk-empty-state">
+              <p className="font-serif text-[30px] leading-tight text-ink">先说一句你想研究什么。</p>
+              <p className="mt-3 max-w-[34rem] text-[14px] leading-7 text-muted">
+                我会保留你的原话，一次只追问一个决定；数据入口和研究进度始终留在两侧。
+              </p>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {(['desk.starter1', 'desk.starter2', 'desk.starter3'] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleChange(t(key))}
+                    className="rounded-full border border-black/[0.08] bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors hover:bg-black/[0.03] hover:text-ink"
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-5 text-[13px] text-muted">
+                {t('desk.haveDataQ')}{' '}
+                <button
+                  type="button"
+                  data-testid="desk-upload-inline"
+                  onClick={onPickData}
+                  disabled={uploading}
+                  className="text-ink underline underline-offset-4 hover:opacity-80 disabled:opacity-50"
+                >
+                  {uploading ? t('app.uploading') : t('desk.uploadCta')}
+                </button>
+              </p>
+            </section>
+          )}
+
+          {text && (
+            <div className="space-y-7" data-testid="desk-thread">
+              {conversationHistory.map((item, index) => (
+                <div key={`${item.user}-${index}`} className="space-y-4">
+                  <div className="ml-auto max-w-[82%] rounded-[18px] rounded-br-[5px] bg-[#f0ede5] px-4 py-3 text-[15px] leading-7 text-ink">
+                    {item.user}
+                  </div>
+                  <div className="max-w-[92%]">
+                    <span className="text-[12px] font-medium text-accent">econpaper</span>
+                    <p className="mt-2 text-[15px] leading-7 text-ink">{item.assistant}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="ml-auto max-w-[82%] rounded-[18px] rounded-br-[5px] bg-[#f0ede5] px-4 py-3 text-[15px] leading-7 text-ink">
+                {text}
+              </div>
+
+              {turns.map((turn, index) => (
+                <div key={`${turn.id}-${index}`} className="space-y-3">
+                  <p className="max-w-[88%] text-[14px] leading-7 text-muted">{turn.question}</p>
+                  <p className="ml-auto max-w-[82%] rounded-[18px] rounded-br-[5px] bg-[#f0ede5] px-4 py-3 text-[14px] leading-6 text-ink">
+                    {turn.answer}
+                  </p>
+                </div>
+              ))}
+
+              {busy && !card && (
+                <p className="text-[14px] text-muted" data-testid="desk-thinking">{t('desk.shaping')}</p>
+              )}
+
+              {card?.intent === 'conversation' && (
+                <section data-testid="conversation-reply" className="animate-slide-up max-w-[92%] pb-4">
+                  <span className="text-[12px] font-medium text-accent">econpaper</span>
+                  <p className="mt-2 text-[15px] leading-7 text-ink">{card.reflection}</p>
+                </section>
+              )}
+
+              {card?.intent === 'research' && (
+                <section data-testid="question-card" className="animate-slide-up max-w-[92%] pb-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-accent">econpaper</span>
+                    <button
+                      type="button"
+                      data-testid="desk-speak-btn"
+                      onClick={() => void speakLine(card.ready ? title : card.question || title)}
+                      className="rounded-md px-2 py-1 text-xs text-muted hover:text-ink"
+                    >
+                      {speaking ? t('desk.speakStop') : t('desk.speakAsk')}
+                    </button>
+                  </div>
+                  <p data-testid="desk-reflection" className="mb-4 text-[15px] leading-7 text-ink">
+                    {card.reflection}
+                  </p>
+                  <textarea
+                    data-testid="question-title"
+                    value={title}
+                    onChange={(e) => setTitleOverride(e.target.value)}
+                    className="w-full resize-none border-l-2 border-accent/45 bg-transparent py-1 pl-4 font-serif text-[21px] leading-8 text-ink outline-none"
+                    rows={3}
+                  />
+
+                  {card.question && (
+                    <div className="mt-5">
+                      <p className="text-[14px] leading-7 text-ink">{card.question}</p>
+                      {asked && busy && (
+                        <p data-testid="desk-ask-pending" className="mt-2 text-sm leading-7 text-muted">
+                          {asked} — {t('desk.shaping')}
+                        </p>
+                      )}
+                      {card.explain && !(asked && busy) && (
+                        <p data-testid="desk-explain" className="mt-2 text-sm leading-7 text-muted">
+                          {card.explain}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {card.options.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            data-testid={`desk-option-${option.id}`}
+                            onClick={() => choose(option.id, option.label)}
+                            className="rounded-full border border-border bg-panel px-3.5 py-2 text-[13px] text-ink transition-colors hover:border-ink/20 hover:bg-cream"
+                          >
+                            {shortLabel(option.label)}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          data-testid="desk-ask-btn"
+                          onClick={() => {
+                            setAsking(true)
+                            requestAnimationFrame(() => paperRef.current?.focus())
+                          }}
+                          className="rounded-full px-3.5 py-2 text-[13px] text-muted hover:bg-cream hover:text-ink"
+                        >
+                          {t('desk.askWhat')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {card.ready && (
+                    <div className="mt-6 flex justify-end">
+                      <button
+                        type="button"
+                        data-testid="desk-confirm-btn"
+                        onClick={() => onConfirm(title)}
+                        className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90"
+                      >
+                        {t('desk.confirm')}
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
+
+          {uploadError && (
+            <p data-testid="upload-error" className="mt-3 text-sm text-danger">
+              {uploadError}
+            </p>
+          )}
+        </div>
+      </main>
+
+      <div className="shrink-0 border-t border-black/[0.06] bg-[#fffefb]/95 px-5 py-3 backdrop-blur sm:px-8">
+        <label className="relative mx-auto block w-full max-w-[780px]">
+          <span className="sr-only">{card && !conversational ? t('desk.askPlaceholder') : t('desk.paperLabel')}</span>
           <div
-            className={`composer-shell ${
-              voiceStatus === 'listening' ? 'animate-listen ring-1 ring-accent/40' : ''
-            }`}
+            className={`rounded-[18px] border bg-white transition-colors ${
+              asking ? 'border-accent/40' : 'border-black/[0.1]'
+            } ${voiceStatus === 'listening' ? 'animate-listen ring-1 ring-accent/40' : ''}`}
           >
             <textarea
               ref={paperRef}
-              data-testid="desk-paper"
-              value={text}
-              onChange={(e) => handleChange(e.target.value)}
-              placeholder={text ? '' : t('desk.placeholder')}
-              className="min-h-[140px] w-full resize-none rounded-[24px] bg-transparent px-5 pt-5 font-serif text-[18px] leading-8 text-ink outline-none placeholder:text-muted/55"
+              data-testid={conversational ? 'desk-conversation-input' : card ? 'desk-ask-input' : 'desk-paper'}
+              value={card ? askText : text}
+              onChange={(event) => {
+                if (card) setAskText(event.target.value)
+                else handleChange(event.target.value)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  sendComposer()
+                }
+              }}
+              placeholder={conversational ? '继续说你的想法…' : card ? t('desk.askPlaceholder') : t('desk.placeholder')}
+              className="min-h-[56px] w-full resize-none rounded-[18px] bg-transparent px-4 pt-3 text-[15px] leading-6 text-ink outline-none placeholder:text-muted/55"
             />
-            <div className="flex items-center gap-2 px-3 pb-3">
+            <div className="flex items-center gap-2 px-2.5 pb-2.5">
               <button
                 type="button"
                 onClick={onPickData}
                 disabled={uploading}
                 aria-label={t('desk.haveData')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none text-ink hover:bg-black/[0.04] disabled:opacity-50"
               >
                 +
               </button>
@@ -366,267 +582,112 @@ export default function DeskPage({
                 data-testid="desk-listen-btn"
                 onClick={toggleListen}
                 disabled={voiceStatus === 'unsupported'}
-                className={`rounded-full px-3.5 py-2 text-[13px] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${
-                  voiceStatus === 'listening'
-                    ? 'bg-accent text-white'
-                    : 'text-muted hover:bg-black/[0.04] hover:text-ink'
+                className={`rounded-full px-3 py-1.5 text-[12.5px] disabled:opacity-40 ${
+                  voiceStatus === 'listening' ? 'bg-accent text-white' : 'text-muted hover:bg-black/[0.04] hover:text-ink'
                 }`}
               >
                 {listenLabel}
               </button>
-              {voiceStatus === 'listening' && (
-                <span className="text-[13px] text-muted">{t('desk.listening')}</span>
-              )}
+              {voiceStatus === 'listening' && <span className="text-[12px] text-muted">{t('desk.listening')}</span>}
               <button
                 type="button"
-                data-testid="desk-shape-btn"
-                onClick={() => {
-                  if (!canShape || busy) return
-                  if (!authed) {
-                    // 边界态：未登录先注册/登录，想法暂存 sessionStorage，回来即恢复
-                    sessionStorage.setItem('desk_idea_draft', text)
-                    onLogin?.()
-                    return
-                  }
-                  void askModel(text, turns)
-                }}
-                disabled={!canShape || busy}
-                className="ml-auto rounded-full bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label={t('desk.shape')}
+                data-testid={card ? 'desk-ask-send' : 'desk-shape-btn'}
+                onClick={sendComposer}
+                disabled={busy || (conversational ? !askText.trim() : !card && !canShape)}
+                className="ml-auto rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label={conversational ? t('desk.shape') : card ? t('desk.askSend') : t('desk.shape')}
               >
-                {busy ? t('desk.shaping') : t('desk.shape')} →
+                {busy ? t('desk.shaping') : conversational ? t('desk.shape') : card ? t('desk.askSend') : t('desk.shape')} →
               </button>
             </div>
           </div>
         </label>
-
-        {!text && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {(['desk.starter1', 'desk.starter2', 'desk.starter3'] as const).map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleChange(t(key))}
-                className="rounded-full border border-black/[0.08] bg-white px-3.5 py-2 text-left text-[13px] leading-5 text-muted transition-colors duration-200 hover:bg-black/[0.03] hover:text-ink"
-              >
-                {t(key)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!text && (
-          <p className="mt-5 text-[13px] text-muted">
-            {t('desk.haveDataQ')}{' '}
-            <button
-              type="button"
-              data-testid="desk-upload-inline"
-              onClick={onPickData}
-              disabled={uploading}
-              className="text-ink underline underline-offset-4 transition-colors hover:opacity-80 disabled:opacity-50"
-            >
-              {uploading ? t('app.uploading') : t('desk.uploadCta')}
-            </button>
-          </p>
-        )}
-
-        {uploadError && (
-          <p data-testid="upload-error" className="mt-3 text-sm text-danger">
-            {uploadError}
-          </p>
-        )}
-
-        {card && (
-          <section
-            data-testid="question-card"
-            className="animate-slide-up thread-card mt-8 p-6"
-          >
-            <div className="flex items-start justify-end">
-              <button
-                type="button"
-                data-testid="desk-speak-btn"
-                onClick={() => void speakLine(card.ready ? title : card.question || title)}
-                className="rounded-md px-2 py-1 text-xs text-muted underline-offset-4 hover:text-ink hover:underline"
-              >
-                {speaking ? t('desk.speakStop') : t('desk.speakAsk')}
-              </button>
-            </div>
-            <textarea
-              data-testid="question-title"
-              value={title}
-              onChange={(e) => setTitleOverride(e.target.value)}
-              className="w-full resize-none bg-transparent font-serif text-xl leading-8 text-ink outline-none"
-              rows={3}
-            />
-
-            {card.question && (
-              <div className="mt-6">
-                <p className="text-sm leading-7 text-ink">{card.question}</p>
-                {asked && busy && (
-                  <p data-testid="desk-ask-pending" className="mt-2 text-sm leading-7 text-muted">
-                    {asked} — {t('desk.shaping')}
-                  </p>
-                )}
-                {card.explain && !(asked && busy) && (
-                  <p data-testid="desk-explain" className="mt-2 text-sm leading-7 text-muted">
-                    {card.explain}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {card.options.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      data-testid={`desk-option-${option.id}`}
-                      onClick={() => choose(option.id, option.label)}
-                      className="rounded-full border border-border bg-bg px-3.5 py-2 text-[13px] text-ink transition-colors duration-200 hover:border-ink/20 hover:bg-panel"
-                    >
-                      {shortLabel(option.label)}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    data-testid="desk-ask-btn"
-                    onClick={() => setAsking((open) => !open)}
-                    className="rounded-full px-3.5 py-2 text-[13px] text-muted hover:bg-panel hover:text-ink"
-                  >
-                    {t('desk.askWhat')}
-                  </button>
-                </div>
-                {asking && (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      data-testid="desk-ask-input"
-                      value={askText}
-                      onChange={(e) => setAskText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          askAboutOptions()
-                        }
-                      }}
-                      placeholder={t('desk.askPlaceholder')}
-                      className="min-w-0 flex-1 rounded-md border border-border bg-bg px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-                    />
-                    <button
-                      type="button"
-                      data-testid="desk-ask-send"
-                      onClick={askAboutOptions}
-                      disabled={busy}
-                      className="rounded-full border border-border px-3 py-2 text-[13px] text-ink hover:bg-panel disabled:opacity-40"
-                    >
-                      {busy ? t('desk.shaping') : t('desk.askSend')}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {card.ready && (
-              <div className="mt-6 flex justify-end">
-                <button
-                  type="button"
-                  data-testid="desk-confirm-btn"
-                  onClick={() => onConfirm(title)}
-                      className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white transition-opacity duration-200 hover:opacity-90"
-                >
-                  {t('desk.confirm')}
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {card && (
-          <div className="mt-6 space-y-2" data-testid="agent-queue">
-            <p className="text-[13px] text-muted">每一步一个 agent。点开，右边是它的工作台。写章串行，不并行代写整篇。</p>
-            {(
-              [
-                ['shape', '问', '方向凝练', '乱问 → Y/X/方法'],
-                ['clean', '洗', '清洗 8 步', '数据进来之后才跑'],
-                ['estimate', '估', '估计门', '主表先于正文'],
-                ['write', '章', 'Write Queue · 6 章串行', '没有主表，结果章锁定'],
-              ] as const
-            ).map(([id, mark, name, hint]) => (
-              <button
-                key={id}
-                type="button"
-                data-testid={`agent-row-${id}`}
-                onClick={() => setAgentPane(id)}
-                className={`flex w-full items-center gap-3 rounded-[14px] border px-3.5 py-3 text-left text-[13.5px] ${
-                  agentPane === id ? 'border-ink/20 bg-[#f2f3f5]' : 'border-black/[0.08] bg-white'
-                }`}
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[12px]">
-                  {mark}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="font-medium">{name}</span>
-                  <span className="mt-0.5 block text-[12px] text-muted">{hint}</span>
-                </span>
-                <span className="text-muted">›</span>
-              </button>
-            ))}
-          </div>
-        )}
-        </main>
       </div>
+    </div>
+  )
 
-      <aside className="flex w-[400px] shrink-0 flex-col border-l border-black/[0.06]" data-testid="agent-window">
-        <div className="border-b border-black/[0.06] px-4 py-3">
-          <p className="font-mono text-[14px] font-bold">econpaper Computer</p>
-          <p className="mt-1 text-[13px] text-muted">{paneTitle}</p>
+  const rightPane = (
+    <div className="flex h-full min-h-0 flex-col bg-[#fbfbfa]">
+      <div className="border-b border-black/[0.06] px-4 py-3">
+        <p className="font-mono text-[14px] font-bold">econpaper Computer</p>
+        <p className="mt-1 text-[13px] text-muted">{paneTitle}</p>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[13.5px] leading-7">
+        <div data-testid="agent-queue" className="mb-5 space-y-1.5">
+          {agentRows.map(([id, mark, name, hint]) => (
+            <button
+              key={id}
+              type="button"
+              data-testid={`agent-row-${id}`}
+              onClick={() => setAgentPane(id)}
+              className={`flex w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-left ${
+                agentPane === id ? 'bg-[#ebece9] text-ink' : 'text-muted hover:bg-[#f1f1ef] hover:text-ink'
+              }`}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[11px]">
+                {mark}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium">{name}</span>
+                <span className="block truncate text-[11.5px] text-muted">{hint}</span>
+              </span>
+            </button>
+          ))}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[13.5px] leading-7">
+
+        <div className="border-t border-black/[0.06] pt-4">
           {agentPane === 'shape' && (
             <>
               <p className="mb-3 text-[12px] text-muted">用户原话不会被丢掉。agent 只补可估计的骨架。</p>
-              {card ? (
+              {card?.intent === 'research' ? (
                 <dl className="space-y-2">
-                  <div>
-                    <dt className="text-[12px] text-muted">问题</dt>
-                    <dd>{title || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[12px] text-muted">线索</dt>
-                    <dd>{card.heard.join(' · ') || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[12px] text-muted">比较 / 结果</dt>
-                    <dd>
-                      {card.comparison} · {card.outcome}
-                    </dd>
-                  </div>
+                  <div><dt className="text-[12px] text-muted">问题</dt><dd>{title || '—'}</dd></div>
+                  <div><dt className="text-[12px] text-muted">线索</dt><dd>{card.heard.join(' · ') || '—'}</dd></div>
+                  <div><dt className="text-[12px] text-muted">比较 / 结果</dt><dd>{card.comparison} · {card.outcome}</dd></div>
                 </dl>
               ) : (
-                <p className="text-muted">先把一句话倒进中间。开始之后，设定会出现在这里。</p>
+                <p className="text-muted">
+                  {card?.intent === 'conversation'
+                    ? '还没有进入研究凝练。等你说出想研究的现象或问题。'
+                    : '先把一句话倒进中间。开始之后，设定会出现在这里。'}
+                </p>
               )}
             </>
           )}
           {agentPane === 'clean' && (
             <ul className="space-y-1 text-muted">
-              <li>profiling · 契约</li>
-              <li>missing · 缺失值</li>
-              <li>outliers · 异常值</li>
-              <li>audit · clean.py 留痕</li>
+              <li>profiling · 契约</li><li>missing · 缺失值</li><li>outliers · 异常值</li><li>audit · clean.py 留痕</li>
               <li className="pt-2">CSV 进来之后这些才会亮。</li>
             </ul>
           )}
-          {agentPane === 'estimate' && (
-            <p className="text-muted">还没有估计。数据进来之后，系数先于正文。结果章必须引用这张表。</p>
-          )}
+          {agentPane === 'estimate' && <p className="text-muted">还没有估计。数据进来之后，系数先于正文。结果章必须引用这张表。</p>}
           {agentPane === 'write' && (
             <ol className="space-y-1 text-muted">
-              <li>01 引言 · 排队</li>
-              <li>02 文献综述 · 排队</li>
-              <li>03 数据描述 · 排队</li>
-              <li>04 方法 · 排队</li>
-              <li>05 结果 · 锁（没有主表不能写）</li>
-              <li>06 结论 · 排队</li>
+              <li>01 引言 · 排队</li><li>02 文献综述 · 排队</li><li>03 数据描述 · 排队</li>
+              <li>04 方法 · 排队</li><li>05 结果 · 锁（没有主表不能写）</li><li>06 结论 · 排队</li>
             </ol>
           )}
         </div>
-      </aside>
+      </div>
     </div>
+  )
+
+  return (
+    <ResizableWorkspace
+      storageKey="econpaper.direction.layout.v2"
+      testId="desk-page"
+      leftTestId="desk-left-sidebar"
+      centerTestId="desk-center"
+      rightTestId="agent-window"
+      className="h-screen bg-white text-ink"
+      leftDefault={224}
+      rightDefault={320}
+      leftClassName="border-r border-black/[0.06] bg-white"
+      centerClassName="bg-[#fffefb]"
+      rightClassName="border-l border-black/[0.06] bg-[#fbfbfa]"
+      left={leftPane}
+      center={centerPane}
+      right={rightPane}
+    />
   )
 }

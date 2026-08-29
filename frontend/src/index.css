@@ -115,14 +115,6 @@ body {
 }
 
 @layer components {
-  /* DESIGN lock: 左栏章节 / 中栏纸 / 右栏步骤. Never stack; never wait on lg. */
-  .desk-columns {
-    display: grid;
-    grid-template-columns: 220px minmax(0, 1fr) 280px;
-    min-width: 760px;
-    min-height: 0;
-  }
-
   .desk-preview-columns {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr) 240px;

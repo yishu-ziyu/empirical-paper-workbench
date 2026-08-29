@@ -1275,6 +1275,11 @@ export interface components {
         };
         /** DeskDiscussResponse */
         DeskDiscussResponse: {
+            /**
+             * Intent
+             * @default research
+             */
+            intent: string;
             /** Reflection */
             reflection: string;
             /** Title */

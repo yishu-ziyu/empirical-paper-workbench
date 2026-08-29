@@ -46,11 +46,14 @@ describe('DeskPage', () => {
     vi.unstubAllGlobals()
   })
 
-  test('打开时只有纸，没有问题卡和三栏', () => {
+  test('打开时是连续对话空态，并保留左右功能栏', () => {
     renderDesk()
     expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('desk-paper')).toBeInTheDocument()
     expect(screen.getByTestId('desk-listen-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-left-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('agent-window')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-empty-state')).toBeInTheDocument()
     expect(screen.queryByTestId('question-card')).not.toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
   })
@@ -68,10 +71,72 @@ describe('DeskPage', () => {
     expect((screen.getByTestId('question-title') as HTMLTextAreaElement).value).toMatch(/养老|退休/)
     expect(screen.getByTestId('desk-option-policy')).toBeInTheDocument()
     expect(screen.queryByTestId('desk-option-work')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('desk-reflection')).not.toBeInTheDocument()
-    expect(screen.queryByText('听到')).not.toBeInTheDocument()
+    expect(screen.getByTestId('desk-thread')).toHaveTextContent('导师让我用 CHARLS 做点养老的')
+    expect(screen.getByTestId('desk-reflection')).toHaveTextContent('我听到了 CHARLS、养老')
+    expect(screen.getByTestId('desk-ask-input')).toBeInTheDocument()
     expect(screen.queryByTestId('desk-confirm-btn')).not.toBeInTheDocument()
     expect(screen.getByTestId('desk-ask-btn')).toBeInTheDocument()
+  })
+
+  test('两侧栏可以收起，宽度设置会保留', async () => {
+    const user = userEvent.setup()
+    renderDesk()
+
+    await user.click(screen.getByTestId('left-collapse-btn'))
+    await user.click(screen.getByTestId('right-collapse-btn'))
+
+    expect(screen.getByTestId('desk-left-sidebar')).toHaveClass('hidden')
+    expect(screen.getByTestId('agent-window')).toHaveClass('hidden')
+    expect(localStorage.getItem('econpaper.direction.layout.v2')).toContain('"leftOpen":false')
+    expect(localStorage.getItem('econpaper.direction.layout.v2')).toContain('"rightOpen":false')
+  })
+
+  test('问候只得到自然引导，不出现论文标题和固定研究选项', async () => {
+    const user = userEvent.setup()
+    mockDiscuss({
+      intent: 'conversation',
+      reflection: '你好！你可以随便说一句最近想研究的现象或问题。',
+      title: '',
+      heard: [],
+      comparison: '还没定',
+      outcome: '还没定',
+      question: '',
+      options: [],
+      explain: '',
+      ready: false,
+      source: 'llm',
+    })
+    renderDesk()
+
+    await user.type(screen.getByTestId('desk-paper'), "ni'hao")
+    await user.click(screen.getByTestId('desk-shape-btn'))
+
+    expect(await screen.findByTestId('conversation-reply')).toHaveTextContent('你好')
+    expect(screen.queryByTestId('question-title')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('desk-option-policy')).not.toBeInTheDocument()
+    expect(screen.getByTestId('desk-conversation-input')).toBeInTheDocument()
+
+    mockDiscuss({
+      reflection: '我先保留你的原话。现在只确认要比较什么。',
+      title: '我想研究绿色金融是否降低了高耗能企业的碳排放',
+      heard: [],
+      comparison: '还没定',
+      outcome: '还没定',
+      question: '你现在更想弄清哪一件事？',
+      options: [{ id: 'policy', label: '政策有没有效果' }],
+      explain: '',
+      ready: false,
+      source: 'llm',
+    })
+    await user.type(
+      screen.getByTestId('desk-conversation-input'),
+      '我想研究绿色金融是否降低了高耗能企业的碳排放',
+    )
+    await user.click(screen.getByTestId('desk-ask-send'))
+
+    expect(await screen.findByTestId('question-card')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-thread')).toHaveTextContent("ni'hao")
+    expect(screen.getByTestId('desk-thread')).toHaveTextContent('绿色金融是否降低')
   })
 
   test('两轮选择后才能确认问题', async () => {

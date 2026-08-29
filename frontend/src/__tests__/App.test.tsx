@@ -66,15 +66,14 @@ describe('App 三栏布局', () => {
     expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
     const rightPane = screen.getByTestId('agent-panel')
     expect(rightPane).toContainElement(screen.getByTestId('paper-path'))
-    expect(rightPane.className).not.toMatch(/\bhidden\b|opacity-0|max-h-0|lg:block|lg:hidden/)
+    expect(rightPane).toHaveAttribute('data-open', 'true')
     const desk = screen.getByTestId('desk-columns')
     expect(desk).toContainElement(rightPane)
     expect(desk.className).not.toMatch(/grid-cols-1|lg:grid-cols/)
-    expect(desk).toHaveStyle({
-      display: 'grid',
-      gridTemplateColumns: '220px minmax(0, 1fr) 280px',
-    })
-    expect(rightPane).toHaveStyle({ minWidth: '280px' })
+    expect(rightPane).toHaveStyle({ width: '280px' })
+    expect(screen.getByTestId('outline-panel')).toHaveStyle({ width: '220px' })
+    expect(screen.getByTestId('left-resize-handle')).toBeInTheDocument()
+    expect(screen.getByTestId('right-resize-handle')).toBeInTheDocument()
     for (const id of PAPER_NODES) {
       expect(rightPane).toContainElement(screen.getByTestId(`paper-path-${id}`))
     }

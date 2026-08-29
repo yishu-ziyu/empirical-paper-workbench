@@ -67,6 +67,38 @@ def test_identification_verify_did_california_prop99(tmp_path):
     assert result["identification_failed"] is False
 
 
+def test_identification_verify_did_drops_missing_required_rows(tmp_path):
+    """Missing outcomes must not trigger StatsPAI's silent beta_twfe=0 path."""
+    statspai = pytest.importorskip("statspai")
+    df = statspai.california_prop99()
+    df.loc[df.index[0], "packspercapita"] = float("nan")
+    csv_path = tmp_path / "california_prop99_missing_y.csv"
+    df.to_csv(csv_path, index=False)
+
+    result = identification_verify(
+        {
+            "csv_path": str(csv_path),
+            "research_direction": {
+                "method": "did",
+                "outcome_col": "packspercapita",
+                "treatment_col": "treated",
+                "time_col": "year",
+                "id_col": "state",
+            },
+        }
+    )
+    bacon = next(
+        item
+        for item in result["identification_diag"]["diagnostics"]
+        if item["test"] == "bacon_decomposition"
+    )
+
+    assert bacon["rows_dropped_missing"] == 1
+    assert bacon["n_obs"] == len(df) - 1
+    assert bacon["status"] == "error"
+    assert bacon.get("beta_twfe") != 0.0
+
+
 def test_identification_verify_iv_dgp():
     """Test IV identification with generated dgp."""
     statspai = pytest.importorskip("statspai")
@@ -221,3 +253,60 @@ def test_identification_verify_did_missing_cols_unscored():
     finally:
         import os
         os.unlink(csv_path)
+
+
+def _block_statspai_import(monkeypatch):
+    """Force every `import statspai` to raise ModuleNotFoundError."""
+    import sys
+
+    real_import = __import__
+
+    def blocked(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "statspai" or (isinstance(name, str) and name.startswith("statspai.")):
+            raise ModuleNotFoundError("No module named 'statspai'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", blocked)
+    monkeypatch.delitem(sys.modules, "statspai", raising=False)
+    for key in [k for k in list(sys.modules) if k.startswith("statspai.")]:
+        monkeypatch.delitem(sys.modules, key, raising=False)
+
+
+def test_identification_verify_missing_statspai_does_not_raise(tmp_path, monkeypatch):
+    """`import statspai` raising ModuleNotFoundError must not 500 identification."""
+    csv_path = tmp_path / "panel.csv"
+    pd.DataFrame(
+        {
+            "y": [1.0, 1.2, 2.0, 2.4],
+            "treat": [0, 0, 1, 1],
+            "year": [2000, 2001, 2000, 2001],
+            "id": [1, 1, 2, 2],
+        }
+    ).to_csv(csv_path, index=False)
+    _block_statspai_import(monkeypatch)
+
+    result = identification_verify(
+        {
+            "csv_path": str(csv_path),
+            "research_direction": {
+                "method": "did",
+                "outcome": "y",
+                "treatment": "treat",
+                "time_col": "year",
+                "id_col": "id",
+            },
+        }
+    )
+    assert result.get("identification_failed") is False
+    assert result.get("star_rating") is None
+    diag = result["identification_diag"]
+    bacon = next(d for d in diag["diagnostics"] if d["test"] == "bacon_decomposition")
+    assert bacon["status"] == "error"
+    assert bacon["reason"] == "statspai_unavailable"
+    assert "No module named 'statspai'" in bacon["error"]
+    assert any(
+        item.get("reason") == "statspai_unavailable"
+        and item.get("node") == "identification_verify"
+        for item in (result.get("degradations") or [])
+    )
+    assert "不编造" in diag["report"]

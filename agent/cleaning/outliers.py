@@ -1,8 +1,8 @@
 """Sub-step 4: outlier detection + winsorize.
 
-Detects outliers via the IQR rule (for the report) and clips numeric columns
-via percentile winsorization (StatsPAI ``winsor`` with a pandas fallback).
-Before/after distribution stats are recorded per dataset in the step report.
+Detects outliers via the IQR rule and clips only continuous columns that
+actually contain IQR outliers. Research-design columns and binary indicators
+are report-only. Before/after distribution stats are recorded per dataset.
 
 The report carries ``stats_pai_used`` (bool) so callers can tell whether the
 winsorization was delegated to StatsPAI or handled by the pandas fallback.
@@ -24,6 +24,7 @@ class OutliersStep:
         workspace = config.get("workspace", "/tmp")
         order = config.get("order", 0)
         cuts = config.get("cuts", _DEFAULT_CUTS)
+        protected_columns = set(config.get("protected_columns") or [])
 
         before_list: list = []
         after_list: list = []
@@ -61,21 +62,28 @@ class OutliersStep:
 
             before = _distribution(df, numeric_cols)
             iqr_outliers = _iqr_outlier_counts(df, numeric_cols)
+            winsor_cols = [
+                column
+                for column in numeric_cols
+                if column not in protected_columns
+                and int(iqr_outliers.get(column, 0)) > 0
+                and int(df[column].nunique(dropna=True)) > 2
+            ]
 
-            if sp_winsor is not None:
+            if sp_winsor is not None and winsor_cols:
                 try:
-                    df = sp_winsor(df, vars=numeric_cols, cuts=cuts, replace=True)
+                    df = sp_winsor(df, vars=winsor_cols, cuts=cuts, replace=True)
                     stats_pai_used = True
                 except Exception:
                     logger.warning(
                         "StatsPAI winsor() failed for dataset %d, falling back to pandas", i
                     )
-                    df = _winsorize_pandas(df, numeric_cols, cuts)
-            else:
+                    df = _winsorize_pandas(df, winsor_cols, cuts)
+            elif winsor_cols:
                 logger.warning(
                     "StatsPAI not available for winsorize (dataset %d), using pandas fallback", i
                 )
-                df = _winsorize_pandas(df, numeric_cols, cuts)
+                df = _winsorize_pandas(df, winsor_cols, cuts)
 
             after = _distribution(df, numeric_cols)
 
@@ -90,12 +98,12 @@ class OutliersStep:
                 "before": before,
                 "after": after,
                 "iqr_outliers": iqr_outliers,
-                "winsorized": True,
+                "winsorized": bool(winsor_cols),
             }
             before_list.append(before)
             after_list.append(after)
             iqr_outliers_list.append(iqr_outliers)
-            winsorized_list.append(True)
+            winsorized_list.append(bool(winsor_cols))
 
         return datasets, {
             "before": before_list,

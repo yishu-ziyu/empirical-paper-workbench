@@ -25,6 +25,7 @@ class UploadDataOutput(TypedDict, total=False):
 
 
 class CleanDataOutput(TypedDict, total=False):
+    csv_path: Optional[str]
     uploaded_datasets: List[DatasetMeta]
     cleaned_datasets: List[DatasetMeta]
     cleaning_report: Any  # {"steps": list[StepReport]}

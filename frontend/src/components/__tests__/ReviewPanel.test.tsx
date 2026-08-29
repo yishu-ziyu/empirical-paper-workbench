@@ -35,6 +35,7 @@ const passReview: ReviewInfoResponse = {
   review_iteration: 1,
   max_review_iterations: 2,
   auto_decision: 'pass',
+  review_degraded: false,
 }
 
 const failReview: ReviewInfoResponse = {
@@ -52,6 +53,7 @@ const failReview: ReviewInfoResponse = {
   review_iteration: 2,
   max_review_iterations: 2,
   auto_decision: 'fail',
+  review_degraded: false,
 }
 
 const baseProps: ReviewPanelProps = {
@@ -198,6 +200,7 @@ describe('ReviewPanel 人工评审面板', () => {
       review_iteration: 0,
       max_review_iterations: 2,
       auto_decision: 'fail',
+      review_degraded: false,
     }
     renderWithI18n(<ReviewPanel {...baseProps} review={emptyReview} />)
     expect(screen.getByText('暂无评审反馈')).toBeInTheDocument()

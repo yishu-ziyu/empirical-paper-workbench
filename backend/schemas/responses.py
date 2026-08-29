@@ -116,6 +116,7 @@ class DirectionResponse(BaseModel):
     identification_report: Optional[str] = None
     results: Optional[str] = None
     estimate: Any = None
+    cleaning_report: Any = None
     claim: Optional[str] = None
     literature_source: Optional[str] = None
     degradations: List[Any] = Field(default_factory=list)
@@ -174,6 +175,22 @@ class RegenerateResponse(BaseModel):
     grounding_failures: List[str] = Field(default_factory=list)
 
 
+class EditChapterResponse(BaseModel):
+    """POST /sessions/{id}/edit-chapter 返回体。
+
+    与 regenerate 同形：改过的章 + 全表。instruction 走 generate_chapter
+    时附带评审字段；content 落盘不审，评审字段为空。
+    """
+
+    chapter: ChapterResponse
+    body_chapters: List[ChapterResponse] = Field(default_factory=list)
+    score: Optional[float] = None
+    auto_decision: Optional[str] = None  # "pass" | "fail"
+    review_source: Optional[str] = None
+    review_degraded: bool = False
+    grounding_failures: List[str] = Field(default_factory=list)
+
+
 class ChapterVersionItem(BaseModel):
     """单个版本预览项。"""
 
@@ -187,6 +204,13 @@ class VersionsResponse(BaseModel):
     chapter_index: int
     count: int
     versions: List[ChapterVersionItem] = Field(default_factory=list)
+
+
+class TranslateCodeResponse(BaseModel):
+    """POST /sessions/{id}/translate-code 返回体。"""
+
+    ok: bool = True
+    code_translations: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

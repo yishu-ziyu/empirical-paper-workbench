@@ -195,6 +195,56 @@ def test_clean_data_runs_all_eight_substeps(csv_full, workspace):
     assert steps[7]["status"] == "success"
 
 
+def test_clean_data_promotes_cleaned_path_for_downstream_nodes(csv_full, workspace):
+    """Downstream analysis reads the final cleaned sidecar, not the raw upload."""
+    result = clean_data(
+        make_state(
+            csv_path=str(csv_full),
+            uploaded_datasets=[{"path": str(csv_full)}],
+            filter_conditions=[{"col": "age", "op": ">=", "val": 40}],
+            workspace=workspace,
+        )
+    )
+
+    cleaned_path = result["cleaned_datasets"][0]["path"]
+    assert cleaned_path != str(csv_full)
+    assert result["csv_path"] == cleaned_path
+    assert len(pd.read_csv(result["csv_path"])) == 4
+
+
+def test_clean_data_does_not_winsorize_design_columns(tmp_path, workspace):
+    """Identifiers and binary treatment columns must survive outlier cleaning."""
+    raw_path = tmp_path / "design.csv"
+    original = pd.DataFrame(
+        {
+            "id": [*range(1, 21), 999],
+            "year": [2020] * 21,
+            "treat": [0] * 20 + [1],
+            "income": [*range(10, 210, 10), 1000],
+        }
+    )
+    original.to_csv(raw_path, index=False)
+
+    result = clean_data(
+        make_state(
+            csv_path=str(raw_path),
+            uploaded_datasets=[{"path": str(raw_path)}],
+            research_direction={
+                "method": "did",
+                "id_col": "id",
+                "time_col": "year",
+                "iv": "treat",
+            },
+            workspace=workspace,
+        )
+    )
+    cleaned = pd.read_csv(result["csv_path"])
+
+    assert cleaned["id"].tolist() == original["id"].tolist()
+    assert cleaned["treat"].tolist() == original["treat"].tolist()
+    assert cleaned["income"].max() < original["income"].max()
+
+
 # --------------------------------------------------------------------------- #
 # Sub-step failure isolation (ADR-0002 unified try/except)
 # --------------------------------------------------------------------------- #

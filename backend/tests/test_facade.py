@@ -6,7 +6,7 @@ names that the facade looks up at call time. This verifies:
 1. Session lifecycle (create / has / get / save / update / seed / drop).
 2. Graph invocation (run_upload_pipeline) stores final state + csv_path.
 3. Single-node calls (set_direction_and_outline, resume_outline,
-   generate_chapter, regenerate_chapter, rollback_chapter, export_document)
+   generate_chapter, regenerate_chapter, edit_chapter, rollback_chapter, export_document)
    call the right node, persist state, and return the new state / result.
 4. Cleaning step calls (transform_variables, filter_sample, balance_panel)
    delegate to the step class with the right config.
@@ -506,17 +506,101 @@ def test_regenerate_chapter_sets_index_and_calls_node(monkeypatch):
 
     def fake_generate_chapter(state):
         captured["current_chapter_index"] = state.get("current_chapter_index")
+        captured["current_chapter"] = state.get("current_chapter")
         return {"body_chapters": [{"content": "new"}]}
 
     monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
     monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
 
     sid = "test-regen"
-    facade.seed_state(sid, {})
+    facade.seed_state(sid, {"current_chapter": {"type": "methods"}})
     result = facade.regenerate_chapter(sid, 2)
 
     assert captured["current_chapter_index"] == 2
+    assert captured["current_chapter"] is None
     assert result["body_chapters"] == [{"content": "new"}]
+    facade.drop_session(sid)
+
+
+def test_regenerate_chapter_writes_instruction(monkeypatch):
+    """Optional instruction is stored on revision_suggestions[index]."""
+    captured = {}
+
+    def fake_generate_chapter(state):
+        captured["revision_suggestions"] = state.get("revision_suggestions")
+        captured["current_chapter_index"] = state.get("current_chapter_index")
+        return {"body_chapters": [{"content": "new"}]}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+
+    sid = "test-regen-instruction"
+    facade.seed_state(sid, {})
+    facade.regenerate_chapter(sid, 0, instruction="写短一点")
+    assert captured["current_chapter_index"] == 0
+    assert captured["revision_suggestions"][0] == "写短一点"
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_instruction_sets_revision_and_regenerates(monkeypatch):
+    """edit_chapter(instruction) writes revision_suggestions then generate_chapter."""
+    captured = {}
+
+    def fake_generate_chapter(state):
+        captured["current_chapter_index"] = state.get("current_chapter_index")
+        captured["revision_suggestions"] = list(state.get("revision_suggestions") or [])
+        return {"body_chapters": [{"content": "refined", "status": "generated"}]}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+
+    sid = "test-edit-instr"
+    facade.seed_state(
+        sid,
+        {
+            "body_chapters": [
+                {"type": "intro", "content": "old intro", "versions": ["old intro"]}
+            ]
+        },
+    )
+    result = facade.edit_chapter(sid, 0, instruction="把引言第一段写短一点")
+
+    assert captured["current_chapter_index"] == 0
+    assert "把引言第一段写短一点" in captured["revision_suggestions"][0]
+    assert "old intro" in captured["revision_suggestions"][0]
+    assert result["body_chapters"][0]["content"] == "refined"
+    facade.drop_session(sid)
+
+
+def test_edit_chapter_content_does_not_call_generate(monkeypatch):
+    """edit_chapter(content) persists markdown without generate_chapter."""
+    calls = []
+
+    def fake_generate_chapter(state):
+        calls.append(state)
+        return {}
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+
+    sid = "test-edit-content"
+    facade.seed_state(
+        sid,
+        {
+            "body_chapters": [
+                {"type": "intro", "content": "old", "versions": ["old"]}
+            ],
+            "review_scores": [0.95],
+            "review_feedback": ["过审"],
+        },
+    )
+    result = facade.edit_chapter(sid, 0, content="## 研究背景\n\n短。\n")
+    assert calls == []
+    ch = result["body_chapters"][0]
+    assert ch["content"] == "## 研究背景\n\n短。\n"
+    assert ch["status"] == "edited"
+    assert ch["versions"][0] == "## 研究背景\n\n短。\n"
+    assert result["review_scores"][0] in (None, "")
+    assert result["review_feedback"][0] in (None, "")
     facade.drop_session(sid)
 
 
@@ -600,6 +684,70 @@ def test_export_document_503_when_node_missing(monkeypatch):
         facade.export_document("test-exp-503", "cn_journal")
     assert exc_info.value.status_code == 503
     facade.drop_session("test-exp-503")
+
+
+def test_run_translate_code_calls_node_and_persists(monkeypatch):
+    """run_translate_code writes code_translations into session state."""
+    captured = {}
+
+    def fake_translate(state):
+        captured["saw_state"] = True
+        return {
+            "code_translations": [
+                {"lang": "stata", "code": "regress y x\n", "filename": "analysis.do"},
+            ]
+        }
+
+    monkeypatch.setattr("facade.translate_code_node", fake_translate)
+
+    sid = "test-translate-code"
+    facade.seed_state(sid, {"research_direction": {"dv": "y", "iv": "x"}})
+    result = facade.run_translate_code(sid)
+
+    assert captured["saw_state"] is True
+    assert result["code_translations"][0]["lang"] == "stata"
+    assert facade.get_state(sid)["code_translations"][0]["filename"] == "analysis.do"
+    facade.drop_session(sid)
+
+
+def test_run_translate_code_503_when_node_missing(monkeypatch):
+    """run_translate_code raises 503 when translate_code_node is None."""
+    monkeypatch.setattr("facade.translate_code_node", None)
+    facade.seed_state("test-translate-503", {})
+    with pytest.raises(Exception) as exc_info:
+        facade.run_translate_code("test-translate-503")
+    assert exc_info.value.status_code == 503
+    facade.drop_session("test-translate-503")
+
+
+def test_generate_chapter_fills_code_translations(monkeypatch):
+    """Successful generate fills Stata/R translations for /code-export."""
+    monkeypatch.setattr(
+        "facade.generate_chapter_node",
+        lambda state: {"body_chapters": [state["current_chapter"]]},
+    )
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+    monkeypatch.setattr(
+        "facade.translate_code_node",
+        lambda state: {
+            "code_translations": [
+                {"lang": "stata", "code": "regress income age\n", "filename": "analysis.do"},
+                {"lang": "r", "code": "lm(income ~ age, data=df)\n", "filename": "analysis.R"},
+            ]
+        },
+    )
+
+    sid = "test-gen-fills-code"
+    facade.seed_state(
+        sid,
+        {"research_direction": {"dv": "income", "iv": "age", "method": "ols"}},
+    )
+    result = facade.generate_chapter(sid, {"type": "intro", "title": "引言"})
+    langs = {t["lang"] for t in result["code_translations"]}
+    assert "stata" in langs
+    assert "r" in langs
+    assert facade.get_state(sid)["code_translations"]
+    facade.drop_session(sid)
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,6 @@
 // Tailwind config (CommonJS — project is "type": "module", so .cjs is required).
-// Living-notes cream/paper/green. Crayon red is retired.
+// Paper / ink / shelf green. Crayon red and the dark room are retired.
 
-// Tremor plugin: newer @tremor/react (v3.18+) no longer ships a tailwind plugin
-// export; load defensively so the build stays green across versions.
 let tremorPlugin = null;
 try {
   const tremor = require('@tremor/react');

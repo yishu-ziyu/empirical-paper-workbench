@@ -6,6 +6,7 @@
 // 类型：从 types/api.ts import（遵循 ADR 0003 codegen 规范，不手写 API 响应 interface）
 
 import { useState } from 'react'
+import { API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -58,7 +59,7 @@ export default function ReviewPanel({
     setError(null)
     try {
       const resp = await fetch(
-        `http://localhost:8000/sessions/${sessionId}/review/decision`,
+        `${API_BASE}/sessions/${sessionId}/review/decision`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -81,7 +82,7 @@ export default function ReviewPanel({
   return (
     <div
       data-testid="review-panel"
-      className="border border-border rounded bg-paper shadow-sm"
+      className="rounded-xl border border-border bg-white shadow-sm"
     >
       {/* 头部：综合分 + 迭代轮次 + 自动决策 */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -104,6 +105,9 @@ export default function ReviewPanel({
           {t('review.roundLabel').replace('{0}', String(review.review_iteration)).replace('{1}', String(review.max_review_iterations))} · {t('review.scoreLabel').replace('{0}', review.score.toFixed(2))}
         </span>
       </div>
+      <p data-testid="review-plain-verdict" className="px-4 pb-2 text-[11.5px] leading-4 text-muted">
+        {(review.auto_decision === 'pass' ? t('review.plainPass') : t('review.plainFail')).replace('{0}', review.score.toFixed(2))}
+      </p>
       {(reviewSource || grounding.length > 0) && (
         <div className="border-b border-border px-4 py-2 font-mono text-[11px] text-muted">
           {reviewSource ? (
@@ -193,7 +197,7 @@ export default function ReviewPanel({
           data-testid="review-btn-accept"
           disabled={submitting}
           onClick={() => submitDecision('accept')}
-          className="flex-1 rounded border border-accent bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-50"
+          className="flex-1 rounded bg-accent px-3 py-1.5 font-serif text-xs font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
         >
           {autoPass ? t('review.accept') : t('review.acceptRegen')}
         </button>

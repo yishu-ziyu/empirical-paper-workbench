@@ -441,10 +441,17 @@ def open_session(workdir: str, *, prefer_kernel: bool = True) -> SandboxSession:
     return SubprocessSession(workdir)
 
 
+def run_sandboxed_python(code: str, workdir: str, timeout_s: int = 30) -> SandboxResult:
+    """一次性 subprocess 便捷入口，保留 Phase A 对外契约。"""
+    with SubprocessSession(workdir) as session:
+        return session.run(code, timeout_s=timeout_s)
+
+
 __all__ = [
     "SandboxResult",
     "SandboxSession",
     "KernelSession",
     "SubprocessSession",
     "open_session",
+    "run_sandboxed_python",
 ]

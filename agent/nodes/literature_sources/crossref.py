@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, List
 
-from protocols import LiteratureEntry
+from ...protocols import LiteratureEntry
 
 CROSSREF = "https://api.crossref.org/works"
 UA = "econpaper/1.0 (literature-search; mailto:dev@local)"

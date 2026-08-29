@@ -10,8 +10,8 @@ import json
 import re
 from typing import Any
 
-from desk.heuristic import heuristic_discuss
-from llm.call_llm import call_llm
+from .heuristic import heuristic_discuss
+from ..llm.call_llm import call_llm
 
 SYSTEM = """你是实证经济学研究助手，正在和学生对话，把一个模糊念头收成可估计的研究设定。
 规则：

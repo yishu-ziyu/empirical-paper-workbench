@@ -17,9 +17,9 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-from nodes.search_literature import MAX_LITERATURE_ENTRIES, _entry_key, _merge_unique
-from protocols import CitationGraphOutput, LiteratureEntry
-from state import EconPaperState
+from .search_literature import MAX_LITERATURE_ENTRIES, _entry_key, _merge_unique
+from ..protocols import CitationGraphOutput, LiteratureEntry
+from ..state import EconPaperState
 
 # 单次构建最多对多少条文献调 references API
 # Semantic Scholar 无 key 限 100 次/5分钟，这里保守取 5
@@ -57,7 +57,7 @@ def _citation_rank(entry: Any) -> tuple:
 
 def _entry_for_cited_doi(doi: str) -> LiteratureEntry:
     """集外被引 DOI → 文献条目。mock 库有就用全文，没有就只留 DOI。"""
-    from nodes.literature_sources.mock_corpus import mock_literature_corpus
+    from .literature_sources.mock_corpus import mock_literature_corpus
 
     for entry in mock_literature_corpus():
         if entry.get("doi") == doi:
@@ -107,7 +107,7 @@ def build_citation_graph(state: EconPaperState) -> CitationGraphOutput:
             "literature_actions": list(state.get("literature_actions") or []),
         }
 
-    from nodes.literature_sources.semantic_scholar import (
+    from .literature_sources.semantic_scholar import (
         semantic_scholar_references,
     )
 

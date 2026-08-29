@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from engine.sandbox import (
+from agent.engine.sandbox import (
     KernelSession,
     SandboxSession,
     SubprocessSession,
@@ -201,7 +201,7 @@ def test_open_session_prefers_kernel(tmp_path):
 def test_open_session_falls_back_to_subprocess(tmp_path, monkeypatch):
     """依赖缺失/启动失败时回退一次性 subprocess，接口不变。"""
     monkeypatch.setattr(
-        "engine.sandbox.KernelSession",
+        "agent.engine.sandbox.KernelSession",
         lambda _workdir: (_ for _ in ()).throw(RuntimeError("no jupyter here")),
     )
     session = open_session(str(tmp_path))
@@ -218,7 +218,7 @@ def test_open_session_falls_back_to_subprocess(tmp_path, monkeypatch):
 # ===========================================================================
 
 def _kernel_session(tmp_path):
-    from engine.sandbox import KernelSession
+    from agent.engine.sandbox import KernelSession
     return KernelSession(str(tmp_path))
 
 
@@ -256,7 +256,7 @@ def test_kernel_restore_missing_file_false(tmp_path):
 
 def test_subprocess_snapshot_noop(tmp_path):
     """无内核后端：snapshot/restore 是诚实的 no-op（返回 False，不写文件）。"""
-    from engine.sandbox import SubprocessSession
+    from agent.engine.sandbox import SubprocessSession
     s = SubprocessSession(str(tmp_path))
     assert s.snapshot(str(tmp_path / "k.dill")) is False
     assert s.restore(str(tmp_path / "k.dill")) is False

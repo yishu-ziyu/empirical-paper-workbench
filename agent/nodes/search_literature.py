@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, List, Optional, Tuple
 
-from protocols import LiteratureEntry, LiteratureOutput
-from state import EconPaperState
+from ..protocols import LiteratureEntry, LiteratureOutput
+from ..state import EconPaperState
 
 # 文献检索限长（Fitness Function）
 MAX_LITERATURE_ENTRIES = 20
@@ -46,7 +46,7 @@ def resolve_literature_source(state: EconPaperState) -> str:
     """
     import os
 
-    from llm.ssot import in_pytest
+    from ..llm.ssot import in_pytest
 
     explicit = str(state.get("literature_source") or "").strip()
     if explicit:
@@ -80,7 +80,7 @@ def _mock_search(query: str) -> List[LiteratureEntry]:
     lazy import 避免循环依赖。返回按 query 关键词匹配后的文献列表，
     每条 relevance_score 已按命中次数调整。
     """
-    from nodes.literature_sources.mock_corpus import (
+    from .literature_sources.mock_corpus import (
         filter_by_query,
         mock_literature_corpus,
     )
@@ -126,7 +126,7 @@ def _method_family(research_direction: Any) -> Optional[str]:
         method = research_direction
 
     try:
-        from design.spec import norm_method
+        from ..design.spec import norm_method
 
         key = norm_method(method)
         if key in METHOD_ANCHOR_DOIS:
@@ -157,7 +157,7 @@ def _method_anchors(family: Optional[str]) -> List[LiteratureEntry]:
     doi = METHOD_ANCHOR_DOIS.get(family)
     if not doi:
         return []
-    from nodes.literature_sources.mock_corpus import mock_literature_corpus
+    from .literature_sources.mock_corpus import mock_literature_corpus
 
     for entry in mock_literature_corpus():
         if entry.get("doi") == doi:
@@ -168,7 +168,7 @@ def _method_anchors(family: Optional[str]) -> List[LiteratureEntry]:
 def _dispatch_search(query: str, source: str) -> Tuple[List[LiteratureEntry], str]:
     """按源检索。失败降级 mock_degraded，不往外抛。"""
     if source == "apodex":
-        from nodes.literature_sources.apodex import (
+        from .literature_sources.apodex import (
             get_api_key_from_env,
             apodex_search,
         )
@@ -181,7 +181,7 @@ def _dispatch_search(query: str, source: str) -> Tuple[List[LiteratureEntry], st
         except RuntimeError:
             return _mock_search(query), "mock_degraded"
     if source == "semantic_scholar":
-        from nodes.literature_sources.semantic_scholar import (
+        from .literature_sources.semantic_scholar import (
             get_api_key_from_env,
             semantic_scholar_search,
         )
@@ -194,7 +194,7 @@ def _dispatch_search(query: str, source: str) -> Tuple[List[LiteratureEntry], st
         except RuntimeError:
             return _mock_search(query), "mock_degraded"
     if source == "crossref":
-        from nodes.literature_sources.crossref import crossref_search
+        from .literature_sources.crossref import crossref_search
 
         try:
             return crossref_search(query), "crossref"

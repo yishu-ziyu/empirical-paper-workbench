@@ -1,7 +1,7 @@
 """ADR-0004 Stage 2/4: search_literature 节点测试。"""
 import pytest
 
-from nodes.search_literature import (
+from agent.nodes.search_literature import (
     MAX_LITERATURE_ENTRIES,
     _build_query,
     _mock_search,
@@ -46,7 +46,7 @@ def test_search_limit_length(monkeypatch):
         ]
 
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", fake_mock_search
+        "agent.nodes.search_literature._mock_search", fake_mock_search
     )
     state = {"research_direction": "test"}
     result = search_literature(state)
@@ -67,7 +67,7 @@ def test_search_dedup_by_doi(monkeypatch):
         ]
 
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", fake_mock_search
+        "agent.nodes.search_literature._mock_search", fake_mock_search
     )
     state = {"research_direction": "test"}
     result = search_literature(state)
@@ -91,7 +91,7 @@ def test_each_entry_has_required_fields():
 
     Stage 3：遍历 mock 文献库，断言每条含全部必需字段。
     """
-    from nodes.literature_sources.mock_corpus import mock_literature_corpus
+    from agent.nodes.literature_sources.mock_corpus import mock_literature_corpus
 
     entries = mock_literature_corpus()
     assert len(entries) > 0, "mock 文献库不应为空"
@@ -158,11 +158,11 @@ def test_search_literature_semantic_scholar_with_api_key(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "real_key_123",
     )
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         lambda query, api_key, **kwargs: fake_entries,
     )
 
@@ -178,7 +178,7 @@ def test_search_literature_semantic_scholar_with_api_key(monkeypatch):
 def test_search_literature_semantic_scholar_without_api_key_degrades(monkeypatch):
     """literature_source=semantic_scholar 但无 API key 时降级为 mock_degraded。"""
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: None,
     )
     # semantic_scholar_search 不应被调用
@@ -186,7 +186,7 @@ def test_search_literature_semantic_scholar_without_api_key_degrades(monkeypatch
         raise AssertionError("semantic_scholar_search 不应在无 API key 时被调用")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         _fail_if_called,
     )
 
@@ -204,7 +204,7 @@ def test_search_literature_semantic_scholar_without_api_key_degrades(monkeypatch
 def test_search_literature_semantic_scholar_empty_api_key_degrades(monkeypatch):
     """literature_source=semantic_scholar 但 API key 为空字符串时降级。"""
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "",
     )
 
@@ -220,7 +220,7 @@ def test_search_literature_semantic_scholar_empty_api_key_degrades(monkeypatch):
 def test_search_literature_semantic_scholar_api_error_degrades(monkeypatch):
     """API 调用失败（RuntimeError）时降级为 mock_degraded。"""
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "real_key_123",
     )
 
@@ -228,7 +228,7 @@ def test_search_literature_semantic_scholar_api_error_degrades(monkeypatch):
         raise RuntimeError("Semantic Scholar API 调用失败: network error")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         _raise_runtime_error,
     )
 
@@ -276,11 +276,11 @@ def test_search_literature_semantic_scholar_with_api_key_dedup(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "real_key_123",
     )
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         lambda query, api_key, **kwargs: fake_entries,
     )
 
@@ -310,11 +310,11 @@ def test_search_literature_semantic_scholar_with_api_key_limit(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "real_key_123",
     )
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         lambda query, api_key, **kwargs: fake_entries,
     )
 
@@ -328,11 +328,11 @@ def test_search_literature_semantic_scholar_with_api_key_limit(monkeypatch):
 def test_search_literature_semantic_scholar_propagates_query(monkeypatch):
     """semantic_scholar 路径正确派生 literature_query。"""
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.get_api_key_from_env",
+        "agent.nodes.literature_sources.semantic_scholar.get_api_key_from_env",
         lambda: "real_key_123",
     )
     monkeypatch.setattr(
-        "nodes.literature_sources.semantic_scholar.semantic_scholar_search",
+        "agent.nodes.literature_sources.semantic_scholar.semantic_scholar_search",
         lambda query, api_key, **kwargs: [],
     )
 
@@ -367,7 +367,7 @@ def test_pytest_default_does_not_call_crossref(monkeypatch):
         raise AssertionError("crossref must not be called under pytest default")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.crossref.crossref_search",
+        "agent.nodes.literature_sources.crossref.crossref_search",
         _boom,
     )
     result = search_literature({"research_direction": "劳动 教育"})
@@ -382,7 +382,7 @@ def test_pytest_ignores_literature_source_env(monkeypatch):
         raise AssertionError("crossref must not be called under pytest")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.crossref.crossref_search",
+        "agent.nodes.literature_sources.crossref.crossref_search",
         _boom,
     )
     assert resolve_literature_source({}) == "mock"
@@ -392,7 +392,7 @@ def test_pytest_ignores_literature_source_env(monkeypatch):
 
 def test_resolve_runtime_last_resort_is_crossref(monkeypatch):
     """运行时最后一档是 crossref，不是 mock。"""
-    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.ssot.in_pytest", lambda: False)
     monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
     monkeypatch.delenv("ECONPAPER_LLM", raising=False)
     assert resolve_literature_source({}) == "crossref"
@@ -401,21 +401,21 @@ def test_resolve_runtime_last_resort_is_crossref(monkeypatch):
 
 
 def test_resolve_econpaper_llm_mock_even_outside_pytest(monkeypatch):
-    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.ssot.in_pytest", lambda: False)
     monkeypatch.setenv("ECONPAPER_LLM", "mock")
     monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
     assert resolve_literature_source({}) == "mock"
 
 
 def test_resolve_literature_source_env_outside_pytest(monkeypatch):
-    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.ssot.in_pytest", lambda: False)
     monkeypatch.setenv("LITERATURE_SOURCE", "semantic_scholar")
     monkeypatch.delenv("ECONPAPER_LLM", raising=False)
     assert resolve_literature_source({}) == "semantic_scholar"
 
 
 def test_resolve_explicit_state_wins(monkeypatch):
-    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.ssot.in_pytest", lambda: False)
     monkeypatch.setenv("LITERATURE_SOURCE", "crossref")
     monkeypatch.delenv("ECONPAPER_LLM", raising=False)
     assert resolve_literature_source({"literature_source": "disabled"}) == "disabled"
@@ -423,7 +423,7 @@ def test_resolve_explicit_state_wins(monkeypatch):
 
 def test_runtime_crossref_failure_is_mock_degraded(monkeypatch):
     """运行时默认走 Crossref；失败必须 mock_degraded，不能假装成功。"""
-    monkeypatch.setattr("llm.ssot.in_pytest", lambda: False)
+    monkeypatch.setattr("agent.llm.ssot.in_pytest", lambda: False)
     monkeypatch.delenv("LITERATURE_SOURCE", raising=False)
     monkeypatch.delenv("ECONPAPER_LLM", raising=False)
 
@@ -431,7 +431,7 @@ def test_runtime_crossref_failure_is_mock_degraded(monkeypatch):
         raise RuntimeError("network down")
 
     monkeypatch.setattr(
-        "nodes.literature_sources.crossref.crossref_search",
+        "agent.nodes.literature_sources.crossref.crossref_search",
         _boom,
     )
     result = search_literature({"research_direction": "劳动 教育"})
@@ -478,7 +478,7 @@ def test_did_session_includes_callaway_anchor(monkeypatch):
     """DID 方向即使词袋没命中，也要塞 Callaway–Sant'Anna。"""
 
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits()
     )
     result = search_literature(
         {"research_direction": {"question": "养老金", "method": "DID"}}
@@ -490,7 +490,7 @@ def test_did_session_includes_callaway_anchor(monkeypatch):
 
 def test_iv_session_includes_stock_yogo_anchor(monkeypatch):
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits()
     )
     result = search_literature(
         {"research_direction": {"question": "教育回报", "method": "IV"}}
@@ -501,7 +501,7 @@ def test_iv_session_includes_stock_yogo_anchor(monkeypatch):
 
 def test_rdd_session_includes_lee_lemieux_anchor(monkeypatch):
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits()
     )
     result = search_literature(
         {"research_direction": {"question": "高考分数", "method": "RDD"}}
@@ -512,7 +512,7 @@ def test_rdd_session_includes_lee_lemieux_anchor(monkeypatch):
 
 def test_chinese_did_alias_includes_anchor(monkeypatch):
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits()
     )
     result = search_literature(
         {"research_direction": {"question": "医保", "method": "双重差分"}}
@@ -539,7 +539,7 @@ def test_threat_hop_adds_counterexample_paper(monkeypatch):
             ]
         return _unrelated_hits()
 
-    monkeypatch.setattr("nodes.search_literature._mock_search", fake)
+    monkeypatch.setattr("agent.nodes.search_literature._mock_search", fake)
     result = search_literature(
         {"research_direction": {"question": "养老金", "method": "DID"}}
     )
@@ -553,7 +553,7 @@ def test_anchor_survives_when_l0_already_full(monkeypatch):
     """L0 已有 20 条时，方法锚仍在，总长仍 <= 20。"""
 
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits(20)
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits(20)
     )
     result = search_literature(
         {"research_direction": {"question": "养老金", "method": "DID"}}
@@ -567,7 +567,7 @@ def test_anchor_survives_when_l0_already_full(monkeypatch):
 
 def test_no_method_skips_anchor_hop(monkeypatch):
     monkeypatch.setattr(
-        "nodes.search_literature._mock_search", lambda query: _unrelated_hits()
+        "agent.nodes.search_literature._mock_search", lambda query: _unrelated_hits()
     )
     result = search_literature({"research_direction": {"question": "养老金"}})
     dois = [e.get("doi") for e in result["literature_entries"]]

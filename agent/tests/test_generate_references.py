@@ -1,5 +1,5 @@
 """ADR-0009: generate_references 节点测试。"""
-from nodes.generate_references import generate_references, _format_apa
+from agent.nodes.generate_references import generate_references, _format_apa
 
 
 def test_empty_graph_returns_empty_list():
@@ -99,8 +99,8 @@ def test_citation_graph_not_dict_returns_empty():
 def test_return_type_annotation_is_references_output():
     """NodeResult 协议: 返回类型注解为 ReferencesOutput。"""
     from typing import get_type_hints
-    from nodes.generate_references import generate_references as fn
-    from protocols import ReferencesOutput
+    from agent.nodes.generate_references import generate_references as fn
+    from agent.protocols import ReferencesOutput
 
     hints = get_type_hints(fn)
     assert hints.get("return") is ReferencesOutput

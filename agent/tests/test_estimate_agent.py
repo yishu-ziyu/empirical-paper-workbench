@@ -16,7 +16,7 @@ import sys
 import pandas as pd
 import pytest
 
-from engine.estimate_agent import (
+from agent.engine.estimate_agent import (
     EstimateAgentOutput,
     build_estimate_agent,
     estimate_output_from_agent,
@@ -26,9 +26,9 @@ from engine.estimate_agent import (
     _truncate_to_file,
     _usage_limits,
 )
-from engine.sandbox import KernelSession, SubprocessSession
-from llm.router import LLMConfig, MINIMAX_BASE_URL
-from nodes.estimate import estimate
+from agent.engine.sandbox import KernelSession, SubprocessSession
+from agent.llm.router import LLMConfig, MINIMAX_BASE_URL
+from agent.nodes.estimate import estimate
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.test import TestModel
@@ -195,7 +195,7 @@ def test_run_python_short_output_untouched(tmp_path):
 
 def test_serialize_conversation_truncates_tool_results():
     """序列化器：工具结果截 2000 字符（对齐 compaction.md），其余角色逐条保留。"""
-    from engine.estimate_agent import serialize_conversation
+    from agent.engine.estimate_agent import serialize_conversation
 
     class UserPromptPart:
         def __init__(self, content):
@@ -224,7 +224,7 @@ def test_serialize_conversation_truncates_tool_results():
 
 def test_compact_history_six_section_deterministic():
     """六段结构化摘要：只填可抽出的事实，模板六段齐全。"""
-    from engine.estimate_agent import compact_history_six_section, serialize_conversation
+    from agent.engine.estimate_agent import compact_history_six_section, serialize_conversation
 
     class ToolCallPart:
         def __init__(self, tool_name, args):
@@ -305,7 +305,7 @@ def test_test_model_full_run_with_kernel_session(tmp_path):
 
 @pytest.fixture
 def force_agent_enabled(monkeypatch):
-    monkeypatch.setattr("nodes.estimate._estimate_agent_enabled", lambda: True)
+    monkeypatch.setattr("agent.nodes.estimate._estimate_agent_enabled", lambda: True)
 
 
 def test_estimate_node_agent_success_short_circuits(tmp_path, force_agent_enabled, monkeypatch):
@@ -314,7 +314,7 @@ def test_estimate_node_agent_success_short_circuits(tmp_path, force_agent_enable
         "results": "# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| x | 0.5000 | 0.1000 | 0.0200 |",
         "estimate": {"status": "ok", "produced_by": "estimate", "estimator": "estimate_agent"},
     }
-    monkeypatch.setattr("engine.estimate_agent.run_estimate_agent", lambda state: canned)
+    monkeypatch.setattr("agent.engine.estimate_agent.run_estimate_agent", lambda state: canned)
     out = estimate(make_state(tmp_path))
     assert out is canned
     assert out["estimate"]["estimator"] == "estimate_agent"
@@ -325,7 +325,7 @@ def test_estimate_node_agent_error_falls_back_with_degradation(tmp_path, force_a
     def boom(_state):
         raise RuntimeError("sandbox exploded")
 
-    monkeypatch.setattr("engine.estimate_agent.run_estimate_agent", boom)
+    monkeypatch.setattr("agent.engine.estimate_agent.run_estimate_agent", boom)
     out = estimate(make_state(tmp_path))
     payload = out["estimate"]
     assert payload["status"] == "ok"                      # 固定分派照常出表
@@ -343,7 +343,7 @@ def test_estimate_node_agent_error_falls_back_with_degradation(tmp_path, force_a
 
 def test_estimate_node_agent_none_no_degradation(tmp_path, force_agent_enabled, monkeypatch):
     """provider 不可用（返回 None）：静默回退，不算 degradation。"""
-    monkeypatch.setattr("engine.estimate_agent.run_estimate_agent", lambda state: None)
+    monkeypatch.setattr("agent.engine.estimate_agent.run_estimate_agent", lambda state: None)
     out = estimate(make_state(tmp_path))
     assert out["estimate"]["estimator"] == "statspai.feols"
     assert "degradations" not in out["estimate"]
@@ -366,7 +366,7 @@ def test_estimate_agent_enabled_env_flag(monkeypatch):
     # 绕开 backend/config.py 同名冲突：让 sys.modules["config"] 暂无旗标
     monkeypatch.setitem(sys.modules, "config", types.SimpleNamespace())
     monkeypatch.delitem(sys.modules, "_econpaper_agent_config", raising=False)
-    import nodes.estimate as est_mod
+    import agent.nodes.estimate as est_mod
 
     monkeypatch.setenv("ECONPAPER_ESTIMATE_AGENT", "1")
     assert est_mod._estimate_agent_enabled() is True

@@ -17,7 +17,7 @@ import pytest
 
 def test_profiling_step_returns_existing_fields_on_generic_csv(generic_csv):
     """T-04 contract: n_rows / n_cols / variables still present per profile."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(generic_csv)}]
     result_datasets, result_report = ProfilingStep().run(ds, {})
@@ -32,7 +32,7 @@ def test_profiling_step_returns_existing_fields_on_generic_csv(generic_csv):
 
 def test_profiling_step_returns_empty_profile_when_no_path():
     """T-04 contract: missing path -> empty profile dict in the list."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{}]
     result_datasets, result_report = ProfilingStep().run(ds, {})
@@ -44,7 +44,7 @@ def test_profiling_step_returns_empty_profile_when_no_path():
 
 def test_profiling_step_detects_charls_dataset_type(charls_csv):
     """CHARLS CSV -> profile['dataset_type'] == 'CHARLS'."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(charls_csv)}]
     _, result_report = ProfilingStep().run(ds, {})
@@ -54,7 +54,7 @@ def test_profiling_step_detects_charls_dataset_type(charls_csv):
 
 def test_profiling_step_includes_charls_config_when_charls(charls_csv):
     """CHARLS CSV -> profile['charls_config'] contains variable_mapping dict."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(charls_csv)}]
     _, result_report = ProfilingStep().run(ds, {})
@@ -66,7 +66,7 @@ def test_profiling_step_includes_charls_config_when_charls(charls_csv):
 
 def test_profiling_step_no_charls_config_for_generic_csv(generic_csv):
     """Generic CSV -> dataset_type == 'generic', no charls_config key."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(generic_csv)}]
     _, result_report = ProfilingStep().run(ds, {})
@@ -77,7 +77,7 @@ def test_profiling_step_no_charls_config_for_generic_csv(generic_csv):
 
 def test_profiling_step_does_not_mutate_existing_return_keys(charls_csv):
     """T-04 backward-compat: existing keys unchanged in shape."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(charls_csv)}]
     _, result_report = ProfilingStep().run(ds, {})
@@ -96,7 +96,7 @@ def test_profiling_step_does_not_mutate_existing_return_keys(charls_csv):
 
 def test_profiling_step_profiles_all_datasets(generic_csv, charls_csv):
     """ProfilingStep profiles ALL datasets (not just datasets[0])."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [
         {"path": str(generic_csv)},
@@ -113,7 +113,7 @@ def test_profiling_step_profiles_all_datasets(generic_csv, charls_csv):
 
 def test_profiling_step_returns_tuple(generic_csv):
     """ProfilingStep.run returns (datasets, report) tuple."""
-    from cleaning.profiling import ProfilingStep
+    from agent.cleaning.profiling import ProfilingStep
 
     ds = [{"path": str(generic_csv)}]
     result = ProfilingStep().run(ds, {})

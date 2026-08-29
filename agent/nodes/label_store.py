@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from nodes.learning_labels import assert_no_mock_score, collect_learning_labels
+from .learning_labels import assert_no_mock_score, collect_learning_labels
 
 _LOCK = threading.Lock()
 _FORBIDDEN = ("reward", "score", "review_score")

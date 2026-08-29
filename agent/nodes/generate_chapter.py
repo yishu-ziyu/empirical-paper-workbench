@@ -24,18 +24,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from engine.bind import bind_chapter_kwargs
-from engine.readiness import paper_ready_to_write, resolve_slot
-from prompts import get_prompt
-from protocols import GenerateChapterOutput
-from state import EconPaperState
+from ..engine.bind import bind_chapter_kwargs
+from ..engine.readiness import paper_ready_to_write, resolve_slot
+from ..prompts import get_prompt
+from ..protocols import GenerateChapterOutput
+from ..state import EconPaperState
 
 _NUM_CHAPTERS = 6
 
 
 def invoke_generate_llm(config: Any, system: str, user: str) -> str:
     """非 mock 生成通道。与占位字符串分离，测试可断言走了真通道。"""
-    from llm.call_llm import call_llm as unified_call
+    from ..llm.call_llm import call_llm as unified_call
 
     return unified_call(user, node_type="generate", system=system)
 
@@ -47,7 +47,7 @@ def call_llm(system: str, user: str) -> str:
     - provider == "mock" → 占位（开发 / 测试，现有单测不破）
     - 其他 provider → ``invoke_generate_llm``
     """
-    from llm.router import router
+    from ..llm.router import router
 
     config = router.get_config("generate")
     if config.provider == "mock":
@@ -148,7 +148,7 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
             kwargs[key] = value
     system, user = prompt_mod.render(**kwargs)
 
-    from nodes.review_sources.threat_cards import (
+    from .review_sources.threat_cards import (
         active_threat_cards,
         format_threat_constraints,
     )
@@ -159,7 +159,7 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
 
     prose = call_llm(system, user)
     if str(chapter_type) == "intro":
-        from prompts.intro import strip_contribution
+        from ..prompts.intro import strip_contribution
 
         prose = strip_contribution(prose)
     est = state.get("estimate") or {}

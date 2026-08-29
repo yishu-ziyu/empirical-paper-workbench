@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from cleaning.filter import FilterStep
+from agent.cleaning.filter import FilterStep
 
 
 @pytest.fixture

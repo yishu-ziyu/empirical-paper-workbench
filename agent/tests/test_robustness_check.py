@@ -6,8 +6,8 @@ summary_table are produced.
 """
 import pytest
 import pandas as pd
-from nodes.robustness_check import robustness_check
-from state import EconPaperState
+from agent.nodes.robustness_check import robustness_check
+from agent.state import EconPaperState
 
 import statspai
 

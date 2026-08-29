@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from prompts.outline import build_outline_prompt
-from protocols import GenerateOutlineOutput
-from state import EconPaperState
+from ..prompts.outline import build_outline_prompt
+from ..protocols import GenerateOutlineOutput
+from ..state import EconPaperState
 
 
 def call_llm(prompt: str) -> str:
@@ -28,7 +28,7 @@ def call_llm(prompt: str) -> str:
     ``monkeypatch.setattr(nodes.generate_outline, "call_llm", ...)`` 替换为
     fake，故必须是模块级函数。
     """
-    from llm.call_llm import call_llm as unified_call
+    from ..llm.call_llm import call_llm as unified_call
 
     return unified_call(prompt, node_type="outline")
 
@@ -49,7 +49,7 @@ def generate_outline(state: EconPaperState) -> GenerateOutlineOutput:
     prompt = build_outline_prompt(rd)
     llm_summary = call_llm(prompt)
 
-    from engine.readiness import SLOT_REQUIREMENTS, estimate_ran
+    from ..engine.readiness import SLOT_REQUIREMENTS, estimate_ran
 
     outline = [
         {

@@ -1,7 +1,7 @@
 """#8 下游监督：命中主题词但 lit_review 没写 [N]，relevance 给负分。"""
 from __future__ import annotations
 
-from nodes.review_chapter import (
+from agent.nodes.review_chapter import (
     UNCITED_TOPIC_PENALTY,
     apply_uncited_topic_penalty,
     review_chapter,
@@ -56,7 +56,7 @@ def test_no_penalty_when_cited_in_lit_review():
 def test_review_lit_review_writes_penalized_entries(monkeypatch):
     """评审文献综述章时，把负分写回 literature_entries。"""
     monkeypatch.setattr(
-        "nodes.review_chapter.call_review_llm",
+        "agent.nodes.review_chapter.call_review_llm",
         lambda *args, **kwargs: {
             "rubric": {
                 "endogeneity": 0.9,

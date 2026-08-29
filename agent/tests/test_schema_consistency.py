@@ -7,28 +7,28 @@
 import inspect
 from typing import get_type_hints
 
-from protocols import (
+from agent.protocols import (
     UploadDataOutput, CleanDataOutput, GenerateTitleOutput, SetDirectionOutput,
     EstimateOutput, GenerateOutlineOutput, GenerateChapterOutput, TranslateCodeOutput,
     ExportDocxOutput, ApproveChapterOutput, RollbackOutput, ReviewOutput,
     CitationGraphOutput, ReferencesOutput, LiteratureOutput,
 )
-from state import EconPaperState
-from nodes.upload_data import upload_data
-from nodes.clean_data import clean_data
-from nodes.generate_title import generate_title
-from nodes.set_direction import set_direction
-from nodes.estimate import estimate
-from nodes.generate_outline import generate_outline
-from nodes.generate_chapter import generate_chapter
-from nodes.review_chapter import review_chapter
-from nodes.translate_code import translate_code
-from nodes.export_docx import export_docx
-from nodes.approve_chapter import approve_chapter
-from nodes.rollback import rollback_chapter
-from nodes.citation_graph import build_citation_graph
-from nodes.generate_references import generate_references
-from nodes.search_literature import search_literature
+from agent.state import EconPaperState
+from agent.nodes.upload_data import upload_data
+from agent.nodes.clean_data import clean_data
+from agent.nodes.generate_title import generate_title
+from agent.nodes.set_direction import set_direction
+from agent.nodes.estimate import estimate
+from agent.nodes.generate_outline import generate_outline
+from agent.nodes.generate_chapter import generate_chapter
+from agent.nodes.review_chapter import review_chapter
+from agent.nodes.translate_code import translate_code
+from agent.nodes.export_docx import export_docx
+from agent.nodes.approve_chapter import approve_chapter
+from agent.nodes.rollback import rollback_chapter
+from agent.nodes.citation_graph import build_citation_graph
+from agent.nodes.generate_references import generate_references
+from agent.nodes.search_literature import search_literature
 
 
 STATE_KEYS = set(EconPaperState.__annotations__.keys())

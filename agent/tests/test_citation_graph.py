@@ -7,7 +7,7 @@ semantic_scholar_references 返回空列表（等价于无引用关系）。
 """
 import pytest
 
-from nodes.citation_graph import build_citation_graph
+from agent.nodes.citation_graph import build_citation_graph
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def _stub_empty_references(monkeypatch):
     本文件只测编号分配 / 排序 / 降级行为；
     真实 edges 构建逻辑在 test_citation_edges.py 验证。
     """
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _fake_references(doi, api_key=None, max_results=20):
         return []
@@ -98,8 +98,8 @@ def test_same_year_sorted_by_title():
 def test_return_type_annotation_is_citation_graph_output():
     """NodeResult 协议: 返回类型注解为 CitationGraphOutput。"""
     from typing import get_type_hints
-    from nodes.citation_graph import build_citation_graph as fn
-    from protocols import CitationGraphOutput
+    from agent.nodes.citation_graph import build_citation_graph as fn
+    from agent.protocols import CitationGraphOutput
 
     hints = get_type_hints(fn)
     assert hints.get("return") is CitationGraphOutput

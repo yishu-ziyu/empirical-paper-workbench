@@ -10,8 +10,8 @@ HITL 策略同 T-04/T-06/T-07：state-driven，不调 interrupt()。
 """
 from __future__ import annotations
 
-from protocols import RollbackOutput
-from state import EconPaperState
+from ..protocols import RollbackOutput
+from ..state import EconPaperState
 
 
 def rollback_chapter(state: EconPaperState) -> RollbackOutput:

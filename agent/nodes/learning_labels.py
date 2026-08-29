@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from state import EconPaperState
+from ..state import EconPaperState
 
 _DOI_RE = re.compile(r"^10\.\d+/\S+")
 _CITE_RE = re.compile(r"\[(\d+)\]")
@@ -88,7 +88,7 @@ def _degradation_labels(state: EconPaperState) -> List[Dict[str, Any]]:
 
 
 def _citation_labels(state: EconPaperState) -> List[Dict[str, Any]]:
-    from nodes.review_sources.structure_checks import check_structure
+    from .review_sources.structure_checks import check_structure
 
     chapters = state.get("body_chapters") or []
     indices = state.get("citation_indices")

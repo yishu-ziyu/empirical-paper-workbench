@@ -1,18 +1,18 @@
 """三位审稿代理对照：看得见机器分 vs 看不见。"""
 from __future__ import annotations
 
-from eval.ab_review import run_ab
-from eval.judge import judge, rule_judge
-from eval.packets import (
+from agent.eval.ab_review import run_ab
+from agent.eval.judge import judge, rule_judge
+from agent.eval.packets import (
     packet_good_methods,
     packet_invented_cite,
     packet_keyword_intro,
     packet_overclaim_results,
     packet_weak_iv,
 )
-from eval.personas import persona_ids
-from nodes.label_store import append_event, event_from_decision, read_events
-from nodes.learning_labels import assert_no_mock_score
+from agent.eval.personas import persona_ids
+from agent.nodes.label_store import append_event, event_from_decision, read_events
+from agent.nodes.learning_labels import assert_no_mock_score
 
 
 def test_three_personas_exist():

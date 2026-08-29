@@ -15,7 +15,7 @@ from typing import Any, Dict
 
 from langgraph.types import interrupt
 
-from state import EconPaperState
+from ..state import EconPaperState
 
 
 def hitl_pause(state: EconPaperState) -> Dict[str, Any]:

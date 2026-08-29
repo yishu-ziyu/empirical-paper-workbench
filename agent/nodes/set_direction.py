@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from design.spec import DirectionSpec
-from protocols import SetDirectionOutput
-from state import EconPaperState
+from ..design.spec import DirectionSpec
+from ..protocols import SetDirectionOutput
+from ..state import EconPaperState
 
 
 _CHARLS_ID_KEYS = {"pid", "id"}

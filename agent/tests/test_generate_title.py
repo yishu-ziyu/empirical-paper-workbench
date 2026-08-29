@@ -8,7 +8,7 @@ generate_title 是 agent 节点，测试归 agent/tests/）。
 - 把 \\title{...} 写入 state.title_chapter
 - title_chapter.type == "title"
 """
-from nodes.generate_title import generate_title
+from agent.nodes.generate_title import generate_title
 
 from conftest import make_state
 
@@ -93,8 +93,8 @@ def test_title_call_llm_delegates_to_unified(monkeypatch):
         seen["prompt"] = prompt
         return "Live Title"
 
-    monkeypatch.setattr("llm.call_llm.call_llm", fake_unified)
-    from nodes.generate_title import call_llm
+    monkeypatch.setattr("agent.llm.call_llm.call_llm", fake_unified)
+    from agent.nodes.generate_title import call_llm
 
     assert call_llm("p") == "Live Title"
     assert seen["node_type"] == "title"

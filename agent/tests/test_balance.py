@@ -12,7 +12,7 @@ rejects the frame, a pandas fallback computes the same metrics.
 """
 import pytest
 
-from cleaning.balance import BalanceStep
+from agent.cleaning.balance import BalanceStep
 
 
 @pytest.fixture

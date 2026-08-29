@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from prompts.revision import REVISION_BLOCK, fill_revision
+from .revision import REVISION_BLOCK, fill_revision
 
 SYSTEM_PROMPT = (
     "你是一位经济学论文写作助手，现在为用户撰写论文的【文献综述】章节。"

@@ -5,8 +5,8 @@
 - blind：只看正文（独立判断）
 
 用法：
-    python -m eval.ab_review
-    python -m eval.ab_review --no-llm
+    python -m agent.eval.ab_review
+    python -m agent.eval.ab_review --no-llm
 """
 from __future__ import annotations
 
@@ -16,15 +16,10 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-# 允许直接 python agent/eval/ab_review.py
-_AGENT_DIR = Path(__file__).resolve().parents[1]
-if str(_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENT_DIR))
-
-from eval.judge import judge
-from eval.packets import all_packets
-from eval.personas import persona_ids
-from nodes.label_store import (
+from .judge import judge
+from .packets import all_packets
+from .personas import persona_ids
+from ..nodes.label_store import (
     ARM_BLIND,
     ARM_SEE_AUTO,
     REVIEWER_PERSONA,

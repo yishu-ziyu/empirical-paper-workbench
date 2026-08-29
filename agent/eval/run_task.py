@@ -46,11 +46,6 @@ from typing import Any, Callable, Dict, List, Tuple
 # 覆盖 SSOT 文件里的 MiniMax key。headless 基线绝不真调 LLM API。
 os.environ["ECONPAPER_LLM"] = "mock"
 
-# agent/ 用扁平 import（from nodes.xxx import ...），需要 agent/ 在 sys.path
-_AGENT_DIR = Path(__file__).resolve().parents[1]
-if str(_AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_AGENT_DIR))
-
 TASKS_ROOT = Path(__file__).resolve().parent / "tasks"
 
 # ---------------------------------------------------------------------------
@@ -131,10 +126,10 @@ def run_pipeline(state: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List
     该段路径逐字段等价（每个节点返回部分 dict，按 key 合并，LangGraph
     的合并语义就是按 key 整体替换）。
     """
-    from nodes.clean_data import clean_data
-    from nodes.estimate import estimate
-    from nodes.identification_verify import identification_verify
-    from nodes.set_direction import set_direction
+    from ..nodes.clean_data import clean_data
+    from ..nodes.estimate import estimate
+    from ..nodes.identification_verify import identification_verify
+    from ..nodes.set_direction import set_direction
 
     nodes_run: List[str] = []
     stop_reasons: List[str] = []
@@ -345,7 +340,7 @@ def main(argv: List[str] | None = None) -> int:
 
     # LLM provider 复核（ECONPAPER_LLM=mock 已在模块顶部、import 前设置）
     try:
-        from llm.router import router
+        from ..llm.router import router
 
         provider = router.get_config("generate").provider
     except Exception as exc:

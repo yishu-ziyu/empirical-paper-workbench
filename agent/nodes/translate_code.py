@@ -23,9 +23,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from design.spec import norm_method
-from protocols import TranslateCodeOutput
-from state import EconPaperState
+from ..design.spec import norm_method
+from ..protocols import TranslateCodeOutput
+from ..state import EconPaperState
 
 # Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
 _PANEL_METHOD_KEYS = {"did", "panel", "twfe", "fe"}

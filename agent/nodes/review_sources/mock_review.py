@@ -16,7 +16,7 @@ association 钉死，不要走 else=0.4:
 """
 from typing import Any, List
 
-from protocols import ReviewRubric
+from ...protocols import ReviewRubric
 
 _ASSOC_FORBIDDEN = ("因果", "识别策略", "解决内生性", "本文识别了因果")
 

@@ -19,7 +19,7 @@ import zipfile
 
 import pytest
 
-from nodes.export_docx import (
+from agent.nodes.export_docx import (
     _escape_tex_text,
     _extract_sections,
     _strip_tex_markup,
@@ -128,8 +128,8 @@ def test_render_template_undergrad_alias_matches_undergraduate():
 
 def test_export_docx_undergrad_alias_from_state(tmp_path, monkeypatch):
     """state.export_template='undergrad' must not raise; uses undergraduate.tex."""
-    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
-    monkeypatch.setattr("nodes.export_docx.convert_docx", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.convert_docx", lambda tex, outdir: None)
     result = export_docx(_full_state(export_template="undergrad"))
     assert "本科毕业论文模板" in result["latex_source"]
     assert "\\begin{document}" in result["latex_source"]
@@ -158,10 +158,10 @@ def test_export_docx_returns_latex_source(tmp_path, monkeypatch):
     """export_docx(state) 返回 latex_source 字符串，包含 title。"""
     # 让编译函数返回 None（模拟 latexmk 不可用），只验证 latex_source
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state()
     result = export_docx(state)
@@ -174,10 +174,10 @@ def test_export_docx_returns_latex_source(tmp_path, monkeypatch):
 def test_export_docx_extracts_title_from_title_chapter(tmp_path, monkeypatch):
     """export_docx 从 state.title_chapter 提取 title 填入 \\title{}。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state()
     result = export_docx(state)
@@ -187,10 +187,10 @@ def test_export_docx_extracts_title_from_title_chapter(tmp_path, monkeypatch):
 def test_export_docx_degraded_when_compilers_unavailable(tmp_path, monkeypatch):
     """latexmk/pandoc 不可用时 pdf_path/docx_path=None 且 degraded=True。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state()
     result = export_docx(state)
@@ -206,10 +206,10 @@ def test_export_docx_returns_paths_when_compilers_succeed(tmp_path, monkeypatch)
     docx = tmp_path / "out.docx"
     docx.write_bytes(b"PK fake docx")
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: str(pdf)
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: str(pdf)
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: str(docx)
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: str(docx)
     )
     state = _full_state()
     result = export_docx(state)
@@ -226,9 +226,9 @@ def test_export_docx_uses_template_from_state(tmp_path, monkeypatch):
         captured["tex"] = tex
         return None
 
-    monkeypatch.setattr("nodes.export_docx.compile_pdf", fake_compile)
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", fake_compile)
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state(export_template="master_thesis")
     result = export_docx(state)
@@ -239,10 +239,10 @@ def test_export_docx_uses_template_from_state(tmp_path, monkeypatch):
 def test_export_docx_no_chapters_still_returns_tex(tmp_path, monkeypatch):
     """无 title_chapter / body_chapters 时仍返回 latex_source（用 Untitled 兜底）。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = make_state()
     result = export_docx(state)
@@ -256,10 +256,10 @@ def test_export_docx_no_chapters_still_returns_tex(tmp_path, monkeypatch):
 def test_export_docx_renders_bibliography_when_references_present(tmp_path, monkeypatch):
     """ADR-0009: references_list 非空时 latex_source 含 thebibliography 环境。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state(
         references_list=[
@@ -282,10 +282,10 @@ def test_export_docx_renders_bibliography_when_references_present(tmp_path, monk
 def test_export_docx_no_bibliography_when_references_empty(tmp_path, monkeypatch):
     """ADR-0009: references_list 为空时不渲染 thebibliography。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state(references_list=[])
     result = export_docx(state)
@@ -296,10 +296,10 @@ def test_export_docx_no_bibliography_when_references_empty(tmp_path, monkeypatch
 def test_export_docx_no_bibliography_when_references_missing(tmp_path, monkeypatch):
     """ADR-0009: references_list 缺失时不渲染 thebibliography（向后兼容）。"""
     monkeypatch.setattr(
-        "nodes.export_docx.compile_pdf", lambda tex, outdir: None
+        "agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None
     )
     monkeypatch.setattr(
-        "nodes.export_docx.convert_docx", lambda tex, outdir: None
+        "agent.nodes.export_docx.convert_docx", lambda tex, outdir: None
     )
     state = _full_state()  # 不设 references_list
     result = export_docx(state)
@@ -309,13 +309,13 @@ def test_export_docx_no_bibliography_when_references_missing(tmp_path, monkeypat
 
 def test_render_bibliography_empty_returns_empty_string():
     """_render_bibliography 空列表返回空字符串。"""
-    from nodes.export_docx import _render_bibliography
+    from agent.nodes.export_docx import _render_bibliography
     assert _render_bibliography([]) == ""
 
 
 def test_render_bibliography_renders_bibitems():
     """_render_bibliography 渲染 thebibliography + bibitem。"""
-    from nodes.export_docx import _render_bibliography
+    from agent.nodes.export_docx import _render_bibliography
     refs = [
         {"index": 1, "text": "A (2020).", "doi": "10.1/a", "entry": {}},
         {"index": 2, "text": "B (2021).", "doi": "10.1/b", "entry": {}},
@@ -329,7 +329,7 @@ def test_render_bibliography_renders_bibitems():
 
 def test_append_bibliography_inserts_before_end_document():
     """_append_bibliography 在 \\end{document} 前插入。"""
-    from nodes.export_docx import _append_bibliography
+    from agent.nodes.export_docx import _append_bibliography
     tex = "\\begin{document}\nHello\n\\end{document}"
     refs = [{"index": 1, "text": "Ref.", "doi": None, "entry": {}}]
     result = _append_bibliography(tex, refs)
@@ -339,7 +339,7 @@ def test_append_bibliography_inserts_before_end_document():
 
 def test_append_bibliography_empty_returns_unchanged():
     """_append_bibliography 空列表原样返回。"""
-    from nodes.export_docx import _append_bibliography
+    from agent.nodes.export_docx import _append_bibliography
     tex = "\\begin{document}\n\\end{document}"
     assert _append_bibliography(tex, []) == tex
 
@@ -521,8 +521,8 @@ def test_extract_sections_injects_omitted_treat_row():
 
 def test_export_docx_takeable_paper_no_markdown_or_untitled(tmp_path, monkeypatch):
     """Live-shaped intro/methods/results export: no hashes, no empty H1, % survives."""
-    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
-    monkeypatch.setattr("nodes.export_docx.convert_docx", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.convert_docx", lambda tex, outdir: None)
     state = _full_state(
         export_template="undergrad",
         main_specification={
@@ -580,7 +580,7 @@ def test_export_docx_takeable_paper_no_markdown_or_untitled(tmp_path, monkeypatc
 
 def test_convert_docx_without_pandoc_writes_ooxml(tmp_path, monkeypatch):
     """pandoc 缺失时仍写出可下载的 .docx（OOXML zip），含章节正文。"""
-    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", lambda name: None)
     tex = (
         "\\title{Castle paper}\n"
         "\\begin{document}\n"
@@ -606,7 +606,7 @@ def test_strip_tex_markup_keeps_textbf_contents():
 
 
 def test_convert_docx_includes_abstract_and_textbf(tmp_path, monkeypatch):
-    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", lambda name: None)
     tex = (
         "\\title{Castle paper}\n"
         "\\begin{document}\n"
@@ -627,8 +627,8 @@ def test_convert_docx_includes_abstract_and_textbf(tmp_path, monkeypatch):
 
 
 def test_export_docx_ooxml_fallback_is_degraded(tmp_path, monkeypatch):
-    monkeypatch.setattr("nodes.export_docx.shutil.which", lambda name: None)
-    monkeypatch.setattr("nodes.export_docx.compile_pdf", lambda tex, outdir: None)
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", lambda name: None)
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", lambda tex, outdir: None)
     state = _full_state(workspace=str(tmp_path), abstract="摘要可见")
     result = export_docx(state)
     assert result["docx_path"]

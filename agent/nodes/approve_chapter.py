@@ -10,8 +10,8 @@ T-04/T-06/T-07：state-driven，不调 interrupt()。
 """
 from __future__ import annotations
 
-from protocols import ApproveChapterOutput
-from state import EconPaperState
+from ..protocols import ApproveChapterOutput
+from ..state import EconPaperState
 
 _NUM_CHAPTERS = 6
 

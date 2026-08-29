@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from nodes.search_literature import search_literature
+from agent.nodes.search_literature import search_literature
 
 
 FAKE_ENTRIES = [
@@ -42,7 +42,7 @@ def test_missing_key_degrades_to_mock():
 def test_apodex_happy_path(monkeypatch):
     monkeypatch.setenv("APODEX_API_KEY", "k-test")
     monkeypatch.setattr(
-        "nodes.literature_sources.apodex.apodex_search",
+        "agent.nodes.literature_sources.apodex.apodex_search",
         lambda query, api_key, **kwargs: FAKE_ENTRIES,
     )
     result = search_literature(
@@ -58,7 +58,7 @@ def test_apodex_error_degrades_to_mock(monkeypatch):
     def _boom(query, api_key, **kwargs):
         raise RuntimeError("deep search down")
 
-    monkeypatch.setattr("nodes.literature_sources.apodex.apodex_search", _boom)
+    monkeypatch.setattr("agent.nodes.literature_sources.apodex.apodex_search", _boom)
     result = search_literature(
         {"research_direction": "automation wages", "literature_source": "apodex"}
     )
@@ -70,7 +70,7 @@ def test_apodex_error_degrades_to_mock(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_parse_unwraps_choices_and_fenced_json(monkeypatch):
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     payload = {
         "choices": [
@@ -100,7 +100,7 @@ def test_parse_unwraps_choices_and_fenced_json(monkeypatch):
 
 
 def test_parse_drops_titleless_and_coerces(monkeypatch):
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     payload = {
         "choices": [
@@ -121,7 +121,7 @@ def test_parse_drops_titleless_and_coerces(monkeypatch):
 def test_search_assembles_sse_stream_when_server_streams(monkeypatch):
     """服务端忽略 stream:false 强推 SSE 时，适配器自行拼装完整内容。"""
     import io
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     class _FakeResp:
         headers = {"content-type": "text/event-stream"}
@@ -147,7 +147,7 @@ def test_search_assembles_sse_stream_when_server_streams(monkeypatch):
         return _FakeResp(sse)
 
     monkeypatch.setattr(
-        "nodes.literature_sources.apodex.urllib.request.urlopen", _fake_urlopen
+        "agent.nodes.literature_sources.apodex.urllib.request.urlopen", _fake_urlopen
     )
     entries = apodex.apodex_search("q", "k-test")
     assert captured["body"]["stream"] is False, "应显式请求非流式"
@@ -164,7 +164,7 @@ def test_search_assembles_sse_stream_when_server_streams(monkeypatch):
 
 def test_parse_extracts_array_from_prose_prefix(monkeypatch):
     """模型无视指令包了 prose/围栏：数组在正文中也要被找到。"""
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     payload = {
         "choices": [
@@ -186,7 +186,7 @@ def test_parse_extracts_array_from_prose_prefix(monkeypatch):
 def test_parse_survives_concatenated_json_bodies(monkeypatch):
     """多段 JSON 连排（流式 chunk 与完整对象混排）不炸，取含数组的对象。"""
     import json as _json
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     obj_a = {"id": "c1", "object": "chat.completion.chunk", "choices": []}
     obj_b = {
@@ -202,7 +202,7 @@ def test_parse_survives_concatenated_json_bodies(monkeypatch):
 def test_parse_finds_array_in_reasoning_content(monkeypatch):
     """免费模型思考很重、可能把最终数组只写在 reasoning_content（或被
     max_tokens 截断在思考尾部）：收集器必须连 reasoning_content 一起扫。"""
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     payload = {
         "choices": [
@@ -223,14 +223,14 @@ def test_parse_finds_array_in_reasoning_content(monkeypatch):
 
 
 def test_parse_bad_json_raises_valueerror():
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     with pytest.raises(ValueError):
         apodex.parse_entries({"choices": [{"message": {"content": "not json"}}]})
 
 
 def test_parse_empty_choices_raises_valueerror():
-    from nodes.literature_sources import apodex
+    from agent.nodes.literature_sources import apodex
 
     with pytest.raises(ValueError):
         apodex.parse_entries({"choices": []})

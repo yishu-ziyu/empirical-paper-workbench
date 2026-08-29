@@ -34,9 +34,9 @@ if os.path.isdir(_TEX_BIN) and _TEX_BIN not in os.environ.get("PATH", ""):
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
-from nodes.estimate import looks_like_coef_table, splice_missing_table_rows
-from protocols import ExportDocxOutput
-from state import EconPaperState
+from ..nodes.estimate import looks_like_coef_table, splice_missing_table_rows
+from ..protocols import ExportDocxOutput
+from ..state import EconPaperState
 
 # 模板目录：agent/templates/
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"

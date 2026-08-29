@@ -14,8 +14,8 @@ from string import Formatter
 
 import pytest
 
-from prompts import get_prompt
-from prompts.lit_review import (
+from agent.prompts import get_prompt
+from agent.prompts.lit_review import (
     _format_citation_indices,
     SYSTEM_PROMPT,
     USER_TEMPLATE,
@@ -151,9 +151,9 @@ def test_generate_chapter_passes_citation_indices_to_lit_review_prompt(monkeypat
         captured["user"] = user
         return "文献综述正文...Smith (2020) [1] 指出..."
 
-    monkeypatch.setattr("nodes.generate_chapter.call_llm", fake_call_llm)
+    monkeypatch.setattr("agent.nodes.generate_chapter.call_llm", fake_call_llm)
 
-    from nodes.generate_chapter import generate_chapter
+    from agent.nodes.generate_chapter import generate_chapter
 
     from conftest import make_write_ready_state
 
@@ -183,11 +183,11 @@ def test_generate_chapter_passes_citation_indices_to_lit_review_prompt(monkeypat
 def test_generate_chapter_no_citation_indices_does_not_crash(monkeypatch):
     """state 无 citation_indices 时 generate_chapter 不崩溃。"""
     monkeypatch.setattr(
-        "nodes.generate_chapter.call_llm",
+        "agent.nodes.generate_chapter.call_llm",
         lambda system, user: "文献综述正文，无引用标记",
     )
 
-    from nodes.generate_chapter import generate_chapter
+    from agent.nodes.generate_chapter import generate_chapter
 
     from conftest import make_write_ready_state
 

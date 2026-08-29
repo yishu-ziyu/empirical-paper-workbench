@@ -12,7 +12,7 @@
 """
 from typing import List
 
-from protocols import LiteratureEntry
+from ...protocols import LiteratureEntry
 
 
 def mock_literature_corpus() -> List[LiteratureEntry]:

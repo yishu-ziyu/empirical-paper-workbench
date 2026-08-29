@@ -5,11 +5,11 @@ review_chapter 综合分与不回退 idx 由执行 1 覆盖。
 """
 from __future__ import annotations
 
-from engine.bind import bind_chapter_kwargs
-from nodes.review_sources.mock_review import mock_review_llm
-from nodes.review_sources.structure_checks import check_structure
-from prompts import get_prompt
-from protocols import ReviewRubric
+from agent.engine.bind import bind_chapter_kwargs
+from agent.nodes.review_sources.mock_review import mock_review_llm
+from agent.nodes.review_sources.structure_checks import check_structure
+from agent.prompts import get_prompt
+from agent.protocols import ReviewRubric
 
 from conftest import make_write_ready_state
 

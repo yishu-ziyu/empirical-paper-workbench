@@ -6,8 +6,8 @@ import uuid
 import routers.labels  # noqa: F401
 import routers.review  # noqa: F401
 from facade import facade
-from nodes.label_store import read_events
-from nodes.learning_labels import assert_no_mock_score
+from agent.nodes.label_store import read_events
+from agent.nodes.learning_labels import assert_no_mock_score
 
 from conftest import make_state
 

@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""仓库根目录入口：派出三位审稿代理跑对照。"""
+"""仓库根目录入口：派出三位审稿代理跑对照。
+
+依赖 agent 已作为可编辑包安装（`pip install -e ./agent`），故 `from agent.eval...`
+与 `from agent.nodes...` 无需任何进程级 sys.path 拼接即可唯一解析。
+"""
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parents[1]
-_AGENT = _ROOT / "agent"
-if str(_AGENT) not in sys.path:
-    sys.path.insert(0, str(_AGENT))
-
-from eval.ab_review import main  # noqa: E402
+from agent.eval.ab_review import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -14,7 +14,7 @@ from typing import List
 
 import pytest
 
-from nodes.citation_graph import build_citation_graph, MAX_API_CALL_ENTRIES
+from agent.nodes.citation_graph import build_citation_graph, MAX_API_CALL_ENTRIES
 
 
 def _patch_references(monkeypatch, mapping: dict[str, List[str]]):
@@ -23,7 +23,7 @@ def _patch_references(monkeypatch, mapping: dict[str, List[str]]):
     mapping: {source_doi: [cited_doi, ...]}
     未在 mapping 中的 doi 返回空列表。
     """
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _fake(doi, api_key=None, max_results=20):
         return mapping.get(doi, [])
@@ -98,7 +98,7 @@ def test_api_failure_degrades_to_empty_edges(monkeypatch):
         {"title": "B", "year": 2021, "doi": "10.1/b"},
     ]
 
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _flaky(doi, api_key=None, max_results=20):
         if doi == "10.1/a":
@@ -127,7 +127,7 @@ def test_no_doi_entry_skips_api(monkeypatch):
 
     call_count = {"n": 0}
 
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _counter(doi, api_key=None, max_results=20):
         call_count["n"] += 1
@@ -153,7 +153,7 @@ def test_api_call_count_capped(monkeypatch):
 
     call_count = {"n": 0}
 
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _counter(doi, api_key=None, max_results=20):
         call_count["n"] += 1
@@ -172,7 +172,7 @@ def test_empty_entries_skips_api_entirely(monkeypatch):
     """空 literature_entries 时完全不调 API。"""
     call_count = {"n": 0}
 
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _counter(doi, api_key=None, max_results=20):
         call_count["n"] += 1
@@ -229,7 +229,7 @@ def test_fitness_function_edge_endpoints_in_indices(monkeypatch):
 
 def test_citation_hop_adds_out_of_set_doi_and_keeps_cap(monkeypatch):
     """有被引跳时集外 DOI 进 literature_entries，总长 <= 20。"""
-    from nodes.search_literature import MAX_LITERATURE_ENTRIES
+    from agent.nodes.search_literature import MAX_LITERATURE_ENTRIES
 
     entries = [
         {"title": "A", "year": 2020, "doi": "10.1/a", "citation_count": 99},
@@ -247,7 +247,7 @@ def test_citation_hop_adds_out_of_set_doi_and_keeps_cap(monkeypatch):
 
 def test_citation_hop_does_not_exceed_max_when_l0_full(monkeypatch):
     """L0 已 20 条时，集外 DOI 不能再进，边仍滤掉。"""
-    from nodes.search_literature import MAX_LITERATURE_ENTRIES
+    from agent.nodes.search_literature import MAX_LITERATURE_ENTRIES
 
     entries = [
         {"title": f"P{i}", "year": 2000 + i, "doi": f"10.1/p{i}", "citation_count": i}
@@ -270,7 +270,7 @@ def test_citation_hop_api_failure_does_not_crash(monkeypatch):
         {"title": "A", "year": 2020, "doi": "10.1/a", "citation_count": 10},
         {"title": "B", "year": 2021, "doi": "10.1/b"},
     ]
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _boom(doi, api_key=None, max_results=20):
         raise RuntimeError("network down")
@@ -289,7 +289,7 @@ def test_citation_hop_only_queries_top_three(monkeypatch):
         for i in range(6)
     ]
     called: list[str] = []
-    from nodes.literature_sources import semantic_scholar
+    from agent.nodes.literature_sources import semantic_scholar
 
     def _counter(doi, api_key=None, max_results=20):
         called.append(doi)

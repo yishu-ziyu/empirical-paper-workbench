@@ -4,10 +4,10 @@ from __future__ import annotations
 import sys
 
 import pandas as pd
-from engine.prewrite import run_prewrite
-from nodes.estimate import estimate
-from nodes.robustness_check import robustness_check
-from nodes.set_direction import set_direction
+from agent.engine.prewrite import run_prewrite
+from agent.nodes.estimate import estimate
+from agent.nodes.robustness_check import robustness_check
+from agent.nodes.set_direction import set_direction
 
 
 def _block_statspai_import(monkeypatch):

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from cleaning.audit import AuditStep
+from agent.cleaning.audit import AuditStep
 
 
 @pytest.fixture

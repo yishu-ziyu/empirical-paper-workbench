@@ -19,7 +19,7 @@ import urllib.parse
 import urllib.request
 from typing import List, Optional
 
-from protocols import LiteratureEntry
+from ...protocols import LiteratureEntry
 
 
 # Semantic Scholar Graph API - paper search endpoint

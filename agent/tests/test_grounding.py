@@ -1,7 +1,7 @@
 """批次 4：结果章数字接地纯函数。"""
 from __future__ import annotations
 
-from nodes.review_sources.grounding import check_grounding
+from agent.nodes.review_sources.grounding import check_grounding
 
 from conftest import make_write_ready_state
 

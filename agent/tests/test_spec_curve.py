@@ -1,7 +1,7 @@
 """ADR-0010: spec curve keeps every defensible spec on the table."""
 import pandas as pd
 
-from design.spec_curve import build_specs, run_spec_curve, spec_curve_markdown
+from agent.design.spec_curve import build_specs, run_spec_curve, spec_curve_markdown
 
 
 def test_build_specs_includes_bivariate_and_splits():

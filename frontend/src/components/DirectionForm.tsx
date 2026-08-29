@@ -49,6 +49,14 @@ export type DirectionFormInitial = {
   controls?: string
   method?: string
   template?: string
+  instrument?: string
+  time_col?: string
+  id_col?: string
+  first_treat_col?: string
+  running_var?: string
+  cutoff?: number
+  unit_col?: string
+  treatment_time?: string
 }
 
 export interface DirectionFormProps {
@@ -71,16 +79,17 @@ export default function DirectionForm({
   const [controls, setControls] = useState(initial?.controls ?? '')
   const [method, setMethod] = useState(initial?.method ?? '')
   const [template, setTemplate] = useState(initial?.template ?? 'undergrad')
-  const [instrument, setInstrument] = useState('')
-  const [timeCol, setTimeCol] = useState('')
-  const [idCol, setIdCol] = useState('')
-  const [firstTreatCol, setFirstTreatCol] = useState('')
-  const [runningVar, setRunningVar] = useState('')
-  const [cutoff, setCutoff] = useState('')
-  const [unitCol, setUnitCol] = useState('')
-  const [treatmentTime, setTreatmentTime] = useState('')
+  const [instrument, setInstrument] = useState(initial?.instrument ?? '')
+  const [timeCol, setTimeCol] = useState(initial?.time_col ?? '')
+  const [idCol, setIdCol] = useState(initial?.id_col ?? '')
+  const [firstTreatCol, setFirstTreatCol] = useState(initial?.first_treat_col ?? '')
+  const [runningVar, setRunningVar] = useState(initial?.running_var ?? '')
+  const [cutoff, setCutoff] = useState(initial?.cutoff != null ? String(initial.cutoff) : '')
+  const [unitCol, setUnitCol] = useState(initial?.unit_col ?? '')
+  const [treatmentTime, setTreatmentTime] = useState(initial?.treatment_time ?? '')
   const kind = methodKind(method)
   const canSubmit = Boolean(question.trim() && dv.trim() && iv.trim() && method)
+  const columnListId = 'direction-data-columns'
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -118,11 +127,13 @@ export default function DirectionForm({
     <form
       data-testid="direction-form"
       onSubmit={handleSubmit}
-      className="space-y-3"
+      className="space-y-4"
     >
-      {columns.length > 0 && <datalist id="direction-columns">{columns.map((c) => (
-        <option key={c} value={c} />
-      ))}</datalist>}
+      {columns.length > 0 && (
+        <datalist id={columnListId}>
+          {columns.map((column) => <option key={column} value={column} />)}
+        </datalist>
+      )}
       {columns.length > 0 ? (
         <p data-testid="data-columns" className="text-xs leading-5 text-muted">
           {t('direction.columns')}
@@ -135,37 +146,37 @@ export default function DirectionForm({
           aria-label={t('direction.question')}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.dv')}</span>
+        <span className="block text-xs text-muted" title={t('direction.dvHint')}>{t('direction.dv')}</span>
         <input
           aria-label={t('direction.dv')}
-          list="direction-columns"
           value={dv}
+          list={columns.length ? columnListId : undefined}
           onChange={(e) => setDv(e.target.value)}
-          className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.iv')}</span>
+        <span className="block text-xs text-muted" title={t('direction.ivHint')}>{t('direction.iv')}</span>
         <input
           aria-label={t('direction.iv')}
-          list="direction-columns"
           value={iv}
+          list={columns.length ? columnListId : undefined}
           onChange={(e) => setIv(e.target.value)}
-          className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <label className="block">
-        <span className="block text-xs text-muted">{t('direction.controls')}</span>
+        <span className="block text-xs text-muted" title={t('direction.controlsHint')}>{t('direction.controls')}</span>
         <input
           aria-label={t('direction.controls')}
-          list="direction-columns"
           value={controls}
+          list={columns.length ? columnListId : undefined}
           onChange={(e) => setControls(e.target.value)}
-          className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         />
       </label>
       <div className="block">
@@ -173,67 +184,61 @@ export default function DirectionForm({
         <MethodSelector value={method} onChange={setMethod} />
       </div>
       {kind === 'iv' && (
-        <label className="block animate-slide-up">
+        <label className="block">
           <span className="block text-xs text-muted">{t('direction.instrument')}</span>
           <input
             aria-label={t('direction.instrument')}
-          list="direction-columns"
             value={instrument}
+            list={columns.length ? columnListId : undefined}
             onChange={(e) => setInstrument(e.target.value)}
-            className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
           />
         </label>
       )}
       {kind === 'did' && (
         <>
-          <label className="block animate-slide-up">
-            <span className="block text-xs text-muted">
-              {t('direction.timeCol')}
-              {!timeCol.trim() && <span className="ml-1 text-[11px] text-muted/70">{t('direction.hintMissing')}</span>}
-            </span>
+          <label className="block">
+            <span className="block text-xs text-muted">{t('direction.timeCol')}</span>
             <input
               aria-label={t('direction.timeCol')}
-          list="direction-columns"
               value={timeCol}
+              list={columns.length ? columnListId : undefined}
               onChange={(e) => setTimeCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
-            <span className="block text-xs text-muted">
-              {t('direction.idCol')}
-              {!idCol.trim() && <span className="ml-1 text-[11px] text-muted/70">{t('direction.hintMissing')}</span>}
-            </span>
+            <span className="block text-xs text-muted">{t('direction.idCol')}</span>
             <input
               aria-label={t('direction.idCol')}
-          list="direction-columns"
               value={idCol}
+              list={columns.length ? columnListId : undefined}
               onChange={(e) => setIdCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
             <span className="block text-xs text-muted">{t('direction.firstTreatCol')}</span>
             <input
               aria-label={t('direction.firstTreatCol')}
-          list="direction-columns"
               value={firstTreatCol}
+              list={columns.length ? columnListId : undefined}
               onChange={(e) => setFirstTreatCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
       )}
       {kind === 'rd' && (
         <>
-          <label className="block animate-slide-up">
+          <label className="block">
             <span className="block text-xs text-muted">{t('direction.runningVar')}</span>
             <input
               aria-label={t('direction.runningVar')}
-          list="direction-columns"
               value={runningVar}
+              list={columns.length ? columnListId : undefined}
               onChange={(e) => setRunningVar(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -242,21 +247,21 @@ export default function DirectionForm({
               aria-label={t('direction.cutoff')}
               value={cutoff}
               onChange={(e) => setCutoff(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
       )}
       {kind === 'scm' && (
         <>
-          <label className="block animate-slide-up">
+          <label className="block">
             <span className="block text-xs text-muted">{t('direction.unitCol')}</span>
             <input
               aria-label={t('direction.unitCol')}
-          list="direction-columns"
               value={unitCol}
+              list={columns.length ? columnListId : undefined}
               onChange={(e) => setUnitCol(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
           <label className="block">
@@ -265,7 +270,7 @@ export default function DirectionForm({
               aria-label={t('direction.treatmentTime')}
               value={treatmentTime}
               onChange={(e) => setTreatmentTime(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
             />
           </label>
         </>
@@ -276,7 +281,7 @@ export default function DirectionForm({
           aria-label={t('direction.template')}
           value={template}
           onChange={(e) => setTemplate(e.target.value)}
-          className="mt-1 w-full rounded border border-border bg-white p-2 transition-colors duration-150 focus:border-accent focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
         >
           {TEMPLATES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -288,8 +293,7 @@ export default function DirectionForm({
       <button
         type="submit"
         disabled={!canSubmit}
-        title={canSubmit ? undefined : t('direction.needQuestionVarMethod')}
-        className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
       >
         {t('direction.submit')}
       </button>

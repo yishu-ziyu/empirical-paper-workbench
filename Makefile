@@ -17,7 +17,7 @@ dev-frontend:
 
 dev-backend:
 	cd backend && . .venv/bin/activate 2>/dev/null || true; \
-	uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 0.0.0.0 --port 8000
+	DEBUG=true RUNS_DIR=../runs uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 0.0.0.0 --port 8000
 
 # 一次性装齐所有依赖
 install: install-frontend install-backend install-agent

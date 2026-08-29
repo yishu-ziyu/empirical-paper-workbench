@@ -18,7 +18,7 @@ export interface StepTimelineProps {
   identFailed: boolean
   outline: Array<{ type: string; title?: string }>
   currentChapterIndex: number
-  writtenChapters: Array<{ type: string; content?: string }>
+  writtenChapters: Array<{ type: string; content?: string | null }>
   writeBusy: boolean
 }
 
@@ -137,8 +137,6 @@ export default function StepTimeline({
   const hasAgentTrace = Boolean(estimate?.history_compact || estimate?.final_code)
 
   const contentOf = (type: string) => writtenChapters.find((ch) => ch.type === type)?.content
-  const resultsIdx = outline.findIndex((ch) => ch.type === 'results')
-
   return (
     <div data-testid="step-timeline" className="mb-6 flex flex-col gap-2.5">
       <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">

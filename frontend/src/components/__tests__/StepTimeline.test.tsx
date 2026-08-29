@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest'
+import { describe, test, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import StepTimeline from '../StepTimeline'
 import { I18nProvider } from '../../lib/i18n'

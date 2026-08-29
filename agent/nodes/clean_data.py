@@ -37,6 +37,42 @@ STEPS: list[CleaningStep] = [
     AuditStep(),
 ]
 
+_DESIGN_COLUMN_KEYS = (
+    "id_col",
+    "id",
+    "unit_col",
+    "unit",
+    "time_col",
+    "time",
+    "treatment_col",
+    "treatment",
+    "iv",
+    "post_col",
+    "post",
+    "first_treat_col",
+    "instrument_col",
+    "instrument",
+    "cluster",
+)
+
+
+def _design_columns(state: dict) -> list[str]:
+    """Columns whose values encode the research design, not measurements."""
+    names = {
+        str(value)
+        for value in (state.get("panel_id"), state.get("time_col"))
+        if value
+    }
+    for field in ("research_direction", "main_specification"):
+        source = state.get(field)
+        if not isinstance(source, dict):
+            continue
+        for key in _DESIGN_COLUMN_KEYS:
+            value = source.get(key)
+            if isinstance(value, str) and value.strip():
+                names.add(value.strip())
+    return sorted(names)
+
 
 def _step_config(
     state: dict,
@@ -51,6 +87,7 @@ def _step_config(
         base["strategy"] = state.get("missing_strategy")
     elif step_name == "outliers":
         base["cuts"] = state.get("outliers_cuts", (5, 95))
+        base["protected_columns"] = _design_columns(state)
     elif step_name == "transform":
         base.update(state.get("transform_config", {}))
     elif step_name == "filter":
@@ -64,7 +101,7 @@ def _step_config(
 
 
 def clean_data(state: EconPaperState) -> CleanDataOutput:
-    """Run the 8 cleaning steps in order, aggregating ``cleaning_report.steps``."""
+    """Run all steps and promote the final sidecar as the analysis CSV."""
     datasets = state.get("uploaded_datasets", [])
     workspace = state.get("workspace", "/tmp/econpaper_workspace")
     Path(workspace).mkdir(parents=True, exist_ok=True)
@@ -92,7 +129,12 @@ def clean_data(state: EconPaperState) -> CleanDataOutput:
             }
         )
 
+    cleaned_path = next(
+        (str(dataset["path"]) for dataset in datasets if dataset.get("path")),
+        state.get("csv_path"),
+    )
     return {
+        "csv_path": cleaned_path,
         "uploaded_datasets": datasets,
         "cleaned_datasets": datasets,
         "cleaning_report": {"steps": reports},

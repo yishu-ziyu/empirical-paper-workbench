@@ -392,11 +392,13 @@ class TestSessionOwnership:
         assert resp.status_code == 200
         session_id = resp.json()["session_id"]
 
-        # Try to delete without auth
+        # Try to delete without auth. The cookie jar holds the login cookies,
+        # so drop them to simulate a truly unauthenticated client.
+        client.cookies.clear()
         delete_resp = client.delete(f"/sessions/{session_id}")
         assert delete_resp.status_code == 401
 
-        # Delete with auth should succeed
+        # Delete with auth should succeed (legacy Bearer header still works)
         delete_resp = client.delete(
             f"/sessions/{session_id}",
             headers={"Authorization": f"Bearer {token}"},

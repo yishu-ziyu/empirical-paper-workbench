@@ -6,6 +6,7 @@
 // 修复漂移 1：字段名 balanced_n/unbalanced_n → balanced/unbalanced，新增 n_periods。
 
 import { useState } from 'react'
+import { API_BASE, apiFetch } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 import type { components } from '../types/api'
 
@@ -14,8 +15,6 @@ type BalanceResponse = components['schemas']['BalanceResponse']
 export interface BalanceReportProps {
   sessionId: string
 }
-
-const API_BASE = 'http://localhost:8000'
 
 function pct(rate: number): string {
   return `${(rate * 100).toFixed(0)}%`
@@ -33,7 +32,7 @@ export function BalanceReport({ sessionId }: BalanceReportProps) {
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch(`${API_BASE}/sessions/${sessionId}/balance`, {
+      const resp = await apiFetch(`${API_BASE}/sessions/${sessionId}/balance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ panel_id: panelId, time_col: timeCol }),

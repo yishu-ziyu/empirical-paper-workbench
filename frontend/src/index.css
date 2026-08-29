@@ -17,10 +17,29 @@
   --danger: #9b3d30;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid rgba(47, 107, 79, 0.55);
+  outline-offset: 1px;
+}
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -32,12 +51,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Selection highlight ── */
 ::selection {
   background-color: rgba(47, 107, 79, 0.22);
 }
-
-/* ── Keyframe animations ── */
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -64,8 +80,6 @@ body {
   50%  { opacity: 1; }
   100% { transform: scaleX(1); opacity: 0.6; }
 }
-
-/* ── Utility animation classes ── */
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
@@ -100,96 +114,57 @@ body {
   animation: listen-ring 1.6s ease-out infinite;
 }
 
-/* ── Reduced motion: 动效全部坍缩为瞬时 ── */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0s !important;
-    transition-duration: 0.01ms !important;
+@layer components {
+  /* DESIGN lock: 左栏章节 / 中栏纸 / 右栏步骤. Never stack; never wait on lg. */
+  .desk-columns {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) 280px;
+    min-width: 760px;
+    min-height: 0;
+  }
+
+  .desk-preview-columns {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr) 240px;
+    min-height: 420px;
+  }
+
+  .journal-page {
+    @apply bg-white px-8 py-10 font-serif text-[16.5px] leading-[1.9] text-ink sm:px-14 sm:py-14;
+  }
+
+  .composer-shell {
+    @apply rounded-[24px] border border-black/[0.08] bg-white shadow-[0_12px_40px_rgba(24,21,21,0.07)];
+  }
+
+  .thread-card {
+    @apply rounded-[20px] border border-black/[0.06] bg-white shadow-[0_8px_28px_rgba(24,21,21,0.045)];
+  }
+
+  .source-tile {
+    @apply flex w-[6.75rem] flex-col items-center rounded-[18px] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(24,21,21,0.08)];
+  }
+
+  .code-card {
+    @apply overflow-x-auto rounded-[20px] bg-[#1c1b1a] px-4 py-3 font-mono text-[12px] leading-6 text-[#e8e4dc];
   }
 }
 
-/* ── Focus ring（DESIGN.md：焦点环用绿，2px，永不做动画） ── */
-:focus-visible {
-  outline: 2px solid rgba(47, 107, 79, 0.55);
-  outline-offset: 1px;
+/* Auth micro-interactions */
+@keyframes auth-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
 }
+.animate-shake { animation: auth-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
 
-/* ── 首页图纸层（寓意：识别策略图纸还在画；手法借 design-notes/living/laper） ── */
-@keyframes blueprint-pattern-draw {
-  from { clip-path: inset(0 0 100% 0); }
-  to { clip-path: inset(0); }
+@keyframes auth-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
-@keyframes blueprint-line-draw-y {
-  from { clip-path: inset(0 0 100% 0); }
-  to { clip-path: inset(0); }
-}
-@keyframes blueprint-line-draw-x {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0); }
-}
-@keyframes blueprint-pin-draw {
-  0%, 55% { opacity: 0; }
-  100% { opacity: 1; }
-}
-.blueprint-dots {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background-image: radial-gradient(rgba(24, 21, 21, 0.16) 1px, transparent 1px);
-  background-size: 8px 8px;
-  clip-path: inset(0 0 100% 0);
-}
-.is-play .blueprint-dots {
-  animation: blueprint-pattern-draw 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
-}
-.blueprint-rail-y {
-  position: absolute;
-  top: 0;
-  left: 58%;
-  width: 1px;
-  height: 100%;
-  background: rgba(24, 21, 21, 0.14);
-  clip-path: inset(0 0 100% 0);
-}
-.blueprint-rail-x {
-  position: absolute;
-  top: 34%;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  background: rgba(24, 21, 21, 0.1);
-  clip-path: inset(0 100% 0 0);
-}
-.is-play .blueprint-rail-y { animation: blueprint-line-draw-y 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
-.is-play .blueprint-rail-x { animation: blueprint-line-draw-x 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both; }
-.blueprint-pin {
-  position: absolute;
-  top: 34%;
-  left: 58%;
-  width: 8px;
-  height: 8px;
-  background: var(--bg);
-  border: 1px solid rgba(24, 21, 21, 0.3);
-  opacity: 0;
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-.is-play .blueprint-pin { animation: blueprint-pin-draw 0.76s ease-out 0.9s both; }
-.blueprint-glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(46% 34% at 22% 16%, rgba(47, 107, 79, 0.08) 0%, transparent 70%),
-    radial-gradient(36% 44% at 78% 10%, rgba(47, 107, 79, 0.05) 0%, transparent 70%);
-}
-@media (prefers-reduced-motion: reduce) {
-  .blueprint-dots, .blueprint-rail-y, .blueprint-rail-x, .blueprint-pin {
-    animation: none !important;
-    clip-path: none !important;
-    opacity: 1;
-  }
-}
+.animate-pop { animation: auth-pop 0.3s ease-out both; }
+
+@keyframes auth-check-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+.auth-check path { stroke-dasharray: 24; animation: auth-check-draw 0.35s ease-out 0.05s forwards; }

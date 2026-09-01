@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
+import { apiFetch } from '../lib/apiBase'
 
 export interface StepTimelineProps {
   sessionId?: string | null
@@ -97,13 +98,18 @@ export default function StepTimeline({
     }
     const poll = async () => {
       try {
-        const resp = await fetch(`http://localhost:8000/sessions/${sessionId}/trace?limit=5`)
+        const resp = await apiFetch(`/api/sessions/${sessionId}/trace?limit=5`)
         if (!resp.ok) return
         const data = (await resp.json()) as { events?: Array<{ node: string; status: string }> }
         const last = (data.events ?? []).at(-1)
         if (!alive || !last) return
         const zh = STAGES[last.node]
-        if (zh) setStage(last.status === 'done' ? null : zh)
+        if (!zh) return
+        // trace 事件状态协议是 ok / error / blocked（见 run_store.append_event），
+        // 没有 'done'。ok = 该节点已完成（流水线已推进到这里）→ 展示该阶段；
+        // error / blocked = 终态失败/暂停 → 不再展示"进行中"的阶段。
+        if (last.status === 'ok') setStage(zh)
+        else setStage(null)
       } catch {
         /* 静默：trace 拉不到就不显示阶段 */
       }

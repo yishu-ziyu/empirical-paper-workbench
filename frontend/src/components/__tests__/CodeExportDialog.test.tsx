@@ -24,7 +24,7 @@ const baseProps: CodeExportDialogProps = {
 
 describe('CodeExportDialog 代码导出对话框', () => {
   beforeEach(() => {
-    localStorage.setItem('econpaper_access_token', 'test-token-for-auth')
+    // 鉴权走 httpOnly cookie：不再读 localStorage 的遗留 Bearer token。
     // Mock fetch for download triggering
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -87,18 +87,18 @@ describe('CodeExportDialog 代码导出对话框', () => {
     expect(screen.getByText(/\.m/)).toBeInTheDocument()
   })
 
-  test('点击 Python 按钮触发 fetch 请求 format=py', async () => {
+  test('点击 Python 按钮触发 fetch 请求 format=py（cookie 凭证，无遗留 Bearer 头）', async () => {
     const user = userEvent.setup()
     renderWithI18n(<CodeExportDialog {...baseProps} />)
     const buttons = screen.getAllByTestId('code-export-button')
     await user.click(buttons[0]) // Python
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('format=py'),
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer test-token-for-auth' }),
-      }),
+      expect.objectContaining({ credentials: 'include' }),
     )
+    const init = (fetch as unknown as { mock: { calls: Array<[string, RequestInit]> } }).mock.calls[0][1]
+    const headers = (init?.headers ?? {}) as Record<string, string>
+    expect(headers.Authorization).toBeUndefined()
   })
 
   test('点击 Stata 按钮触发 fetch 请求 format=do', async () => {

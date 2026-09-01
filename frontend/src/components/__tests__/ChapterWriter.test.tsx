@@ -25,6 +25,9 @@ const introChapter = {
   title: '引言',
   status: 'generated',
   content: '# 引言\n\n## 研究背景\n教育回报是劳动经济学经典议题。',
+  generation_degraded: false,
+  review_degraded: false,
+  review_typed: false,
 }
 
 const baseProps: ChapterWriterProps = {
@@ -70,7 +73,7 @@ describe('ChapterWriter 章节写作器', () => {
       const { unmount } = renderWithI18n(
         <ChapterWriter
           {...baseProps}
-          chapter={{ type, title: type, status: 'generated', content: 'x' }}
+          chapter={{ type, title: type, status: 'generated', content: 'x', generation_degraded: false, review_degraded: false, review_typed: false }}
         />,
       )
       const badge = screen.getByTestId('chapter-type-badge')
@@ -289,6 +292,9 @@ describe('ChapterWriter T-08c 扩展：4 按钮 + 回滚 + 编辑模式', () => 
           status: 'generated',
           content: '方法正文不该被引言草稿覆盖。',
           chapter_index: 3,
+          generation_degraded: false,
+          review_degraded: false,
+          review_typed: false,
         }}
         chapterIndex={3}
         onSaveEdit={onSaveEdit}

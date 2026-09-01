@@ -5,6 +5,7 @@ import ThreeColumn from './components/ThreeColumn'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DeskPage from './pages/DeskPage'
+import AgentSpikePage from './pages/AgentSpikePage'
 import GuidePage from './pages/GuidePage'
 import { BrandMark, LangPills } from './components/UnauthHeader'
 import { CsvDropZone } from './components/CsvDropZone'
@@ -30,6 +31,10 @@ function App() {
   const ws = useWorkspace({ sessionId, setSessionId, setAuthed, t })
 
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
+
+  const spikeRoute =
+    window.location.pathname === '/spike' ||
+    new URLSearchParams(window.location.search).get('spike') === '1'
 
   const handleLogin = useCallback(
     (_token: string) => {
@@ -58,6 +63,10 @@ function App() {
         onHome={() => setAuthPage(null)}
       />
     )
+  }
+
+  if (spikeRoute) {
+    return <AgentSpikePage />
   }
 
   const firstScreenInput = (
@@ -394,12 +403,6 @@ function App() {
                   {t('app.degradedBanner')}
                 </div>
               )}
-              <p
-                data-testid="product-journey"
-                className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-muted"
-              >
-                {t('bench.journey')}
-              </p>
               {!ws.hasReadout && (
                 <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
                   {t('guide.nowDirection')}
@@ -586,6 +589,7 @@ function App() {
               hasChapter={Boolean(ws.writtenChapter?.content)}
               awaitingApprove={ws.writtenChapter?.status === 'generated'}
               canExport={ws.canExport}
+              hasExported={ws.hasExported}
               onSelect={(id) => {
                 if (id === 'upload_data' || id === 'clean_data') {
                   ws.setWorkbenchTab('data')

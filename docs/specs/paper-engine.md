@@ -7,8 +7,8 @@
 | 日期 | 2026-08-16 |
 | 修订 | 2026-08-16 r4（`literature_produced_by` / `literature_query` 列入 `TRUTH_KEYS`） |
 | 状态 | Draft |
-| 产品 | `/Users/mahaoxuan/Desktop/经济学论文/econpaper` |
-| 范围 | `agent/` + StatsPAI / stata-code；FastAPI 只是门；操作台只展示发动机产物 |
+| 产品 | `econpaper/` |
+| 范围 | `agent/` + `../dependencies/StatsPAI/` + 产品内置代码导出；FastAPI 只是门；操作台只展示发动机产物 |
 | 权威 | `CONTEXT.md`、`docs/adr/*`、`agent/graph.py`、`backend/facade.py` |
 | 机制目录 | Antonio Gulli《Agentic Design Patterns》中译（本地 `chapters/`）。书是机制清单，不是产品名。 |
 
@@ -32,7 +32,9 @@ econpaper 是工作区里唯一的实证论文网页产品（ADR-0010）。用�
 
 ### 产品身份
 
-ADR-0010：唯一产品是 `econpaper/` 网页端。StatsPAI 与 stata-code 是同级库，不是第二个产品。不合并两份本地仓的 Git 历史，不推本地 main。本设计不碰前台排版。
+ADR-0010：唯一产品是 `econpaper/` 网页端。StatsPAI 是经过验证的本地源码依赖，
+位于 `../dependencies/StatsPAI/`；识别、稳健性和多语言代码导出均由产品自有实现负责。
+本设计不碰前台排版。
 
 人做的事：定方向、看 0 星、改大纲要点、批章节、点导出。  
 机器做的事：清洗、识别诊断、估计、稳健性、检索、填六章、接地评审、翻译代码、编参考文献、出 tex/pdf/docx。
@@ -111,7 +113,7 @@ POST /direction
 - 把图换成开放 ReAct 规划器，或拆成 writer/reviewer/estimator/librarian 多智能体并加 A2A。
 - 把 MCP 做成产品。
 - 在线学习 / DPO / 用用户论文微调。
-- 合并 `实证论文项目模板/` 或推本地 main。
+- 恢复或合并已退役的旧 CLI Git 历史，或推本地 main。
 - 训练专用评审模型；替换 ADR-0008 的 generate/review 分配置。
 - 让 OLS 获得因果星级（识别节点已经如此；要关的是正文路径）。
 - 第一批就编译文献∥估计的扇入扇出。

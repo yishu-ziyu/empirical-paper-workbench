@@ -38,506 +38,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/sessions/{session_id}/charls/detect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detect Charls
-         * @description Run the profiling dataset-type detector on the session CSV.
-         *
-         *     Returns ``{dataset_type, charls_config?}``. ``charls_config`` is the
-         *     parsed ``charls.yaml`` and is only included when the dataset is
-         *     detected as CHARLS.
-         */
-        get: operations["detect_charls_sessions__session_id__charls_detect_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/charls/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirm Charls
-         * @description Persist the user-confirmed CHARLS wizard config into session state.
-         *
-         *     The wizard payload is written to ``state["charls_config"]`` so
-         *     downstream nodes (clean_data sub-steps, eda, outline) can read
-         *     readable variable names instead of raw CHARLS codes.
-         */
-        post: operations["confirm_charls_sessions__session_id__charls_confirm_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/generate-chapter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate Chapter Endpoint
-         * @description 触发 generate_chapter 节点：写入 current_chapter → 跑节点 → 返回章节。
-         *
-         *     返回体：
-         *     {
-         *       "chapter": {type, title, content, status: "generated", ...},
-         *       "body_chapters": [...],  # 全部正文章节
-         *     }
-         */
-        post: operations["generate_chapter_endpoint_sessions__session_id__generate_chapter_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/approve-chapter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve Chapter Endpoint
-         * @description 用户审批章节 → 标记 status="approved"。
-         *
-         *     graph resume 由后续集成阶段在 graph 层加 interrupt() 后实现；此处只
-         *     更新 session 状态。
-         */
-        post: operations["approve_chapter_endpoint_sessions__session_id__approve_chapter_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rollback Chapter Endpoint
-         * @description 回滚到指定版本。
-         *
-         *     Request:  ``{"chapter_index": int, "version_index": int}``
-         *     Response: ``{"chapter": {...}, "body_chapters": [...]}``
-         *
-         *     把 chapter_index / version_index 写入 state 后调
-         *     ``rollback_chapter(state)`` 节点（T-08a），节点返回
-         *     ``{"body_chapters": [...]}``，合并回 session 状态。
-         */
-        post: operations["rollback_chapter_endpoint_sessions__session_id__rollback_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/regenerate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Regenerate Chapter Endpoint
-         * @description 重新生成当前章。
-         *
-         *     Request:  ``{"chapter_index": int, "instruction"?: str}``
-         *     Response: ``{"chapter": {...含新版本...}, "body_chapters": [...]}``
-         *
-         *     设置 ``state['current_chapter_index']``，可选把 ``instruction`` 写入
-         *     ``revision_suggestions[index]``，再调 ``generate_chapter(state)``。
-         *     空 instruction 仍重生成。
-         */
-        post: operations["regenerate_chapter_endpoint_sessions__session_id__regenerate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/edit-chapter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Edit Chapter Endpoint
-         * @description 按用户指令改写当前章，或把用户 markdown 落盘。
-         *
-         *     Request:  ``{"chapter_index": int, "instruction": str?}``
-         *               或 ``{"chapter_index": int, "content": str?}``
-         *     Response: ``{"chapter": {...}, "body_chapters": [...]}``
-         *
-         *     ``instruction`` 写入 ``revision_suggestions`` 后走
-         *     ``generate_chapter``（与 regenerate 同一条写管线）。
-         *     ``content`` 直接 prepend 新版本，``status="edited"``。
-         */
-        post: operations["edit_chapter_endpoint_sessions__session_id__edit_chapter_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/chapters/{chapter_index}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Versions
-         * @description 获取指定章节的所有版本。
-         *
-         *     Response: ``{"chapter_index": int, "count": int,
-         *                   "versions": [{"index": int, "preview": str}]}``
-         *
-         *     每个版本的 ``preview`` 截断到前 50 字。章节无 ``versions`` 列表时，
-         *     降级用 ``content`` 作为唯一版本。
-         */
-        get: operations["get_versions_sessions__session_id__chapters__chapter_index__versions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/translate-code": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Translate Code Endpoint
-         * @description Run translate_code so GET /code-export can return Stata / R files.
-         */
-        post: operations["translate_code_endpoint_sessions__session_id__translate_code_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/code-export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export Code
-         * @description 导出代码文件。
-         *
-         *     Parameters
-         *     ----------
-         *     session_id : str
-         *         会话 ID。
-         *     format : str
-         *         代码格式：``py`` / ``do`` / ``R`` / ``m``。默认 ``py``。
-         *
-         *     Returns
-         *     -------
-         *     PlainTextResponse
-         *         带 ``Content-Disposition: attachment; filename="..."`` 的代码文本。
-         *
-         *     Raises
-         *     ------
-         *     HTTPException
-         *         - 404: session 不存在，或 no takeable translation (empty stubs are not files)
-         *         - 400: 不支持的 format
-         */
-        get: operations["export_code_sessions__session_id__code_export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/doc-export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export Document
-         * @description 导出文档：format=tex|pdf|docx，template=4 模板之一。
-         */
-        get: operations["export_document_sessions__session_id__doc_export_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/progress": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Progress
-         * @description 返回 6 章完成进度。
-         */
-        get: operations["get_progress_sessions__session_id__progress_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/journey": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Journey
-         * @description 返回 8 阶段研究旅程进度（收敛版，去掉了无节点的"表格图形"站）。
-         *
-         *     每个阶段状态：``pending`` / ``active`` / ``completed`` / ``interrupt``。
-         *     currentStage 为正在进行的阶段；若 state 为空，降级为第 0 站 active、
-         *     其余 pending，不抛错。
-         */
-        get: operations["get_journey_sessions__session_id__journey_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Review
-         * @description 返回当前章的评审信息。
-         *
-         *     Response: ``{chapter_index, feedback, suggestions, score, rubric,
-         *                  review_iteration, max_review_iterations, auto_decision,
-         *                  review_source, review_degraded, grounding_failures}``
-         *
-         *     无评审数据时返回 200 + 空字段（非 404），让前端渲染空态。
-         */
-        get: operations["get_review_sessions__session_id__review_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/review/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Submit Review Decision
-         * @description 接收人工评审决策，写入 state。
-         *
-         *     Request:  ``{decision: "accept"|"reject"|"force_pass", reviewer?, comment?}``
-         *     Response: ``{ok, decision, chapter_index, next_action}``
-         *
-         *     - ``accept`` / ``force_pass`` → ``next_action="proceed"``
-         *     - ``reject`` → 触发 ``facade.regenerate_chapter``，``next_action="regenerate"``
-         */
-        post: operations["submit_review_decision_sessions__session_id__review_decision_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Artifacts
-         * @description 列出某 session 的 run 目录：manifest + 文件树。
-         *
-         *     会话不存在 → 404；会话存在但尚无 run 目录（还没跑过任何被追踪的
-         *     步骤）→ exists=False + 空清单，前端渲染空态。
-         */
-        get: operations["get_artifacts_sessions__session_id__artifacts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/trace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Trace
-         * @description 返回 trace.jsonl 的尾部事件流（默认最近 50 条）。
-         */
-        get: operations["get_trace_sessions__session_id__trace_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/transform": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Transform
-         * @description Apply variable recoding & construction (sub-step 5).
-         *
-         *     Request body (flat form, matching the frontend VariableConstructor):
-         *     ``{"type": "log_transform"|"onehot"|"label"|"bin"|"interaction"|"policy_dummy",
-         *        "column": str, ...}``
-         *
-         *     The flat ``type``/``column`` is translated into the nested config that
-         *     ``cleaning.transform.transform`` expects.
-         */
-        post: operations["run_transform_sessions__session_id__transform_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Filter
-         * @description Apply sample filtering (sub-step 6).
-         *
-         *     Request body: ``{"conditions": [{"col": str, "op": str, "val": Any}, ...]}``
-         */
-        post: operations["run_filter_sessions__session_id__filter_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/sessions/{session_id}/balance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Balance
-         * @description Check panel balance (sub-step 7).
-         *
-         *     Request body: ``{"panel_id": str, "time_col": str}``
-         *
-         *     Stage D 修复漂移 1：返回 ``BalanceResponse``（4 字段：
-         *     ``balanced`` / ``unbalanced`` / ``n_periods`` / ``attrition_rate``），
-         *     不再直接透传 step report。``unbalanced`` 在 router 层补算
-         *     （总 panel 数 - balanced 数），因为 BalanceStep 的 step report 不含
-         *     ``unbalanced`` 字段（只有 ``balanced`` / ``n_periods`` /
-         *     ``attrition_rate``）。
-         */
-        post: operations["run_balance_sessions__session_id__balance_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -892,6 +392,203 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/paper-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Paper Draft Endpoint
+         * @description Build the formal short draft on an atomic Facade state copy.
+         */
+        post: operations["generate_paper_draft_endpoint_sessions__session_id__paper_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/paper-draft/claims/{claim_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Paper Claim Evidence Endpoint
+         * @description Read the claim evidence directly from the canonical Facade state.
+         */
+        get: operations["get_paper_claim_evidence_endpoint_sessions__session_id__paper_draft_claims__claim_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/generate-chapter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Chapter Endpoint
+         * @description 触发 generate_chapter 节点：写入 current_chapter → 跑节点 → 返回章节。
+         *
+         *     返回体：
+         *     {
+         *       "chapter": {type, title, content, status: "generated", ...},
+         *       "body_chapters": [...],  # 全部正文章节
+         *     }
+         */
+        post: operations["generate_chapter_endpoint_sessions__session_id__generate_chapter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/approve-chapter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Chapter Endpoint
+         * @description 用户审批章节 → 标记 status="approved"。
+         *
+         *     graph resume 由后续集成阶段在 graph 层加 interrupt() 后实现；此处只
+         *     更新 session 状态。
+         */
+        post: operations["approve_chapter_endpoint_sessions__session_id__approve_chapter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rollback Chapter Endpoint
+         * @description 回滚到指定版本。
+         *
+         *     Request:  ``{"chapter_index": int, "version_index": int}``
+         *     Response: ``{"chapter": {...}, "body_chapters": [...]}``
+         *
+         *     把 chapter_index / version_index 写入 state 后调
+         *     ``rollback_chapter(state)`` 节点（T-08a），节点返回
+         *     ``{"body_chapters": [...]}``，合并回 session 状态。
+         */
+        post: operations["rollback_chapter_endpoint_sessions__session_id__rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate Chapter Endpoint
+         * @description 重新生成当前章。
+         *
+         *     Request:  ``{"chapter_index": int, "instruction"?: str}``
+         *     Response: ``{"chapter": {...含新版本...}, "body_chapters": [...]}``
+         *
+         *     设置 ``state['current_chapter_index']``，可选把 ``instruction`` 写入
+         *     ``revision_suggestions[index]``，再调 ``generate_chapter(state)``。
+         *     空 instruction 仍重生成。
+         */
+        post: operations["regenerate_chapter_endpoint_sessions__session_id__regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/edit-chapter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit Chapter Endpoint
+         * @description 按用户指令改写当前章，或把用户 markdown 落盘。
+         *
+         *     Request:  ``{"chapter_index": int, "instruction": str?}``
+         *               或 ``{"chapter_index": int, "content": str?}``
+         *     Response: ``{"chapter": {...}, "body_chapters": [...]}``
+         *
+         *     ``instruction`` 写入 ``revision_suggestions`` 后走
+         *     ``generate_chapter``（与 regenerate 同一条写管线）。
+         *     ``content`` 直接 prepend 新版本，``status="edited"``。
+         */
+        post: operations["edit_chapter_endpoint_sessions__session_id__edit_chapter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/chapters/{chapter_index}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Versions
+         * @description 获取指定章节的所有版本。
+         *
+         *     Response: ``{"chapter_index": int, "count": int,
+         *                   "versions": [{"index": int, "preview": str}]}``
+         *
+         *     每个版本的 ``preview`` 截断到前 50 字。章节无 ``versions`` 列表时，
+         *     降级用 ``content`` 作为唯一版本。
+         */
+        get: operations["get_versions_sessions__session_id__chapters__chapter_index__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/desk/discuss": {
         parameters: {
             query?: never;
@@ -959,6 +656,350 @@ export interface paths {
         put?: never;
         /** Speak Desk */
         post: operations["speak_desk_desk_speak_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/transform": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Transform
+         * @description Apply variable recoding & construction (sub-step 5).
+         *
+         *     Request body (flat form, matching the frontend VariableConstructor):
+         *     ``{"type": "log_transform"|"onehot"|"label"|"bin"|"interaction"|"policy_dummy",
+         *        "column": str, ...}``
+         *
+         *     The flat ``type``/``column`` is translated into the nested config that
+         *     ``cleaning.transform.transform`` expects.
+         */
+        post: operations["run_transform_sessions__session_id__transform_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/filter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Filter
+         * @description Apply sample filtering (sub-step 6).
+         *
+         *     Request body: ``{"conditions": [{"col": str, "op": str, "val": Any}, ...]}``
+         */
+        post: operations["run_filter_sessions__session_id__filter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Balance
+         * @description Check panel balance (sub-step 7).
+         *
+         *     Request body: ``{"panel_id": str, "time_col": str}``
+         *
+         *     Stage D 修复漂移 1：返回 ``BalanceResponse``（4 字段：
+         *     ``balanced`` / ``unbalanced`` / ``n_periods`` / ``attrition_rate``），
+         *     不再直接透传 step report。``unbalanced`` 在 router 层补算
+         *     （总 panel 数 - balanced 数），因为 BalanceStep 的 step report 不含
+         *     ``unbalanced`` 字段（只有 ``balanced`` / ``n_periods`` /
+         *     ``attrition_rate``）。
+         */
+        post: operations["run_balance_sessions__session_id__balance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/charls/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detect Charls
+         * @description Run the profiling dataset-type detector on the session CSV.
+         *
+         *     Returns ``{dataset_type, charls_config?}``. ``charls_config`` is the
+         *     parsed ``charls.yaml`` and is only included when the dataset is
+         *     detected as CHARLS.
+         */
+        get: operations["detect_charls_sessions__session_id__charls_detect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/charls/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Charls
+         * @description Persist the user-confirmed CHARLS wizard config into session state.
+         *
+         *     The wizard payload is written to ``state["charls_config"]`` so
+         *     downstream nodes (clean_data sub-steps, eda, outline) can read
+         *     readable variable names instead of raw CHARLS codes.
+         */
+        post: operations["confirm_charls_sessions__session_id__charls_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/translate-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Code Endpoint
+         * @description Run translate_code so GET /code-export can return Stata / R files.
+         */
+        post: operations["translate_code_endpoint_sessions__session_id__translate_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/code-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Code
+         * @description 导出代码文件。
+         *
+         *     Parameters
+         *     ----------
+         *     session_id : str
+         *         会话 ID。
+         *     format : str
+         *         代码格式：``py`` / ``do`` / ``R`` / ``m``。默认 ``py``。
+         *
+         *     Returns
+         *     -------
+         *     PlainTextResponse
+         *         带 ``Content-Disposition: attachment; filename="..."`` 的代码文本。
+         *
+         *     Raises
+         *     ------
+         *     HTTPException
+         *         - 404: session 不存在，或 no takeable translation (empty stubs are not files)
+         *         - 400: 不支持的 format
+         */
+        get: operations["export_code_sessions__session_id__code_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/doc-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Document
+         * @description 导出文档：format=tex|pdf|docx，template=4 模板之一。
+         */
+        get: operations["export_document_sessions__session_id__doc_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Progress
+         * @description 返回 6 章完成进度。
+         */
+        get: operations["get_progress_sessions__session_id__progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/journey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Journey
+         * @description 返回 8 阶段研究旅程进度（收敛版，去掉了无节点的"表格图形"站）。
+         *
+         *     每个阶段状态：``pending`` / ``active`` / ``completed`` / ``interrupt``。
+         *     currentStage 为正在进行的阶段；若 state 为空，降级为第 0 站 active、
+         *     其余 pending，不抛错。
+         */
+        get: operations["get_journey_sessions__session_id__journey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review
+         * @description 返回当前章的评审信息。
+         *
+         *     Response: ``{chapter_index, feedback, suggestions, score, rubric,
+         *                  review_iteration, max_review_iterations, auto_decision,
+         *                  review_source, review_degraded, grounding_failures}``
+         *
+         *     无评审数据时返回 200 + 空字段（非 404），让前端渲染空态。
+         */
+        get: operations["get_review_sessions__session_id__review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/review/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Review Decision
+         * @description 接收人工评审决策，写入 state。
+         *
+         *     Request:  ``{decision: "accept"|"reject"|"force_pass", reviewer?, comment?}``
+         *     Response: ``{ok, decision, chapter_index, next_action}``
+         *
+         *     - ``accept`` / ``force_pass`` → ``next_action="proceed"``
+         *     - ``reject`` → 触发 ``facade.regenerate_chapter``，``next_action="regenerate"``
+         */
+        post: operations["submit_review_decision_sessions__session_id__review_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Artifacts
+         * @description 列出某 session 的 run 目录：manifest + 文件树。
+         *
+         *     会话不存在 → 404；会话存在但尚无 run 目录（还没跑过任何被追踪的
+         *     步骤）→ exists=False + 空清单，前端渲染空态。
+         *     鉴权：与其它 session 路由一致，校验 ownership（匿名会话仅 DEBUG 放行）。
+         */
+        get: operations["get_artifacts_sessions__session_id__artifacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Trace
+         * @description 返回 trace.jsonl 的尾部事件流（默认最近 50 条）。
+         */
+        get: operations["get_trace_sessions__session_id__trace_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1105,6 +1146,31 @@ export interface components {
             versions?: string[];
             /** Chapter Index */
             chapter_index?: number | null;
+            /** Generation Source */
+            generation_source?: string | null;
+            /**
+             * Generation Degraded
+             * @default false
+             */
+            generation_degraded: boolean;
+            /** Review Source */
+            review_source?: string | null;
+            /**
+             * Review Degraded
+             * @default false
+             */
+            review_degraded: boolean;
+            /**
+             * Review Typed
+             * @default false
+             */
+            review_typed: boolean;
+            /** Review Status */
+            review_status?: ("passed" | "failed" | "degraded") | null;
+            /** Grounding Failures */
+            grounding_failures?: string[];
+            /** Structure Failures */
+            structure_failures?: string[];
         } & {
             [key: string]: unknown;
         };
@@ -1713,6 +1779,147 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * PaperAnalysisEvidenceResponse
+         * @description Exact executed-estimate facts backing the main claim.
+         */
+        PaperAnalysisEvidenceResponse: {
+            /** Formula */
+            formula: string;
+            /** N */
+            n?: number | null;
+            /** Coef */
+            coef?: number | null;
+            /** Se */
+            se?: number | null;
+            /** P */
+            p?: number | null;
+            /** Treatment */
+            treatment: string;
+            /** Treatment Row */
+            treatment_row: string;
+            /** Estimator */
+            estimator: string;
+            /** Status */
+            status: string;
+        };
+        /** PaperClaimEvidenceResponse */
+        PaperClaimEvidenceResponse: {
+            /** Claim Id */
+            claim_id: string;
+            /**
+             * Claim Type
+             * @enum {string}
+             */
+            claim_type: "association" | "causal_with_caveat";
+            analysis: components["schemas"]["PaperAnalysisEvidenceResponse"];
+            /** Sources */
+            sources?: components["schemas"]["PaperSourceEvidenceResponse"][];
+            /** Limitation */
+            limitation: string;
+        };
+        /** PaperClaimSummaryResponse */
+        PaperClaimSummaryResponse: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /** Type */
+            type: string;
+        };
+        /** PaperDraftContentResponse */
+        PaperDraftContentResponse: {
+            /** Title */
+            title: string;
+            /** Sections */
+            sections?: components["schemas"]["ChapterResponse"][];
+            /** References */
+            references?: components["schemas"]["PaperReferenceResponse"][];
+        };
+        /**
+         * PaperDraftResponse
+         * @description One-shot paper result or a structured formal-draft refusal.
+         */
+        PaperDraftResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "not_ready";
+            /**
+             * Readiness
+             * @enum {string}
+             */
+            readiness: "ready" | "not_ready";
+            /** Gaps */
+            gaps?: string[];
+            paper?: components["schemas"]["PaperDraftContentResponse"] | null;
+            main_claim?: components["schemas"]["PaperClaimSummaryResponse"] | null;
+            evidence?: components["schemas"]["PaperClaimEvidenceResponse"] | null;
+            /** Open Questions */
+            open_questions?: components["schemas"]["PaperOpenQuestionResponse"][];
+        };
+        /** PaperOpenQuestionResponse */
+        PaperOpenQuestionResponse: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Source */
+            source: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "warning" | "error";
+        };
+        /**
+         * PaperReferenceResponse
+         * @description APA reference produced by the existing generate_references node.
+         */
+        PaperReferenceResponse: {
+            /** Index */
+            index: number;
+            /** Text */
+            text: string;
+            /** Doi */
+            doi?: string | null;
+            /** Entry */
+            entry?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * PaperSourceEvidenceResponse
+         * @description Resolver-verified source metadata; no fabricated full-text excerpt.
+         */
+        PaperSourceEvidenceResponse: {
+            /** Title */
+            title: string;
+            /** Abstract */
+            abstract?: string | null;
+            /** Doi */
+            doi: string;
+            /** Url */
+            url: string;
+            /**
+             * Source
+             * @constant
+             */
+            source: "crossref";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "unverified";
+            /** Excerpt */
+            excerpt?: string | null;
+            /**
+             * Excerpt Status
+             * @enum {string}
+             */
+            excerpt_status: "available" | "unavailable";
+        };
+        /**
          * ProgressChapterSummary
          * @description progress 端点返回的章节概要。
          */
@@ -1734,7 +1941,7 @@ export interface components {
             /** Completed */
             completed: number;
             /** Current */
-            current?: string | number | null;
+            current?: number | string | null;
             /** Body Chapters */
             body_chapters?: components["schemas"]["ProgressChapterSummary"][];
         };
@@ -2132,674 +2339,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
-                };
-            };
-        };
-    };
-    detect_charls_sessions__session_id__charls_detect_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CharlsDetectResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_charls_sessions__session_id__charls_confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CharlsConfirmRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CharlsConfirmResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    generate_chapter_endpoint_sessions__session_id__generate_chapter_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GenerateChapterRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["GenerateChapterResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_chapter_endpoint_sessions__session_id__approve_chapter_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApproveChapterRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApproveChapterResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rollback_chapter_endpoint_sessions__session_id__rollback_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RollbackRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RollbackResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    regenerate_chapter_endpoint_sessions__session_id__regenerate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegenerateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegenerateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    edit_chapter_endpoint_sessions__session_id__edit_chapter_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EditChapterRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EditChapterResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_versions_sessions__session_id__chapters__chapter_index__versions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-                chapter_index: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VersionsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    translate_code_endpoint_sessions__session_id__translate_code_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TranslateCodeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_code_sessions__session_id__code_export_get: {
-        parameters: {
-            query?: {
-                format?: string;
-            };
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_document_sessions__session_id__doc_export_get: {
-        parameters: {
-            query?: {
-                format?: string;
-                template?: string;
-            };
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_progress_sessions__session_id__progress_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProgressResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_journey_sessions__session_id__journey_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JourneyResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_review_sessions__session_id__review_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReviewInfoResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    submit_review_decision_sessions__session_id__review_decision_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReviewDecisionRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReviewDecisionResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_artifacts_sessions__session_id__artifacts_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ArtifactsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_trace_sessions__session_id__trace_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TraceResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_transform_sessions__session_id__transform_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TransformRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TransformResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_filter_sessions__session_id__filter_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FilterRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FilterResultResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_balance_sessions__session_id__balance_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BalanceRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BalanceResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3333,6 +2872,276 @@ export interface operations {
             };
         };
     };
+    generate_paper_draft_endpoint_sessions__session_id__paper_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_paper_claim_evidence_endpoint_sessions__session_id__paper_draft_claims__claim_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperClaimEvidenceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_chapter_endpoint_sessions__session_id__generate_chapter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateChapterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateChapterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_chapter_endpoint_sessions__session_id__approve_chapter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveChapterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApproveChapterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rollback_chapter_endpoint_sessions__session_id__rollback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RollbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RollbackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_chapter_endpoint_sessions__session_id__regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegenerateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_chapter_endpoint_sessions__session_id__edit_chapter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditChapterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EditChapterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_versions_sessions__session_id__chapters__chapter_index__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                chapter_index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     discuss_desk_desk_discuss_post: {
         parameters: {
             query?: never;
@@ -3454,6 +3263,467 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_transform_sessions__session_id__transform_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransformRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransformResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_filter_sessions__session_id__filter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FilterRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterResultResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_balance_sessions__session_id__balance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detect_charls_sessions__session_id__charls_detect_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharlsDetectResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_charls_sessions__session_id__charls_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CharlsConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CharlsConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_code_endpoint_sessions__session_id__translate_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_code_sessions__session_id__code_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_document_sessions__session_id__doc_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+                template?: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_progress_sessions__session_id__progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_journey_sessions__session_id__journey_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_review_sessions__session_id__review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_review_decision_sessions__session_id__review_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_artifacts_sessions__session_id__artifacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trace_sessions__session_id__trace_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TraceResponse"];
                 };
             };
             /** @description Validation Error */

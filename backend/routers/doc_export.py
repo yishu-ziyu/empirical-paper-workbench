@@ -29,7 +29,6 @@ from facade import facade
 from models.user import User
 
 router = APIRouter()
-_REGISTERED = False
 
 # Word docx 的 MIME 类型
 _DOCX_MEDIA_TYPE = (
@@ -87,28 +86,4 @@ async def export_document(
     )
 
 
-# ---------------------------------------------------------------------------
-# self-registration（与 chapter.py 模式一致）
-# ---------------------------------------------------------------------------
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import.
-
-    Idempotent via ``_REGISTERED``. Integration phase moves
-    ``app.include_router`` into ``main.py`` explicitly. Self-registering lets
-    tests + dev runs reach the endpoint without touching ``main.py`` (T-10
-    file-boundary constraint).
-    """
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        # main not importable yet — skip silently.
-        pass
-
-
-_self_register()
+# 路由注册统一在 main.py include_router，不再 import 侧自注册。

@@ -1,9 +1,11 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
-langgraph==0.2.50
-langchain-core==0.3.20
-pydantic==2.9.0
+langgraph==1.2.11
+langchain==1.3.18
+langchain-core==1.6.1
+langchain-openai==1.6.0
+pydantic==2.13.5
 httpx==0.27.0
 pandas==2.2.3
 openpyxl==3.1.5
@@ -24,11 +26,12 @@ python-jose[cryptography]==3.3.0
 jinja2==3.1.6
 psycopg[binary]==3.2.3
 statsmodels==0.14.6
-langgraph-checkpoint-postgres==2.0.19
+langgraph-checkpoint-postgres==3.1.2
+langgraph-checkpoint-sqlite==3.1.1  # isolated durable Agent spike
 # Optional extra (not required): pip install statspai
 # Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
 # Sibling checkout (same as agent venv):
-#   pip install --ignore-scripts -e ../StatsPAI
+# From econpaper/: python -m pip install -e ../dependencies/StatsPAI
 # A missing install must not 500 POST /direction; nodes degrade.
 
 # --- S3 / 对象存储 ---

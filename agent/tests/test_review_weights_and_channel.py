@@ -101,7 +101,16 @@ def test_review_non_mock_uses_invoke(monkeypatch):
     """非 mock 走 invoke_review_llm，不直接调 mock_review_llm。"""
     seen = {}
 
-    def fake_invoke(config, content, rubric, direction, literature, claim=""):
+    def fake_invoke(
+        config,
+        content,
+        rubric,
+        direction,
+        literature,
+        claim="",
+        *,
+        structured_retries=2,
+    ):
         seen["called"] = True
         seen["claim"] = claim
         return {
@@ -129,7 +138,16 @@ def test_review_non_mock_uses_invoke(monkeypatch):
 def test_review_bad_json_falls_back_to_mock(monkeypatch):
     """评审 JSON 坏掉时可见降级 mock，不得假装审过。"""
 
-    def boom(config, content, rubric, direction, literature, claim=""):
+    def boom(
+        config,
+        content,
+        rubric,
+        direction,
+        literature,
+        claim="",
+        *,
+        structured_retries=2,
+    ):
         raise ValueError("bad json")
 
     monkeypatch.setattr("agent.nodes.review_chapter.invoke_review_llm", boom)

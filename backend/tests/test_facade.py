@@ -858,8 +858,15 @@ def test_confirm_charls_persists_config():
 # ---------------------------------------------------------------------------
 # Fresh instance isolation
 # ---------------------------------------------------------------------------
-def test_fresh_facade_instance_starts_empty():
-    """A new AgentFacade has no sessions."""
+def test_fresh_facade_instance_starts_empty(tmp_path, monkeypatch):
+    """A new AgentFacade has no sessions（指向干净的持久化文件时）。
+
+    SessionStore 现在启动时会从 SESSIONS_PATH 恢复（P1-3），所以"全新为空"
+    的前提是给每个用例一个独立临时文件。
+    """
+    from config import settings
+
+    monkeypatch.setattr(settings, "SESSIONS_PATH", str(tmp_path / "sessions.json"))
     f = AgentFacade()
     assert f._sessions == {}
     assert f.has_session("anything") is False

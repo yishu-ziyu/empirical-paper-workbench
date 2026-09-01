@@ -18,7 +18,7 @@
 ### 前置要求
 
 - **Python 3.12**（项目锁定版本）。系统默认 `python3` 可能是 3.14，在 3.14 下 numpy 需源码编译、pydantic 与 typing-extensions 冲突，依赖装不上。请确保有 `python3.12`（如没有：`brew install python@3.12` 或 `pyenv install 3.12`）。Makefile 用 `PY ?= python3.12`，可用 `make install PY=python3.12` 覆盖。
-- `StatsPAI`、`stata-code` 需与 `econpaper/` 同级目录（`make install` 自动 `pip install -e`）。
+- 工作区的 `dependencies/StatsPAI/` 是唯一本地源码依赖（`make install` 自动以 editable 模式安装）。
 
 ### 开发环境
 
@@ -63,7 +63,7 @@ make docker-up
 | 后端 | FastAPI + uvicorn（reload 模式）|
 | Agent 框架 | LangGraph（Hybrid 架构） + PostgresSaver |
 | 计量引擎 | StatsPAI（38 种方法统一入口 `sp.causal.<method>()`）|
-| 代码翻译 | stata-code（Python → Stata / R / EViews）|
+| 代码翻译 | econpaper 内置导出器（Python / Stata / R / EViews）|
 | 排版 | LaTeX + Pandoc（一键转 Word）|
 | 数据库 | PostgreSQL 16+（checkpoint 持久化）|
 
@@ -129,11 +129,9 @@ econpaper/
 
 | 仓库 | 说明 |
 |------|------|
-| [StatsPAI](https://github.com/yishu-ziyu/StatsPAI) | 38 种计量方法统一入口（private fork） |
-| [AERS](https://github.com/yishu-ziyu/Auto-Empirical-Research-Skills) | prompt/skill 库（不 pip install） |
-| [stata-code](https://github.com/yishu-ziyu/stata-code) | Python → Stata/R/EViews 代码翻译引擎 |
+| [StatsPAI](https://github.com/brycewang-stanford/StatsPAI) | 38 种计量方法统一入口 |
 
-需与 `econpaper/` 同级目录，`make install` 自动 pip install -e。
+依赖的上游、固定修订和去留证据见 [本地依赖契约](docs/dependencies.md)。
 
 ## 当前状态
 

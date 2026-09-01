@@ -35,7 +35,6 @@ from models.user import User
 from schemas.responses import TranslateCodeResponse
 
 router = APIRouter()
-_REGISTERED = False
 
 # format query 值 → code_translations 里的 lang 值
 _FORMAT_TO_LANG: Dict[str, str] = {
@@ -233,28 +232,4 @@ async def export_code(
     )
 
 
-# ---------------------------------------------------------------------------
-# self-registration（与 chapter.py / eda.py 模式一致）
-# ---------------------------------------------------------------------------
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import.
-
-    The integration phase will move ``app.include_router`` into ``main.py``
-    explicitly. Self-registering here lets tests (which import this module)
-    and dev runs reach the endpoint without modifying ``main.py`` (T-09
-    file-boundary constraint). Idempotent via the ``_REGISTERED`` flag.
-    """
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        # main not importable yet (e.g. during partial builds) — skip silently.
-        pass
-
-
-_self_register()
+# 路由注册统一在 main.py include_router，不再 import 侧自注册。

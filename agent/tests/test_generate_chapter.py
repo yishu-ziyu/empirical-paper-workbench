@@ -43,6 +43,8 @@ def test_generate_chapter_writes_to_body_chapters(recorder, six_chapter_outline)
     assert out["title"] == "引言"
     assert out["content"] == "MOCK CHAPTER CONTENT"
     assert out["status"] == "generated"
+    assert out["generation_source"] == "mock"
+    assert out["generation_degraded"] is True
 
 
 def test_generate_chapter_preserves_other_body_chapters(

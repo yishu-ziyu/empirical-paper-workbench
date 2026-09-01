@@ -30,7 +30,11 @@ def default_path() -> Path:
     env = (os.environ.get("LEARNING_LABELS_PATH") or "").strip()
     if env:
         return Path(env)
-    return Path(__file__).resolve().parents[2] / "data" / "learning_labels.jsonl"
+    product_root = Path(__file__).resolve().parents[2]
+    state_root = Path(
+        os.environ.get("ECONPAPER_LOCAL_STATE_ROOT") or product_root / ".local"
+    ).expanduser().resolve()
+    return state_root / "learning" / "learning_labels.jsonl"
 
 
 def _strip_forbidden(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -104,10 +108,12 @@ def append_event(event: Dict[str, Any], path: Optional[Path] = None) -> Dict[str
     assert_no_mock_score(event["labels"])
     target = path or default_path()
     target.parent.mkdir(parents=True, exist_ok=True)
+    target.parent.chmod(0o700)
     line = json.dumps(event, ensure_ascii=False)
     with _LOCK:
         with target.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
+        target.chmod(0o600)
     return event
 
 

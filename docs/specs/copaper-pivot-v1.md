@@ -6,12 +6,9 @@
 **Status:** ready-for-agent
 **Triage label:** ready-for-agent
 
-**Sources:**
-- [map.md](../../实证论文项目模板/.scratch/copaper-pivot/map.md)
-- [T01 Research: Academic automation landscape](../../实证论文项目模板/.scratch/copaper-pivot/issues/01-research-academic-automation-landscape.md)
-- [T02 Research: Agent architecture — Loop vs Graph](../../实证论文项目模板/.scratch/copaper-pivot/issues/02-research-agent-architecture-loop-vs-graph.md)
-- [T03 Grilling: 4 subsystems repositioning](../../实证论文项目模板/.scratch/copaper-pivot/issues/03-grilling-subsystem-repositioning.md)
-- [T04 Grilling: Differentiation positioning](../../实证论文项目模板/.scratch/copaper-pivot/issues/04-grilling-differentiation.md)
+**Historical source note:** The exploratory map and issue notes were reviewed
+when this spec was written. Their durable conclusions are included below;
+the superseded legacy checkout is not a documentation dependency.
 
 ---
 
@@ -52,7 +49,7 @@ Agent 生成 outline（HITL 暂停，用户审阅）
     ↓
 逐章生成（每章 HITL 暂停，用户可调整 prompt / 回滚 / 暂停）
     ↓
-代码翻译（Python → Stata/R/EViews，via stata-code）
+代码导出（Python → Stata/R/EViews，产品内置转换）
     ↓
 排版输出（LaTeX 模板 + Pandoc 转 Word）
     ↓
@@ -70,15 +67,10 @@ Agent 生成 outline（HITL 暂停，用户审阅）
 ### Workspace 架构
 
 ```
-/Users/mahaoxuan/Desktop/经济学论文/
-├── econpaper/                        ← 本产品仓库
-│   ├── frontend/                     ← 三栏沉浸式 UI
-│   ├── backend/                      ← FastAPI + LangGraph orchestration
-│   ├── agent/                        ← LangGraph graph 定义 + 节点实现
-│   └── docs/                         ← 本 spec + ADRs
-├── StatsPAI/                         ← private fork + 中文扩展（上游依赖）
-├── Auto-Empirical-Research-Skills/   ← private fork + 中文扩展（上游依赖）
-└── stata-code/                       ← private fork + 集成（上游依赖）
+workspace/
+├── econpaper/                    ← 唯一产品仓库
+├── dependencies/StatsPAI/       ← 已验证的本地源码依赖
+└── materials/                    ← 不进入产品 Git 的研究材料
 ```
 
 ## User Stories
@@ -167,7 +159,7 @@ Agent 生成 outline（HITL 暂停，用户审阅）
    - **clean_data 节点**是 HITL 暂停点，内部拆 8 个子步骤（契约+合并+缺失值+异常值+变量构造+样本筛选+平衡性+留痕），覆盖 AERS Stage 04 全流程；复用 StatsPAI 的 `read_data`/`winsor`/`mice`/`balance_panel`/`outlier_indicator`，其余清洗逻辑（merge/reshape/encode/样本筛选）econpaper 自实现
    - `draft_chapter` 和 `pick_method` 节点内嵌小 ReAct loop（max_iterations=10，token budget cap）
    - 38 方法 dispatch 走静态路由表 + 一个 LLM routing 节点（Anthropic Routing workflow 模式），不把 38 工具塞给 ReAct loop
-   - 理由详见 [T02](../../实证论文项目模板/.scratch/copaper-pivot/issues/02-research-agent-architecture-loop-vs-graph.md) §5-§8
+   - 理由：固定图保证可追踪的主流程，小循环只处理节点内需要试错的工作。
 
 2. **Durable execution：PostgresSaver checkpoint**
    - 开发用 InMemorySaver，生产用 PostgresSaver
@@ -192,10 +184,9 @@ Agent 生成 outline（HITL 暂停，用户审阅）
    - LangGraph graph 编排 Agent 流程
    - 上传文件存到本地 disk（开发）或 S3-compatible storage（生产）
 
-6. **StatsPAI / AERS / stata-code 集成**
-   - StatsPAI 作为 Python 库依赖（`pip install -e ../StatsPAI`），graph 节点直接调 `statspai.causal.<method>()`
-   - AERS 作为 prompt/skill 库，graph 节点根据章节类型从 AERS 加载对应 skill
-   - stata-code 作为代码翻译引擎，`translate_code` 节点调 `stata_code.translate(python_ast, target="stata")`
+6. **StatsPAI 与代码导出**
+   - StatsPAI 作为 Python 库依赖（`python -m pip install -e ../dependencies/StatsPAI`）。
+   - 识别、稳健性 prompt 和多语言代码导出已由 econpaper 自有实现负责；AERS 和 `stata-code` 不是运行依赖。
 
 ### 模块划分
 
@@ -225,7 +216,7 @@ Agent 生成 outline（HITL 暂停，用户审阅）
     - ADR-0001: 选用 LangGraph 作为 Agent 框架
     - ADR-0002: 选用 LaTeX + Pandoc 作为排版方案
     - ADR-0003: 三栏沉浸式布局作为前端架构
-    - ADR-0004: Private fork 策略（StatsPAI/AERS/stata-code）
+    - ADR-0004: 文献检索与来源降级策略
 
 ### Schema / API 契约
 
@@ -293,7 +284,7 @@ Agent 生成 outline（HITL 暂停，用户审阅）
 - `econpaper/backend/` REST + WebSocket endpoint 契约
 
 **不会测试的模块**（信任上游）：
-- StatsPAI / AERS / stata-code 的内部实现（fork 的上游依赖）
+- StatsPAI 的内部实现；产品对它的调用契约仍需测试
 - LangGraph 框架本身（信任 Anthropic/LangChain）
 - FastAPI / Monaco Editor / dnd-kit 等第三方库
 
@@ -308,7 +299,7 @@ Agent 生成 outline（HITL 暂停，用户审阅）
 ### 不做的差异化方向（T04 明确排除）
 1. **教学场景**（面向学生/教师的作业批改/课程管理）—— 定位仍是研究者工具
 2. **方法论前沿改进**（超越 CoPaper 38 方法，比如前沿 DID estimator / RDD 改进）—— 38 方法够用，扩展走 StatsPAI 上游 sync
-3. **完全开源**—— econpaper 产品本身闭源，3 个 fork 仓库 private
+3. **完全开源**—— econpaper 产品本身的开源策略不在本 spec 范围内
 4. **Agent 透明度 / 可解释 Agent**（trace LLM 决策路径）—— 章节式 HITL 已给用户控制权
 5. **复现性深度**（docker / virtualenv 一键复现）—— Stata/R/EViews 代码 + LaTeX 源码已足够
 
@@ -321,16 +312,16 @@ Agent 生成 outline（HITL 暂停，用户审阅）
 9. **IDE 插件**—— 只做 Web SaaS
 
 ### 不做的范围
-10. **StatsPAI / AERS / stata-code 的内部修改**—— 只 fork + 加中文扩展 skill，不改上游代码
+10. **StatsPAI 的内部修改**—— 产品只依赖验证过的上游修订，中文产品逻辑留在 econpaper
 11. **多语言扩展**（除 Python/Stata/R/EViews 外的语言）—— 不做
 12. **商业化 / 定价模型**—— 本 spec 只定产品定位，不定商业模式
-13. **旧仓库代码迁移**—— 从零开始，不迁移 `实证论文项目模板/` 的任何代码
+13. **恢复旧 CLI 仓库**—— 其能力核对已完成，不再作为开发入口
 
 ## Further Notes
 
 ### 关键背景（来自 T01-T04 调研 + grilling）
 
-1. **我们一直在 mirror Bryce Wang (Stanford REAP) 的体系**：StatsPAI / AERS / stata-code / CoPaper.AI 是同一人作品。我们的 workspace 已经 fork 了前三个，econpaper 是补齐消费端产品。
+1. **上游生态已经评估**：StatsPAI / AERS / stata-code / CoPaper.AI 来自同一体系；当前只保留通过运行契约验证的 StatsPAI，其余能力由 econpaper 自有实现负责。
 2. **经济学自动化是蓝海**：Dawid et al. (arxiv 2504.09736) 显示 421 篇 agentic workflow 研究中只有 4 篇经济学。
 3. **经济学家同行选择 Graph**：Korinek (UVA) 用 LangGraph，Dawid et al. 用 AutoGen，Bryce 推断也用 Graph。
 4. **CoPaper.ai 是 closed-source**：我们的差异化不是技术架构（架构相同），是中文原生 + 极致交互 + LaTeX/Word 兼容。

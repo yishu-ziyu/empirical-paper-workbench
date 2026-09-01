@@ -61,6 +61,41 @@ describe('PaperPath 右栏步骤', () => {
     expect(derived.clean.audit).toBe('pending')
   })
 
+  test('export ready: export_docx active but translate_code stays pending until exported', () => {
+    const derived = derivePaperPath({
+      uploading: false,
+      hasSession: true,
+      hasDirection: true,
+      directionOpen: false,
+      hasReadout: true,
+      hasOutline: true,
+      writing: false,
+      hasChapter: true,
+      awaitingApprove: false,
+      canExport: true,
+    })
+    expect(derived.nodes.translate_code).toBe('pending')
+    expect(derived.nodes.export_docx).toBe('active')
+  })
+
+  test('after a successful export both translate_code and export_docx complete', () => {
+    const derived = derivePaperPath({
+      uploading: false,
+      hasSession: true,
+      hasDirection: true,
+      directionOpen: false,
+      hasReadout: true,
+      hasOutline: true,
+      writing: false,
+      hasChapter: true,
+      awaitingApprove: false,
+      canExport: true,
+      hasExported: true,
+    })
+    expect(derived.nodes.translate_code).toBe('completed')
+    expect(derived.nodes.export_docx).toBe('completed')
+  })
+
   test('pauses generate_chapter until the chapter is written or approved', () => {
     renderPath({
       hasSession: true,

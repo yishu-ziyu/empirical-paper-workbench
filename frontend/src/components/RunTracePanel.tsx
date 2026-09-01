@@ -5,7 +5,7 @@
 // - 数据源头见 backend/run_store.py；每次导出/审批/评审都会留痕
 
 import { useCallback, useEffect, useState } from 'react'
-import { API_BASE } from '../lib/apiBase'
+import { apiFetch, API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 interface TraceEvent {
@@ -37,7 +37,7 @@ export default function RunTracePanel({ sessionId }: { sessionId: string }) {
   const load = useCallback(async () => {
     setBusy(true)
     try {
-      const resp = await fetch(
+      const resp = await apiFetch(
         `${API_BASE}/sessions/${sessionId}/trace?limit=20`,
       )
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)

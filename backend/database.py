@@ -7,12 +7,14 @@ development; switch to ``postgresql+asyncpg://...`` for production.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import AsyncIterator
 
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from config import settings
+from config import ensure_private_file, settings
 
 # ---------------------------------------------------------------------------
 # Engine & session factory
@@ -49,6 +51,9 @@ async def create_tables() -> None:
     """
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    url = make_url(settings.DATABASE_URL)
+    if url.get_backend_name() == "sqlite" and url.database:
+        ensure_private_file(Path(url.database))
 
 
 async def drop_tables() -> None:

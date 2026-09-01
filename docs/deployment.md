@@ -12,13 +12,14 @@
 | latexmk | 最新版 | 可选，PDF 导出需要 |
 | pandoc | 2.0+ | 可选，Word 导出需要 |
 
-**上游依赖**（需与 econpaper 同级目录）：
+**上游依赖**（从 econpaper 根目录视角）：
 
 ```
-../StatsPAI/          — 因果推断主库
-../_refs/AERS-ref/    — prompt/skill 库（不 pip install）
-../stata-code/        — Python → Stata/R/EViews 代码翻译引擎
+../dependencies/StatsPAI/    — 计量与因果识别主库
 ```
+
+可用 `ECONPAPER_DEPENDENCY_ROOT` 覆盖依赖根目录。AERS 和 `stata-code`
+不是当前运行依赖，证据见 [`docs/dependencies.md`](dependencies.md)。
 
 ## 快速开始（开发环境）
 
@@ -38,12 +39,12 @@ cd frontend && npm install
 # 后端
 cd backend && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-pip install -e ../StatsPAI
-pip install -e ../stata-code
+cd .. && backend/.venv/bin/python -m pip install -e ../dependencies/StatsPAI
 
 # Agent
 cd agent && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
+cd .. && agent/.venv/bin/python -m pip install -e ../dependencies/StatsPAI
 ```
 
 ### 2. 启动开发服务器

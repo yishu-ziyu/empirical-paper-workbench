@@ -287,6 +287,7 @@ class AgentFacade:
             "csv_path": str(csv_path),
             "user_id": existing.get("user_id"),
         }
+        self._store.flush()
         return self._sessions[session_id]["state"]
 
     # ------------------------------------------------------------------
@@ -810,6 +811,7 @@ class AgentFacade:
         # Mirror on the entry top-level (legacy charls.py behavior).
         if session_id in self._sessions:
             self._sessions[session_id]["charls_config"] = charls_config
+            self._store.flush()
         return charls_config
 
     # ------------------------------------------------------------------

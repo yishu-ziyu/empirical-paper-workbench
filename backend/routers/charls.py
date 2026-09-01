@@ -77,30 +77,3 @@ async def confirm_charls(
         filter_presets=payload.filter_presets,
     )
     return CharlsConfirmResponse(ok=True, charls_config=charls_config)
-
-
-_REGISTERED = False
-
-
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import.
-
-    Mirrors the eda.py pattern: importing this module attaches the
-    router to ``main.app`` so tests and dev runs reach the endpoints
-    without modifying ``main.py`` (T-11 file-boundary constraint).
-    Idempotent via ``_REGISTERED``.
-    """
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        # main not importable yet (e.g. during partial builds) — skip silently.
-        pass
-
-
-_self_register()

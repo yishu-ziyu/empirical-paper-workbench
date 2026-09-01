@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: 后端 + Agent pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            agent/requirements.txt
+
+      # backend/tests 会 import agent.*：backend/.venv 里同时装两份 requirements
+      # （重叠依赖版本完全一致，无冲突）。StatsPAI 从 PyPI 装（CI 没有 sibling 仓），
+      # 补齐 estimate 测试的 statspai.feols 契约。
+      - name: 安装 backend venv（含 agent 依赖 + StatsPAI）
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt
+          backend/.venv/bin/pip install StatsPAI
+
+      - name: 安装 agent venv
+        run: |
+          python -m venv agent/.venv
+          agent/.venv/bin/pip install -r agent/requirements.txt
+          agent/.venv/bin/pip install StatsPAI
+
+      # make test-agent / test-backend 严格传播失败（任一失败 job 即红）
+      - name: pytest（agent + backend，严格传播失败）
+        run: make test-agent test-backend
+
+  frontend:
+    name: 前端 类型 / 测试 / lint / 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装依赖
+        working-directory: frontend
+        run: npm ci
+
+      - name: 类型检查
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: 测试
+        working-directory: frontend
+        run: npm test
+
+      - name: lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: 生产构建
+        working-directory: frontend
+        run: npm run build
+
+  api-contract:
+    name: API 契约同步 + 前端类型
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            agent/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Makefile 的 check-api-drift 通过 backend/.venv/bin/python 取解释器，
+      # 所以必须把 venv 建在 backend/.venv，不能只装进系统 python。
+      # openapi 导出会 import facade → agent 模块，agent 依赖也要装。
+      - name: 安装后端依赖（含 agent 依赖）
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt
+
+      - name: 安装前端依赖
+        working-directory: frontend
+        run: npm ci
+
+      # 两段闸门：openapi.json ↔ 后端代码、types/api.ts ↔ openapi.json
+      - name: API 契约同步闸门
+        run: make check-api-drift
+
+  docker-build:
+    name: Docker 镜像构建
+    runs-on: ubuntu-latest
+    env:
+      # compose evaluate 阶段要求这些变量存在；dummy 值仅用于 build。
+      MINIO_ROOT_USER: ci-dummy-user
+      MINIO_ROOT_PASSWORD: ci-dummy-password-123456
+      POSTGRES_PASSWORD: ci-dummy
+      JWT_SECRET_KEY: ci-dummy-jwt-secret-key-32-chars-min
+      S3_ECONPAPER_PASSWORD: ci-dummy-s3-password
+    steps:
+      - uses: actions/checkout@v4
+
+      # 实测 backend/frontend 镜像能构建出来（build context 与 Dockerfile COPY 一致）
+      - name: 构建镜像
+        run: docker compose build backend frontend

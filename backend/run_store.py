@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from config import settings
+from config import ensure_private_directory, ensure_private_file, settings
 
 
 def runs_root() -> Path:
@@ -43,9 +43,9 @@ def run_dir(session_id: str) -> Path:
 
 def ensure_run_dir(session_id: str) -> Path:
     """创建（幂等）run 目录结构并返回其路径。"""
-    d = run_dir(session_id)
-    (d / "checkpoints").mkdir(parents=True, exist_ok=True)
-    (d / "outputs" / "export").mkdir(parents=True, exist_ok=True)
+    d = ensure_private_directory(run_dir(session_id))
+    ensure_private_directory(d / "checkpoints")
+    ensure_private_directory(d / "outputs" / "export")
     return d
 
 
@@ -70,6 +70,7 @@ def write_manifest(session_id: str, **fields: Any) -> dict:
         json.dumps(manifest, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
     )
+    ensure_private_file(path)
     return manifest
 
 
@@ -109,6 +110,7 @@ def append_event(
         d = ensure_run_dir(session_id)
         with (d / "trace.jsonl").open("a", encoding="utf-8") as f:
             f.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+        ensure_private_file(d / "trace.jsonl")
         return event
     except Exception:
         return None
@@ -125,12 +127,16 @@ def snapshot_state(session_id: str, label: str, state: dict) -> Optional[str]:
         except Exception:
             seq = 1
         seq_file.write_text(str(seq), encoding="utf-8")
+        ensure_private_file(seq_file)
         stamp = datetime.now(timezone.utc).strftime("%H%M%S%f")[:10]
         name = f"{seq:04d}_{label}_{stamp}.json"
         payload = json.dumps(state, ensure_ascii=False, indent=2, default=str)
         cp = d / "checkpoints" / name
         cp.write_text(payload, encoding="utf-8")
-        (d / "checkpoints" / "latest.json").write_text(payload, encoding="utf-8")
+        ensure_private_file(cp)
+        latest = d / "checkpoints" / "latest.json"
+        latest.write_text(payload, encoding="utf-8")
+        ensure_private_file(latest)
         return str(cp)
     except Exception:
         return None
@@ -150,6 +156,7 @@ def register_export(session_id: str, paths: list[Path]) -> list[dict]:
         dest = dest_dir / src.name
         try:
             shutil.copy2(src, dest)
+            ensure_private_file(dest)
             copied.append({"name": dest.name, "bytes": dest.stat().st_size})
         except Exception:
             continue

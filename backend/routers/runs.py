@@ -11,14 +11,14 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 import run_store
-from facade import facade
+from auth import get_optional_user, require_session_ownership
+from models.user import User
 
 router = APIRouter()
-_REGISTERED = False
 
 
 class ArtifactFile(BaseModel):
@@ -48,14 +48,17 @@ class TraceResponse(BaseModel):
 
 
 @router.get("/sessions/{session_id}/artifacts", response_model=ArtifactsResponse)
-async def get_artifacts(session_id: str) -> ArtifactsResponse:
+async def get_artifacts(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> ArtifactsResponse:
     """列出某 session 的 run 目录：manifest + 文件树。
 
     会话不存在 → 404；会话存在但尚无 run 目录（还没跑过任何被追踪的
     步骤）→ exists=False + 空清单，前端渲染空态。
+    鉴权：与其它 session 路由一致，校验 ownership（匿名会话仅 DEBUG 放行）。
     """
-    if not facade.has_session(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    require_session_ownership(session_id, current_user)
     files = run_store.list_files(session_id)
     return ArtifactsResponse(
         session_id=session_id,
@@ -66,10 +69,13 @@ async def get_artifacts(session_id: str) -> ArtifactsResponse:
 
 
 @router.get("/sessions/{session_id}/trace", response_model=TraceResponse)
-async def get_trace(session_id: str, limit: int = 50) -> TraceResponse:
+async def get_trace(
+    session_id: str,
+    limit: int = 50,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> TraceResponse:
     """返回 trace.jsonl 的尾部事件流（默认最近 50 条）。"""
-    if not facade.has_session(session_id):
-        raise HTTPException(status_code=404, detail="Session not found")
+    require_session_ownership(session_id, current_user)
     limit = max(1, min(limit, 500))
     events = run_store.tail_events(session_id, limit=limit)
     return TraceResponse(
@@ -86,20 +92,3 @@ async def get_trace(session_id: str, limit: int = 50) -> TraceResponse:
             for e in events
         ],
     )
-
-
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import."""
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        pass
-
-
-_self_register()

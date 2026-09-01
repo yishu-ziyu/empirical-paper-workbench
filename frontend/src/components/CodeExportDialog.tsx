@@ -1,4 +1,4 @@
-import { API_BASE } from '../lib/apiBase'
+import { apiFetch, API_BASE } from '../lib/apiBase'
 import { useT } from '../lib/i18n'
 
 // 代码导出对话框 (T-09)
@@ -48,17 +48,12 @@ const FORMATS: FormatConfig[] = [
   },
 ]
 
-// 触发浏览器下载：fetch 拿 blob → createObjectURL → click 隐藏 <a>
-const LS_TOKEN_KEY = 'econpaper_access_token'
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(LS_TOKEN_KEY)
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
+// 触发浏览器下载：apiFetch 拿 blob → createObjectURL → click 隐藏 <a>
+// 鉴权走 httpOnly cookie（apiFetch 自动携带 + 401 静默刷新），
+// 不再读 localStorage 的遗留 Bearer token（XSS 暴露面）。
 async function downloadCode(sessionId: string, format: string): Promise<void> {
   const url = `${API_BASE}/sessions/${sessionId}/code-export?format=${format}`
-  const resp = await fetch(url, { method: 'GET', headers: authHeaders() })
+  const resp = await apiFetch(url)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`下载失败 (${resp.status}): ${text}`)
@@ -114,7 +109,16 @@ export default function CodeExportDialog({
             className="rounded p-1 text-muted hover:bg-panel hover:text-ink"
             aria-label={t('codeExport.close')}
           >
-            ✕
+            <svg
+              viewBox="0 0 16 16"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" d="M4 4l8 8M12 4l-8 8" />
+            </svg>
           </button>
         </div>
 

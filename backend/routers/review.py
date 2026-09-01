@@ -28,7 +28,6 @@ from schemas.review import (
 )
 
 router = APIRouter()
-_REGISTERED = False
 
 
 @router.get(
@@ -96,21 +95,4 @@ async def submit_review_decision(
     )
 
 
-# ---------------------------------------------------------------------------
-# self-registration（与 chapter.py 模式一致）
-# ---------------------------------------------------------------------------
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import."""
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        pass
-
-
-_self_register()
+# 路由注册统一在 main.py include_router，不再 import 侧自注册。

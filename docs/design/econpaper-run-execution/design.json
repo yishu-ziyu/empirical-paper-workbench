@@ -1,0 +1,2683 @@
+{
+  "version": 2,
+  "slug": "econpaper-run-execution",
+  "title": "econpaper 运行执行与进度推送架构",
+  "mode": "repo",
+  "status": "draft",
+  "decided": null,
+  "updatedAt": "2026-08-31",
+  "context": {
+    "problem": "econpaper 是实验室级实证论文工作台（上传数据→清洗→识别与稳健→逐章 HITL 写作→导出），LangGraph 管道与 FastAPI 同进程，POST /upload 在 async 路由内同步跑完预写管道（20-60 分钟量级），独占事件循环使全服务停摆；进度推送依赖 5 秒轮询，WebSocket 链路三处断裂成为死代码；run 工件有四层记录但进程重启后无自动恢复通道。本设计决定运行执行与进度推送如何从 Architecture 0 演进。",
+    "constraints": [
+      "实验室级单机 Docker Compose，≤50 用户（user）",
+      "渐进演进：不引入 Redis/Celery/Temporal 等重中间件（user）",
+      "拓扑特性优先级：可信 > 可查可恢复 > 省（user）",
+      "ADR-0008 多 LLM 路由、ADR-0010 单产品合并、ADR-0002 清洗 Step 协议为已接受约束",
+      "LangGraph PostgresSaver checkpointer 已启用（CHECKPOINT_DB_URL）"
+    ],
+    "vocabulary": [
+      "Run Directory",
+      "Trace Event",
+      "RunStore fail-open",
+      "HITL Pause",
+      "Degraded",
+      "Chapter Version",
+      "StepReport"
+    ]
+  },
+  "requirements": {
+    "functional": [
+      {
+        "id": "fr-1",
+        "text": "上传数据→8 步清洗→预写（识别/估计/稳健/文献/标题/大纲）→逐章生成与 HITL 审批→导出 LaTeX/PDF/docx",
+        "priority": "core"
+      },
+      {
+        "id": "fr-2",
+        "text": "每一步可查：manifest/trace/checkpoint/工件按 Run Directory 组织且可经 API 查询",
+        "priority": "core"
+      },
+      {
+        "id": "fr-3",
+        "text": "审批硬证据门：无审批记录的章节内容不得通过导出交付（现状缺失，候选补齐）",
+        "priority": "core"
+      },
+      {
+        "id": "fr-4",
+        "text": "真实进度实时推送：节点开始/结束、章节流式文本、HITL 暂停以事件形式在 2s 内到达浏览器",
+        "priority": "core"
+      },
+      {
+        "id": "fr-5",
+        "text": "多 LLM 路由：generate/review 分通道配置（ADR-0008）",
+        "priority": "core"
+      },
+      {
+        "id": "fr-6",
+        "text": "防编造证据链：因果主张只认实际执行的估计器 + 3 星识别 + 稳健性通过（bind.py）",
+        "priority": "core"
+      },
+      {
+        "id": "fr-7",
+        "text": "多模板导出与 Stata/R/EViews 代码翻译",
+        "priority": "stretch"
+      }
+    ],
+    "nonFunctional": [
+      {
+        "id": "nfr-1",
+        "axis": "latency",
+        "target": "交互端点 p99 < 500ms，且 run 运行期间仍成立",
+        "rationale": "user：实验室交互体验"
+      },
+      {
+        "id": "nfr-2",
+        "axis": "capacity",
+        "target": "接受并发 ≥ 5 个 run（同时执行 3 + 排队 ≥ 2，队列容量 20）；超限 429 + Retry-After",
+        "rationale": "user：实验室级"
+      },
+      {
+        "id": "nfr-3",
+        "axis": "latency",
+        "target": "进度事件从产生到浏览器 ≤ 2s",
+        "rationale": "user：实时推送为核心需求"
+      },
+      {
+        "id": "nfr-4",
+        "axis": "reliability",
+        "target": "审批记录 RPO=0（Postgres 同事务）；整机丢失 RPO ≤ 24h、RTO ≤ 4h（自动化备份，且备份须跨故障域：异机/云对象存储）",
+        "rationale": "assumed：实验室可接受"
+      },
+      {
+        "id": "nfr-5",
+        "axis": "availability",
+        "target": "99.9%（单机故障域，约 8.8h/年）",
+        "rationale": "assumed：无钱/安全承诺"
+      }
+    ],
+    "outOfScope": [
+      "多副本横向扩展与负载均衡",
+      "多区域/异地容灾",
+      "离线客户端与多端同步",
+      "多人协作共编",
+      "公开 SaaS 计费与配额商业化。"
+    ],
+    "priorities": {
+      "top3": [
+        "reliability",
+        "faultTolerance",
+        "cost"
+      ],
+      "source": "user",
+      "rationale": "可信（防编造/审批权威）> 可查可恢复（run 状态机/checkpoint/工件）> 省（单机 + 零新中间件）；用户在需求访谈中确认"
+    },
+    "conflicts": [
+      {
+        "text": "实时推送 anti-gate（数千连接以下用长轮询即可）与用户裁定『实时为核心需求』冲突；WebSocket 现状为断链死代码（nginx 只代理 /ws/、后端路由为 /sessions/{id}/stream、前端 WSClient 从未实例化）",
+        "resolution": "30 连接远低于数千门槛，不引入连接织物；以单向 SSE + Last-Event-ID 断点续传替代并覆盖其失效模式"
+      },
+      {
+        "text": "用户要求『渐进演进』且要求『真实进度实时推送』与 5 并发 run；三者可同时满足——Postgres SKIP LOCKED 租约表即队列，无新中间件",
+        "resolution": "已按此组合设计候选 B"
+      },
+      {
+        "text": "候选 C（事件溯源）评审结论为正式关闭——checkpoint 已覆盖主要恢复需求，全面事件溯源缺必要性论证",
+        "resolution": "C 关闭；仅当 checkpoint 恢复路线被证伪或审计可查性出现硬需求时凭新证据重开"
+      }
+    ]
+  },
+  "estimates": {
+    "assumptions": [
+      {
+        "text": "实验室 30 人，30 个打开页签，同时跑 5 篇论文",
+        "source": "user"
+      },
+      {
+        "text": "单 run ≈ 40 次 LLM 调用 × 60s 均延迟（30-120s/次）",
+        "source": "assumed"
+      },
+      {
+        "text": "100 run/月",
+        "source": "assumed"
+      },
+      {
+        "text": "LangGraph 每超级步 checkpoint ≈ 5MB（全章文本 + 文献表 + 清洗报告全量入 state）",
+        "source": "assumed"
+      }
+    ],
+    "rows": [
+      {
+        "metric": "交互 API 负载",
+        "value": "6 QPS 均值 / ~20 峰值",
+        "derivation": "30 页签 × 5s 轮询；峰值 ×3；比反过度工程门 2（~100 TPS）低三个数量级"
+      },
+      {
+        "metric": "并发 run 容量（现状）",
+        "value": "1",
+        "derivation": "async 路由内同步 invoke（sessions.py:149）独占事件循环；单 uvicorn worker（Dockerfile:40）"
+      },
+      {
+        "metric": "并发 run 需求",
+        "value": "5",
+        "derivation": "user 实验室级；验收口径 = 接受 5（同时执行 3 + 排队 ≥ 2，队列容量 20）"
+      },
+      {
+        "metric": "单 run 时长",
+        "value": "≈40 min",
+        "derivation": "40 调用 × 60s；预写段 8 节点 + 6 章 × 写/审"
+      },
+      {
+        "metric": "LLM 并发请求",
+        "value": "≈6（3 run × 2）",
+        "derivation": "并发 run × 节点内并发调用；Provider 配额未知，列为待测量"
+      },
+      {
+        "metric": "checkpoint 存储",
+        "value": "≈200MB/run，≈20GB/月",
+        "derivation": "40 超级步 × 5MB × 100 run/月；Postgres 磁盘压力主项"
+      },
+      {
+        "metric": "工件存储",
+        "value": "≤5GB/月",
+        "derivation": "100 run × 50MB（8 份清洗 sidecar CSV + 导出件）"
+      },
+      {
+        "metric": "run_events 存储",
+        "value": "≈2MB/run，30 天保留稳态 ≈200MB",
+        "derivation": "~2000 事件 × 1KB"
+      },
+      {
+        "metric": "并发连接",
+        "value": "30",
+        "derivation": "SSE 每连接 1 协程；现状 WS 每连接占 1 个 DB 会话（池 5+10=15）会被 30 连接占满"
+      }
+    ]
+  },
+  "domain": {
+    "entities": [
+      {
+        "name": "Run",
+        "purpose": "一次管道执行的权威生命周期记录",
+        "invariants": [
+          "INV-1：每个被接受的 run 必达七态之一（PENDING/RUNNING/WAITING_INPUT/RECONCILING/SUCCEEDED/FAILED/CANCELLED），状态只能由租约持有者推进",
+          "INV-2：已接受的 run 从 checkpoint + 事件日志可恢复到可查状态",
+          "INV-1b：效果提交必须校验 lease_epoch，旧租约只能产出暂存结果，不得成为权威状态"
+        ]
+      },
+      {
+        "name": "Session",
+        "purpose": "用户论文工作会话（LangGraph thread）",
+        "invariants": [
+          "同一 session 至多一个活跃 run（租约互斥）",
+          "thread_id = session_id 恒等（facade/__init__.py:267 已落实）"
+        ]
+      },
+      {
+        "name": "ChapterVersion",
+        "purpose": "章节内容版本（versions[0] 最新）",
+        "invariants": [
+          "versions 只 prepend 不覆写",
+          "内容以 sha256 标识，rollback 按索引取回"
+        ]
+      },
+      {
+        "name": "Approval",
+        "purpose": "章节审批决定的权威记录",
+        "invariants": [
+          "审批行与 run 事件同事务落库",
+          "force 必留 reviewer_bypassed_review 标记（CONTEXT.md 契约）",
+          "无审批记录的版本不得导出"
+        ]
+      },
+      {
+        "name": "Dataset",
+        "purpose": "上传数据集与清洗产物",
+        "invariants": [
+          "原始 CSV 不可覆写，清洗产物为 sidecar 副本（ADR-0002）"
+        ]
+      }
+    ]
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Session",
+        "representation": "Postgres 行 + LangGraph thread（thread_id=session_id）",
+        "identity": "uuid session_id",
+        "orderingAuthority": "单写者：持有该 session 租约的 runner",
+        "conflictResolution": "无并发写——每 session 一个活跃租约，写路径单点",
+        "durabilityPoint": "Postgres 事务提交",
+        "gc": "用户删除会话时整目录清理；无自动过期"
+      },
+      {
+        "name": "Run",
+        "representation": "Postgres 行（runs 表），租约字段含 epoch",
+        "identity": "uuid run_id；attempt 单调递增",
+        "orderingAuthority": "Postgres 行级事务（SKIP LOCKED 认领）",
+        "conflictResolution": "lease_owner + lease_epoch 栅栏令牌，效果目标（runs 行）校验 epoch",
+        "durabilityPoint": "runs 行 commit 即 run 被接受（202 的依据）",
+        "gc": "终态 run 保留 90 天后归档"
+      },
+      {
+        "name": "RunEvent",
+        "representation": "append-only Postgres 行（(run_id, seq) 主键）",
+        "identity": "(run_id, seq) 复合主键，seq 每 run 单调",
+        "orderingAuthority": "Postgres 序列分配，单写者 = 租约持有者",
+        "conflictResolution": "无——append-only，消费端按 seq 去重",
+        "durabilityPoint": "insert commit；SSE 从此处游标读取",
+        "gc": "30 天保留，到期删除（消除现状 trace/checkpoint 无限增长）"
+      },
+      {
+        "name": "ChapterVersion",
+        "representation": "LangGraph PostgresSaver checkpoint 内 state 字段",
+        "identity": "(thread_id, chapter_index, content sha256)；写入经效果标识 (run_id, step_id, attempt) 暂存，提交时校验 lease_epoch",
+        "orderingAuthority": "checkpointer 每超级步快照",
+        "conflictResolution": "单写者（租约 + epoch 栅栏）+ prepend-only 版本表；效果键唯一约束去重，重复结果不二次提交",
+        "durabilityPoint": "checkpointer commit",
+        "gc": "随 checkpoint 保留策略；导出后归档最终稿"
+      },
+      {
+        "name": "Approval",
+        "representation": "Postgres 行（approvals 表）",
+        "identity": "(session_id, chapter_index, version_sha256) 唯一",
+        "orderingAuthority": "Postgres 唯一约束",
+        "conflictResolution": "重复审批同版本返回已记录结果（幂等）",
+        "durabilityPoint": "与 run_events 同事务 commit",
+        "gc": "随会话生命周期"
+      },
+      {
+        "name": "Dataset",
+        "representation": "本地卷 CSV（工作副本）+ S3 镜像（恢复副本）",
+        "identity": "session_id + 文件名",
+        "orderingAuthority": "本地卷为准，S3 为异步镜像",
+        "conflictResolution": "单写者（上传端点）；镜像失败记录 Degradation（F7 模式，现状已有）",
+        "durabilityPoint": "本地卷 write + rename",
+        "gc": "随会话删除"
+      },
+      {
+        "name": "ChapterReadModel（章节读模型）",
+        "representation": "从已提交 checkpoint 投影的派生视图（按 chapter 组装正文与状态，供 API 读取）",
+        "identity": "(session_id, chapter_index, version_sha256)",
+        "orderingAuthority": "checkpointer 提交顺序",
+        "conflictResolution": "无——只读投影，唯一写入口为投影器",
+        "durabilityPoint": "n/a（派生视图；权威在 checkpoint 与 approvals）",
+        "gc": "随 checkpoint 保留策略可全量重建"
+      }
+    ],
+    "schemas": [
+      {
+        "name": "users",
+        "store": "Postgres",
+        "kind": "authoritative",
+        "fields": [
+          {
+            "name": "id",
+            "type": "int 自增",
+            "key": "primary key"
+          },
+          {
+            "name": "uuid",
+            "type": "String(36)",
+            "key": "unique"
+          },
+          {
+            "name": "email",
+            "type": "String",
+            "key": "unique + index"
+          },
+          {
+            "name": "username",
+            "type": "String",
+            "key": "unique"
+          },
+          {
+            "name": "hashed_password",
+            "type": "String"
+          },
+          {
+            "name": "is_active",
+            "type": "Boolean"
+          }
+        ],
+        "indexes": [
+          "email 唯一索引"
+        ],
+        "relationships": [],
+        "notes": [
+          "现状保留，无改动"
+        ]
+      },
+      {
+        "name": "sessions",
+        "store": "Postgres",
+        "kind": "authoritative",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": "uuid",
+            "key": "primary key"
+          },
+          {
+            "name": "user_id",
+            "type": "int",
+            "key": "",
+            "references": "users.id"
+          },
+          {
+            "name": "title",
+            "type": "String"
+          },
+          {
+            "name": "status",
+            "type": "String"
+          },
+          {
+            "name": "created_at / updated_at",
+            "type": "timestamptz"
+          }
+        ],
+        "indexes": [
+          "(user_id, updated_at DESC)"
+        ],
+        "relationships": [
+          "user_id → users.id"
+        ],
+        "notes": [
+          "替代 sessions.json 全量 JSON 写穿（O(全库) 每变更重写 → 行级更新）"
+        ]
+      },
+      {
+        "name": "runs",
+        "store": "Postgres",
+        "kind": "authoritative",
+        "fields": [
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "key": "primary key"
+          },
+          {
+            "name": "session_id",
+            "type": "uuid",
+            "key": "",
+            "references": "sessions.session_id"
+          },
+          {
+            "name": "kind",
+            "type": "enum(upload_pipeline / generate_chapter / export)",
+            "key": ""
+          },
+          {
+            "name": "status",
+            "type": "enum(PENDING/RUNNING/WAITING_INPUT/RECONCILING/SUCCEEDED/FAILED/CANCELLED)",
+            "key": ""
+          },
+          {
+            "name": "attempt",
+            "type": "int",
+            "key": ""
+          },
+          {
+            "name": "lease_owner / lease_expires_at / lease_epoch",
+            "type": "String / timestamptz / int",
+            "key": ""
+          },
+          {
+            "name": "thread_id",
+            "type": "String (= session_id)"
+          },
+          {
+            "name": "error",
+            "type": "text"
+          }
+        ],
+        "indexes": [
+          "(status, lease_expires_at) — 认领查询",
+          "(session_id, created_at DESC)"
+        ],
+        "relationships": [
+          "session_id → sessions"
+        ],
+        "notes": [
+          "runs 行 commit 即『run 被接受』；租约互斥保证每 session 单活跃 run"
+        ]
+      },
+      {
+        "name": "run_events",
+        "store": "Postgres",
+        "kind": "authoritative 进度日志",
+        "fields": [
+          {
+            "name": "run_id + seq",
+            "type": "uuid + int",
+            "key": "composite primary key"
+          },
+          {
+            "name": "ts",
+            "type": "timestamptz"
+          },
+          {
+            "name": "type",
+            "type": "enum(node_started / node_finished / chunk / interrupt / degradation / state)"
+          },
+          {
+            "name": "payload",
+            "type": "jsonb"
+          }
+        ],
+        "indexes": [
+          "主键即 (run_id, seq) 游标"
+        ],
+        "relationships": [
+          "run_id → runs"
+        ],
+        "notes": [
+          "append-only；trace.jsonl 降级为其派生镜像（重建源 = run_events，游标 = seq）"
+        ]
+      },
+      {
+        "name": "approvals",
+        "store": "Postgres",
+        "kind": "authoritative",
+        "fields": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "key": "primary key"
+          },
+          {
+            "name": "session_id + chapter_index + version_sha256",
+            "type": "uuid + int + hex",
+            "key": "unique"
+          },
+          {
+            "name": "decision",
+            "type": "enum(approve/reject/force)"
+          },
+          {
+            "name": "reviewer_id",
+            "type": "int",
+            "references": "users.id"
+          },
+          {
+            "name": "evidence",
+            "type": "jsonb（引用核对摘要）"
+          }
+        ],
+        "indexes": [
+          "(session_id, chapter_index, version_sha256) 唯一"
+        ],
+        "relationships": [
+          "session_id → sessions"
+        ],
+        "notes": [
+          "导出硬门读取此表；与 run_events 同事务写入"
+        ]
+      },
+      {
+        "name": "checkpoints",
+        "store": "Postgres（LangGraph 管理）",
+        "kind": "authoritative（state 内容）",
+        "fields": [
+          {
+            "name": "thread_id / checkpoint_ns / checkpoint_id",
+            "type": "由 PostgresSaver 管理",
+            "key": "primary key"
+          }
+        ],
+        "indexes": [
+          "PostgresSaver 自带"
+        ],
+        "relationships": [
+          "thread_id = sessions.session_id"
+        ],
+        "notes": [
+          "ChapterVersion 与 pipeline state 的权威存储；保留策略需配套（现状无限增长，见债务 F6）"
+        ]
+      }
+    ],
+    "notes": [
+      "排序是 per-session，不是全局——跨 session 顺序不是产品承诺",
+      "trace.jsonl 从『fail-open 观测面』改为 run_events 的派生镜像，保留 fail-open 语义：镜像失败不阻断主流程",
+      "LangGraph Saver 提交边界独立于应用表：提交顺序 = checkpoint 先提交 → run_events/approvals 后写 → runner 启动与认领时对账（比对 checkpoint 步进与 runs 状态）；禁止宣称跨 Saver 的原子提交",
+      "章节读模型只从已提交 checkpoint 投影，禁止与 session JSON 双向写入形成两个数据真相；sessions 表只承载会话元数据"
+    ]
+  },
+  "interfaces": [
+    {
+      "name": "提交 run",
+      "transport": "HTTPS POST JSON（/api/sessions/{id}/runs 及现有触发改造）",
+      "purpose": "持久接受一次管道执行请求",
+      "consistency": "runs 行 commit 先于 202 返回",
+      "idempotency": "客户端生成的 run key（Idempotency-Key 头，按调用方+操作限定作用域，24h 保留；重复提交返回已记录 run_id）",
+      "style": "command（创建操作资源）",
+      "trustBoundary": "浏览器 → nginx → api；JWT cookie 鉴权 + 会话所有权校验（现状 require_session_ownership）",
+      "deadline": "500ms 内返回 202",
+      "retryability": "超时可带同一 key 重试；429 为可重试拒绝",
+      "backpressure": "队列容量 20；满则 429 + Retry-After；租约并发 3；验收口径 = 同时接受 ≥ 5 个 run（3 执行 + ≥ 2 排队）",
+      "failureResult": "202 + run_id | 4xx 校验拒绝 | 429 排队满 | 5xx 未接受（可安全重试）",
+      "compatibility": "端点为增量新增；旧同步端点保留一个发布周期后移除"
+    },
+    {
+      "name": "进度事件流",
+      "transport": "SSE GET /api/sessions/{id}/events（Last-Event-ID 断点续传）",
+      "purpose": "单向推送节点进度、章节流式文本、HITL 中断",
+      "consistency": "per-run 单调 seq；重连可从任意 seq 续读",
+      "idempotency": "at-least-once 交付 + 客户端按 seq 去重",
+      "style": "SSE 单向事件流",
+      "trustBoundary": "浏览器 → nginx → api（只读游标消费，不占 DB 会话）",
+      "deadline": "事件产生到浏览器 ≤ 2s；15s 心跳",
+      "retryability": "断线客户端携 Last-Event-ID 重连",
+      "backpressure": "每连接缓冲 1000 事件，超出断开并等客户端带游标重连",
+      "failureResult": "流断开不是 run 失败——run 状态以 runs 行为准",
+      "compatibility": "事件 type 枚举只增不改；未知 type 客户端忽略"
+    },
+    {
+      "name": "提交审批决定",
+      "transport": "HTTPS POST /api/sessions/{id}/review/decision",
+      "purpose": "记录章节审批/驳回/强制通过",
+      "consistency": "approvals 行与 run_events 写入同一事务",
+      "idempotency": "(session_id, chapter_index, version_sha256) 唯一约束；重复提交返回已记录决定",
+      "style": "command",
+      "trustBoundary": "浏览器 → nginx → api",
+      "deadline": "1s",
+      "retryability": "同 key 重试安全（唯一约束兜底）",
+      "backpressure": "n/a——低频单行写入，受 Postgres 本身限流",
+      "failureResult": "200 已记录 | 409 版本不匹配（内容已变更需重审）",
+      "compatibility": "decision 枚举只增不改"
+    },
+    {
+      "name": "认领 run（内部）",
+      "transport": "Postgres SELECT … FOR UPDATE SKIP LOCKED（api 与 runner 同库）",
+      "purpose": "runner 认领 PENDING run 并持有租约",
+      "consistency": "认领即行级写锁；lease_epoch 随认领自增",
+      "idempotency": "认领自带互斥；重复认领被 epoch 栅栏拒绝",
+      "style": "unary RPC（进程间，同机）",
+      "trustBoundary": "同机容器间，Postgres 为信任锚",
+      "deadline": "认领查询 < 100ms；租约 60s，心跳 20s 续期",
+      "retryability": "runner 崩溃后租约过期，任意 runner 可重新认领（attempt+1）",
+      "backpressure": "并发上限 = 租约并发数 3；PENDING 行数即队列（≤20，提交端点强制）",
+      "failureResult": "认领失败（无可用 run）→ 退避后重查",
+      "compatibility": "表结构演进遵循 additive；runner 与 api 同镜像发布"
+    }
+  ],
+  "deepDives": [
+    {
+      "title": "LLM 超时是第三终态：UNKNOWN 的归属与对账",
+      "pressure": "call_llm 120s 超时后效果（章节写入 checkpoint）可能已提交；现状直接 raise，节点失败且 run 无对账通道",
+      "decision": "效果标识 = (run_id, step_id, attempt)：每次执行先落 attempt 作用域暂存（对外不可见）；最终提交（章节版本、run_events、工件指针）时在 runs 行校验 lease_epoch，epoch 不匹配的旧租约提交被拒绝；同一效果键唯一约束去重。LLM 请求本身无法 exactly-once，但重复结果只留存于暂存，不会二次提交为权威状态",
+      "alternatives": [
+        "立即重试（将重复计费且可能产生重复章节版本）",
+        "直接 FAILED（把可恢复的中断当失败，损失 40min 管道进度）"
+      ],
+      "failureMode": "LLM provider 长时间故障 → 3 个活跃 run 全部耗尽重试预算（每调用 2 次上限 + 抖动，唯一重试 Owner = call_llm 层）→ run FAILED 携证据，用户重新触发；被击杀 runner 的旧租约在暂存层留下孤儿结果，由对账清理",
+      "evidence": [
+        "单 run 40min × 现状无恢复通道 = 最大损失面",
+        "INV-1 状态机 + INV-2 可恢复",
+        "HEURISTICS：UNKNOWN 只是调用方观察，不是权威状态",
+        "HEURISTICS：exactly-once = at-least-once 交付 + 端点幂等效果键；prepend-only 版本表只提供历史保留，不提供重执行幂等"
+      ]
+    },
+    {
+      "title": "进度事件交付语义：at-least-once + seq 去重",
+      "pressure": "SSE 重连必产生重复事件；现状伪流回放 + 5s 轮询无法表达 HITL 中断的即时性（NFR-3 ≤2s）",
+      "decision": "run_events 以 (run_id, seq) 为权威日志；SSE handler 只做游标读取（不占 DB 会话，修复现状 WS 占满连接池的失效模式）；客户端按 seq 去重，Last-Event-ID 续传；nginx 加 proxy_buffering off 与 /api/ 长读超时",
+      "alternatives": [
+        "修 WS 双向链路（三处断裂全修 + 重连协议，维护面更大且双向能力无消费者）",
+        "保留 5s 轮询（违反 NFR-3，用户已裁定实时为核心）"
+      ],
+      "failureMode": "api 重启 → SSE 断开 → 客户端自动重连带游标恢复；事件在 pg 不丢；worker 写事件失败 → 该 run 标记 Degradation（fail-open 观测面语义保留）",
+      "evidence": [
+        "30 连接 << 连接织物 anti-gate 数千门槛",
+        "NFR-3 用户裁定",
+        "envelope：run_events ≈2MB/run，30 天稳态 200MB"
+      ]
+    },
+    {
+      "title": "审批权威与导出硬门",
+      "pressure": "红队证实导出路径（doc_export.py:48 → export_docx.py:600）既不读审批记录也不检查章节 status——只要 body_chapters 有内容即可交付，违反 CONTEXT.md『approve_chapter 才转 approved』的产品契约与 devlog 北极星『审批硬证据门』",
+      "decision": "approvals 表为审批权威（与 run_events 同事务）；export 端点前置校验：导出所含每个 body 章节必须存在匹配 version_sha256 的 approve 记录，否则 409 review_gate；force 路径沿用 reviewer_bypassed_review 留痕",
+      "alternatives": [
+        "只在前端隐藏导出按钮（UX 不是执法——不可信边缘原则）",
+        "只检查 state 里的 status 字段（status 可被任意写路径绕过，非权威）"
+      ],
+      "failureMode": "用户在审批后 regenerate 覆盖了已审批版本 → version_sha256 不再匹配 → 导出 409，强制重审（正确的失败方向：宁可拦住不可放行）",
+      "evidence": [
+        "INV-3（Approval 不变量）",
+        "fr-3",
+        "不可信边缘原则（HEURISTICS sanity pass）"
+      ]
+    }
+  ],
+  "architectures": [
+    {
+      "id": "current",
+      "name": "Architecture 0：单进程同步管道",
+      "style": "layered-monolith",
+      "thesis": "现状如实记录：LangGraph 引擎与 FastAPI 同进程同事件循环，run 在 HTTP 请求内同步跑完，进度靠轮询与伪流回放",
+      "canvas": {
+        "primaryFlow": "upload-sync"
+      },
+      "components": [
+        {
+          "id": "client",
+          "name": "React SPA",
+          "type": "client",
+          "zone": "edge",
+          "position": {
+            "x": 150,
+            "y": 200
+          },
+          "tech": "Vite + React 18",
+          "note": "5s 轮询 degradation/trace；WSClient 未接线",
+          "change": "unchanged"
+        },
+        {
+          "id": "nginx",
+          "name": "Nginx",
+          "type": "lb",
+          "zone": "edge",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "tech": "nginx 1.27",
+          "note": "静态资源 + /api 反代；/ws/ 代理指向不存在路由",
+          "change": "unchanged"
+        },
+        {
+          "id": "api",
+          "name": "FastAPI",
+          "type": "service",
+          "zone": "app",
+          "position": {
+            "x": 680,
+            "y": 200
+          },
+          "tech": "uvicorn 单 worker",
+          "note": "18 router；/upload 同步跑管道，事件循环独占",
+          "change": "unchanged"
+        },
+        {
+          "id": "agent-engine",
+          "name": "LangGraph 引擎",
+          "type": "worker",
+          "zone": "app",
+          "position": {
+            "x": 960,
+            "y": 200
+          },
+          "tech": "LangGraph 1.2 + StatsPAI",
+          "note": "与 api 同进程；预写段 12 节点；同步 invoke",
+          "change": "unchanged"
+        },
+        {
+          "id": "llm",
+          "name": "MiniMax LLM",
+          "type": "external",
+          "zone": "external",
+          "position": {
+            "x": 1260,
+            "y": 200
+          },
+          "tech": "OpenAI 兼容 API",
+          "note": "urllib 单次调用 timeout=120s，无重试",
+          "change": "unchanged"
+        },
+        {
+          "id": "sessions-store",
+          "name": "会话状态存储",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 680,
+            "y": 470
+          },
+          "tech": "本地 JSON 文件",
+          "note": "全量序列化写穿，无锁；O(全库) 每变更重写",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "os.replace 原子落盘",
+            "failureDomain": "本机磁盘",
+            "rpo": "≤1 次变更（无 WAL）",
+            "rto": "手工恢复",
+            "recovery": "无自动备份"
+          },
+          "change": "unchanged"
+        },
+        {
+          "id": "pg",
+          "name": "Postgres",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 470
+          },
+          "tech": "postgres 16",
+          "note": "auth + LangGraph checkpointer（章节内容权威）",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "事务 commit",
+            "failureDomain": "单机卷",
+            "rpo": "未定义（无自动备份，文档仅手动 tar）",
+            "rto": "未定义",
+            "recovery": "未演练"
+          },
+          "change": "unchanged"
+        },
+        {
+          "id": "s3",
+          "name": "MinIO",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 1260,
+            "y": 470
+          },
+          "tech": "MinIO",
+          "note": "CSV 镜像 + 导出件 presigned URL；失败降级本地",
+          "change": "unchanged"
+        },
+        {
+          "id": "runs-dir",
+          "name": "runs/ 工件",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 620
+          },
+          "tech": "本地卷",
+          "note": "manifest/trace/checkpoints/exports；fail-open 写入",
+          "change": "unchanged"
+        },
+        {
+          "id": "trace-log",
+          "name": "trace 日志",
+          "type": "stream",
+          "zone": "data",
+          "position": {
+            "x": 1180,
+            "y": 620
+          },
+          "tech": "追加式文件",
+          "note": "tail 每次全量读盘；无保留期",
+          "state": {
+            "role": "derived",
+            "source": "内存状态写盘（无独立重建源声明）",
+            "cursor": "无"
+          },
+          "change": "unchanged"
+        },
+        {
+          "id": "ws-hub",
+          "name": "WS 流端点",
+          "type": "ws",
+          "zone": "app",
+          "position": {
+            "x": 400,
+            "y": 340
+          },
+          "tech": "FastAPI WS",
+          "note": "断链死代码：nginx /ws/ 不匹配、前端从未连接",
+          "change": "unchanged"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "nginx",
+          "kind": "sync",
+          "label": "HTTPS",
+          "importance": "primary"
+        },
+        {
+          "from": "nginx",
+          "to": "api",
+          "kind": "sync",
+          "label": "/api 反代",
+          "importance": "primary"
+        },
+        {
+          "from": "api",
+          "to": "agent-engine",
+          "kind": "sync",
+          "label": "进程内同步 invoke",
+          "importance": "primary"
+        },
+        {
+          "from": "agent-engine",
+          "to": "llm",
+          "kind": "sync",
+          "label": "urllib",
+          "importance": "primary"
+        },
+        {
+          "from": "api",
+          "to": "sessions-store",
+          "kind": "sync",
+          "label": "全量写穿",
+          "importance": "primary"
+        },
+        {
+          "from": "agent-engine",
+          "to": "pg",
+          "kind": "sync",
+          "label": "checkpointer",
+          "importance": "primary"
+        },
+        {
+          "from": "api",
+          "to": "pg",
+          "kind": "sync",
+          "label": "auth",
+          "importance": "secondary"
+        },
+        {
+          "from": "api",
+          "to": "s3",
+          "kind": "sync",
+          "label": "镜像/降级",
+          "importance": "secondary"
+        },
+        {
+          "from": "agent-engine",
+          "to": "runs-dir",
+          "kind": "sync",
+          "label": "工件 fail-open",
+          "importance": "secondary"
+        },
+        {
+          "from": "agent-engine",
+          "to": "trace-log",
+          "kind": "async",
+          "label": "追加事件",
+          "importance": "secondary"
+        },
+        {
+          "from": "client",
+          "to": "ws-hub",
+          "kind": "stream",
+          "label": "（断裂）",
+          "importance": "secondary"
+        }
+      ],
+      "flows": [
+        {
+          "id": "upload-sync",
+          "name": "上传即同步跑完预写管道（现状）",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "client",
+              "to": "nginx",
+              "label": "POST /api/upload"
+            },
+            {
+              "seq": 2,
+              "from": "nginx",
+              "to": "api",
+              "label": "转发"
+            },
+            {
+              "seq": 3,
+              "from": "api",
+              "to": "agent-engine",
+              "label": "同步 invoke（40min 独占事件循环）"
+            },
+            {
+              "seq": 4,
+              "from": "agent-engine",
+              "to": "llm",
+              "label": "40 次调用，无重试"
+            },
+            {
+              "seq": 5,
+              "from": "agent-engine",
+              "to": "pg",
+              "label": "每超级步 checkpoint"
+            },
+            {
+              "seq": 6,
+              "from": "api",
+              "to": "client",
+              "label": "200（管道跑完后才返回）"
+            }
+          ]
+        }
+      ],
+      "tradeoffs": {
+        "pros": [
+          "零运维面：一个进程一个容器",
+          "工件四层记录完整（manifest/trace/checkpoint/Saver）"
+        ],
+        "cons": [
+          "并发 run 容量 = 1：第二个 run 到来全服务停摆（含 /health，healthcheck 30s×3 将容器标 unhealthy）",
+          "进程重启 = 进行中 run 全部中断且无自动恢复",
+          "进度推送为轮询 + 伪流，WS 三处断裂"
+        ],
+        "migration": {
+          "cost": "S",
+          "notes": [
+            "现状即起点，无需迁移动作"
+          ]
+        }
+      },
+      "ratings": {
+        "deployability": 2,
+        "elasticity": 1,
+        "evolvability": 2,
+        "faultTolerance": 1,
+        "modularity": 3,
+        "cost": 5,
+        "performance": 2,
+        "reliability": 2,
+        "scalability": 1,
+        "simplicity": 4,
+        "testability": 3
+      }
+    },
+    {
+      "id": "a",
+      "name": "候选 A：单进程有界执行器",
+      "style": "modular-monolith",
+      "thesis": "不动部署形态：把管道执行移出事件循环（asyncio.to_thread / 进程池），Postgres runs 表做准入与状态机，SSE 替代 WS——一个容器内解决容量 1→5",
+      "canvas": {
+        "primaryFlow": "submit-run-a"
+      },
+      "components": [
+        {
+          "id": "client",
+          "name": "React SPA",
+          "type": "client",
+          "zone": "edge",
+          "position": {
+            "x": 150,
+            "y": 200
+          },
+          "tech": "Vite + React 18",
+          "note": "EventSource 订阅 /events，按 seq 去重",
+          "change": "modified"
+        },
+        {
+          "id": "nginx",
+          "name": "Nginx",
+          "type": "lb",
+          "zone": "edge",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "tech": "nginx 1.27",
+          "note": "SSE 路由 proxy_buffering off",
+          "change": "modified"
+        },
+        {
+          "id": "api",
+          "name": "FastAPI",
+          "type": "service",
+          "zone": "app",
+          "position": {
+            "x": 680,
+            "y": 200
+          },
+          "tech": "uvicorn 单 worker",
+          "note": "202 + run_id；事件循环不再被管道阻塞",
+          "change": "modified"
+        },
+        {
+          "id": "agent-engine",
+          "name": "LangGraph 引擎",
+          "type": "worker",
+          "zone": "app",
+          "position": {
+            "x": 960,
+            "y": 200
+          },
+          "tech": "to_thread + 信号量",
+          "note": "并发 3 + 队列 20；仍在 api 进程内",
+          "change": "modified"
+        },
+        {
+          "id": "llm",
+          "name": "MiniMax LLM",
+          "type": "external",
+          "zone": "external",
+          "position": {
+            "x": 1260,
+            "y": 200
+          },
+          "tech": "OpenAI 兼容 API",
+          "note": "call_llm 增加 2 次上限 + 抖动重试（唯一重试 Owner）",
+          "change": "modified"
+        },
+        {
+          "id": "sessions-store",
+          "name": "会话状态存储",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 680,
+            "y": 470
+          },
+          "tech": "Postgres sessions 表",
+          "note": "sessions.json → 行级事务，消除 O(全库) 写穿与无锁竞态",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "Postgres commit",
+            "failureDomain": "单机卷",
+            "rpo": "0（同事务审批）",
+            "rto": "≤4h（自动备份后）",
+            "recovery": "pg_dump 恢复（与 pg 共用）"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "pg",
+          "name": "Postgres",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 470
+          },
+          "tech": "postgres 16",
+          "note": "新增 runs/run_events/approvals；checkpointer 不变",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "事务 commit（runs 行 = run 被接受）",
+            "failureDomain": "单机卷",
+            "rpo": "0 提交级 / ≤24h 整机（备份）",
+            "rto": "≤4h",
+            "recovery": "pg_dump cron 至 S3 + 一次恢复演练"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "s3",
+          "name": "MinIO",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 1260,
+            "y": 470
+          },
+          "tech": "MinIO",
+          "note": "CSV 镜像 + 备份目标 + 导出件",
+          "change": "modified"
+        },
+        {
+          "id": "runs-dir",
+          "name": "runs/ 工件",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 620
+          },
+          "tech": "本地卷",
+          "note": "增加保留期回收（30 天事件镜像 / 90 天终态归档）",
+          "change": "modified"
+        },
+        {
+          "id": "trace-log",
+          "name": "trace 日志",
+          "type": "stream",
+          "zone": "data",
+          "position": {
+            "x": 1180,
+            "y": 620
+          },
+          "tech": "追加式文件",
+          "note": "降级为 run_events 派生镜像，fail-open 保留",
+          "state": {
+            "role": "derived",
+            "source": "run_events 表全量回放",
+            "cursor": "(run_id, seq)"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "sse",
+          "name": "SSE 端点",
+          "type": "stream",
+          "zone": "app",
+          "position": {
+            "x": 400,
+            "y": 340
+          },
+          "tech": "FastAPI SSE",
+          "note": "游标读 run_events；不占 DB 会话",
+          "change": "added"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "nginx",
+          "kind": "sync",
+          "label": "HTTPS",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms 交互 / 流式另计",
+            "retryOwner": "前端（同源重试一次）",
+            "backlogBound": "浏览器每页签 1 连接"
+          }
+        },
+        {
+          "from": "nginx",
+          "to": "api",
+          "kind": "sync",
+          "label": "/api",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms（202 提交）",
+            "retryOwner": "nginx 不重试非幂等 POST",
+            "backlogBound": "nginx 默认连接上限"
+          }
+        },
+        {
+          "from": "api",
+          "to": "agent-engine",
+          "kind": "async",
+          "label": "提交至有界执行器",
+          "importance": "primary",
+          "contract": {
+            "deadline": "交接 < 100ms",
+            "retryOwner": "执行器重启对账（attempt+1）",
+            "backlogBound": "并发 3 + 队列 20，满则 429"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "llm",
+          "kind": "sync",
+          "label": "chat/completions",
+          "importance": "primary",
+          "contract": {
+            "deadline": "120s/调用",
+            "retryOwner": "call_llm 层唯一持有，2 次 + 抖动",
+            "backlogBound": "全进程 ≤6 并发请求"
+          }
+        },
+        {
+          "from": "api",
+          "to": "sessions-store",
+          "kind": "sync",
+          "label": "行级事务",
+          "importance": "primary",
+          "contract": {
+            "deadline": "50ms",
+            "retryOwner": "SQLAlchemy 重试死锁一次",
+            "backlogBound": "连接池 5+10"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "pg",
+          "kind": "sync",
+          "label": "checkpointer + run_events",
+          "importance": "primary",
+          "contract": {
+            "deadline": "100ms/超级步",
+            "retryOwner": "checkpointer 内建",
+            "backlogBound": "checkpoint ≈5MB × 40 步/run"
+          }
+        },
+        {
+          "from": "client",
+          "to": "sse",
+          "kind": "stream",
+          "label": "EventSource",
+          "importance": "primary",
+          "contract": {
+            "deadline": "事件 ≤2s；15s 心跳",
+            "retryOwner": "客户端 Last-Event-ID 重连",
+            "backlogBound": "每连接缓冲 1000 事件，超出断开"
+          }
+        }
+      ],
+      "flows": [
+        {
+          "id": "submit-run-a",
+          "name": "提交 run（候选 A）",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "client",
+              "to": "api",
+              "label": "POST /runs + Idempotency-Key",
+              "note": "runs 行 commit 后 202"
+            },
+            {
+              "seq": 2,
+              "from": "api",
+              "to": "agent-engine",
+              "label": "入有界执行器（并发 3 / 队列 20）"
+            },
+            {
+              "seq": 3,
+              "from": "agent-engine",
+              "to": "llm",
+              "label": "节点执行，2 次重试上限"
+            },
+            {
+              "seq": 4,
+              "from": "agent-engine",
+              "to": "pg",
+              "label": "checkpoint + run_events 同步写"
+            },
+            {
+              "seq": 5,
+              "from": "client",
+              "to": "sse",
+              "label": "EventSource 按 seq 消费",
+              "note": "≤2s 到达"
+            }
+          ]
+        }
+      ],
+      "tradeoffs": {
+        "pros": [
+          "零新增容器/中间件，演进成本最小",
+          "容量 1→5，事件循环解放",
+          "SSE 修复实时性"
+        ],
+        "cons": [
+          "api 重启仍杀死进行中 run（40min 管道 + uvicorn --reload 开发常态 = 高频踩雷）；需重启对账兜底",
+          "准入队列在进程内存，重启丢失排队请求（runs 行尚存，可重提）"
+        ],
+        "migration": {
+          "cost": "S",
+          "notes": [
+            "单发布内完成：run_upload_pipeline 调用点改为执行器提交",
+            "回滚 = 恢复同步调用点，无数据迁移"
+          ]
+        }
+      },
+      "ratings": {
+        "deployability": 3,
+        "elasticity": 2,
+        "evolvability": 3,
+        "faultTolerance": 3,
+        "modularity": 4,
+        "cost": 5,
+        "performance": 3,
+        "reliability": 3,
+        "scalability": 2,
+        "simplicity": 4,
+        "testability": 3
+      }
+    },
+    {
+      "id": "b",
+      "name": "候选 B：Postgres 队列双进程（API + Runner）",
+      "style": "service-based",
+      "thesis": "运行生命周期权威与执行者分离为两个进程：Postgres SKIP LOCKED 租约表即队列（零新中间件），api 重启不再杀死 40min 的 run，进度事件落库后由 SSE 游标消费",
+      "canvas": {
+        "primaryFlow": "submit-run"
+      },
+      "components": [
+        {
+          "id": "client",
+          "name": "React SPA",
+          "type": "client",
+          "zone": "edge",
+          "position": {
+            "x": 150,
+            "y": 200
+          },
+          "tech": "Vite + React 18",
+          "note": "EventSource 订阅 /events，按 seq 去重 + Last-Event-ID",
+          "change": "modified"
+        },
+        {
+          "id": "nginx",
+          "name": "Nginx",
+          "type": "lb",
+          "zone": "edge",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "tech": "nginx 1.27",
+          "note": "SSE 路由 proxy_buffering off；删除 /ws/ 幻影路由",
+          "change": "modified"
+        },
+        {
+          "id": "api",
+          "name": "FastAPI",
+          "type": "service",
+          "zone": "app",
+          "position": {
+            "x": 680,
+            "y": 200
+          },
+          "tech": "uvicorn",
+          "note": "纯交互面：202/审批/SSE/导出；可独立重启",
+          "change": "modified"
+        },
+        {
+          "id": "runner",
+          "name": "Runner",
+          "type": "worker",
+          "zone": "async",
+          "position": {
+            "x": 960,
+            "y": 260
+          },
+          "tech": "独立容器，同镜像新入口",
+          "note": "租约认领并发 3；持有 agent-engine；心跳 20s 续租",
+          "change": "added"
+        },
+        {
+          "id": "agent-engine",
+          "name": "LangGraph 引擎",
+          "type": "worker",
+          "zone": "async",
+          "position": {
+            "x": 1220,
+            "y": 260
+          },
+          "tech": "LangGraph 1.2 + StatsPAI",
+          "note": "随 runner 进程；checkpointer 恢复通道激活",
+          "change": "modified"
+        },
+        {
+          "id": "llm",
+          "name": "MiniMax LLM",
+          "type": "external",
+          "zone": "external",
+          "position": {
+            "x": 1260,
+            "y": 120
+          },
+          "tech": "OpenAI 兼容 API",
+          "note": "call_llm 2 次 + 抖动重试（唯一重试 Owner）",
+          "change": "modified"
+        },
+        {
+          "id": "sessions-store",
+          "name": "会话状态存储",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 680,
+            "y": 470
+          },
+          "tech": "Postgres sessions 表",
+          "note": "会话元数据行级事务；章节内容只经读模型投影，禁止 JSON 双写",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "Postgres commit",
+            "failureDomain": "单机卷",
+            "rpo": "0",
+            "rto": "≤4h",
+            "recovery": "pg 恢复流程共用"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "pg",
+          "name": "Postgres",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 470
+          },
+          "tech": "postgres 16",
+          "note": "runs/approvals 应用权威 + checkpointer 恢复权威；章节读模型为 checkpoint 投影",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "事务 commit；runs 行 = run 被接受",
+            "failureDomain": "单机卷",
+            "rpo": "0 提交级 / ≤24h 整机",
+            "rto": "≤4h",
+            "recovery": "pg_dump cron → 异机/云对象存储（跨故障域）+ 计时恢复演练"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "s3",
+          "name": "MinIO",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 1260,
+            "y": 470
+          },
+          "tech": "MinIO",
+          "note": "CSV 镜像 + 导出件（同机缓存；非备份唯一落点）",
+          "change": "modified"
+        },
+        {
+          "id": "runs-dir",
+          "name": "runs/ 工件",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 620
+          },
+          "tech": "共享卷（api+runner 挂载）",
+          "note": "workspace CSV 与导出件；保留期回收",
+          "change": "modified"
+        },
+        {
+          "id": "trace-log",
+          "name": "trace 日志",
+          "type": "stream",
+          "zone": "data",
+          "position": {
+            "x": 1180,
+            "y": 620
+          },
+          "tech": "追加式文件",
+          "note": "run_events 的 fail-open 派生镜像",
+          "state": {
+            "role": "derived",
+            "source": "run_events 表回放",
+            "cursor": "(run_id, seq)"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "sse",
+          "name": "SSE 端点",
+          "type": "stream",
+          "zone": "app",
+          "position": {
+            "x": 400,
+            "y": 340
+          },
+          "tech": "FastAPI SSE",
+          "note": "游标读 run_events（LISTEN/NOTIFY 或 500ms 轮询游标）",
+          "change": "added"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "nginx",
+          "kind": "sync",
+          "label": "HTTPS",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms 交互",
+            "retryOwner": "前端（同源重试一次）",
+            "backlogBound": "每页签 1 连接"
+          }
+        },
+        {
+          "from": "nginx",
+          "to": "api",
+          "kind": "sync",
+          "label": "/api",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms（202）",
+            "retryOwner": "nginx 不重试非幂等 POST",
+            "backlogBound": "nginx 连接上限"
+          }
+        },
+        {
+          "from": "api",
+          "to": "pg",
+          "kind": "sync",
+          "label": "INSERT runs（202 依据）",
+          "importance": "primary",
+          "contract": {
+            "deadline": "50ms",
+            "retryOwner": "api 对死锁重试一次",
+            "backlogBound": "PENDING ≤20（提交端点强制），满则 429 + Retry-After"
+          }
+        },
+        {
+          "from": "runner",
+          "to": "pg",
+          "kind": "sync",
+          "label": "SKIP LOCKED 认领 + 心跳续租",
+          "importance": "primary",
+          "contract": {
+            "deadline": "认领 <100ms；租约 60s/心跳 20s",
+            "retryOwner": "runner 崩溃 → 租约过期后任意 runner 重认领（epoch 栅栏）",
+            "backlogBound": "并发租约 = 3"
+          }
+        },
+        {
+          "from": "runner",
+          "to": "agent-engine",
+          "kind": "sync",
+          "label": "进程内驱动",
+          "importance": "primary",
+          "contract": {
+            "deadline": "随节点",
+            "retryOwner": "runner 层对账（RECONCILING → checkpoint 恢复）",
+            "backlogBound": "每租约 1 run"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "llm",
+          "kind": "sync",
+          "label": "chat/completions",
+          "importance": "primary",
+          "contract": {
+            "deadline": "120s/调用",
+            "retryOwner": "call_llm 层唯一持有，2 次 + 抖动",
+            "backlogBound": "≤6 并发请求"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "pg",
+          "kind": "sync",
+          "label": "checkpoint 先提交，run_events/approvals 后写 + 启动对账",
+          "importance": "primary",
+          "contract": {
+            "deadline": "100ms/超级步",
+            "retryOwner": "checkpointer 内建",
+            "backlogBound": "≈5MB × 40 步/run；事件 30 天保留"
+          }
+        },
+        {
+          "from": "client",
+          "to": "sse",
+          "kind": "stream",
+          "label": "EventSource",
+          "importance": "primary",
+          "contract": {
+            "deadline": "事件 ≤2s；15s 心跳",
+            "retryOwner": "客户端 Last-Event-ID 重连",
+            "backlogBound": "每连接缓冲 1000 事件"
+          }
+        },
+        {
+          "from": "runner",
+          "to": "runs-dir",
+          "kind": "sync",
+          "label": "工件写入",
+          "importance": "secondary",
+          "contract": {
+            "deadline": "n/a（本地卷 IO，fail-open 吞异常）",
+            "retryOwner": "无——fail-open 观测面",
+            "backlogBound": "保留期回收（事件镜像 30 天 / 终态归档 90 天）"
+          }
+        }
+      ],
+      "flows": [
+        {
+          "id": "submit-run",
+          "name": "提交并执行 run（主流程）",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "client",
+              "to": "api",
+              "label": "POST /runs + Idempotency-Key",
+              "note": "runs 行 commit 即被接受，202 + run_id"
+            },
+            {
+              "seq": 2,
+              "from": "api",
+              "to": "pg",
+              "label": "INSERT runs(PENDING)"
+            },
+            {
+              "seq": 3,
+              "from": "runner",
+              "to": "pg",
+              "label": "SKIP LOCKED 认领，epoch+1",
+              "note": "并发 3，每 session 单租约"
+            },
+            {
+              "seq": 4,
+              "from": "runner",
+              "to": "agent-engine",
+              "label": "驱动管道；每超级步 checkpoint + run_event"
+            },
+            {
+              "seq": 5,
+              "from": "agent-engine",
+              "to": "llm",
+              "label": "节点执行（重试 Owner = call_llm）"
+            },
+            {
+              "seq": 6,
+              "from": "client",
+              "to": "sse",
+              "label": "按 seq 消费进度，≤2s"
+            },
+            {
+              "seq": 7,
+              "from": "runner",
+              "to": "pg",
+              "label": "WAITING_INPUT（HITL）或 SUCCEEDED"
+            }
+          ]
+        },
+        {
+          "id": "reconcile-run",
+          "name": "中断恢复（失败流）",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "agent-engine",
+              "to": "llm",
+              "label": "LLM 超时（120s 无响应）",
+              "note": "效果可能已提交 = UNKNOWN"
+            },
+            {
+              "seq": 2,
+              "from": "runner",
+              "to": "pg",
+              "label": "记 attempt 事件，run → RECONCILING"
+            },
+            {
+              "seq": 3,
+              "from": "runner",
+              "to": "pg",
+              "label": "心跳停止 → 租约过期（60s）"
+            },
+            {
+              "seq": 4,
+              "from": "runner",
+              "to": "pg",
+              "label": "任意 runner 重认领（attempt+1，epoch 校验）"
+            },
+            {
+              "seq": 5,
+              "from": "runner",
+              "to": "agent-engine",
+              "label": "从 PostgresSaver checkpoint 恢复（thread_id=session_id）",
+              "note": "效果键 (run_id, step_id, attempt) + lease_epoch 栅栏：重复结果不二次提交"
+            },
+            {
+              "seq": 6,
+              "from": "runner",
+              "to": "pg",
+              "label": "SUCCEEDED，或重试预算耗尽 → FAILED（携证据）；暂存孤儿由对账清理"
+            }
+          ]
+        },
+        {
+          "id": "approval-gate",
+          "name": "审批与导出硬门",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "client",
+              "to": "api",
+              "label": "POST review/decision"
+            },
+            {
+              "seq": 2,
+              "from": "api",
+              "to": "pg",
+              "label": "approvals + run_events 同事务 commit"
+            },
+            {
+              "seq": 3,
+              "from": "client",
+              "to": "api",
+              "label": "GET doc-export"
+            },
+            {
+              "seq": 4,
+              "from": "api",
+              "to": "pg",
+              "label": "校验每个 body 章节有匹配 version_sha256 的审批",
+              "note": "无 → 409 review_gate；force 留痕放行"
+            }
+          ]
+        }
+      ],
+      "tradeoffs": {
+        "pros": [
+          "api 重启/发版不杀 run（dev --reload 高频重启不再破坏 40min 管道）",
+          "零新中间件：Postgres 即队列，符合渐进演进约束",
+          "run_events 落库：SSE 游标、断线续传、审计同源",
+          "租约 + epoch 栅栏：重启对账通道激活 PostgresSaver 既有能力"
+        ],
+        "cons": [
+          "多一个容器与入口（同镜像新 entrypoint），部署面 +1",
+          "本地卷需两容器共享挂载（同主机无碍，跨机即失效——单机约束内可接受）",
+          "SSE 事件交付需要游标协议与 nginx 配套（比轮询多一层机制）"
+        ],
+        "migration": {
+          "cost": "M",
+          "notes": [
+            "分三步可各自发布：① runs/run_events/approvals 建表 + sessions.json → pg（双写一个发布周期）② runner 容器 + 认领循环 ③ SSE 端点 + 前端切换",
+            "回滚：①② 各自可逆（旧写路径保留一个发布周期）；sessions.json 停写后回滚需追平增量——一次性窗口，之后不可逆",
+            "迁移完成后删除 ws-hub 与 /ws/ 幻影路由"
+          ]
+        }
+      },
+      "ratings": {
+        "deployability": 3,
+        "elasticity": 2,
+        "evolvability": 4,
+        "faultTolerance": 4,
+        "modularity": 4,
+        "cost": 4,
+        "performance": 3,
+        "reliability": 4,
+        "scalability": 3,
+        "simplicity": 3,
+        "testability": 4
+      }
+    },
+    {
+      "id": "c",
+      "name": "候选 C：事件溯源 run 日志（数据模型轴）",
+      "style": "event-driven",
+      "thesis": "不换拓扑（同候选 A 单进程），换真相：trace 从 sidecar 升级为权威 append-only 事件日志，全部状态由回放重建，checkpointer 降级为缓存——可查性的最大化形态",
+      "canvas": {
+        "primaryFlow": "journal-write"
+      },
+      "components": [
+        {
+          "id": "client",
+          "name": "React SPA",
+          "type": "client",
+          "zone": "edge",
+          "position": {
+            "x": 150,
+            "y": 200
+          },
+          "tech": "Vite + React 18",
+          "note": "视图 = 事件流投影",
+          "change": "modified"
+        },
+        {
+          "id": "nginx",
+          "name": "Nginx",
+          "type": "lb",
+          "zone": "edge",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "tech": "nginx 1.27",
+          "note": "同候选 A",
+          "change": "modified"
+        },
+        {
+          "id": "api",
+          "name": "FastAPI",
+          "type": "service",
+          "zone": "app",
+          "position": {
+            "x": 680,
+            "y": 200
+          },
+          "tech": "uvicorn",
+          "note": "命令模型：所有变更先写日志",
+          "change": "modified"
+        },
+        {
+          "id": "agent-engine",
+          "name": "LangGraph 引擎",
+          "type": "worker",
+          "zone": "app",
+          "position": {
+            "x": 960,
+            "y": 200
+          },
+          "tech": "to_thread + 信号量",
+          "note": "同候选 A 的并发结构",
+          "change": "modified"
+        },
+        {
+          "id": "llm",
+          "name": "MiniMax LLM",
+          "type": "external",
+          "zone": "external",
+          "position": {
+            "x": 1260,
+            "y": 200
+          },
+          "tech": "OpenAI 兼容 API",
+          "note": "同候选 A",
+          "change": "modified"
+        },
+        {
+          "id": "run-journal",
+          "name": "Run 事件日志",
+          "type": "stream",
+          "zone": "data",
+          "position": {
+            "x": 680,
+            "y": 470
+          },
+          "tech": "Postgres append-only",
+          "note": "权威：会话/章节/审批/降级全部为事件",
+          "state": {
+            "role": "authoritative",
+            "acknowledgement": "日志 append commit",
+            "failureDomain": "单机卷",
+            "rpo": "0",
+            "rto": "≤4h",
+            "recovery": "pg 恢复 + 回放"
+          },
+          "change": "added"
+        },
+        {
+          "id": "pg",
+          "name": "Postgres",
+          "type": "db-sql",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 470
+          },
+          "tech": "postgres 16",
+          "note": "承载日志 + 投影 + checkpointer（缓存）",
+          "state": {
+            "role": "derived",
+            "source": "run-journal 全量回放",
+            "cursor": "全局 seq"
+          },
+          "change": "modified"
+        },
+        {
+          "id": "s3",
+          "name": "MinIO",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 1260,
+            "y": 470
+          },
+          "tech": "MinIO",
+          "note": "同候选 A",
+          "change": "modified"
+        },
+        {
+          "id": "runs-dir",
+          "name": "runs/ 工件",
+          "type": "blob",
+          "zone": "data",
+          "position": {
+            "x": 960,
+            "y": 620
+          },
+          "tech": "本地卷",
+          "note": "二进制工件；事件日志存引用",
+          "change": "modified"
+        },
+        {
+          "id": "trace-log",
+          "name": "trace 日志",
+          "type": "stream",
+          "zone": "data",
+          "position": {
+            "x": 1180,
+            "y": 620
+          },
+          "tech": "—",
+          "note": "被 run-journal 取代后删除",
+          "change": "removed"
+        },
+        {
+          "id": "sse",
+          "name": "SSE 端点",
+          "type": "stream",
+          "zone": "app",
+          "position": {
+            "x": 400,
+            "y": 340
+          },
+          "tech": "FastAPI SSE",
+          "note": "直接订阅日志，天然实时",
+          "change": "added"
+        }
+      ],
+      "edges": [
+        {
+          "from": "client",
+          "to": "nginx",
+          "kind": "sync",
+          "label": "HTTPS",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms",
+            "retryOwner": "前端",
+            "backlogBound": "每页签 1 连接"
+          }
+        },
+        {
+          "from": "nginx",
+          "to": "api",
+          "kind": "sync",
+          "label": "/api",
+          "importance": "primary",
+          "contract": {
+            "deadline": "500ms",
+            "retryOwner": "nginx 不重试非幂等",
+            "backlogBound": "连接上限"
+          }
+        },
+        {
+          "from": "api",
+          "to": "run-journal",
+          "kind": "sync",
+          "label": "命令 → 事件",
+          "importance": "primary",
+          "contract": {
+            "deadline": "50ms",
+            "retryOwner": "api 重试死锁一次",
+            "backlogBound": "每 run 事件数 ≤2000"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "run-journal",
+          "kind": "sync",
+          "label": "节点事件 append",
+          "importance": "primary",
+          "contract": {
+            "deadline": "100ms",
+            "retryOwner": "执行器对账",
+            "backlogBound": "追加即提交，无积压"
+          }
+        },
+        {
+          "from": "agent-engine",
+          "to": "llm",
+          "kind": "sync",
+          "label": "chat/completions",
+          "importance": "primary",
+          "contract": {
+            "deadline": "120s/调用",
+            "retryOwner": "call_llm 2 次 + 抖动",
+            "backlogBound": "≤6 并发"
+          }
+        },
+        {
+          "from": "pg",
+          "to": "run-journal",
+          "kind": "async",
+          "label": "投影回放",
+          "importance": "secondary",
+          "contract": {
+            "deadline": "投影滞后 ≤1s",
+            "retryOwner": "投影器（从 cursor 重放）",
+            "backlogBound": "回放速率 > 写入速率 10×"
+          }
+        },
+        {
+          "from": "client",
+          "to": "sse",
+          "kind": "stream",
+          "label": "EventSource",
+          "importance": "primary",
+          "contract": {
+            "deadline": "≤2s",
+            "retryOwner": "客户端游标重连",
+            "backlogBound": "每连接 1000 事件"
+          }
+        }
+      ],
+      "flows": [
+        {
+          "id": "journal-write",
+          "name": "命令即事件（候选 C）",
+          "steps": [
+            {
+              "seq": 1,
+              "from": "client",
+              "to": "api",
+              "label": "命令提交"
+            },
+            {
+              "seq": 2,
+              "from": "api",
+              "to": "run-journal",
+              "label": "校验 + append 事件（权威落库）"
+            },
+            {
+              "seq": 3,
+              "from": "agent-engine",
+              "to": "run-journal",
+              "label": "节点生命周期事件追加"
+            },
+            {
+              "seq": 4,
+              "from": "pg",
+              "to": "run-journal",
+              "label": "投影器回放构建读视图"
+            },
+            {
+              "seq": 5,
+              "from": "client",
+              "to": "sse",
+              "label": "订阅日志流"
+            }
+          ]
+        }
+      ],
+      "tradeoffs": {
+        "pros": [
+          "可查性最强：任意历史状态可精确重建，审计零盲区",
+          "SSE 天然同源（日志即推送流）",
+          "时间旅行调试与回归测试（回放即测试）"
+        ],
+        "cons": [
+          "事件 schema 版本化负担最重（旧事件永远要能读）",
+          "state 处理全链路重写，工作量约为 B 的 3 倍",
+          "实验室规模下 checkpointer 已满足恢复需求——机制超出证据（machinery-outruns-envelope 风险）"
+        ],
+        "migration": {
+          "cost": "L",
+          "notes": [
+            "需要长期双写（旧 state 写路径 + 新日志）直到投影可信",
+            "回滚困难：一旦停写旧路径，历史仅存在于事件日志，回滚 = 永久切换"
+          ]
+        }
+      },
+      "ratings": {
+        "deployability": 2,
+        "elasticity": 2,
+        "evolvability": 5,
+        "faultTolerance": 4,
+        "modularity": 3,
+        "cost": 2,
+        "performance": 3,
+        "reliability": 4,
+        "scalability": 3,
+        "simplicity": 1,
+        "testability": 2
+      }
+    }
+  ],
+  "comparison": {
+    "axes": [
+      "reliability",
+      "faultTolerance",
+      "cost",
+      "simplicity",
+      "evolvability",
+      "deployability"
+    ],
+    "recommendation": {
+      "architecture": "b",
+      "reasoning": [
+        "envelope 实测：现状并发 run 容量 = 1（async 路由内同步 invoke 独占事件循环，sessions.py:149；单 worker Dockerfile:40），需求 = 5（NFR-2）——三个候选都把执行移出请求路径，此为入场券",
+        "分胜负责的命名失效模式：api 进程重启进行中 run 全灭。开发常态 uvicorn --reload（Makefile dev-backend）下这是高频事件而非尾部风险；40min × 无自动恢复（paper-engine.md:67 记录在案）直接违反 INV-2。候选 A 的进程内队列与执行器随进程同生共死，B 用租约把两者隔离——这是 A 与 B 唯一的载荷轴差异，也是可靠性 3 vs 4 的来源",
+        "成本证据链：B 新增面 = 一个容器入口 + runs/run_events/approvals 三张表；Postgres SKIP LOCKED 即队列（反过度工程门 1：~6 QPS 场景一个 ACID 库绰绰有余），无 Redis/Celery——满足『渐进演进』约束（user）",
+        "实时性证据链：run_events 落库 + SSE 游标 ≤2s（NFR-3），替代断链 WS（F8：nginx /ws/ 幻影路由 + 前端零实例化 + 路径不匹配三处断裂）；30 连接远低于连接织物 anti-gate，SSE 单向模型精确匹配产品形态",
+        "候选 C 在可查轴上更强（evolvability 5），但机制超出证据：实验室规模下 PostgresSaver checkpoint 已提供恢复通道，事件溯源的 3 倍重写成本与不可逆迁移违反『省』优先级——machinery-outruns-envelope",
+        "可查优先级的其余落点：trace.jsonl 降级为 run_events 派生镜像（fail-open 语义保留），30 天保留期同时消解债务 F6 的无回收增长",
+        "用户评审（2026-08-31）：候选 B 方向批准，四项修订（容量口径统一 / 效果键幂等 / 提交顺序与读模型 / 备份跨故障域）完成后按五项故障场景验收；A 仅限紧急过渡方案；C 正式关闭"
+      ]
+    }
+  },
+  "debt": {
+    "scheme": "pattern+components/v1",
+    "checked": [
+      "boundaries",
+      "data-ownership",
+      "coupling",
+      "dependency-contracts",
+      "failure-containment",
+      "over-engineering",
+      "obsolescence"
+    ],
+    "unverified": [
+      {
+        "check": "ADR 0001/0003/0005/0006/0007 的状态（accepted/draft）",
+        "reason": "仅读取了 0002/0004/0008-0012 的状态行，其余未读"
+      },
+      {
+        "check": "按路径的变更频次统计（git log 聚合）",
+        "reason": "本次运行未执行，exposure 的 on-path 判定基于主流程结构位置而非提交频率"
+      },
+      {
+        "check": "obsolescence 网络核查（MiniMax API 状态、pyfixest/langgraph 版本是否被取代）",
+        "reason": "无网络查询工具接入"
+      }
+    ],
+    "findings": [
+      {
+        "id": "dbt-no-bulkhead--agent-engine-api",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "no-bulkhead",
+          "components": [
+            "agent-engine",
+            "api"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "failure-containment",
+        "pattern": "no-bulkhead",
+        "affects": [
+          "availability",
+          "performance"
+        ],
+        "title": "单个事件循环同时服务交互请求与 40 分钟同步管道，无任何舱壁隔离",
+        "components": [
+          "agent-engine",
+          "api"
+        ],
+        "edges": [],
+        "consequence": "breaking",
+        "exposure": "on-path",
+        "severity": "blocking",
+        "confidence": "high",
+        "evidence": [
+          {
+            "text": "async def upload 路由内直接同步调用 run_upload_pipeline → _graph.invoke",
+            "source": "backend/routers/sessions.py:84,149"
+          },
+          {
+            "text": "节点内 LLM 调用为同步 urllib.urlopen(timeout=120s)",
+            "source": "agent/llm/call_llm.py:86"
+          },
+          {
+            "text": "单 uvicorn worker，无 --workers；healthcheck 30s × retries=3，管道运行期间容器可被标 unhealthy",
+            "source": "backend/Dockerfile:37-40"
+          }
+        ],
+        "whyItMatters": "一个用户点上传，全实验室的登录、EDA、审批、健康检查全部停摆直到管道跑完；违反 nfr-1（交互 p99 在 run 期间成立）。",
+        "remedy": {
+          "action": "isolate",
+          "text": "执行移出请求路径：候选 A（进程内有界执行器）或 B（独立 runner）；B 同时修复重启杀 run 的连带问题。"
+        },
+        "effort": "M",
+        "reversibility": "reversible",
+        "blastRadius": "所有交互端点 + 容器健康判定",
+        "resolvedBy": [
+          "a",
+          "b",
+          "c"
+        ],
+        "disconfirming": "F1 红队指出客户端断开不会取消同步管道且已有四层工件记录——本发现仅保留『事件循环独占』这一残余主张，且该主张被红队确认比原陈述更严重。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [
+            {
+              "lens": "uncovered",
+              "refuted": false,
+              "objection": "无任何注释/ADR 记录接受此权衡；代码注释自称 dev stage: synchronous 但未记录代价"
+            }
+          ],
+          "tools": [
+            "repository",
+            "红队独立核verify"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-no-retry-owner--agent-engine-llm",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "no-retry-owner",
+          "components": [
+            "agent-engine",
+            "llm"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "dependency-contracts",
+        "pattern": "no-retry-owner",
+        "affects": [
+          "reliability"
+        ],
+        "title": "LLM 边界无重试 Owner：瞬时错误直接击穿核心写作节点成全局 500",
+        "components": [
+          "agent-engine",
+          "llm"
+        ],
+        "edges": [],
+        "consequence": "friction",
+        "exposure": "on-path",
+        "severity": "medium",
+        "confidence": "high",
+        "evidence": [
+          {
+            "text": "单次 urlopen，HTTPError/URLError 直接 raise RuntimeError；llm/ 目录 grep retry|backoff|tenacity 零匹配",
+            "source": "agent/llm/call_llm.py:85-97"
+          },
+          {
+            "text": "generate_chapter 裸调 call_llm，RuntimeError 直穿节点；facade 只捕 ValueError → 全局 500",
+            "source": "agent/nodes/generate_chapter.py:162; backend/facade/__init__.py:433-434"
+          }
+        ],
+        "whyItMatters": "40 分钟管道在第 39 分钟遇一次瞬时 429/超时即整 run 失败；多数节点无降级分支。",
+        "remedy": {
+          "action": "isolate",
+          "text": "call_llm 层成为唯一重试 Owner：2 次上限 + 指数退避 + 抖动；仅重试瞬态错误（429/5xx/超时），不重试校验拒绝。"
+        },
+        "effort": "S",
+        "reversibility": "reversible",
+        "resolvedBy": [
+          "a",
+          "b",
+          "c"
+        ],
+        "disconfirming": "红队确认 robustness_check / review_chapter 等个别节点有自己的 try/except 降级——不构成对 call_llm 层无重试的反驳，反而说明重试策略散落且不完整。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-untested-recovery--pg",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "untested-recovery",
+          "components": [
+            "pg"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "failure-containment",
+        "pattern": "untested-recovery",
+        "affects": [
+          "reliability",
+          "faultTolerance"
+        ],
+        "title": "Postgres 承载全部权威状态但恢复路径未经演练，且无自动化备份",
+        "components": [
+          "pg"
+        ],
+        "edges": [],
+        "consequence": "breaking",
+        "exposure": "on-path",
+        "severity": "blocking",
+        "confidence": "medium",
+        "evidence": [
+          {
+            "text": "compose 五服务中无备份 sidecar/cron/脚本；全仓 grep pg_dump/backup/wal-g 仅命中文档",
+            "source": "docker-compose.yml:1-112"
+          },
+          {
+            "text": "唯一备份指引为手动 tar 卷快照，未保证停机一致性；make docker-clean 会连数据卷一起销毁",
+            "source": "docs/deployment.md:161-164; Makefile:115"
+          },
+          {
+            "text": "checkpointer 为章节内容权威 + 审批状态所在库",
+            "source": "docker-compose.yml:66-67; agent/graph.py:97-106"
+          },
+          {
+            "text": "pg 与 MinIO 同机同 Docker volume，整机/磁盘故障两者同时丢失，同机备份不满足整机 RPO",
+            "source": "docker-compose.yml:1-112（pgdata 与 minio_data 均为本机卷）"
+          }
+        ],
+        "whyItMatters": "违反 nfr-4（整机丢失 RPO ≤24h）与 INV-2：卷损坏/误删 docker-clean 后，全部论文状态与审批记录不可恢复。未经演练的备份是断言不是恢复计划。",
+        "remedy": {
+          "action": "isolate",
+          "text": "pg_dump 定时任务落异机/云对象存储（每日，保留 7 份；禁止仅落同机 MinIO——与主机同故障域）+ 一次计时恢复演练并记录实际 RPO/RTO；docker-clean 增加数据卷确认提示"
+        },
+        "effort": "S",
+        "reversibility": "reversible",
+        "blastRadius": "全部权威状态",
+        "resolvedBy": [],
+        "disconfirming": "红队驳倒了绝对化表述：deployment.md:161-164 确有手动备份指引——发现据此收窄为『无自动化 + 未演练』，confidence 由 high 降为 medium。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [
+            {
+              "lens": "uncovered",
+              "refuted": false,
+              "objection": "手动指引覆盖了『机制存在性』但未覆盖『自动化与可验证性』"
+            }
+          ],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-unstated-conflict-resolution--api-sessions-store",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "unstated-conflict-resolution",
+          "components": [
+            "api",
+            "sessions-store"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "data-ownership",
+        "pattern": "unstated-conflict-resolution",
+        "affects": [
+          "reliability"
+        ],
+        "title": "sessions.json 全量写穿且无锁：def 端点线程池与 async 端点存在读-改-写竞态",
+        "components": [
+          "api",
+          "sessions-store"
+        ],
+        "edges": [],
+        "consequence": "friction",
+        "exposure": "on-path",
+        "severity": "medium",
+        "confidence": "medium",
+        "evidence": [
+          {
+            "text": "flush() 将所有 session 全量 json.dumps → tmp → os.replace；所有写路径每次变更触发整文件重写；无文件锁",
+            "source": "backend/facade/session_store.py:78-93"
+          },
+          {
+            "text": "单进程假设已记录，但 def 端点跑线程池时 get_state→save_state 读-改-写可交错",
+            "source": "backend/facade/session_store.py:23-24"
+          }
+        ],
+        "whyItMatters": "O(全库) 每变更重写随会话数与 state 体积线性恶化；并发写交错可静默丢失一次状态更新（如刚记录的 Degradation）。",
+        "remedy": {
+          "action": "replace",
+          "text": "sessions.json → Postgres sessions 行（候选 A/B/C 均含）；行级事务 + 连接池天然串行化，写穿成本消失。"
+        },
+        "effort": "M",
+        "reversibility": "reversible",
+        "resolvedBy": [
+          "a",
+          "b",
+          "c"
+        ],
+        "disconfirming": "红队指出 async 端点之间因事件循环串行而安全——竞态窗口仅限 def 端点（线程池）与 async 混合并发，频率低但非零。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-abandoned-component--ws-hub",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "abandoned-component",
+          "components": [
+            "ws-hub"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "obsolescence",
+        "pattern": "abandoned-component",
+        "affects": [
+          "simplicity"
+        ],
+        "title": "WS 链路三处断裂成为死代码，而 deployment.md 仍宣称其工作",
+        "components": [
+          "ws-hub"
+        ],
+        "edges": [],
+        "consequence": "friction",
+        "exposure": "on-path",
+        "severity": "medium",
+        "confidence": "high",
+        "evidence": [
+          {
+            "text": "WSClient 仅测试引用，生产代码零实例化；AgentPanel 连接状态恒为 disconnected",
+            "source": "frontend/src/lib/ws.ts:30-68; components/AgentPanel.tsx:46"
+          },
+          {
+            "text": "后端路由 /sessions/{sid}/stream，nginx 仅代理 /ws/ 且无 rewrite —— 必 404",
+            "source": "backend/routers/ws.py:47; frontend/nginx/nginx.conf:28-34"
+          },
+          {
+            "text": "deployment.md:135 仍宣称 /ws/* → backend 可用",
+            "source": "docs/deployment.md:135"
+          }
+        ],
+        "whyItMatters": "维护者会以为实时通道存在而围绕它设计；文档宣称与实现相反是审计能遇到的最危险漂移。",
+        "remedy": {
+          "action": "cut",
+          "text": "按候选 B 以 SSE 替代后删除 ws-hub、WSClient 与 /ws/ 幻影路由；或若保留 WS 则三处全部接通——不可停留在中间态。"
+        },
+        "effort": "S",
+        "reversibility": "reversible",
+        "resolvedBy": [
+          "a",
+          "b",
+          "c"
+        ],
+        "disconfirming": "红队确认测试注释记录了『前端有意不走 WS』的产品决策——但该决策未覆盖 nginx 幻影路由与文档反向宣称，配置断裂未被任何记录接受。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [
+            {
+              "lens": "uncovered",
+              "refuted": false,
+              "objection": "产品决策覆盖前端不接线，未覆盖 nginx/文档两层"
+            }
+          ],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-no-steady-state--trace-log",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "no-steady-state",
+          "components": [
+            "trace-log"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "failure-containment",
+        "pattern": "no-steady-state",
+        "affects": [
+          "performance"
+        ],
+        "title": "trace/checkpoint 无限增长且 tail 全量读盘，无保留期机制",
+        "components": [
+          "trace-log"
+        ],
+        "edges": [],
+        "consequence": "friction",
+        "exposure": "on-path",
+        "severity": "medium",
+        "confidence": "high",
+        "evidence": [
+          {
+            "text": "tail_events 逐行读整个 trace.jsonl 后取尾部",
+            "source": "backend/run_store.py:164-181"
+          },
+          {
+            "text": "run_store 无保留期/回收代码；仅删会话时整目录 rmtree",
+            "source": "backend/run_store.py 全文"
+          },
+          {
+            "text": "envelope：checkpoint ≈200MB/run，100 run/月 ≈20GB/月",
+            "source": "estimates"
+          }
+        ],
+        "whyItMatters": "trace 面板随 run 变大线性变慢；pg 磁盘被 checkpoint 持续吞噬，一年内触及磁盘上限。",
+        "remedy": {
+          "action": "document",
+          "text": "候选 B：run_events 落 pg 并定 30 天保留（终态 run 归档 90 天）；trace.jsonl 降级为派生镜像后随保留期滚动删除；tail 改游标查询。"
+        },
+        "effort": "S",
+        "reversibility": "reversible",
+        "resolvedBy": [
+          "a",
+          "b",
+          "c"
+        ],
+        "disconfirming": "红队指出增长按 session 目录隔离且随 delete_session 整体删除——长期滞留只发生在不删除的活跃会话上，缓解但未消除无界增长。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      },
+      {
+        "id": "dbt-stale-reference-model--api-nginx",
+        "identity": {
+          "scheme": "pattern+components/v1",
+          "pattern": "stale-reference-model",
+          "components": [
+            "api",
+            "nginx"
+          ]
+        },
+        "aliases": [],
+        "subject": "repo",
+        "category": "obsolescence",
+        "pattern": "stale-reference-model",
+        "affects": [
+          "simplicity"
+        ],
+        "title": "deployment.md 写 80 端口，compose 实际映射 127.0.0.1:8080:80，无任何解释",
+        "components": [
+          "api",
+          "nginx"
+        ],
+        "edges": [],
+        "consequence": "friction",
+        "exposure": "off-path",
+        "severity": "low",
+        "confidence": "high",
+        "evidence": [
+          {
+            "text": "文档：curl http://localhost/health、前端 http://localhost、架构图 Nginx (80)",
+            "source": "docs/deployment.md:106,110,133-137"
+          },
+          {
+            "text": "实际：127.0.0.1:8080:80；全仓 8080 仅此一处且无注释",
+            "source": "docker-compose.yml:105"
+          }
+        ],
+        "whyItMatters": "照文档操作必然失败；发现是文档问题而非系统问题——更新文档即可。",
+        "remedy": {
+          "action": "document",
+          "text": "deployment.md 统一改为 8080，或在 compose 恢复 80 并注释端口选择理由。"
+        },
+        "effort": "XS",
+        "reversibility": "reversible",
+        "resolvedBy": [],
+        "disconfirming": "无——红队复核确认漂移成立。",
+        "verification": {
+          "gates": {
+            "real": "pass",
+            "live": "pass"
+          },
+          "lenses": [],
+          "tools": [
+            "repository"
+          ],
+          "survived": 1
+        },
+        "status": "open",
+        "justification": null,
+        "acceptedUntil": null,
+        "firstSeen": "2026-08-31",
+        "baselineState": "new"
+      }
+    ],
+    "notes": [
+      {
+        "text": "导出路径（doc_export.py:48 → export_docx.py:600）既不读审批记录也不检查章节 status——devlog 北极星『审批硬证据门』在导出链路上无实现。属缺失能力（backlog）而非结构债：已列为 fr-3，由候选 B 的 approval-gate 流程补齐。",
+        "kind": "observation"
+      },
+      {
+        "text": "agent/pyproject.toml 未声明 dependencies（pip install -e agent 不装依赖，依赖全在 requirements.txt）——打包缺陷，建议补齐。",
+        "kind": "observation"
+      },
+      {
+        "text": "F1（请求内管道无持久化记录）与 F4（session 双写无排序权威）被红队驳倒：前者有四层记录且断开不取消执行，后者的排序权威已在 session_store.py 模块文档与 paper-engine.md:525 明确命名。按规则静默删除。",
+        "kind": "observation"
+      }
+    ]
+  },
+  "risks": [
+    {
+      "text": "MiniMax provider 并发配额未知：3 run × 2 并发 = 6 请求可能触及限额；429 行为未测量",
+      "horizon": "立即——接入即测量（记录 429 率与延迟分布）"
+    },
+    {
+      "text": "checkpoint ≈20GB/月 增长在保留策略落地前持续吞噬 pg 磁盘",
+      "horizon": "3-6 个月"
+    },
+    {
+      "text": "租约并发 3 之外排队 20 在学期截止周可能不足（提交流激增）",
+      "horizon": "首个截止周——观测 PENDING 队列深度再调"
+    }
+  ],
+  "nextSteps": [
+    "M1：pg_dump cron 至异机/云对象存储（跨故障域）+ 一次计时恢复演练（债务 dbt-untested-recovery--pg 唯一解，先行）",
+    "M2：建 runs/run_events/approvals 表；sessions.json → pg 双写一个发布周期（候选 B 迁移第①步）",
+    "M3：runner 容器（同镜像新 entrypoint）+ SKIP LOCKED 认领循环 + call_llm 重试（迁移第②步）",
+    "M4：SSE 端点 + nginx proxy_buffering off + 前端 EventSource 切换；删除 ws-hub 死链（迁移第③步）",
+    "M5：导出审批硬门（409 review_gate）——补齐 fr-3，独立于迁移可先行",
+    "M6：deployment.md 端口修正；agent/pyproject.toml 补 dependencies",
+    "M7：测量：MiniMax 429 率、单 run 实际时长分布、PENDING 队列峰值——三者推翻任一 envelope 假设即重算",
+    "M8：验收——五项故障场景测试：① api 重启进行中 run 存活 ② runner 于 LLM 调用中被击杀后正确恢复 ③ 租约过期的旧 runner 无法提交章节/工件（epoch 拒绝）④ SSE 断线重连不丢最终状态、重复由客户端去重 ⑤ 异机备份恢复后 runs/审批/checkpoint/论文内容一致"
+  ],
+  "adr": null
+}

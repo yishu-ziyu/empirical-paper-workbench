@@ -18,6 +18,7 @@ import pytest
 
 from agent.nodes.review_chapter import (
     REVIEW_SCORE_THRESHOLD,
+    ReviewResult,
     apply_association_review_guard,
     _compute_composite_score,
     call_review_llm,
@@ -643,15 +644,22 @@ def test_association_guard_rewrites_causal_demand():
 def test_invoke_review_prompt_states_association(monkeypatch):
     seen = {}
 
-    def fake_call(prompt, node_type="review"):
-        seen["prompt"] = prompt
-        return (
-            '{"rubric":{"endogeneity":0.8,"identification":0.8,'
-            '"robustness":0.8,"contribution":0.8,"readability":0.8},'
-            '"feedback":"ok","suggestions":"ok"}'
-        )
+    class FakeRun:
+        output = ReviewResult.model_validate({
+            "rubric": dict(HIGH_SCORE_RUBRIC),
+            "feedback": "ok",
+            "suggestions": "ok",
+        })
 
-    monkeypatch.setattr("agent.llm.call_llm.call_llm", fake_call)
+    class FakeAgent:
+        def run_sync(self, prompt):
+            seen["prompt"] = prompt
+            return FakeRun()
+
+    monkeypatch.setattr(
+        "agent.nodes.review_chapter.build_review_agent",
+        lambda **kwargs: FakeAgent(),
+    )
     invoke_review_llm(None, "正文", ReviewRubric(), "dir", [], claim="association")
     assert "association" in seen["prompt"]
     assert "不得因为没有" in seen["prompt"]

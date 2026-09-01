@@ -248,6 +248,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
   } | null>(null)
   const [gateBusy, setGateBusy] = useState(false)
   const [docExportOpen, setDocExportOpen] = useState(false)
+  // 导出成功后置 true：paperPath 的 export_docx / translate_code 依赖它区分
+  // 「可导出但未导出」与「已导出」。此前两站同源于 canExport，永远同步跳变。
+  const [hasExported, setHasExported] = useState(false)
   const [codeExportOpen, setCodeExportOpen] = useState(false)
   const [workbenchTab, setWorkbenchTab] = useState<'paper' | 'data' | 'format'>('paper')
   const [directionBusy, setDirectionBusy] = useState(false)
@@ -977,9 +980,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     async (format: 'tex' | 'pdf' | 'docx', template: string) => {
       if (!sessionId) return
       try {
-        const resp = await fetch(
+        const resp = await apiFetch(
           `${API_BASE}/sessions/${sessionId}/doc-export?format=${format}&template=${template}`,
-          { headers: authHeaders() },
         )
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
         const blob = await resp.blob()
@@ -990,6 +992,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         a.click()
         URL.revokeObjectURL(url)
         setDocExportOpen(false)
+        setHasExported(true)
       } catch (err) {
         showGlobalError(err instanceof Error ? err.message : t('app.exportFailed'))
       }
@@ -1009,6 +1012,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
       status:
         written?.status ?? (writeBusy && writingType === ch.type ? 'streaming' : 'pending'),
       content: written?.content,
+      generation_degraded: written?.generation_degraded ?? false,
+      review_degraded: written?.review_degraded ?? false,
+      review_typed: written?.review_typed ?? false,
     }
   })
 
@@ -1059,6 +1065,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     // derived
     hasReadout,
     canExport,
+    hasExported,
     railItems,
     writtenChapter,
     // actions

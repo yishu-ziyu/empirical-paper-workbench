@@ -67,12 +67,28 @@ def generate_title(state: EconPaperState) -> GenerateTitleOutput:
         "只输出标题本身，不要 LaTeX，不要引号，不要解释。"
         f"中文，30 字以内。{data_summary}"
     )
-    title = _clean_title(call_llm(prompt))
+    from ..llm.router import router
+
+    provider = str(router.get_config("title").provider or "").strip().lower()
+    raw_title = call_llm(prompt)
+    raw_text = str(raw_title or "").strip()
+    if not raw_text:
+        generation_source = "fallback"
+        generation_degraded = True
+    elif provider == "mock":
+        generation_source = "mock"
+        generation_degraded = True
+    else:
+        generation_source = "llm"
+        generation_degraded = False
+    title = _clean_title(raw_title)
 
     chapter = {
         "type": "title",
         "title": title,
         "content": f"\\title{{{title}}}",
         "status": "done",
+        "generation_source": generation_source,
+        "generation_degraded": generation_degraded,
     }
     return {"title_chapter": chapter}

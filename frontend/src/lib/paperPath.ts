@@ -39,6 +39,8 @@ export interface PaperPathState {
   hasChapter: boolean
   awaitingApprove: boolean
   canExport: boolean
+  /** 用户点过导出且成功。与 canExport 解耦：此前两站同源于 canExport，永远同步跳变。 */
+  hasExported?: boolean
   cleaningSteps?: CleanStepReport[]
 }
 
@@ -92,8 +94,15 @@ export function derivePaperPath(state: PaperPathState): {
     else if (state.hasChapter) chapter = 'completed'
     else chapter = 'paused'
   }
-  const translate: PathStatus = state.canExport ? 'active' : 'pending'
-  const exportDoc: PathStatus = state.canExport ? 'active' : 'pending'
+  // translate_code（生成 Stata/R 复现代码）是导出动作的一部分，后端在 doc-export
+  // 请求内生成——导出前它并不在进行中。旧逻辑挂在 canExport 上，导致
+  // 「翻译代码」在写完章节后就永远显示进行中（谎报）。
+  const translate: PathStatus = state.hasExported ? 'completed' : 'pending'
+  const exportDoc: PathStatus = state.hasExported
+    ? 'completed'
+    : state.canExport
+      ? 'active'
+      : 'pending'
 
   const clean = emptyClean()
   let cleanData: PathStatus = 'pending'

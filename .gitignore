@@ -9,6 +9,7 @@ venv/
 .DS_Store
 dist/
 build/
+.local/
 
 # 用户上传的测试数据（运行时生成，不入版本控制）
 uploads/
@@ -24,6 +25,10 @@ backend/uploads/.s3_cache/
 # 运行时学习标签（对照报告的样例可入库，原始 jsonl 不入库）
 data/*.jsonl
 backend/data/*.jsonl
+
+# SessionStore 本地持久化文件（P1-3 写穿透，运行时生成）
+data/
+backend/data/
 
 # 运行时 SQLite（不要把本地会话库提交上去）
 *.db

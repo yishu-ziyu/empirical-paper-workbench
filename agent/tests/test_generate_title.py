@@ -23,6 +23,8 @@ def test_generate_title_calls_llm_and_writes_title_chapter(mock_llm_for):
     assert title_chapter.get("type") == "title", (
         f"expected type=title, got {title_chapter.get('type')!r}"
     )
+    assert title_chapter["generation_source"] == "mock"
+    assert title_chapter["generation_degraded"] is True
     assert title_chapter.get("content") == "\\title{Test Title}", (
         f"expected '\\title{{Test Title}}', "
         f"got {title_chapter.get('content')!r}"

@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, RedirectResponse
 
 from auth import get_optional_user, get_current_user, require_session_ownership
-from config import settings
+from config import ensure_private_directory, ensure_private_file, settings
 from facade import facade
 from models.user import User
 from storage.s3 import s3_fs
@@ -129,9 +129,10 @@ async def upload(
 
     # 5. Persist the normalized CSV to the upload dir.
     upload_dir = Path(settings.UPLOAD_DIR)
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(upload_dir)
     csv_path = upload_dir / f"{session_id}.csv"
     csv_path.write_bytes(csv_bytes)
+    ensure_private_file(csv_path)
 
     # 5b. Sync to S3 (only if S3_ENDPOINT_URL is configured).
     if settings.S3_ENDPOINT_URL:

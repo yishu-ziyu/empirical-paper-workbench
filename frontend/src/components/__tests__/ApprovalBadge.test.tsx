@@ -11,7 +11,15 @@ function renderWithI18n(ui: React.ReactElement) {
   return render(ui, { wrapper: I18nProvider })
 }
 
-const base: Chapter = { type: 'intro', title: '引言', content: 'x', versions: [] }
+const base: Chapter = {
+  type: 'intro',
+  title: '引言',
+  content: 'x',
+  versions: [],
+  generation_degraded: false,
+  review_degraded: false,
+  review_typed: false,
+}
 
 describe('ApprovalBadge 绕过核对徽标', () => {
   test('正常审批的章节不渲染徽标', () => {

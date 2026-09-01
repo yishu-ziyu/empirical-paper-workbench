@@ -8,7 +8,7 @@ Naming convention: ``XxxResponse`` for endpoint return types.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +45,14 @@ class ChapterResponse(BaseModel):
     status: Optional[str] = None
     versions: List[str] = Field(default_factory=list)
     chapter_index: Optional[int] = None
+    generation_source: Optional[str] = None
+    generation_degraded: bool = False
+    review_source: Optional[str] = None
+    review_degraded: bool = False
+    review_typed: bool = False
+    review_status: Optional[Literal["passed", "failed", "degraded"]] = None
+    grounding_failures: List[str] = Field(default_factory=list)
+    structure_failures: List[str] = Field(default_factory=list)
 
     model_config = {"extra": "allow"}
 
@@ -211,6 +219,86 @@ class TranslateCodeResponse(BaseModel):
 
     ok: bool = True
     code_translations: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# paper_draft.py (Frame 5 development read model)
+# ---------------------------------------------------------------------------
+
+
+class PaperReferenceResponse(BaseModel):
+    """APA reference produced by the existing generate_references node."""
+
+    index: int
+    text: str
+    doi: Optional[str] = None
+    entry: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PaperAnalysisEvidenceResponse(BaseModel):
+    """Exact executed-estimate facts backing the main claim."""
+
+    formula: str
+    n: Optional[int] = None
+    coef: Optional[float] = None
+    se: Optional[float] = None
+    p: Optional[float] = None
+    treatment: str
+    treatment_row: str
+    estimator: str
+    status: str
+
+
+class PaperSourceEvidenceResponse(BaseModel):
+    """Resolver-verified source metadata; no fabricated full-text excerpt."""
+
+    title: str
+    abstract: Optional[str] = None
+    doi: str
+    url: str
+    source: Literal["crossref"]
+    status: Literal["verified", "unverified"]
+    excerpt: Optional[str] = None
+    excerpt_status: Literal["available", "unavailable"]
+
+
+class PaperClaimSummaryResponse(BaseModel):
+    id: str
+    text: str
+    type: str
+
+
+class PaperClaimEvidenceResponse(BaseModel):
+    claim_id: str
+    claim_type: Literal["association", "causal_with_caveat"]
+    analysis: PaperAnalysisEvidenceResponse
+    sources: List[PaperSourceEvidenceResponse] = Field(default_factory=list)
+    limitation: str
+
+
+class PaperDraftContentResponse(BaseModel):
+    title: str
+    sections: List[ChapterResponse] = Field(default_factory=list)
+    references: List[PaperReferenceResponse] = Field(default_factory=list)
+
+
+class PaperOpenQuestionResponse(BaseModel):
+    code: str
+    message: str
+    source: str
+    severity: Literal["warning", "error"]
+
+
+class PaperDraftResponse(BaseModel):
+    """One-shot paper result or a structured formal-draft refusal."""
+
+    status: Literal["ready", "not_ready"]
+    readiness: Literal["ready", "not_ready"]
+    gaps: List[str] = Field(default_factory=list)
+    paper: Optional[PaperDraftContentResponse] = None
+    main_claim: Optional[PaperClaimSummaryResponse] = None
+    evidence: Optional[PaperClaimEvidenceResponse] = None
+    open_questions: List[PaperOpenQuestionResponse] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

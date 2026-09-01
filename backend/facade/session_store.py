@@ -1,9 +1,9 @@
 """会话存储（facade 收敛 Task 1 / Task 4）。
 
-职责一句话：**持有进程内的会话元数据与 session state，作为 facade 层的
+职责一句话：**持有会话元数据与 session state，作为 facade 层的
 单一真相（single source of truth），负责增删改查、CSV 路径与降级日志。**
 
-Task 4 决策：以本进程内的 `SessionStore.sessions` 为上层的**显式**状态存储，
+Task 4 决策：以 `SessionStore.sessions` 为上层的**显式**状态存储，
 LangGraph 的 checkpointer 只服务于完整 graph 管道（run_upload_pipeline）内部
 的持久化，facade 不再对它做"先内存再 checkpoint"的隐式回退读取。
 
@@ -16,21 +16,29 @@ LangGraph 的 checkpointer 只服务于完整 graph 管道（run_upload_pipeline
   `self._store.sessions` / `self._store.degradations`，因此
   `facade._sessions == {}`、`facade._degradations.pop(sid)` 等既有断言/清理
   保持原语义。
+
+持久化（P1-3）：写穿透到 ``settings.SESSIONS_PATH``（JSON，原子替换写），
+启动时加载。进程重启 / 单机重新部署后 session、state、owner、CSV 路径、
+降级日志均可恢复；磁盘写失败打 stderr 但不阻断主流程（与 run_store 的
+fail-open 哲学一致，内存态仍是权威）。多副本部署仍需外置存储，当前单进程
+部署形态下文件持久化已闭合"重启即失忆"的洞。
 """
 from __future__ import annotations
 
+import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from fastapi import HTTPException
 
-from config import settings
+from config import ensure_private_directory, ensure_private_file, settings
 
 
 class SessionStore:
-    """进程内会话存储：元数据 + state + CSV 路径 + 降级日志。"""
+    """会话存储：元数据 + state + CSV 路径 + 降级日志（文件持久化）。"""
 
     def __init__(self) -> None:
         # 会话元数据 + state：
@@ -39,6 +47,55 @@ class SessionStore:
         self.sessions: dict = {}
         # 降级日志（F7）：{session_id: [{node, reason, fallback, timestamp}]}
         self.degradations: dict[str, list[dict]] = {}
+        self._path: Path = Path(settings.SESSIONS_PATH)
+        self._load()
+        self._flush()
+
+    # ------------------------------------------------------------------
+    # 文件持久化（write-through，原子替换写）
+    # ------------------------------------------------------------------
+    def _load(self) -> None:
+        """启动恢复：读回上次进程的 sessions + degradations。"""
+        path = self._path
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                self.sessions = data.get("sessions", {}) or {}
+                self.degradations = data.get("degradations", {}) or {}
+        except Exception as exc:  # 损坏文件：备份后从空开始，不让启动崩
+            print(
+                f"⚠ SessionStore: failed to load {path} ({exc}); "
+                "backing it up and starting fresh",
+                file=sys.stderr,
+            )
+            try:
+                path.rename(path.with_suffix(path.suffix + ".corrupt"))
+            except Exception:
+                pass
+
+    def flush(self) -> None:
+        """把内存态原子写入磁盘。失败打日志但不抛（fail-open）。"""
+        try:
+            ensure_private_directory(self._path.parent)
+            tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+            tmp.write_text(
+                json.dumps(
+                    {"sessions": self.sessions, "degradations": self.degradations},
+                    ensure_ascii=False,
+                    default=str,
+                ),
+                encoding="utf-8",
+            )
+            ensure_private_file(tmp)
+            os.replace(tmp, self._path)
+            ensure_private_file(self._path)
+        except Exception as exc:
+            print(f"⚠ SessionStore: flush failed: {exc}", file=sys.stderr)
+
+    def _flush(self) -> None:
+        self.flush()
 
     # ------------------------------------------------------------------
     # 生命周期
@@ -48,6 +105,7 @@ class SessionStore:
 
     def create(self, session_id: str, user_id: Optional[int]) -> str:
         self.sessions[session_id] = {"user_id": user_id}
+        self._flush()
         return session_id
 
     def get_owner(self, session_id: str) -> Optional[int]:
@@ -66,6 +124,7 @@ class SessionStore:
     def delete(self, session_id: str) -> bool:
         if session_id in self.sessions:
             del self.sessions[session_id]
+            self._flush()
             return True
         return False
 
@@ -87,6 +146,7 @@ class SessionStore:
         if session_id not in self.sessions:
             raise HTTPException(status_code=404, detail="Session not found")
         self.sessions[session_id]["state"] = state
+        self._flush()
 
     def update_state(self, session_id: str, **fields) -> dict:
         """将字段合并进 state 并返回新 state。"""
@@ -140,6 +200,7 @@ class SessionStore:
         if session_id not in self.sessions:
             self.sessions[session_id] = {"state": {}}
         self.sessions[session_id]["csv_path"] = csv_path
+        self._flush()
 
     def get_datasets(self, session_id: str) -> list:
         """返回会话数据集列表（清洗包装用）。"""
@@ -177,6 +238,7 @@ class SessionStore:
             "visible": visible,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        self._flush()
 
     def get_degradations(self, session_id: str) -> list[dict]:
         """返回会话的降级日志。"""
@@ -188,7 +250,9 @@ class SessionStore:
     def seed(self, session_id: str, state: dict) -> None:
         """Test helper: 直接往会话存储注入 state。"""
         self.sessions[session_id] = {"state": state}
+        self._flush()
 
     def drop(self, session_id: str) -> None:
         """Test helper: 从存储移除会话。"""
         self.sessions.pop(session_id, None)
+        self._flush()

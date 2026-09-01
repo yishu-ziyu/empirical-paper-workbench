@@ -157,7 +157,20 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     if threat_text:
         user = f"{user}\n\n识别威胁约束（必须在正文处理）：\n{threat_text}"
 
-    prose = call_llm(system, user)
+    from ..llm.router import router
+
+    provider = str(router.get_config("generate").provider or "").strip().lower()
+    raw_prose = call_llm(system, user)
+    prose = str(raw_prose or "")
+    if not prose.strip():
+        generation_source = "fallback"
+        generation_degraded = True
+    elif provider == "mock":
+        generation_source = "mock"
+        generation_degraded = True
+    else:
+        generation_source = "llm"
+        generation_degraded = False
     if str(chapter_type) == "intro":
         from ..prompts.intro import strip_contribution
 
@@ -192,6 +205,8 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         "status": "generated",
         "versions": versions,
         "chapter_index": idx,
+        "generation_source": generation_source,
+        "generation_degraded": generation_degraded,
     }
     body_chapters[idx] = new_chapter
 

@@ -38,7 +38,6 @@ from schemas.responses import (
 )
 
 router = APIRouter()
-_REGISTERED = False
 
 # 评审通过阈值：与 agent/nodes/review_chapter.REVIEW_SCORE_THRESHOLD 同源。
 # agent 模块缺失时退回默认值，保持与 facade 的 try/except 导入风格一致。
@@ -489,27 +488,5 @@ def _to_chapter_response(chapter: Any) -> ChapterResponse:
 
 
 # ---------------------------------------------------------------------------
-# self-registration（与 eda.py 模式一致）
+# （路由注册统一在 main.py include_router，不再 import 侧自注册）
 # ---------------------------------------------------------------------------
-def _self_register() -> None:
-    """Attach this router to the FastAPI app on import.
-
-    The integration phase will move ``app.include_router`` into ``main.py``
-    explicitly. Self-registering here lets tests (which import this module)
-    and dev runs reach the endpoint without modifying ``main.py`` (T-07
-    file-boundary constraint). Idempotent via the ``_REGISTERED`` flag.
-    """
-    global _REGISTERED
-    if _REGISTERED:
-        return
-    try:
-        from main import app  # noqa: PLC0415
-
-        app.include_router(router)
-        _REGISTERED = True
-    except Exception:
-        # main not importable yet (e.g. during partial builds) — skip silently.
-        pass
-
-
-_self_register()

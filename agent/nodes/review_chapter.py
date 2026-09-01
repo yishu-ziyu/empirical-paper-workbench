@@ -18,10 +18,13 @@
 """
 from __future__ import annotations
 
-import json
+import asyncio
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..protocols import ReviewOutput, ReviewRubric
 from ..prompts.review import (
@@ -131,6 +134,36 @@ UNCITED_TOPIC_PENALTY = -0.5
 _CITE_MARKER_RE = re.compile(r"\[(\d+)\]")
 
 
+class ReviewRubricResult(BaseModel):
+    """Provider-validated five-dimensional review rubric."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endogeneity: float = Field(ge=0.0, le=1.0)
+    identification: float = Field(ge=0.0, le=1.0)
+    robustness: float = Field(ge=0.0, le=1.0)
+    contribution: float = Field(ge=0.0, le=1.0)
+    readability: float = Field(ge=0.0, le=1.0)
+
+
+class ReviewResult(BaseModel):
+    """Strict LLM output; deterministic grounding remains outside this schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rubric: ReviewRubricResult
+    feedback: str = Field(min_length=1)
+    suggestions: str = Field(min_length=1)
+
+    @field_validator("feedback", "suggestions")
+    @classmethod
+    def _require_nonblank_text(cls, value: str) -> str:
+        text = value.strip()
+        if not text:
+            raise ValueError("review text must not be blank")
+        return text
+
+
 def apply_uncited_topic_penalty(
     entries: List[Any],
     content: str,
@@ -172,6 +205,36 @@ def apply_uncited_topic_penalty(
 
 
 
+def build_review_agent(model: Any = None, config: Any = None, *, retries: int = 2):
+    """Build the configured provider as a Pydantic AI typed-output agent."""
+    from pydantic_ai import Agent
+
+    if model is None:
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        if config is None:
+            from ..llm.router import router
+
+            config = router.get_config("review")
+        provider = OpenAIProvider(
+            base_url=config.base_url,
+            api_key=config.api_key,
+        )
+        model = OpenAIChatModel(config.model, provider=provider)
+    return Agent(model, output_type=ReviewResult, retries=max(0, int(retries)))
+
+
+def _run_review_agent_sync(agent: Any, prompt: str):
+    """Run typed review from both LangGraph sync code and async API handlers."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return agent.run_sync(prompt)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(agent.run_sync, prompt).result()
+
+
 def invoke_review_llm(
     config: Any,
     chapter_content: str,
@@ -179,10 +242,10 @@ def invoke_review_llm(
     research_direction: str,
     literature_entries: List[Any],
     claim: str = "",
+    *,
+    structured_retries: int = 2,
 ) -> dict:
-    """非 mock 评审通道。要求 JSON ``{rubric, feedback, suggestions}``。"""
-    from ..llm.call_llm import call_llm as unified_call
-
+    """非 mock 评审通道：tool schema 约束输出，Pydantic 失败自动重试。"""
     claim_block = _review_claim_instruction(claim)
     prompt = assemble_review_prompt(
         claim_block,
@@ -190,49 +253,13 @@ def invoke_review_llm(
         len(literature_entries or []),
         chapter_content,
     )
-    raw = unified_call(prompt, node_type="review")
-    parsed = _parse_review_json(raw)
-    if parsed is None:
-        raise ValueError("review llm returned unparseable json")
-    return parsed
-
-
-def _parse_review_json(raw: str) -> Optional[dict]:
-    """解析评审 JSON。失败返回 None，由调用方降级 mock。"""
-    if not raw or not isinstance(raw, str):
-        return None
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:].strip()
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start < 0 or end <= start:
-            return None
-        try:
-            payload = json.loads(text[start : end + 1])
-        except json.JSONDecodeError:
-            return None
-    if not isinstance(payload, dict):
-        return None
-    rubric_raw = payload.get("rubric") or {}
-    if not isinstance(rubric_raw, dict):
-        return None
-    rubric: ReviewRubric = ReviewRubric()
-    for dim in _RUBRIC_DIMS:
-        try:
-            value = float(rubric_raw.get(dim, 0.0))
-        except (TypeError, ValueError):
-            value = 0.0
-        rubric[dim] = min(1.0, max(0.0, value))
+    result: ReviewResult = _run_review_agent_sync(
+        build_review_agent(config=config, retries=structured_retries), prompt
+    ).output
     return {
-        "rubric": rubric,
-        "feedback": str(payload.get("feedback") or ""),
-        "suggestions": str(payload.get("suggestions") or ""),
+        "rubric": result.rubric.model_dump(),
+        "feedback": result.feedback,
+        "suggestions": result.suggestions,
     }
 
 
@@ -242,6 +269,8 @@ def call_review_llm(
     research_direction: str,
     literature_entries: List[Any],
     claim: str = "",
+    *,
+    structured_retries: int = 2,
 ) -> dict:
     """模块级 LLM 调用函数（与 generate_chapter.call_llm 同一 monkeypatch 模式）。
 
@@ -263,7 +292,12 @@ def call_review_llm(
             literature_entries,
             claim=claim,
         )
-        return {**result, "review_source": "mock", "review_degraded": False}
+        return {
+            **result,
+            "review_source": "mock",
+            "review_degraded": False,
+            "review_typed": False,
+        }
 
     try:
         result = invoke_review_llm(
@@ -273,8 +307,14 @@ def call_review_llm(
             research_direction,
             literature_entries,
             claim=claim,
+            structured_retries=structured_retries,
         )
-        return {**result, "review_source": "llm", "review_degraded": False}
+        return {
+            **result,
+            "review_source": "llm",
+            "review_degraded": False,
+            "review_typed": True,
+        }
     except Exception:
         result = mock_review_llm(
             chapter_content,
@@ -287,6 +327,7 @@ def call_review_llm(
             **result,
             "review_source": "mock_fallback",
             "review_degraded": True,
+            "review_typed": False,
         }
 
 
@@ -448,20 +489,28 @@ def _has_forbidden_causal_claim(content: str) -> bool:
 def _visibility_fields(
     review_source: str,
     review_degraded: bool,
+    review_typed: bool,
     grounding_failures: List[str],
+    structure_failures: Optional[List[str]] = None,
     degradations: Optional[List[Any]] = None,
 ) -> dict:
     fields: dict = {
         "review_source": review_source,
         "review_degraded": review_degraded,
+        "review_typed": review_typed,
         "grounding_failures": list(grounding_failures),
+        "structure_failures": list(structure_failures or []),
     }
     if degradations:
         fields["degradations"] = degradations
     return fields
 
 
-def review_chapter(state: EconPaperState) -> ReviewOutput:
+def review_chapter(
+    state: EconPaperState,
+    *,
+    structured_retries: int = 2,
+) -> ReviewOutput:
     """对当前刚生成的章节评审。
 
     1. review_enabled == False → 返回 {} (no-op)
@@ -530,7 +579,7 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "review_rubrics": review_rubrics,
             "review_iteration": 0,
             "review_chapter_index": idx,
-            **_visibility_fields("", False, []),
+            **_visibility_fields("", False, False, []),
         }
 
     # 新章节检测：若上一轮 review_chapter_index != idx，说明换了章节，重置迭代
@@ -561,12 +610,14 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
         research_direction,
         literature_entries,
         claim=claim,
+        structured_retries=structured_retries,
     )
     rubric = dict(llm_result["rubric"])
     feedback = str(llm_result["feedback"] or "")
     suggestions = str(llm_result["suggestions"] or "")
     review_source = str(llm_result.get("review_source") or "mock")
     review_degraded = bool(llm_result.get("review_degraded"))
+    review_typed = bool(llm_result.get("review_typed"))
     method = ""
     if isinstance(chapter, dict):
         method = str(chapter.get("method") or state.get("method") or "")
@@ -636,7 +687,12 @@ def review_chapter(state: EconPaperState) -> ReviewOutput:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
     visible = _visibility_fields(
-        review_source, review_degraded, grounding_failures, degradations
+        review_source,
+        review_degraded,
+        review_typed,
+        grounding_failures,
+        failures,
+        degradations,
     )
 
     penalty_fields: dict = {}

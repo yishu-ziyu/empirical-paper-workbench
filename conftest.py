@@ -11,6 +11,10 @@
 - charls_csv / generic_csv / workspace: 跨文件复用的数据 fixture
 """
 import os
+import tempfile
+from pathlib import Path
+
+_TEST_STATE_ROOT = Path(tempfile.mkdtemp(prefix="ep-test-state-"))
 
 # Backend tests import config at collection time. Local/demo tests rely on
 # anonymous sessions; production (DEBUG=false) rejects those with 401.
@@ -18,6 +22,21 @@ os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault(
     "JWT_SECRET_KEY",
     "test-only-jwt-secret-key-32chars-min",
+)
+# SessionStore 写穿透持久化：测试进程必须无条件改用系统临时目录。
+# 不能用 setdefault：开发者终端可能已配置真实数据路径，测试不得写入它们。
+os.environ["SESSIONS_PATH"] = str(
+    _TEST_STATE_ROOT / "sessions" / "sessions.json"
+)
+os.environ["ECONPAPER_LOCAL_STATE_ROOT"] = str(_TEST_STATE_ROOT)
+os.environ["DATABASE_URL"] = (
+    f"sqlite+aiosqlite:///{_TEST_STATE_ROOT / 'db' / 'econpaper.db'}"
+)
+os.environ["UPLOAD_DIR"] = str(_TEST_STATE_ROOT / "uploads")
+os.environ["RUNS_DIR"] = str(_TEST_STATE_ROOT / "runs")
+os.environ["S3_CACHE_DIR"] = str(_TEST_STATE_ROOT / "cache" / "s3")
+os.environ["LEARNING_LABELS_PATH"] = str(
+    _TEST_STATE_ROOT / "learning" / "learning_labels.jsonl"
 )
 
 import pytest

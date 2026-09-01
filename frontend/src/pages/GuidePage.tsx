@@ -141,7 +141,7 @@ export default function GuidePage({
             <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-ink font-serif text-[9px] leading-none text-white">
               e
             </span>
-            {t('guide.badge')}
+            {t('bench.journey')}
           </p>
 
           <h1 className="mt-10 font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.75rem] lg:text-[4.35rem]">

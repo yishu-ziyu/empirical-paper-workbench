@@ -8,9 +8,8 @@
 2. 翻译成 Stata (.do) / R (.R) / EViews (.m) 三种格式（外加原 Python .py）。
 3. 返回 ``{"code_translations": [{"lang", "code", "filename"}, ...]}``。
 
-stata-code 上游包（``stata_code``）经检查是 Stata *执行*桥（subprocess
-runner），不是 Python→Stata 翻译器——其公开 API 只有 ``run / execute /
-run_console`` 等，无 translate 函数。故本节点用内置关键词映射翻译器，
+经过对外部 Stata 执行桥的契约检查，产品需要的 Python→Stata 翻译能力
+并不在其公开 API 中。故本节点用内置关键词映射翻译器，
 覆盖常见 pandas / statsmodels 操作（read_csv / describe / corr / OLS /
 dropna / groupby / plot / head）。未知 Python 代码降级为注释保留，不报错。
 

@@ -9,24 +9,26 @@ function escapeHtml(str: string): string {
 }
 
 export function latexToHtml(latex: string): string {
-  let html = latex
+  // 安全不变式：先整体 HTML 转义，再做 LaTeX→HTML 变换。
+  // 后续所有替换注入的都是本文件内的已知安全标签，捕获组内容永远是已转义文本，
+  // 因此章节内容（LLM 生成 / 用户编辑）中的 <script>、事件属性等无法进入 DOM。
+  let html = escapeHtml(latex)
 
   // ── 0. 保护 verbatim / lstlisting 环境 ──
   const verbatimBlocks: string[] = []
   html = html.replace(
     /\\begin\{(verbatim|lstlisting)\}[\s\S]*?\\end\{\1\}/g,
     (match) => {
-      // 提取内容（去掉 \begin 和 \end 行）
+      // 提取内容（去掉 \begin 和 \end 行）；输入已整体转义，无需再次 escapeHtml
       const content = match
         .replace(/\\begin\{(verbatim|lstlisting)\}\s*\n?/, '')
         .replace(/\\end\{(verbatim|lstlisting)\}\s*$/, '')
       const idx = verbatimBlocks.length
       verbatimBlocks.push(
-        `<pre class="bg-panel p-2 rounded text-xs font-mono overflow-x-auto my-2">${escapeHtml(
-          content
-        )}</pre>`
+        `<pre class="bg-panel p-2 rounded text-xs font-mono overflow-x-auto my-2">${content}</pre>`
       )
-      return `%%VERBATIM_${idx}%%`
+      // 占位符不能用 % 开头：会被步骤 1 的 LaTeX 注释清除规则误删（存量 bug）。
+      return `@@VERBATIM_${idx}@@`
     }
   )
 
@@ -255,7 +257,7 @@ export function latexToHtml(latex: string): string {
 
   // ── 16. 特殊字符 ──
   html = html.replace(/\\%/g, '%')
-  html = html.replace(/\\&/g, '&amp;')
+  html = html.replace(/\\&amp;/g, '&amp;')
   html = html.replace(/\\#/g, '#')
   html = html.replace(/\\_/g, '_')
   html = html.replace(/\\\$/g, '$')
@@ -277,7 +279,7 @@ export function latexToHtml(latex: string): string {
   html = html.replace(/\\\\/g, '\n')
 
   // ── 19. 恢复 verbatim 块 ──
-  html = html.replace(/%%VERBATIM_(\d+)%%/g, (_, idx) => {
+  html = html.replace(/@@VERBATIM_(\d+)@@/g, (_, idx) => {
     return verbatimBlocks[parseInt(idx)] || ''
   })
 

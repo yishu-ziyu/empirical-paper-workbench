@@ -10,12 +10,12 @@ import userEvent from '@testing-library/user-event'
 import ChapterList, { type ChapterListProps } from '../ChapterList'
 
 const bodyChapters: ChapterListProps['body_chapters'] = [
-  { type: 'intro', title: '引言', status: 'done', content: '引言内容' },
-  { type: 'lit_review', title: '文献综述', status: 'done', content: '文献内容' },
-  { type: 'data_desc', title: '数据描述', status: 'generated', content: '数据内容' },
-  { type: 'methods', title: '方法', status: 'pending' },
-  { type: 'results', title: '结果', status: 'pending' },
-  { type: 'conclusion', title: '结论', status: 'pending' },
+  { type: 'intro', title: '引言', status: 'done', content: '引言内容', generation_degraded: false, review_degraded: false, review_typed: false },
+  { type: 'lit_review', title: '文献综述', status: 'done', content: '文献内容', generation_degraded: false, review_degraded: false, review_typed: false },
+  { type: 'data_desc', title: '数据描述', status: 'generated', content: '数据内容', generation_degraded: false, review_degraded: false, review_typed: false },
+  { type: 'methods', title: '方法', status: 'pending', generation_degraded: false, review_degraded: false, review_typed: false },
+  { type: 'results', title: '结果', status: 'pending', generation_degraded: false, review_degraded: false, review_typed: false },
+  { type: 'conclusion', title: '结论', status: 'pending', generation_degraded: false, review_degraded: false, review_typed: false },
 ]
 
 const baseProps: ChapterListProps = {
@@ -58,8 +58,10 @@ describe('ChapterList 章节大纲列表', () => {
     render(<ChapterList {...baseProps} />)
     const icons = screen.getAllByTestId('chapter-status-icon')
     // intro (0) 和 lit_review (1) 是 done
-    expect(icons[0].textContent).toContain('✓')
-    expect(icons[1].textContent).toContain('✓')
+    expect(icons[0].getAttribute('data-status')).toBe('done')
+    expect(icons[1].getAttribute('data-status')).toBe('done')
+    expect(icons[0].querySelector('svg')).not.toBeNull()
+    expect(icons[0].getAttribute('aria-label')).toBe('已完成')
   })
 
   test('当前章节高亮（currentIndex）', () => {

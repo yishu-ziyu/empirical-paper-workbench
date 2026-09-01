@@ -63,11 +63,19 @@ class S3Filesystem:
         return self._client
 
     def _ensure_bucket(self) -> None:
-        """Create the bucket if it does not exist."""
+        """Create the bucket only when it is missing (404).
+
+        只对"桶不存在"建桶：AccessDenied 等权限错误必须原样抛出，
+        否则最小权限用户的配置错误会被静默吞掉（审查 P2-11）。
+        """
         try:
             self._client.head_bucket(Bucket=self._bucket)
-        except ClientError:
-            self._client.create_bucket(Bucket=self._bucket)
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code in ("404", "NoSuchBucket"):
+                self._client.create_bucket(Bucket=self._bucket)
+            else:
+                raise
 
     def _key(self, path: str) -> str:
         """Prefix the path with S3_PATH_PREFIX (acts as virtual folder)."""
@@ -126,8 +134,11 @@ class S3Filesystem:
         try:
             self.client.head_object(Bucket=self._bucket, Key=key)
             return True
-        except ClientError:
-            return False
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise  # 权限等配置错误不应被当作"对象不存在"
 
     def list(self, prefix: str = "") -> list[str]:
         """List objects under the given prefix."""

@@ -1,13 +1,31 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
 import { API_BASE } from '../lib/apiBase'
 import { CLEAN_STEPS, PAPER_NODES } from '../lib/paperPath'
+import { CAPSULE_DELAY_MS, READING_NOTICE_MS } from '../components/ReadingFocus'
 
 function renderWithI18n(ui: React.ReactElement) {
   return render(ui, { wrapper: I18nProvider })
+}
+
+class AppFakeEventSource {
+  static latest: AppFakeEventSource | null = null
+  onmessage: ((event: MessageEvent<string>) => void) | null = null
+  onerror: (() => void) | null = null
+  closed = false
+  url: string
+
+  constructor(url: string) {
+    this.url = url
+    AppFakeEventSource.latest = this
+  }
+
+  close() {
+    this.closed = true
+  }
 }
 
 describe('App 三栏布局', () => {
@@ -16,8 +34,10 @@ describe('App 三栏布局', () => {
     localStorage.clear()
     sessionStorage.clear()
     localStorage.setItem("econpaper_access_token", "test-token-for-auth")
+    AppFakeEventSource.latest = null
   })
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -37,6 +57,17 @@ describe('App 三栏布局', () => {
     fireEvent.click(screen.getByTestId('guide-write-paper'))
     expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
+  })
+
+  test('首屏发送研究想法后进入对话，并保留用户原文', async () => {
+    const user = userEvent.setup()
+    renderWithI18n(<App />)
+
+    await user.type(screen.getByTestId('guide-idea-input'), '我想研究高铁开通是否促进县域创业')
+    await user.click(screen.getByTestId('guide-send-idea'))
+
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-paper')).toHaveValue('我想研究高铁开通是否促进县域创业')
   })
 
   test('未上传时不显示 EdaSidebar', () => {
@@ -87,6 +118,210 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('paper-path-search_literature')).not.toBeInTheDocument()
     expect(screen.queryByTestId('paper-path-eda')).not.toBeInTheDocument()
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
+  })
+
+  test('右栏命名 Research Computer，并分成研究结构、数据与设计、证据写作和运行记录', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    renderWithI18n(<App />)
+
+    expect(await screen.findByTestId('research-computer')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Research Computer' })).toBeInTheDocument()
+    expect(screen.getByTestId('research-structure')).toBeInTheDocument()
+    expect(screen.getByTestId('research-data-design')).toBeInTheDocument()
+    expect(screen.getByTestId('research-evidence-writing')).toBeInTheDocument()
+    expect(screen.getByTestId('research-run-records')).toBeInTheDocument()
+    expect(screen.getByTestId('research-computer')).toContainElement(screen.getByTestId('paper-path'))
+  })
+
+  test('提交状态显示真实阻塞与已通过条件', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ exists: true }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    const status = await screen.findByTestId('submission-status')
+    expect(status).toHaveTextContent(/暂不可提交 · \d+/)
+    fireEvent.click(screen.getByTestId('submission-toggle'))
+    expect(screen.getByTestId('submission-details')).toBeInTheDocument()
+    expect(screen.getAllByTestId('submission-blocker').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('submission-passed')).toBeInTheDocument()
+  })
+
+  test('已有章节但仍待审批时不会把 canExport 误显示为生成提交包', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            exists: true,
+            claim: 'association',
+            results: '| age | 0.1 |',
+            outline: [{ type: 'intro', title: '引言' }],
+            body_chapters: [
+              { type: 'intro', title: '引言', content: '正文', status: 'generated' },
+            ],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+          }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    const status = await screen.findByTestId('submission-status')
+    expect(screen.queryByTestId('submission-generate')).not.toBeInTheDocument()
+    expect(screen.getByTestId('submission-toggle')).toHaveTextContent('暂不可提交 · 1')
+    fireEvent.click(screen.getByTestId('submission-toggle'))
+    expect(screen.getByTestId('submission-details')).toHaveTextContent('还有 1 个章节待你确认')
+    expect(status).toBeInTheDocument()
+  })
+
+  test('所有真实条件通过后才显示生成提交包并打开导出对话框', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            exists: true,
+            claim: 'age is associated with income',
+            results: '| age | 0.1 |',
+            estimate: { status: 'ok', treatment_row: 'age | 0.1' },
+            outline: [{ type: 'intro', title: '引言' }],
+            body_chapters: [
+              { type: 'intro', title: '引言', content: '正文', status: 'approved' },
+            ],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+          }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    const generate = await screen.findByTestId('submission-generate')
+    expect(generate).toHaveTextContent('生成提交包')
+    fireEvent.click(generate)
+    expect(screen.getByTestId('doc-export-dialog')).toBeInTheDocument()
+  })
+
+  test('证据入口会展开右栏，手动收起说明后仍可再次打开', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            exists: true,
+            claim: 'association',
+            results: '| age | 0.1 |',
+            estimate: { status: 'ok', treatment_row: 'age | 0.1' },
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+          }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    await screen.findByTestId('evidence-why')
+    fireEvent.click(screen.getByTestId('right-collapse-btn'))
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
+
+    fireEvent.click(screen.getByTestId('evidence-why'))
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+    const details = screen.getByTestId('research-evidence-explanation') as HTMLDetailsElement
+    expect(details.open).toBe(true)
+
+    act(() => {
+      details.open = false
+      fireEvent(details, new Event('toggle'))
+    })
+    expect(details.open).toBe(false)
+
+    fireEvent.click(screen.getByTestId('evidence-why'))
+    expect(details.open).toBe(true)
+  })
+
+  test('左栏一次只显示一个阻塞决策，优先提示识别失败', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            exists: true,
+            claim: 'association',
+            identification_failed: true,
+            identification_report: '设计未通过',
+            write_blockers: ['缺少主表', '结果章被锁定'],
+            outline: [{ type: 'intro', title: '引言' }],
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+          }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    expect(await screen.findByTestId('decision-blocker')).toBeInTheDocument()
+    expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
+    expect(screen.getByTestId('decision-blocker-title')).toHaveTextContent('研究设计')
+    expect(screen.getByTestId('decision-blocker-reason')).toHaveTextContent('设计未通过')
+  })
+
+  test('专注阅读提示可进入收起状态，八秒无操作后变成胶囊并可恢复', () => {
+    vi.useFakeTimers()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    renderWithI18n(<App />)
+
+    expect(screen.queryByTestId('focus-reading-prompt')).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(READING_NOTICE_MS))
+    expect(screen.getByTestId('focus-reading-prompt')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('focus-reading-enter'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('focus-reading-open-left')).toBeInTheDocument()
+    expect(screen.getByTestId('focus-reading-open-right')).toBeInTheDocument()
+
+    act(() => vi.advanceTimersByTime(CAPSULE_DELAY_MS))
+    expect(screen.getByTestId('focus-reading-capsule')).toHaveTextContent('专注阅读')
+    fireEvent.click(screen.getByTestId('focus-reading-capsule'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+  })
+
+  test('离开论文页时恢复进入专注前的侧栏布局', () => {
+    vi.useFakeTimers()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    renderWithI18n(<App />)
+
+    fireEvent.click(screen.getByTestId('left-collapse-btn'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+
+    act(() => vi.advanceTimersByTime(READING_NOTICE_MS))
+    fireEvent.click(screen.getByTestId('focus-reading-enter'))
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
+
+    fireEvent.click(screen.getByTestId('workbench-tab-format'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+  })
+
+  test('工作台不以百分比呈现生成进度', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+    renderWithI18n(<App />)
+    await screen.findByTestId('desk-columns')
+    expect(screen.queryByTestId('paper-agent')).not.toBeInTheDocument()
+    expect(screen.getByTestId('desk-columns')).not.toHaveTextContent(/\d+%/)
   })
 
   test('Format 页有导出 CTA；路径 translate_code / export_docx 打开现有对话框', async () => {
@@ -157,6 +392,497 @@ describe('App 三栏布局', () => {
     const [, init] = uploadCall!
     expect(init.method).toBe('POST')
     expect(init.body).toBeInstanceOf(FormData)
+    expect(init.headers).toEqual(expect.objectContaining({ 'Idempotency-Key': expect.any(String) }))
+  })
+
+  test('202 上传在等待 Runner 前持久化 session、数据和 kind-aware handle', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    let pendingAtRequest: Record<string, unknown> | null = null
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/upload')) {
+        pendingAtRequest = JSON.parse(localStorage.getItem('econpaper_pending_upload') || 'null')
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-upload-202',
+              run_id: 'run-upload-202',
+              status: 'PENDING',
+              events_url: '/api/runs/run-upload-202/events',
+              dataset_meta: { columns: ['year', 'income'], rows: 2 },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/runs/run-upload-202')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: 'SUCCEEDED',
+              result: {
+                upload_readiness: 'READY',
+                cleaning_report: { steps: [{ name: 'profiling', status: 'success' }] },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['year,income\n2020,1'], 'panel.csv')] },
+    })
+
+    await waitFor(() => expect(AppFakeEventSource.latest?.url).toBe('/api/runs/run-upload-202/events'))
+    expect(pendingAtRequest).toMatchObject({ fileName: 'panel.csv', idempotencyKey: expect.any(String) })
+    expect(localStorage.getItem('econpaper_session_id')).toBe('sess-upload-202')
+    expect(JSON.parse(sessionStorage.getItem('econpaper_csv_meta') || '{}')).toMatchObject({
+      sessionId: 'sess-upload-202',
+      name: 'panel.csv',
+      rows: 2,
+      cols: 2,
+    })
+    expect(JSON.parse(localStorage.getItem('econpaper_active_run_id:sess-upload-202') || '{}')).toMatchObject({
+      runId: 'run-upload-202',
+      kind: 'upload_pipeline',
+    })
+    expect(screen.getByTestId('upload-live-status')).toHaveTextContent('正在清理')
+    expect(screen.getByTestId('direction-disabled-reason')).toHaveTextContent('数据清理完成后')
+    expect(screen.queryByText('正在估计主结果并检索文献…')).not.toBeInTheDocument()
+
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ status: 'SUCCEEDED' }),
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(localStorage.getItem('econpaper_active_run_id:sess-upload-202')).toBeNull()
+      expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
+    })
+    expect(screen.queryByTestId('direction-disabled-reason')).not.toBeInTheDocument()
+    expect(screen.getByTestId('clean-step-profiling')).toHaveAttribute('data-status', 'completed')
+  })
+
+  test('新上传一开始就清除上一份数据的清理结果', async () => {
+    localStorage.setItem('econpaper_session_id', 'sess-previous')
+    const previousSteps = CLEAN_STEPS.map((name) => ({ name, status: 'success' }))
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-previous')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              exists: true,
+              upload_readiness: 'READY',
+              cleaning_report: { steps: previousSteps },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/upload')) return new Promise<Response>(() => {})
+      return Promise.resolve(new Response('{}', { status: 200 }))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    expect(await screen.findByText('8/8 ✓')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['year,income\n2021,2'], 'replacement.csv')] },
+    })
+
+    await waitFor(() => expect(screen.queryByText('8/8 ✓')).not.toBeInTheDocument())
+    expect(screen.getByTestId('upload-live-status')).toHaveTextContent('正在接收数据')
+  })
+
+  test('上传 Run 失败时保留 Session、清理恢复句柄并提供可键盘触发的重选动作', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/upload')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-failed-upload',
+              run_id: 'run-failed-upload',
+              status: 'PENDING',
+              events_url: '/api/runs/run-failed-upload/events',
+              dataset_meta: { columns: ['id'], rows: 1 },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/runs/run-failed-upload')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: 'FAILED', error: 'internal path omitted' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['id\n1'], 'failed.csv')] },
+    })
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'FAILED' }) }),
+      )
+    })
+
+    expect(await screen.findByTestId('upload-reselect-btn')).toBeEnabled()
+    expect(screen.getByTestId('upload-error')).toHaveTextContent('数据处理失败')
+    expect(screen.getByTestId('upload-error')).not.toHaveTextContent('internal path omitted')
+    expect(localStorage.getItem('econpaper_session_id')).toBe('sess-failed-upload')
+    expect(localStorage.getItem('econpaper_active_run_id:sess-failed-upload')).toBeNull()
+    expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
+    expect(screen.getByTestId('direction-disabled-reason')).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByTestId('upload-reselect-btn'), { key: 'Enter' })
+    expect(screen.getByTestId('upload-reselect-btn').tagName).toBe('BUTTON')
+  })
+
+  test('上传 Run 取消时保留 Session、禁用方向并显示重选动作', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const href = String(url)
+        if (href.endsWith('/upload')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                session_id: 'sess-cancelled-upload',
+                run_id: 'run-cancelled-upload',
+                status: 'PENDING',
+                events_url: '/api/runs/run-cancelled-upload/events',
+                dataset_meta: { columns: ['id'], rows: 1 },
+              }),
+              { status: 202, headers: { 'Content-Type': 'application/json' } },
+            ),
+          )
+        }
+        if (href.endsWith('/runs/run-cancelled-upload')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ status: 'CANCELLED' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }),
+    )
+    renderWithI18n(<App />)
+
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['id\n1'], 'cancelled.csv')] },
+    })
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'CANCELLED' }) }),
+      )
+    })
+
+    expect(await screen.findByTestId('upload-reselect-btn')).toBeEnabled()
+    expect(screen.getByTestId('upload-error')).toHaveTextContent('数据处理已取消')
+    expect(screen.getByTestId('direction-disabled-reason')).toBeInTheDocument()
+    expect(localStorage.getItem('econpaper_session_id')).toBe('sess-cancelled-upload')
+    expect(localStorage.getItem('econpaper_active_run_id:sess-cancelled-upload')).toBeNull()
+  })
+
+  test('更新的上传意图隔离上一个 Run 的晚到结果', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    let uploadCount = 0
+    const keys: string[] = []
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.endsWith('/upload')) {
+        uploadCount += 1
+        keys.push(String((init?.headers as Record<string, string>)?.['Idempotency-Key']))
+        if (uploadCount === 1) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                session_id: 'sess-first',
+                run_id: 'run-first',
+                status: 'PENDING',
+                events_url: '/api/runs/run-first/events',
+                dataset_meta: { columns: ['first'], rows: 1 },
+              }),
+              { status: 202, headers: { 'Content-Type': 'application/json' } },
+            ),
+          )
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-second',
+              dataset_meta: { columns: ['second'], rows: 1 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['first\n1'], 'first.csv')] },
+    })
+    await waitFor(() => expect(AppFakeEventSource.latest?.url).toContain('run-first'))
+    const firstSource = AppFakeEventSource.latest
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [new File(['second\n1'], 'second.csv')] },
+    })
+    await waitFor(() => expect(localStorage.getItem('econpaper_session_id')).toBe('sess-second'))
+
+    firstSource?.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+    )
+    await Promise.resolve()
+    expect(localStorage.getItem('econpaper_session_id')).toBe('sess-second')
+    expect(screen.getByTestId('session-file')).toHaveTextContent('second.csv')
+    expect(keys[1]).not.toBe(keys[0])
+  })
+
+  test.each([
+    [401, '登录已失效'],
+    [403, '没有权限'],
+  ])('恢复上传遇到 %i 时清理敏感句柄并给出恢复提示', async (status, message) => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    localStorage.setItem('econpaper_session_id', 'sess-protected')
+    localStorage.setItem('econpaper_seen_guide', '1')
+    localStorage.setItem(
+      'econpaper_active_run_id:sess-protected',
+      JSON.stringify({
+        runId: 'run-protected',
+        eventsUrl: '/api/runs/run-protected/events',
+        kind: 'upload_pipeline',
+      }),
+    )
+    localStorage.setItem(
+      'econpaper_pending_upload',
+      JSON.stringify({ idempotencyKey: 'protected-key', fileName: 'protected.csv' }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const href = String(url)
+        if (href.endsWith('/sessions/sess-protected')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        if (href.endsWith('/runs/run-protected')) {
+          return Promise.resolve(new Response('{}', { status }))
+        }
+        if (href.endsWith('/auth/refresh')) {
+          return Promise.resolve(new Response('{}', { status: 401 }))
+        }
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }),
+    )
+
+    renderWithI18n(<App />)
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    AppFakeEventSource.latest?.onerror?.()
+
+    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('upload-error')).toHaveTextContent(message)
+    expect(localStorage.getItem('econpaper_session_id')).toBeNull()
+    expect(localStorage.getItem('econpaper_active_run_id:sess-protected')).toBeNull()
+    expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
+  })
+
+  test('恢复中的上传 Run 已不存在时清理 handle 并回到上传引导', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    localStorage.setItem('econpaper_session_id', 'sess-missing-run')
+    localStorage.setItem('econpaper_seen_guide', '1')
+    localStorage.setItem(
+      'econpaper_active_run_id:sess-missing-run',
+      JSON.stringify({
+        runId: 'run-missing-upload',
+        eventsUrl: '/api/runs/run-missing-upload/events',
+        kind: 'upload_pipeline',
+      }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const href = String(url)
+        if (href.endsWith('/sessions/sess-missing-run')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        }
+        if (href.endsWith('/runs/run-missing-upload')) {
+          return Promise.resolve(new Response('{}', { status: 404 }))
+        }
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }),
+    )
+
+    renderWithI18n(<App />)
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    AppFakeEventSource.latest?.onerror?.()
+
+    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('upload-error')).toHaveTextContent('未找到这次数据处理')
+    expect(localStorage.getItem('econpaper_session_id')).toBeNull()
+    expect(localStorage.getItem('econpaper_active_run_id:sess-missing-run')).toBeNull()
+  })
+
+  test('刷新后用全局 key 解析已接纳上传，不再发送文件体', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    localStorage.setItem(
+      'econpaper_pending_upload',
+      JSON.stringify({
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        fileName: 'recovered.csv',
+      }),
+    )
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/upload/resolve')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-recovered',
+              run_id: 'run-recovered-upload',
+              status: 'PENDING',
+              events_url: '/api/runs/run-recovered-upload/events',
+              dataset_meta: { columns: ['id'], rows: 1 },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+
+    await waitFor(() => expect(AppFakeEventSource.latest?.url).toContain('run-recovered-upload'))
+    const resolveCall = mockFetch.mock.calls.find((call) => String(call[0]).endsWith('/upload/resolve'))
+    expect(resolveCall?.[1]).not.toHaveProperty('body')
+    expect(resolveCall?.[1]?.headers).toMatchObject({
+      'Idempotency-Key': '11111111-1111-4111-8111-111111111111',
+    })
+    expect(screen.getByTestId('upload-live-status')).toHaveTextContent('恢复')
+    expect(screen.queryByText('正在估计主结果并检索文献…')).not.toBeInTheDocument()
+  })
+
+  test('刷新时新上传意图优先于旧上传 Run', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    localStorage.setItem('econpaper_session_id', 'sess-old')
+    localStorage.setItem('econpaper_seen_guide', '1')
+    localStorage.setItem(
+      'econpaper_active_run_id:sess-old',
+      JSON.stringify({
+        runId: 'run-old',
+        eventsUrl: '/api/runs/run-old/events',
+        kind: 'upload_pipeline',
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      }),
+    )
+    localStorage.setItem(
+      'econpaper_pending_upload',
+      JSON.stringify({
+        idempotencyKey: '22222222-2222-4222-8222-222222222222',
+        fileName: 'new.csv',
+      }),
+    )
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/upload/resolve')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-new',
+              run_id: 'run-new',
+              status: 'PENDING',
+              events_url: '/api/runs/run-new/events',
+              dataset_meta: { columns: ['new'], rows: 1 },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/sessions/sess-old')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (href.endsWith('/sessions/sess-new')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify({ status: 'RUNNING' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+
+    await waitFor(() => expect(localStorage.getItem('econpaper_session_id')).toBe('sess-new'))
+    expect(mockFetch.mock.calls.some((call) => String(call[0]).endsWith('/upload/resolve'))).toBe(true)
+    expect(JSON.parse(localStorage.getItem('econpaper_active_run_id:sess-new') || '{}')).toMatchObject({
+      runId: 'run-new',
+      idempotencyKey: '22222222-2222-4222-8222-222222222222',
+    })
+  })
+
+  test('刷新解析 404 时清理 key 并回到可重新选文件的引导页', async () => {
+    localStorage.setItem(
+      'econpaper_pending_upload',
+      JSON.stringify({ idempotencyKey: 'missing-upload', fileName: 'missing.csv' }),
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } })),
+    )
+
+    renderWithI18n(<App />)
+
+    expect(await screen.findByTestId('upload-error')).toHaveTextContent(
+      '上次上传未被接收，请重新选择文件。',
+    )
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('guide-upload-btn')).toBeEnabled()
+    expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
   })
 
   test('上传失败时显示错误信息', async () => {
@@ -174,7 +900,8 @@ describe('App 三栏布局', () => {
     await waitFor(() => {
       expect(screen.getByTestId('upload-error')).toBeInTheDocument()
     })
-    expect(screen.getByText(/HTTP 400/i)).toBeInTheDocument()
+    expect(screen.getByTestId('upload-error')).toHaveTextContent('数据处理失败')
+    expect(screen.queryByText(/HTTP 400/i)).not.toBeInTheDocument()
   })
 
   test('提交研究方向后显示识别报告', async () => {

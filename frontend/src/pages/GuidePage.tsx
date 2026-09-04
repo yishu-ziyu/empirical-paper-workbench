@@ -9,7 +9,7 @@ export interface GuidePageProps {
   uploadError?: string | null
   onPickData: () => void
   onTrySample: () => void
-  onWritePaper: () => void
+  onWritePaper: (idea?: string) => void
   onFile?: (file: File) => void
   onLogin?: () => void
   headerExtra?: ReactNode
@@ -110,9 +110,10 @@ export default function GuidePage({
 }: GuidePageProps) {
   const { t } = useT()
   const [dropError, setDropError] = useState<string | null>(null)
+  const [idea, setIdea] = useState('')
   const error = dropError || uploadError
 
-  function handleDrop(e: DragEvent<HTMLDivElement>) {
+  function handleDrop(e: DragEvent<HTMLFormElement>) {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
     if (!file) return
@@ -122,6 +123,12 @@ export default function GuidePage({
     }
     setDropError(null)
     onFile?.(file)
+  }
+
+  function startConversation() {
+    const next = idea.trim()
+    if (!next) return
+    onWritePaper(next)
   }
 
   return (
@@ -164,22 +171,36 @@ export default function GuidePage({
           <div className="mt-14 w-full max-w-[680px] rounded-[32px] bg-[#f5f5f3] px-4 py-8 sm:px-8">
             <p className="text-center text-[1.05rem] font-medium tracking-tight text-ink">{t('guide.ingestKicker')}</p>
             <p className="mt-1 text-center text-[13px] text-[#8a8a8a]">{t('guide.ingestSub')}</p>
-            <div
+            <form
               data-testid="guide-composer"
               className="composer-shell mt-6 p-4 text-left sm:p-5"
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
+              onSubmit={(event) => {
+                event.preventDefault()
+                startConversation()
+              }}
             >
-              <p className="px-1 pb-4 text-[15px] leading-7 text-[#6b6b6b]">{t('guide.composerHint')}</p>
+              <textarea
+                data-testid="guide-idea-input"
+                value={idea}
+                onChange={(event) => setIdea(event.target.value)}
+                placeholder={t('guide.ideaPlaceholder')}
+                rows={3}
+                className="min-h-[86px] w-full resize-none bg-transparent px-1 text-[16px] leading-7 text-ink outline-none placeholder:text-[#929292]"
+              />
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  data-testid="guide-upload-btn"
                   onClick={onPickData}
                   disabled={uploading}
                   aria-label={t('guide.haveData')}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[22px] leading-none text-ink transition-colors hover:bg-black/[0.04] disabled:opacity-50"
                 >
-                  +
+                  <span className={uploading ? 'text-[9px]' : ''}>
+                    {uploading ? t('app.uploading') : '+'}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -193,22 +214,23 @@ export default function GuidePage({
                 <button
                   type="button"
                   data-testid="guide-write-paper"
-                  onClick={onWritePaper}
+                  onClick={() => onWritePaper()}
                   className="rounded-full border border-black/[0.08] bg-[#f7f7f7] px-3.5 py-2 text-[13px] text-ink transition-colors hover:bg-[#efefef]"
                 >
                   {t('guide.writePaper')}
                 </button>
                 <button
-                  type="button"
-                  data-testid="guide-upload-btn"
-                  onClick={onPickData}
-                  disabled={uploading}
-                  className="ml-auto flex h-10 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  type="submit"
+                  data-testid="guide-send-idea"
+                  aria-label={t('guide.sendIdea')}
+                  title={t('guide.sendIdea')}
+                  disabled={!idea.trim()}
+                  className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-ink text-[20px] leading-none text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
                 >
-                  {uploading ? t('app.uploading') : t('guide.haveData')}
+                  ↑
                 </button>
               </div>
-            </div>
+            </form>
             <ul className="mt-6 flex flex-wrap justify-center gap-3">
               <li>
                 <button

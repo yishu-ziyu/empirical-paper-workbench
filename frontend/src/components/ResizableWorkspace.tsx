@@ -1,6 +1,21 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 
-interface ResizableWorkspaceProps {
+export interface ResizableWorkspaceHandle {
+  collapseSides: () => void
+  expandSides: () => void
+  expandLeft: () => void
+  expandRight: () => void
+}
+
+export interface ResizableWorkspaceProps {
   left: ReactNode
   center: ReactNode
   right: ReactNode
@@ -28,6 +43,10 @@ type StoredLayout = {
   rightOpen?: boolean
 }
 
+type FocusLayout = StoredLayout & {
+  compactPane: 'left' | 'right' | null
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -40,86 +59,121 @@ function readLayout(key: string): StoredLayout {
   }
 }
 
-export default function ResizableWorkspace({
-  left,
-  center,
-  right,
-  storageKey,
-  leftDefault = 224,
-  leftMin = 176,
-  leftMax = 360,
-  rightDefault = 320,
-  rightMin = 240,
-  rightMax = 440,
-  className = '',
-  leftClassName = '',
-  centerClassName = '',
-  rightClassName = '',
-  testId = 'resizable-workspace',
-  leftTestId = 'workspace-left-panel',
-  centerTestId = 'workspace-center-panel',
-  rightTestId = 'workspace-right-panel',
-}: ResizableWorkspaceProps) {
-  const initial = useRef(readLayout(storageKey)).current
-  const [leftWidth, setLeftWidth] = useState(() =>
-    clamp(initial.leftWidth ?? leftDefault, leftMin, leftMax),
-  )
-  const [rightWidth, setRightWidth] = useState(() =>
-    clamp(initial.rightWidth ?? rightDefault, rightMin, rightMax),
-  )
-  const [leftOpen, setLeftOpen] = useState(initial.leftOpen ?? true)
-  const [rightOpen, setRightOpen] = useState(initial.rightOpen ?? true)
-  const [compact, setCompact] = useState(false)
-  const [compactPane, setCompactPane] = useState<'left' | 'right' | null>(null)
+const ResizableWorkspace = forwardRef<ResizableWorkspaceHandle, ResizableWorkspaceProps>(
+  function ResizableWorkspace({
+      left,
+      center,
+      right,
+      storageKey,
+      leftDefault = 224,
+      leftMin = 176,
+      leftMax = 360,
+      rightDefault = 320,
+      rightMin = 240,
+      rightMax = 440,
+      className = '',
+      leftClassName = '',
+      centerClassName = '',
+      rightClassName = '',
+      testId = 'resizable-workspace',
+      leftTestId = 'workspace-left-panel',
+      centerTestId = 'workspace-center-panel',
+      rightTestId = 'workspace-right-panel',
+    }, ref) {
+    const initial = useRef(readLayout(storageKey)).current
+    const [leftWidth, setLeftWidth] = useState(() =>
+      clamp(initial.leftWidth ?? leftDefault, leftMin, leftMax),
+    )
+    const [rightWidth, setRightWidth] = useState(() =>
+      clamp(initial.rightWidth ?? rightDefault, rightMin, rightMax),
+    )
+    const [leftOpen, setLeftOpen] = useState(initial.leftOpen ?? true)
+    const [rightOpen, setRightOpen] = useState(initial.rightOpen ?? true)
+    const [compact, setCompact] = useState(false)
+    const [compactPane, setCompactPane] = useState<'left' | 'right' | null>(null)
+    const compactRef = useRef(compact)
+    const layoutRef = useRef<FocusLayout>({ leftOpen, rightOpen, compactPane })
+    const focusLayoutRef = useRef<FocusLayout | null>(null)
 
-  useEffect(() => {
-    const media = window.matchMedia?.('(max-width: 900px)')
-    if (!media) return
-    const sync = () => {
-      setCompact(media.matches)
-      if (!media.matches) setCompactPane(null)
+    layoutRef.current = { leftOpen, rightOpen, compactPane }
+    compactRef.current = compact
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        collapseSides: () => {
+          focusLayoutRef.current ??= layoutRef.current
+          setLeftOpen(false)
+          setRightOpen(false)
+          setCompactPane(null)
+        },
+        expandSides: () => {
+          const previous = focusLayoutRef.current
+          setLeftOpen(previous?.leftOpen ?? true)
+          setRightOpen(previous?.rightOpen ?? true)
+          setCompactPane(previous?.compactPane ?? null)
+          focusLayoutRef.current = null
+        },
+        expandLeft: () => {
+          setLeftOpen(true)
+          if (compactRef.current) setCompactPane('left')
+        },
+        expandRight: () => {
+          setRightOpen(true)
+          if (compactRef.current) setCompactPane('right')
+        },
+      }),
+      [],
+    )
+
+    useEffect(() => {
+      const media = window.matchMedia?.('(max-width: 900px)')
+      if (!media) return
+      const sync = () => {
+        setCompact(media.matches)
+        if (!media.matches) setCompactPane(null)
+      }
+      sync()
+      media.addEventListener?.('change', sync)
+      return () => media.removeEventListener?.('change', sync)
+    }, [])
+
+    useEffect(() => {
+      localStorage.setItem(storageKey, JSON.stringify({ leftWidth, rightWidth, leftOpen, rightOpen }))
+    }, [leftOpen, leftWidth, rightOpen, rightWidth, storageKey])
+
+    function resizeWithKeyboard(side: 'left' | 'right', key: string) {
+      if (key !== 'ArrowLeft' && key !== 'ArrowRight') return
+      const direction = key === 'ArrowRight' ? 1 : -1
+      if (side === 'left') setLeftWidth((value) => clamp(value + direction * 12, leftMin, leftMax))
+      else setRightWidth((value) => clamp(value - direction * 12, rightMin, rightMax))
     }
-    sync()
-    media.addEventListener?.('change', sync)
-    return () => media.removeEventListener?.('change', sync)
-  }, [])
 
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify({ leftWidth, rightWidth, leftOpen, rightOpen }))
-  }, [leftOpen, leftWidth, rightOpen, rightWidth, storageKey])
-
-  function resizeWithKeyboard(side: 'left' | 'right', key: string) {
-    if (key !== 'ArrowLeft' && key !== 'ArrowRight') return
-    const direction = key === 'ArrowRight' ? 1 : -1
-    if (side === 'left') setLeftWidth((value) => clamp(value + direction * 12, leftMin, leftMax))
-    else setRightWidth((value) => clamp(value - direction * 12, rightMin, rightMax))
-  }
-
-  function startResize(side: 'left' | 'right', startX: number) {
-    const startWidth = side === 'left' ? leftWidth : rightWidth
-    const move = (event: PointerEvent) => {
-      const delta = event.clientX - startX
-      if (side === 'left') setLeftWidth(clamp(startWidth + delta, leftMin, leftMax))
-      else setRightWidth(clamp(startWidth - delta, rightMin, rightMax))
+    function startResize(side: 'left' | 'right', startX: number) {
+      const startWidth = side === 'left' ? leftWidth : rightWidth
+      const move = (event: PointerEvent) => {
+        const delta = event.clientX - startX
+        if (side === 'left') setLeftWidth(clamp(startWidth + delta, leftMin, leftMax))
+        else setRightWidth(clamp(startWidth - delta, rightMin, rightMax))
+      }
+      const stop = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', stop)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', stop, { once: true })
     }
-    const stop = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', stop)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop, { once: true })
-  }
 
-  const paneStyle = (width: number): CSSProperties => ({ width, flexBasis: width })
-  const leftVisible = compact ? compactPane === 'left' : leftOpen
-  const rightVisible = compact ? compactPane === 'right' : rightOpen
+    const paneStyle = (width: number): CSSProperties => ({ width, flexBasis: width })
+    const leftVisible = compact ? compactPane === 'left' : leftOpen
+    const rightVisible = compact ? compactPane === 'right' : rightOpen
 
-  return (
-    <main data-testid={testId} className={`relative flex min-h-0 min-w-0 overflow-hidden ${className}`}>
+    return (
+      <main data-testid={testId} className={`relative flex min-h-0 min-w-0 overflow-hidden ${className}`}>
       {compact && compactPane && (
         <button
           type="button"
@@ -258,6 +312,11 @@ export default function ResizableWorkspace({
           </button>
         </>
       )}
-    </main>
-  )
-}
+      </main>
+    )
+  },
+)
+
+ResizableWorkspace.displayName = 'ResizableWorkspace'
+
+export default ResizableWorkspace

@@ -31,4 +31,37 @@ describe('ThreeColumn 桌面三栏', () => {
     expect(right).toHaveClass('hidden')
     expect(screen.getByTestId('right-expand-btn')).toBeInTheDocument()
   })
+
+  test('左右开合状态独立持久化，中栏始终保留', () => {
+    const view = render(
+      <ThreeColumn
+        outline={<p>chapters</p>}
+        editor={<p>paper</p>}
+        agent={<p>research</p>}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('left-collapse-btn'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('editor-panel')).toBeVisible()
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+
+    view.unmount()
+    render(
+      <ThreeColumn
+        outline={<p>chapters</p>}
+        editor={<p>paper</p>}
+        agent={<p>research</p>}
+      />,
+    )
+
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('editor-panel')).toBeVisible()
+
+    fireEvent.click(screen.getByTestId('left-expand-btn'))
+    fireEvent.click(screen.getByTestId('right-collapse-btn'))
+    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
+  })
 })

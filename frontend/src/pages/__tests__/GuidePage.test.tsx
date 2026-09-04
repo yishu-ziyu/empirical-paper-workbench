@@ -31,7 +31,7 @@ describe('GuidePage 进门介绍', () => {
     expect(screen.getByRole('heading', { name: '润色并导出' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '生成论文长什么样' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '从上传到导出，你都在场' })).toBeInTheDocument()
-    expect(screen.getByText('马上接上数据')).toBeInTheDocument()
+    expect(screen.getByText('从你的想法开始')).toBeInTheDocument()
     expect(screen.getAllByText(/Word · LaTeX/).length).toBeGreaterThan(0)
     expect(screen.getByText(/Stata \/ R/)).toBeInTheDocument()
     expect(screen.queryByText('guide.statCode')).not.toBeInTheDocument()
@@ -51,6 +51,21 @@ describe('GuidePage 进门介绍', () => {
     expect(onPickData).toHaveBeenCalledTimes(1)
     expect(onTrySample).toHaveBeenCalledTimes(1)
     expect(onWritePaper).toHaveBeenCalledTimes(1)
+  })
+
+  test('可以在首屏直接输入研究想法并发送到对话工作台', async () => {
+    const user = userEvent.setup()
+    const onWritePaper = vi.fn()
+    renderGuide({ onWritePaper })
+
+    const input = screen.getByTestId('guide-idea-input')
+    expect(input).toHaveAttribute('placeholder', '描述你的研究想法、问题，或你手头已有的数据…')
+    expect(screen.getByTestId('guide-send-idea')).toBeDisabled()
+
+    await user.type(input, '我想研究高铁开通是否促进县域创业')
+    await user.click(screen.getByTestId('guide-send-idea'))
+
+    expect(onWritePaper).toHaveBeenCalledWith('我想研究高铁开通是否促进县域创业')
   })
 
   test('composer accepts table files and rejects other files', () => {

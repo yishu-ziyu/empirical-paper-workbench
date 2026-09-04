@@ -1,20 +1,33 @@
 // ── Workspace state & actions ──────────────────────────────────────
-// Everything the workspace touch panel needs, lifted out of App.tsx so
-// the shell component only assembles routing + layout. No API contract,
-// no response shape and no state field changes here — only extraction.
+// Everything the workspace touch panel needs: local state, persistence,
+// API orchestration, and recovery across page or process interruption.
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { OutlineChapter } from '../components/Outline'
 import type { DirectionFormData, DirectionFormInitial } from '../components/DirectionForm'
 import type { PausePayload } from '../components/WriteLoop'
 import { API_BASE, apiFetch } from './apiBase'
+import {
+  RunRequestError,
+  RunTerminalError,
+  shouldForgetRunHandle,
+  waitForRun,
+} from './runEvents'
 import type { components } from '../types/api'
+import {
+  clearStoredSessionId,
+  persistSessionId,
+  readStoredSessionId,
+} from './session'
 
 // localStorage / sessionStorage keys owned by the workspace.
 export const LS_GUIDE_KEY = 'econpaper_seen_guide'
 export const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 export const LS_COLS_KEY = 'econpaper_data_columns'
 export const LS_CSV_KEY = 'econpaper_csv_meta'
+export const LS_ACTIVE_RUN_KEY = 'econpaper_active_run_id'
+export const LS_PENDING_RUN_KEY = 'econpaper_pending_run_command'
+export const LS_PENDING_UPLOAD_KEY = 'econpaper_pending_upload'
 
 export const SAMPLE_CSV = '/samples/course-panel.csv'
 export const SAMPLE_DIRECTION = {
@@ -28,9 +41,257 @@ export const SAMPLE_DIRECTION = {
 
 type ReviewInfo = components['schemas']['ReviewInfoResponse']
 type WrittenChapter = components['schemas']['ChapterResponse']
+type RunAccepted = components['schemas']['RunAcceptedResponse']
+type DirectionAcceptance =
+  | RunAccepted
+  | { immediate_result: Record<string, any> }
+
+type StoredPendingRun = {
+  idempotencyKey: string
+  direction: DirectionFormData
+}
+
+type ActiveRunHandle = {
+  runId: string
+  eventsUrl: string
+  kind: RunKind
+  idempotencyKey?: string
+}
+
+type RunKind = components['schemas']['RunStatusResponse']['kind']
+type UploadReadiness = NonNullable<
+  components['schemas']['SessionInfoResponse']['upload_readiness']
+>
+
+type PendingUploadIntent = {
+  idempotencyKey: string
+  fileName: string
+}
+
+type GeneratedUploadAcceptance = components['schemas']['UploadResponse']
+type UploadAcceptance = Pick<
+  GeneratedUploadAcceptance,
+  'session_id' | 'dataset_meta'
+> &
+  Partial<
+    Pick<GeneratedUploadAcceptance, 'run_id' | 'status' | 'events_url'>
+  >
+
+function runStorageKey(prefix: string, sessionId: string): string {
+  return `${prefix}:${sessionId}`
+}
+
+function readActiveRun(sessionId: string): ActiveRunHandle | null {
+  try {
+    const raw = localStorage.getItem(runStorageKey(LS_ACTIVE_RUN_KEY, sessionId))
+    if (!raw) return null
+    const active = JSON.parse(raw) as Partial<ActiveRunHandle>
+    if (!active.runId || !active.eventsUrl) return null
+    return {
+      runId: active.runId,
+      eventsUrl: active.eventsUrl,
+      kind: active.kind === 'upload_pipeline' ? 'upload_pipeline' : 'prewrite',
+      idempotencyKey: typeof active.idempotencyKey === 'string' ? active.idempotencyKey : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeActiveRun(
+  sessionId: string,
+  accepted: Pick<RunAccepted, 'run_id' | 'events_url'>,
+  kind: RunKind = 'prewrite',
+  idempotencyKey?: string,
+) {
+  localStorage.setItem(
+    runStorageKey(LS_ACTIVE_RUN_KEY, sessionId),
+    JSON.stringify({ runId: accepted.run_id, eventsUrl: accepted.events_url, kind, idempotencyKey }),
+  )
+}
+
+function clearActiveRun(sessionId: string, runId: string) {
+  const key = runStorageKey(LS_ACTIVE_RUN_KEY, sessionId)
+  if (readActiveRun(sessionId)?.runId === runId) localStorage.removeItem(key)
+}
+
+function writePendingRun(sessionId: string, pending: StoredPendingRun) {
+  localStorage.setItem(
+    runStorageKey(LS_PENDING_RUN_KEY, sessionId),
+    JSON.stringify(pending),
+  )
+}
+
+function clearPendingRun(sessionId: string, idempotencyKey?: string) {
+  const pending = readPendingRun(sessionId)
+  if (!pending) return
+  if (idempotencyKey && pending.idempotencyKey !== idempotencyKey) return
+  localStorage.removeItem(runStorageKey(LS_PENDING_RUN_KEY, sessionId))
+}
+
+function readPendingRun(sessionId: string): StoredPendingRun | null {
+  try {
+    const raw = localStorage.getItem(runStorageKey(LS_PENDING_RUN_KEY, sessionId))
+    if (!raw) return null
+    const pending = JSON.parse(raw) as StoredPendingRun
+    return pending.idempotencyKey && pending.direction ? pending : null
+  } catch {
+    return null
+  }
+}
+
+function clearAllRunStorage() {
+  for (const key of Object.keys(localStorage)) {
+    if (
+      key === LS_ACTIVE_RUN_KEY ||
+      key === LS_PENDING_RUN_KEY ||
+      key === LS_PENDING_UPLOAD_KEY ||
+      key.startsWith(`${LS_ACTIVE_RUN_KEY}:`) ||
+      key.startsWith(`${LS_PENDING_RUN_KEY}:`)
+    ) {
+      localStorage.removeItem(key)
+    }
+  }
+}
+
+export function beginUploadIntent(fileName: string): PendingUploadIntent {
+  const activeSession = readStoredSessionId()
+  const activeUpload = activeSession ? readActiveRun(activeSession) : null
+  if (activeSession && activeUpload?.kind === 'upload_pipeline') {
+    localStorage.removeItem(runStorageKey(LS_ACTIVE_RUN_KEY, activeSession))
+  }
+  const intent = { idempotencyKey: crypto.randomUUID(), fileName }
+  localStorage.setItem(LS_PENDING_UPLOAD_KEY, JSON.stringify(intent))
+  return intent
+}
+
+function readPendingUploadIntent(): PendingUploadIntent | null {
+  try {
+    const raw = localStorage.getItem(LS_PENDING_UPLOAD_KEY)
+    if (!raw) return null
+    const intent = JSON.parse(raw) as Partial<PendingUploadIntent>
+    return intent.idempotencyKey && intent.fileName
+      ? { idempotencyKey: intent.idempotencyKey, fileName: intent.fileName }
+      : null
+  } catch {
+    return null
+  }
+}
+
+function clearPendingUpload(idempotencyKey?: string) {
+  const pending = readPendingUploadIntent()
+  if (idempotencyKey && pending?.idempotencyKey !== idempotencyKey) return
+  localStorage.removeItem(LS_PENDING_UPLOAD_KEY)
+}
+
+async function uploadResponse(response: Response): Promise<UploadAcceptance> {
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new RunRequestError(response.status)
+  return payload as UploadAcceptance
+}
+
+export async function acceptUploadRun(
+  file: File,
+  idempotencyKey: string,
+): Promise<UploadAcceptance> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const response = await apiFetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey, ...authHeaders() },
+        body: formData,
+      })
+      if (!response.ok && response.status < 500) throw new RunRequestError(response.status)
+      return await uploadResponse(response)
+    } catch (error) {
+      if (error instanceof RunRequestError && error.status < 500) throw error
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+export async function resolvePendingUpload(): Promise<UploadAcceptance | null> {
+  const pending = readPendingUploadIntent()
+  if (!pending) return null
+  const response = await apiFetch(`${API_BASE}/upload/resolve`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': pending.idempotencyKey, ...authHeaders() },
+  })
+  return uploadResponse(response)
+}
+
+export function directionGateForReadiness(readiness: UploadReadiness | undefined): {
+  disabled: boolean
+  reason: UploadReadiness | null
+} {
+  if (!readiness || readiness === 'READY') return { disabled: false, reason: null }
+  return { disabled: true, reason: readiness }
+}
+
+export async function acceptDirectionRun(
+  sessionId: string,
+  direction: DirectionFormData,
+  idempotencyKey: string,
+): Promise<DirectionAcceptance> {
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/direction`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+      ...authHeaders(),
+    },
+    body: JSON.stringify(direction),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    if (response.status < 500) clearPendingRun(sessionId, idempotencyKey)
+    const retryAfter = response.headers.get('Retry-After')
+    throw new Error(retryAfter ? `HTTP ${response.status}; retry after ${retryAfter}s` : `HTTP ${response.status}`)
+  }
+  // Rolling deploy compatibility: an older API may still complete this
+  // command synchronously with the former DirectionResponse body.
+  if (!payload.run_id) return { immediate_result: payload as Record<string, any> }
+  return payload as RunAccepted
+}
+
+export async function recoverAcceptedRun(
+  sessionId: string,
+): Promise<
+  | (Pick<RunAccepted, 'run_id' | 'events_url'> & { kind: RunKind })
+  | { immediate_result: Record<string, any>; kind: 'prewrite' }
+  | null
+> {
+  const activeRun = readActiveRun(sessionId)
+  if (activeRun) {
+    return {
+      run_id: activeRun.runId,
+      events_url: activeRun.eventsUrl,
+      kind: activeRun.kind,
+    }
+  }
+  const pendingRun = readPendingRun(sessionId)
+  if (!pendingRun) return null
+  const accepted = await acceptDirectionRun(
+    sessionId,
+    pendingRun.direction,
+    pendingRun.idempotencyKey,
+  )
+  if ('immediate_result' in accepted) {
+    clearPendingRun(sessionId, pendingRun.idempotencyKey)
+    return { ...accepted, kind: 'prewrite' }
+  }
+  writeActiveRun(sessionId, accepted, 'prewrite')
+  clearPendingRun(sessionId, pendingRun.idempotencyKey)
+  return { ...accepted, kind: 'prewrite' }
+}
 
 export type DeskSnapshot = {
   exists?: boolean
+  upload_readiness?: UploadReadiness
   claim?: string | null
   star_rating?: number | null
   identification_failed?: boolean
@@ -139,6 +400,19 @@ export function chapterIndexForApply(
   return Math.min(Math.max(0, opts.currentIndex), accepted.length - 1)
 }
 
+export function createRestoreSnapshotGate() {
+  let runApplied = false
+  return {
+    applySession(apply: () => void) {
+      if (!runApplied) apply()
+    },
+    applyRun(apply: () => void) {
+      runApplied = true
+      apply()
+    },
+  }
+}
+
 export function toDirectionInitial(
   record: DirectionFormData | null,
 ): DirectionFormInitial | undefined {
@@ -184,9 +458,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadReadiness, setUploadReadiness] = useState<UploadReadiness | undefined>()
+  const [uploadNeedsReselect, setUploadNeedsReselect] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [deskOpen, setDeskOpen] = useState(
-    () => !localStorage.getItem('econpaper_session_id'),
+    () => !readStoredSessionId(),
   )
   const [seenGuide, setSeenGuide] = useState(
     () => localStorage.getItem(LS_GUIDE_KEY) === '1',
@@ -220,13 +497,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
     }
   })
   const [csvName, setCsvName] = useState<string | null>(
-    () => readCsvMeta(localStorage.getItem('econpaper_session_id')).name,
+    () => readCsvMeta(readStoredSessionId()).name,
   )
   const [csvRows, setCsvRows] = useState<number | null>(
-    () => readCsvMeta(localStorage.getItem('econpaper_session_id')).rows,
+    () => readCsvMeta(readStoredSessionId()).rows,
   )
   const [csvCols, setCsvCols] = useState<number | null>(
-    () => readCsvMeta(localStorage.getItem('econpaper_session_id')).cols,
+    () => readCsvMeta(readStoredSessionId()).cols,
   )
   const [directionRecord, setDirectionRecord] = useState<DirectionFormData | null>(null)
 
@@ -254,6 +531,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const [codeExportOpen, setCodeExportOpen] = useState(false)
   const [workbenchTab, setWorkbenchTab] = useState<'paper' | 'data' | 'format'>('paper')
   const [directionBusy, setDirectionBusy] = useState(false)
+  const activeSessionRef = useRef(sessionId)
+  const sessionEpochRef = useRef(0)
+  const runAbortRef = useRef<AbortController | null>(null)
+  const uploadRecoveryEpochRef = useRef(0)
+  const directionOperationRef = useRef<symbol | null>(null)
+  const uploadOperationRef = useRef<string | null>(readPendingUploadIntent()?.idempotencyKey ?? null)
   const [directionOpen, setDirectionOpen] = useState(true)
   const [directionSummary, setDirectionSummary] = useState<string | null>(null)
   const [claim, setClaim] = useState<string | null>(null)
@@ -287,6 +570,35 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setCsvCols(null)
   }, [])
 
+  const invalidateSessionWork = useCallback(() => {
+    sessionEpochRef.current += 1
+    runAbortRef.current?.abort()
+    runAbortRef.current = null
+    directionOperationRef.current = null
+    setDirectionBusy(false)
+    setUploading(false)
+  }, [])
+
+  const switchSession = useCallback(
+    (nextSessionId: string | null) => {
+      if (activeSessionRef.current !== nextSessionId) {
+        invalidateSessionWork()
+        activeSessionRef.current = nextSessionId
+        setUploadReadiness(undefined)
+        setUploadNeedsReselect(false)
+      }
+      setSessionId(nextSessionId)
+    },
+    [invalidateSessionWork, setSessionId],
+  )
+
+  useEffect(() => {
+    if (activeSessionRef.current !== sessionId) {
+      invalidateSessionWork()
+      activeSessionRef.current = sessionId
+    }
+  }, [invalidateSessionWork, sessionId])
+
   const handleLogout = useCallback(() => {
     // Server revokes the refresh token and clears both cookies.
     void (async () => {
@@ -296,17 +608,20 @@ export function useWorkspace(opts: WorkspaceOptions) {
         /* local logout proceeds regardless */
       }
     })()
+    invalidateSessionWork()
+    uploadOperationRef.current = null
     setAuthed(false)
-    setSessionId(null)
-    localStorage.removeItem('econpaper_session_id')
+    switchSession(null)
+    clearStoredSessionId()
     localStorage.removeItem(LS_GUIDE_KEY)
+    clearAllRunStorage()
     forgetCsvMeta()
     setDeskOpen(false)
     setSeenGuide(false)
-  }, [setAuthed, setSessionId, forgetCsvMeta])
+  }, [invalidateSessionWork, setAuthed, switchSession, forgetCsvMeta])
 
   const ensureSession = useCallback(async (): Promise<string> => {
-    if (sessionId) return sessionId
+    if (activeSessionRef.current) return activeSessionRef.current
     const resp = await apiFetch(`${API_BASE}/sessions`, {
       method: 'POST',
       headers: authHeaders(),
@@ -314,9 +629,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
     forgetCsvMeta()
-    setSessionId(data.session_id)
     return data.session_id as string
-  }, [sessionId, forgetCsvMeta, setSessionId])
+  }, [forgetCsvMeta])
 
   const refreshReview = useCallback(
     async (sid: string) => {
@@ -342,6 +656,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
         data.literature_source ||
         data.identification_report ||
         data.robustness_status ||
+        data.cleaning_report ||
+        data.upload_readiness ||
         data.identification_failed ||
         data.star_rating != null ||
         (data.outline && data.outline.length) ||
@@ -356,6 +672,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setTreatmentRow(typeof row === 'string' && row ? row : null)
     setEstimateMeta(data.estimate ?? null)
     setCleaningReport(data.cleaning_report ?? null)
+    if (Object.prototype.hasOwnProperty.call(data, 'upload_readiness')) {
+      setUploadReadiness(data.upload_readiness)
+      setUploadNeedsReselect(
+        data.upload_readiness === 'FAILED' || data.upload_readiness === 'CANCELLED',
+      )
+    }
     setLiteratureSource(data.literature_source ?? null)
     setWriteBlockers(Array.isArray(data.write_blockers) ? data.write_blockers : [])
     setIdentFailed(Boolean(data.identification_failed))
@@ -400,33 +722,162 @@ export function useWorkspace(opts: WorkspaceOptions) {
         treatment_time: rd.treatment_time || prev?.treatment_time,
       }))
     }
-    const csv = readCsvMeta(sid ?? localStorage.getItem('econpaper_session_id'))
+    const csv = readCsvMeta(sid ?? readStoredSessionId())
     if (csv.name) setCsvName(csv.name)
     if (csv.rows != null) setCsvRows(csv.rows)
     if (csv.cols != null) setCsvCols(csv.cols)
   }, [])
 
+  const returnToUploadGuide = useCallback(
+    (message: string, clearAuth = false) => {
+      uploadOperationRef.current = null
+      clearAllRunStorage()
+      clearStoredSessionId()
+      localStorage.removeItem(LS_GUIDE_KEY)
+      switchSession(null)
+      forgetCsvMeta()
+      setSeenGuide(false)
+      setDeskOpen(false)
+      setUploadError(message)
+      setUploadStatus(message)
+      if (clearAuth) setAuthed(false)
+    },
+    [forgetCsvMeta, setAuthed, switchSession],
+  )
+
+  const handleUploadRunError = useCallback(
+    (error: unknown, sid: string | null, runId: string | null) => {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setUploading(false)
+      if (sid && runId && shouldForgetRunHandle(error)) clearActiveRun(sid, runId)
+      if (error instanceof RunRequestError && (error.status === 401 || error.status === 403)) {
+        returnToUploadGuide(
+          error.status === 401 ? t('app.uploadAuthRequired') : t('app.uploadPermissionRequired'),
+          error.status === 401,
+        )
+        return
+      }
+      if (error instanceof RunRequestError && error.status === 404) {
+        returnToUploadGuide(t('app.uploadMissing'))
+        return
+      }
+      if (error instanceof RunRequestError && error.status < 500) {
+        clearPendingUpload()
+        uploadOperationRef.current = null
+        setUploadNeedsReselect(true)
+        setUploadError(t('app.uploadFailedReselect'))
+        setUploadStatus(t('app.uploadFailedReselect'))
+        return
+      }
+      if (error instanceof RunTerminalError) {
+        clearPendingUpload()
+        uploadOperationRef.current = null
+        setUploadReadiness(error.status)
+        setUploadNeedsReselect(true)
+        const message =
+          error.status === 'CANCELLED' ? t('app.uploadCancelled') : t('app.uploadFailedReselect')
+        setUploadError(message)
+        setUploadStatus(message)
+        return
+      }
+      setUploadError(t('app.uploadRetryRefresh'))
+      setUploadStatus(t('app.uploadRetryRefresh'))
+    },
+    [returnToUploadGuide, t],
+  )
+
   // 会话回填：刷新后从 session 恢复工作区
   useEffect(() => {
-    const saved = localStorage.getItem('econpaper_session_id')
+    const saved = readStoredSessionId()
     if (!saved) return
+    const restoreEpoch = sessionEpochRef.current
+    const snapshotGate = createRestoreSnapshotGate()
+    let cancelled = false
+    let restoreController: AbortController | null = null
+    const isCurrent = () =>
+      !cancelled &&
+      sessionEpochRef.current === restoreEpoch &&
+      activeSessionRef.current === saved
     apiFetch(`${API_BASE}/sessions/${saved}`, { headers: authHeaders() })
       .then((res) => res.json())
       .then((data: DeskSnapshot & { exists: boolean }) => {
-        if (!data.exists) {
-          localStorage.removeItem('econpaper_session_id')
-          setSessionId(null)
-          forgetCsvMeta()
-          return
-        }
-        applyDeskSnapshot(data, saved)
+        if (!isCurrent()) return
+        snapshotGate.applySession(() => {
+          if (!data.exists) {
+            returnToUploadGuide(t('app.uploadMissing'))
+            return
+          }
+          applyDeskSnapshot(data, saved)
+        })
       })
       .catch(() => {})
-  }, [setSessionId, forgetCsvMeta, applyDeskSnapshot])
+    const storedRun = readActiveRun(saved)
+    if (storedRun || readPendingRun(saved)) {
+      const initialKind = storedRun?.kind ?? 'prewrite'
+      if (initialKind === 'upload_pipeline') {
+        setUploading(true)
+        setUploadStatus(t('app.uploadRecovering'))
+      } else {
+        setDirectionBusy(true)
+      }
+      const controller = new AbortController()
+      restoreController = controller
+      runAbortRef.current?.abort()
+      runAbortRef.current = controller
+      let recoveredRunId: string | null = null
+      let recoveredKind: RunKind = initialKind
+      void recoverAcceptedRun(saved)
+        .then((run) => {
+          if (!run) return null
+          recoveredKind = run.kind
+          if ('immediate_result' in run) return run.immediate_result
+          recoveredRunId = run.run_id
+          return waitForRun(run.run_id, run.events_url, controller.signal)
+        })
+        .then((result) => {
+          if (!isCurrent() || !result) return
+          if (recoveredRunId) clearActiveRun(saved, recoveredRunId)
+          if (recoveredKind === 'upload_pipeline') {
+            clearPendingUpload()
+            uploadOperationRef.current = null
+            setUploadReadiness('READY')
+            setUploadStatus(t('app.uploadReady'))
+          }
+          snapshotGate.applyRun(() => applyDeskSnapshot(result as DeskSnapshot, saved))
+        })
+        .catch((error) => {
+          if (!isCurrent()) return
+          if (recoveredKind === 'upload_pipeline') {
+            handleUploadRunError(error, saved, recoveredRunId)
+          } else {
+            if (recoveredRunId && shouldForgetRunHandle(error)) {
+              clearActiveRun(saved, recoveredRunId)
+            }
+            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+              showGlobalError(error instanceof Error ? error.message : String(error))
+            }
+          }
+        })
+        .finally(() => {
+          if (runAbortRef.current === controller) runAbortRef.current = null
+          if (isCurrent()) {
+            if (recoveredKind === 'upload_pipeline') setUploading(false)
+            else setDirectionBusy(false)
+          }
+        })
+    }
+    return () => {
+      cancelled = true
+      if (restoreController && runAbortRef.current === restoreController) {
+        restoreController.abort()
+        runAbortRef.current = null
+      }
+    }
+  }, [applyDeskSnapshot, handleUploadRunError, returnToUploadGuide, showGlobalError, t])
 
   useEffect(() => {
     if (sessionId) {
-      localStorage.setItem('econpaper_session_id', sessionId)
+      persistSessionId(sessionId)
       setDeskOpen(false)
     }
   }, [sessionId])
@@ -586,55 +1037,186 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setSeenGuide(true)
   }, [])
 
+  const applyUploadMetadata = useCallback(
+    async (data: UploadAcceptance, fileName: string, file?: File) => {
+      const columns = data.dataset_meta?.columns
+      let parsedColumns: string[] = []
+      if (Array.isArray(columns) && columns.every((item) => typeof item === 'string')) {
+        parsedColumns = columns
+      } else if (file) {
+        try {
+          const header = (await file.slice(0, 2048).text()).split(/\r?\n/).find(Boolean) || ''
+          parsedColumns = header.split(',').map((name) => name.trim()).filter(Boolean)
+        } catch {
+          parsedColumns = []
+        }
+      }
+      setDataColumns(parsedColumns)
+      sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(parsedColumns))
+      setCsvCols(parsedColumns.length || null)
+      setCsvName(fileName)
+      const rows = typeof data.dataset_meta?.rows === 'number' ? data.dataset_meta.rows : null
+      setCsvRows(rows)
+      writeCsvMeta(data.session_id, fileName, rows, parsedColumns.length || null)
+      persistSessionId(data.session_id)
+      markGuideSeen()
+      switchSession(data.session_id)
+    },
+    [markGuideSeen, switchSession],
+  )
+
+  useEffect(() => {
+    const pending = readPendingUploadIntent()
+    if (!pending) return
+    const saved = readStoredSessionId()
+    const savedUpload = saved ? readActiveRun(saved) : null
+    if (
+      savedUpload?.kind === 'upload_pipeline'
+      && (
+        !savedUpload.idempotencyKey
+        || savedUpload.idempotencyKey === pending.idempotencyKey
+      )
+    ) return
+
+    uploadOperationRef.current = pending.idempotencyKey
+    const recoveryEpoch = ++uploadRecoveryEpochRef.current
+    let cancelled = false
+    setUploading(true)
+    setUploadError(null)
+    setUploadStatus(t('app.uploadRecovering'))
+    let runId: string | null = null
+    let sid: string | null = null
+    let controller: AbortController | null = null
+    const isCurrent = () =>
+      !cancelled
+      && uploadRecoveryEpochRef.current === recoveryEpoch
+      && uploadOperationRef.current === pending.idempotencyKey
+
+    void resolvePendingUpload()
+      .then(async (accepted) => {
+        if (!accepted || !isCurrent()) return null
+        sid = accepted.session_id
+        await applyUploadMetadata(accepted, pending.fileName)
+        if (!isCurrent()) return null
+        if (!accepted.run_id || !accepted.events_url) {
+          clearPendingUpload(pending.idempotencyKey)
+          uploadOperationRef.current = null
+          setUploadReadiness('READY')
+          setUploadStatus(t('app.uploadReady'))
+          setUploading(false)
+          return null
+        }
+        runId = accepted.run_id
+        writeActiveRun(
+          accepted.session_id,
+          { run_id: accepted.run_id, events_url: accepted.events_url },
+          'upload_pipeline',
+          pending.idempotencyKey,
+        )
+        setUploadReadiness('PROCESSING')
+        controller = new AbortController()
+        runAbortRef.current?.abort()
+        runAbortRef.current = controller
+        return waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+      })
+      .then((result) => {
+        if (!result || !sid || !isCurrent()) return
+        if (runId) clearActiveRun(sid, runId)
+        clearPendingUpload(pending.idempotencyKey)
+        uploadOperationRef.current = null
+        setUploadReadiness('READY')
+        setUploadStatus(t('app.uploadReady'))
+        setUploading(false)
+        applyDeskSnapshot(result as DeskSnapshot, sid)
+      })
+      .catch((error) => {
+        if (!isCurrent()) return
+        if (error instanceof RunRequestError && error.status === 404 && !sid) {
+          clearPendingUpload(pending.idempotencyKey)
+          uploadOperationRef.current = null
+          setUploadNeedsReselect(true)
+          setUploadError(t('app.uploadNotAccepted'))
+          setUploadStatus(t('app.uploadNotAccepted'))
+          setUploading(false)
+          return
+        }
+        handleUploadRunError(error, sid, runId)
+      })
+      .finally(() => {
+        if (runAbortRef.current === controller) runAbortRef.current = null
+        if (isCurrent()) setUploading(false)
+      })
+    return () => {
+      cancelled = true
+      if (controller && runAbortRef.current === controller) {
+        controller.abort()
+        runAbortRef.current = null
+      }
+    }
+  }, [applyDeskSnapshot, applyUploadMetadata, handleUploadRunError, t])
+
   const uploadCsv = useCallback(
     async (file: File) => {
+      invalidateSessionWork()
+      uploadRecoveryEpochRef.current += 1
+      const intent = beginUploadIntent(file.name)
+      uploadOperationRef.current = intent.idempotencyKey
       setUploading(true)
+      setCleaningReport(null)
       setUploadError(null)
+      setUploadNeedsReselect(false)
+      setUploadStatus(t('app.uploadSubmitting'))
+      let sid: string | null = null
+      let runId: string | null = null
+      let controller: AbortController | null = null
+      const isCurrent = () => uploadOperationRef.current === intent.idempotencyKey
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        const resp = await apiFetch(`${API_BASE}/upload`, {
-          method: 'POST',
-          headers: authHeaders(),
-          body: formData,
-        })
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-        const data = await resp.json()
-        const cols = data.dataset_meta?.columns
-        let colCount: number | null = null
-        if (Array.isArray(cols) && cols.every((item: unknown) => typeof item === 'string')) {
-          setDataColumns(cols)
-          sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(cols))
-          colCount = cols.length
-          setCsvCols(colCount)
-        } else {
-          try {
-            const header =
-              (await file.slice(0, 2048).text()).split(/\r?\n/).find(Boolean) || ''
-            const parsed = header.split(',').map((name) => name.trim()).filter(Boolean)
-            setDataColumns(parsed)
-            sessionStorage.setItem(LS_COLS_KEY, JSON.stringify(parsed))
-            colCount = parsed.length
-            setCsvCols(colCount)
-          } catch {
-            setDataColumns([])
-          }
+        const accepted = await acceptUploadRun(file, intent.idempotencyKey)
+        if (!isCurrent()) return
+        sid = accepted.session_id
+        await applyUploadMetadata(accepted, file.name, file)
+        if (!isCurrent()) return
+        if (!accepted.run_id || !accepted.events_url) {
+          clearPendingUpload(intent.idempotencyKey)
+          uploadOperationRef.current = null
+          setUploadReadiness('READY')
+          setUploadStatus(t('app.uploadReady'))
+          setUploading(false)
+          return
         }
-        setCsvName(file.name)
-        const rowCount = data.dataset_meta?.rows
-        const rows = typeof rowCount === 'number' ? rowCount : null
-        setCsvRows(rows)
-        writeCsvMeta(data.session_id, file.name, rows, colCount)
-        markGuideSeen()
-        setSessionId(data.session_id)
-      } catch (err) {
-        setUploadError(err instanceof Error ? err.message : 'Upload failed')
-      } finally {
+        runId = accepted.run_id
+        writeActiveRun(
+          accepted.session_id,
+          { run_id: accepted.run_id, events_url: accepted.events_url },
+          'upload_pipeline',
+          intent.idempotencyKey,
+        )
+        setUploadReadiness('PROCESSING')
+        setUploading(true)
+        setUploadStatus(t('app.uploadProcessing'))
+        controller = new AbortController()
+        runAbortRef.current?.abort()
+        runAbortRef.current = controller
+        const result = await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+        if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
+        clearActiveRun(accepted.session_id, accepted.run_id)
+        clearPendingUpload(intent.idempotencyKey)
+        uploadOperationRef.current = null
+        setUploadReadiness('READY')
+        setUploadStatus(t('app.uploadReady'))
         setUploading(false)
-        if (fileInputRef.current) fileInputRef.current.value = ''
+        applyDeskSnapshot(result as DeskSnapshot, accepted.session_id)
+      } catch (err) {
+        if (isCurrent()) handleUploadRunError(err, sid, runId)
+      } finally {
+        if (runAbortRef.current === controller) runAbortRef.current = null
+        if (isCurrent()) {
+          setUploading(false)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        }
       }
     },
-    [markGuideSeen, setSessionId],
+    [applyDeskSnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t],
   )
 
   const takeCsv = useCallback(
@@ -675,16 +1257,55 @@ export function useWorkspace(opts: WorkspaceOptions) {
 
   const handleDirectionSubmit = useCallback(
     async (data: DirectionFormData) => {
+      if (directionGateForReadiness(uploadReadiness).disabled) {
+        showGlobalError(t('app.directionUploadNotReady'))
+        return
+      }
+      if (directionOperationRef.current) return
+      const operation = Symbol('direction-run')
+      directionOperationRef.current = operation
       setDirectionBusy(true)
+      const startingEpoch = sessionEpochRef.current
+      let sid: string | null = null
+      let runId: string | null = null
+      let operationEpoch = sessionEpochRef.current
+      let controller: AbortController | null = null
       try {
-        const sid = await ensureSession()
-        const resp = await apiFetch(`${API_BASE}/sessions/${sid}/direction`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify(data),
-        })
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-        const result = await resp.json()
+        sid = await ensureSession()
+        if (
+          directionOperationRef.current !== operation ||
+          sessionEpochRef.current !== startingEpoch
+        ) return
+        if (activeSessionRef.current !== sid) switchSession(sid)
+        // Creating the first session invalidates older work, but this exact
+        // submission owns that transition and remains the active single flight.
+        directionOperationRef.current = operation
+        operationEpoch = sessionEpochRef.current
+        const idempotencyKey = crypto.randomUUID()
+        writePendingRun(sid, { idempotencyKey, direction: data })
+        const accepted = await acceptDirectionRun(sid, data, idempotencyKey)
+        let result: Record<string, any>
+        if ('immediate_result' in accepted) {
+          clearPendingRun(sid, idempotencyKey)
+          result = accepted.immediate_result
+        } else {
+          runId = accepted.run_id
+          writeActiveRun(sid, accepted)
+          clearPendingRun(sid, idempotencyKey)
+          controller = new AbortController()
+          runAbortRef.current?.abort()
+          runAbortRef.current = controller
+          result = await waitForRun(
+            accepted.run_id,
+            accepted.events_url,
+            controller.signal,
+          )
+        }
+        if (
+          sessionEpochRef.current !== operationEpoch ||
+          activeSessionRef.current !== sid
+        ) return
+        if (runId) clearActiveRun(sid, runId)
         applyDeskSnapshot(result, sid)
         if (result.identification_report) {
           setIdentReport(formatIdentReport(result.star_rating, result.identification_report))
@@ -701,12 +1322,19 @@ export function useWorkspace(opts: WorkspaceOptions) {
           showGlobalError(t('app.identBlocked'))
         }
       } catch (err) {
-        showGlobalError(err instanceof Error ? err.message : t('app.directionFailed'))
+        if (sid && runId && shouldForgetRunHandle(err)) clearActiveRun(sid, runId)
+        if (!(err instanceof DOMException && err.name === 'AbortError')) {
+          showGlobalError(err instanceof Error ? err.message : t('app.directionFailed'))
+        }
       } finally {
-        setDirectionBusy(false)
+        if (runAbortRef.current === controller) runAbortRef.current = null
+        if (directionOperationRef.current === operation) {
+          directionOperationRef.current = null
+          setDirectionBusy(false)
+        }
       }
     },
-    [ensureSession, applyDeskSnapshot, showGlobalError, t],
+    [ensureSession, applyDeskSnapshot, showGlobalError, switchSession, t, uploadReadiness],
   )
 
   const runGenerateChapter = useCallback(
@@ -1003,6 +1631,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const hasReadout = Boolean(
     claim || treatmentRow || literatureSource || identFailed || robustnessStatus,
   )
+  const directionGate = directionGateForReadiness(uploadReadiness)
+  const directionDisabledReason = directionGate.disabled
+    ? uploadReadiness === 'PROCESSING'
+      ? t('app.directionBlockedProcessing')
+      : t('app.directionBlockedUploadFailed')
+    : null
   const canExport = writtenChapters.some((ch) => Boolean(ch.content))
   const railItems = outline.map((ch) => {
     const written = writtenChapters.find((item) => item.type === ch.type)
@@ -1024,6 +1658,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
     outline,
     uploading,
     uploadError,
+    uploadReadiness,
+    uploadNeedsReselect,
+    uploadStatus,
     fileInputRef,
     deskOpen,
     seenGuide,
@@ -1044,6 +1681,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     codeExportOpen,
     workbenchTab,
     directionBusy,
+    directionDisabledReason,
     directionOpen,
     directionSummary,
     claim,

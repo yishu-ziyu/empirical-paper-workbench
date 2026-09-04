@@ -14,7 +14,10 @@ Each test uses unique credentials to avoid state leakage through the
 persistent database.
 """
 
+import asyncio
 import uuid
+
+from run_repository import RunRepository
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +263,18 @@ class TestLogout:
 
 
 class TestSessionOwnership:
+    def test_production_upload_requires_auth_before_creating_state(
+        self, client, sample_csv_path, monkeypatch
+    ):
+        monkeypatch.setattr("config.settings.DEBUG", False)
+        with open(sample_csv_path, "rb") as f:
+            response = client.post(
+                "/upload",
+                files={"file": ("sample.csv", f, "text/csv")},
+                headers={"Idempotency-Key": str(uuid.uuid4())},
+            )
+        assert response.status_code == 401
+
     def test_upload_with_auth_creates_owned_session(self, client, sample_csv_path):
         """Authenticated upload creates a session owned by the user."""
         token = _register_and_login(client)
@@ -267,11 +282,13 @@ class TestSessionOwnership:
             resp = client.post(
                 "/upload",
                 files={"file": ("sample.csv", f, "text/csv")},
-                headers={"Authorization": f"Bearer {token}"},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Idempotency-Key": str(uuid.uuid4()),
+                },
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
         session_id = resp.json()["session_id"]
-
         # The user should be able to list their own sessions
         sessions_resp = client.get(
             "/sessions",
@@ -289,9 +306,12 @@ class TestSessionOwnership:
             resp_a = client.post(
                 "/upload",
                 files={"file": ("sample.csv", f, "text/csv")},
-                headers={"Authorization": f"Bearer {token_a}"},
+                headers={
+                    "Authorization": f"Bearer {token_a}",
+                    "Idempotency-Key": str(uuid.uuid4()),
+                },
             )
-        assert resp_a.status_code == 200
+        assert resp_a.status_code == 202
         session_id_a = resp_a.json()["session_id"]
 
         # Register as user B
@@ -313,18 +333,64 @@ class TestSessionOwnership:
         session_ids_b = [s["session_id"] for s in sessions_resp.json()]
         assert session_id_a not in session_ids_b
 
+    def test_upload_resolve_requires_exact_owner_in_production(
+        self, client, sample_csv_path, monkeypatch
+    ):
+        token_a = _register_and_login(client)
+        token_b = _register_and_login(client)
+        monkeypatch.setattr("config.settings.DEBUG", False)
+        key = str(uuid.uuid4())
+        with open(sample_csv_path, "rb") as f:
+            accepted = client.post(
+                "/upload",
+                files={"file": ("sample.csv", f, "text/csv")},
+                headers={
+                    "Authorization": f"Bearer {token_a}",
+                    "Idempotency-Key": key,
+                },
+            )
+        assert accepted.status_code == 202, accepted.text
+        owner = client.post(
+            "/upload/resolve",
+            headers={
+                "Authorization": f"Bearer {token_a}",
+                "Idempotency-Key": key,
+            },
+        )
+        other = client.post(
+            "/upload/resolve",
+            headers={
+                "Authorization": f"Bearer {token_b}",
+                "Idempotency-Key": key,
+            },
+        )
+        missing = client.post(
+            "/upload/resolve",
+            headers={
+                "Authorization": f"Bearer {token_a}",
+                "Idempotency-Key": str(uuid.uuid4()),
+            },
+        )
+        assert owner.status_code == 202
+        assert owner.json()["run_id"] == accepted.json()["run_id"]
+        assert other.status_code == missing.status_code == 404
+        assert accepted.json()["session_id"] not in other.text
+        assert accepted.json()["run_id"] not in other.text
+
     def test_anonymous_session_ops_unauthorized_when_debug_false(
         self, client, sample_csv_path, monkeypatch
     ):
         """Anonymous session ops in DEBUG=false return 401."""
-        monkeypatch.setattr("config.settings.DEBUG", False)
+        monkeypatch.setattr("config.settings.DEBUG", True)
         with open(sample_csv_path, "rb") as f:
             resp = client.post(
                 "/upload",
                 files={"file": ("sample.csv", f, "text/csv")},
+                headers={"Idempotency-Key": str(uuid.uuid4())},
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
         session_id = resp.json()["session_id"]
+        monkeypatch.setattr("config.settings.DEBUG", False)
 
         info_resp = client.get(f"/sessions/{session_id}")
         assert info_resp.status_code == 401
@@ -347,9 +413,12 @@ class TestSessionOwnership:
             resp = client.post(
                 "/upload",
                 files={"file": ("sample.csv", f, "text/csv")},
-                headers={"Authorization": f"Bearer {token_a}"},
+                headers={
+                    "Authorization": f"Bearer {token_a}",
+                    "Idempotency-Key": str(uuid.uuid4()),
+                },
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
         session_id = resp.json()["session_id"]
 
         headers_a = {"Authorization": f"Bearer {token_a}"}
@@ -376,6 +445,13 @@ class TestSessionOwnership:
         )
         assert export.status_code == 403
 
+        run_id = resp.json()["run_id"]
+        assert client.get(f"/runs/{run_id}", headers=headers_b).status_code == 403
+        assert (
+            client.get(f"/runs/{run_id}/events", headers=headers_b).status_code
+            == 403
+        )
+
         # Owner can still read/export their own session.
         own = client.get(f"/sessions/{session_id}", headers=headers_a)
         assert own.status_code == 200
@@ -387,10 +463,14 @@ class TestSessionOwnership:
             resp = client.post(
                 "/upload",
                 files={"file": ("sample.csv", f, "text/csv")},
-                headers={"Authorization": f"Bearer {token}"},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Idempotency-Key": str(uuid.uuid4()),
+                },
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 202
         session_id = resp.json()["session_id"]
+        run_id = resp.json()["run_id"]
 
         # Try to delete without auth. The cookie jar holds the login cookies,
         # so drop them to simulate a truly unauthenticated client.
@@ -404,3 +484,4 @@ class TestSessionOwnership:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert delete_resp.status_code == 200
+        assert asyncio.run(RunRepository().get(run_id)) is None

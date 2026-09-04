@@ -229,9 +229,29 @@ export interface paths {
         put?: never;
         /**
          * Upload
-         * @description Accept a CSV / Stata (.dta) / Excel (.xlsx) upload, parse meta, run the graph.
+         * @description Persist an upload command and return before cleaning begins.
          */
         post: operations["upload_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/upload/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Upload
+         * @description Resolve a committed upload after the accepting response was lost.
+         */
+        post: operations["resolve_upload_upload_resolve_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -363,7 +383,7 @@ export interface paths {
         put?: never;
         /**
          * Set Direction Endpoint
-         * @description 接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。
+         * @description Persist a pre-write command and return before research work begins.
          */
         post: operations["set_direction_endpoint_sessions__session_id__direction_post"];
         delete?: never;
@@ -998,6 +1018,40 @@ export interface paths {
          * @description 返回 trace.jsonl 的尾部事件流（默认最近 50 条）。
          */
         get: operations["get_trace_sessions__session_id__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Run Events */
+        get: operations["stream_run_events_runs__run_id__events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1945,6 +1999,25 @@ export interface components {
             /** Body Chapters */
             body_chapters?: components["schemas"]["ProgressChapterSummary"][];
         };
+        /** QueueFullResponse */
+        QueueFullResponse: {
+            /** Error */
+            error: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Code
+             * @default 429
+             * @constant
+             */
+            code: 429;
+            /**
+             * Degraded
+             * @default false
+             * @constant
+             */
+            degraded: false;
+        };
         /**
          * RegenerateRequest
          * @description POST /sessions/{id}/regenerate 请求体。
@@ -2116,6 +2189,77 @@ export interface components {
             body_chapters?: components["schemas"]["ChapterResponse"][];
         };
         /**
+         * RunAcceptedResponse
+         * @description A durable pre-write run accepted for independent execution.
+         */
+        RunAcceptedResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Status
+             * @default PENDING
+             * @constant
+             */
+            status: "PENDING";
+            /** Events Url */
+            events_url: string;
+        };
+        /** RunStatusResponse */
+        RunStatusResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "prewrite" | "upload_pipeline";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "PENDING" | "RUNNING" | "RECONCILING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+            /** Attempt */
+            attempt: number;
+            /** Lease Epoch */
+            lease_epoch: number;
+            /** Result */
+            result?: components["schemas"]["DirectionResponse"] | components["schemas"]["UploadRunResultResponse"] | null;
+            /** Error */
+            error?: string | null;
+        };
+        /** SessionBusyDetail */
+        SessionBusyDetail: {
+            /**
+             * Code
+             * @default session_busy
+             * @constant
+             */
+            code: "session_busy";
+            /** Run Id */
+            run_id: string;
+        };
+        /** SessionBusyResponse */
+        SessionBusyResponse: {
+            error: components["schemas"]["SessionBusyDetail"];
+            detail: components["schemas"]["SessionBusyDetail"];
+            /**
+             * Code
+             * @default 409
+             * @constant
+             */
+            code: 409;
+            /**
+             * Degraded
+             * @default false
+             * @constant
+             */
+            degraded: false;
+        };
+        /**
          * SessionInfoResponse
          * @description GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。
          */
@@ -2129,6 +2273,8 @@ export interface components {
              * @default false
              */
             has_dataset: boolean;
+            /** Upload Readiness */
+            upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
             /** Claim */
             claim?: string | null;
             /** Star Rating */
@@ -2249,7 +2395,30 @@ export interface components {
         UploadResponse: {
             /** Session Id */
             session_id: string;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Status
+             * @default PENDING
+             * @constant
+             */
+            status: "PENDING";
+            /** Events Url */
+            events_url: string;
             dataset_meta: components["schemas"]["DatasetMetaResponse"];
+        };
+        /** UploadRunResultResponse */
+        UploadRunResultResponse: {
+            /** Cleaning Report */
+            cleaning_report: {
+                [key: string]: unknown;
+            };
+            /**
+             * Upload Readiness
+             * @default READY
+             * @constant
+             */
+            upload_readiness: "READY";
         };
         /** UserResponse */
         UserResponse: {
@@ -2569,7 +2738,9 @@ export interface operations {
     upload_upload_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -2580,13 +2751,20 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["UploadResponse"];
                 };
+            };
+            /** @description Idempotency key was reused for different input */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2596,6 +2774,60 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description The durable run queue is full */
+            429: {
+                headers: {
+                    /** @description Seconds before retrying admission */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resolve_upload_upload_resolve_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+            /** @description No upload is visible for this capability */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Upload resolution is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2805,7 +3037,9 @@ export interface operations {
     set_direction_endpoint_sessions__session_id__direction_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 session_id: string;
             };
@@ -2818,12 +3052,21 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DirectionResponse"];
+                    "application/json": components["schemas"]["RunAcceptedResponse"];
+                };
+            };
+            /** @description The session already has an active run; attach to it. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBusyResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2833,6 +3076,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The durable run queue is full. */
+            429: {
+                headers: {
+                    /** @description Seconds before retrying admission. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueFullResponse"];
                 };
             };
         };
@@ -3724,6 +3978,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TraceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_run_events_runs__run_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ordered run events; resume with Last-Event-ID. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */

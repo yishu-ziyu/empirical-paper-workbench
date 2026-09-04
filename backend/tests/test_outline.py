@@ -7,9 +7,85 @@ agent/tests/test_generate_outline.py（ADR-0003 Stage C 命名约定）。
 - POST /sessions/{id}/direction 接受 {question, dv, iv, controls, method, template}
 - POST /sessions/{id}/resume 接受调整后的 outline
 """
+import asyncio
 import pytest
+import uuid
 
 from facade import facade
+from runner import process_one_run
+
+
+def _post_and_finish(
+    client,
+    session_id: str,
+    payload: dict,
+) -> dict:
+    accepted = client.post(
+        f"/sessions/{session_id}/direction",
+        json=payload,
+        headers={"Idempotency-Key": f"test-{session_id}"},
+    )
+    assert accepted.status_code == 202, accepted.text
+    run_id = accepted.json()["run_id"]
+    assert asyncio.run(
+        process_one_run(
+            owner="outline-test",
+            run_id=run_id,
+        )
+    ) is True
+    terminal = client.get(f"/runs/{run_id}")
+    assert terminal.status_code == 200, terminal.text
+    assert terminal.json()["status"] == "SUCCEEDED", terminal.text
+    return terminal.json()["result"]
+
+
+@pytest.mark.parametrize("readiness", ["PROCESSING", "FAILED", "CANCELLED"])
+def test_direction_rejects_explicit_non_ready_upload_state(client, readiness):
+    sid = f"direction-gate-{readiness.lower()}-{uuid.uuid4().hex[:8]}"
+    facade.seed_state(
+        sid,
+        {"csv_path": "/tmp/input.csv", "upload_readiness": readiness},
+    )
+    try:
+        response = client.post(
+            f"/sessions/{sid}/direction",
+            json={
+                "question": "x on y",
+                "dv": "y",
+                "iv": "x",
+                "controls": [],
+                "method": "OLS",
+            },
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert response.status_code == 409
+        assert response.json()["detail"] == {
+            "code": "upload_not_ready",
+            "upload_readiness": readiness,
+        }
+    finally:
+        facade.drop_session(sid)
+
+
+@pytest.mark.parametrize("state", [{"upload_readiness": "READY"}, {}])
+def test_direction_allows_ready_and_legacy_sessions(client, state):
+    sid = f"direction-gate-allowed-{uuid.uuid4().hex[:8]}"
+    facade.seed_state(sid, {"csv_path": "/tmp/input.csv", **state})
+    try:
+        response = client.post(
+            f"/sessions/{sid}/direction",
+            json={
+                "question": "x on y",
+                "dv": "y",
+                "iv": "x",
+                "controls": [],
+                "method": "OLS",
+            },
+            headers={"Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert response.status_code == 202, response.text
+    finally:
+        facade.drop_session(sid)
 
 
 def test_post_direction_did_missing_statspai_returns_outline(client, tmp_path, monkeypatch):
@@ -38,13 +114,18 @@ def test_post_direction_did_missing_statspai_returns_outline(client, tmp_path, m
 
     monkeypatch.setattr("builtins.__import__", blocked)
     monkeypatch.delitem(sys.modules, "statspai", raising=False)
+    monkeypatch.setattr(
+        "runner.execute_prewrite_supervised",
+        facade.execute_prewrite,
+    )
 
     sid = "test-direction-did-no-statspai"
     facade.seed_state(sid, {"csv_path": str(csv)})
     try:
-        resp = client.post(
-            f"/sessions/{sid}/direction",
-            json={
+        data = _post_and_finish(
+            client,
+            sid,
+            {
                 "question": "treat on y",
                 "dv": "y",
                 "iv": "treat",
@@ -55,8 +136,6 @@ def test_post_direction_did_missing_statspai_returns_outline(client, tmp_path, m
                 "id_col": "id",
             },
         )
-        assert resp.status_code == 200, resp.text
-        data = resp.json()
         assert data["identification_failed"] is False
         assert len(data["outline"]) == 6
         assert any(
@@ -73,9 +152,10 @@ def test_post_direction_runs_identification_without_blocking_ols(client):
     sid = "test-direction-ident"
     facade.seed_state(sid, {"csv_path": "/tmp/missing.csv"})
     try:
-        resp = client.post(
-            f"/sessions/{sid}/direction",
-            json={
+        data = _post_and_finish(
+            client,
+            sid,
+            {
                 "question": "教育对收入的影响",
                 "dv": "income",
                 "iv": "education",
@@ -84,8 +164,6 @@ def test_post_direction_runs_identification_without_blocking_ols(client):
                 "template": "cn_journal",
             },
         )
-        assert resp.status_code == 200, resp.text
-        data = resp.json()
         assert data["identification_failed"] is False
         assert data.get("identification_report")
         assert "识别诊断套餐" in data["identification_report"]
@@ -102,9 +180,10 @@ def test_post_direction_endpoint(uploaded_session, client):
     """POST /sessions/{id}/direction 接受研究方向并返回 6 章 outline。"""
     if uploaded_session == "red-stage-dummy-session-id":
         pytest.skip("upload pipeline unavailable in this env (graph/psycopg)")
-    resp = client.post(
-        f"/sessions/{uploaded_session}/direction",
-        json={
+    data = _post_and_finish(
+        client,
+        uploaded_session,
+        {
             "question": "年龄与收入",
             "dv": "income",
             "iv": "age",
@@ -113,8 +192,6 @@ def test_post_direction_endpoint(uploaded_session, client):
             "template": "cn_journal",
         },
     )
-    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
-    data = resp.json()
     assert "outline" in data
     outline = data["outline"]
     assert len(outline) == 6

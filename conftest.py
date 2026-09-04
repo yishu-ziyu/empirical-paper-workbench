@@ -23,13 +23,14 @@ os.environ.setdefault(
     "JWT_SECRET_KEY",
     "test-only-jwt-secret-key-32chars-min",
 )
-# SessionStore 写穿透持久化：测试进程必须无条件改用系统临时目录。
+# 旧 SessionStore JSON 迁移入口：测试进程必须无条件改用系统临时目录。
 # 不能用 setdefault：开发者终端可能已配置真实数据路径，测试不得写入它们。
 os.environ["SESSIONS_PATH"] = str(
     _TEST_STATE_ROOT / "sessions" / "sessions.json"
 )
 os.environ["ECONPAPER_LOCAL_STATE_ROOT"] = str(_TEST_STATE_ROOT)
-os.environ["DATABASE_URL"] = (
+_POSTGRES_TEST_URL = os.getenv("TEST_POSTGRES_DATABASE_URL")
+os.environ["DATABASE_URL"] = _POSTGRES_TEST_URL or (
     f"sqlite+aiosqlite:///{_TEST_STATE_ROOT / 'db' / 'econpaper.db'}"
 )
 os.environ["UPLOAD_DIR"] = str(_TEST_STATE_ROOT / "uploads")

@@ -79,6 +79,9 @@ class UploadResponse(BaseModel):
     """POST /upload 返回体。"""
 
     session_id: str
+    run_id: str
+    status: Literal["PENDING"] = "PENDING"
+    events_url: str
     dataset_meta: DatasetMetaResponse
 
 
@@ -94,6 +97,9 @@ class SessionInfoResponse(BaseModel):
     session_id: str
     exists: bool
     has_dataset: bool = False
+    upload_readiness: Optional[
+        Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
+    ] = None
     claim: Optional[str] = None
     star_rating: Optional[int] = None
     identification_failed: bool = False
@@ -130,6 +136,34 @@ class DirectionResponse(BaseModel):
     degradations: List[Any] = Field(default_factory=list)
     write_blockers: List[str] = Field(default_factory=list)
     robustness_status: Optional[str] = None
+
+
+class RunAcceptedResponse(BaseModel):
+    """A durable pre-write run accepted for independent execution."""
+
+    run_id: str
+    session_id: str
+    status: Literal["PENDING"] = "PENDING"
+    events_url: str
+
+
+class SessionBusyDetail(BaseModel):
+    code: Literal["session_busy"] = "session_busy"
+    run_id: str
+
+
+class SessionBusyResponse(BaseModel):
+    error: SessionBusyDetail
+    detail: SessionBusyDetail
+    code: Literal[409] = 409
+    degraded: Literal[False] = False
+
+
+class QueueFullResponse(BaseModel):
+    error: str
+    detail: str
+    code: Literal[429] = 429
+    degraded: Literal[False] = False
 
 
 class ResumeResponse(BaseModel):

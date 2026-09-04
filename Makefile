@@ -1,4 +1,4 @@
-.PHONY: dev dev-frontend dev-backend install install-frontend install-backend install-agent health test test-agent test-backend test-frontend smoke-agent verify-deps verify clean gen-api check-api-drift \
+.PHONY: dev dev-frontend dev-backend dev-runner install install-frontend install-backend install-agent health test test-agent test-backend test-frontend smoke-agent verify-deps verify clean gen-api check-api-drift \
         docker-up docker-down docker-build docker-logs docker-ps docker-clean
 
 # Python 版本：项目锁定 3.12（3.14 下 numpy/pydantic 依赖装不上）。
@@ -16,9 +16,10 @@ PYPATH := PYTHONPATH=$(CURDIR):$(CURDIR)/backend
 # 默认并发起 frontend + backend；Ctrl-C 同时杀掉
 dev:
 	@trap 'kill 0' INT TERM; \
-	$(MAKE) dev-backend & \
-	$(MAKE) dev-frontend & \
-	wait
+		$(MAKE) dev-backend & \
+		$(MAKE) dev-runner & \
+		$(MAKE) dev-frontend & \
+		wait
 
 dev-frontend:
 	cd frontend && npm run dev
@@ -27,7 +28,11 @@ dev-frontend:
 # 容器内必须 0.0.0.0，见 backend/Dockerfile CMD（docker-compose 已收窄映射到 127.0.0.1:8000）
 dev-backend:
 	cd backend && . .venv/bin/activate 2>/dev/null || true; \
-	DEBUG=true $(PYPATH) uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 127.0.0.1 --port 8000
+		DEBUG=true $(PYPATH) uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 127.0.0.1 --port 8000
+
+dev-runner:
+	cd backend && . .venv/bin/activate 2>/dev/null || true; \
+		DEBUG=true $(PYPATH) python -m runner
 
 # 一次性装齐所有依赖
 install: install-frontend install-backend install-agent
@@ -58,7 +63,7 @@ health:
 
 # 测试入口：三个分项严格传播失败，任一失败 make 即失败。
 # pytest 必须给 --basetemp（全新目录）：否则沙箱拦截 mkdir 会误报 198 个 error（环境噪音，非代码问题）。
-test: test-agent test-backend test-frontend
+test: check-api-drift test-agent test-backend test-frontend
 	@echo "[test] agent + backend + frontend 全部通过"
 
 test-agent:
@@ -136,6 +141,7 @@ gen-api:
 import json; \
 from main import app; \
 open('../frontend/openapi.json', 'w').write(json.dumps(app.openapi(), indent=2, ensure_ascii=False)); \
+open('../docs/api/openapi.json', 'w').write(json.dumps(app.openapi(), indent=2, ensure_ascii=False)); \
 print('[gen-api] openapi.json exported, schemas:', len(app.openapi().get('components', {}).get('schemas', {})))"
 	@echo "[gen-api] 生成 frontend/src/types/api.ts"
 	@cd frontend && npx openapi-typescript openapi.json -o src/types/api.ts
@@ -153,10 +159,17 @@ from main import app; \
 open('/tmp/openapi.drift.json', 'w').write(json.dumps(app.openapi(), indent=2, ensure_ascii=False))"
 	@if diff -q frontend/openapi.json /tmp/openapi.drift.json >/dev/null 2>&1; then \
 		echo "[check-api-drift] ✅ openapi.json 与后端代码同步"; \
-		rm -f /tmp/openapi.drift.json; \
 	else \
 		echo "[check-api-drift] ❌ openapi.json 落后于后端代码，请运行 make gen-api"; \
 		diff frontend/openapi.json /tmp/openapi.drift.json | head -40 || true; \
+		exit 1; \
+	fi
+	@if diff -q docs/api/openapi.json /tmp/openapi.drift.json >/dev/null 2>&1; then \
+		echo "[check-api-drift] ✅ docs/api/openapi.json 与后端代码同步"; \
+		rm -f /tmp/openapi.drift.json; \
+	else \
+		echo "[check-api-drift] ❌ docs/api/openapi.json 落后于后端代码，请运行 make gen-api"; \
+		diff docs/api/openapi.json /tmp/openapi.drift.json | head -40 || true; \
 		rm -f /tmp/openapi.drift.json; \
 		exit 1; \
 	fi

@@ -4,12 +4,26 @@ sys.path setup + mock_llm 已上移至根 conftest.py（ADR-0003 Stage C）。
 本文件只保留 backend 专用 fixture：client (FastAPI TestClient)、
 sample_csv_path、uploaded_session、s3_enabled。
 """
+import asyncio
 import os
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+
+
+@pytest.fixture(scope="session", autouse=True)
+def initialize_test_database():
+    """Create the shared test schema through the production bootstrap path."""
+    if os.getenv("TEST_POSTGRES_DATABASE_URL"):
+        # PostgreSQL async connections are bound to their event loop. The
+        # dedicated PostgreSQL acceptance owns one loop for bootstrap + test.
+        return
+    from database import create_tables
+
+    asyncio.run(create_tables())
 
 
 @pytest.fixture
@@ -65,7 +79,17 @@ def uploaded_session(client, sample_csv_path):
         resp = client.post(
             "/upload",
             files={"file": ("sample.csv", f, "text/csv")},
+            headers={"Idempotency-Key": str(uuid.uuid4())},
         )
-    if resp.status_code == 200:
-        return resp.json()["session_id"]
+    if resp.status_code == 202:
+        from runner import process_one_run
+
+        accepted = resp.json()
+        if asyncio.run(
+            process_one_run(
+                owner="uploaded-session-fixture",
+                run_id=accepted["run_id"],
+            )
+        ):
+            return accepted["session_id"]
     return "red-stage-dummy-session-id"

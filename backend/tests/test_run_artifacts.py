@@ -1,7 +1,7 @@
 """Run 工件目录（trace / checkpoints / outputs）契约测试。
 
 北极星"每一步可查"的磁盘级落地面：
-1. 上传管线 → manifest + trace.jsonl + checkpoints/latest.json 存在
+1. 上传管线 → lease-epoch 工作区 + 数据库 Run 事件存在
 2. 章节生成 → generate_chapter 与 review_chapter 事件可读（含分数）
 3. 审批硬证据门 409 → force 通过 → approve_chapter forced 事件
 4. 人工评审决策 accept 落 trace
@@ -11,12 +11,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import shutil
 import uuid
 
 import run_store
 from conftest import make_write_ready_state
 from facade import facade
+from run_repository import RunRepository
 
 
 def _seed(**overrides) -> str:
@@ -25,31 +27,36 @@ def _seed(**overrides) -> str:
     return sid
 
 
-def test_upload_pipeline_writes_run_dir(client, sample_csv_path):
-    """POST /upload 后 run 目录三件套齐全：manifest/trace/checkpoints。"""
+def test_upload_pipeline_writes_attempt_artifacts_and_durable_events(client, sample_csv_path):
+    """Runner 将上传产物隔离到 lease epoch，并持久化有序 Run 事件。"""
     with open(sample_csv_path, "rb") as f:
         resp = client.post(
-            "/upload", files={"file": ("sample.csv", f, "text/csv")}
+            "/upload",
+            files={"file": ("sample.csv", f, "text/csv")},
+            headers={"Idempotency-Key": str(uuid.uuid4())},
         )
-    assert resp.status_code == 200, resp.text
-    sid = resp.json()["session_id"]
+    assert resp.status_code == 202, resp.text
+    accepted = resp.json()
+    from runner import process_one_run
+
+    assert asyncio.run(
+        process_one_run(owner="run-artifacts-test", run_id=accepted["run_id"])
+    )
+    sid = accepted["session_id"]
 
     files = {f["path"] for f in run_store.list_files(sid)}
-    assert "trace.jsonl" in files
-    assert "checkpoints/latest.json" in files
-    assert any(p.startswith("workspace/") for p in files), (
-        f"清洗产物应落在 run 目录 workspace/ 下: {sorted(files)}"
+    attempt_prefix = f"attempts/{accepted['run_id']}/epoch-1/"
+    assert any(p.startswith(attempt_prefix) for p in files), (
+        f"清洗产物应落在当前 lease epoch 工作区: {sorted(files)}"
     )
 
-    events = run_store.tail_events(sid, limit=50)
-    nodes = [e["node"] for e in events]
-    assert "upload_pipeline" in nodes
-    up = next(e for e in events if e["node"] == "upload_pipeline")
-    assert up["status"] == "ok"
-    assert isinstance(up.get("duration_ms"), (int, float))
-
-    manifest = run_store.read_manifest(sid)
-    assert manifest and manifest.get("source_csv")
+    events = asyncio.run(RunRepository().events_after(accepted["run_id"], 0))
+    event_types = [event.event_type for event in events]
+    assert event_types[0] == "run.accepted"
+    assert "run.claimed" in event_types
+    assert event_types[-1] == "run.succeeded"
+    progress = [event.payload for event in events if event.event_type == "run.progress"]
+    assert {item.get("node") for item in progress} == {"upload_data", "clean_data"}
 
 
 def test_generate_and_review_events_traced(client):
@@ -216,6 +223,20 @@ def test_delete_session_removes_run_dir():
     assert not d.exists()
     # 二次删除：会话已不存在，返回 False 且不抛错
     assert facade.delete_session(sid) is False
+
+
+def test_delete_session_logs_remote_artifact_failure(monkeypatch, caplog):
+    from config import settings
+    from storage.s3 import s3_fs
+
+    sid = facade.create_session()
+    monkeypatch.setattr(settings, "S3_ENDPOINT_URL", "http://object-store.invalid")
+    monkeypatch.setattr(s3_fs, "delete", lambda _remote_path: False)
+
+    with caplog.at_level("WARNING", logger="facade"):
+        assert facade.delete_session(sid) is True
+
+    assert "remote_session_artifact_delete_failed" in caplog.text
 
 
 def teardown_function() -> None:

@@ -19,7 +19,10 @@ Estimate runs before literature so a slow search cannot hide the table.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
+from typing import Any
 
+from .cancellation import cancellation_scope, raise_if_cancelled
 from .readiness import claim_mode
 
 # 预写流程单一真相：预写步骤的有序元数据（节点名 + 调用来源 + 前驱依赖）。
@@ -78,17 +81,34 @@ def _node_callable(node_id: str):
     return getattr(importlib.import_module(module_path), attr)
 
 
-def run_prewrite(state: dict) -> dict:
+def run_prewrite(
+    state: dict,
+    progress: Callable[[str, str, dict[str, Any]], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> dict:
     """按 ``PRWRITE_SEQUENCE`` 顺序串行执行预写段（Facade HITL 路径）。
 
     识别节点后有中断判定：0 星或识别失败则直接返回，不跑估计／文献／大纲。
     """
-    for node_id, _src, _deps in PRWRITE_SEQUENCE:
-        state = {**state, **(_node_callable(node_id)(state))}
-        if node_id == "identification_verify":
-            state["claim"] = claim_mode(state)
-            if state.get("star_rating") == 0 or state.get("identification_failed"):
-                return state
+    with cancellation_scope(should_cancel):
+        for node_id, _src, _deps in PRWRITE_SEQUENCE:
+            raise_if_cancelled()
+            if progress:
+                progress(node_id, "started", {})
+            state = {**state, **(_node_callable(node_id)(state))}
+            raise_if_cancelled()
+            if progress:
+                progress(node_id, "completed", {})
+            if node_id == "identification_verify":
+                state["claim"] = claim_mode(state)
+                if state.get("star_rating") == 0 or state.get("identification_failed"):
+                    if progress:
+                        progress(
+                            node_id,
+                            "blocked",
+                            {"reason": "identification_failed"},
+                        )
+                    return state
     return state
 
 

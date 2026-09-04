@@ -9,7 +9,7 @@
 
 职责拆分（每个模块一句话）：
 - ``_deps``         —— agent 依赖加载器：直接 import graph/节点/清洗类并快速失败。
-- ``session_store`` —— 会话元数据 + state 的进程内单一真相，负责增删改查/CSV/降级日志。
+- ``session_store`` —— 会话元数据 + state 的数据库真相，负责增删改查/CSV/降级日志。
 - ``desk_client``   —— desk 能力（讨论/设计对话/语音）封装。
 - 本文件（AgentFacade）—— 薄门面：组合上述协作者，编排 graph.invoke 与单节点
   HITL / 清洗 / 评审 / CHARLS / run 工件。
@@ -18,13 +18,16 @@
 """
 from __future__ import annotations
 
+import logging
 import shutil
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterator, List, Optional
 
 import run_store
 from fastapi import HTTPException
+from config import settings
 
 from . import desk_client
 from ._deps import (
@@ -50,6 +53,9 @@ from ._deps import (
 from .session_store import SessionStore
 
 
+logger = logging.getLogger(__name__)
+
+
 class AgentFacade:
     """组合 SessionStore / desk_client / graph 与各 agent 节点的薄门面。
 
@@ -58,13 +64,8 @@ class AgentFacade:
     """
 
     def __init__(self) -> None:
-        # 会话元数据 + state 的单一真相（Task 4：以 in-memory store 为显式存储，
-        # 不再对 LangGraph checkpointer 做隐式回退）。
+        # 会话元数据 + state 的单一真相；每次调用都访问共享数据库。
         self._store: SessionStore = SessionStore()
-        # 保留旧引用：self._sessions / self._degradations 指向 store 同名 dict，
-        # 让既有代码（facade._sessions[sid]["state"]）与测试断言语义不变。
-        self._sessions: dict = self._store.sessions
-        self._degradations: dict[str, list[dict]] = self._store.degradations
 
     # ------------------------------------------------------------------
     # Session 生命周期（编排 store + run 工件目录）
@@ -99,13 +100,41 @@ class AgentFacade:
         """Return all session IDs owned by the given user."""
         return self._store.list_by_user(user_id)
 
+    def list_session_summaries_by_user(self, user_id: int) -> list[tuple[str, bool]]:
+        """Return session IDs and dataset presence without per-session I/O."""
+        return self._store.list_summaries_by_user(user_id)
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a session. Returns True if it existed, False otherwise.
 
         会话删除同时清掉磁盘上的 run 工件目录（隐私优先：删就是删）。
         """
+        # Revoking the database row first fences every current Runner lease.
+        # Artifact cleanup then runs twice safely if a caller retries deletion.
         existed = self._store.delete(session_id)
-        shutil.rmtree(run_store.run_dir(session_id), ignore_errors=True)
+        if _safe_session_component(session_id):
+            for root in (settings.UPLOAD_DIR, settings.S3_CACHE_DIR):
+                _unlink_owned_session_file(Path(root), session_id)
+
+            run_path = run_store.run_dir(session_id)
+            try:
+                runs_root = run_store.runs_root().resolve(strict=False)
+                if run_path.parent.resolve(strict=False) == runs_root:
+                    shutil.rmtree(run_path, ignore_errors=True)
+            except OSError:
+                pass
+
+            if settings.S3_ENDPOINT_URL:
+                try:
+                    from storage.s3 import s3_fs
+
+                    if not s3_fs.delete(f"{session_id}/data.csv"):
+                        logger.warning("remote_session_artifact_delete_failed")
+                except Exception:
+                    logger.warning(
+                        "remote_session_artifact_delete_failed",
+                        exc_info=True,
+                    )
         return existed
 
     # ------------------------------------------------------------------
@@ -160,12 +189,12 @@ class AgentFacade:
     def get_state(self, session_id: str) -> dict:
         """Return the state dict for a session (404 if missing).
 
-        Task 4：单一读取路径只读进程内 store，不再回退 LangGraph checkpointer。
+        单一读取路径只读数据库，不再回退 LangGraph checkpointer。
         """
         return self._store.get_state(session_id)
 
     def save_state(self, session_id: str, state: dict) -> None:
-        """Overwrite the session state (in-memory store only)."""
+        """Overwrite the durable session state."""
         self._store.save_state(session_id, state)
 
     def update_state(self, session_id: str, **fields) -> dict:
@@ -206,8 +235,7 @@ class AgentFacade:
             session_id,
             node,
             snapshot_label=snapshot_label,
-            get_state_fn=lambda: self._sessions.get(session_id, {}).get("state")
-            or {},
+            get_state_fn=lambda: self.get_state(session_id),
         )
 
     def record_event(
@@ -279,24 +307,75 @@ class AgentFacade:
                     or None,
                     degraded=bool(final_state.get("degradations")) or None,
                 )
-        # Persist final state + csv_path on the entry. Preserve the existing
-        # ``user_id`` if set (F10: session ownership).
-        existing = self._sessions.get(session_id, {})
-        self._sessions[session_id] = {
-            "state": final_state if isinstance(final_state, dict) else {},
-            "csv_path": str(csv_path),
-            "user_id": existing.get("user_id"),
-        }
-        self._store.flush()
-        return self._sessions[session_id]["state"]
+        return self._store.save_entry(
+            session_id,
+            state=final_state if isinstance(final_state, dict) else {},
+            csv_path=str(csv_path),
+        )
+
+    def execute_upload(
+        self,
+        session_id: str,
+        initial_state: dict,
+        *,
+        progress_callback=None,
+        cancellation_check=None,
+    ) -> dict:
+        """Execute upload cleaning from a snapshot without SessionStore I/O."""
+        try:
+            from agent.engine.upload import run_upload
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"upload execution unavailable: {type(exc).__name__}",
+            ) from exc
+        state = {**initial_state, "session_id": session_id}
+        return run_upload(
+            state,
+            progress=progress_callback,
+            should_cancel=cancellation_check,
+        )
 
     # ------------------------------------------------------------------
     # Single-node calls (state-driven HITL pattern)
     # ------------------------------------------------------------------
     def set_direction_and_outline(
-        self, session_id: str, research_direction: dict
+        self,
+        session_id: str,
+        research_direction: dict,
     ) -> dict:
         """Run the shared pre-write path: identify → estimate → robustness → literature → outline."""
+        initial_state = self.prepare_prewrite_state(session_id)
+        state = {**initial_state, "research_direction": research_direction}
+        try:
+            state = self.execute_prewrite(
+                session_id,
+                research_direction,
+                initial_state,
+            )
+            return state
+        finally:
+            self.save_state(session_id, state)
+
+    def prepare_prewrite_state(self, session_id: str) -> dict:
+        """Build the immutable state snapshot persisted with a pre-write run."""
+        state = dict(self.get_state(session_id))
+        if not state.get("csv_path"):
+            csv_path = self.get_session_entry(session_id).get("csv_path")
+            if csv_path:
+                state["csv_path"] = csv_path
+        return state
+
+    def execute_prewrite(
+        self,
+        session_id: str,
+        research_direction: dict,
+        initial_state: dict,
+        *,
+        progress_callback=None,
+        cancellation_check=None,
+    ) -> dict:
+        """Execute pre-write from a persisted snapshot without session-cache I/O."""
         if set_direction_node is None or generate_outline_node is None:
             raise HTTPException(
                 status_code=503,
@@ -309,24 +388,31 @@ class AgentFacade:
                 status_code=503,
                 detail=f"prewrite unavailable: {exc}",
             ) from exc
-        state = self.get_state(session_id)
-        state = {**state, "research_direction": research_direction}
-        if not state.get("csv_path"):
-            entry = self._sessions.get(session_id) or {}
-            csv_path = entry.get("csv_path")
-            if csv_path:
-                state["csv_path"] = csv_path
-        if not state.get("workspace"):
+        state = {**initial_state, "research_direction": research_direction}
+        # A durable run must never recreate disk artifacts after its Session is
+        # deleted. Prewrite does not require a workspace; legacy synchronous
+        # callers keep the existing create-on-demand behavior.
+        if not state.get("workspace") and cancellation_check is None:
             state["workspace"] = self._workspace_dir(session_id)
+
+        def run() -> dict:
+            return run_prewrite(
+                state,
+                progress=progress_callback,
+                should_cancel=cancellation_check,
+            )
+
+        # Durable workers publish RunEvent rows. Avoid the legacy disk trace
+        # because its error handler would recreate a deleted session directory.
+        if cancellation_check is not None:
+            return run()
+
         with self._tracked(session_id, "prewrite", "prewrite") as t:
-            try:
-                state = run_prewrite(state)
-                t.set_detail(
-                    star_rating=state.get("star_rating"),
-                    claim=state.get("claim"),
-                )
-            finally:
-                self.save_state(session_id, state)
+            state = run()
+            t.set_detail(
+                star_rating=state.get("star_rating"),
+                claim=state.get("claim"),
+            )
         return state
 
     def run_identification_verify(self, session_id: str) -> dict:
@@ -808,10 +894,6 @@ class AgentFacade:
         }
         state["charls_config"] = charls_config
         self.save_state(session_id, state)
-        # Mirror on the entry top-level (legacy charls.py behavior).
-        if session_id in self._sessions:
-            self._sessions[session_id]["charls_config"] = charls_config
-            self._store.flush()
         return charls_config
 
     # ------------------------------------------------------------------
@@ -994,6 +1076,10 @@ class AgentFacade:
         """Return the degradation log for a session."""
         return self._store.get_degradations(session_id)
 
+    def clear_degradations(self, session_id: str) -> None:
+        """Clear degradation records for one session."""
+        self._store.clear_degradations(session_id)
+
     # ------------------------------------------------------------------
     # Desk（薄代理 → desk_client）
     # ------------------------------------------------------------------
@@ -1034,3 +1120,22 @@ class AgentFacade:
 
 # Module-level singleton: routers import this.
 facade = AgentFacade()
+
+
+def _safe_session_component(session_id: str) -> bool:
+    return bool(
+        session_id
+        and session_id not in {".", ".."}
+        and "/" not in session_id
+        and "\\" not in session_id
+        and Path(session_id).name == session_id
+    )
+
+
+def _unlink_owned_session_file(root: Path, session_id: str) -> None:
+    path = root / f"{session_id}.csv"
+    try:
+        if path.parent.resolve(strict=False) == root.resolve(strict=False):
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass

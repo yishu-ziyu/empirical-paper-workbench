@@ -14,13 +14,19 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
-from schemas.responses import DirectionResponse, ResumeResponse
+from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
+from schemas.responses import (
+    QueueFullResponse,
+    ResumeResponse,
+    RunAcceptedResponse,
+    SessionBusyResponse,
+)
 
 router = APIRouter()
 
@@ -66,32 +72,76 @@ class ResumeRequest(BaseModel):
 
 @router.post(
     "/sessions/{session_id}/direction",
-    response_model=DirectionResponse,
+    response_model=RunAcceptedResponse,
+    status_code=202,
+    responses={
+        409: {
+            "model": SessionBusyResponse,
+            "description": "The session already has an active run; attach to it.",
+        },
+        429: {
+            "model": QueueFullResponse,
+            "description": "The durable run queue is full.",
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds before retrying admission.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
 )
 async def set_direction_endpoint(
     session_id: str,
     payload: DirectionRequest,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+    ),
     current_user: Optional[User] = Depends(get_optional_user),
-) -> DirectionResponse:
-    """接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。"""
+) -> RunAcceptedResponse:
+    """Persist a pre-write command and return before research work begins."""
     require_session_ownership(session_id, current_user)
+    upload_readiness = facade.get_state(session_id).get("upload_readiness")
+    if upload_readiness in {"PROCESSING", "FAILED", "CANCELLED"}:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "upload_not_ready",
+                "upload_readiness": upload_readiness,
+            },
+        )
     rd = payload.model_dump()
-    state = facade.set_direction_and_outline(session_id, rd)
-    fields = facade.instrument_fields(state)
-    return DirectionResponse(
-        outline=fields.get("outline") or [],
-        research_direction=fields.get("research_direction") or rd,
-        star_rating=fields.get("star_rating"),
-        identification_failed=bool(fields.get("identification_failed")),
-        identification_report=fields.get("identification_report"),
-        results=fields.get("results"),
-        estimate=fields.get("estimate"),
-        cleaning_report=fields.get("cleaning_report"),
-        claim=fields.get("claim"),
-        literature_source=fields.get("literature_source"),
-        degradations=list(state.get("degradations") or []),
-        write_blockers=list(fields.get("write_blockers") or []),
-        robustness_status=fields.get("robustness_status"),
+    try:
+        run = await RunRepository().enqueue(
+            session_id=session_id,
+            kind="prewrite",
+            payload={
+                "research_direction": rd,
+                "initial_state": facade.prepare_prewrite_state(session_id),
+            },
+            idempotency_key=idempotency_key,
+        )
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    except SessionBusy as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "session_busy", "run_id": exc.run_id},
+        ) from exc
+    except QueueFull as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="run queue is full",
+            headers={"Retry-After": "5"},
+        ) from exc
+    return RunAcceptedResponse(
+        run_id=run.run_id,
+        session_id=run.session_id,
+        status="PENDING",
+        events_url=f"/api/runs/{run.run_id}/events",
     )
 
 

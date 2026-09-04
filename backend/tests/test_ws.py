@@ -1,4 +1,4 @@
-"""Contract tests for WS /sessions/{id}/stream (T-02 red stage).
+"""Legacy WS compatibility tests while production progress uses SSE.
 
 Pins the WS message schema from spec §12-§14:
 - status: {type:"status", node, status:"running"|"paused"|"done"}
@@ -10,6 +10,10 @@ so the connection is rejected and the drain helper returns an empty list;
 every test then fails on the "received at least one matching frame"
 assertion.
 """
+
+import asyncio
+
+from runner import process_one_run
 
 
 def _drain_ws(client, session_id, max_messages=20):
@@ -52,6 +56,7 @@ def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
     # 跑完预写(含 generate_title)再开 WS,才有标题可流。
     direction = client.post(
         f"/sessions/{uploaded_session}/direction",
+        headers={"Idempotency-Key": "ws-direction"},
         json={
             "question": "年龄与收入",
             "dv": "income",
@@ -61,9 +66,12 @@ def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
             "template": "cn_journal",
         },
     )
-    assert direction.status_code == 200, (
+    assert direction.status_code == 202, (
         f"set direction failed: {direction.status_code}: {direction.text}"
     )
+    run_id = direction.json()["run_id"]
+    assert asyncio.run(process_one_run(owner="ws-test", run_id=run_id)) is True
+    assert client.get(f"/runs/{run_id}").json()["status"] == "SUCCEEDED"
     messages = _drain_ws(client, uploaded_session)
     chunks = [m for m in messages if m.get("type") == "streaming_chunk"]
     assert len(chunks) > 0, "no streaming_chunk frames received over WS"

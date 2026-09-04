@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -21,8 +22,19 @@ from config import settings
 async def lifespan(app: FastAPI):
     """Application lifespan: create DB tables on startup, clean up on shutdown."""
     from database import create_tables
+    from upload_artifacts import (
+        reconcile_upload_artifacts,
+        reconcile_upload_artifacts_forever,
+    )
 
     await create_tables()
+    try:
+        await reconcile_upload_artifacts()
+    except Exception:
+        logging.getLogger("econpaper").exception(
+            "upload artifact startup reconciliation failed"
+        )
+    upload_reconciler = asyncio.create_task(reconcile_upload_artifacts_forever())
 
     try:
         from agent.llm.ssot import load_ssot
@@ -49,7 +61,14 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             print(f"⚠ S3 connection failed (degraded): {exc}")
 
-    yield
+    try:
+        yield
+    finally:
+        upload_reconciler.cancel()
+        try:
+            await upload_reconciler
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
@@ -80,6 +99,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     """Return structured JSON for known HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
+        headers=exc.headers,
         content={
             "error": exc.detail,
             "detail": exc.detail,
@@ -161,6 +181,7 @@ from routers.paper_draft import router as paper_draft_router  # noqa: E402
 from routers.progress import router as progress_router  # noqa: E402
 from routers.review import router as review_router  # noqa: E402
 from routers.runs import router as runs_router  # noqa: E402
+from routers.run_execution import router as run_execution_router  # noqa: E402
 from routers.sample import router as sample_router  # noqa: E402
 from routers.sessions import router as sessions_router  # noqa: E402
 from routers.ws import router as ws_router  # noqa: E402
@@ -183,3 +204,4 @@ app.include_router(doc_export_router)
 app.include_router(progress_router)
 app.include_router(review_router)
 app.include_router(runs_router)
+app.include_router(run_execution_router)

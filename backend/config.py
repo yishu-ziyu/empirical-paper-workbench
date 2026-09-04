@@ -86,7 +86,7 @@ class Settings:
     # --- Run 工件目录（trace/checkpoints/outputs，"每一步可查"的磁盘载体）---
     RUNS_DIR: str = str(_state_path("RUNS_DIR", "runs"))
 
-    # --- 会话存储持久化文件（P1-3：重启后恢复 session/state/owner）---
+    # --- 旧会话 JSON（启动时一次性迁入 DATABASE_URL，仅作兼容入口）---
     SESSIONS_PATH: str = str(
         _state_path("SESSIONS_PATH", "sessions", "sessions.json")
     )

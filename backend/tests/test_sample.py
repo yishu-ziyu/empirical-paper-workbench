@@ -6,10 +6,12 @@ Seams: the three POST endpoints self-registered by ``routers.sample``:
 - POST /sessions/{id}/balance     -- sub-step 7
 
 Each test uploads a small CSV, then exercises the endpoint and checks the
-response shape. The session store is the in-module ``_sessions`` dict from
+response shape. The session store is the shared database-backed facade from
 ``routers.sessions``.
 """
+import asyncio
 import io
+import uuid
 
 # Importing the sample router triggers its self-registration on main.app
 # (see routers/sample.py::_self_register). Matches the eda.py pattern.
@@ -30,9 +32,16 @@ def _upload_csv(client):
     resp = client.post(
         "/upload",
         files={"file": ("panel.csv", io.BytesIO(csv_bytes), "text/csv")},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()["session_id"]
+    assert resp.status_code == 202, resp.text
+    accepted = resp.json()
+    from runner import process_one_run
+
+    assert asyncio.run(
+        process_one_run(owner="sample-router-test", run_id=accepted["run_id"])
+    )
+    return accepted["session_id"]
 
 
 # --------------------------------------------------------------------------- #

@@ -355,25 +355,55 @@
     "/upload": {
       "post": {
         "summary": "Upload",
-        "description": "Accept a CSV / Stata (.dta) / Excel (.xlsx) upload, parse meta, run the graph.",
+        "description": "Persist an upload command and return before cleaning begins.",
         "operationId": "upload_upload_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_upload_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key was reused for different input"
+          },
+          "429": {
+            "description": "The durable run queue is full",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying admission",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -388,12 +418,58 @@
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/upload/resolve": {
+      "post": {
+        "summary": "Resolve Upload",
+        "description": "Resolve a committed upload after the accepting response was lost.",
+        "operationId": "resolve_upload_upload_resolve_post",
         "security": [
           {
             "OAuth2PasswordBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No upload is visible for this capability"
+          },
+          "503": {
+            "description": "Upload resolution is temporarily unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/sessions": {
@@ -717,7 +793,7 @@
     "/sessions/{session_id}/direction": {
       "post": {
         "summary": "Set Direction Endpoint",
-        "description": "接受研究方向 → set_direction → 识别验真 → 非 0 星再生成 outline。",
+        "description": "Persist a pre-write command and return before research work begins.",
         "operationId": "set_direction_endpoint_sessions__session_id__direction_post",
         "security": [
           {
@@ -733,6 +809,17 @@
               "type": "string",
               "title": "Session Id"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Idempotency-Key"
+            }
           }
         ],
         "requestBody": {
@@ -746,12 +833,40 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DirectionResponse"
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session already has an active run; attach to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBusyResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The durable run queue is full.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying admission.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueFullResponse"
                 }
               }
             }
@@ -2124,6 +2239,110 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TraceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}": {
+      "get": {
+        "summary": "Get Run",
+        "operationId": "get_run_runs__run_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{run_id}/events": {
+      "get": {
+        "summary": "Stream Run Events",
+        "operationId": "stream_run_events_runs__run_id__events_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ordered run events; resume with Last-Event-ID.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -4289,6 +4508,36 @@
         "title": "ProgressResponse",
         "description": "GET /sessions/{id}/progress 返回体。"
       },
+      "QueueFullResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "code": {
+            "type": "integer",
+            "const": 429,
+            "title": "Code",
+            "default": 429
+          },
+          "degraded": {
+            "type": "boolean",
+            "const": false,
+            "title": "Degraded",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "detail"
+        ],
+        "title": "QueueFullResponse"
+      },
       "RegenerateRequest": {
         "properties": {
           "chapter_index": {
@@ -4699,6 +4948,158 @@
         "title": "RollbackResponse",
         "description": "POST /sessions/{id}/rollback 返回体。"
       },
+      "RunAcceptedResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "PENDING",
+            "title": "Status",
+            "default": "PENDING"
+          },
+          "events_url": {
+            "type": "string",
+            "title": "Events Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "session_id",
+          "events_url"
+        ],
+        "title": "RunAcceptedResponse",
+        "description": "A durable pre-write run accepted for independent execution."
+      },
+      "RunStatusResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prewrite",
+              "upload_pipeline"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "RECONCILING",
+              "SUCCEEDED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "title": "Status"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "lease_epoch": {
+            "type": "integer",
+            "title": "Lease Epoch"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DirectionResponse"
+              },
+              {
+                "$ref": "#/components/schemas/UploadRunResultResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "session_id",
+          "kind",
+          "status",
+          "attempt",
+          "lease_epoch"
+        ],
+        "title": "RunStatusResponse"
+      },
+      "SessionBusyDetail": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "session_busy",
+            "title": "Code",
+            "default": "session_busy"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "SessionBusyDetail"
+      },
+      "SessionBusyResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/SessionBusyDetail"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/SessionBusyDetail"
+          },
+          "code": {
+            "type": "integer",
+            "const": 409,
+            "title": "Code",
+            "default": 409
+          },
+          "degraded": {
+            "type": "boolean",
+            "const": false,
+            "title": "Degraded",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "detail"
+        ],
+        "title": "SessionBusyResponse"
+      },
       "SessionInfoResponse": {
         "properties": {
           "session_id": {
@@ -4713,6 +5114,23 @@
             "type": "boolean",
             "title": "Has Dataset",
             "default": false
+          },
+          "upload_readiness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PROCESSING",
+                  "READY",
+                  "FAILED",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload Readiness"
           },
           "claim": {
             "anyOf": [
@@ -4974,6 +5392,20 @@
             "type": "string",
             "title": "Session Id"
           },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "PENDING",
+            "title": "Status",
+            "default": "PENDING"
+          },
+          "events_url": {
+            "type": "string",
+            "title": "Events Url"
+          },
           "dataset_meta": {
             "$ref": "#/components/schemas/DatasetMetaResponse"
           }
@@ -4981,10 +5413,32 @@
         "type": "object",
         "required": [
           "session_id",
+          "run_id",
+          "events_url",
           "dataset_meta"
         ],
         "title": "UploadResponse",
         "description": "POST /upload 返回体。"
+      },
+      "UploadRunResultResponse": {
+        "properties": {
+          "cleaning_report": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Cleaning Report"
+          },
+          "upload_readiness": {
+            "type": "string",
+            "const": "READY",
+            "title": "Upload Readiness",
+            "default": "READY"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cleaning_report"
+        ],
+        "title": "UploadRunResultResponse"
       },
       "UserResponse": {
         "properties": {

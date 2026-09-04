@@ -52,7 +52,8 @@ export default function DeskPage({
   authed,
 }: DeskPageProps) {
   const { t } = useT()
-  const [text, setText] = useState('')
+  const initialDraft = useRef(sessionStorage.getItem('desk_idea_draft') || '').current
+  const [text, setText] = useState(initialDraft)
   const [conversationHistory, setConversationHistory] = useState<Array<{ user: string; assistant: string }>>([])
   const [turns, setTurns] = useState<DeskTurn[]>([])
   const [card, setCard] = useState<DeskCard | null>(null)
@@ -63,6 +64,7 @@ export default function DeskPage({
   const [asking, setAsking] = useState(false)
   const [askText, setAskText] = useState('')
   const [asked, setAsked] = useState('')
+  const [replyError, setReplyError] = useState('')
   const [agentPane, setAgentPane] = useState<'shape' | 'clean' | 'estimate' | 'write'>('shape')
   const paperRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<number | null>(null)
@@ -75,13 +77,18 @@ export default function DeskPage({
   const title = titleOverride ?? card?.title ?? ''
   const canShape = text.trim().length > 0
   const conversational = card?.intent === 'conversation'
+  const inReplyFlow = Boolean(card) || turns.length > 0
 
-  // 未登录点「开始」会先去注册/登录；想法暂存 sessionStorage，回来即恢复
+  // 首屏或登录流程带来的原话会自动发起第一轮讨论。
+  // initialDraft 在 effect 重放前已缓存，React StrictMode 清掉首个 timer 后仍能重新调度。
   useEffect(() => {
-    const draft = sessionStorage.getItem('desk_idea_draft')
-    if (draft && !text) {
-      handleChange(draft)
-      sessionStorage.removeItem('desk_idea_draft')
+    if (!initialDraft) return
+    timerRef.current = window.setTimeout(() => {
+      void askModel(initialDraft, [])
+    }, IDLE_MS)
+    sessionStorage.removeItem('desk_idea_draft')
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -103,11 +110,12 @@ export default function DeskPage({
       setCard(next)
       setTitleOverride(null)
       setAsking(false)
+      setReplyError('')
     } catch {
       if (requestRef.current !== ticket) return
-      const askedNow = [...nextTurns].reverse().find((item) => item.id === 'ask')
-      if (askedNow) {
-        setAsking(true)
+      if (nextTurns.length > 0) {
+        setCard(null)
+        setReplyError('刚才没有完成回答，请重试。')
         return
       }
       const answers: ShapeAnswers = {}
@@ -147,18 +155,22 @@ export default function DeskPage({
     setAsking(false)
     setAskText('')
     setAsked('')
+    setReplyError('')
+    setCard(null)
     void askModel(text, nextTurns)
   }
 
-  function askAboutOptions() {
+  function submitCardReply() {
     const note = askText.trim() || '这几个选项分别是什么意思？我该怎么选？'
     if (timerRef.current) window.clearTimeout(timerRef.current)
     const nextTurns = [
       ...turns,
-      { question: card?.question || '', answer: note, id: 'ask' },
+      { question: card?.question || '', answer: note, id: asking ? 'ask' : 'freeform' },
     ]
     setTurns(nextTurns)
-    setAsked(note)
+    setAsked(asking ? note : '')
+    setReplyError('')
+    setCard(null)
     void askModel(text, nextTurns)
   }
 
@@ -302,7 +314,7 @@ export default function DeskPage({
       return
     }
     if (card) {
-      askAboutOptions()
+      submitCardReply()
       setAskText('')
       return
     }
@@ -446,6 +458,22 @@ export default function DeskPage({
                 <p className="text-[14px] text-muted" data-testid="desk-thinking">{t('desk.shaping')}</p>
               )}
 
+              {replyError && !busy && (
+                <div data-testid="desk-reply-error" className="flex items-center gap-3 text-[14px] text-danger">
+                  <span>{replyError}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyError('')
+                      void askModel(text, turns)
+                    }}
+                    className="underline underline-offset-4"
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+
               {card?.intent === 'conversation' && (
                 <section data-testid="conversation-reply" className="animate-slide-up max-w-[92%] pb-4">
                   <span className="text-[12px] font-medium text-accent">econpaper</span>
@@ -544,7 +572,7 @@ export default function DeskPage({
 
       <div className="shrink-0 border-t border-black/[0.06] bg-[#fffefb]/95 px-5 py-3 backdrop-blur sm:px-8">
         <label className="relative mx-auto block w-full max-w-[780px]">
-          <span className="sr-only">{card && !conversational ? t('desk.askPlaceholder') : t('desk.paperLabel')}</span>
+          <span className="sr-only">{inReplyFlow && !conversational ? t('desk.askPlaceholder') : t('desk.paperLabel')}</span>
           <div
             className={`rounded-[18px] border bg-white transition-colors ${
               asking ? 'border-accent/40' : 'border-black/[0.1]'
@@ -552,10 +580,10 @@ export default function DeskPage({
           >
             <textarea
               ref={paperRef}
-              data-testid={conversational ? 'desk-conversation-input' : card ? 'desk-ask-input' : 'desk-paper'}
-              value={card ? askText : text}
+              data-testid={conversational ? 'desk-conversation-input' : inReplyFlow ? 'desk-ask-input' : 'desk-paper'}
+              value={inReplyFlow ? askText : text}
               onChange={(event) => {
-                if (card) setAskText(event.target.value)
+                if (inReplyFlow) setAskText(event.target.value)
                 else handleChange(event.target.value)
               }}
               onKeyDown={(event) => {
@@ -564,7 +592,7 @@ export default function DeskPage({
                   sendComposer()
                 }
               }}
-              placeholder={conversational ? '继续说你的想法…' : card ? t('desk.askPlaceholder') : t('desk.placeholder')}
+              placeholder={conversational ? '继续说你的想法…' : inReplyFlow ? t('desk.askPlaceholder') : t('desk.placeholder')}
               className="min-h-[56px] w-full resize-none rounded-[18px] bg-transparent px-4 pt-3 text-[15px] leading-6 text-ink outline-none placeholder:text-muted/55"
             />
             <div className="flex items-center gap-2 px-2.5 pb-2.5">
@@ -591,13 +619,13 @@ export default function DeskPage({
               {voiceStatus === 'listening' && <span className="text-[12px] text-muted">{t('desk.listening')}</span>}
               <button
                 type="button"
-                data-testid={card ? 'desk-ask-send' : 'desk-shape-btn'}
+                data-testid={inReplyFlow ? 'desk-ask-send' : 'desk-shape-btn'}
                 onClick={sendComposer}
                 disabled={busy || (conversational ? !askText.trim() : !card && !canShape)}
                 className="ml-auto rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label={conversational ? t('desk.shape') : card ? t('desk.askSend') : t('desk.shape')}
+                aria-label={conversational ? t('desk.shape') : inReplyFlow ? t('desk.askSend') : t('desk.shape')}
               >
-                {busy ? t('desk.shaping') : conversational ? t('desk.shape') : card ? t('desk.askSend') : t('desk.shape')} →
+                {busy ? t('desk.shaping') : conversational ? t('desk.shape') : inReplyFlow ? t('desk.askSend') : t('desk.shape')} →
               </button>
             </div>
           </div>

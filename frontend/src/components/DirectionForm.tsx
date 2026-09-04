@@ -64,6 +64,8 @@ export interface DirectionFormProps {
   initialQuestion?: string
   initial?: DirectionFormInitial
   columns?: string[]
+  disabled?: boolean
+  disabledReason?: string | null
 }
 
 export default function DirectionForm({
@@ -71,6 +73,8 @@ export default function DirectionForm({
   initialQuestion = '',
   initial,
   columns = [],
+  disabled = false,
+  disabledReason = null,
 }: DirectionFormProps) {
   const { t } = useT()
   const [question, setQuestion] = useState(initial?.question ?? initialQuestion)
@@ -93,7 +97,7 @@ export default function DirectionForm({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!canSubmit) return
+    if (!canSubmit || disabled) return
     const controlsArr = controls
       .split(',')
       .map((s) => s.trim())
@@ -292,11 +296,17 @@ export default function DirectionForm({
       </label>
       <button
         type="submit"
-        disabled={!canSubmit}
+        disabled={!canSubmit || disabled}
+        aria-describedby={disabledReason ? 'direction-disabled-reason' : undefined}
         className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
       >
         {t('direction.submit')}
       </button>
+      {disabledReason ? (
+        <p id="direction-disabled-reason" data-testid="direction-disabled-reason" className="text-xs text-muted">
+          {disabledReason}
+        </p>
+      ) : null}
     </form>
   )
 }

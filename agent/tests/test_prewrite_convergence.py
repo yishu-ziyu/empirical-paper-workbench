@@ -6,7 +6,10 @@ graph（LangGraph 并行图）与 ``run_prewrite``（Facade HITL 串行路径）
 """
 from __future__ import annotations
 
+import pytest
+
 import agent.graph as graph_module
+from agent.engine.cancellation import ExecutionCancelled
 from agent.engine.prewrite import PRWRITE_NODES, PRWRITE_SEQUENCE, run_prewrite
 from agent.nodes.route_after_review import _advance  # noqa: F401  (route 收敛锚点)
 
@@ -63,6 +66,27 @@ def test_prwrite_sequence_is_single_source():
             assert dep in declared, f"依赖 {dep!r} 不在清单中"
             assert dep in seen, f"依赖 {dep!r} 必须排在 {node_id!r} 之前"
         seen.add(node_id)
+
+
+def test_run_prewrite_does_not_start_the_next_node_after_cancellation(monkeypatch):
+    calls: list[str] = []
+    cancelled = False
+
+    def node_for(node_id: str):
+        def run(_state):
+            nonlocal cancelled
+            calls.append(node_id)
+            cancelled = True
+            return {"first_node_finished": True}
+
+        return run
+
+    monkeypatch.setattr("agent.engine.prewrite._node_callable", node_for)
+
+    with pytest.raises(ExecutionCancelled):
+        run_prewrite({}, should_cancel=lambda: cancelled)
+
+    assert calls == ["set_direction"]
 
 
 def test_id_node_reuse_in_nonzero_star():

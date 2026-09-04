@@ -456,4 +456,4 @@ def test_generate_chapter_bad_review_json_get_review_is_mock_fallback(
         for d in degs
     )
     facade.drop_session(sid)
-    facade._degradations.pop(sid, None)
+    facade.clear_degradations(sid)

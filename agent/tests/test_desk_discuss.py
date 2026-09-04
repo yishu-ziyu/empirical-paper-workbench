@@ -141,3 +141,79 @@ def test_discuss_rejects_llm_title_that_replaces_explicit_outcome(monkeypatch):
 
     assert result["source"] == "llm"
     assert result["title"] == "我想研究数字经济发展是否提高了制造业企业的生产率"
+
+
+def test_discuss_turns_uncertainty_into_a_recommendation_instead_of_repeating(monkeypatch):
+    previous_question = "你打算用什么数据来源？"
+    payload = {
+        "intent": "research",
+        "reflection": "学生表示不清楚，需要系统给一个方向。",
+        "title": "教育的作用会不会隔代才显著",
+        "question": previous_question,
+        "options": [
+            {"id": "cfps", "label": "CFPS"},
+            {"id": "cgss", "label": "CGSS"},
+        ],
+        "explain": "我建议先看 CFPS，因为它更接近家庭与代际追踪场景。",
+        "ready": False,
+    }
+    monkeypatch.setattr(
+        "agent.desk.socratic.call_llm",
+        lambda *args, **kwargs: __import__("json").dumps(payload),
+    )
+
+    result = discuss(
+        "教育的作用会不会隔代才显著",
+        [
+            {
+                "id": "freeform",
+                "question": previous_question,
+                "answer": "我不太清楚，你觉得用哪些数据会更合适？",
+            }
+        ],
+    )
+
+    assert "建议" in result["explain"]
+    assert result["reflection"] == "我来替你判断，先给你一个可以直接采用的方案。"
+    assert result["question"] != previous_question
+    assert result["question"] == "先按我的建议继续，可以吗？"
+    assert result["options"][0]["id"] == "accept_recommendation"
+
+
+def test_discuss_owns_dataset_field_checks_instead_of_quizzing_the_student(monkeypatch):
+    payload = {
+        "intent": "research",
+        "reflection": "CGSS 是一个候选数据源。",
+        "title": "教育的作用会不会隔代才显著",
+        "question": "CGSS里能拿到祖辈教育年限吗？",
+        "options": [
+            {"id": "yes", "label": "能直接拿到"},
+            {"id": "parent", "label": "只有父亲一代"},
+            {"id": "other", "label": "需要另寻数据"},
+        ],
+        "explain": "",
+        "ready": False,
+    }
+    monkeypatch.setattr(
+        "agent.desk.socratic.call_llm",
+        lambda *args, **kwargs: __import__("json").dumps(payload),
+    )
+
+    result = discuss(
+        "教育的作用会不会隔代才显著",
+        [
+            {
+                "id": "freeform",
+                "question": "你打算用什么数据来源？",
+                "answer": "CGSS等专项调查",
+            }
+        ],
+    )
+
+    assert result["question"] == "你手上已经有数据文件吗？"
+    assert result["options"] == [
+        {"id": "data_in_hand", "label": "已有数据"},
+        {"id": "data_accessible", "label": "可以申请"},
+        {"id": "data_no_access", "label": "还没有"},
+    ]
+    assert "由我来核验" in result["explain"]

@@ -41,27 +41,112 @@ describe('App 三栏布局', () => {
     vi.unstubAllGlobals()
   })
 
-  test('无 session 时先进入引导，不摊开工作台', () => {
+  test('C1 首次访问直接进空桌：无 seen_guide 无会话时首屏是 DeskPage，无落地页内容', () => {
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
-    expect(screen.getByTestId('guide-steps')).toBeInTheDocument()
-    expect(screen.getByTestId('guide-upload-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-paper')).toBeInTheDocument()
+    expect(screen.queryByText('用数据写实证论文')).not.toBeInTheDocument()
+    expect(screen.queryByText('四步写出论文')).not.toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('desk-page')).not.toBeInTheDocument()
   })
 
-  test('引导里点先写在纸上才进入空桌', () => {
+  test('C2 seenGuide 不再是进门条件：seen_guide 键存在与否首屏都是 desk-page', () => {
+    const seeds: Array<[string, () => void]> = [
+      ['未看过落地页（无键）', () => {}],
+      ['看过落地页（键=1）', () => localStorage.setItem('econpaper_seen_guide', '1')],
+    ]
+    for (const [label, seed] of seeds) {
+      localStorage.clear()
+      localStorage.setItem('econpaper_access_token', 'test-token-for-auth')
+      seed()
+      const { unmount } = renderWithI18n(<App />)
+      expect(screen.getByTestId('desk-page'), label).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  test('C4 空桌页眉「了解产品」进入 GuidePage，CTA 再回到空桌', () => {
     renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-open-guide'))
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByText('用数据写实证论文')).toBeInTheDocument()
+
     fireEvent.click(screen.getByTestId('guide-write-paper'))
     expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
   })
 
-  test('首屏发送研究想法后进入对话，并保留用户原文', async () => {
+  test('C4 GuidePage 的返回按钮回到 desk-page', () => {
+    renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-open-guide'))
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('guide-back-desk'))
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+  })
+
+  test('C5 无会话工作台点「再看一次产品页」能看 GuidePage，且能回到工作台不丢方向', async () => {
+    const user = userEvent.setup()
+    const shapedTitle = '养老金并轨之后，临近退休的人是不是更早离开劳动力市场？'
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.includes('/desk/discuss')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              intent: 'research',
+              reflection: '收到，方向可以先定下来。',
+              title: shapedTitle,
+              heard: ['CHARLS', '养老'],
+              comparison: '比较政策前后',
+              outcome: '看就业、工时或退休',
+              question: '',
+              options: [],
+              explain: '',
+              ready: true,
+              source: 'llm',
+            }),
+        })
+      }
+      if (href.endsWith('/auth/me')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    // 等 /auth/me 的微任务链落地，authed 置真后再走 desk 确认流
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+
+    await user.type(screen.getByTestId('desk-paper'), '导师让我用 CHARLS 做点养老的')
+    await user.click(screen.getByTestId('desk-shape-btn'))
+    const confirm = await screen.findByTestId('desk-confirm-btn')
+    await user.click(confirm)
+
+    // desk 确认方向后进入无会话工作台
+    expect(screen.getByTestId('desk-columns')).toBeInTheDocument()
+    expect(screen.getByTestId('open-guide-btn')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('open-guide-btn'))
+    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('guide-back-desk'))
+    expect(screen.getByTestId('desk-columns')).toBeInTheDocument()
+    expect(screen.getByTestId('direction-section')).toBeInTheDocument()
+    expect(screen.getByLabelText(/研究问题/)).toHaveValue(shapedTitle)
+  })
+
+  test('GuidePage 发送研究想法后进入空桌对话，并保留用户原文', async () => {
     const user = userEvent.setup()
     renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-open-guide'))
 
     await user.type(screen.getByTestId('guide-idea-input'), '我想研究高铁开通是否促进县域创业')
     await user.click(screen.getByTestId('guide-send-idea'))
@@ -120,13 +205,13 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
   })
 
-  test('右栏命名 Research Computer，并分成研究结构、数据与设计、证据写作和运行记录', async () => {
+  test('右栏命名「研究进度」，并分成研究结构、数据与设计、证据写作和运行记录', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
     localStorage.setItem('econpaper_session_id', 'test-sess')
     renderWithI18n(<App />)
 
     expect(await screen.findByTestId('research-computer')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Research Computer' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '研究进度' })).toBeInTheDocument()
     expect(screen.getByTestId('research-structure')).toBeInTheDocument()
     expect(screen.getByTestId('research-data-design')).toBeInTheDocument()
     expect(screen.getByTestId('research-evidence-writing')).toBeInTheDocument()
@@ -364,7 +449,7 @@ describe('App 三栏布局', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
 
     // 触发文件选择 → 模拟选择 CSV
     const fileInput = screen.getByTestId('file-input')
@@ -707,7 +792,8 @@ describe('App 三栏布局', () => {
     await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
     AppFakeEventSource.latest?.onerror?.()
 
-    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
+    // 新入口语义：恢复失败不再回落地页，而是回到可重新上传的空桌
+    expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('upload-error')).toHaveTextContent(message)
     expect(localStorage.getItem('econpaper_session_id')).toBeNull()
     expect(localStorage.getItem('econpaper_active_run_id:sess-protected')).toBeNull()
@@ -749,7 +835,7 @@ describe('App 三栏布局', () => {
     await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
     AppFakeEventSource.latest?.onerror?.()
 
-    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
+    expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('upload-error')).toHaveTextContent('未找到这次数据处理')
     expect(localStorage.getItem('econpaper_session_id')).toBeNull()
     expect(localStorage.getItem('econpaper_active_run_id:sess-missing-run')).toBeNull()
@@ -865,7 +951,7 @@ describe('App 三栏布局', () => {
     })
   })
 
-  test('刷新解析 404 时清理 key 并回到可重新选文件的引导页', async () => {
+  test('刷新解析 404 时清理 key 并回到可重新选文件的空桌', async () => {
     localStorage.setItem(
       'econpaper_pending_upload',
       JSON.stringify({ idempotencyKey: 'missing-upload', fileName: 'missing.csv' }),
@@ -880,8 +966,8 @@ describe('App 三栏布局', () => {
     expect(await screen.findByTestId('upload-error')).toHaveTextContent(
       '上次上传未被接收，请重新选择文件。',
     )
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
-    expect(screen.getByTestId('guide-upload-btn')).toBeEnabled()
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-upload-inline')).toBeEnabled()
     expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
   })
 
@@ -1010,9 +1096,9 @@ describe('App 三栏布局', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     await waitFor(() => {
-      expect(screen.getByTestId('guide-upload-btn')).toHaveTextContent(/上传中/)
+      expect(screen.getByTestId('desk-upload-inline')).toHaveTextContent(/上传中/)
     })
-    expect(screen.getByTestId('guide-upload-btn')).toBeDisabled()
+    expect(screen.getByTestId('desk-upload-inline')).toBeDisabled()
   })
 
   test('课设样例预填方向并显示列名', async () => {
@@ -1049,6 +1135,7 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-open-guide'))
     fireEvent.click(screen.getByTestId('guide-sample-btn'))
     await waitFor(() => {
       expect(screen.getByTestId('direction-form')).toBeInTheDocument()
@@ -1677,8 +1764,8 @@ describe('App 三栏布局', () => {
     fireEvent.click(await screen.findByTestId('info-expand'))
     expect(await screen.findByTestId('info-dataset')).toHaveTextContent('macro.csv')
     await user.click(screen.getByRole('button', { name: '退出' }))
-    // B3: 退出后回落地/引导页，而不是停在空桌
-    expect(await screen.findByTestId('guide-page')).toBeInTheDocument()
+    // 空桌直入语义：退出后回到可立即输入/上传的空桌，而不是落地页
+    expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
     expect(sessionStorage.getItem('econpaper_csv_meta')).toBeNull()
   })
 

@@ -59,6 +59,50 @@ describe('DeskPage', () => {
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
   })
 
+  test('C3 starter chip 点击把文本填入输入框', async () => {
+    const user = userEvent.setup()
+    renderDesk()
+
+    const starterChips = Array.from(
+      screen.getByTestId('desk-empty-state').querySelectorAll<HTMLButtonElement>('button'),
+    )
+    expect(starterChips.length).toBeGreaterThanOrEqual(3)
+    await user.click(starterChips[0]!)
+
+    expect(screen.getByTestId('desk-paper')).toHaveValue(starterChips[0]!.textContent)
+  })
+
+  test('C3 desk-upload-inline 触发上传入口', async () => {
+    const user = userEvent.setup()
+    const onPickData = vi.fn()
+    renderDesk({ onPickData })
+
+    await user.click(screen.getByTestId('desk-upload-inline'))
+    expect(onPickData).toHaveBeenCalledTimes(1)
+  })
+
+  test('C3 desk-paper 可输入后出现 desk-thread', async () => {
+    const user = userEvent.setup()
+    renderDesk()
+    expect(screen.queryByTestId('desk-thread')).not.toBeInTheDocument()
+
+    await user.type(screen.getByTestId('desk-paper'), '想看教育对工资的影响')
+
+    expect(screen.getByTestId('desk-thread')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-thread')).toHaveTextContent('想看教育对工资的影响')
+  })
+
+  test('C4 页眉「了解产品」入口始终可见并可触发', async () => {
+    const user = userEvent.setup()
+    const onOpenGuide = vi.fn()
+    renderDesk({ onOpenGuide })
+
+    const entry = screen.getByTestId('desk-open-guide')
+    expect(entry).toBeInTheDocument()
+    await user.click(entry)
+    expect(onOpenGuide).toHaveBeenCalledTimes(1)
+  })
+
   test('倒出想法后出现一张可改的问题卡，一次只问一件事', async () => {
     const user = userEvent.setup()
     renderDesk()

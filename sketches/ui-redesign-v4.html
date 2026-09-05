@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>econpaper · 界面层 v4 —— 同一个工件台，三套平台级视觉</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#22252b; color:#e8e8e8; font-family:Inter,'PingFang SC',system-ui,sans-serif; font-size:14px; line-height:1.6; }
+  .serif { font-family:'Instrument Serif','Noto Serif SC','Songti SC',serif; }
+  .mono { font-family:'JetBrains Mono',ui-monospace,monospace; }
+  .page { max-width:1160px; margin:0 auto; padding:40px 24px 170px; }
+  .page-head h1 { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:30px; margin:0 0 8px; color:#fff; }
+  .page-head p { margin:0; color:#a8adb8; }
+  .page-head .free { color:#7ee2a8; font-weight:600; }
+
+  .note { margin-top:22px; background:#2a2e36; border:1px solid #3a3f4a; border-radius:12px; padding:16px 22px; font-size:13.5px; color:#c6cad4; }
+  .note b { color:#fff; }
+
+  .variant-head { margin:42px 0 12px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .vk { font-family:'JetBrains Mono',monospace; font-size:12px; background:#e8e8e8; color:#22252b; border-radius:5px; padding:2px 9px; }
+  .vt { font-size:19px; font-weight:650; color:#fff; }
+  .vd { font-size:12.5px; color:#a8adb8; }
+  .sw { display:inline-flex; gap:6px; margin-left:auto; }
+  .sw i { width:15px; height:15px; border-radius:4px; border:1px solid rgba(255,255,255,.18); }
+
+  .verdict-label { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#8b8371; font-family:'JetBrains Mono',monospace; margin:18px 0 6px; }
+
+  /* ============ 皮肤 1 · Anthropic 暖纸白 ============ */
+  .t1 { background:#faf9f5; color:#141413; border-radius:12px; overflow:hidden; border:1px solid #e5e3dc; display:flex; flex-direction:column; font-size:13px; height:600px; box-shadow:0 2px 16px rgba(0,0,0,.18); }
+  .t1 * { min-width:0; box-sizing:border-box; }
+  .t1 .tbar { height:50px; display:flex; align-items:center; gap:13px; padding:0 18px; background:#f5f2ea; border-bottom:1px solid #e5e3dc; }
+  .t1 .brand { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px; }
+  .t1 .logo { width:22px; height:22px; border-radius:7px; background:#141413; color:#faf9f5; display:inline-flex; align-items:center; justify-content:center; font-family:'Instrument Serif',serif; font-size:12px; }
+  .t1 .proj { font-size:12.5px; color:#6b675e; border-left:1px solid #e5e3dc; padding-left:13px; }
+  .t1 .proj b { color:#141413; font-weight:500; }
+  .t1 .sp { flex:1; }
+  .t1 .pill { font-family:'JetBrains Mono',monospace; font-size:10px; border:1px solid #e0ddd2; border-radius:999px; padding:2px 10px; color:#6b675e; background:#fff; white-space:nowrap; }
+  .t1 .pill.run { border-color:#d97757; color:#c05f3f; background:#fdf1ec; }
+  .t1 .tbtn { font-size:12px; color:#141413; border:1px solid #e0ddd2; background:#fff; border-radius:8px; padding:4px 12px; }
+  .t1 .wb { flex:1; display:grid; grid-template-columns:210px 1fr 262px; min-height:0; }
+  .t1 .rail { background:#f5f2ea; border-right:1px solid #e5e3dc; padding:13px; }
+  .t1 .rail.r { border-right:0; border-left:1px solid #e5e3dc; }
+  .t1 .micro { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#a29d8e; margin-bottom:7px; }
+  .t1 .item { font-size:12.5px; padding:5px 8px; border-radius:7px; color:#6b675e; display:flex; align-items:center; gap:8px; }
+  .t1 .item.on { background:#fff; border:1px solid #e5e3dc; color:#141413; font-weight:500; }
+  .t1 .item i { width:7px; height:7px; border-radius:50%; background:#d8d4c6; flex-shrink:0; }
+  .t1 .item.done i { background:#7d9b7a; }
+  .t1 .item.run i { background:#d97757; box-shadow:0 0 0 3px rgba(217,119,87,.18); }
+  .t1 .stage { min-height:0; display:flex; flex-direction:column; }
+  .t1 .tabs { display:flex; gap:2px; padding:9px 16px 0; border-bottom:1px solid #e5e3dc; background:#faf9f5; }
+  .t1 .tab { font-size:12.5px; padding:6px 14px; border-radius:9px 9px 0 0; color:#6b675e; border:1px solid transparent; border-bottom:0; }
+  .t1 .tab.on { background:#fff; border-color:#e5e3dc; color:#141413; font-weight:500; }
+  .t1 .tab .pill { margin-left:6px; }
+  .t1 .art { flex:1; background:#fff; margin:0 16px; border:1px solid #e5e3dc; border-top:0; border-radius:0 0 10px 10px; padding:20px 30px 0; overflow:hidden; }
+  .t1 .art-title { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:20px; margin:0 0 4px; }
+  .t1 .art-sub { font-size:11.5px; color:#a29d8e; margin:0 0 14px; }
+  .t1 table { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .t1 th { text-align:left; color:#a29d8e; font-weight:500; font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:6px; border-bottom:1px solid #eceade; }
+  .t1 td { padding:7px 6px; border-bottom:1px solid #f3f1e8; }
+  .t1 tr.hot td { background:#fdf1ec; }
+  .t1 .prov { border-top:1px solid #e5e3dc; background:#f5f2ea; padding:9px 18px; font-size:11px; color:#6b675e; display:flex; gap:16px; flex-wrap:wrap; }
+  .t1 .prov .k { color:#a29d8e; }
+  .t1 .prov .v { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#141413; }
+  .t1 .rev { background:#fff; border:1px solid #e5e3dc; border-radius:9px; padding:10px 12px; margin-bottom:9px; font-size:12px; }
+  .t1 .rev .h { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .t1 .rev b { font-size:12px; }
+  .t1 .rev p { margin:0; color:#6b675e; font-size:11.5px; line-height:1.55; }
+  .t1 .rev .fix { color:#c05f3f; font-size:11px; margin-top:3px; display:block; }
+  .t1 .stream { display:inline-block; width:7px; height:14px; background:#d97757; vertical-align:-2px; margin-left:2px; animation:blink 1s steps(2) infinite; }
+
+  /* ============ 皮肤 2 · Linear 冷白 ============ */
+  .t2 { background:#ffffff; color:#18181b; border-radius:12px; overflow:hidden; border:1px solid #e4e4e7; display:flex; flex-direction:column; font-size:13px; height:600px; box-shadow:0 2px 16px rgba(0,0,0,.18); font-family:Inter,'PingFang SC',system-ui,sans-serif; }
+  .t2 * { min-width:0; box-sizing:border-box; }
+  .t2 .tbar { height:48px; display:flex; align-items:center; gap:13px; padding:0 16px; background:#fcfcfc; border-bottom:1px solid #ececee; }
+  .t2 .brand { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:13px; letter-spacing:-.01em; }
+  .t2 .logo { width:20px; height:20px; border-radius:6px; background:#5e6ad2; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; }
+  .t2 .proj { font-size:12.5px; color:#7c7c85; border-left:1px solid #ececee; padding-left:13px; }
+  .t2 .proj b { color:#18181b; font-weight:500; }
+  .t2 .sp { flex:1; }
+  .t2 .pill { font-family:'JetBrains Mono',monospace; font-size:10px; border:1px solid #e4e4e7; border-radius:6px; padding:2px 8px; color:#7c7c85; background:#fff; }
+  .t2 .pill.run { border-color:#c7cdf5; color:#4c56c9; background:#eef0fd; }
+  .t2 .tbtn { font-size:12px; color:#18181b; border:1px solid #e4e4e7; background:#fff; border-radius:7px; padding:4px 12px; }
+  .t2 .tbtn.primary { background:#5e6ad2; border-color:#5e6ad2; color:#fff; font-weight:500; }
+  .t2 .wb { flex:1; display:grid; grid-template-columns:206px 1fr 258px; min-height:0; }
+  .t2 .rail { background:#fafafa; border-right:1px solid #ececee; padding:12px; }
+  .t2 .rail.r { border-right:0; border-left:1px solid #ececee; }
+  .t2 .micro { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:#9d9da6; margin-bottom:7px; }
+  .t2 .item { font-size:12.5px; padding:5px 8px; border-radius:6px; color:#5f5f68; display:flex; align-items:center; gap:8px; }
+  .t2 .item.on { background:#f0f0f2; color:#18181b; font-weight:500; }
+  .t2 .item i { width:6px; height:6px; border-radius:2px; background:#d4d4d8; flex-shrink:0; }
+  .t2 .item.done i { background:#22c374; }
+  .t2 .item.run i { background:#5e6ad2; box-shadow:0 0 0 3px rgba(94,106,210,.16); }
+  .t2 .stage { min-height:0; display:flex; flex-direction:column; }
+  .t2 .tabs { display:flex; align-items:center; gap:14px; padding:0 16px; border-bottom:1px solid #ececee; }
+  .t2 .tab { font-size:12.5px; padding:9px 2px; color:#7c7c85; border-bottom:2px solid transparent; }
+  .t2 .tab.on { color:#18181b; font-weight:550; border-bottom-color:#5e6ad2; }
+  .t2 .tab .pill { margin-left:6px; }
+  .t2 .art { flex:1; padding:18px 26px 0; overflow:hidden; background:#fff; }
+  .t2 .art-title { font-size:16.5px; font-weight:650; letter-spacing:-.01em; margin:0 0 3px; }
+  .t2 .art-sub { font-size:11.5px; color:#9d9da6; margin:0 0 14px; }
+  .t2 table { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .t2 th { text-align:left; color:#9d9da6; font-weight:500; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:6px; border-bottom:1px solid #ececee; }
+  .t2 td { padding:7px 6px; border-bottom:1px solid #f4f4f5; }
+  .t2 tr.hot td { background:#eef0fd; }
+  .t2 .prov { border-top:1px solid #ececee; background:#fafafa; padding:9px 18px; font-size:11px; color:#7c7c85; display:flex; gap:16px; flex-wrap:wrap; }
+  .t2 .prov .k { color:#9d9da6; }
+  .t2 .prov .v { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#18181b; }
+  .t2 .rev { background:#fff; border:1px solid #e4e4e7; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:12px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+  .t2 .rev .h { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .t2 .rev b { font-size:12px; }
+  .t2 .rev p { margin:0; color:#5f5f68; font-size:11.5px; line-height:1.55; }
+  .t2 .rev .fix { color:#4c56c9; font-size:11px; margin-top:3px; display:block; }
+  .t2 .stream { display:inline-block; width:7px; height:14px; background:#5e6ad2; vertical-align:-2px; margin-left:2px; animation:blink 1s steps(2) infinite; }
+
+  /* ============ 皮肤 3 · 暗色实验室 ============ */
+  .t3 { background:#0e1116; color:#e6e9ee; border-radius:12px; overflow:hidden; border:1px solid #232a33; display:flex; flex-direction:column; font-size:13px; height:600px; box-shadow:0 2px 20px rgba(0,0,0,.5); }
+  .t3 * { min-width:0; box-sizing:border-box; }
+  .t3 .tbar { height:48px; display:flex; align-items:center; gap:13px; padding:0 16px; background:#11151b; border-bottom:1px solid #1e242d; }
+  .t3 .brand { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:13px; }
+  .t3 .logo { width:20px; height:20px; border-radius:6px; background:#34d399; color:#0e1116; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; }
+  .t3 .proj { font-size:12.5px; color:#7d8896; border-left:1px solid #1e242d; padding-left:13px; }
+  .t3 .proj b { color:#e6e9ee; font-weight:500; }
+  .t3 .sp { flex:1; }
+  .t3 .pill { font-family:'JetBrains Mono',monospace; font-size:10px; border:1px solid #2a323d; border-radius:6px; padding:2px 8px; color:#8b96a4; background:#161b22; }
+  .t3 .pill.run { border-color:rgba(52,211,153,.5); color:#34d399; background:rgba(52,211,153,.08); }
+  .t3 .tbtn { font-size:12px; color:#cdd4dd; border:1px solid #2a323d; background:#161b22; border-radius:7px; padding:4px 12px; }
+  .t3 .tbtn.primary { background:#34d399; border-color:#34d399; color:#0e1116; font-weight:600; }
+  .t3 .wb { flex:1; display:grid; grid-template-columns:206px 1fr 258px; min-height:0; }
+  .t3 .rail { background:#11151b; border-right:1px solid #1e242d; padding:12px; }
+  .t3 .rail.r { border-right:0; border-left:1px solid #1e242d; }
+  .t3 .micro { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:#5c6673; margin-bottom:7px; }
+  .t3 .item { font-size:12.5px; padding:5px 8px; border-radius:6px; color:#8b96a4; display:flex; align-items:center; gap:8px; }
+  .t3 .item.on { background:#1a2029; color:#e6e9ee; font-weight:500; }
+  .t3 .item i { width:6px; height:6px; border-radius:50%; background:#333d49; flex-shrink:0; }
+  .t3 .item.done i { background:#34d399; }
+  .t3 .item.run i { background:#34d399; box-shadow:0 0 0 3px rgba(52,211,153,.18); }
+  .t3 .stage { min-height:0; display:flex; flex-direction:column; }
+  .t3 .tabs { display:flex; gap:2px; padding:9px 16px 0; border-bottom:1px solid #1e242d; background:#0e1116; }
+  .t3 .tab { font-size:12.5px; padding:6px 13px; border-radius:8px 8px 0 0; color:#7d8896; border:1px solid transparent; }
+  .t3 .tab.on { background:#161b22; border-color:#1e242d; border-bottom-color:#161b22; color:#e6e9ee; font-weight:500; }
+  .t3 .tab .pill { margin-left:6px; }
+  .t3 .art { flex:1; background:#161b22; margin:0 16px; border:1px solid #1e242d; border-top:0; border-radius:0 0 10px 10px; padding:20px 30px 0; overflow:hidden; }
+  .t3 .art-title { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:20px; margin:0 0 4px; color:#fff; }
+  .t3 .art-sub { font-size:11.5px; color:#5c6673; margin:0 0 14px; }
+  .t3 table { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .t3 th { text-align:left; color:#5c6673; font-weight:500; font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:6px; border-bottom:1px solid #232a33; }
+  .t3 td { padding:7px 6px; border-bottom:1px solid #1b212a; }
+  .t3 tr.hot td { background:rgba(52,211,153,.09); }
+  .t3 .prov { border-top:1px solid #1e242d; background:#11151b; padding:9px 18px; font-size:11px; color:#7d8896; display:flex; gap:16px; flex-wrap:wrap; }
+  .t3 .prov .k { color:#5c6673; }
+  .t3 .prov .v { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#cdd4dd; }
+  .t3 .rev { background:#161b22; border:1px solid #232a33; border-radius:8px; padding:10px 12px; margin-bottom:8px; font-size:12px; }
+  .t3 .rev .h { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .t3 .rev b { font-size:12px; color:#fff; }
+  .t3 .rev p { margin:0; color:#8b96a4; font-size:11.5px; line-height:1.55; }
+  .t3 .rev .fix { color:#34d399; font-size:11px; margin-top:3px; display:block; }
+  .t3 .stream { display:inline-block; width:7px; height:14px; background:#34d399; vertical-align:-2px; margin-left:2px; animation:blink 1s steps(2) infinite; }
+
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* ---------- 裁决栏 ---------- */
+  .pick-bar { position:fixed; left:0; right:0; bottom:0; z-index:50; background:rgba(15,17,21,.97); color:#e8e8e8; padding:12px 24px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .pick-bar .sel { font-size:13.5px; }
+  .pick-bar .sel b { color:#7ee2a8; }
+  .pick-bar textarea { flex:1 1 260px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.22); color:#e8e8e8; border-radius:8px; padding:7px 10px; font:inherit; font-size:13px; height:38px; resize:none; }
+  .pick-bar textarea::placeholder { color:rgba(232,232,232,.4); }
+  .pick-bar button { border:0; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+  .vbtn { background:rgba(255,255,255,.12); color:#e8e8e8; }
+  .vbtn.on { background:#7ee2a8; color:#12271c; }
+  .btn-copy { background:#7ee2a8; color:#12271c; }
+  .copy-out { width:100%; }
+  .copy-out pre { display:none; white-space:pre-wrap; background:rgba(255,255,255,.07); border:1px dashed rgba(255,255,255,.3); border-radius:8px; padding:10px 12px; font-size:12.5px; margin:4px 0 0; user-select:all; }
+  .copy-out.show pre { display:block; }
+  .copy-out .hint { font-size:11.5px; color:rgba(232,232,232,.55); margin:3px 0 0; display:none; }
+  .copy-out.show .hint { display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>econpaper · 界面层 v4</h1>
+    <p><span class="free">纪律解散。</span>色板、字体、纸感约束全部作废——产品骨架沿用 v3 的可审计工件台（你没否的部分），这次只裁一件事：<b style="color:#fff">哪套视觉气质配得上这个平台</b>。三块屏幕内容完全相同，纯换皮肤，直接对比。</p>
+  </div>
+
+  <div class="note">裁完之后，选中的那套就定格为本产品的设计系统：色板、字重、圆角、状态色全部从它身上取，老的参考笔记降级为历史档案，不再约束任何决定。</div>
+
+  <!-- ============ 皮肤 1 ============ -->
+  <div class="variant-head">
+    <span class="vk">视觉 1</span>
+    <span class="vt">Anthropic 暖纸白</span>
+    <span class="vd">象牙白 + 墨字 + 陶土橘。安静、贵气、出版感——Claude 系产品的直系气质</span>
+    <span class="sw"><i style="background:#faf9f5"></i><i style="background:#f5f2ea"></i><i style="background:#141413"></i><i style="background:#d97757"></i><i style="background:#7d9b7a"></i></span>
+  </div>
+  <div class="t1">
+    <div class="tbar">
+      <span class="brand"><span class="logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill run">估计员运行中 · 00:23</span>
+      <button class="tbtn">分叉</button>
+      <button class="tbtn">导出</button>
+    </div>
+    <div class="wb">
+      <div class="rail">
+        <p class="micro">专家分工</p>
+        <div class="item done"><i></i>清洗员 · 8/8 步</div>
+        <div class="item run"><i></i>估计员 · OLS 主表</div>
+        <div class="item"><i></i>写手 · 排队</div>
+        <div class="item"><i></i>评审员 · 实时核对</div>
+        <p class="micro" style="margin-top:14px">研究计划</p>
+        <div class="item done"><i></i>已批准 · 04:41</div>
+      </div>
+      <div class="stage">
+        <div class="tabs">
+          <span class="tab on">主结果表<span class="pill run">生成中</span></span>
+          <span class="tab">稿件</span>
+          <span class="tab">图</span>
+          <span class="tab">代码</span>
+        </div>
+        <div class="art">
+          <h3 class="art-title">表 1 · 主估计</h3>
+          <p class="art-sub">双向固定效应 · 县级聚类稳健标准误 · N = 1,284</p>
+          <table>
+            <tr><th>变量</th><th>(1) 就业率</th><th>(2) + 控制</th></tr>
+            <tr class="hot"><td>mwy_change</td><td>−0.031** (0.014)</td><td>−0.028* (0.015)</td></tr>
+            <tr><td>县级 / 年份固定效应</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td style="color:#a29d8e">N</td><td>1,284</td><td>1,284</td></tr>
+          </table>
+          <p style="font-size:11.5px;color:#a29d8e;margin:12px 0 0">95% CI [−0.058, −0.004] · 逐格生成中<span class="stream"></span></p>
+        </div>
+        <div class="prov">
+          <span><span class="k" style="color:#a29d8e">代码</span> <span class="v">estimate_did.R · L41–67</span></span>
+          <span><span class="k" style="color:#a29d8e">环境</span> <span class="v">R 4.4 · fixest 0.12</span></span>
+          <span><span class="k" style="color:#a29d8e">说明</span> <span class="v">结果与代码输出逐格核对</span></span>
+          <span><span class="k" style="color:#a29d8e">历史</span> <span class="v">12 条 · 可展开</span></span>
+        </div>
+      </div>
+      <div class="rail r">
+        <p class="micro">评审员 · 实时</p>
+        <div class="rev">
+          <div class="h"><b>核对通过</b><span class="pill">3/5 格</span></div>
+          <p>已生成单元格与 estimate_did.R 输出一致。</p>
+        </div>
+        <div class="rev" style="border-color:#ecd9c8">
+          <div class="h"><b>发现一处</b><span class="pill run">已修正</span></div>
+          <p>模型 (2) 的 N 与清洗报告不一致（1,290 → 1,284）。</p>
+          <span class="fix">↳ 已按 clean audit 修正，稿件同步</span>
+        </div>
+        <div class="rev" style="opacity:.6">
+          <div class="h"><b>待办</b></div>
+          <p>图形与代码一致性 · 待图生成后检查</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 皮肤 2 ============ -->
+  <div class="variant-head">
+    <span class="vk">视觉 2</span>
+    <span class="vt">Linear 冷白</span>
+    <span class="vd">纯白 + 锌灰 + 靛蓝。锋利、精密、工程感——现代 SaaS 工具的默认高级相</span>
+    <span class="sw"><i style="background:#ffffff"></i><i style="background:#fafafa"></i><i style="background:#18181b"></i><i style="background:#5e6ad2"></i><i style="background:#22c374"></i></span>
+  </div>
+  <div class="t2">
+    <div class="tbar">
+      <span class="brand"><span class="logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill run">估计员运行中 · 00:23</span>
+      <button class="tbtn">分叉</button>
+      <button class="tbtn primary">导出</button>
+    </div>
+    <div class="wb">
+      <div class="rail">
+        <p class="micro">专家分工</p>
+        <div class="item done"><i></i>清洗员 · 8/8 步</div>
+        <div class="item run"><i></i>估计员 · OLS 主表</div>
+        <div class="item"><i></i>写手 · 排队</div>
+        <div class="item"><i></i>评审员 · 实时核对</div>
+        <p class="micro" style="margin-top:14px">研究计划</p>
+        <div class="item done"><i></i>已批准 · 04:41</div>
+      </div>
+      <div class="stage">
+        <div class="tabs">
+          <span class="tab on">主结果表<span class="pill run">生成中</span></span>
+          <span class="tab">稿件</span>
+          <span class="tab">图</span>
+          <span class="tab">代码</span>
+        </div>
+        <div class="art">
+          <h3 class="art-title">表 1 · 主估计</h3>
+          <p class="art-sub">双向固定效应 · 县级聚类稳健标准误 · N = 1,284</p>
+          <table>
+            <tr><th>变量</th><th>(1) 就业率</th><th>(2) + 控制</th></tr>
+            <tr class="hot"><td>mwy_change</td><td>−0.031** (0.014)</td><td>−0.028* (0.015)</td></tr>
+            <tr><td>县级 / 年份固定效应</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td style="color:#9d9da6">N</td><td>1,284</td><td>1,284</td></tr>
+          </table>
+          <p style="font-size:11.5px;color:#9d9da6;margin:12px 0 0">95% CI [−0.058, −0.004] · 逐格生成中<span class="stream"></span></p>
+        </div>
+        <div class="prov">
+          <span><span class="k" style="color:#9d9da6">代码</span> <span class="v">estimate_did.R · L41–67</span></span>
+          <span><span class="k" style="color:#9d9da6">环境</span> <span class="v">R 4.4 · fixest 0.12</span></span>
+          <span><span class="k" style="color:#9d9da6">说明</span> <span class="v">结果与代码输出逐格核对</span></span>
+          <span><span class="k" style="color:#9d9da6">历史</span> <span class="v">12 条 · 可展开</span></span>
+        </div>
+      </div>
+      <div class="rail r">
+        <p class="micro">评审员 · 实时</p>
+        <div class="rev">
+          <div class="h"><b>核对通过</b><span class="pill">3/5 格</span></div>
+          <p>已生成单元格与 estimate_did.R 输出一致。</p>
+        </div>
+        <div class="rev" style="border-color:#d9e6d9">
+          <div class="h"><b>发现一处</b><span class="pill run">已修正</span></div>
+          <p>模型 (2) 的 N 与清洗报告不一致（1,290 → 1,284）。</p>
+          <span class="fix">↳ 已按 clean audit 修正，稿件同步</span>
+        </div>
+        <div class="rev" style="opacity:.6">
+          <div class="h"><b>待办</b></div>
+          <p>图形与代码一致性 · 待图生成后检查</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 皮肤 3 ============ -->
+  <div class="variant-head">
+    <span class="vk">视觉 3</span>
+    <span class="vt">暗色实验室</span>
+    <span class="vd">近黑 + 冷灰 + 数据绿。监视器感、跑实验的夜档——研究进行时最有戏剧张力</span>
+    <span class="sw"><i style="background:#0e1116"></i><i style="background:#161b22"></i><i style="background:#e6e9ee"></i><i style="background:#34d399"></i><i style="background:#8b96a4"></i></span>
+  </div>
+  <div class="t3">
+    <div class="tbar">
+      <span class="brand"><span class="logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill run">估计员运行中 · 00:23</span>
+      <button class="tbtn">分叉</button>
+      <button class="tbtn primary">导出</button>
+    </div>
+    <div class="wb">
+      <div class="rail">
+        <p class="micro">专家分工</p>
+        <div class="item done"><i></i>清洗员 · 8/8 步</div>
+        <div class="item run"><i></i>估计员 · OLS 主表</div>
+        <div class="item"><i></i>写手 · 排队</div>
+        <div class="item"><i></i>评审员 · 实时核对</div>
+        <p class="micro" style="margin-top:14px">研究计划</p>
+        <div class="item done"><i></i>已批准 · 04:41</div>
+      </div>
+      <div class="stage">
+        <div class="tabs">
+          <span class="tab on">主结果表<span class="pill run">生成中</span></span>
+          <span class="tab">稿件</span>
+          <span class="tab">图</span>
+          <span class="tab">代码</span>
+        </div>
+        <div class="art">
+          <h3 class="art-title">表 1 · 主估计</h3>
+          <p class="art-sub">双向固定效应 · 县级聚类稳健标准误 · N = 1,284</p>
+          <table>
+            <tr><th>变量</th><th>(1) 就业率</th><th>(2) + 控制</th></tr>
+            <tr class="hot"><td>mwy_change</td><td>−0.031** (0.014)</td><td>−0.028* (0.015)</td></tr>
+            <tr><td>县级 / 年份固定效应</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td style="color:#5c6673">N</td><td>1,284</td><td>1,284</td></tr>
+          </table>
+          <p style="font-size:11.5px;color:#5c6673;margin:12px 0 0">95% CI [−0.058, −0.004] · 逐格生成中<span class="stream"></span></p>
+        </div>
+        <div class="prov">
+          <span><span class="k" style="color:#5c6673">代码</span> <span class="v">estimate_did.R · L41–67</span></span>
+          <span><span class="k" style="color:#5c6673">环境</span> <span class="v">R 4.4 · fixest 0.12</span></span>
+          <span><span class="k" style="color:#5c6673">说明</span> <span class="v">结果与代码输出逐格核对</span></span>
+          <span><span class="k" style="color:#5c6673">历史</span> <span class="v">12 条 · 可展开</span></span>
+        </div>
+      </div>
+      <div class="rail r">
+        <p class="micro">评审员 · 实时</p>
+        <div class="rev">
+          <div class="h"><b>核对通过</b><span class="pill">3/5 格</span></div>
+          <p>已生成单元格与 estimate_did.R 输出一致。</p>
+        </div>
+        <div class="rev" style="border-color:#2c3a33">
+          <div class="h"><b>发现一处</b><span class="pill run">已修正</span></div>
+          <p>模型 (2) 的 N 与清洗报告不一致（1,290 → 1,284）。</p>
+          <span class="fix">↳ 已按 clean audit 修正，稿件同步</span>
+        </div>
+        <div class="rev" style="opacity:.6">
+          <div class="h"><b>待办</b></div>
+          <p>图形与代码一致性 · 待图生成后检查</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pick-bar">
+  <span class="sel">我的选择：<b id="sel-name">还没选</b></span>
+  <div id="verdicts" style="display:flex;gap:8px;">
+    <button class="vbtn" data-v="1">视觉 1 · 暖纸白</button>
+    <button class="vbtn" data-v="2">视觉 2 · 冷白</button>
+    <button class="vbtn" data-v="3">视觉 3 · 暗色实验室</button>
+  </div>
+  <textarea id="sel-note" placeholder="备注（可不填）：比如「2，但 accent 换成蓝以外的」「3，但论文正文页要亮色」…"></textarea>
+  <button class="btn-copy" id="btn-copy">复制我的选择</button>
+  <div class="copy-out" id="copy-out">
+    <pre id="copy-text"></pre>
+    <p class="hint">↑ 自动复制没生效就手动选中上面这段，贴回对话。</p>
+  </div>
+</div>
+
+<script>
+  var picked = null;
+  var NAMES = {
+    '1': '视觉 1「Anthropic 暖纸白」— 象牙白 + 墨字 + 陶土橘，安静出版感',
+    '2': '视觉 2「Linear 冷白」— 纯白 + 锌灰 + 靛蓝，锋利工程感',
+    '3': '视觉 3「暗色实验室」— 近黑 + 冷灰 + 数据绿，研究进行时夜档'
+  };
+  document.querySelectorAll('.vbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      picked = b.getAttribute('data-v');
+      document.querySelectorAll('.vbtn').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      document.getElementById('sel-name').textContent = NAMES[picked];
+      document.getElementById('copy-out').classList.remove('show');
+    });
+  });
+  document.getElementById('btn-copy').addEventListener('click', function () {
+    if (!picked) { alert('先选一套视觉'); return; }
+    var note = document.getElementById('sel-note').value.trim();
+    var text = '我的选择：' + NAMES[picked] + '\n备注：' + (note || '无');
+    document.getElementById('copy-text').textContent = text;
+    document.getElementById('copy-out').classList.add('show');
+    var btn = document.getElementById('btn-copy');
+    var done = function () { btn.textContent = '已复制 ✓'; setTimeout(function(){btn.textContent='复制我的选择';},1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { manual(); });
+    } else { manual(); }
+    function manual() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+</body>
+</html>

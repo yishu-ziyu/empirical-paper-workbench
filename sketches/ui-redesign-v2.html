@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>econpaper · 界面层重思 v2 —— 从设计笔记与真实参考出发</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f4efe4; --cream: #f1f0ed; --ink: #181515; --accent: #2f6b4f;
+    --muted: #515151; --line: #d8d2c6; --panel: #fffdf7; --gold: #8a6a12; --red: #9b3d30;
+    /* 身份色（RAG 拆解：2–3 个纸底上够稳的莫兰迪调，绿只留给交互） */
+    --id-data: #6b7f9e; --id-est: #a8785a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e7e2d3; color: var(--ink); font-family: 'Instrument Sans','PingFang SC',system-ui,sans-serif; font-size: 14px; line-height: 1.65; }
+  .serif { font-family: 'Instrument Serif','Noto Serif SC','Songti SC',serif; }
+  .mono { font-family: 'JetBrains Mono',ui-monospace,monospace; }
+  .page { max-width: 1120px; margin: 0 auto; padding: 40px 24px 180px; }
+  .page-head h1 { font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 30px; margin: 0 0 8px; }
+  .page-head p { margin: 0; color: var(--muted); }
+
+  .block { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; }
+  .block h2 { margin: 0 0 10px; font-size: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 28px; }
+  .inh { margin: 0; padding-left: 18px; }
+  .inh li { font-size: 13px; margin-bottom: 7px; }
+  .inh b { color: var(--accent); }
+  .inh .src { color: #8b8371; font-size: 11.5px; font-family:'JetBrains Mono',monospace; }
+
+  /* ---------- 候选 ---------- */
+  .candidate { margin-top: 46px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 22px 18px; transition: border-color .18s, box-shadow .18s; }
+  .candidate.picked { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,107,79,.16); }
+  .cand-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cand-key { font-family:'JetBrains Mono',monospace; font-size: 12px; color:#fff; background: var(--ink); border-radius:5px; padding:2px 9px; letter-spacing:.08em; cursor:pointer; }
+  .candidate.picked .cand-key { background: var(--accent); }
+  .cand-title { font-size: 19px; font-weight: 600; }
+  .cand-tag { font-size: 12.5px; color: var(--muted); }
+  .thesis { margin: 8px 0 12px; font-size: 13.5px; max-width: 72ch; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+  .refs span { font-size: 11.5px; font-family:'JetBrains Mono',monospace; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--muted); background: var(--paper); }
+  .refs span.hot { border-color: var(--accent); color: var(--accent); }
+  .shot-label { font-family:'JetBrains Mono',monospace; font-size: 10.5px; letter-spacing:.14em; color:#8b8371; margin: 18px 0 6px; text-transform: uppercase; }
+  .risk { font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .risk b { color: var(--gold); }
+
+  /* ---------- 屏幕通用 ---------- */
+  .screen { border: 1px solid #c9c2b2; border-radius: 10px; overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: 13px; height: 560px; }
+  .screen * { min-width: 0; }
+  .brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; }
+  .dot-logo { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-family:'Instrument Serif',serif; flex-shrink:0; }
+  .micro { font-family:'JetBrains Mono',monospace; font-size: 9.5px; letter-spacing:.13em; text-transform: uppercase; color:#8b8371; }
+  .pill { font-family:'JetBrains Mono',monospace; font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+
+  /* ===== 方向 A 稿纸即产品 ===== */
+  .a-screen { background: var(--paper); }
+  .a-top { height: 40px; display:flex; align-items:center; justify-content:space-between; padding: 0 20px; border-bottom: 1px solid var(--line); }
+  .a-tools { display:flex; gap:14px; font-size:12px; color:#a49d8d; }
+  .a-body { flex: 1; display: flex; justify-content: center; padding: 26px 20px; min-height: 0; }
+  .a-sheet { width: 640px; background: var(--panel); border: 1px solid #d9d4c7; box-shadow: 0 8px 22px rgba(50,42,30,.08); padding: 34px 52px 30px; overflow: hidden; }
+  .a-sheet.kicker-top { border-top: 3px solid var(--accent); }
+  .a-kick { font-size: 11px; color: var(--accent); letter-spacing: .05em; margin: 0 0 6px; }
+  .a-sheet h2 { font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 22px; margin: 0 0 14px; font-weight: 600; }
+  .a-p { font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 14.5px; line-height: 1.85; color: var(--ink); margin: 0 0 12px; }
+  .a-p .grey { color: #9a927f; }
+  .a-num { font-family:'JetBrains Mono',monospace; font-size: 12px; background: rgba(168,120,90,.16); border-radius: 3px; padding: 1px 5px; color: #7c5540; box-decoration-break: clone; -webkit-box-decoration-break: clone; cursor: pointer; }
+  .a-num.lit { outline: 2px solid var(--id-est); background: rgba(168,120,90,.28); }
+  .a-cite { font-family:'JetBrains Mono',monospace; font-size: 10px; color: var(--id-data); cursor: pointer; vertical-align: super; }
+  .a-cite.lit { color: #fff; background: var(--id-data); border-radius: 3px; padding: 0 3px; }
+  .a-margin { width: 218px; margin-left: 18px; display:flex; flex-direction:column; gap: 10px; }
+  .a-card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .a-card h5 { margin: 0 0 4px; font-size: 12px; }
+  .a-card p { margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .a-table { width: 100%; border-collapse: collapse; font-family:'JetBrains Mono',monospace; font-size: 11px; margin-top: 4px; }
+  .a-table td { padding: 3px 4px; border-top: 1px solid #eee8db; }
+  .a-table tr.lit td { background: rgba(168,120,90,.14); }
+  .a-inputline { border-bottom: 1.5px solid var(--ink); padding: 6px 2px 10px; margin-top: 10px; }
+  .a-inputline span { color: #a49d8d; font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 14.5px; }
+  .a-chip { display:inline-block; border:0; background: rgba(47,107,79,.1); color: var(--accent); border-radius: 999px; padding: 2px 10px; font-size: 12px; margin-right: 6px; }
+
+  /* ===== 方向 B 轨迹即产品 ===== */
+  .b-screen { background: var(--paper); }
+  .b-bar { height: 42px; display:flex; align-items:center; justify-content:space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--cream); }
+  .b-body { flex: 1; display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+  .b-left { padding: 20px 22px; min-height: 0; display:flex; flex-direction:column; }
+  .b-hello { font-size: 21px; margin: 0 0 4px; }
+  .b-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .b-input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px 9px; }
+  .b-input textarea { width:100%; border:0; outline:0; resize:none; font:inherit; height:36px; background:transparent; color:var(--ink); }
+  .b-ghost { margin-top: 16px; background: var(--panel); border: 1px dashed #c9c2b2; border-radius: 10px; padding: 12px 14px; }
+  .b-ghost .row { display:flex; align-items:center; gap:8px; padding: 4px 0; color:#b3ab99; font-size: 12px; }
+  .b-ghost .ring { width: 14px; height: 14px; border-radius: 50%; border: 1.5px dashed #c9c2b2; flex-shrink:0; }
+  .b-ghost .bar { height: 6px; border-radius: 3px; background: #ece6d8; flex: 0 0 84px; }
+  .b-trace { border-left: 1px solid var(--line); background: var(--cream); padding: 14px; overflow: hidden; }
+  .b-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 13px 11px; position: relative; }
+  .b-card .head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; }
+  .b-card .head b { font-size: 12.5px; }
+  .b-card .pill.run { border-color: var(--accent); color: var(--accent); }
+  .b-spine { margin: 2px 0 4px 7px; border-left: 2px solid var(--line); padding-left: 14px; }
+  .b-stage { display:flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 12px; }
+  .b-stage i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex-shrink:0; align-self:center; }
+  .b-stage.done i { background: transparent; border: 1.5px solid var(--accent); }
+  .b-stage .t { font-family:'JetBrains Mono',monospace; font-size: 10.5px; color:#8b8371; margin-left:auto; }
+  .b-viz { display: flex; gap: 3px; margin: 6px 0 2px 17px; align-items: flex-end; height: 26px; }
+  .b-viz i { width: 7px; background: var(--id-data); opacity: .75; border-radius: 2px 2px 0 0; }
+  .b-ci { margin: 6px 0 2px 17px; height: 22px; position: relative; }
+  .b-ci .axis { position:absolute; left:0; right:0; top:10px; height:1px; background: var(--line); }
+  .b-ci .rng { position:absolute; left: 26%; width: 48%; top: 4px; height: 13px; border-radius: 7px; background: rgba(168,120,90,.3); border: 1px solid var(--id-est); }
+  .b-ci .dot { position:absolute; left: 47%; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--id-est); }
+  .b-note { font-size: 11px; color: var(--muted); margin: 6px 0 0 17px; }
+
+  /* ===== 方向 C 卷宗即产品 ===== */
+  .c-screen { background: var(--paper); }
+  .c-bar { height: 42px; display:flex; align-items:center; justify-content:space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--cream); }
+  .c-body { flex: 1; display: grid; grid-template-columns: 210px 1fr; min-height: 0; }
+  .c-drawer { background: var(--cream); border-right: 1px solid var(--line); padding: 12px 10px; overflow: hidden; }
+  .c-tab { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 6px 6px 0 0; padding: 7px 10px 6px; margin-bottom: 4px; font-size: 12px; box-shadow: 0 -1px 0 rgba(0,0,0,.03) inset; }
+  .c-tab small { display:block; color:#8b8371; font-size: 10.5px; }
+  .c-tab.on { border-color: var(--accent); border-bottom: 2px solid var(--accent); }
+  .c-tab:nth-child(2) { margin-left: 8px; }
+  .c-tab:nth-child(3) { margin-left: 16px; }
+  .c-desk { padding: 18px 20px; min-height: 0; display:flex; flex-direction:column; }
+  .c-kick { font-size: 11px; color: var(--accent); margin: 0 0 4px; }
+  .c-hello { font-size: 20px; margin: 0 0 12px; }
+  .c-clips { display:flex; gap: 10px; margin-bottom: 14px; }
+  .c-clip { flex:1; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; box-shadow: 0 2px 5px rgba(50,42,30,.06); }
+  .c-clip:nth-child(2) { transform: rotate(.6deg); }
+  .c-clip:nth-child(3) { transform: rotate(-.5deg); }
+  .c-clip b { font-size: 12px; display:block; }
+  .c-clip span { font-size: 11px; color: var(--muted); }
+  .c-input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px 9px; }
+  .c-input textarea { width:100%; border:0; outline:0; resize:none; font:inherit; height:36px; background:transparent; color:var(--ink); }
+  .c-chip { display:inline-block; border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 9px; font-size:12px; color:#333; margin-right:6px; }
+  .c-send { width: 28px; height: 28px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; flex-shrink: 0; }
+  .c-wb-body { flex: 1; display: grid; grid-template-columns: 190px 1fr 190px; min-height: 0; }
+  .c-stack { padding: 14px 12px; background: var(--cream); border-right: 1px solid var(--line); }
+  .c-stack.r { border-right: 0; border-left: 1px solid var(--line); }
+  .c-fan { position: relative; height: 58px; margin-bottom: 10px; }
+  .c-fan i { position:absolute; inset: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .c-fan i:nth-child(1) { transform: rotate(-2deg) translateY(4px); }
+  .c-fan i:nth-child(2) { transform: rotate(1deg) translateY(2px); }
+  .c-fan i:nth-child(3) { transform: rotate(-.5deg); }
+  .c-fan span { position:absolute; inset: 0; display:flex; align-items:center; justify-content:center; font-size: 11.5px; color: var(--muted); }
+  .c-list { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+  .c-list b { color: var(--ink); font-weight: 500; }
+  .c-paper { background: var(--panel); border: 1px solid #d9d4c7; border-radius: 4px; margin: 16px 20px; padding: 22px 30px; box-shadow: 0 8px 22px rgba(50,42,30,.08); overflow: hidden; }
+  .c-paper h4 { font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 16px; margin: 0 0 8px; }
+  .c-paper p { font-family:'Instrument Serif','Noto Serif SC',serif; font-size: 13px; line-height: 1.8; margin: 0 0 9px; }
+
+  /* ---------- 参考清单 ---------- */
+  .srcs { margin-top: 34px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 24px; }
+  .srcs h3 { margin: 0 0 10px; font-size: 15px; }
+  .srcs ul { margin: 0; padding-left: 18px; }
+  .srcs li { font-size: 12.5px; margin-bottom: 5px; color: var(--muted); }
+  .srcs a { color: var(--accent); }
+
+  /* ---------- 选择栏 ---------- */
+  .pick-bar { position: fixed; left:0; right:0; bottom:0; z-index:50; background: rgba(24,21,21,.96); color:#f4efe4; padding: 12px 24px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .pick-bar .sel { font-size: 13.5px; }
+  .pick-bar .sel b { color:#9fd3b6; }
+  .pick-bar textarea { flex:1 1 260px; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); color:#f4efe4; border-radius:8px; padding:7px 10px; font:inherit; font-size:13px; height:38px; resize:none; }
+  .pick-bar textarea::placeholder { color: rgba(244,239,228,.45); }
+  .pick-bar button { border:0; border-radius:8px; padding:9px 18px; font-size:13.5px; font-weight:600; cursor:pointer; }
+  .btn-copy { background:#9fd3b6; color:#14271d; }
+  .copy-out { width:100%; }
+  .copy-out pre { display:none; white-space:pre-wrap; background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.35); border-radius:8px; padding:10px 12px; font-size:12.5px; margin:4px 0 0; user-select:all; }
+  .copy-out.show pre { display:block; }
+  .copy-out .hint { font-size:11.5px; color:rgba(244,239,228,.6); margin:3px 0 0; display:none; }
+  .copy-out.show .hint { display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>econpaper · 界面层重思 v2</h1>
+    <p>这版不是换皮。先承认三条不能动的纪律（全部来自设计笔记），再给三个方向——它们回答的是同一个问题：<b>整个界面的组织中心是什么</b>。参考全部实名。</p>
+  </div>
+
+  <div class="block">
+    <h2 class="serif">所有方向共享的纪律（写进笔记的，不再发明）</h2>
+    <div class="grid2">
+      <ul class="inh">
+        <li><b>色板锁死</b>：paper #f4efe4 / ink #181515 / 绿 #2f6b4f 是唯一交互 accent / 红只给删除失败 / 金只给告警。<span class="src">design-sources.md · 本机货架</span></li>
+        <li><b>身份色是语义层</b>：选 2–3 个纸底上够稳的莫兰迪调，把「设定卡 ↔ 估计产物」同色绑定，悬停任一端另一端亮。<span class="src">RAG 轨迹卡拆解 §2</span></li>
+        <li><b>动效纪律</b>：≤200ms、ease-out、只动 transform/opacity、reduced-motion 全局坍缩、focus 环永不动画。<span class="src">DESIGN.md §10</span></li>
+        <li><b>状态机语言</b>：进行时动词（正在估计…），完成语报证据数（结论由 3 张表支撑）；未运行先展示 ghost 占位。<span class="src">RAG 拆解 §4/§5</span></li>
+      </ul>
+      <ul class="inh">
+        <li><b>等待 = 阶段化反馈</b>：凡 &gt;2s 的操作必须显示所处阶段，禁止无阶段转圈。<span class="src">DESIGN.md §10</span></li>
+        <li><b>先亮步骤和数字，再写正文</b>；正文必须能点回来源；人随时能改方向。<span class="src">Notion Will's S：Show the work / Citations / Governors</span></li>
+        <li><b>衬线给长读</b>：论文正文永远衬线 70ch/1.8 行高；sans 管功能；mono 只管数字、变量、耗时。<span class="src">Notion Typography + 货架字体令</span></li>
+        <li><b>门禁 = 显式解锁条件</b>：禁用按钮必须说明怎么解锁。<span class="src">DESIGN.md §10</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ 方向 A ============ -->
+  <section class="candidate" id="cand-A">
+    <div class="cand-head">
+      <span class="cand-key">方向 A</span>
+      <span class="cand-title serif">稿纸即产品</span>
+      <span class="cand-tag">聊天退位，论文纸面升为界面中心</span>
+    </div>
+    <p class="thesis">回应《The Conversation Trap》的批评：研究的产出物是论文，不是对话流。空桌就是一张白纸加一行写线（入口仍是你定稿的输入卡）；进入工作台后，中央永远是那张正在生长的稿纸——正文里的系数、变量、引用全部是<b>活的</b>：系数悬停亮出回归表对应行与设定卡（身份色绑定），论断尾注点开侧栏来源卡。工具全部藏进纸边。</p>
+    <div class="refs">
+      <span class="hot">pageflow#win 纸就是产品·工具栏藏着</span><span class="hot">inline 三层墨·链接是句法</span><span class="hot">handword 马克笔语义高亮</span><span>type 70ch/1.8</span><span>bunsen 要印的论文</span><span>RAG 拆解 §2 身份色绑定</span><span>Notion Citations</span><span>The Conversation Trap</span>
+    </div>
+
+    <p class="shot-label">空桌 · 一张纸，一行写线</p>
+    <div class="screen a-screen">
+      <div class="a-top">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="a-tools"><span>论文</span><span>数据</span><span>了解产品</span><span class="pill">工具在纸边，悬停出现</span></span>
+      </div>
+      <div class="a-body">
+        <div class="a-sheet kicker-top">
+          <p class="a-kick">新的研究 · 未命名</p>
+          <h2>今天研究什么？</h2>
+          <p class="a-p">先说一句你想研究的<span class="grey">现象、问题，或者你手头已有的数据</span>。提交之后先出主结果表，再按章写正文。</p>
+          <p class="a-p"><span class="grey">比如：</span>最低工资上调之后，周边城市的就业有没有变化<span class="a-cite lit">示例</span>。</p>
+          <div class="a-inputline"><span>把想法写在这条线上……</span></div>
+          <div style="margin-top:10px"><span class="a-chip">＋ 上传数据</span><span class="a-chip">用示例数据</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台 · 活的正文，悬停系数看证据</p>
+    <div class="screen a-screen">
+      <div class="a-top">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="a-tools"><span class="pill">研究进度</span><span class="pill">✓ 清洗 8 步 · ✓ OLS 主表</span></span>
+      </div>
+      <div class="a-body" style="align-items:stretch">
+        <div class="a-sheet" style="flex:1;max-width:none">
+          <h2 style="font-size:17px">5. 结果</h2>
+          <p class="a-p">在控制城市固定效应之后，最低工资每上调 10%，周边县域的青年就业率变化为 <span class="a-num lit">β = −0.031**（0.014）</span>，幅度较小但方向稳定<span class="a-cite">表1</span>。这一结果在替换就业度量后仍然成立<span class="a-cite">表3</span>。</p>
+          <p class="a-p"><span class="grey">稳健性检查见附录；主结果表如下，系数与上文同色绑定——</span></p>
+          <table class="a-table">
+            <tr><td style="color:#8b8371">变量</td><td>(1)</td><td>(2)</td></tr>
+            <tr class="lit"><td>mwy_change</td><td>−0.031** (0.014)</td><td>−0.028* (0.015)</td></tr>
+            <tr><td style="color:#8b8371">controls</td><td>Yes</td><td>Yes</td></tr>
+          </table>
+        </div>
+        <div class="a-margin">
+          <div class="a-card" style="border-color: var(--id-est)">
+            <h5>悬停 β = −0.031** 后</h5>
+            <p>亮出：回归表对应行 · 方向卡「mwy_change → 青年就业率」· 识别说明第 2 段。同一身份色，三处同亮。</p>
+          </div>
+          <div class="a-card">
+            <h5>来源 <span class="mono" style="font-size:10px;color:var(--id-data)">[表1]</span></h5>
+            <p>主估计 · OLS · 双向固定效应，运行于 04:13，识别 ✓ 通过，稳健性 ✓ 2/2。</p>
+          </div>
+          <div class="a-card">
+            <h5>下一章 · 文献综述</h5>
+            <p>等本章确认后解锁。批准 / 打回重写 / 改方向。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="risk"><b>风险</b>：对话被降到纸边后，追问式交互要另想位置；正文活点是密度最高的界面，移动端难做。参考原文：Rauno《Invisible Details》、Emil《Agents with Taste》的纪律都吃这条线。</p>
+  </section>
+
+  <!-- ============ 方向 B ============ -->
+  <section class="candidate" id="cand-B">
+    <div class="cand-head">
+      <span class="cand-key">方向 B</span>
+      <span class="cand-title serif">轨迹即产品</span>
+      <span class="cand-tag">把笔记里那份 RAG 轨迹卡拆解，长成整个界面</span>
+    </div>
+    <p class="thesis">DESIGN.md 已把 RAG 轨迹卡定为 Phase B 步骤卡的「直接参照」——这一版把它从右栏的一张卡升格为<b>整个界面的脊柱</b>：空桌就是一列 ghost 步骤卡（虚线环 + 灰条 + "--"，告诉你将会出现什么）；运行时每张卡有计时药丸、竖脊线阶段、每阶段一个微型可视化（诊断=缺失率条带、估计=置信区间微图），进行时动词、完成报证据数，全部同位交叉淡变零布局跳动。BoardUI 的 Agent progress / thinking / 数据表格组件直接可用（MIT）。</p>
+    <div class="refs">
+      <span class="hot">RAG 轨迹卡拆解 §1–§7 全条</span><span class="hot">BoardUI Agent progress/thinking</span><span>laper#compose 入口是输入卡</span><span>DESIGN.md §10 阶段化等待</span><span>GPT Researcher live progress</span><span>Morphic generative UI</span>
+    </div>
+
+    <p class="shot-label">空桌 · ghost 轨迹：先看见将会出现什么</p>
+    <div class="screen b-screen">
+      <div class="b-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="pill">研究进度</span>
+      </div>
+      <div class="b-body">
+        <div class="b-left">
+          <h2 class="b-hello serif">今天研究什么？</h2>
+          <p class="b-sub">提交之后，右边这张轨迹会一步一步真实地跑起来。</p>
+          <div class="b-input">
+            <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <span><span class="a-chip">＋ 上传数据</span><span class="a-chip">用示例数据</span></span>
+              <button class="c-send">↑</button>
+            </div>
+          </div>
+          <div class="b-ghost">
+            <div class="row"><span class="ring"></span><span class="bar"></span><span style="margin-left:auto" class="mono">--</span></div>
+            <div class="row"><span class="ring"></span><span style="color:#8b8371">检查数据 · 将显示缺失率条带</span><span class="mono" style="margin-left:auto">--</span></div>
+            <div class="row"><span class="ring"></span><span style="color:#8b8371">算出主结果 · 将显示置信区间微图</span><span class="mono" style="margin-left:auto">--</span></div>
+            <div class="row"><span class="ring"></span><span style="color:#8b8371">逐章写正文 · 6 章</span><span class="mono" style="margin-left:auto">--</span></div>
+          </div>
+        </div>
+        <div class="b-trace">
+          <p class="micro" style="margin-bottom:8px">将会出现的研究轨迹（示意）</p>
+          <div class="b-card">
+            <div class="head"><b>估计 · 主结果</b><span class="pill run">正在估计…</span></div>
+            <div class="b-spine">
+              <div class="b-stage"><i></i>读入 course-panel.csv<span class="t">1.2s</span></div>
+              <div class="b-stage done"><i></i>OLS · 双向固定效应<span class="t">0.8s</span></div>
+              <div class="b-stage done"><i></i>聚类稳健标准误<span class="t">0.3s</span></div>
+            </div>
+            <div class="b-ci"><div class="axis"></div><div class="rng"></div><div class="dot"></div></div>
+            <p class="b-note">95% 置信区间 · 点 = 系数</p>
+          </div>
+          <div class="b-card" style="margin-top:10px;opacity:.75">
+            <div class="head"><b>检查数据</b><span class="pill">完成 · 8/8</span></div>
+            <div class="b-viz"><i style="height:9px"></i><i style="height:15px"></i><i style="height:7px"></i><i style="height:21px"></i><i style="height:13px"></i><i style="height:17px"></i><i style="height:10px"></i><i style="height:19px"></i></div>
+            <p class="b-note">缺失率条带 · 每根 = 一列</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台 · 轨迹与论文并排，卡上直接盖章</p>
+    <div class="screen b-screen">
+      <div class="b-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="pill">课设样例 · 主表已出</span>
+      </div>
+      <div class="b-body">
+        <div class="b-left" style="background:var(--panel);border-right:1px solid var(--line)">
+          <p class="micro" style="margin-bottom:8px">论文 · 第 2 章 写作中</p>
+          <h2 class="b-hello serif" style="font-size:18px">2. 文献综述与研究假设</h2>
+          <p style="font-family:'Instrument Serif','Noto Serif SC',serif;font-size:13.5px;line-height:1.85">已有研究多聚焦于……本文在此基础上，将注意力转向……据此提出假设 1。</p>
+          <p class="b-note">写完这一章会停下来，等你批准。</p>
+        </div>
+        <div class="b-trace">
+          <p class="micro" style="margin-bottom:8px">研究轨迹</p>
+          <div class="b-card">
+            <div class="head"><b>写作 · 逐章串行</b><span class="pill run">正在写第 2 章…</span></div>
+            <div class="b-spine">
+              <div class="b-stage done"><i></i>01 引言 · 已批准<span class="t">2.1s</span></div>
+              <div class="b-stage"><i></i>02 文献综述 · 生成中<span class="t">实时</span></div>
+              <div class="b-stage" style="color:#8b8371"><i style="background:transparent;border:1.5px dashed #c9c2b2"></i>05 结果 · 等主结果<span class="t">--</span></div>
+            </div>
+            <p class="b-note">结论将由 3 张表支撑：主估计 · 稳健性 · 平衡性</p>
+          </div>
+          <div class="b-card" style="margin-top:10px">
+            <div class="head"><b>主结果</b><span class="pill">完成</span></div>
+            <div class="b-ci"><div class="axis"></div><div class="rng"></div><div class="dot"></div></div>
+            <p class="b-note">mwy_change −0.031** · 悬停亮论文对应句</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="risk"><b>风险</b>：轨迹卡密度高，只此一套语言容易把产品做成「流水线监视器」；论文纸面要刻意保住占比。这正是笔记说的「论文是 View 之一」的表达，但别让 View 抢了主体。</p>
+  </section>
+
+  <!-- ============ 方向 C ============ -->
+  <section class="candidate" id="cand-C">
+    <div class="cand-head">
+      <span class="cand-key">方向 C</span>
+      <span class="cand-title serif">卷宗即产品</span>
+      <span class="cand-tag">研究是一次办案：材料、证据、章节都是卷内页</span>
+    </div>
+    <p class="thesis">mosby 的「案子当文件」搬过来：每份研究会话是一份卷宗，左侧是探出的页签抽屉（数据 / 方向 / 证据 / 章节），卷内是带一点歪的剪贴卡。上传用 minifolio 的上传零件，材料多时 fan stack 叠卡，空格老实写「待归档」不虚构。这是最「物」的一版，也离 parked 的 Research Canvas 最近。</p>
+    <div class="refs">
+      <span class="hot">mosby 案子当文件·页签抽屉·剪贴落点</span><span class="hot">minifolio 上传零件·fan stack</span><span>idols 空格写待归档</span><span>oasis 进场一半风景一半门</span><span>paper-echo 过线才提交</span>
+    </div>
+
+    <p class="shot-label">空桌 · 建一份新卷宗</p>
+    <div class="screen c-screen">
+      <div class="c-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="pill">2 份卷宗</span>
+      </div>
+      <div class="c-body">
+        <div class="c-drawer">
+          <div class="c-tab on">新的研究<small>草稿 · 空卷</small></div>
+          <div class="c-tab">课设样例<small>主表已出 · 第 3 章待确认</small></div>
+          <div class="c-tab">企业面板<small>识别未通过 · 待重开</small></div>
+        </div>
+        <div class="c-desk">
+          <p class="c-kick">新的研究 · 空卷宗</p>
+          <h2 class="c-hello serif">先往卷里放第一份材料</h2>
+          <div class="c-clips">
+            <div class="c-clip"><b>一份数据</b><span>CSV · Stata · Excel</span></div>
+            <div class="c-clip"><b>一个想法</b><span>一句话就够</span></div>
+            <div class="c-clip"><b>一篇论文</b><span>先读后仿 · 待归档</span></div>
+          </div>
+          <div class="c-input">
+            <textarea placeholder="或者直接说：导师让我用 CHARLS 做点养老的，不知道从哪问起"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <span><span class="c-chip">＋ 放进卷宗</span><span class="c-chip">用示例数据</span></span>
+              <button class="c-send">↑</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台 · 卷宗摊开，章节是页，证据是剪贴</p>
+    <div class="screen c-screen">
+      <div class="c-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="pill">课设样例 · 卷内 6 章 · 3 份证据</span>
+      </div>
+      <div class="c-wb-body">
+        <div class="c-stack">
+          <p class="micro" style="margin-bottom:8px">章节卷</p>
+          <div class="c-fan"><i></i><i></i><i></i><span>02 文献综述 · 第 2 稿</span></div>
+          <div class="c-list"><b>01 引言</b> · 已确认</div>
+          <div class="c-list"><b>03 数据描述</b> · 待写</div>
+          <div class="c-list"><b>05 结果</b> · 等主结果</div>
+        </div>
+        <div class="c-paper">
+          <h4>2. 文献综述与研究假设</h4>
+          <p>已有研究多聚焦于……本文在此基础上，将注意力转向……</p>
+          <p>据此提出假设 1：在其他条件不变时……</p>
+          <p style="color:#8b8371;font-size:11.5px" class="mono">—— 写完会停下来等你确认 ——</p>
+        </div>
+        <div class="c-stack r">
+          <p class="micro" style="margin-bottom:8px">证据剪贴</p>
+          <div class="c-clip" style="transform:rotate(-1deg)"><b>主估计表</b><span>age 0.124***</span></div>
+          <div class="c-clip" style="transform:rotate(.8deg);margin-top:6px"><b>稳健性 2/2</b><span>替换度量 · 缩尾</span></div>
+          <div class="c-list" style="margin-top:8px">跑过的每一步都在卷底留档，可回查。</div>
+        </div>
+      </div>
+    </div>
+    <p class="risk"><b>风险</b>：最重、最「作品化」的一版，和现有对话主路径距离最远（笔记里 Research Canvas 的重启条件还没满足）；剪贴/拖拽的实现成本最高。建议只取它的<b>卷宗信息架构</b>，动效零件按货架规矩最多挑 3 个。</p>
+  </section>
+
+  <div class="srcs">
+    <h3 class="serif">参考来源</h3>
+    <ul>
+      <li>设计笔记：<span class="mono">econpaper/docs/specs/design-sources.md</span>（Notion 12 页原则 + 货架色板 + RAG 轨迹卡拆解）、<span class="mono">DESIGN.md §10</span>、<span class="mono">docs/UX-BACKLOG.md</span>、<span class="mono">~/Documents/design-notes/living/INDEX.md</span></li>
+      <li>X / 外部：RAG 轨迹卡 <a href="https://x.com/jeetnirnejak/status/2095507715556831429">x.com/jeetnirnejak/status/2095507715556831429</a>；Emil Kowalski <a href="https://emilkowal.ski/ui/agents-with-taste">Agents with Taste</a> 与 <a href="https://x.com/emilkowalski">动画技能系列</a>；Rauno Freiberg <a href="https://devouringdetails.com/">Devouring Details</a> / <a href="https://every.to/p/invisible-details-of-interaction-design">Invisible Details</a>；《<a href="https://www.designative.info/2026/03/19/the-conversation-trap-why-defaulting-to-chat-might-be-the-biggest-interaction-design-mistake-of-the-ai-era/">The Conversation Trap</a>》</li>
+      <li>开源：<a href="https://boardui.com">BoardUI</a>（MIT，Agent progress / thinking / 表格）、<a href="https://libraries.dev">libraries.dev</a>（5 个 MIT 特效库）、<a href="https://github.com/miurla/morphic">Morphic</a>（generative UI）、<a href="https://github.com/assafelovic/gpt-researcher">GPT Researcher</a>（进度日志 + 报告流）、<a href="https://github.com/ItzCrazyKns/Vane">Vane / Perplexica</a>（引用式回答引擎）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="pick-bar">
+  <span class="sel">我的选择：<b id="sel-name">还没选</b></span>
+  <textarea id="sel-note" placeholder="备注（可不填）：比如「A 的活正文 + B 的步骤卡」…"></textarea>
+  <button class="btn-copy" id="btn-copy">复制我的选择</button>
+  <div class="copy-out" id="copy-out">
+    <pre id="copy-text"></pre>
+    <p class="hint">↑ 自动复制没生效就手动选中上面这段，贴回对话。</p>
+  </div>
+</div>
+
+<script>
+  var picked = null;
+  var NAMES = {
+    'A': '方向 A「稿纸即产品」— 聊天退位，论文纸面升为中心，正文里的系数/引用全部可点回证据',
+    'B': '方向 B「轨迹即产品」— RAG 轨迹卡拆解升格为界面脊柱：ghost 占位、计时药丸、微型可视化、状态机语言',
+    'C': '方向 C「卷宗即产品」— 研究会话是卷宗：页签抽屉、剪贴证据、fan stack，最物化也最重'
+  };
+  document.querySelectorAll('.candidate').forEach(function (card) {
+    card.addEventListener('click', function (ev) {
+      if (ev.target.closest('textarea, .b-input, .c-input, .a-inputline, button, .a-num, .a-cite')) return;
+      pick(card.id.replace('cand-', ''));
+    });
+    var key = card.querySelector('.cand-key');
+    key.title = '选这个方向';
+    key.addEventListener('click', function (ev) { ev.stopPropagation(); pick(card.id.replace('cand-', '')); });
+  });
+  function pick(k) {
+    picked = k;
+    document.querySelectorAll('.candidate').forEach(function (c) {
+      c.classList.toggle('picked', c.id === 'cand-' + k);
+    });
+    document.getElementById('sel-name').textContent = NAMES[k].split('—')[0].trim();
+    document.getElementById('copy-out').classList.remove('show');
+  }
+  document.getElementById('btn-copy').addEventListener('click', function () {
+    if (!picked) { alert('先点一个方向（点卡片任意处或左上角的方向标）'); return; }
+    var note = document.getElementById('sel-note').value.trim();
+    var text = '我的选择：' + NAMES[picked] + '\n备注：' + (note || '无');
+    document.getElementById('copy-text').textContent = text;
+    document.getElementById('copy-out').classList.add('show');
+    var btn = document.getElementById('btn-copy');
+    var done = function () { btn.textContent = '已复制 ✓'; setTimeout(function(){btn.textContent='复制我的选择';},1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { manual(); });
+    } else { manual(); }
+    function manual() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+  // 方向 A 演示：悬停/点击活系数，亮回归表行
+  document.querySelectorAll('.a-num').forEach(function (el) {
+    var toggle = function () {
+      el.classList.toggle('lit');
+      var tr = document.querySelector('.a-table tr.lit');
+      if (tr) tr.classList.toggle('lit');
+    };
+    el.addEventListener('click', toggle);
+    el.addEventListener('mouseenter', function () { el.classList.add('lit'); var tr = document.querySelector('.a-table tr.lit'); if (tr) tr.classList.add('lit'); });
+    el.addEventListener('mouseleave', function () { el.classList.remove('lit'); var tr = document.querySelector('.a-table tr.lit'); if (tr) tr.classList.remove('lit'); });
+  });
+</script>
+</body>
+</html>

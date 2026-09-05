@@ -465,9 +465,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const [deskOpen, setDeskOpen] = useState(
     () => !readStoredSessionId(),
   )
-  const [seenGuide, setSeenGuide] = useState(
-    () => localStorage.getItem(LS_GUIDE_KEY) === '1',
-  )
+  // 空桌直入：落地页不再拦截首次访问。showGuide 只由显式请求
+  // （页眉「了解产品」/「再看一次产品页」）置位；LS_GUIDE_KEY 退化为
+  // 「看过」记录，与进门与否无关。
+  const [showGuide, setShowGuide] = useState(false)
   const [shapedQuestion, setShapedQuestion] = useState(() => {
     try {
       const raw = sessionStorage.getItem(LS_SAMPLE_KEY)
@@ -616,8 +617,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     localStorage.removeItem(LS_GUIDE_KEY)
     clearAllRunStorage()
     forgetCsvMeta()
-    setDeskOpen(false)
-    setSeenGuide(false)
+    setShowGuide(false)
+    setDeskOpen(true)
   }, [invalidateSessionWork, setAuthed, switchSession, forgetCsvMeta])
 
   const ensureSession = useCallback(async (): Promise<string> => {
@@ -728,16 +729,15 @@ export function useWorkspace(opts: WorkspaceOptions) {
     if (csv.cols != null) setCsvCols(csv.cols)
   }, [])
 
-  const returnToUploadGuide = useCallback(
+  const returnToUploadDesk = useCallback(
     (message: string, clearAuth = false) => {
       uploadOperationRef.current = null
       clearAllRunStorage()
       clearStoredSessionId()
-      localStorage.removeItem(LS_GUIDE_KEY)
       switchSession(null)
       forgetCsvMeta()
-      setSeenGuide(false)
-      setDeskOpen(false)
+      setShowGuide(false)
+      setDeskOpen(true)
       setUploadError(message)
       setUploadStatus(message)
       if (clearAuth) setAuthed(false)
@@ -751,14 +751,14 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setUploading(false)
       if (sid && runId && shouldForgetRunHandle(error)) clearActiveRun(sid, runId)
       if (error instanceof RunRequestError && (error.status === 401 || error.status === 403)) {
-        returnToUploadGuide(
+        returnToUploadDesk(
           error.status === 401 ? t('app.uploadAuthRequired') : t('app.uploadPermissionRequired'),
           error.status === 401,
         )
         return
       }
       if (error instanceof RunRequestError && error.status === 404) {
-        returnToUploadGuide(t('app.uploadMissing'))
+        returnToUploadDesk(t('app.uploadMissing'))
         return
       }
       if (error instanceof RunRequestError && error.status < 500) {
@@ -783,7 +783,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setUploadError(t('app.uploadRetryRefresh'))
       setUploadStatus(t('app.uploadRetryRefresh'))
     },
-    [returnToUploadGuide, t],
+    [returnToUploadDesk, t],
   )
 
   // 会话回填：刷新后从 session 恢复工作区
@@ -804,7 +804,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         if (!isCurrent()) return
         snapshotGate.applySession(() => {
           if (!data.exists) {
-            returnToUploadGuide(t('app.uploadMissing'))
+            returnToUploadDesk(t('app.uploadMissing'))
             return
           }
           applyDeskSnapshot(data, saved)
@@ -873,7 +873,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         runAbortRef.current = null
       }
     }
-  }, [applyDeskSnapshot, handleUploadRunError, returnToUploadGuide, showGlobalError, t])
+  }, [applyDeskSnapshot, handleUploadRunError, returnToUploadDesk, showGlobalError, t])
 
   useEffect(() => {
     if (sessionId) {
@@ -1032,9 +1032,11 @@ export function useWorkspace(opts: WorkspaceOptions) {
     }
   }, [gateInfo, sessionId, postApprove, markChapterUpdated, refreshReview, showGlobalError])
 
-  const markGuideSeen = useCallback(() => {
+  // 落地页降级为可选入口后的两种操作：显式打开、显式关闭（关闭即记录「看过」）。
+  const openGuide = useCallback(() => setShowGuide(true), [])
+  const closeGuide = useCallback(() => {
     localStorage.setItem(LS_GUIDE_KEY, '1')
-    setSeenGuide(true)
+    setShowGuide(false)
   }, [])
 
   const applyUploadMetadata = useCallback(
@@ -1059,10 +1061,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setCsvRows(rows)
       writeCsvMeta(data.session_id, fileName, rows, parsedColumns.length || null)
       persistSessionId(data.session_id)
-      markGuideSeen()
+      closeGuide()
       switchSession(data.session_id)
     },
-    [markGuideSeen, switchSession],
+    [closeGuide, switchSession],
   )
 
   useEffect(() => {
@@ -1663,7 +1665,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     uploadStatus,
     fileInputRef,
     deskOpen,
-    seenGuide,
+    showGuide,
     shapedQuestion,
     sampleDirection,
     dataColumns,
@@ -1710,7 +1712,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setEdaOpen,
     setUploadError,
     setUploading,
-    setSeenGuide,
+    openGuide,
+    closeGuide,
     setShapedQuestion,
     setSampleDirection,
     setDeskOpen,
@@ -1728,7 +1731,6 @@ export function useWorkspace(opts: WorkspaceOptions) {
     handleLogout,
     ensureSession,
     refreshReview,
-    markGuideSeen,
     uploadCsv,
     takeCsv,
     handleFileSelect,

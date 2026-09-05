@@ -71,8 +71,8 @@ export default function ResearchComputer({
   return (
     <section data-testid="research-computer" className="space-y-5">
       <header className="border-b border-border pb-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">研究控制面</p>
-        <h2 className="mt-1 font-serif text-[1.2rem] text-ink">Research Computer</h2>
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">进度 · 证据 · 记录</p>
+        <h2 className="mt-1 font-serif text-[1.2rem] text-ink">研究进度</h2>
         <p className="mt-1 text-xs leading-5 text-muted">研究结构、数据与设计、证据与写作、运行记录</p>
       </header>
 
@@ -103,9 +103,14 @@ export default function ResearchComputer({
           <div>
             <dt className="text-muted">变量 / 方法</dt>
             <dd data-testid="research-design" className="text-ink">
-              {directionDv || directionIv || directionMethod
-                ? `${directionDv || 'Y'} ~ ${directionIv || 'X'} · ${directionMethod || '方法未记录'}`
-                : '尚未形成设计'}
+              {(() => {
+                const parts = [
+                  directionDv ? `结果 ${directionDv}` : null,
+                  directionIv ? `解释 ${directionIv}` : null,
+                  directionMethod ? `方法 ${directionMethod}` : null,
+                ].filter(Boolean)
+                return parts.length > 0 ? parts.join(' · ') : '尚未形成设计'
+              })()}
             </dd>
           </div>
         </dl>
@@ -120,7 +125,7 @@ export default function ResearchComputer({
           onToggle={(event) => onEvidenceOpenChange(event.currentTarget.open)}
           className="mt-3 border-t border-border pt-3"
         >
-          <summary className="cursor-pointer text-xs text-ink">为什么：识别、稳健性与主估计记录</summary>
+          <summary className="cursor-pointer text-xs text-ink">为什么能这么读：识别说明、稳健性检查、主结果记录</summary>
           <dl className="mt-3 space-y-2 text-xs leading-5">
             <div>
               <dt className="text-muted">识别说明</dt>
@@ -135,9 +140,9 @@ export default function ResearchComputer({
               </dd>
             </div>
             <div>
-              <dt className="text-muted">主估计运行</dt>
+              <dt className="text-muted">主结果记录</dt>
               <dd data-testid="research-estimate-record" className="whitespace-pre-wrap text-ink">
-                {estimate?.history_compact || estimate?.status || (hasSuccessfulEstimate ? '主结果已记录，暂无运行摘要' : '尚无可用主估计记录')}
+                {estimate?.history_compact || estimate?.status || (hasSuccessfulEstimate ? '主结果已记录' : '还没有主结果记录')}
               </dd>
             </div>
           </dl>

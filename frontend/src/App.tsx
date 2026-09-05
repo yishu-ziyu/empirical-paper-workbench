@@ -237,7 +237,8 @@ function App() {
     </p>
   )
 
-  if (!sessionId && !ws.seenGuide) {
+  // 空桌直入：GuidePage 只在显式请求（openGuide）时出现，且不拦在无会话工作台前。
+  if (ws.showGuide && !sessionId) {
     return (
       <>
         {firstScreenInput}
@@ -254,35 +255,46 @@ function App() {
           }}
           onWritePaper={(idea) => {
             if (idea?.trim()) sessionStorage.setItem('desk_idea_draft', idea.trim())
-            ws.markGuideSeen()
+            ws.closeGuide()
             ws.setDeskOpen(true)
           }}
           onLogin={authed || DEV_AUTH_BYPASS ? undefined : () => setAuthPage('login')}
           onRegister={authed || DEV_AUTH_BYPASS ? undefined : () => setAuthPage('register')}
           headerExtra={
-            authed && !DEV_AUTH_BYPASS ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="guide-enter-desk"
-                  onClick={() => {
-                    ws.markGuideSeen()
-                    ws.setDeskOpen(true)
-                  }}
-                  className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-                >
-                  {t('guide.enterDesk')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="guide-logout"
-                  onClick={ws.handleLogout}
-                  className="rounded-full border border-black/15 px-3 py-1.5 text-[13px] text-muted transition-colors hover:text-ink"
-                >
-                  {t('app.logout')}
-                </button>
-              </div>
-            ) : undefined
+            <>
+              {/* 从落地页始终有可见途径回到来处（空桌或工作台），不改动 deskOpen 状态 */}
+              <button
+                type="button"
+                data-testid="guide-back-desk"
+                onClick={ws.closeGuide}
+                className="rounded-full border border-black/15 px-3 py-1.5 text-[13px] text-muted transition-colors hover:text-ink"
+              >
+                {t('guide.backToDesk')}
+              </button>
+              {authed && !DEV_AUTH_BYPASS ? (
+                <>
+                  <button
+                    type="button"
+                    data-testid="guide-enter-desk"
+                    onClick={() => {
+                      ws.closeGuide()
+                      ws.setDeskOpen(true)
+                    }}
+                    className="rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
+                  >
+                    {t('guide.enterDesk')}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="guide-logout"
+                    onClick={ws.handleLogout}
+                    className="rounded-full border border-black/15 px-3 py-1.5 text-[13px] text-muted transition-colors hover:text-ink"
+                  >
+                    {t('app.logout')}
+                  </button>
+                </>
+              ) : undefined}
+            </>
           }
         />
       </>
@@ -299,6 +311,7 @@ function App() {
           uploading={ws.uploading}
           uploadError={ws.uploadError}
           onPickData={() => ws.fileInputRef.current?.click()}
+          onOpenGuide={() => ws.openGuide()}
           onLogin={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('login')}
           onRegister={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('register')}
           onConfirm={(title) => {
@@ -426,10 +439,7 @@ function App() {
             <button
               type="button"
               data-testid="open-guide-btn"
-              onClick={() => {
-                localStorage.removeItem('econpaper_seen_guide')
-                ws.setSeenGuide(false)
-              }}
+              onClick={() => ws.openGuide()}
               className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
             >
               {t('guide.nowAgain')}

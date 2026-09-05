@@ -62,7 +62,8 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    // 空桌直入：首屏是对话工作台，不再被落地页拦截
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
 
     // 触发文件上传
     const fileInput = screen.getByTestId('file-input') as HTMLInputElement

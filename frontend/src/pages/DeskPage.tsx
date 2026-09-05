@@ -13,6 +13,7 @@ export interface DeskPageProps {
   onPickData: () => void
   uploading?: boolean
   uploadError?: string | null
+  onOpenGuide?: () => void
   onLogin?: () => void
   onRegister?: () => void
   authed?: boolean
@@ -47,6 +48,7 @@ export default function DeskPage({
   onPickData,
   uploading = false,
   uploadError = null,
+  onOpenGuide,
   onLogin,
   onRegister,
   authed,
@@ -281,18 +283,18 @@ export default function DeskPage({
 
   const paneTitle =
     agentPane === 'clean'
-      ? '清洗 8 步 · audit 留痕'
+      ? '上传后自动进行，每一步都留记录'
       : agentPane === 'estimate'
-        ? '估计门 · 主表会出现在这里'
+        ? '主结果表会先于正文出现在这里'
         : agentPane === 'write'
-          ? '按章写作 · 串行 HITL'
-          : '方向凝练 · 可追溯'
+          ? '写一章停一次，你确认后再写下一章'
+          : '把你的想法，整理成能估计的研究问题'
 
   const agentRows = [
-    ['shape', '问', '方向凝练', '乱问 → Y/X/方法'],
-    ['clean', '洗', '清洗 8 步', '数据进来之后才跑'],
-    ['estimate', '估', '估计门', '主表先于正文'],
-    ['write', '章', 'Write Queue · 6 章串行', '没有主表，结果章锁定'],
+    ['shape', '问', '把想法变成问题', '说清在比较什么、关心什么结果'],
+    ['clean', '洗', '检查数据', '自动查缺失和异常，全程留记录'],
+    ['estimate', '估', '算出主结果', '先看见估计表，再动笔写'],
+    ['write', '章', '逐章写正文', '每一章都停下来等你确认'],
   ] as const
 
   function sendComposer() {
@@ -374,8 +376,23 @@ export default function DeskPage({
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.06] px-6">
         <p className="truncate text-[14px] font-medium">{title || t('desk.heading')}</p>
         <div className="flex items-center gap-3 text-[13px]">
+          {onOpenGuide && (
+            <button
+              type="button"
+              data-testid="desk-open-guide"
+              onClick={onOpenGuide}
+              className="text-muted transition-colors hover:text-ink"
+            >
+              {t('desk.openGuide')}
+            </button>
+          )}
           {onLogin && (
-            <button type="button" onClick={onLogin} className="text-muted hover:text-ink">
+            <button
+              type="button"
+              data-testid="open-login-btn"
+              onClick={onLogin}
+              className="text-muted hover:text-ink"
+            >
               {t('app.login')}
             </button>
           )}
@@ -637,7 +654,7 @@ export default function DeskPage({
   const rightPane = (
     <div className="flex h-full min-h-0 flex-col bg-[#fbfbfa]">
       <div className="border-b border-black/[0.06] px-4 py-3">
-        <p className="font-mono text-[14px] font-bold">econpaper Computer</p>
+        <p className="font-mono text-[14px] font-bold">研究进度</p>
         <p className="mt-1 text-[13px] text-muted">{paneTitle}</p>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[13.5px] leading-7">
@@ -666,7 +683,7 @@ export default function DeskPage({
         <div className="border-t border-black/[0.06] pt-4">
           {agentPane === 'shape' && (
             <>
-              <p className="mb-3 text-[12px] text-muted">用户原话不会被丢掉。agent 只补可估计的骨架。</p>
+              <p className="mb-3 text-[12px] text-muted">你的原话都会保留，我只帮你把问题补齐到能估计。</p>
               {card?.intent === 'research' ? (
                 <dl className="space-y-2">
                   <div><dt className="text-[12px] text-muted">问题</dt><dd>{title || '—'}</dd></div>
@@ -676,23 +693,26 @@ export default function DeskPage({
               ) : (
                 <p className="text-muted">
                   {card?.intent === 'conversation'
-                    ? '还没有进入研究凝练。等你说出想研究的现象或问题。'
-                    : '先把一句话倒进中间。开始之后，设定会出现在这里。'}
+                    ? '还不知道你想研究什么。先说一个你注意到的现象，或者一个想验证的问题。'
+                    : '先在下面说一句你的想法；问题定下来后，研究设定会显示在这里。'}
                 </p>
               )}
             </>
           )}
           {agentPane === 'clean' && (
             <ul className="space-y-1 text-muted">
-              <li>profiling · 契约</li><li>missing · 缺失值</li><li>outliers · 异常值</li><li>audit · clean.py 留痕</li>
-              <li className="pt-2">CSV 进来之后这些才会亮。</li>
+              <li>变量概览：每个字段是什么、有多少</li>
+              <li>缺失值：缺在哪里、怎么处理</li>
+              <li>异常值：明显不合理的记录怎么处理</li>
+              <li>每一步都留记录，之后可以回查</li>
+              <li className="pt-2">上传数据后，这里会逐项亮起来。</li>
             </ul>
           )}
-          {agentPane === 'estimate' && <p className="text-muted">还没有估计。数据进来之后，系数先于正文。结果章必须引用这张表。</p>}
+          {agentPane === 'estimate' && <p className="text-muted">还没有主结果。上传数据、定好方向后，主结果表会出现在这里——先看见它，再写正文。</p>}
           {agentPane === 'write' && (
             <ol className="space-y-1 text-muted">
-              <li>01 引言 · 排队</li><li>02 文献综述 · 排队</li><li>03 数据描述 · 排队</li>
-              <li>04 方法 · 排队</li><li>05 结果 · 锁（没有主表不能写）</li><li>06 结论 · 排队</li>
+              <li>01 引言 · 待写</li><li>02 文献综述 · 待写</li><li>03 数据描述 · 待写</li>
+              <li>04 方法 · 待写</li><li>05 结果 · 等主结果</li><li>06 结论 · 待写</li>
             </ol>
           )}
         </div>

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>econpaper · 入口首屏设计选型稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4efe4;
+    --cream: #f1f0ed;
+    --ink: #181515;
+    --accent: #2f6b4f;
+    --muted: #515151;
+    --border: #d8d2c6;
+    --panel: #fffdf7;
+    --warning: #8a6a12;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #ece7da;
+    color: var(--ink);
+    font-family: 'Instrument Sans', 'PingFang SC', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .serif { font-family: 'Instrument Serif', 'Noto Serif SC', 'Songti SC', serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  .page { max-width: 1060px; margin: 0 auto; padding: 36px 24px 160px; }
+  .page-head h1 { font-family: 'Instrument Serif','Noto Serif SC',serif; font-size: 30px; margin: 0 0 6px; font-weight: 600; }
+  .page-head p { margin: 0 0 4px; color: var(--muted); }
+  .page-head .note { font-size: 12.5px; color: #7a7466; }
+
+  /* ---------- candidate card ---------- */
+  .candidate {
+    margin-top: 40px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 20px 16px;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .candidate.picked { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,107,79,.16); }
+  .cand-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .cand-key {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #fff;
+    background: var(--ink); border-radius: 5px; padding: 2px 8px; letter-spacing: .08em;
+  }
+  .candidate.picked .cand-key { background: var(--accent); }
+  .cand-title { font-size: 17px; font-weight: 600; }
+  .cand-tag { font-size: 12.5px; color: var(--muted); }
+  .cand-desc { margin: 2px 0 14px; font-size: 13px; color: var(--muted); max-width: 62ch; }
+  .cand-ref { font-size: 12px; color: #7a7466; }
+  .cand-ref b { color: var(--accent); font-weight: 600; }
+
+  /* ---------- mock screen ---------- */
+  .screen {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    height: 620px;
+    background: var(--bg);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    font-size: 13.5px;
+  }
+  .screen * { min-width: 0; }
+
+  .bar { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; height: 46px; border-bottom: 1px solid var(--border); background: var(--cream); flex-shrink: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .dot-logo { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-family: 'Instrument Serif', serif; }
+  .bar-links { display: flex; gap: 16px; color: var(--muted); font-size: 12.5px; }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12.5px; color: var(--ink); cursor: pointer; transition: all .15s; }
+  .chip:hover { border-color: #b9b2a2; }
+  .chip.on { background: rgba(47,107,79,.1); border-color: var(--accent); color: var(--accent); }
+  .chip.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .inputbox { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px 11px; transition: border-color .15s, box-shadow .15s; }
+  .inputbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,107,79,.12); }
+  .inputbox textarea { width: 100%; border: 0; outline: 0; resize: none; font: inherit; color: var(--ink); background: transparent; height: 44px; }
+  .inputbox textarea::placeholder { color: #a49d8d; }
+  .input-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .send { width: 30px; height: 30px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; }
+
+  .micro-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8b8371; }
+
+  /* selection footer */
+  .pick-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: rgba(24,21,21,.96); color: #f4efe4;
+    padding: 12px 24px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  }
+  .pick-bar .sel { font-size: 13.5px; }
+  .pick-bar .sel b { color: #9fd3b6; }
+  .pick-bar textarea {
+    flex: 1 1 260px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.25);
+    color: #f4efe4; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; height: 38px; resize: none;
+  }
+  .pick-bar textarea::placeholder { color: rgba(244,239,228,.45); }
+  .pick-bar button { border: 0; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .btn-copy { background: #9fd3b6; color: #14271d; }
+  .btn-copy.flash { background: #fff; }
+  .copy-out { width: 100%; }
+  .copy-out pre {
+    display: none; white-space: pre-wrap; background: rgba(255,255,255,.08); border: 1px dashed rgba(255,255,255,.35);
+    border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin: 4px 0 0; color: #f4efe4; user-select: all;
+  }
+  .copy-out.show pre { display: block; }
+  .copy-out .hint { font-size: 11.5px; color: rgba(244,239,228,.6); margin-top: 3px; display: none; }
+  .copy-out.show .hint { display: block; }
+
+  /* ============ 方案 A 空桌 ============ */
+  .deskA { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 52px 24px 20px; overflow: auto; }
+  .deskA .hello { font-size: 26px; margin: 0 0 6px; }
+  .deskA .sub { color: var(--muted); font-size: 13px; margin: 0 0 26px; }
+  .deskA .box { width: 620px; max-width: 100%; }
+  .starters { width: 620px; max-width: 100%; margin-top: 22px; display: flex; flex-direction: column; gap: 8px; }
+  .starter { display: flex; gap: 10px; align-items: baseline; text-align: left; border: 1px solid var(--border); background: rgba(255,253,247,.7); border-radius: 10px; padding: 10px 14px; cursor: pointer; font: inherit; color: var(--ink); }
+  .starter:hover { border-color: var(--accent); }
+  .starter .q { font-size: 13.5px; }
+  .starter .why { margin-left: auto; font-size: 11px; color: #8b8371; white-space: nowrap; }
+  .deskA .foot-hint { margin-top: auto; padding-top: 24px; font-size: 11.5px; color: #8b8371; }
+
+  /* ============ 方案 B 产品首页 ============ */
+  .homeB { flex: 1; overflow: auto; padding: 40px 48px 24px; }
+  .homeB .greet { font-size: 22px; margin: 0 0 18px; }
+  .new-run { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; box-shadow: 0 1px 0 rgba(24,21,21,.04); }
+  .new-run .inputbox { margin-top: 12px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .recent { margin-top: 26px; }
+  .recent .r-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  table.sessions { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table.sessions td { padding: 9px 14px; border-top: 1px solid #eee8db; font-size: 13px; }
+  table.sessions tr:first-child td { border-top: 0; }
+  table.sessions .name { font-weight: 500; }
+  table.sessions .st { color: var(--muted); font-size: 12px; }
+  .st-ok { color: var(--accent); }
+  .st-warn { color: var(--warning); }
+  .how-link { margin-top: 14px; font-size: 12.5px; color: #7a7466; }
+
+  /* ============ 方案 C 工作台直入 ============ */
+  .benchC { flex: 1; display: grid; grid-template-columns: 200px 1fr 240px; min-height: 0; }
+  .colC { border-right: 1px solid var(--border); padding: 14px; background: var(--cream); overflow: hidden; }
+  .colC.right { border-right: 0; border-left: 1px solid var(--border); background: var(--bg); }
+  .colC h4 { margin: 0 0 10px; }
+  .rail-item { font-size: 12.5px; color: #8b8371; padding: 5px 8px; border-radius: 6px; }
+  .coach { margin: 40px auto 0; width: 420px; max-width: 90%; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; position: relative; box-shadow: 0 8px 24px rgba(24,21,21,.08); }
+  .coach h3 { margin: 0 0 6px; font-size: 17px; }
+  .coach p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .coach .x { position: absolute; top: 10px; right: 12px; border: 0; background: none; color: #8b8371; font-size: 15px; cursor: pointer; }
+  .ghost-editor { text-align: center; color: #b5ad9a; padding-top: 26px; font-size: 12px; }
+  .pathC { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .pathC li { padding: 4px 0; display: flex; gap: 7px; align-items: center; }
+  .pathC .k { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border); flex-shrink: 0; }
+  .pathC li.done .k { background: var(--accent); border-color: var(--accent); }
+
+  /* ============ 方案 D 扉页压缩 ============ */
+  .leafD { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .leaf-band {
+    flex-shrink: 0; height: 168px; position: relative; overflow: hidden;
+    background: var(--ink); color: #f4efe4;
+    display: flex; flex-direction: column; justify-content: center; padding: 0 44px;
+  }
+  .leaf-band .dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(244,239,228,.34) 1px, transparent 1.4px); background-size: 13px 13px; opacity: .5; }
+  .leaf-band .t1 { font-size: 27px; margin: 0; position: relative; }
+  .leaf-band .t2 { font-size: 12.5px; color: rgba(244,239,228,.72); margin: 4px 0 0; position: relative; }
+  .leaf-main { flex: 1; overflow: auto; padding: 26px 44px; display: flex; gap: 28px; }
+  .leaf-main .left { flex: 1.35; }
+  .leaf-main .right { flex: 1; border-left: 1px solid var(--border); padding-left: 26px; display: flex; flex-direction: column; gap: 10px; }
+  .mini-card { border: 1px solid var(--border); background: var(--panel); border-radius: 10px; padding: 12px 14px; }
+  .mini-card h5 { margin: 0 0 3px; font-size: 13.5px; }
+  .mini-card p { margin: 0; font-size: 12px; color: var(--muted); }
+  .leaf-foot { padding: 10px 44px 16px; font-size: 12px; color: #7a7466; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>econpaper · 入口首屏选型稿</h1>
+    <p>四个候选方向，都是「打开产品后的第一屏」结构草图——看结构、密度、气质，不看最终像素。</p>
+    <p class="note">每个方案里能点的：输入框可聚焦、灰片可切换、方案 C 的引导卡可关闭。选好后在页面底部点「复制我的选择」，把内容贴回对话即可；备注可写可不写。</p>
+  </div>
+
+  <!-- ============ A ============ -->
+  <section class="candidate" id="cand-A">
+    <div class="cand-head">
+      <span class="cand-key">方案 A</span>
+      <span class="cand-title serif">空桌直入 · 对话先行</span>
+      <span class="cand-tag">进门就是一张空桌子</span>
+    </div>
+    <p class="cand-desc">砍掉全部营销层。第一屏 = 一句招呼 + 一个输入框 + 两三个起步问题。上传、示例数据都是输入框旁的灰片。产品的「使用感」来自对话本身。</p>
+    <p class="cand-ref">外部参考：<b>ChatGPT / Claude 的空桌形态</b>——问候语极短，动作都收在输入框周边。</p>
+    <div class="screen" data-plan="A">
+      <div class="bar">
+        <div class="brand"><span class="dot-logo">e</span>econpaper</div>
+        <div class="bar-links"><span>论文</span><span>数据</span><span>格式</span><span>EN</span></div>
+      </div>
+      <div class="deskA">
+        <h2 class="hello serif">今天研究什么？</h2>
+        <p class="sub">一句话说想法，或直接丢数据进来。提交后先出主表，再按章写。</p>
+        <div class="box inputbox">
+          <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+          <div class="input-row">
+            <div class="chips">
+              <span class="chip" data-toggle>＋ 上传数据</span>
+              <span class="chip" data-toggle>用示例数据</span>
+              <span class="chip" data-toggle>还没想好问题</span>
+            </div>
+            <button class="send">↑</button>
+          </div>
+        </div>
+        <div class="starters">
+          <button class="starter"><span class="q">这份课设样例里，年龄和收入是否相关？</span><span class="why">示例数据</span></button>
+          <button class="starter"><span class="q">我有一份企业面板数据，想估计某政策的效果</span><span class="why">DiD</span></button>
+        </div>
+        <p class="foot-hint">每一章都会停下来给你确认 · 没有主表，不能写结果章</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ B ============ -->
+  <section class="candidate" id="cand-B">
+    <div class="cand-head">
+      <span class="cand-key">方案 B</span>
+      <span class="cand-title serif">产品首页 · 输入即首屏，下面是最近会话</span>
+      <span class="cand-tag">有「家」的感觉，会话可续</span>
+    </div>
+    <p class="cand-desc">首屏 = 新建研究会话（输入框 + 起步动作），紧跟着一列<b>最近会话</b>（真实产品数据：哪份数据、走到哪一步、什么在等你）。教程收成一行链接。它回答的不只是「怎么开始」，还有「我上次做到哪」。</p>
+    <p class="cand-ref">外部参考：<b>Linear / Notion 的输入即首页</b>——新建动作是主角，下面直接是工作对象列表。</p>
+    <div class="screen" data-plan="B">
+      <div class="bar">
+        <div class="brand"><span class="dot-logo">e</span>econpaper</div>
+        <div class="bar-links"><span>新建会话</span><span>论文</span><span>数据</span><span>格式</span><span>EN</span></div>
+      </div>
+      <div class="homeB">
+        <h2 class="greet serif">新建研究会话</h2>
+        <div class="new-run">
+          <div class="inputbox">
+            <textarea placeholder="描述你的研究想法，或先上传数据…"></textarea>
+            <div class="input-row">
+              <div class="chips">
+                <span class="chip" data-toggle>＋ 上传数据</span>
+                <span class="chip" data-toggle>用示例数据</span>
+              </div>
+              <button class="send">↑</button>
+            </div>
+          </div>
+        </div>
+        <div class="recent">
+          <div class="r-head">
+            <span class="micro-label">最近会话</span>
+            <span class="mono" style="font-size:11px;color:#8b8371">3 个</span>
+          </div>
+          <table class="sessions">
+            <tr><td class="name">课设样例 · 年龄与收入</td><td class="st"><span class="st-ok">主表已出</span> · 第 3 章待你确认</td><td class="st mono">2 小时前</td></tr>
+            <tr><td class="name">企业面板 · 政策效应</td><td class="st"><span class="st-warn">识别未通过</span> · 需要改研究设计</td><td class="st mono">昨天</td></tr>
+            <tr><td class="name">县域数据 · 落户与房价</td><td class="st">方向已确认 · 估计运行中</td><td class="st mono">3 天前</td></tr>
+          </table>
+          <p class="how-link">第一次用？看 30 秒说明 →</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ C ============ -->
+  <section class="candidate" id="cand-C">
+    <div class="cand-head">
+      <span class="cand-key">方案 C</span>
+      <span class="cand-title serif">工作台直入 · 空白纸面 + 引导卡</span>
+      <span class="cand-tag">最像「软件」，一眼看到全貌</span>
+    </div>
+    <p class="cand-desc">直接进三栏工作台（章节导航 / 论文纸面 / 运行记录），中央一张可关闭的引导卡负责冷启动。结构、密度、面板感最强；引导完成抽走卡片，剩下的就是日常使用界面——<b>引导层和使用层是同一层</b>。</p>
+    <p class="cand-ref">外部参考：<b>BoardUI 仪表盘系统</b>的密度与状态表达 + IDE 的「空态引导卡」。</p>
+    <div class="screen" data-plan="C">
+      <div class="bar">
+        <div class="brand"><span class="dot-logo">e</span>econpaper</div>
+        <div class="bar-links"><span style="color:var(--accent);font-weight:600">论文</span><span>数据与模型</span><span>格式</span><span>EN</span></div>
+      </div>
+      <div class="benchC">
+        <div class="colC">
+          <h4 class="micro-label">章节</h4>
+          <div class="rail-item">引言</div><div class="rail-item">方法</div><div class="rail-item">结果</div>
+          <div style="margin-top:14px" class="micro-label">数据</div>
+          <div class="rail-item">course-panel.csv</div>
+        </div>
+        <div style="position:relative;background:var(--cream)">
+          <div class="ghost-editor">论文纸面 · 等待第一章</div>
+          <div class="coach" id="coachC">
+            <button class="x" data-close-coach>✕</button>
+            <h3 class="serif">从一份数据或一句话开始</h3>
+            <p>上传 CSV / Stata / Excel，或直接说你的想法。系统会先出主表，再按章写正文。</p>
+            <div class="chips">
+              <span class="chip primary">＋ 上传数据</span>
+              <span class="chip" data-toggle>用示例数据</span>
+              <span class="chip" data-toggle>说我的想法</span>
+            </div>
+          </div>
+        </div>
+        <div class="colC right">
+          <h4 class="micro-label">运行记录</h4>
+          <ul class="pathC">
+            <li class="done"><span class="k"></span>上传数据</li>
+            <li class="done"><span class="k"></span>清洗完成</li>
+            <li><span class="k"></span>设定方向</li>
+            <li><span class="k"></span>估计与识别</li>
+            <li><span class="k"></span>按章写作</li>
+            <li><span class="k"></span>导出</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ D ============ -->
+  <section class="candidate" id="cand-D">
+    <div class="cand-head">
+      <span class="cand-key">方案 D</span>
+      <span class="cand-title serif">扉页压缩 · 海报只留一条边</span>
+      <span class="cand-tag">保留「纸上扉页」基因，产品占大头</span>
+    </div>
+    <p class="cand-desc">墨色点绘海报从整页压成顶部一条 168px 的扉页带（一句 tagline，去掉锚点导航和全部营销分区），下面 70% 是可操作区：输入卡 + 三个起步卡。完整落地页挪到独立的「了解产品」入口。</p>
+    <p class="cand-ref">参考对象是你已定稿的<b>「纸上扉页」</b>：品牌气质不丢，但海报从「门」变成「门楣」。</p>
+    <div class="screen" data-plan="D">
+      <div class="leafD">
+        <div class="leaf-band">
+          <div class="dots"></div>
+          <h2 class="t1 serif">先看见估计，再写正文</h2>
+          <p class="t2">econpaper · 用数据写实证论文</p>
+        </div>
+        <div class="leaf-main">
+          <div class="left">
+            <p class="micro-label" style="margin-bottom:8px">从你的想法开始</p>
+            <div class="inputbox">
+              <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+              <div class="input-row">
+                <div class="chips">
+                  <span class="chip" data-toggle>＋ 上传数据</span>
+                  <span class="chip" data-toggle>用示例数据</span>
+                </div>
+                <button class="send">↑</button>
+              </div>
+            </div>
+            <p class="foot-hint" style="margin-top:12px">每一章都停下来给你确认 · 没有主表，不能写结果章</p>
+          </div>
+          <div class="right">
+            <div class="mini-card"><h5>数据文件</h5><p>CSV · Stata (.dta) · Excel (.xlsx/.xls)</p></div>
+            <div class="mini-card"><h5>课设样例</h5><p>没有数据？用一份示例先跑通全流程</p></div>
+            <div class="mini-card"><h5>识别方法</h5><p>OLS · DiD · IV · RD · SCM</p></div>
+          </div>
+        </div>
+        <div class="leaf-foot"><span>OLS · DiD · IV · RD · SCM　Word · LaTeX · Stata / R</span><span>了解产品 →</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- selection bar -->
+<div class="pick-bar">
+  <span class="sel">我的选择：<b id="sel-name">还没选</b></span>
+  <textarea id="sel-note" placeholder="备注（可不填）：比如喜欢 B 的最近会话但想要 D 的扉页带…"></textarea>
+  <button class="btn-copy" id="btn-copy">复制我的选择</button>
+  <div class="copy-out" id="copy-out">
+    <pre id="copy-text"></pre>
+    <p class="hint">↑ 如果自动复制没生效，直接选中上面这段文字手动复制，贴回对话。</p>
+  </div>
+</div>
+
+<script>
+  var picked = null;
+  var NAMES = {
+    A: '方案 A — 空桌直入 · 对话先行（进门即对话工作台，营销层全部砍掉）',
+    B: '方案 B — 产品首页 · 输入即首屏 + 最近会话列表（新建会话是主角，能续上次进度）',
+    C: '方案 C — 工作台直入 · 空白纸面 + 可关闭引导卡（引导层和使用层同一层，最像软件）',
+    D: '方案 D — 扉页压缩 · 海报只留顶部一条带（保留纸上扉页基因，下方 70% 可操作）'
+  };
+
+  // chips toggle
+  document.querySelectorAll('[data-toggle]').forEach(function (el) {
+    el.addEventListener('click', function () { el.classList.toggle('on'); });
+  });
+  // coach close
+  var coach = document.getElementById('coachC');
+  if (coach) coach.querySelector('[data-close-coach]').addEventListener('click', function () { coach.style.display = 'none'; });
+
+  // pick
+  document.querySelectorAll('.candidate').forEach(function (card) {
+    card.addEventListener('click', function (ev) {
+      if (ev.target.closest('textarea, .inputbox, .starter, [data-toggle], [data-close-coach], button.send')) return;
+      pick(card.id.replace('cand-', ''));
+    });
+    var key = card.querySelector('.cand-key');
+    key.style.cursor = 'pointer';
+    key.title = '选这个方案';
+    key.addEventListener('click', function (ev) { ev.stopPropagation(); pick(card.id.replace('cand-', '')); });
+  });
+
+  function pick(k) {
+    picked = k;
+    document.querySelectorAll('.candidate').forEach(function (c) {
+      c.classList.toggle('picked', c.id === 'cand-' + k);
+    });
+    document.getElementById('sel-name').textContent = k + ' · ' + NAMES[k].split('—')[1].split('（')[0].trim();
+    document.getElementById('copy-out').classList.remove('show');
+  }
+
+  document.getElementById('btn-copy').addEventListener('click', function () {
+    if (!picked) { alert('先点一个方案（点卡片任意处或左上角的方案标）'); return; }
+    var note = document.getElementById('sel-note').value.trim();
+    var text = '我的选择：' + NAMES[picked] + '\n备注：' + (note || '无');
+    document.getElementById('copy-text').textContent = text;
+    var out = document.getElementById('copy-out');
+    out.classList.add('show');
+    var btn = document.getElementById('btn-copy');
+    var done = function () {
+      btn.textContent = '已复制 ✓';
+      btn.classList.add('flash');
+      setTimeout(function () { btn.textContent = '复制我的选择'; btn.classList.remove('flash'); }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { manual(); });
+    } else { manual(); }
+    function manual() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+</body>
+</html>

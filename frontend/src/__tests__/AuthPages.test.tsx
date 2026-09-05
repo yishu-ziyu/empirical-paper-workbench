@@ -232,7 +232,7 @@ describe('App auth flow', () => {
     expect(screen.getByTestId('test-value')).toHaveTextContent('null')
   })
 
-  test('renders login page when not authenticated', () => {
+  test('renders desk first without forcing login when not authenticated', () => {
     localStorage.clear()
     // Verify localStorage is empty
     expect(localStorage.getItem('econpaper_access_token')).toBeNull()
@@ -243,7 +243,8 @@ describe('App auth flow', () => {
     const calls = getItemSpy.mock.calls.map(c => c[0])
     console.error('localStorage.getItem calls:', calls)
     getItemSpy.mockRestore()
-    expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+    // 空桌直入：未登录首屏是对话工作台，不强制登录、也不再先进落地页
+    expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getAllByText(/econpaper/i).length).toBeGreaterThan(0)
   })
 
@@ -259,9 +260,9 @@ describe('App auth flow', () => {
     )
 
     renderWithI18n(<App />)
-    // With token, should show main app (upload button, outline, etc.)
+    // With token, should show main app (upload entry on the desk, etc.)
     await waitFor(() => {
-      expect(screen.getByTestId('guide-upload-btn')).toBeInTheDocument()
+      expect(screen.getByTestId('desk-upload-inline')).toBeInTheDocument()
     })
   })
 })

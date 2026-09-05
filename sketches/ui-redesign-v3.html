@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>econpaper · 界面层 v3 —— 对标 Claude Science 的「可审计工件台」</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper:#f4efe4; --cream:#f1f0ed; --ink:#181515; --accent:#2f6b4f;
+    --muted:#515151; --line:#d8d2c6; --panel:#fffdf7; --gold:#8a6a12; --red:#9b3d30;
+    --id-data:#6b7f9e; --id-est:#a8785a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e9e4d6; color:var(--ink); font-family:'Instrument Sans','PingFang SC',system-ui,sans-serif; font-size:14px; line-height:1.65; }
+  .serif { font-family:'Instrument Serif','Noto Serif SC','Songti SC',serif; }
+  .mono { font-family:'JetBrains Mono',ui-monospace,monospace; }
+  .page { max-width:1140px; margin:0 auto; padding:40px 24px 170px; }
+  .page-head h1 { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:30px; margin:0 0 8px; }
+  .page-head p { margin:0 0 4px; color:var(--muted); }
+  .page-head .warn { color:var(--red); font-weight:600; }
+
+  .block { margin-top:28px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 24px; }
+  .block h2 { margin:0 0 12px; font-size:18px; }
+  table.gap { width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.gap th { text-align:left; color:#8b8371; font-weight:500; font-size:11px; letter-spacing:.08em; text-transform:uppercase; padding:6px 10px; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace; }
+  table.gap td { padding:8px 10px; border-bottom:1px solid #eee8db; vertical-align:top; }
+  table.gap td.cs { color:var(--ink); }
+  table.gap td.now { color:var(--red); }
+  table.gap td.v3 { color:var(--accent); }
+
+  /* ---------- 屏幕 ---------- */
+  .screen { margin-top:14px; border:1px solid #c9c2b2; border-radius:12px; overflow:hidden; background:var(--paper); display:flex; flex-direction:column; font-size:13px; box-shadow:0 2px 14px rgba(50,42,30,.07); }
+  .screen * { min-width:0; }
+  .tbar { height:46px; display:flex; align-items:center; gap:14px; padding:0 16px; background:var(--cream); border-bottom:1px solid var(--line); }
+  .brand { display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:13px; }
+  .dot-logo { width:22px; height:22px; border-radius:6px; background:var(--ink); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-family:'Instrument Serif',serif; }
+  .proj { font-size:12.5px; color:var(--muted); border-left:1px solid var(--line); padding-left:14px; }
+  .proj b { color:var(--ink); font-weight:500; }
+  .tbar .sp { flex:1; }
+  .tbtn { font-size:12px; color:var(--muted); border:1px solid var(--line); background:#fff; border-radius:7px; padding:4px 11px; }
+  .tbtn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; }
+
+  .pill { font-family:'JetBrains Mono',monospace; font-size:10px; border:1px solid var(--line); border-radius:999px; padding:1px 9px; color:var(--muted); background:#fff; white-space:nowrap; }
+  .pill.run { border-color:var(--accent); color:var(--accent); }
+  .pill.flag { border-color:var(--gold); color:var(--gold); }
+  .micro { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#8b8371; }
+
+  /* 计划卡 */
+  .plan-stage { flex:1; display:flex; align-items:flex-start; justify-content:center; padding:30px 22px; }
+  .plan { width:660px; background:var(--panel); border:1px solid #d9d4c7; border-radius:10px; box-shadow:0 10px 30px rgba(50,42,30,.1); overflow:hidden; }
+  .plan .head { padding:14px 20px 12px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; justify-content:space-between; }
+  .plan .head h3 { margin:0; font-size:17px; }
+  .plan .body { padding:16px 20px 6px; }
+  .plan .row { display:grid; grid-template-columns:96px 1fr; gap:10px; padding:7px 0; border-bottom:1px dashed #e8e2d2; font-size:13px; }
+  .plan .row:last-child { border-bottom:0; }
+  .plan .row dt { color:#8b8371; font-size:12px; }
+  .plan .row dd { margin:0; }
+  .plan .row dd .mono { font-size:12px; color:var(--id-est); }
+  .plan .foot { display:flex; align-items:center; gap:10px; padding:12px 20px 14px; background:var(--cream); border-top:1px solid var(--line); }
+  .plan .foot .note { font-size:11.5px; color:#8b8371; }
+  .btn { border:0; border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+  .btn.primary { background:var(--accent); color:#fff; }
+  .btn.ghost { background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500; }
+
+  /* 工件台 */
+  .wb { flex:1; display:grid; grid-template-columns: 216px 1fr 264px; min-height:0; }
+  .rail { background:var(--cream); border-right:1px solid var(--line); padding:12px; overflow:hidden; }
+  .rail.r { border-right:0; border-left:1px solid var(--line); }
+  .rail .sec { margin-bottom:14px; }
+  .item { font-size:12.5px; padding:5px 8px; border-radius:6px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .item.on { background:#fff; border:1px solid var(--line); color:var(--ink); font-weight:500; }
+  .item i { width:7px; height:7px; border-radius:50%; background:var(--line); flex-shrink:0; }
+  .item.done i { background:var(--accent); }
+  .item.run i { background:var(--accent); box-shadow:0 0 0 3px rgba(47,107,79,.18); }
+
+  .stage { min-height:0; display:flex; flex-direction:column; }
+  .art-tabs { display:flex; align-items:center; gap:2px; padding:8px 14px 0; border-bottom:1px solid var(--line); background:var(--cream); }
+  .art-tab { font-size:12.5px; padding:6px 13px; border-radius:8px 8px 0 0; color:var(--muted); border:1px solid transparent; }
+  .art-tab.on { background:var(--panel); border-color:var(--line); border-bottom-color:var(--panel); color:var(--ink); font-weight:500; }
+  .art-tab .pill { margin-left:6px; }
+  .art-body { flex:1; background:var(--panel); margin:0 14px; border:1px solid #d9d4c7; border-top:0; border-radius:0 0 8px 8px; padding:20px 30px 0; overflow:hidden; position:relative; }
+  .art-title { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:19px; margin:0 0 10px; }
+  .art-p { font-family:'Instrument Serif','Noto Serif SC',serif; font-size:13.5px; line-height:1.85; margin:0 0 10px; color:var(--ink); }
+  .art-p .grey { color:#9a927f; }
+  .a-num { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:rgba(168,120,90,.16); border-radius:3px; padding:1px 5px; color:#7c5540; cursor:pointer; }
+  .a-cite { font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--id-data); vertical-align:super; cursor:pointer; }
+  .anno { border-left:3px solid var(--gold); background:rgba(138,106,18,.06); border-radius:0 6px 6px 0; padding:7px 11px; font-size:12px; color:var(--ink); margin:0 0 10px; }
+  .anno b { font-size:11px; color:var(--gold); display:block; }
+  .stream { display:inline-block; width:7px; height:14px; background:var(--accent); vertical-align:-2px; margin-left:2px; animation:blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  .prov { border-top:1px solid var(--line); background:var(--cream); padding:9px 16px; font-size:11px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+  .prov .k { color:#8b8371; }
+  .prov .v { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ink); }
+
+  .rv { background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 11px; margin-bottom:8px; font-size:12px; }
+  .rv .h { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+  .rv b { font-size:12px; }
+  .rv p { margin:0; color:var(--muted); font-size:11.5px; line-height:1.55; }
+  .rv .fix { color:var(--accent); font-size:11px; margin-top:3px; display:block; }
+
+  .review-body { min-height:0; display:flex; flex-direction:column; }
+  .art-grid { flex:1; display:grid; grid-template-columns: 1fr 264px; min-height:0; }
+
+  .stream-body { flex:1; display:grid; grid-template-columns: 216px 1fr 264px; min-height:0; }
+  .table-art { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .table-art th { text-align:left; color:#8b8371; font-weight:500; font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:5px 6px; border-bottom:1px solid var(--line); }
+  .table-art td { padding:6px; border-bottom:1px solid #eee8db; }
+  .table-art tr.hot td { background:rgba(168,120,90,.12); }
+
+  /* ---------- 通过栏 ---------- */
+  .pick-bar { position:fixed; left:0; right:0; bottom:0; z-index:50; background:rgba(24,21,21,.96); color:#f4efe4; padding:12px 24px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .pick-bar .sel { font-size:13.5px; }
+  .pick-bar .sel b { color:#9fd3b6; }
+  .pick-bar textarea { flex:1 1 260px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25); color:#f4efe4; border-radius:8px; padding:7px 10px; font:inherit; font-size:13px; height:38px; resize:none; }
+  .pick-bar textarea::placeholder { color:rgba(244,239,228,.45); }
+  .pick-bar button { border:0; border-radius:8px; padding:9px 18px; font-size:13.5px; font-weight:600; cursor:pointer; }
+  .btn-copy { background:#9fd3b6; color:#14271d; }
+  .copy-out { width:100%; }
+  .copy-out pre { display:none; white-space:pre-wrap; background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.35); border-radius:8px; padding:10px 12px; font-size:12.5px; margin:4px 0 0; user-select:all; }
+  .copy-out.show pre { display:block; }
+  .copy-out .hint { font-size:11.5px; color:rgba(244,239,228,.6); margin:3px 0 0; display:none; }
+  .copy-out.show .hint { display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>econpaper · 界面层 v3</h1>
+    <p>只做一个方向，对标 <b>Claude Science</b>（Anthropic，2026-06-30 发布的科学家工作台）。v1/v2 的病根：在排版层打转。顶级平台的差距不在风格，在<b class="warn">产品语言：工件 + 溯源</b>。色板仍是货架那套，纸感保住，但界面骨架按平台级重建。</p>
+  </div>
+
+  <div class="block">
+    <h2 class="serif">差距表：Claude Science 做对的，和我们现在的</h2>
+    <table class="gap">
+      <tr><th>Claude Science 的产品语言</th><th>我们现状</th><th>v3 怎么落地</th></tr>
+      <tr><td class="cs">每个产出物带<b>可审计溯源</b>：生成代码、环境、一句人话说明、完整历史</td><td class="now">主表、章节是「结果」，没有出生证明；代码导出是终点不是同伴</td><td class="v3">每个工件底部固定溯源条：代码 · 运行 · 评审状态，可展开</td></tr>
+      <tr><td class="cs"><b>评审 agent</b> 抓引用错误、无溯源数字、图文不符，自我修正</td><td class="now">评审门只打分（0.88 ≥ 0.8），不核对具体声明</td><td class="v3">右侧常驻「评审员」栏：逐条 findings，附修正动作</td></tr>
+      <tr><td class="cs"><b>先起草计划，征求批准</b>再动资源；决策可审可撤</td><td class="now">方向表单 → 直接跑；计划这件事不存在</td><td class="v3">研究计划卡：问题/数据/方法/主结果定义，批准后才跑估计</td></tr>
+      <tr><td class="cs">工件是<b>一等公民</b>：图、表、稿件原生渲染，可迭代到可发表</td><td class="now">论文是唯一主角，表和图是配角；代码缺席</td><td class="v3">工件页签：稿件 / 主表 / 图 / 代码，同级并列</td></tr>
+      <tr><td class="cs"><b>对着工件批注</b>：圈图、划句子，agent 知道改哪</td><td class="now">「打回重写」是一句话黑盒</td><td class="v3">选中正文即批注，批注卡挂在段落上，重写带上下文</td></tr>
+      <tr><td class="cs"><b>分叉会话</b>对比两种做法</td><td class="now">无</td><td class="v3">顶栏「分叉」按钮（先占位，后实现）</td></tr>
+      <tr><td class="cs">60+ 领域连接器，<b>专家 agent</b> 分工</td><td class="now">问/洗/估/章 四步单线</td><td class="v3">左栏显示专家 agent 分工与状态（清洗员、估计员、写手、评审员）</td></tr>
+    </table>
+  </div>
+
+  <!-- ========== 屏 1 计划卡 ========== -->
+  <div class="screen" style="margin-top:34px; height:560px;">
+    <div class="tbar">
+      <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill">计划待批准</span>
+      <button class="tbtn">了解产品</button>
+    </div>
+    <div class="plan-stage">
+      <div class="plan">
+        <div class="head">
+          <h3 class="serif">研究计划（草案）</h3>
+          <span class="pill">估计员起草 · 等你批准</span>
+        </div>
+        <div class="body">
+          <div class="row"><dt>研究问题</dt><dd>最低工资上调对周边县域青年就业率的影响</dd></div>
+          <div class="row"><dt>数据</dt><dd>course-panel.csv · 1,284 行 × 14 列 · 清洗 8/8 已通过</dd></div>
+          <div class="row"><dt>方法</dt><dd>双向固定效应 + 聚类稳健标准误（县级聚类）</dd></div>
+          <div class="row"><dt>主结果定义</dt><dd><span class="mono">mwy_change → youth_emp</span>，系数与 95% 置信区间，<b>先出主表，再写正文</b></dd></div>
+          <div class="row"><dt>评审安排</dt><dd>估计完成后评审员核对：数字溯源、引用、图文一致</dd></div>
+        </div>
+        <div class="foot">
+          <button class="btn primary">批准计划，开始估计</button>
+          <button class="btn ghost">修改计划</button>
+          <span class="note">批准前不会动数据 · 预计 40 秒</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 屏 2 运行中 ========== -->
+  <div class="screen" style="height:620px;">
+    <div class="tbar">
+      <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill run">估计员运行中 · 00:23</span>
+      <button class="tbtn">分叉</button>
+    </div>
+    <div class="stream-body">
+      <div class="rail">
+        <div class="sec">
+          <p class="micro" style="margin-bottom:6px">专家分工</p>
+          <div class="item done"><i></i>清洗员 · 8/8 步</div>
+          <div class="item run"><i></i>估计员 · OLS 主表</div>
+          <div class="item"><i></i>写手 · 排队</div>
+          <div class="item"><i></i>评审员 · 待命</div>
+        </div>
+        <div class="sec">
+          <p class="micro" style="margin-bottom:6px">研究计划</p>
+          <div class="item done"><i></i>已批准 · 04:41</div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="art-tabs">
+          <span class="art-tab on">主结果表<span class="pill run">生成中</span></span>
+          <span class="art-tab">稿件</span>
+          <span class="art-tab">图</span>
+          <span class="art-tab">代码</span>
+        </div>
+        <div class="art-body">
+          <h3 class="art-title">表 1 · 主估计</h3>
+          <table class="table-art">
+            <tr><th>变量</th><th>(1) 就业率</th><th>(2) 就业率+控制</th></tr>
+            <tr class="hot"><td>mwy_change</td><td>−0.031** (0.014)</td><td>−0.028* (0.015)</td></tr>
+            <tr><td>县级固定效应</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>年份固定效应</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td style="color:#8b8371">N</td><td>1,284</td><td>1,284</td></tr>
+          </table>
+          <p style="font-size:11.5px;color:#8b8371;margin:10px 0 0">95% CI [−0.058, −0.004] · 聚类稳健标准误（县级） · 逐格生成中<span class="stream"></span></p>
+        </div>
+        <div class="prov">
+          <span><span class="k">代码</span> <span class="v">estimate_did.R · L41–67</span></span>
+          <span><span class="k">环境</span> <span class="v">R 4.4 · fixest 0.12</span></span>
+          <span><span class="k">一句话</span> <span class="v">县级聚类稳健 OLS，结果与代码输出逐格核对</span></span>
+          <span><span class="k">历史</span> <span class="v">12 条消息 · 可展开</span></span>
+        </div>
+      </div>
+      <div class="rail r">
+        <p class="micro" style="margin-bottom:8px">评审员 · 实时</p>
+        <div class="rv">
+          <div class="h"><b>核对通过</b><span class="pill">3/5 格</span></div>
+          <p>已生成单元格与 estimate_did.R 输出一致。</p>
+        </div>
+        <div class="rv" style="border-color:var(--gold)">
+          <div class="h"><b>发现一处</b><span class="pill flag">已修正</span></div>
+          <p>模型 (2) 的 N 与清洗报告不一致（1,290 → 1,284）。</p>
+          <span class="fix">↳ 已按 clean audit 修正，并在稿件中同步</span>
+        </div>
+        <div class="rv" style="opacity:.65">
+          <div class="h"><b>待办</b></div>
+          <p>图形与代码一致性 · 待图生成后检查</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 屏 3 工作台 ========== -->
+  <div class="screen" style="height:620px;">
+    <div class="tbar">
+      <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+      <span class="proj">研究会话 · <b>最低工资与青年就业</b></span>
+      <span class="sp"></span>
+      <span class="pill">第 2 章 · 写作中</span>
+      <button class="tbtn">分叉</button>
+      <button class="tbtn primary">导出</button>
+    </div>
+    <div class="wb">
+      <div class="rail">
+        <div class="sec">
+          <p class="micro" style="margin-bottom:6px">章节</p>
+          <div class="item done"><i></i>01 引言 · 已批准</div>
+          <div class="item run"><i></i>02 文献综述</div>
+          <div class="item"><i></i>03 数据描述</div>
+          <div class="item"><i></i>05 结果 · 主表已出</div>
+          <div class="item"><i></i>06 结论</div>
+        </div>
+        <div class="sec">
+          <p class="micro" style="margin-bottom:6px">专家分工</p>
+          <div class="item done"><i></i>清洗员 · 完成</div>
+          <div class="item done"><i></i>估计员 · 主表已出</div>
+          <div class="item run"><i></i>写手 · 第 2 章</div>
+          <div class="item done"><i></i>评审员 · 每步核对</div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="art-tabs">
+          <span class="art-tab on">稿件<span class="pill run">第 2 稿</span></span>
+          <span class="art-tab">主表<span class="pill">已评审</span></span>
+          <span class="art-tab">图</span>
+          <span class="art-tab">代码</span>
+        </div>
+        <div class="art-body">
+          <h3 class="art-title">2. 文献综述与研究假设</h3>
+          <div class="anno"><b>你的批注 · 04:52</b>这一段只讲了工资效应，把双侧就业调整的文献也补进来。</div>
+          <p class="art-p">已有研究多聚焦于<span class="grey">劳动需求侧的成本效应</span>，本文在此基础上，将注意力转向周边县域的<span class="grey">替代与溢出</span>。据此提出假设 1：在其他条件不变时，最低工资上调将<span class="grey">小幅降低</span>青年就业率，系数为 <span class="a-num">β = −0.031**（0.014）</span><span class="a-cite">[表1]</span>。</p>
+          <p class="art-p">对批注的回应正在补写<span class="grey">——双侧调整文献（Cengiz et al. 2019 等）将在下一稿并入</span>。</p>
+          <p style="font-size:11.5px;color:#8b8371">选中正文任意一段即可批注，批注会随重写单一起交给写手。</p>
+        </div>
+        <div class="prov">
+          <span><span class="k">写手</span> <span class="v">write_agent · 第 2 稿</span></span>
+          <span><span class="k">评审</span> <span class="v">引用 2 处已核对 · 数字全部溯源到表 1</span></span>
+          <span><span class="k">批注</span> <span class="v">1 条待并入</span></span>
+          <span><span class="k">历史</span> <span class="v">第 1 稿 → 打回原因 · 可展开</span></span>
+        </div>
+      </div>
+      <div class="rail r">
+        <p class="micro" style="margin-bottom:8px">评审员 · 发现</p>
+        <div class="rv">
+          <div class="h"><b>全部核对通过</b><span class="pill">本稿 7/7</span></div>
+          <p>数字可溯源到表 1；引用 2 处真实存在；无图文不符。</p>
+        </div>
+        <div class="sec" style="margin-top:14px">
+          <p class="micro" style="margin-bottom:6px">工件</p>
+          <div class="item done"><i></i>主结果表 · 已评审</div>
+          <div class="item done"><i></i>图 1 · 与代码一致</div>
+          <div class="item run"><i></i>稿件 · 第 2 稿</div>
+        </div>
+        <div class="sec">
+          <p class="micro" style="margin-bottom:6px">会话</p>
+          <div class="item"><i></i>分叉 · 主线 A（OLS）</div>
+          <div class="item"><i></i>分叉 · 对比 B（RD）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block" style="margin-top:26px;">
+    <h2 class="serif">守住的东西（货架纪律不变）</h2>
+    <p style="margin:0;font-size:13px;color:var(--muted)">色板仍是 paper/ink/绿；论文正文永远衬线；mono 只管数字与代码；动效 ≤200ms；「先出主表再写正文、每章停下确认」的产品法条不变——变的只是骨架：从「页面」变成「工件台」，从「结果」变成「带出生证明的工件」。</p>
+  </div>
+</div>
+
+<div class="pick-bar">
+  <span class="sel">我的裁决：<b id="sel-name">还没裁</b></span>
+  <textarea id="sel-note" placeholder="备注：哪里还不对、哪里要调（比如「计划卡放空桌」「评审员太吵」）…"></textarea>
+  <button class="btn-copy" id="btn-copy">复制我的裁决</button>
+  <div class="copy-out" id="copy-out">
+    <pre id="copy-text"></pre>
+    <p class="hint">↑ 自动复制没生效就手动选中上面这段，贴回对话。</p>
+  </div>
+</div>
+
+<script>
+  var picked = null;
+  var VERDICTS = {
+    pass: '通过 — 按 v3「可审计工件台」方向立契约实现',
+    adjust: '方向对，但要调整（备注写改哪里）',
+    reject: '仍不对（备注写为什么、还差哪个平台的感觉）'
+  };
+  var bar = document.querySelector('.pick-bar');
+  var selRow = document.createElement('div');
+  ['pass','adjust','reject'].forEach(function (k) {
+    var b = document.createElement('button');
+    b.textContent = {pass:'通过',adjust:'方向对但要调',reject:'仍不对'}[k];
+    b.style.cssText = 'background:rgba(255,255,255,.12);color:#f4efe4;';
+    b.addEventListener('click', function () {
+      picked = k;
+      Array.prototype.forEach.call(selRow.children, function (c) { c.style.background = 'rgba(255,255,255,.12)'; });
+      b.style.background = '#9fd3b6'; b.style.color = '#14271d';
+      document.getElementById('sel-name').textContent = VERDICTS[k];
+    });
+    selRow.appendChild(b);
+  });
+  selRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;width:100%;';
+  bar.insertBefore(selRow, document.getElementById('sel-note'));
+  document.getElementById('btn-copy').addEventListener('click', function () {
+    if (!picked) { alert('先在左下选一个裁决'); return; }
+    var note = document.getElementById('sel-note').value.trim();
+    var text = '我的裁决：' + VERDICTS[picked] + '\n备注：' + (note || '无');
+    document.getElementById('copy-text').textContent = text;
+    document.getElementById('copy-out').classList.add('show');
+    var btn = document.getElementById('btn-copy');
+    var done = function () { btn.textContent = '已复制 ✓'; setTimeout(function(){btn.textContent='复制我的裁决';},1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { manual(); });
+    } else { manual(); }
+    function manual() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>econpaper · 界面层设计重思选型稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f4efe4; --cream: #f1f0ed; --ink: #181515; --accent: #2f6b4f;
+    --muted: #515151; --border: #d8d2c6; --panel: #fffdf7; --warning: #8a6a12;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #e9e4d6; color: var(--ink);
+    font-family: 'Instrument Sans', 'PingFang SC', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.6;
+  }
+  .serif { font-family: 'Instrument Serif', 'Noto Serif SC', 'Songti SC', serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 36px 24px 170px; }
+  .page-head h1 { font-family: 'Instrument Serif','Noto Serif SC',serif; font-size: 30px; margin: 0 0 6px; }
+  .page-head p { margin: 0; color: var(--muted); }
+
+  /* ---------- 现状体检 ---------- */
+  .audit {
+    margin-top: 28px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 22px;
+  }
+  .audit h2 { margin: 0 0 4px; font-size: 18px; }
+  .audit .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .audit ol { margin: 0; padding-left: 20px; }
+  .audit li { margin-bottom: 9px; font-size: 13.5px; }
+  .audit b { color: #9b3d30; }
+  .audit .where { color: #8b8371; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ---------- 候选卡 ---------- */
+  .candidate {
+    margin-top: 44px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 20px 16px; transition: border-color .18s, box-shadow .18s;
+  }
+  .candidate.picked { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,107,79,.16); }
+  .cand-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cand-key {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #fff;
+    background: var(--ink); border-radius: 5px; padding: 2px 8px; letter-spacing: .08em; cursor: pointer;
+  }
+  .candidate.picked .cand-key { background: var(--accent); }
+  .cand-title { font-size: 18px; font-weight: 600; }
+  .cand-tag { font-size: 12.5px; color: var(--muted); }
+  .cand-desc { margin: 6px 0 12px; font-size: 13px; color: var(--muted); max-width: 68ch; }
+  .principles { margin: 0 0 14px; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 22px; }
+  .principles li { font-size: 12.5px; color: var(--ink); border-left: 2px solid var(--accent); padding-left: 9px; }
+  .tokens { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; font-size: 11.5px; color: var(--muted); }
+  .tokens .sw { display: inline-flex; align-items: center; gap: 5px; }
+  .tokens i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.12); display: inline-block; }
+  .ref-risk { font-size: 12px; color: #7a7466; margin: 12px 2px 0; }
+  .ref-risk b { color: var(--accent); font-weight: 600; }
+  .shot-label { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .14em; color: #8b8371; margin: 16px 0 6px; text-transform: uppercase; }
+
+  /* ---------- mock screen 通用 ---------- */
+  .screen { border: 1px solid #cfc8b8; border-radius: 10px; overflow: hidden; position: relative; display: flex; flex-direction: column; font-size: 13px; height: 540px; }
+  .screen.wb { height: 500px; }
+  .screen * { min-width: 0; }
+  .brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+  .dot-logo { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-family: 'Instrument Serif', serif; flex-shrink: 0; }
+  .micro { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #8b8371; }
+  .send { width: 28px; height: 28px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; flex-shrink: 0; }
+  .ghost-center { display: flex; align-items: center; justify-content: center; height: 100%; color: #b5ad9a; }
+
+  /* ============ 方向一 · 一张纸 ============ */
+  .p1-screen { background: var(--bg); }
+  .p1-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; height: 44px; border-bottom: 1px solid var(--border); }
+  .p1-links { display: flex; gap: 15px; font-size: 12.5px; color: var(--muted); }
+  .p1-links .on { color: var(--ink); border-bottom: 2px solid var(--ink); padding-bottom: 1px; }
+  .p1-desk { flex: 1; display: grid; grid-template-columns: 170px 1fr 205px; min-height: 0; }
+  .p1-side { padding: 14px; border-right: 1px solid var(--border); }
+  .p1-side.r { border-right: 0; border-left: 1px solid var(--border); }
+  .p1-mid { display: flex; flex-direction: column; padding: 30px 34px 16px; min-height: 0; }
+  .p1-hello { font-size: 24px; margin: 0 0 4px; }
+  .p1-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }
+  .p1-input { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 12px 13px 10px; }
+  .p1-input textarea { width: 100%; border: 0; outline: 0; resize: none; font: inherit; height: 40px; background: transparent; color: var(--ink); }
+  .p1-input textarea::placeholder { color: #a49d8d; }
+  .p1-chip { display: inline-block; border: 1px solid var(--border); background: transparent; border-radius: 3px; padding: 3px 10px; font-size: 12px; color: var(--ink); margin-right: 6px; }
+  .p1-quote { border-left: 2px solid var(--accent); padding: 2px 0 2px 11px; margin-top: 16px; font-size: 12.5px; color: var(--muted); }
+  .p1-stage { font-size: 12px; color: var(--muted); padding: 4px 0; }
+  .p1-stage.on { color: var(--ink); }
+  .p1-stage i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--border); margin-right: 7px; }
+  .p1-stage.done i, .p1-stage.on i { background: var(--accent); }
+  .p1-wb { flex: 1; display: grid; grid-template-columns: 158px 1fr 200px; min-height: 0; }
+  .p1-paper { background: var(--panel); border: 1px solid var(--border); border-radius: 3px; margin: 14px 18px; padding: 22px 26px; overflow: hidden; font-family: 'Instrument Serif','Noto Serif SC',serif; }
+  .p1-paper h4 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .p1-paper p { margin: 0 0 8px; font-size: 12.5px; line-height: 1.75; color: var(--ink); }
+  .p1-paper .tab { font-size: 11px; color: #8b8371; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ============ 方向二 · 安静的工具 ============ */
+  .p2-screen { background: #fff; }
+  .p2-shell { flex: 1; display: grid; grid-template-columns: 52px 168px 1fr 200px; min-height: 0; }
+  .p2-rail { background: #1c1c1a; color: #bbb; display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 4px; }
+  .p2-rail .lg { width: 24px; height: 24px; border-radius: 7px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Instrument Serif',serif; font-size: 12px; margin-bottom: 10px; }
+  .p2-rail span { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .p2-rail span.on { background: #33332f; color: #fff; }
+  .p2-nav { border-right: 1px solid #e8e6e1; padding: 12px; background: #fafaf8; }
+  .p2-nav .new { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid #e2e0da; border-radius: 7px; padding: 6px 9px; font-size: 12.5px; margin-bottom: 12px; }
+  .p2-nav .it { font-size: 12.5px; color: #555; padding: 4px 7px; border-radius: 5px; }
+  .p2-nav .it.on { background: #ececea; color: #111; }
+  .p2-mid { display: flex; flex-direction: column; padding: 26px 30px 14px; min-height: 0; }
+  .p2-hello { font-size: 19px; font-weight: 600; margin: 0 0 3px; letter-spacing: -.01em; }
+  .p2-sub { font-size: 12.5px; color: #777; margin: 0 0 16px; }
+  .p2-input { border: 1px solid #ddd; border-radius: 10px; padding: 11px 12px 9px; box-shadow: 0 1px 2px rgba(0,0,0,.04); background: #fff; }
+  .p2-input textarea { width: 100%; border: 0; outline: 0; resize: none; font: inherit; height: 38px; color: #111; }
+  .p2-chip { display: inline-block; border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 3px 9px; font-size: 12px; color: #333; margin-right: 6px; }
+  .p2-right { border-left: 1px solid #e8e6e1; padding: 12px; background: #fafaf8; font-size: 12px; color: #444; }
+  .p2-step { display: flex; gap: 8px; padding: 5px 0; align-items: center; }
+  .p2-step i { width: 7px; height: 7px; border-radius: 2px; background: #ddd; flex-shrink: 0; }
+  .p2-step.done i { background: var(--accent); }
+  .p2-wb { flex: 1; display: grid; grid-template-columns: 52px 158px 1fr 200px; min-height: 0; }
+  .p2-tabs { display: flex; gap: 2px; background: #f0efec; border-radius: 7px; padding: 2px; font-size: 12px; }
+  .p2-tabs span { padding: 3px 11px; border-radius: 5px; color: #666; }
+  .p2-tabs .on { background: #fff; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 500; }
+  .p2-sheet { background: #fff; border: 1px solid #e6e4df; border-radius: 8px; margin: 12px 16px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); font-family: 'Instrument Serif','Noto Serif SC',serif; }
+  .p2-sheet h4 { margin: 0 0 7px; font-size: 15.5px; }
+  .p2-sheet p { margin: 0 0 7px; font-size: 12px; line-height: 1.7; color: #333; }
+  .p2-mono { font-family: 'JetBrains Mono',monospace; font-size: 10.5px; color: #888; }
+
+  /* ============ 方向三 · 研究台 ============ */
+  .p3-screen { background: #eeece5; }
+  .p3-bar { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: #fff; border-bottom: 1px solid #e3e0d8; }
+  .p3-shell { flex: 1; display: grid; grid-template-columns: 186px 1fr 208px; min-height: 0; }
+  .p3-side { padding: 12px; background: #f7f6f2; border-right: 1px solid #e3e0d8; }
+  .p3-side.r { border-right: 0; border-left: 1px solid #e3e0d8; }
+  .p3-sheetwrap { padding: 18px 22px; display: flex; min-height: 0; }
+  .p3-sheet { flex: 1; background: var(--panel); border: 1px solid #d9d4c7; border-radius: 4px; box-shadow: 0 6px 18px rgba(50,42,30,.09); padding: 24px 28px; display: flex; flex-direction: column; min-height: 0; }
+  .p3-hello { font-size: 21px; margin: 2px 0 4px; }
+  .p3-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .p3-input { border: 0; border-bottom: 1.5px solid var(--ink); background: transparent; padding: 4px 2px 8px; }
+  .p3-input textarea { width: 100%; border: 0; outline: 0; resize: none; font: inherit; height: 34px; background: transparent; color: var(--ink); font-family: 'Instrument Serif','Noto Serif SC',serif; font-size: 14px; }
+  .p3-input textarea::placeholder { color: #a49d8d; }
+  .p3-chip { display: inline-block; border: 0; background: rgba(47,107,79,.09); color: var(--accent); border-radius: 999px; padding: 3px 11px; font-size: 12px; margin-right: 6px; }
+  .p3-kicker { font-size: 11px; color: var(--accent); letter-spacing: .06em; margin: 0 0 2px; }
+  .p3-step { font-size: 12px; color: var(--muted); padding: 4px 0; display: flex; gap: 7px; }
+  .p3-step b { color: var(--ink); font-weight: 500; }
+  .p3-wb { flex: 1; display: grid; grid-template-columns: 168px 1fr 200px; min-height: 0; }
+  .p3-paper p { margin: 0 0 8px; font-family: 'Instrument Serif','Noto Serif SC',serif; font-size: 12.5px; line-height: 1.75; }
+  .p3-toolside { font-size: 12px; color: #444; }
+  .p3-card { background: #fff; border: 1px solid #e3e0d8; border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; }
+  .p3-card b { font-size: 12px; font-weight: 600; display: block; }
+  .p3-card span { font-size: 11.5px; color: #777; }
+
+  /* ---------- 选择栏 ---------- */
+  .pick-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: rgba(24,21,21,.96); color: #f4efe4; padding: 12px 24px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .pick-bar .sel { font-size: 13.5px; }
+  .pick-bar .sel b { color: #9fd3b6; }
+  .pick-bar textarea { flex: 1 1 260px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.25); color: #f4efe4; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; height: 38px; resize: none; }
+  .pick-bar textarea::placeholder { color: rgba(244,239,228,.45); }
+  .pick-bar button { border: 0; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .btn-copy { background: #9fd3b6; color: #14271d; }
+  .copy-out { width: 100%; }
+  .copy-out pre { display: none; white-space: pre-wrap; background: rgba(255,255,255,.08); border: 1px dashed rgba(255,255,255,.35); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin: 4px 0 0; user-select: all; }
+  .copy-out.show pre { display: block; }
+  .copy-out .hint { font-size: 11.5px; color: rgba(244,239,228,.6); margin: 3px 0 0; display: none; }
+  .copy-out.show .hint { display: block; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>econpaper · 界面层设计重思</h1>
+    <p>先看现状体检（为什么必须重想），再看三个完整方向。每个方向都画了<b>空桌</b>和<b>工作台</b>两个核心界面，配设计原则与 token 表。</p>
+  </div>
+
+  <div class="audit">
+    <h2 class="serif">现状体检：问题不是某一页丑，是没有「一个」界面层</h2>
+    <p class="sub">以下每条都是今天在代码里核对过的事实，不是感觉。</p>
+    <ol>
+      <li><b>三套视觉语言并存</b>：空桌是白色聊天工具（#fffefb 气泡流），工作台是奶油纸学术风（#f4efe4 衬线），落地页是墨色海报——用户每前进一步就换一次产品。<span class="where">DeskPage / ThreeColumn / GuidePage</span></li>
+      <li><b>控件没有规则</b>：同样是一颗按钮，圆角有 rounded-full / rounded-md / rounded 三种，字号有 11–13.5px 五档，同一屏混用。<span class="where">App header / DeskPage 输入区</span></li>
+      <li><b>字体角色失序</b>：mono 被用在 eyebrow、运行记录、正文标注；衬线被用在问候、章节标题、纸面正文；正文 12–15px 无字阶——想表达「纸感」的元素和「仪表」的元素互相渗透。<span class="where">全局</span></li>
+      <li><b>两个三栏、语义不同</b>：空桌的 ResizableWorkspace 三栏（会话/对话/进度）和工作台的 ThreeColumn 三栏（章节/论文/证据）结构相似但骨架不连续，切换时空间感断裂。</li>
+      <li><b>弹窗各自为政</b>：导出、评审门、代码导出各写一套遮罩、圆角与按钮排布。<span class="where">DocExportDialog / ReviewGateDialog / CodeExportDialog</span></li>
+      <li><b>文案口径曾各自为政</b>：econpaper Computer / Research Computer / 估计门 / Write Queue——今天已统一成「研究进度」口径，但这类问题说明缺一份全产品共享的界面语言规范。</li>
+    </ol>
+  </div>
+
+  <!-- ================= 方向一 ================= -->
+  <section class="candidate" id="cand-1">
+    <div class="cand-head">
+      <span class="cand-key">方向一</span>
+      <span class="cand-title serif">一张纸 · 素雅学术</span>
+      <span class="cand-tag">整台产品就是一张纸，工具退到边上来</span>
+    </div>
+    <p class="cand-desc">把已定稿的「纸上扉页」贯穿到底：所有界面共享纸底、发丝线、衬线标题。对话不是气泡，是纸上的批注；进度不是仪表盘，是目录。品牌感最强，和落地页、论文纸面天然同源。</p>
+    <ul class="principles">
+      <li>纸底只有一个：全产品 #f4efe4，卡片即纸片 #fffdf7</li>
+      <li>发丝线 1px 分隔，不做阴影和浮层卡片</li>
+      <li>衬线只给「纸的成分」：标题、问候、论文正文</li>
+      <li>mono 只给数字、代码、变量名</li>
+      <li>圆角统一 3px，圆角即印刷，不做胶囊</li>
+    </ul>
+    <div class="tokens">
+      <span class="sw"><i style="background:#f4efe4"></i>纸底</span>
+      <span class="sw"><i style="background:#fffdf7"></i>纸片</span>
+      <span class="sw"><i style="background:#181515"></i>墨</span>
+      <span class="sw"><i style="background:#2f6b4f"></i>墨绿</span>
+      <span class="sw"><i style="background:#d8d2c6"></i>发丝线</span>
+      <span>衬线 = 纸 · 无衬线 = 功能 · mono = 数字</span>
+    </div>
+
+    <p class="shot-label">空桌</p>
+    <div class="screen p1-screen">
+      <div class="p1-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="p1-links"><span class="on">新研究</span><span>论文</span><span>数据</span><span>了解产品</span></span>
+      </div>
+      <div class="p1-desk">
+        <div class="p1-side">
+          <p class="micro">研究</p>
+          <p class="p1-stage on"><i></i>新的研究</p>
+          <p class="micro" style="margin-top:14px">数据</p>
+          <p class="p1-stage"><i></i>＋ 上传数据</p>
+        </div>
+        <div class="p1-mid">
+          <h2 class="p1-hello serif">今天研究什么？</h2>
+          <p class="p1-sub">一句话说想法，或直接丢数据进来。提交后先出主表，再按章写。</p>
+          <div class="p1-input">
+            <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <span><span class="p1-chip">＋ 上传数据</span><span class="p1-chip">用示例数据</span></span>
+              <button class="send">↑</button>
+            </div>
+          </div>
+          <div class="p1-quote">例：导师让我用 CHARLS 做点养老的，不知道从哪问起。</div>
+        </div>
+        <div class="p1-side r">
+          <p class="micro">研究进度</p>
+          <p class="p1-stage done"><i></i>把想法变成问题</p>
+          <p class="p1-stage"><i></i>检查数据</p>
+          <p class="p1-stage"><i></i>算出主结果</p>
+          <p class="p1-stage"><i></i>逐章写正文</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台</p>
+    <div class="screen p1-screen wb">
+      <div class="p1-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span class="p1-links"><span class="on">论文</span><span>数据</span><span>格式</span></span>
+      </div>
+      <div class="p1-wb">
+        <div class="p1-side">
+          <p class="micro">章节</p>
+          <p class="p1-stage done"><i></i>引言 · 已确认</p>
+          <p class="p1-stage on"><i></i>方法 · 写作中</p>
+          <p class="p1-stage"><i></i>结果 · 等主结果</p>
+          <p class="p1-stage"><i></i>结论</p>
+          <p class="micro" style="margin-top:14px">数据</p>
+          <p class="p1-stage done"><i></i>course-panel.csv</p>
+        </div>
+        <div style="min-height:0;display:flex">
+          <div class="p1-paper">
+            <h4>2. 文献综述与研究假设</h4>
+            <p>已有研究多聚焦于……本文在此基础上，将注意力转向……</p>
+            <p>据此提出假设 1：在其他条件不变时，……</p>
+            <p style="color:#8b8371">——这一章写完后会停下来，等你确认。</p>
+            <div class="tab">econpaper / paper / 方法 · 第 2 稿 · 待确认</div>
+          </div>
+        </div>
+        <div class="p1-side r">
+          <p class="micro">主结果</p>
+          <p class="p1-stage done"><i></i>age 0.124***（0.046）</p>
+          <p class="micro" style="margin-top:12px">运行记录</p>
+          <p class="p1-stage done"><i></i>清洗 · 8 步全过</p>
+          <p class="p1-stage done"><i></i>估计 · OLS 主表</p>
+          <p class="p1-stage on"><i></i>写作 · 方法章</p>
+        </div>
+      </div>
+    </div>
+    <p class="ref-risk">参考：<b>iA Writer、Matter、你定稿的纸上扉页</b>。风险：工具效率感偏弱，状态密集时纸面语言容易被撑破——靠发丝线和字阶纪律守住。</p>
+  </section>
+
+  <!-- ================= 方向二 ================= -->
+  <section class="candidate" id="cand-2">
+    <div class="cand-head">
+      <span class="cand-key">方向二</span>
+      <span class="cand-title serif">安静的工具 · 中性高效</span>
+      <span class="cand-tag">产品是仪器，纸只是产出物</span>
+    </div>
+    <p class="cand-desc">全产品换上中性的工作台外壳：恒定的左侧窄导航 + 面板 + 列表，密度优先、装饰归零。衬线只允许出现在论文纸面正文里——纸是产品<b>产出</b>的东西，不是产品的皮肤。会话跨界面连续，像 Linear 一样「在哪都能接着干」。</p>
+    <ul class="principles">
+      <li>恒定壳：窄导航（会话/论文/数据/设置）永不消失</li>
+      <li>白底 + #e8e6e1 一档边线，状态只用墨绿一色</li>
+      <li>全 sans 13px 一档正文，serif 只在纸面正文</li>
+      <li>mono 只给时间戳、行×列、耗时等数字</li>
+      <li>圆角统一 6–7px，不做胶囊不做粗描边</li>
+    </ul>
+    <div class="tokens">
+      <span class="sw"><i style="background:#ffffff"></i>底</span>
+      <span class="sw"><i style="background:#fafaf8"></i>面板</span>
+      <span class="sw"><i style="background:#1c1c1a"></i>导航</span>
+      <span class="sw"><i style="background:#2f6b4f"></i>状态绿</span>
+      <span class="sw"><i style="background:#e8e6e1"></i>边线</span>
+      <span>sans 13px = 一切 · serif = 纸面正文 · mono = 数字</span>
+    </div>
+
+    <p class="shot-label">空桌</p>
+    <div class="screen p2-screen">
+      <div class="p2-shell">
+        <div class="p2-rail"><span class="lg">e</span><span class="on">✎</span><span>▦</span><span>◷</span><span>⚙</span></div>
+        <div class="p2-nav">
+          <span class="new">＋ 新研究</span>
+          <p class="it on">草稿研究</p>
+          <p class="it">课设样例 · 年龄与收入</p>
+          <p class="it" style="color:#999">企业面板 · 昨天</p>
+        </div>
+        <div class="p2-mid">
+          <h2 class="p2-hello">今天研究什么？</h2>
+          <p class="p2-sub">一句话说想法，或直接丢数据进来。提交后先出主表，再按章写。</p>
+          <div class="p2-input">
+            <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <span><span class="p2-chip">＋ 上传数据</span><span class="p2-chip">用示例数据</span></span>
+              <button class="send">↑</button>
+            </div>
+          </div>
+        </div>
+        <div class="p2-right">
+          <p class="p2-mono" style="margin-bottom:6px">研究进度</p>
+          <div class="p2-step done"><i></i>把想法变成问题</div>
+          <div class="p2-step"><i></i>检查数据</div>
+          <div class="p2-step"><i></i>算出主结果</div>
+          <div class="p2-step"><i></i>逐章写正文</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台</p>
+    <div class="screen p2-screen wb">
+      <div class="p2-shell p2-wb">
+        <div class="p2-rail"><span class="lg">e</span><span>✎</span><span class="on">▦</span><span>◷</span><span>⚙</span></div>
+        <div class="p2-nav">
+          <p class="p2-mono" style="margin:2px 0 6px">章节</p>
+          <p class="it">01 引言 ✓</p>
+          <p class="it on">02 文献综述</p>
+          <p class="it" style="color:#aaa">05 结果 · 等主结果</p>
+        </div>
+        <div style="min-height:0;display:flex;flex-direction:column;padding:12px 16px">
+          <div class="p2-tabs"><span class="on">论文</span><span>数据</span><span>格式</span></div>
+          <div class="p2-sheet" style="margin-top:10px;flex:1">
+            <h4>2. 文献综述与研究假设</h4>
+            <p>已有研究多聚焦于……本文在此基础上，将注意力转向……</p>
+            <p>据此提出假设 1：在其他条件不变时，……</p>
+            <p class="p2-mono" style="margin-top:8px">第 2 稿 · 待你确认</p>
+          </div>
+        </div>
+        <div class="p2-right">
+          <p class="p2-mono" style="margin-bottom:6px">证据</p>
+          <div class="p2-step done"><i></i>主结果 age 0.124***</div>
+          <div class="p2-step done"><i></i>稳健性 · 通过</div>
+          <p class="p2-mono" style="margin:10px 0 6px">运行记录</p>
+          <div class="p2-step done"><i></i>清洗 8 步 · 04:12:33</div>
+          <div class="p2-step done"><i></i>OLS 主表 · 04:13:02</div>
+        </div>
+      </div>
+    </div>
+    <p class="ref-risk">参考：<b>Linear、Notion、BoardUI</b>。收益：效率与连续性最强，后续加「最近会话」最自然。风险：文气品牌感退位，产品气质向通用 SaaS 靠拢。</p>
+  </section>
+
+  <!-- ================= 方向三 ================= -->
+  <section class="candidate" id="cand-3">
+    <div class="cand-head">
+      <span class="cand-key">方向三</span>
+      <span class="cand-title serif">研究台 · 纸面为心，仪器为壳</span>
+      <span class="cand-tag">中央永远是那张纸，两侧是仪器</span>
+    </div>
+    <p class="cand-desc">明确的混血契约：中央内容区永远是一张带阴影的「稿纸」（纸的语言：衬线、纸色、写线），壳和两侧栏永远是仪器（工具语言：浅灰、卡片、状态点）。两者用一条清晰的纸边分界，<b>纸在桌上</b>——既保住文气，又给足工具感。</p>
+    <ul class="principles">
+      <li>壳 = 工具：#f7f6f2 浅灰、卡片、状态点、sans</li>
+      <li>心 = 纸：中央稿纸带纸边+阴影，衬线正文</li>
+      <li>输入即写字：输入框是纸上一道写线，不是气泡框</li>
+      <li>墨绿 = 唯一强调色，只标「活着/进行中」的东西</li>
+      <li>圆角两档：纸 4px、仪器 8px，绝不混用第三档</li>
+    </ul>
+    <div class="tokens">
+      <span class="sw"><i style="background:#eeece5"></i>台面</span>
+      <span class="sw"><i style="background:#f7f6f2"></i>仪器</span>
+      <span class="sw"><i style="background:#fffdf7;border-color:#c9bfa8"></i>稿纸</span>
+      <span class="sw"><i style="background:#2f6b4f"></i>活</span>
+      <span>仪器 sans · 稿纸 serif · mono 数字</span>
+    </div>
+
+    <p class="shot-label">空桌</p>
+    <div class="screen p3-screen">
+      <div class="p3-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span style="font-size:12px;color:#777">了解产品</span>
+      </div>
+      <div class="p3-shell">
+        <div class="p3-side">
+          <p class="micro" style="margin-bottom:8px">研究</p>
+          <div class="p3-card"><b>新的研究</b><span>草稿</span></div>
+          <div class="p3-card"><b>课设样例</b><span>主表已出</span></div>
+        </div>
+        <div class="p3-sheetwrap">
+          <div class="p3-sheet">
+            <p class="p3-kicker">新的研究</p>
+            <h2 class="p3-hello serif">今天研究什么？</h2>
+            <p class="p3-sub">提交后先出主表，再按章写；每一章都停下来等你确认。</p>
+            <div class="p3-input">
+              <textarea placeholder="描述你的研究想法、问题，或你手头已有的数据…"></textarea>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+                <span><span class="p3-chip">＋ 上传数据</span><span class="p3-chip">用示例数据</span></span>
+                <button class="send">↑</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="p3-side r p3-toolside">
+          <p class="micro" style="margin-bottom:8px">研究进度</p>
+          <div class="p3-step"><b>问</b>把想法变成问题</div>
+          <div class="p3-step"><b>洗</b>检查数据</div>
+          <div class="p3-step"><b>估</b>算出主结果</div>
+          <div class="p3-step"><b>章</b>逐章写正文</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shot-label">工作台</p>
+    <div class="screen p3-screen wb">
+      <div class="p3-bar">
+        <span class="brand"><span class="dot-logo">e</span>econpaper</span>
+        <span style="font-size:12px;color:#777">论文 · 数据 · 格式</span>
+      </div>
+      <div class="p3-shell p3-wb">
+        <div class="p3-side">
+          <p class="micro" style="margin-bottom:8px">章节</p>
+          <div class="p3-card"><b>01 引言</b><span>已确认</span></div>
+          <div class="p3-card" style="border-color:#2f6b4f"><b style="color:#2f6b4f">02 文献综述</b><span>写作中 · 第 2 稿</span></div>
+          <div class="p3-card"><b>05 结果</b><span>等主结果</span></div>
+        </div>
+        <div class="p3-sheetwrap">
+          <div class="p3-sheet p3-paper">
+            <h4 style="margin:0 0 8px;font-size:16px" class="serif">2. 文献综述与研究假设</h4>
+            <p>已有研究多聚焦于……本文在此基础上，将注意力转向……</p>
+            <p>据此提出假设 1：在其他条件不变时，……</p>
+            <p style="color:#8b8371;font-size:11.5px;font-family:'JetBrains Mono',monospace">写完这一章会停下来，等你确认</p>
+          </div>
+        </div>
+        <div class="p3-side r p3-toolside">
+          <p class="micro" style="margin-bottom:8px">证据</p>
+          <div class="p3-card"><b>主结果</b><span>age 0.124***（0.046）</span></div>
+          <div class="p3-card"><b>稳健性</b><span>通过</span></div>
+          <p class="micro" style="margin:10px 0 8px">运行记录</p>
+          <div class="p3-step"><b>✓</b>清洗 8 步全过</div>
+          <div class="p3-step"><b>✓</b>OLS 主表已出</div>
+        </div>
+      </div>
+    </div>
+    <p class="ref-risk">参考：<b>Arc 的双语言纪律、学术投稿系统、Figma 渐进 chrome</b>。收益：品牌与效率都要。风险：双语言靠纪律维持，边界一旦含糊就退回今天的割裂——所以圆角、色、字三处一刀切死。</p>
+  </section>
+</div>
+
+<div class="pick-bar">
+  <span class="sel">我的选择：<b id="sel-name">还没选</b></span>
+  <textarea id="sel-note" placeholder="备注（可不填）：比如「方向三，但空桌输入框要方向一的纸片式」…"></textarea>
+  <button class="btn-copy" id="btn-copy">复制我的选择</button>
+  <div class="copy-out" id="copy-out">
+    <pre id="copy-text"></pre>
+    <p class="hint">↑ 自动复制没生效就手动选中上面这段，贴回对话。</p>
+  </div>
+</div>
+
+<script>
+  var picked = null;
+  var NAMES = {
+    '1': '方向一「一张纸」— 素雅学术：全产品共享纸底/发丝线/衬线标题，工具退到边上',
+    '2': '方向二「安静的工具」— 中性高效：恒定导航壳+面板列表，serif 只活在论文纸面',
+    '3': '方向三「研究台」— 纸面为心仪器为壳：中央永远是一张稿纸，两侧是工具栏，纸边一刀切分界'
+  };
+  document.querySelectorAll('.candidate').forEach(function (card) {
+    card.addEventListener('click', function (ev) {
+      if (ev.target.closest('textarea, .p1-input, .p2-input, .p3-input, button')) return;
+      pick(card.id.replace('cand-', ''));
+    });
+    var key = card.querySelector('.cand-key');
+    key.title = '选这个方向';
+    key.addEventListener('click', function (ev) { ev.stopPropagation(); pick(card.id.replace('cand-', '')); });
+  });
+  function pick(k) {
+    picked = k;
+    document.querySelectorAll('.candidate').forEach(function (c) {
+      c.classList.toggle('picked', c.id === 'cand-' + k);
+    });
+    document.getElementById('sel-name').textContent = k;
+    document.getElementById('copy-out').classList.remove('show');
+  }
+  document.getElementById('btn-copy').addEventListener('click', function () {
+    if (!picked) { alert('先点一个方向（点卡片任意处或左上角的方向标）'); return; }
+    var note = document.getElementById('sel-note').value.trim();
+    var text = '我的选择：' + NAMES[picked] + '\n备注：' + (note || '无');
+    document.getElementById('copy-text').textContent = text;
+    document.getElementById('copy-out').classList.add('show');
+    var btn = document.getElementById('btn-copy');
+    var done = function () { btn.textContent = '已复制 ✓'; setTimeout(function(){btn.textContent='复制我的选择';},1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { manual(); });
+    } else { manual(); }
+    function manual() {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+</body>
+</html>

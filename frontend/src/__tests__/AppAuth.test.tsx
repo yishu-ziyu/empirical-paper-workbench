@@ -12,10 +12,10 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-test('opens guide without forcing login', () => {
+test('opens desk without forcing login', () => {
   renderWithI18n(<App />)
   expect(screen.queryByTestId('login-page')).not.toBeInTheDocument()
-  expect(screen.getByTestId('guide-page')).toBeInTheDocument()
+  expect(screen.getByTestId('desk-page')).toBeInTheDocument()
 })
 
 test('header login button opens the login page', async () => {

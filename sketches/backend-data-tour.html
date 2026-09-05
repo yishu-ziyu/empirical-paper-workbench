@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>econpaper 后端层 + 数据层 · 带看导览</title>
+<style>
+  :root {
+    --paper: #f6f4ec;
+    --ink: #22302a;
+    --ink-soft: #5c6b62;
+    --green: #2f6b4f;
+    --green-soft: #e3ede6;
+    --amber: #b97f24;
+    --amber-soft: #f7ecd7;
+    --line: #d8d3c4;
+    --card: #fffdf7;
+    --red: #a04432;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.85;
+  }
+
+  /* ============ 顶部 ============ */
+  header {
+    padding: 22px 36px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 24px; letter-spacing: 1px; }
+  header .sub { color: var(--ink-soft); font-size: 15px; }
+  header .guide-chip {
+    margin-left: auto; font-size: 14px; color: var(--green);
+    background: var(--green-soft); border-radius: 999px; padding: 3px 14px;
+  }
+
+  /* ============ 主体两栏 ============ */
+  main { display: flex; min-height: calc(100vh - 120px); }
+
+  /* 左：全景地图 */
+  #map {
+    flex: 0 0 46%;
+    padding: 26px 10px 26px 30px;
+    border-right: 1px dashed var(--line);
+    position: sticky; top: 0; align-self: flex-start;
+  }
+  .floor-label {
+    font-size: 13px; color: var(--ink-soft); letter-spacing: 3px;
+    margin: 14px 0 8px; display: flex; align-items: center; gap: 10px;
+  }
+  .floor-label::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+  .floor-label.now { color: var(--amber); font-weight: 600; }
+  .floor-label.now::after { border-top-color: var(--amber-soft); }
+
+  .node {
+    background: var(--card); border: 1.5px solid var(--line);
+    border-radius: 10px; padding: 9px 14px; margin: 6px 0;
+    font-size: 15px; transition: all .35s; cursor: default;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .node .ic { font-size: 17px; opacity: .75; }
+  .node .np { font-size: 12px; color: var(--ink-soft); margin-left: auto; font-family: var(--mono); }
+  .node.dim { opacity: .35; filter: grayscale(.6); }
+  .node.lit {
+    border-color: var(--amber); background: var(--amber-soft);
+    box-shadow: 0 0 0 3px rgba(185,127,36,.15); opacity: 1; filter: none;
+  }
+  .node.green.lit { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 3px rgba(47,107,79,.15); }
+  .node.click { cursor: pointer; }
+  .node.click:hover { border-color: var(--green); }
+
+  .arrowrow {
+    display: flex; align-items: center; gap: 8px; margin: 2px 0 2px 26px;
+    color: var(--ink-soft); font-size: 13px; transition: opacity .35s;
+  }
+  .arrowrow.dim { opacity: .25; }
+  .arrowrow .ar { color: var(--amber); font-size: 15px; }
+  .arrowrow.lit .ar { color: var(--amber); text-shadow: 0 0 6px rgba(185,127,36,.5); }
+
+  .lane { display: flex; gap: 8px; }
+  .lane .node { flex: 1; }
+
+  /* 右：讲解面板 */
+  #panel {
+    flex: 1; padding: 30px 38px 60px; max-width: 780px;
+  }
+  .step-tag {
+    font-size: 13px; color: var(--amber); letter-spacing: 2px; font-weight: 600;
+  }
+  .step-title { font-size: 27px; margin: 8px 0 18px; line-height: 1.5; }
+  .block {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 22px; margin: 14px 0;
+  }
+  .block.analogy {
+    background: var(--green-soft); border-color: transparent;
+    border-left: 4px solid var(--green);
+  }
+  .block.analogy .bt { color: var(--green); font-weight: 700; font-size: 14px; letter-spacing: 2px; }
+  .block p { margin: 6px 0; }
+  .block code, .pathchip {
+    font-family: var(--mono); font-size: 14px; background: #efece0;
+    padding: 1px 7px; border-radius: 5px; word-break: break-all;
+  }
+  .pathchip { display: inline-block; margin: 2px 4px 2px 0; }
+  b.hl { color: var(--amber); }
+  b.hg { color: var(--green); }
+
+  details.real {
+    border: 1px solid var(--line); border-radius: 12px;
+    margin: 16px 0; background: #fbfaf4; overflow: hidden;
+  }
+  details.real summary {
+    cursor: pointer; padding: 12px 20px; font-size: 15px; font-weight: 600;
+    color: var(--green); list-style: none; user-select: none;
+  }
+  details.real summary::before { content: "▸ "; transition: transform .2s; display: inline-block; }
+  details.real[open] summary::before { transform: rotate(90deg); }
+  details.real .rt { padding: 4px 20px 16px; }
+  details.real .rlabel { font-size: 13px; color: var(--ink-soft); margin: 10px 0 4px; }
+  details.real pre {
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+    background: #2b332e; color: #d8e4dc; border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  details.real pre .k { color: #8fd0a9; }
+
+  /* 底部导航 */
+  nav {
+    position: fixed; bottom: 0; left: 46%; right: 0;
+    background: linear-gradient(transparent, var(--paper) 30%);
+    padding: 22px 38px 18px; display: flex; align-items: center; gap: 16px;
+  }
+  nav button {
+    font-size: 16px; padding: 10px 26px; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--green); background: var(--green); color: #fff;
+    transition: all .2s; font-family: inherit;
+  }
+  nav button.ghost { background: transparent; color: var(--green); }
+  nav button:hover:not(:disabled) { transform: translateY(-2px); }
+  nav button:disabled { opacity: .3; cursor: not-allowed; }
+  .dots { display: flex; gap: 7px; margin-left: auto; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); cursor: pointer; transition: all .2s; }
+  .dot.on { background: var(--amber); transform: scale(1.35); }
+  .dot.done { background: var(--green); }
+  .kbd-hint { font-size: 12.5px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>后端层 × 数据层 · 带看导览</h1>
+  <span class="sub">跟着 9 月 1 日你上传的那份真实数据，把两层楼走一遍</span>
+  <span class="guide-chip">← → 方向键翻页</span>
+</header>
+
+<main>
+  <!-- ================= 左侧全景地图 ================= -->
+  <div id="map">
+    <div class="floor-label">楼上 · 这次不细看</div>
+    <div class="node" data-n="ui"><span class="ic">🖥️</span>界面层 · 你看到的墨纸绿页面</div>
+    <div class="node" data-n="fe"><span class="ic">⚛️</span>前端层 · React（端口 5174）</div>
+    <div class="node" data-n="net"><span class="ic">📡</span>传输层 · HTTP 请求 / WebSocket</div>
+    <div class="arrowrow" data-n="down"><span class="ar">↓</span> 所有按钮按下去，最后都落到下面两层</div>
+
+    <div class="floor-label now">今天的主角 · 后端层</div>
+    <div class="node click" data-n="api" data-step="1"><span class="ic">🚪</span>API 门脸 · FastAPI<b class="np">main.py · 19 个 router</b></div>
+    <div class="lane">
+      <div class="node click" data-n="sync" data-step="4" style="flex:1"><span class="ic">💬</span>对话通道<br><small style="color:var(--ink-soft)">问了立刻答</small></div>
+      <div class="node click" data-n="queue" data-step="5" style="flex:1"><span class="ic">🎫</span>任务通道<br><small style="color:var(--ink-soft)">排队慢慢跑</small></div>
+    </div>
+    <div class="arrowrow" data-n="toqueue"><span class="ar">→</span> 任务变成一张"任务单"写进任务表</div>
+    <div class="node click" data-n="worker" data-step="6"><span class="ic">👷</span>独立工人 · runner（另一个进程）<b class="np">runner.py</b></div>
+
+    <div class="floor-label now">今天的主角 · 数据层</div>
+    <div class="node click" data-n="db" data-step="2" style="border-left:4px solid var(--green)"><span class="ic">🗄️</span>数据库 · SQLite（可换 Postgres）<b class="np">6 张表</b></div>
+    <div class="lane">
+      <div class="node click" data-n="tbl-runs" data-step="6"><span class="ic">🎫</span>runs 任务表</div>
+      <div class="node click" data-n="tbl-sess" data-step="3"><span class="ic">📁</span>sessions 档案表</div>
+    </div>
+    <div class="node click" data-n="disk" data-step="8"><span class="ic">💾</span>磁盘仓库 · .local/<b class="np">uploads · runs 工件</b></div>
+  </div>
+
+  <!-- ================= 右侧讲解面板 ================= -->
+  <div id="panel"></div>
+</main>
+
+<nav>
+  <button class="ghost" id="prev">← 上一步</button>
+  <button id="next">下一步 →</button>
+  <span class="kbd-hint">也可以点左边地图上发亮的框</span>
+  <div class="dots" id="dots"></div>
+</nav>
+
+<script>
+/* ============ 步骤剧本 ============ */
+const REAL = {
+  csvHead: `id,year,income,treat,age
+1,2011,8.21,0,52
+1,2013,8.34,0,54
+2,2011,7.95,1,47`,
+  manifest: `{
+  "created_at": "2026-09-01T12:40:39",
+  "user_id": null,
+  "session_id": "6a515b51-b1a5-...",
+  "source_csv": ".../.local/uploads/6a515b51-b1a5-....csv"
+}`,
+  sessionRow: `session_id : 6a515b51-b1a5-4fe9-b1eb-cd832eb36b2b
+state      : {"csv_path": ".../workspace/05_filter_0.csv", ...}
+             ← 整个会话进度都塞在这一格里（JSON 大口袋）
+csv_path   : .local/uploads/6a515b51-....csv`,
+  trace: `{"ts": "2026-09-01T12:40:40", "node": "upload_pipeline",
+ "status": "ok", "duration_ms": 396.3,
+ "detail": {"cleaning_steps": 8}}
+↑ 真实的一行：9月1日那次上传流水线，跑了 0.4 秒，切了 8 步清洗`,
+  tree: `.local/
+├── uploads/6a515b51-....csv      ← 你传的原始文件（改了安全权限）
+├── db/econpaper.db               ← SQLite 数据库本体
+├── sessions/sessions.json.migrated ← 旧版 JSON 档案（已搬进库，留档）
+└── runs/6a515b51-....../         ← 这个会话的"案卷袋"
+    ├── manifest.json             ← 案卷封面
+    ├── trace.jsonl               ← 流水账（一行 = 一步）
+    ├── checkpoints/latest.json   ← 每步之后的完整快照
+    ├── workspace/                ← 干活现场
+    │   ├── clean.py / clean.do   ← 生成的清洗代码
+    │   └── 03_outliers_0.csv ... ← 中间产物
+    └── outputs/export/           ← 最终交付物副本`
+};
+
+const STEPS = [
+{ // 0
+  title: "开场：这栋楼的下面两层",
+  nodes: ["api","sync","queue","worker","db","tbl-runs","tbl-sess","disk"],
+  lit_arrows: ["down"],
+  html: `
+  <div class="block">
+    <p>左边这张图就是 econpaper 的全貌。<b class="hl">上面三层</b>（页面、前端、网络传输）这次不细看——今天的镜头对准<b class="hl">下面两层：后端层和数据层</b>。</p>
+    <p>带你看的方式不是念文件名，而是跟着一份<b class="hg">真实数据</b>走一遍：9 月 1 日你上传过一份面板数据（就是带 income、treat、age 那份 CSV）。它现在还躺在系统里。我们看看它到过哪些地方、系统为它记了哪些账。</p>
+  </div>
+  <div class="block analogy">
+    <span class="bt">先给个整体比喻</span>
+    <p>econpaper 是一家<b class="hg">餐厅</b>：页面是菜单，传输层是服务员，<b>后端层是后厨</b>，<b>数据层是仓库 + 台账</b>。后厨有两口灶：一口负责"点单即出的小菜"（对话），一口负责"要炖三小时的大菜"（长任务）。</p>
+  </div>
+  <div class="kbd-hint">点右下角"下一步"开始 →（左边地图会跟着亮）</div>`
+},
+{ // 1 上传按钮按下
+  title: "① 你按下「上传」按钮那一刻",
+  nodes: ["ui","fe","net","api"],
+  lit_arrows: ["down"],
+  html: `
+  <div class="block">
+    <p>你在页面上选了 CSV 文件，点上传。文件从浏览器出发，经过传输层，敲开了后端的门。</p>
+    <p>后端的门脸是 <b class="hg">FastAPI</b>（一个 Python 网络框架），门上挂了 <b>19 个窗口</b>（叫 router），每个窗口管一类业务：管登录的、管对话的、管任务的、管导出的。上传数据这件事，走到其中专门管数据的窗口。</p>
+    <p>门脸还有一个统一规矩：不管哪个窗口出了错，返回给前端的都是<b class="hl">同一种格式的错误条</b>（错误码 + 是否降级 + 追踪号），前端不会拿到看不懂的报错。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>FastAPI 是餐厅前厅接待：客人说什么语言（什么请求格式）都行，接待统一翻译成后厨的工单。</p>
+  </div>
+  <div class="kbd-hint">对应文件：econpaper/backend/main.py（门脸）+ routers/ 目录（19 个窗口）</div>`
+},
+{ // 2 文件落盘 + 数据库亮相
+  title: "② 文件落进磁盘，档案开进数据库",
+  nodes: ["api","disk","db"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p>窗口收下文件后干两件事：</p>
+    <p><b class="hl">第一件</b>：把文件存进磁盘的 <code>.local/uploads/</code>，并改名叫 <code>UUID.csv</code>（一串永不重复的编号）。写入方式很较真：<b class="hg">先把文件完整写进硬盘、再"盖章"确认，然后才告诉你"上传成功"</b>——万一中途断电，系统重启后会自己巡逻一遍，把没写完的残次品清掉。这套叫"崩溃收敛"。</p>
+    <p><b class="hl">第二件</b>：在数据库里给这次研究<b class="hg">立一个档案</b>。数据库是 SQLite（单文件数据库，整个库就是<b>一个 .db 文件</b>），里面一共 <b>6 张表</b>，各管一摊：</p>
+    <p>🚪 users 门禁名册 · 📁 research_sessions 研究档案 · 🎫 runs 任务单 · 📜 run_events 任务日志 · ⚠️ session_degradations 降级记录 · 🔧 data_migrations 装修记录</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>先入库上锁、再开发票——发票开了就一定有货；系统还会定期盘库（每 15 分钟自动巡逻一次）。</p>
+  </div>
+  <details class="real"><summary>看真数据：你那份 CSV 长这样</summary><div class="rt">
+    <div class="rlabel">.local/uploads/6a515b51-….csv（前 4 行）</div><pre>${REAL.csvHead}</pre>
+  </div></details>`
+},
+{ // 3 档案表
+  title: "③ 档案表：一个研究 = 一只大口袋",
+  nodes: ["db","tbl-sess"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p>数据库里的 <code>research_sessions</code> 表，一行 = 一个研究会话。你那次上传，就在里面留了一行。</p>
+    <p>这张表的结构很有意思：除了编号和文件路径，中间是一格<b class="hl">超大自由格（JSON 大口袋）</b>——你聊到哪一步了、选了什么模型、清洗到第几步……全塞在这一格里，想到什么装什么。</p>
+    <p>好处：开发快，不用频繁改表结构。代价：<b class="hl">口袋里没贴标签、没和产物做指纹绑定</b>——比如系统只知道"清洗做过了"，但没法证明"现在这份数据就是当时那张设定卡跑出来的"。这是目前已知的最大缺口，最后一步会再提。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>一只没分格的收纳箱：什么都能扔进去，但想找"上周放的那双袜子"，只能整个倒出来翻。</p>
+  </div>
+  <details class="real"><summary>看真数据：你的会话在档案表里长这样</summary><div class="rt">
+    <div class="rlabel">research_sessions 表 · 实际那一行</div><pre>${REAL.sessionRow}</pre>
+  </div></details>`
+},
+{ // 4 同步通道
+  title: "④ 对话通道：问了立刻答（小灶）",
+  nodes: ["ui","net","api","sync","db"],
+  lit_arrows: ["down"],
+  html: `
+  <div class="block">
+    <p>你在对话框里问"帮我看看数据要不要清洗"——这走的是<b class="hg">同步通道</b>：请求进来，后端当场想、当场答，几秒内返回。</p>
+    <p>内部路径：窗口（router）→ 转给<b class="hg">同步门房（facade）</b>→ 门房直接读写同一个数据库 → 拿着档案里的上下文去问 AI → 把答案带回来。</p>
+    <p>有个刻意的设计：门房<b class="hl">每次都直读数据库，不做本地缓存</b>。因为回答你的网页进程和跑任务的后厨进程是<b>两个独立进程</b>，共享同一本台账才不会打架——A 进程刚记的，B 进程立刻能看到。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>小炒窗口：点单 → 现炒 → 端上桌。两位厨师（网页进程和后厨进程）<b>共看同一本点单簿</b>，谁也不凭记忆办事。</p>
+  </div>
+  <div class="kbd-hint">对应代码：backend/facade/session_store.py 第一行注释就写着"刻意不缓存"</div>`
+},
+{ // 5 持久通道
+  title: "⑤ 任务通道：排队慢慢跑（大灶）",
+  nodes: ["api","queue","toqueue","tbl-runs","worker"],
+  lit_arrows: ["toqueue"],
+  html: `
+  <div class="block">
+    <p>但"跑完整条估计流水线"要几分钟，不能让网页干等着。这走<b class="hg">任务通道</b>：</p>
+    <p><b class="hl">第一步</b>：后端往 <code>runs</code> 任务表里写一张任务单（状态 = PENDING 排队中），立刻告诉你"单子接了"。</p>
+    <p><b class="hl">第二步</b>：真正的干活者不是网页进程，是一个<b class="hg">独立工人进程（runner）</b>——它一直盯着任务表，看到新单子就认领，然后开跑。跑的过程、结果、报错全部回写任务表和日志表。</p>
+    <p>这样设计的好处：你关掉浏览器、甚至后端重启，<b class="hl">任务都不丢</b>——单子还在表里，工人醒来接着干。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>大菜窗口是<b>取号叫号制</b>：单子进后厨队列（落库），专门的大灶师傅（runner）叫号开工。客人（前端）凭号牌随时回来问进度。</p>
+  </div>
+  <div class="kbd-hint">对应代码：backend/runner.py（工人）· run_repository.py（任务队列的规则）</div>`
+},
+{ // 6 队列的保险
+  title: "⑥ 任务单上的四道保险",
+  nodes: ["tbl-runs","worker"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p><code>runs</code> 这张表不是普通表格，它内建了四道保险，防的都是真实事故：</p>
+    <p><b class="hl">① 租约（lease）</b>：工人认领单子时要"签一份限时工位协议"——每 30 秒续一次。如果工人中途暴毙，租约到期，<b>别的工人可以合法接管</b>，任务不会卡死。</p>
+    <p><b class="hl">② 栅栏（fencing）</b>：接管会给工人发一个<b>更大的工牌号</b>。老工人如果"诈尸"回来交活，一验工牌号——过期的，拒收。防止两个工人同时改同一份数据。</p>
+    <p><b class="hl">③ 幂等键</b>：你手快点两次"开始"，两次请求带同一个订单号，数据库<b class="hg">唯一约束</b>直接拦下第二张单——不会跑两遍、不会算两份结果。</p>
+    <p><b class="hl">④ 单灶台</b>：数据库层面强制<b>一个会话同时只能有一张活跃任务单</b>，防止同一份研究被两条流水线同时改。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>工位协议（租约）+ 工牌编号（栅栏）+ 订单号去重（幂等）+ 一灶一桌（单活跃）——后厨管理制度写在墙上，数据库就是那个铁面执法的领班。</p>
+  </div>
+  <div class="kbd-hint">这套东西在学术上叫 Durable Execution（持久化执行），econpaper 是自己手写的实现</div>`
+},
+{ // 7 执行与取消
+  title: "⑦ 跑任务时：能喊停，有流水账",
+  nodes: ["worker","db"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p>工人开跑后，还有两个细节值得一提：</p>
+    <p><b class="hl">进程防火墙</b>：任务不在工人进程里直接跑，而是隔着一层"监督员"另起子进程跑（<code>prewrite_supervisor.py</code>）。你在界面上点"停止"，监督员直接<b class="hg">终止整个子进程</b>——不管里面跑到了多深、卡在哪，都能干净地掐掉，不污染主进程。</p>
+    <p><b class="hl">事件流水账</b>：执行过程中每发生一件事，就往 <code>run_events</code> 日志表追加一行，带序号、带时间。前端页面上那些实时跳动的进度，就是靠它喂出来的。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>大灶旁边站了个安全员：客人喊停，安全员直接拉电闸（整锅端走），而不是伸手进锅里捞。灶台上还装了行车记录仪，每一步都有录像（事件日志）。</p>
+  </div>
+  <div class="kbd-hint">对应代码：backend/prewrite_supervisor.py（安全员）· run_events 表（记录仪）</div>`
+},
+{ // 8 磁盘案卷袋
+  title: "⑧ 磁盘上的另一半账：案卷袋",
+  nodes: ["disk"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p>数据库记的是"台账"，但干活现场在磁盘上。每个会话在 <code>.local/runs/会话编号/</code> 下有一只<b class="hg">案卷袋</b>，产品的北极星指标"每一步可查"就落在这里：</p>
+    <p><code>manifest.json</code> 案卷封面 · <code>trace.jsonl</code> 只追加的流水账 · <code>checkpoints/</code> 每步之后的完整快照（可回滚到任意一步）· <code>workspace/</code> 干活现场（清洗代码、中间数据）· <code>outputs/export/</code> 交付物副本（<b class="hl">当时交付的那一份</b>，之后源文件改了也不影响）。</p>
+    <p>数据库和磁盘是<b>双账本</b>：库管"任务状态"，磁盘管"劳动成果"。你 9 月 1 日那次上传的完整案卷，现在还完整地躺在里面。</p>
+  </div>
+  <div class="block analogy"><span class="bt">比喻</span>
+    <p>医院：数据库是挂号系统（你排到几号、看没看完），案卷袋是病历夹（化验单、影像、处方原件）——挂号系统崩了重装，病历夹里的东西一张不少。</p>
+  </div>
+  <details class="real"><summary>看真数据：案卷袋结构 + 真实的一行流水账</summary><div class="rt">
+    <div class="rlabel">.local/ 目录树（真实）</div><pre>${REAL.tree}</pre>
+    <div class="rlabel">trace.jsonl 里唯一的一行（真实）</div><pre>${REAL.trace}</pre>
+    <div class="rlabel">manifest.json（真实）</div><pre>${REAL.manifest}</pre>
+  </div></details>`
+},
+{ // 9 三个信号
+  title: "⑨ 带看完毕：我顺手记下的 3 个观察",
+  nodes: ["db","tbl-sess","disk"],
+  lit_arrows: [],
+  html: `
+  <div class="block">
+    <p>走完这两层楼，整体印象：<b class="hg">骨架相当扎实</b>——租约、幂等、崩溃恢复这些容易翻车的地方都有真防护，测试文件也有 30 多个。同时有 3 个值得留意的点：</p>
+    <p><b class="hl">① 有个空壳库在冒充正主</b>：仓库里 <code>backend/econpaper.db</code> 是旧版本路径留下的空数据库（86KB、0 条数据），现行代码已经不用它了，但今天早上 3 点还被某个程序碰过——建议确认后清掉，免得哪天连错库。</p>
+    <p><b class="hl">② 大口袋没贴指纹</b>：就是第③步说的——会话状态是一整坨 JSON，设定卡和估计产物之间没有"指纹绑定"，系统没法证明"这份结果就是那张卡跑出来的"。</p>
+    <p><b class="hl">③ 装修记录只有一个版本</b>：改表结构靠手写的升级代码，没有用 Alembic（业界标准的地基装修工具）。现在 6 张表还行，表多了容易出错。</p>
+  </div>
+  <div class="block analogy"><span class="bt">一句话总结</span>
+    <p>这台机器的<b>传动系统很硬核</b>，值得留意的是<b>记账的规范度</b>：一个假账本（空壳库）、一本没编页码的账（JSON 大口袋）、一套没有标准流程的装修队（手写迁移）。</p>
+  </div>
+  <div class="kbd-hint">想深入哪个，回对话里告诉我编号即可；想看代码本体也可以随时点开对应的文件</div>`
+}
+];
+
+/* ============ 渲染引擎 ============ */
+let cur = 0;
+const panel = document.getElementById("panel");
+const dots = document.getElementById("dots");
+STEPS.forEach((_, i) => {
+  const d = document.createElement("div");
+  d.className = "dot"; d.title = `第 ${i} 步`;
+  d.onclick = () => go(i);
+  dots.appendChild(d);
+});
+
+function go(i) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[cur];
+  panel.innerHTML = `<div class="step-tag">STEP ${cur} / ${STEPS.length - 1}</div>
+    <div class="step-title">${s.title}</div>${s.html}`;
+  document.querySelectorAll("#map .node").forEach(n => {
+    n.classList.remove("lit");
+    n.classList.toggle("dim", !s.nodes.includes(n.dataset.n));
+  });
+  document.querySelectorAll("#map .arrowrow").forEach(a => {
+    a.classList.remove("lit");
+    a.classList.toggle("dim", !(s.lit_arrows || []).includes(a.dataset.n));
+  });
+  s.nodes.forEach(id => {
+    const n = document.querySelector(`#map .node[data-n="${id}"]`);
+    if (n) n.classList.add("lit");
+  });
+  (s.lit_arrows || []).forEach(id => {
+    const a = document.querySelector(`#map .arrowrow[data-n="${id}"]`);
+    if (a) a.classList.add("lit");
+  });
+  document.querySelectorAll(".dot").forEach((d, di) => {
+    d.classList.toggle("on", di === cur);
+    d.classList.toggle("done", di < cur);
+  });
+  document.getElementById("prev").disabled = cur === 0;
+  document.getElementById("next").disabled = cur === STEPS.length - 1;
+  panel.parentElement.parentElement.scrollIntoView({block: "start"});
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+document.getElementById("next").onclick = () => go(cur + 1);
+document.getElementById("prev").onclick = () => go(cur - 1);
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight" || e.key === " ") go(cur + 1);
+  if (e.key === "ArrowLeft") go(cur - 1);
+});
+document.querySelectorAll("#map .node.click").forEach(n => {
+  n.addEventListener("click", () => { if (n.dataset.step) go(+n.dataset.step); });
+});
+const hashStep = (location.hash.match(/step(\d+)/) || [])[1];
+go(hashStep !== undefined ? +hashStep : 0);
+</script>
+</body>
+</html>

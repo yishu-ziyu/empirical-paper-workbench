@@ -151,10 +151,10 @@ export default function GuidePage({
             {t('bench.journey')}
           </p>
 
-          <h1 className="mt-10 font-serif text-[2.6rem] leading-[1.12] tracking-tight text-ink sm:text-[3.75rem] lg:text-[4.35rem]">
-            <span className="block">{t('guide.heading')}</span>
-            <span className="mt-3 block font-serif text-[1.65rem] leading-snug sm:text-[2.15rem] lg:text-[2.35rem]">
-              <span className="text-[#5a6f82]">{t('guide.headlineLine2')}</span>
+          <h1 className="mt-10 max-w-full font-serif text-[clamp(2.25rem,6.5vw,4.35rem)] leading-[1.12] tracking-tight text-ink">
+            <span className="block break-words">{t('guide.heading')}</span>
+            <span className="mt-3 block font-serif text-[clamp(1.35rem,3vw,2.35rem)] leading-snug">
+              <span className="break-words text-[#5a6f82]">{t('guide.headlineLine2')}</span>
             </span>
           </h1>
 

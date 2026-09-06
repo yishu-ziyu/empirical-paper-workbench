@@ -40,9 +40,9 @@ const research = {
   },
 }
 
-function mockWs(tab: 'question' | 'design'): WorkspaceApi {
+function mockWs(tab: string, overrides: Partial<WorkspaceApi> = {}): WorkspaceApi {
   return {
-    workbenchTab: tab,
+    workbenchTab: tab as any,
     research,
     handleSaveExpectation: vi.fn(async () => undefined),
     handleFreezeSpecSpace: vi.fn(async () => undefined),
@@ -77,6 +77,7 @@ function mockWs(tab: 'question' | 'design'): WorkspaceApi {
     estimateMeta: null,
     railItems: [],
     writtenChapter: null,
+    ...overrides,
   } as unknown as WorkspaceApi
 }
 
@@ -120,4 +121,89 @@ describe('WorkbenchArtifact research lab', () => {
     expect(screen.getByTestId('spec-space-freeze')).toHaveTextContent('Freeze admissible space')
     expect(screen.queryByText(/βA → βB|compare/i)).not.toBeInTheDocument()
   })
+
+  test('Paper writing puts ChapterWriter and evidence anchor first, collapses research trace', () => {
+    const onSelectView = vi.fn()
+    const ws = mockWs('paper', {
+      writtenChapters: [
+        {
+          type: 'results',
+          title: '结果分析',
+          status: 'generated',
+          content: 'OLS yields 0.08, while IV yields 0.14.',
+          chapter_index: 0,
+          grounded: true,
+          generation_degraded: false,
+          review_degraded: false,
+          review_typed: false,
+        } as any,
+      ],
+      outline: [
+        {
+          type: 'results',
+          title: '结果分析',
+        },
+      ],
+      currentChapterIndex: 0,
+      railItems: [
+        {
+          type: 'results',
+          title: '结果分析',
+          status: 'generated',
+          content: 'OLS yields 0.08, while IV yields 0.14.',
+          generation_degraded: false,
+          review_degraded: false,
+          review_typed: false,
+        } as any,
+      ],
+      writtenChapter: {
+        type: 'results',
+        title: '结果分析',
+        status: 'generated',
+        content: 'OLS yields 0.08, while IV yields 0.14.',
+        chapter_index: 0,
+        grounded: true,
+        generation_degraded: false,
+        review_degraded: false,
+        review_typed: false,
+        versions: [],
+      } as any,
+    })
+    render(
+      <I18nProvider>
+        <WorkbenchArtifact
+          ws={ws}
+          sessionId="sess-card"
+          hasSuccessfulEstimate={true}
+          onOpenDirection={vi.fn()}
+          onOpenEvidence={vi.fn()}
+          onSelectView={onSelectView}
+          onOpenCode={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    // ChapterWriter is rendered
+    expect(screen.getByTestId('chapter-writer')).toBeInTheDocument()
+    expect(screen.getByTestId('paper-grounded-badge')).toHaveTextContent('基于证据')
+    expect(screen.getByTestId('paper-claim-link')).toBeInTheDocument()
+
+    // Research trace is a collapsed details element below ChapterWriter
+    const researchTrace = screen.getByTestId('research-trace')
+    expect(researchTrace.tagName.toLowerCase()).toBe('details')
+    expect(researchTrace).toHaveTextContent(/Research trace · 研究记录/)
+
+    // ChapterWriter appears before research-trace in DOM
+    const chapterWriter = screen.getByTestId('chapter-writer')
+    expect(
+      chapterWriter.compareDocumentPosition(researchTrace) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // Clicking paper-claim-link jumps to Evidence
+    const claimLink = screen.getByTestId('paper-claim-link')
+    claimLink.click()
+    expect(onSelectView).toHaveBeenCalledWith('evidence')
+  })
 })
+

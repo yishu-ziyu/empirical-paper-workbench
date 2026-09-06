@@ -47,7 +47,7 @@ export function ResearchQuestionCard({ question }: { question: NonNullable<Resea
     <section data-testid="research-question-card" className="mb-6 space-y-3">
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Question · 研究问题
+          Research Question（研究问题）
         </p>
         <h2 className="mt-1 font-serif text-[1.35rem] text-wb-ink">
           {question.prompt_en || 'Research question'}
@@ -98,7 +98,7 @@ export function ExpectationEditor({
     <section data-testid="expectation-editor" className="mb-6 space-y-3">
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Expectation · 预期
+          Expectation（预期）
         </p>
         <h3 className="mt-1 font-serif text-[1.15rem] text-wb-ink">Before seeing results</h3>
       </header>

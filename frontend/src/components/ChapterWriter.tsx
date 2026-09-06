@@ -149,14 +149,26 @@ export default function ChapterWriter({
       ) : null}
 
       {onJumpToClaim ? (
-        <button
-          type="button"
-          data-testid="paper-claim-link"
-          onClick={onJumpToClaim}
-          className="text-[12px] text-wb-muted underline-offset-2 hover:text-wb-ink hover:underline"
-        >
-          View Claim / Evidence
-        </button>
+        <div className="flex items-center gap-2">
+          <span
+            data-testid="paper-grounded-badge"
+            className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${
+              chapter.grounded !== false
+                ? 'bg-wb-success-soft text-wb-success'
+                : 'bg-wb-warning-soft text-wb-warning'
+            }`}
+          >
+            {chapter.grounded !== false ? '基于证据' : '未 grounded'}
+          </span>
+          <button
+            type="button"
+            data-testid="paper-claim-link"
+            onClick={onJumpToClaim}
+            className="text-[12px] text-wb-muted underline-offset-2 hover:text-wb-ink hover:underline"
+          >
+            View Claim / Evidence
+          </button>
+        </div>
       ) : null}
 
       {isEditing || isStreaming ? (

@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { AgentControlPlaneError, parseSemanticId, rejectCoordinateControl } from '../agentCursor/control'
 import { SemanticTargetRegistry } from '../agentCursor/registry'
-import { AgentCursorPlayer, travelDurationMs, type AgentCursorDriver } from '../agentCursor/player'
+import { AgentCursorPlayer, travelDurationMs, type AgentCursorDriver, type AgentCursorPresentation } from '../agentCursor/player'
 import {
   CARD_CHALLENGE_EXPERIENCE_SCRIPT,
   CARD_SHOW_ME_SCRIPT,
@@ -103,13 +103,18 @@ describe('AgentCursorPlayer', () => {
   })
 
   test('show-me script points then compares without running specs', async () => {
-    const driver = mockDriver(registry)
+    const presentations: AgentCursorPresentation[] = []
+    const driver = mockDriver(registry, {
+      onPresentation: (p) => presentations.push({ ...p }),
+    })
     const player = new AgentCursorPlayer(driver)
     const result = await player.play(CARD_SHOW_ME_SCRIPT)
     expect(result.status).toBe('done')
     expect(result.comparePair).toEqual([TARGET.ols, TARGET.iv])
     expect(result.fadeUnchanged).toBe(true)
-    expect(result.intent).toBe('Identification strategy changed')
+    expect(presentations.some((p) => p.intent === 'Identification strategy changed' && p.intentZh === '识别策略发生变化')).toBe(true)
+    expect(result.intent).toBe('This is the main change.')
+    expect(result.intentZh).toBe('主要变化来自这里。')
     expect(driver.runPreview).not.toHaveBeenCalled()
     expect(driver.promote).not.toHaveBeenCalled()
     expect(driver.openEvidence).toHaveBeenCalled()

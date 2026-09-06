@@ -47,13 +47,15 @@ describe('DeskPage', () => {
     vi.unstubAllGlobals()
   })
 
-  test('打开时是连续对话空态，并保留左右功能栏', () => {
+  test('打开时是连续对话空态：建项对话之外不再内嵌第二套工作台面板', () => {
     renderDesk()
     expect(screen.getByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('desk-paper')).toBeInTheDocument()
     expect(screen.getByTestId('desk-listen-btn')).toBeInTheDocument()
     expect(screen.getByTestId('desk-left-sidebar')).toBeInTheDocument()
-    expect(screen.getByTestId('agent-window')).toBeInTheDocument()
+    // ADR-0013：空桌退为建项对话入口，shape/clean/estimate/write 静态预览面板已退位
+    expect(screen.queryByTestId('agent-window')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('agent-queue')).not.toBeInTheDocument()
     expect(screen.getByTestId('desk-empty-state')).toBeInTheDocument()
     expect(screen.queryByTestId('question-card')).not.toBeInTheDocument()
     expect(screen.queryByTestId('direction-section')).not.toBeInTheDocument()
@@ -137,17 +139,16 @@ describe('DeskPage', () => {
     expect(await screen.findByTestId('question-card', {}, { timeout: 2500 })).toBeInTheDocument()
   })
 
-  test('两侧栏可以收起，宽度设置会保留', async () => {
+  test('左栏可以收起，宽度设置会保留（右栏工作台面板已退位）', async () => {
     const user = userEvent.setup()
     renderDesk()
 
     await user.click(screen.getByTestId('left-collapse-btn'))
-    await user.click(screen.getByTestId('right-collapse-btn'))
 
     expect(screen.getByTestId('desk-left-sidebar')).toHaveClass('hidden')
-    expect(screen.getByTestId('agent-window')).toHaveClass('hidden')
+    expect(screen.queryByTestId('agent-window')).not.toBeInTheDocument()
     expect(localStorage.getItem('econpaper.direction.layout.v2')).toContain('"leftOpen":false')
-    expect(localStorage.getItem('econpaper.direction.layout.v2')).toContain('"rightOpen":false')
+    expect(screen.getByTestId('desk-center')).toBeInTheDocument()
   })
 
   test('问候只得到自然引导，不出现论文标题和固定研究选项', async () => {

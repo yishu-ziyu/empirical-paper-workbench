@@ -487,3 +487,27 @@ def test_translate_code_audit_file_missing(tmp_path):
     )
     result = translate_code(state)
     assert len(result["code_translations"]) == 4
+
+
+def test_translate_code_persists_takeable_artifacts_for_producer_run():
+    import run_store
+    from agent.nodes.translate_code import is_takeable_translation
+
+    sid = "translate-code-persist"
+    producer = "run-producer-code"
+    state = _state_with_chapters_python()
+    state["session_id"] = sid
+    state["estimate"] = {"source_run_id": producer}
+    result = translate_code(state)
+    assert any(is_takeable_translation(item) for item in result["code_translations"])
+    files = run_store.list_files(sid)
+    code_paths = [
+        item["path"] for item in files if f"outputs/code/{producer}/" in item["path"]
+    ]
+    assert any(path.endswith("analysis.py") for path in code_paths)
+
+
+def test_empty_placeholder_translations_are_not_takeable():
+    from agent.nodes.translate_code import _empty_translations, is_takeable_translation
+
+    assert all(not is_takeable_translation(item) for item in _empty_translations())

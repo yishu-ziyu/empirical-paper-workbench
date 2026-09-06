@@ -18,7 +18,7 @@ export interface ResizableWorkspaceHandle {
 export interface ResizableWorkspaceProps {
   left: ReactNode
   center: ReactNode
-  right: ReactNode
+  right?: ReactNode
   storageKey: string
   leftDefault?: number
   leftMin?: number
@@ -240,7 +240,7 @@ const ResizableWorkspace = forwardRef<ResizableWorkspaceHandle, ResizableWorkspa
         {center}
       </section>
 
-      {!compact && (
+      {!compact && right != null && (
         <div className="group relative z-10 flex w-3 shrink-0 items-center justify-center border-l border-black/[0.05] bg-white/70">
           {rightOpen ? (
             <>
@@ -281,16 +281,18 @@ const ResizableWorkspace = forwardRef<ResizableWorkspaceHandle, ResizableWorkspa
         </div>
       )}
 
-      <aside
-        data-testid={rightTestId}
-        data-open={rightVisible}
-        style={paneStyle(rightWidth)}
-        className={`min-h-0 shrink-0 ${rightClassName} ${
-          compact ? `absolute inset-y-0 right-0 z-30 shadow-xl ${rightVisible ? '' : 'hidden'}` : rightVisible ? '' : 'hidden'
-        }`}
-      >
-        {right}
-      </aside>
+      {right != null && (
+        <aside
+          data-testid={rightTestId}
+          data-open={rightVisible}
+          style={paneStyle(rightWidth)}
+          className={`min-h-0 shrink-0 ${rightClassName} ${
+            compact ? `absolute inset-y-0 right-0 z-30 shadow-xl ${rightVisible ? '' : 'hidden'}` : rightVisible ? '' : 'hidden'
+          }`}
+        >
+          {right}
+        </aside>
+      )}
 
       {compact && (
         <>
@@ -302,14 +304,16 @@ const ResizableWorkspace = forwardRef<ResizableWorkspaceHandle, ResizableWorkspa
           >
             目录
           </button>
-          <button
-            type="button"
-            aria-label={compactPane === 'right' ? '关闭右侧栏' : '打开右侧栏'}
-            onClick={() => setCompactPane((pane) => (pane === 'right' ? null : 'right'))}
-            className="absolute right-2 top-1/2 z-40 -translate-y-1/2 rounded-full border border-border bg-panel px-2.5 py-1 text-xs text-ink shadow-sm"
-          >
-            进度
-          </button>
+          {right != null && (
+            <button
+              type="button"
+              aria-label={compactPane === 'right' ? '关闭右侧栏' : '打开右侧栏'}
+              onClick={() => setCompactPane((pane) => (pane === 'right' ? null : 'right'))}
+              className="absolute right-2 top-1/2 z-40 -translate-y-1/2 rounded-full border border-border bg-panel px-2.5 py-1 text-xs text-ink shadow-sm"
+            >
+              进度
+            </button>
+          )}
         </>
       )}
       </main>

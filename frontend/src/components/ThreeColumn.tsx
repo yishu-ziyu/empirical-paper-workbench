@@ -7,21 +7,29 @@ export interface ThreeColumnProps {
   agent: ReactNode
 }
 
+/**
+ * Workbench v2 三栏容器：左=项目 sidebar（可折叠/可调宽），
+ * 中=视图工件，右=Agent 栏。布局持久化在 localStorage。
+ */
 const ThreeColumn = forwardRef<ResizableWorkspaceHandle, ThreeColumnProps>(
   function ThreeColumn({ outline, editor, agent }, ref) {
     return (
       <ResizableWorkspace
         ref={ref}
-        storageKey="econpaper.workbench.layout.v2"
+        storageKey="econpaper.workbench.layout.v3"
         testId="desk-columns"
-        leftTestId="outline-panel"
+        leftTestId="sidebar-panel"
         centerTestId="editor-panel"
         rightTestId="agent-panel"
-        leftDefault={220}
-        rightDefault={280}
-        leftClassName="overflow-auto border-r border-border bg-cream p-5"
-        centerClassName="overflow-auto bg-bg"
-        rightClassName="overflow-auto border-l border-border bg-cream p-5"
+        leftDefault={236}
+        leftMin={208}
+        leftMax={300}
+        rightDefault={304}
+        rightMin={252}
+        rightMax={400}
+        leftClassName="overflow-hidden border-r border-wb-line bg-wb-subtle"
+        centerClassName="overflow-auto bg-wb-canvas"
+        rightClassName="overflow-auto border-l border-wb-line bg-wb-subtle"
         left={outline}
         center={editor}
         right={agent}

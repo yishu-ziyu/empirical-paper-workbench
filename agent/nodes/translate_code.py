@@ -29,6 +29,14 @@ from ..state import EconPaperState
 # Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
 _PANEL_METHOD_KEYS = {"did", "panel", "twfe", "fe"}
 
+_STUB_MARKERS = ("无 Python 代码可翻译", "无 Python 代码")
+_TAKEABLE_NEEDLES: dict[str, tuple[str, ...]] = {
+    "stata": ("import delimited", "xtreg", "reghdfe", "regress "),
+    "r": ("read.csv", "feols", "felm", "lm("),
+    "py": ("read_csv", "smf.ols", "sm.OLS"),
+    "eviews": ("import ", "ls "),
+}
+
 # Executable Python that can become a real estimator — not a cleaning audit.
 _REGRESSION_MARKERS = (
     "smf.ols",
@@ -612,6 +620,40 @@ def _translate_block(python_code: str, lang: str) -> str:
 # ---------------------------------------------------------------------------
 # 节点入口
 # ---------------------------------------------------------------------------
+def is_takeable_translation(item: Any) -> bool:
+    """True for runnable scripts; empty placeholder translations do not count."""
+    if not isinstance(item, dict):
+        return False
+    text = str(item.get("code") or "").strip()
+    if not text:
+        return False
+    if any(marker in text for marker in _STUB_MARKERS):
+        return False
+    needles = _TAKEABLE_NEEDLES.get(str(item.get("lang") or "")) or ()
+    return any(needle in text for needle in needles)
+
+
+def _persist_takeable_code(state: EconPaperState, translations: list[dict]) -> None:
+    session_id = state.get("session_id")
+    estimate = state.get("estimate")
+    producer_id = None
+    if isinstance(estimate, dict):
+        raw = estimate.get("source_run_id")
+        if isinstance(raw, str) and raw.strip():
+            producer_id = raw.strip()
+    if not session_id or not producer_id:
+        return
+    takeable = [item for item in translations if is_takeable_translation(item)]
+    if not takeable:
+        return
+    try:
+        import run_store
+
+        run_store.persist_code_translations(str(session_id), producer_id, takeable)
+    except Exception:
+        return
+
+
 def translate_code(state: EconPaperState) -> TranslateCodeOutput:
     """收集 Python 代码片段，翻译成 Stata/R/EViews。
 
@@ -652,17 +694,25 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
                 "filename": "analysis.m",
             },
         ]
-        return {"code_translations": translations}
+        return _emit_translations(state, translations)
 
     if model is None:
-        return {"code_translations": _empty_translations()}
+        return _emit_translations(state, _empty_translations())
 
     scripts = _scripts_from_direction(model)
-    return {
-        "code_translations": [
+    return _emit_translations(
+        state,
+        [
             {"lang": "py", "code": scripts["py"], "filename": "analysis.py"},
             {"lang": "stata", "code": scripts["stata"], "filename": "analysis.do"},
             {"lang": "r", "code": scripts["r"], "filename": "analysis.R"},
             {"lang": "eviews", "code": scripts["eviews"], "filename": "analysis.m"},
-        ]
-    }
+        ],
+    )
+
+
+def _emit_translations(
+    state: EconPaperState, translations: list[dict]
+) -> TranslateCodeOutput:
+    _persist_takeable_code(state, translations)
+    return {"code_translations": translations}

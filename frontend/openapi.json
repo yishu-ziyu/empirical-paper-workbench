@@ -352,6 +352,51 @@
         }
       }
     },
+    "/sessions/{session_id}/evidence": {
+      "get": {
+        "summary": "Get Evidence",
+        "description": "Project the main-estimate read model plus its full provenance chain.",
+        "operationId": "get_evidence_sessions__session_id__evidence_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -525,7 +570,7 @@
     "/sessions/{session_id}": {
       "get": {
         "summary": "Get Session Info",
-        "description": "Return session existence and basic info.\n\nUsed by the frontend to verify a saved sessionId is still valid\nafter a page refresh (localStorage recovery flow).",
+        "description": "Return the Project Snapshot: the single research-state read model.\n\nC1: besides the instrument readouts this carries the dataset metadata\n(server-side), the in-flight durable run (RunRepository), and the visible\ndegradation summary. The frontend restores from this payload alone and\nkeeps no sessionStorage copies of these fields.",
         "operationId": "get_session_info_sessions__session_id__get",
         "security": [
           {
@@ -3585,6 +3630,287 @@
         "title": "EditChapterResponse",
         "description": "POST /sessions/{id}/edit-chapter 返回体。\n\n与 regenerate 同形：改过的章 + 全表。instruction 走 generate_chapter\n时附带评审字段；content 落盘不审，评审字段为空。"
       },
+      "EvidenceCodeArtifactResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "EvidenceCodeArtifactResponse",
+        "description": "A takeable code file associated with the estimate producer run."
+      },
+      "EvidenceIdentificationResponse": {
+        "properties": {
+          "star_rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Star Rating"
+          },
+          "failed": {
+            "type": "boolean",
+            "title": "Failed",
+            "default": false
+          },
+          "report": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report"
+          }
+        },
+        "type": "object",
+        "title": "EvidenceIdentificationResponse",
+        "description": "识别验真读数（identification_verify 节点产物）。"
+      },
+      "EvidenceProvenanceResponse": {
+        "properties": {
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Status"
+          },
+          "run_events_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Events Url"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotDatasetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceCodeArtifactResponse"
+            },
+            "type": "array",
+            "title": "Code"
+          },
+          "trace_events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Trace Events"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest"
+          },
+          "artifacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          }
+        },
+        "type": "object",
+        "title": "EvidenceProvenanceResponse",
+        "description": "结论溯源链：spec → estimator → run → dataset → trace/artifacts。\n\n全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。\nRun 层只认 estimate.source_run_id；Dataset 层只认 estimate.analysis_dataset。"
+      },
+      "EvidenceResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": false
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          },
+          "claim": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim"
+          },
+          "specification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification"
+          },
+          "identification": {
+            "$ref": "#/components/schemas/EvidenceIdentificationResponse"
+          },
+          "robustness": {
+            "$ref": "#/components/schemas/EvidenceRobustnessResponse"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/EvidenceProvenanceResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "title": "EvidenceResponse",
+        "description": "GET /sessions/{id}/evidence 返回体。\n\nestimate 缺失时 ``available=false`` + ``blockers``，不报 500：\n数字先于正文，失败也要显式。"
+      },
+      "EvidenceRobustnessResponse": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "ran": {
+            "type": "boolean",
+            "title": "Ran",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "EvidenceRobustnessResponse",
+        "description": "稳健性审计状态（robustness_check 节点产物摘要）。"
+      },
       "FilterConditionItem": {
         "properties": {
           "col": {
@@ -5232,6 +5558,34 @@
           },
           "research_direction": {
             "title": "Research Direction"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotDatasetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SnapshotActiveRunResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "degradations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Degradations"
           }
         },
         "type": "object",
@@ -5240,7 +5594,115 @@
           "exists"
         ],
         "title": "SessionInfoResponse",
-        "description": "GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。"
+        "description": "GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"
+      },
+      "SnapshotActiveRunResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prewrite",
+              "upload_pipeline"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "kind",
+          "status"
+        ],
+        "title": "SnapshotActiveRunResponse",
+        "description": "Project Snapshot 的进行中 run（来自 RunRepository 的 durable 队列）。\n\nC3：刷新恢复凭它重新订阅 /runs/{id}/events，不再读 localStorage 句柄。"
+      },
+      "SnapshotDatasetResponse": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "title": "SnapshotDatasetResponse",
+        "description": "Dataset identity for Snapshot / Evidence.\n\nSnapshot still projects upload session metadata (name/rows/columns).\nEvidence ``provenance.dataset`` uses the analysis input identity\n(path/hash/version/role) recorded on the estimate payload."
       },
       "TokenResponse": {
         "properties": {

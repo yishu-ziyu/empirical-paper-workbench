@@ -1905,4 +1905,474 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('pause-apply')).toBeDisabled()
     expect(screen.getByTestId('outline-approve-btn')).toBeDisabled()
   })
+
+  // ── M2: Run specifications 完整状态转换（C8/C10/C11/C12）──────────
+  function specSnapshot(overrides: Record<string, unknown> = {}) {
+    return {
+      exists: true,
+      has_dataset: true,
+      session_id: 'sess-spec',
+      upload_readiness: 'READY',
+      dataset: { name: 'card_1995.csv', rows: 3010, columns: ['lwage', 'educ'] },
+      research: {
+        teaching_case: 'card_1995',
+        expectation: {
+          text: 'IV smaller than OLS',
+          confidence: 'medium',
+          version: 1,
+          history: [],
+          criteria: [
+            {
+              id: 'criterion.seed.iv-below-ols',
+              kind: 'ordering',
+              operator: 'lt',
+              left: { metric: 'estimate.coef', estimator: 'iv' },
+              right: { metric: 'estimate.coef', estimator: 'ols' },
+              label: 'IV estimate < OLS estimate',
+              source: 'seed',
+            },
+          ],
+        },
+        specification_space: {
+          status: 'frozen',
+          frozen_at: '2026-09-06T00:00:00+00:00',
+          frozen_before_results: true,
+          revealed: false,
+          definitions: [
+            {
+              id: 'ols_full_controls',
+              label: 'OLS · full controls',
+              rationale: 'r',
+              dimension: 'estimator',
+              value: 'ols',
+              admissible: true,
+              user_decision: 'include',
+              choices: [],
+            },
+            {
+              id: 'iv_nearc4_full',
+              label: 'IV · full controls',
+              rationale: 'r',
+              dimension: 'identification',
+              value: 'nearc4',
+              admissible: true,
+              user_decision: 'include',
+              choices: [],
+            },
+            {
+              id: 'ols_region_dummies',
+              label: 'OLS · region',
+              rationale: 'r',
+              dimension: 'region',
+              value: 'reg66',
+              admissible: false,
+              user_decision: 'unavailable',
+              unavailable_reason: 'missing_columns',
+              choices: [],
+            },
+          ],
+        },
+        specification_runs: [],
+      },
+      ...overrides,
+    }
+  }
+
+  function specFetchMock(opts: {
+    runStatus: string
+    runError?: string
+    withRuns?: boolean
+  }) {
+    let sessionGets = 0
+    return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-spec') && (!init?.method || init.method === 'GET')) {
+        sessionGets += 1
+        // 第一次 GET 是刷新恢复；其后的 GET 是 run 终态后的快照重取。
+        const withRuns = opts.withRuns && sessionGets > 1
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              specSnapshot(
+                withRuns
+                  ? {
+                      research: {
+                        teaching_case: 'card_1995',
+                        specification_space: {
+                          status: 'frozen',
+                          frozen_at: '2026-09-06T00:00:00+00:00',
+                          frozen_before_results: true,
+                          revealed: true,
+                          definitions: [],
+                        },
+                        specification_runs: [
+                          {
+                            id: 'r1:ols_full_controls',
+                            spec_id: 'ols_full_controls',
+                            coef: 0.0742,
+                            status: 'ok',
+                            relation: 'exploratory',
+                            choices: [],
+                          },
+                          {
+                            id: 'r1:iv_nearc4_full',
+                            spec_id: 'iv_nearc4_full',
+                            coef: 0.1377,
+                            status: 'ok',
+                            relation: 'exploratory',
+                            choices: [],
+                          },
+                        ],
+                        surprise: {
+                          status: 'Unexpected',
+                          kind: 'ordering_mismatch',
+                          kinds: ['ordering_mismatch'],
+                          expected: 'IV estimate < OLS estimate',
+                          observed: 'IV estimate 0.1377 > OLS estimate 0.0742',
+                        },
+                      },
+                      active_run: null,
+                    }
+                  : {},
+              ),
+            ),
+        })
+      }
+      if (href.endsWith('/research/specification-space/run')) {
+        return Promise.resolve({
+          ok: true,
+          status: 202,
+          json: () =>
+            Promise.resolve({
+              run_id: 'run-spec-space',
+              session_id: 'sess-spec',
+              status: 'PENDING',
+              events_url: '/api/runs/run-spec-space/events',
+            }),
+        })
+      }
+      if (href.endsWith('/runs/run-spec-space')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              opts.runStatus === 'SUCCEEDED'
+                ? { status: 'SUCCEEDED', result: { ok: true, specification_run_count: 2 } }
+                : { status: opts.runStatus, error: opts.runError || 'spec_run_failed' },
+            ),
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ exists: true }) })
+    })
+  }
+
+  test('M2 规格运行：点击即有运行态反馈、逐 spec 进度、完成自动进 Evidence 并清运行态', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    const mockFetch = specFetchMock({ runStatus: 'SUCCEEDED', withRuns: true })
+    vi.stubGlobal('fetch', mockFetch)
+    localStorage.setItem('econpaper_session_id', 'sess-spec')
+    renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-design'))
+    const runButton = await screen.findByTestId('spec-space-run')
+    expect(runButton).toHaveTextContent('Run specifications')
+    expect(runButton).toBeEnabled()
+
+    fireEvent.click(runButton)
+    const running = await screen.findByTestId('spec-space-run-status')
+    expect(running).toHaveTextContent('正在运行规格 0/2')
+    expect(screen.getByTestId('spec-space-run')).toHaveTextContent('Running 0/2')
+    expect(screen.getByTestId('spec-space-run')).toBeDisabled()
+
+    // 逐 spec 进度事件（SSE 投影 spec_id）
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            seq: 1,
+            type: 'run.progress',
+            status: 'running',
+            node: 'spec_run',
+            spec_id: 'ols_full_controls',
+          }),
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('spec-space-run')).toHaveTextContent('Running 1/2')
+    })
+
+    // 终态：成功 → 快照重取 → 自动切到 Evidence，activeRun 清空
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({ status: 'SUCCEEDED' }),
+        }),
+      )
+    })
+    expect(await screen.findByTestId('evidence-choice-matrix')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('run-state')).toHaveTextContent('空闲')
+    })
+    // 运行态解除：回到 Design 时按钮恢复可点、无失败残留
+    fireEvent.click(screen.getByTestId('rail-design'))
+    await waitFor(() => {
+      expect(screen.getByTestId('spec-space-run')).toBeEnabled()
+      expect(screen.queryByTestId('spec-space-run-error')).not.toBeInTheDocument()
+    })
+  })
+
+  test('M2 规格运行失败：Design 页显示稳定错误类别 + Retry，不假成功', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    let currentRunStatus = 'FAILED'
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/runs/run-spec-space')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              currentRunStatus === 'SUCCEEDED'
+                ? { status: 'SUCCEEDED', result: { ok: true, specification_run_count: 2 } }
+                : { status: 'FAILED', error: 'spec_run_failed' },
+            ),
+        })
+      }
+      if (href.endsWith('/research/specification-space/run')) {
+        return Promise.resolve({
+          ok: true,
+          status: 202,
+          json: () =>
+            Promise.resolve({
+              run_id: 'run-spec-space',
+              session_id: 'sess-spec',
+              status: 'PENDING',
+              events_url: '/api/runs/run-spec-space/events',
+            }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(specSnapshot({ active_run: null })),
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    localStorage.setItem('econpaper_session_id', 'sess-spec')
+    renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-design'))
+    fireEvent.click(await screen.findByTestId('spec-space-run'))
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+
+    // 终态 FAILED 事件到达
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'FAILED' }) }),
+      )
+    })
+
+    const error = await screen.findByTestId('spec-space-run-error')
+    expect(error).toHaveTextContent('spec_run_failed')
+    // 按钮恢复可点，无陈旧运行态
+    expect(screen.getByTestId('spec-space-run')).toBeEnabled()
+    expect(screen.getByTestId('run-state')).toHaveTextContent('空闲')
+
+    // Retry：重新发起 run（新 POST），这次成功终态并清除错误
+    const postCalls = () =>
+      mockFetch.mock.calls.filter(
+        (call) => String(call[0]).endsWith('/research/specification-space/run'),
+      ).length
+    expect(postCalls()).toBe(1)
+    currentRunStatus = 'SUCCEEDED'
+    fireEvent.click(screen.getByTestId('spec-space-run-retry'))
+    await waitFor(() => expect(postCalls()).toBe(2))
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+      )
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('spec-space-run-error')).not.toBeInTheDocument()
+    })
+  })
+
+  // ── M4: Failure / Recovery UX（C21/C22）─────────────────────────
+  test('M4 Card boot 终态失败：单一 failure 真相 + Retry Card + Back to desk', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    let bootRuns = 0
+    let bootRunStatus: Record<string, string> = {}
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/demos/card')) {
+        bootRuns += 1
+        const runId = `run-bootfail-${bootRuns}`
+        return Promise.resolve({
+          ok: true,
+          status: 202,
+          json: () =>
+            Promise.resolve({
+              session_id: `sess-bootfail-${bootRuns}`,
+              run_id: runId,
+              status: 'PENDING',
+              events_url: `/api/runs/${runId}/events`,
+              dataset_meta: { name: 'card_1995.csv', rows: 3010, columns: ['lwage'] },
+            }),
+        })
+      }
+      if (href.includes('/runs/run-bootfail-')) {
+        const runId = href.split('/runs/')[1]
+        const status = bootRunStatus[runId] ?? 'FAILED'
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve(
+              status === 'SUCCEEDED'
+                ? {
+                    status: 'SUCCEEDED',
+                    result: { cleaning_report: { steps: [] }, upload_readiness: 'READY' },
+                  }
+                : { status: 'FAILED', error: 'upload_pipeline execution failed' },
+            ),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ exists: true, has_dataset: true }),
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-try-card'))
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'FAILED' }) }),
+      )
+    })
+
+    // 单一 terminal failure surface，含稳定原因
+    const card = await screen.findByTestId('boot-failure-card')
+    expect(card).toHaveTextContent('数据处理失败')
+    expect(screen.getByTestId('boot-failure-category')).toHaveTextContent(
+      'upload_pipeline execution failed',
+    )
+    // 不再叠加其他矛盾信号：无重选文件、无推进决策卡、无 run 仍在进行
+    expect(screen.queryByTestId('upload-reselect-btn')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('decision-blocker')).not.toBeInTheDocument()
+    expect(screen.getByTestId('run-state')).toHaveTextContent('空闲')
+    // 数据处理失败的多路信号（旧 upload-error 横幅）不再同时出现
+    expect(screen.queryByTestId('upload-error')).not.toBeInTheDocument()
+
+    // Retry Card：新 idempotency key 重发 POST /demos/card，这次成功
+    expect(bootRuns).toBe(1)
+    bootRunStatus['run-bootfail-2'] = 'SUCCEEDED'
+    fireEvent.click(screen.getByTestId('boot-failure-retry'))
+    await waitFor(() => expect(bootRuns).toBe(2))
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+      )
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('boot-failure-card')).not.toBeInTheDocument()
+    })
+  })
+
+  test('M4 Back to desk 与 New study 入口都能回到空桌开始新研究（C22）', async () => {
+    // ① 失败卡上的 Back to desk
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/demos/card')) {
+        return Promise.resolve({
+          ok: true,
+          status: 202,
+          json: () =>
+            Promise.resolve({
+              session_id: 'sess-bootfail-b',
+              run_id: 'run-bootfail-b',
+              status: 'PENDING',
+              events_url: '/api/runs/run-bootfail-b/events',
+              dataset_meta: { name: 'card_1995.csv', rows: 3010, columns: ['lwage'] },
+            }),
+        })
+      }
+      if (href.endsWith('/runs/run-bootfail-b')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({ status: 'FAILED', error: 'upload_pipeline execution failed' }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ exists: true, has_dataset: true }),
+      })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    const first = renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-try-card'))
+    await waitFor(() => expect(AppFakeEventSource.latest).not.toBeNull())
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', { data: JSON.stringify({ status: 'FAILED' }) }),
+      )
+    })
+    fireEvent.click(await screen.findByTestId('boot-failure-back-desk'))
+    expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-try-card')).toBeInTheDocument()
+    expect(localStorage.getItem('econpaper_session_id')).toBeNull()
+    first.unmount()
+
+    // ② 有研究会话内 New study 入口
+    localStorage.clear()
+    localStorage.setItem('econpaper_session_id', 'sess-nav')
+    const navFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-nav')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              has_dataset: true,
+              session_id: 'sess-nav',
+              upload_readiness: 'READY',
+              dataset: { name: 'card_1995.csv', rows: 3010, columns: ['lwage'] },
+              research: {
+                teaching_case: 'card_1995',
+                specification_space: {
+                  status: 'frozen',
+                  frozen_at: '2026-09-06T00:00:00+00:00',
+                  definitions: [],
+                },
+                specification_runs: [],
+              },
+            }),
+        })
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ exists: true }),
+      })
+    })
+    vi.stubGlobal('fetch', navFetch)
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('workbench-shell')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('new-study-entry'))
+    expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
+    expect(screen.getByTestId('desk-try-card')).toBeInTheDocument()
+    expect(localStorage.getItem('econpaper_session_id')).toBeNull()
+  })
 })

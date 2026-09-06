@@ -2025,6 +2025,25 @@ export interface components {
             report?: string | null;
         };
         /**
+         * EvidenceMetricRef
+         * @description Reference to a quantity produced by a specification run.
+         *
+         *     ``metric`` is an open string (``estimate.coef`` today; future estimands
+         *     like ``att`` or ``rd_local`` plug in without a schema change). The run to
+         *     read is picked by ``spec_id`` when given, otherwise by ``estimator``
+         *     (matched against a run's estimator/method label).
+         */
+        EvidenceMetricRef: {
+            /** Metric */
+            metric: string;
+            /** Estimator */
+            estimator?: string | null;
+            /** Spec Id */
+            spec_id?: string | null;
+            /** Label */
+            label?: string | null;
+        };
+        /**
          * EvidenceProvenanceResponse
          * @description 结论溯源链：spec → estimator → run → dataset → trace/artifacts。
          *
@@ -2100,6 +2119,47 @@ export interface components {
              */
             ran: boolean;
         };
+        /**
+         * ExpectationCriterion
+         * @description Structured surprise condition. Never re-derived from free text.
+         *
+         *     ``right`` is either another metric reference (ordering/approx) or a
+         *     constant float. ``source`` records who authored the criterion: the
+         *     teaching-case seed or the user via an explicit control.
+         */
+        ExpectationCriterion: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sign" | "ordering" | "distance";
+            left: components["schemas"]["EvidenceMetricRef"];
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "gt" | "lt" | "approx" | "positive" | "negative";
+            /** Right */
+            right?: components["schemas"]["EvidenceMetricRef"] | number | null;
+            tolerance?: components["schemas"]["ExpectationCriterionTolerance"] | null;
+            /** Label */
+            label: string;
+            /**
+             * Source
+             * @default user
+             * @enum {string}
+             */
+            source: "seed" | "user";
+        };
+        /** ExpectationCriterionTolerance */
+        ExpectationCriterionTolerance: {
+            /** Abs */
+            abs?: number | null;
+            /** Rel */
+            rel?: number | null;
+        };
         /** ExpectationHistoryItemResponse */
         ExpectationHistoryItemResponse: {
             /** Version */
@@ -2148,6 +2208,8 @@ export interface components {
             updated_at?: string | null;
             /** History */
             history?: components["schemas"]["ExpectationHistoryItemResponse"][];
+            /** Criteria */
+            criteria?: components["schemas"]["ExpectationCriterion"][];
         };
         /** ExpectationUpdateRequest */
         ExpectationUpdateRequest: {
@@ -2160,6 +2222,8 @@ export interface components {
             confidence: "low" | "medium" | "high";
             /** Locale */
             locale?: string | null;
+            /** Criteria */
+            criteria?: components["schemas"]["ExpectationCriterion"][] | null;
         };
         /**
          * FilterConditionItem

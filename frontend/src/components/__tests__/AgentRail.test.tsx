@@ -223,3 +223,61 @@ describe('AgentRail linked evidence', () => {
   })
 })
 
+describe('AgentRail spec_run progress (M2)', () => {
+  test('shows real per-spec progress while a spec_run is active', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          activeRun: { run_id: 'run-spec-1', kind: 'spec_run', status: 'RUNNING' },
+          specRunProgress: { done: 3, total: 12 },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    const task = screen.getByTestId('agent-current-task')
+    expect(task).toHaveAttribute('data-busy', 'true')
+    expect(task).toHaveTextContent('正在运行规格 3/12')
+    expect(task).not.toHaveTextContent('空闲')
+    expect(task).not.toHaveTextContent('后台运行监控中')
+  })
+
+  test('indeterminate wording when the progress denominator is unknown', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          activeRun: { run_id: 'run-spec-2', kind: 'spec_run', status: 'RUNNING' },
+          specRunProgress: null,
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('agent-current-task')).toHaveTextContent('正在运行规格…')
+  })
+
+  test('terminal spec_run clears the background-run claim (no stale monitoring)', () => {
+    render(
+      <AgentRail
+        ws={ws({ activeRun: null, specRunProgress: null })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('agent-current-task')).toHaveAttribute('data-busy', 'false')
+    expect(screen.queryByText(/后台运行监控中/)).not.toBeInTheDocument()
+  })
+})
+

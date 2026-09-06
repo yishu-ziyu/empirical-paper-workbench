@@ -29,6 +29,19 @@ function deriveCurrentTask(ws: WorkspaceApi): CurrentTask | null {
       why: '完成后会停下请你确认，不会自动写下一篇。',
     }
   }
+  if (ws.activeRun?.kind === 'spec_run') {
+    // 进度来自真实 run 事件（逐 spec）；分母不可数时 indeterminate，不虚构。
+    const progress = ws.specRunProgress
+    return progress
+      ? {
+          label: `正在运行规格 ${progress.done}/${progress.total}`,
+          why: '逐个规格估计中；完成后自动进入 Evidence。',
+        }
+      : {
+          label: '正在运行规格…',
+          why: '逐个规格估计中；完成后自动进入 Evidence。',
+        }
+  }
   if (ws.activeRun) {
     return {
       label: '后台运行监控中',
@@ -267,7 +280,18 @@ export default function AgentRail({
       ) : null}
 
       {cursor.presentation.status === 'paused' ? (
-        <p className="text-[12px] text-wb-muted">Paused. Replay to restart, or Cancel.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[12px] text-wb-muted">已暂停——继续或取消。</p>
+          <button
+            type="button"
+            data-testid="agent-cursor-resume"
+            data-agent-cursor-control=""
+            onClick={cursor.resume}
+            className="wb-press rounded-md border border-wb-line bg-wb-subtle px-2.5 py-1 text-[12px] text-wb-ink"
+          >
+            继续播放
+          </button>
+        </div>
       ) : null}
 
       <WorkspaceDecisionRail decision={decision} waiting={waiting} suggestions={suggestions} />

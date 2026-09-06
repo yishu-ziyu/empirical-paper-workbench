@@ -186,7 +186,9 @@ def _public_event(event, *, kind: str) -> dict[str, Any]:
         "type": event.event_type,
         "kind": kind,
     }
-    for key in ("status", "node", "attempt", "lease_epoch"):
+    # spec_id rides spec_run progress events so the browser can show real
+    # per-specification progress ("Running k/12"); the label is a stable id.
+    for key in ("status", "node", "attempt", "lease_epoch", "spec_id"):
         value = payload.get(key)
         if isinstance(value, str) and _STABLE_LABEL.fullmatch(value):
             public[key] = value

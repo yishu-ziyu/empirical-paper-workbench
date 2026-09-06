@@ -82,7 +82,10 @@ function App() {
 
   let blockingDecision: WorkspaceDecision | null = null
 
-  if (isQuestionGroup) {
+  if (ws.bootFailure) {
+    // C21：终态失败时只有 failure surface 一个真相，抑制一切推进文案。
+    blockingDecision = null
+  } else if (isQuestionGroup) {
     if (ws.identFailed) {
       blockingDecision = {
         title: '研究设计需要重开',
@@ -524,9 +527,19 @@ function App() {
               activeId={ws.workbenchTab}
               onSelect={selectView}
             >
-              <div className="px-4 pb-3 pt-2">
+              <div className="space-y-2 px-4 pb-3 pt-2">
                 {sessionId ? (
-                  <span data-testid="session-ready" hidden />
+                  <>
+                    <span data-testid="session-ready" hidden />
+                    <button
+                      type="button"
+                      data-testid="new-study-entry"
+                      onClick={ws.handleNewStudy}
+                      className="wb-press w-full rounded-md border border-wb-line px-2.5 py-1.5 text-left text-[12px] text-wb-muted transition-colors hover:bg-wb-surface hover:text-wb-ink"
+                    >
+                      New study · 回工作台
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -543,6 +556,56 @@ function App() {
         }
         editor={
           <ErrorBoundary>
+            {/* boot 终态失败的唯一 failure surface（C21）：稳定原因 +
+                Retry Card（新 idempotency key 重发）/ Back to desk。 */}
+            {ws.bootFailure && sessionId ? (
+              <div
+                data-testid="boot-failure-card"
+                role="alert"
+                className="mx-6 mt-6 rounded-lg border border-wb-danger/40 bg-wb-danger-soft px-4 py-4"
+              >
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-danger">
+                  Boot failed · 启动失败
+                </p>
+                <p className="mt-1.5 text-[14px] font-medium text-wb-ink">
+                  数据处理失败，本次研究没有生成任何结果。
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-wb-danger">
+                  <span data-testid="boot-failure-category">{ws.bootFailure.category}</span>
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {ws.bootFailure.kind === 'card' ? (
+                    <button
+                      type="button"
+                      data-testid="boot-failure-retry"
+                      onClick={() => {
+                        void ws.handleTryCard()
+                      }}
+                      className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
+                    >
+                      Retry Card
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="boot-failure-retry"
+                      onClick={() => ws.fileInputRef.current?.click()}
+                      className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
+                    >
+                      重新上传数据
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-testid="boot-failure-back-desk"
+                    onClick={ws.handleNewStudy}
+                    className="wb-press rounded-md border border-wb-line bg-wb-surface px-3 py-1.5 text-[12px] text-wb-ink"
+                  >
+                    Back to desk
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {/* 主区顶部：面包屑 + 项目标题 + 动作区（契约 C1） */}
             <header
               data-testid="workbench-header"

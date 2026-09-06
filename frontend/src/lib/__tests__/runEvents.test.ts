@@ -216,3 +216,70 @@ describe('waitForRun', () => {
     expect(FakeEventSource.latest?.closed).toBe(true)
   })
 })
+
+describe('waitForRun progress projection (M2)', () => {
+  it('forwards projected progress events (specId) to the callback before terminal', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ status: 'SUCCEEDED', result: { ok: true } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const events: Array<{ type: string; status?: string; specId?: string }> = []
+    const waiting = waitForRun('run-progress', '/api/runs/run-progress/events', undefined, (event) => {
+      events.push({ type: event.type, status: event.status, specId: event.specId })
+    })
+    await vi.waitFor(() => expect(FakeEventSource.latest).not.toBeNull())
+
+    FakeEventSource.latest!.onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          seq: 1,
+          type: 'run.progress',
+          kind: 'spec_run',
+          status: 'running',
+          node: 'spec_run',
+          spec_id: 'iv_nearc4_full',
+        }),
+      }),
+    )
+    FakeEventSource.latest!.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+    )
+
+    const result = await waiting
+    expect(result).toEqual({ ok: true })
+    const progress = events.find((event) => event.specId === 'iv_nearc4_full')
+    expect(progress).toBeDefined()
+    expect(progress?.type).toBe('run.progress')
+    expect(progress?.status).toBe('running')
+  })
+
+  it('never lets a throwing progress callback break the run wait', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ status: 'SUCCEEDED', result: { ok: true } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const waiting = waitForRun('run-progress-2', '/api/runs/run-progress-2/events', undefined, () => {
+      throw new Error('observer bug')
+    })
+    await vi.waitFor(() => expect(FakeEventSource.latest).not.toBeNull())
+    FakeEventSource.latest!.onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({ status: 'running', spec_id: 'ols_full_controls' }),
+      }),
+    )
+    FakeEventSource.latest!.onmessage?.(
+      new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+    )
+    await expect(waiting).resolves.toEqual({ ok: true })
+  })
+})

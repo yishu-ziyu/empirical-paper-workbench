@@ -94,6 +94,10 @@ def _remove_upload_attempt(path: Path | None) -> None:
 
 
 def _stable_failure(exc: Exception, run_kind: str) -> str:
+    from services.spec_run import SpecRunRejected
+
+    if isinstance(exc, SpecRunRejected):
+        return exc.code
     if isinstance(exc, UploadResultInvalid):
         return "UnreadableOutput: upload_pipeline output_validation failed"
     if isinstance(exc, RemoteExecutionError):

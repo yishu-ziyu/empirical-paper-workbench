@@ -47,36 +47,24 @@ function semanticIdsFor(run: SpecRun, comparable: { ols: string; iv: string }): 
   return ids
 }
 
-export function compareRuns(a: SpecRun, b: SpecRun) {
+function visualDelta(a: SpecRun, b: SpecRun) {
   const coefA = typeof a.coef === 'number' ? a.coef : null
   const coefB = typeof b.coef === 'number' ? b.coef : null
   const deltaAbs = coefA == null || coefB == null ? null : coefB - coefA
   const deltaPct =
     deltaAbs == null || coefA == null ? null : (deltaAbs / Math.max(Math.abs(coefA), 1e-6)) * 100
-  const dims = Array.from(
-    new Set([...(a.choices ?? []), ...(b.choices ?? [])].map((item) => item.dimension).filter(Boolean)),
-  )
-  const changed: Array<{ dimension: string; a?: string; b?: string }> = []
-  const unchanged: Array<{ dimension: string; a?: string; b?: string }> = []
-  for (const dim of dims) {
-    const left = choiceValue(a, dim)
-    const right = choiceValue(b, dim)
-    const row = { dimension: dim, a: left, b: right }
-    if (left !== right) changed.push(row)
-    else unchanged.push(row)
-  }
-  const changedDims = new Set(changed.map((item) => item.dimension))
-  let why = 'Little changed'
-  if (changedDims.has('estimator') || changedDims.has('identification')) {
-    why = 'Identification strategy changed'
-  } else if (changedDims.has('experience')) {
-    why = 'Experience functional form changed'
-  } else if (changedDims.has('region')) {
-    why = 'Region controls changed'
-  } else if (changedDims.has('demographics')) {
-    why = 'Demographic controls changed'
-  }
-  return { coefA, coefB, deltaAbs, deltaPct, changed, unchanged, why }
+  return { coefA, coefB, deltaAbs, deltaPct }
+}
+
+type CompareModel = {
+  coef_a?: number | null
+  coef_b?: number | null
+  delta_abs?: number | null
+  delta_pct?: number | null
+  changed?: Array<{ dimension?: string; a?: string; b?: string }>
+  unchanged?: Array<{ dimension?: string; a?: string; b?: string }>
+  why_moved?: string | null
+  intent?: string | null
 }
 
 function formatCoef(value: number | null | undefined): string {
@@ -192,14 +180,21 @@ type ClaimLedger = NonNullable<ResearchLab['claim']>
 function ClaimLedgerSection({
   claim,
   busy,
+  mismatch,
   onApprove,
   onPreparePaper,
+  onPromoteSupporting,
+  onReviewEvidence,
 }: {
   claim: ClaimLedger
   busy: boolean
+  mismatch: boolean
   onApprove?: (claimId: string) => Promise<void>
   onPreparePaper?: () => Promise<void>
+  onPromoteSupporting?: () => Promise<void>
+  onReviewEvidence?: () => Promise<void>
 }) {
+  const stale = Boolean(claim.stale)
   return (
     <section
       id="claim-ledger"
@@ -209,6 +204,16 @@ function ClaimLedgerSection({
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
         Claim Ledger · 主张账本
       </p>
+      {stale ? (
+        <p data-testid="claim-stale" className="mt-2 text-[13px] leading-6 text-wb-ink">
+          New evidence available · 结论需要重新审视
+        </p>
+      ) : null}
+      {mismatch && !stale ? (
+        <p data-testid="claim-canonical-mismatch" className="mt-2 text-[13px] leading-6 text-wb-ink">
+          当前 Claim 依赖 IV specification，但正式主规格不是该 IV。
+        </p>
+      ) : null}
       <p data-testid="claim-text" className="mt-2 font-serif text-[1.15rem] leading-7 text-wb-ink">
         {claim.claim_text || claim.supported_wording}
       </p>
@@ -243,11 +248,36 @@ function ClaimLedgerSection({
           Unresolved: {claim.unresolved_assumptions.join(' · ')}
         </p>
       ) : null}
-      {claim.approved_by_user ? (
+      {stale ? (
+        <button
+          type="button"
+          data-testid="claim-review-evidence"
+          disabled={busy || !onReviewEvidence}
+          onClick={() => {
+            void onReviewEvidence?.()
+          }}
+          className="wb-press mt-3 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+        >
+          Review new evidence
+        </button>
+      ) : claim.approved_by_user ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p data-testid="claim-approved" className="text-[12px] text-wb-muted">
             Approved
           </p>
+          {mismatch && onPromoteSupporting ? (
+            <button
+              type="button"
+              data-testid="claim-promote-supporting"
+              disabled={busy}
+              onClick={() => {
+                void onPromoteSupporting()
+              }}
+              className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+            >
+              Promote supporting specification
+            </button>
+          ) : null}
           {onPreparePaper ? (
             <button
               type="button"
@@ -287,6 +317,8 @@ export default function EvidenceLab({
   onAcceptChallenge,
   onApproveClaim,
   onPreparePaper,
+  onCompare,
+  onDraftClaim,
 }: {
   research: ResearchLab
   onPromote?: (runId: string) => Promise<void>
@@ -294,19 +326,40 @@ export default function EvidenceLab({
   onAcceptChallenge?: (challengeId: string) => Promise<void>
   onApproveClaim?: (claimId: string) => Promise<void>
   onPreparePaper?: () => Promise<void>
+  onCompare?: (a: string, b: string) => Promise<CompareModel | null>
+  onDraftClaim?: () => Promise<void>
 }) {
   const runs = (research.specification_runs ?? []).filter((run) => run.status !== 'error')
   const comparable = comparableIds(runs)
   const [selected, setSelected] = useState<string[]>([])
   const [hovered, setHovered] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [serverCompare, setServerCompare] = useState<CompareModel | null>(null)
   const cursor = useAgentCursor()
 
   const selectedRuns = selected
     .map((id) => runs.find((run) => run.id === id || run.spec_id === id))
     .filter((run): run is SpecRun => Boolean(run))
-  const comparison =
-    selectedRuns.length === 2 ? compareRuns(selectedRuns[0], selectedRuns[1]) : null
+  const leftId = selectedRuns[0]?.id
+  const rightId = selectedRuns[1]?.id
+  const leftCoef = selectedRuns[0]?.coef
+  const rightCoef = selectedRuns[1]?.coef
+  const comparison = useMemo(() => {
+    if (!leftId || !rightId) return null
+    const fallback = visualDelta(
+      { coef: leftCoef } as SpecRun,
+      { coef: rightCoef } as SpecRun,
+    )
+    return {
+      coefA: serverCompare?.coef_a ?? fallback.coefA,
+      coefB: serverCompare?.coef_b ?? fallback.coefB,
+      deltaAbs: serverCompare?.delta_abs ?? fallback.deltaAbs,
+      deltaPct: serverCompare?.delta_pct ?? fallback.deltaPct,
+      changed: serverCompare?.changed ?? [],
+      unchanged: serverCompare?.unchanged ?? [],
+      why: serverCompare?.why_moved || serverCompare?.intent || '',
+    }
+  }, [leftCoef, leftId, rightCoef, rightId, serverCompare])
 
   useEffect(() => {
     const pair = cursor.presentation.comparePair
@@ -318,6 +371,20 @@ export default function EvidenceLab({
       setSelected([mapped[0].id, mapped[1].id])
     }
   }, [comparable, cursor.presentation.comparePair, cursor.presentation.status, runs])
+
+  useEffect(() => {
+    if (!leftId || !rightId || !onCompare) {
+      setServerCompare(null)
+      return
+    }
+    let cancelled = false
+    void onCompare(leftId, rightId).then((payload) => {
+      if (!cancelled) setServerCompare(payload)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [leftId, onCompare, rightId])
 
   useEffect(() => {
     if (!comparison) {
@@ -387,6 +454,16 @@ export default function EvidenceLab({
     | undefined
 
   const claim = research.claim ?? research.claims?.[0]
+  const requiredSpec = (claim?.provenance as { iv_spec_id?: string } | undefined)?.iv_spec_id
+  const mismatch = Boolean(
+    claim?.approved_by_user &&
+      !claim?.stale &&
+      requiredSpec &&
+      research.canonical_spec_id !== requiredSpec,
+  )
+  const supportingRunId =
+    (claim?.provenance as { iv_run_id?: string } | undefined)?.iv_run_id ||
+    claim?.supporting_run_ids?.[1]
 
   return (
     <section data-testid="evidence-lab" className="mx-auto max-w-[52rem] space-y-6 px-6 py-8">
@@ -403,8 +480,33 @@ export default function EvidenceLab({
         <ClaimLedgerSection
           claim={claim}
           busy={busy}
+          mismatch={mismatch}
           onApprove={onApproveClaim}
           onPreparePaper={onPreparePaper}
+          onPromoteSupporting={
+            supportingRunId && onPromote
+              ? async () => {
+                  setBusy(true)
+                  try {
+                    await onPromote(supportingRunId)
+                  } finally {
+                    setBusy(false)
+                  }
+                }
+              : undefined
+          }
+          onReviewEvidence={
+            onDraftClaim
+              ? async () => {
+                  setBusy(true)
+                  try {
+                    await onDraftClaim()
+                  } finally {
+                    setBusy(false)
+                  }
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -548,7 +650,7 @@ export default function EvidenceLab({
               {comparison.deltaPct != null ? ` · ${comparison.deltaPct.toFixed(1)}%` : ''}
             </p>
             <p data-testid="evidence-compare-intent">
-              {cursor.presentation.intent === 'Little changed' ? 'Little changed' : comparison.why}
+              {comparison.why || '…'}
             </p>
             <p className="text-[12px] text-wb-muted">
               Changed: {comparison.changed.map((item) => item.dimension).join(', ') || 'none'}

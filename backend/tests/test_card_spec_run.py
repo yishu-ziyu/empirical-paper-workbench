@@ -403,3 +403,89 @@ def test_formula_mapping_drops_reg669():
     assert "reg668" in formula
     assert "reg669" not in formula
     assert "(educ ~ nearc4)" in formula
+
+
+def test_execute_spec_run_rejects_empty_admissible_set(tmp_path):
+    from services.spec_run import SpecRunRejected, execute_spec_run
+
+    csv_path = tmp_path / "empty-admissible.csv"
+    csv_path.write_text("lwage,educ,nearc4\n1,12,1\n", encoding="utf-8")
+    sid = "spec-run-empty-admissible"
+    facade.create_session(sid)
+    facade.save_state(
+        sid,
+        {
+            "csv_path": str(csv_path),
+            "research_lab": {
+                "teaching_case": "card_1995",
+                "specification_space": {
+                    "definitions": [],
+                    "frozen_at": "2026-09-06T00:00:00+00:00",
+                },
+                "specification_runs": [],
+            },
+        },
+    )
+    with pytest.raises(SpecRunRejected) as caught:
+        execute_spec_run(sid, "run-empty", {"spec_ids": ["ols_full_controls"]}, None)
+    assert caught.value.code == "no_admissible_specifications"
+    facade.delete_session(sid)
+
+
+def test_merge_spec_run_does_not_clobber_newer_claim_or_canonical():
+    from services.research_lab import merge_spec_run_lab
+
+    current = {
+        "canonical_spec_id": "iv_region_dummies",
+        "evidence_revision": 3,
+        "current_claim_id": "claim.card.education-earnings",
+        "claim": {
+            "id": "claim.card.education-earnings",
+            "version": 4,
+            "approved_by_user": True,
+            "stale": False,
+            "based_on_evidence_revision": 3,
+            "claim_text": "keep me",
+        },
+        "claims": [
+            {
+                "id": "claim.card.education-earnings",
+                "version": 4,
+                "approved_by_user": True,
+                "stale": False,
+                "based_on_evidence_revision": 3,
+                "claim_text": "keep me",
+            }
+        ],
+        "specification_runs": [{"id": "run-ols", "spec_id": "ols_linear_exper", "status": "ok"}],
+    }
+    incoming = {
+        "canonical_spec_id": "ols_linear_exper",
+        "evidence_revision": 2,
+        "claim": {
+            "id": "claim.card.education-earnings",
+            "version": 1,
+            "approved_by_user": False,
+            "stale": True,
+            "based_on_evidence_revision": 1,
+            "claim_text": "stale worker snapshot",
+        },
+        "claims": [
+            {
+                "id": "claim.card.education-earnings",
+                "version": 1,
+                "claim_text": "stale worker snapshot",
+            }
+        ],
+        "specification_runs": [
+            {"id": "run-ols", "spec_id": "ols_linear_exper", "status": "ok"},
+            {"id": "run-preview", "spec_id": "iv_region_dummies", "relation": "preview", "status": "ok"},
+        ],
+    }
+    merged = merge_spec_run_lab(current, incoming)
+    assert merged["canonical_spec_id"] == "iv_region_dummies"
+    assert merged["claim"]["version"] == 4
+    assert merged["claim"]["claim_text"] == "keep me"
+    assert merged["evidence_revision"] == 4
+    assert merged["claim"]["stale"] is True
+    assert any(run["id"] == "run-preview" for run in merged["specification_runs"])

@@ -55,6 +55,10 @@ def paper_ready_to_write(state: dict, chapter_type: str) -> tuple[bool, list[str
         claim = current_research_claim(state)
         if not claim or not claim.get("approved_by_user"):
             missing.append("claim_unapproved")
+        elif _claim_is_stale(state, claim):
+            missing.append("claim_stale")
+        elif _canonical_mismatches_claim(state, claim):
+            missing.append("canonical_mismatch")
     return (not missing, missing)
 
 
@@ -82,7 +86,44 @@ def current_research_claim(state: dict) -> dict | None:
     return claims[-1] if claims else None
 
 
+def _lab(state: dict) -> dict | None:
+    lab = state.get("research_lab")
+    return lab if isinstance(lab, dict) else None
+
+
+def _claim_is_stale(state: dict, claim: dict | None) -> bool:
+    if not isinstance(claim, dict):
+        return False
+    if claim.get("stale"):
+        return True
+    lab = _lab(state)
+    if lab is None:
+        return False
+    based = claim.get("based_on_evidence_revision")
+    current = lab.get("evidence_revision")
+    if based is None or current is None:
+        return False
+    try:
+        return int(based) != int(current)
+    except (TypeError, ValueError):
+        return True
+
+
+def _canonical_mismatches_claim(state: dict, claim: dict | None) -> bool:
+    if not isinstance(claim, dict):
+        return False
+    lab = _lab(state)
+    if lab is None:
+        return False
+    required = (claim.get("provenance") or {}).get("iv_spec_id")
+    if not required:
+        return False
+    return lab.get("canonical_spec_id") != required
+
+
 def results_is_grounded(state: dict, chapter: dict | None = None) -> bool:
+    from .claim_wording import wording_exceeds_evidence
+
     chapter = chapter if isinstance(chapter, dict) else {}
     if chapter.get("stale") or chapter.get("needs_regeneration"):
         return False
@@ -91,8 +132,11 @@ def results_is_grounded(state: dict, chapter: dict | None = None) -> bool:
     if research_claims_exist(state):
         if not claim or not claim.get("approved_by_user"):
             return False
-        forbidden = str(claim.get("unsupported_wording") or "").strip()
-        if forbidden and forbidden in content:
+        if _claim_is_stale(state, claim):
+            return False
+        if _canonical_mismatches_claim(state, claim):
+            return False
+        if wording_exceeds_evidence(claim, content):
             return False
         return True
     est = state.get("estimate") or {}

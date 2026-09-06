@@ -14,6 +14,7 @@ from services.research_lab import (
     _as_float,
     _event,
     _now,
+    bump_evidence_revision,
     comparable_spec_ids,
     definition_by_id,
     evaluate_surprise,
@@ -25,6 +26,14 @@ from services.research_lab import (
 )
 
 ProgressFn = Callable[[str, str, dict], None]
+
+
+class SpecRunRejected(RuntimeError):
+    """Stable worker failure; not an HTTP 500 / NameError."""
+
+    def __init__(self, code: str, message: str | None = None):
+        self.code = code
+        super().__init__(message or code)
 
 
 def _num(value: Any) -> float | None:
@@ -145,7 +154,10 @@ def execute_spec_run(
     allowed = set(included_spec_ids(lab))
     spec_ids = [spec_id for spec_id in requested if spec_id in allowed]
     if not spec_ids:
-        raise HTTPException(status_code=409, detail="no admissible specifications to run")
+        raise SpecRunRejected(
+            "no_admissible_specifications",
+            "no admissible specifications to run",
+        )
 
     new_runs: list[dict[str, Any]] = []
     for spec_id in spec_ids:
@@ -203,6 +215,7 @@ def execute_spec_run(
     elif updated.get("next_challenge") is None:
         updated["next_challenge"] = next_card_challenge(updated)
 
+    updated = bump_evidence_revision(updated)
     updated = maybe_draft_card_claim(updated)
     progress("spec_run", "done", {"count": len(new_runs)})
     return strip_spec_run_result({"research_lab": updated})

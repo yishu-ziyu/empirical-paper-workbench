@@ -81,6 +81,8 @@ Baseline（2026-09-06，`review/workbench-v2` @ `226546b`，工作树干净）�
 - [x] C28 ADR 0015 — 程序: 读 `docs/adr/0015-card-canonical-research-experience.md` — 预期: 记录 SpecificationRun 模型、preview vs canonical、Cursor semantic-target contract、Claim Ledger 真相边界。
 - [x] C29 validator 独立 ACCEPT。
 
+后续完整性（只增）：`docs/acceptance/card-research-integrity.md`（写作不得隐式 Promote；Claim 绑定 evidence revision；措辞 policy；Compare 以 backend 为准）。
+
 ## Evidence
 
 （收尾填写。每个里程碑结束后追加命令输出、payload、截图路径、系数核验。）

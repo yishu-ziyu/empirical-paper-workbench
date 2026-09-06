@@ -165,7 +165,12 @@ class AgentFacade:
             for item in (state.get("outline") or [])
             if isinstance(item, dict)
         ]
-        from agent.engine.readiness import results_is_grounded
+        from agent.engine.readiness import paper_ready_to_write, results_is_grounded
+
+        _, missing = paper_ready_to_write(state, "results")
+        for code in ("claim_unapproved", "claim_stale", "canonical_mismatch"):
+            if code in missing and code not in blockers:
+                blockers.append(code)
 
         body_chapters = []
         for item in state.get("body_chapters") or []:

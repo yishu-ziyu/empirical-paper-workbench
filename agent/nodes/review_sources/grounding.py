@@ -54,22 +54,11 @@ def check_grounding(state: dict, content: str) -> list[str]:
 
 
 def _wording_exceeds_evidence(state: dict, text: str) -> bool:
-    lab = state.get("research_lab")
-    if not isinstance(lab, dict):
-        return False
-    claims = [item for item in (lab.get("claims") or []) if isinstance(item, dict)]
-    cid = lab.get("current_claim_id")
-    claim = None
-    if cid:
-        claim = next((item for item in claims if item.get("id") == cid), None)
-    if claim is None and isinstance(lab.get("claim"), dict):
-        claim = lab.get("claim")
-    if claim is None and claims:
-        claim = claims[-1]
-    if not isinstance(claim, dict):
-        return False
-    forbidden = str(claim.get("unsupported_wording") or "").strip()
-    return bool(forbidden) and forbidden in (text or "")
+    from agent.engine.claim_wording import wording_exceeds_evidence
+    from agent.engine.readiness import current_research_claim
+
+    claim = current_research_claim(state if isinstance(state, dict) else {})
+    return wording_exceeds_evidence(claim, text)
 
 
 def _norm_label(label: str) -> str:

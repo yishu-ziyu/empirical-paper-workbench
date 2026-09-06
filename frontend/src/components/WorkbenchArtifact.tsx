@@ -355,6 +355,8 @@ export default function WorkbenchArtifact({
               onAcceptChallenge={ws.handleAcceptChallenge}
               onApproveClaim={ws.handleApproveClaim}
               onPreparePaper={ws.handlePreparePaper}
+              onCompare={ws.handleCompareSpecs}
+              onDraftClaim={ws.handleDraftClaim}
             />
           ) : sessionId ? (
             <EvidenceView

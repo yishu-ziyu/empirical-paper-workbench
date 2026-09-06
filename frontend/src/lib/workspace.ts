@@ -1327,10 +1327,19 @@ export function useWorkspace(opts: WorkspaceOptions) {
         headers: { 'Idempotency-Key': crypto.randomUUID(), ...authHeaders() },
       },
     )
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    if (!resp.ok) {
+      const payload = await resp.json().catch(() => null)
+      const detail = payload?.detail
+      const message =
+        typeof detail === 'string'
+          ? detail
+          : (detail && typeof detail === 'object' && detail.message) || `HTTP ${resp.status}`
+      showGlobalError(String(message))
+      return
+    }
     const accepted = (await resp.json()) as RunAccepted
     await waitForSpecRun(sid, accepted)
-  }, [waitForSpecRun])
+  }, [showGlobalError, waitForSpecRun])
 
   const handleRunSpec = useCallback(
     async (specId: string, mode: 'canonical' | 'preview' = 'preview') => {
@@ -1408,6 +1417,17 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [waitForSpecRun],
   )
 
+  const handleDraftClaim = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/claims/draft`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    applySnapshot(await fetchSessionSnapshot(sid))
+  }, [applySnapshot])
+
   const handleApproveClaim = useCallback(
     async (claimId: string) => {
       const sid = activeSessionRef.current
@@ -1432,7 +1452,16 @@ export function useWorkspace(opts: WorkspaceOptions) {
       method: 'POST',
       headers: authHeaders(),
     })
-    if (!prepared.ok) throw new Error(`HTTP ${prepared.status}`)
+    if (!prepared.ok) {
+      const payload = await prepared.json().catch(() => null)
+      const detail = payload?.detail
+      const message =
+        (detail && typeof detail === 'object' && detail.message) ||
+        (typeof detail === 'string' ? detail : `HTTP ${prepared.status}`)
+      applySnapshot(await fetchSessionSnapshot(sid))
+      showGlobalError(String(message))
+      return
+    }
     applySnapshot(await fetchSessionSnapshot(sid))
     const written = await apiFetch(`${API_BASE}/sessions/${sid}/generate-chapter`, {
       method: 'POST',
@@ -1442,7 +1471,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     if (!written.ok) throw new Error(`HTTP ${written.status}`)
     applySnapshot(await fetchSessionSnapshot(sid))
     setWorkbenchTab('paper')
-  }, [applySnapshot])
+  }, [applySnapshot, showGlobalError])
 
   const handleDirectionSubmit = useCallback(
     async (data: DirectionFormData) => {
@@ -1933,6 +1962,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     handleRevertPreview,
     handleAcceptChallenge,
     handleApproveClaim,
+    handleDraftClaim,
     handlePreparePaper,
     handleDirectionSubmit,
     handleWriteChapter,

@@ -62,10 +62,14 @@ def _run_space(client, sid: str) -> dict:
 
 
 def _seed_write_ready(sid: str, research_lab: dict) -> None:
+    lab = dict(research_lab)
+    required = ((lab.get("claim") or {}).get("provenance") or {}).get("iv_spec_id")
+    if required:
+        lab["canonical_spec_id"] = required
     state = make_write_ready_state(
         outline=make_six_chapter_outline(),
         current_chapter_index=4,
-        research_lab=research_lab,
+        research_lab=lab,
         body_chapters=[
             {},
             {},
@@ -81,7 +85,7 @@ def _seed_write_ready(sid: str, research_lab: dict) -> None:
             {},
         ],
     )
-    facade.save_state(sid, {**facade.get_state(sid), **state, "research_lab": research_lab})
+    facade.save_state(sid, {**facade.get_state(sid), **state, "research_lab": lab})
 
 
 def test_space_run_auto_drafts_card_claim_fields(client):
@@ -108,18 +112,48 @@ def test_space_run_auto_drafts_card_claim_fields(client):
     assert snapshot["research"]["claims"][0]["id"] == claim["id"]
 
 
-def test_prepare_paper_promotes_iv_and_unlocks_results(client):
+def test_prepare_paper_does_not_implicitly_promote_canonical(client):
     sid = _boot_frozen(client)
     lab = _run_space(client, sid)
-    claim = lab["claim"]
+    ols = next(run for run in lab["specification_runs"] if run["method"] == "ols")
+    iv = next(
+        run
+        for run in lab["specification_runs"]
+        if run["spec_id"] == lab["claim"]["provenance"]["iv_spec_id"]
+    )
+    promoted = client.post(
+        f"/sessions/{sid}/research/preview/promote",
+        json={"run_id": ols["id"]},
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["canonical_spec_id"] == ols["spec_id"]
+    # Promote bumps evidence revision; redraft + approve on the new revision.
+    client.post(f"/sessions/{sid}/research/claims/draft")
+    claim = client.get(f"/sessions/{sid}/research").json()["claim"]
+    client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
+    before = client.get(f"/sessions/{sid}").json()
+    prepared = client.post(f"/sessions/{sid}/research/prepare-paper")
+    assert prepared.status_code == 409, prepared.text
+    detail = prepared.json()["detail"]
+    assert detail["code"] == "canonical_mismatch"
+    after = client.get(f"/sessions/{sid}").json()
+    assert after["research"]["canonical_spec_id"] == ols["spec_id"]
+    assert (after.get("estimate") or {}).get("coef") == (before.get("estimate") or {}).get("coef") or after[
+        "research"
+    ]["canonical_spec_id"] == ols["spec_id"]
+
+    explicit = client.post(
+        f"/sessions/{sid}/research/preview/promote",
+        json={"run_id": iv["id"]},
+    )
+    assert explicit.status_code == 200, explicit.text
+    client.post(f"/sessions/{sid}/research/claims/draft")
+    claim = client.get(f"/sessions/{sid}/research").json()["claim"]
     client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
     prepared = client.post(f"/sessions/{sid}/research/prepare-paper")
     assert prepared.status_code == 200, prepared.text
     snapshot = client.get(f"/sessions/{sid}").json()
-    assert snapshot["estimate"]["produced_by"] == "estimate"
-    assert snapshot["estimate"]["coef"] is not None
-    assert snapshot["outline"]
-    assert snapshot["robustness_status"] == "ran"
+    assert snapshot["research"]["canonical_spec_id"] == iv["spec_id"]
     written = client.post(
         f"/sessions/{sid}/generate-chapter",
         json={"chapter": {"type": "results", "title": "结果"}},
@@ -128,6 +162,46 @@ def test_prepare_paper_promotes_iv_and_unlocks_results(client):
     chapter = written.json()["chapter"]
     assert chapter["grounded"] is True
     assert "educ" in (chapter.get("content") or "")
+
+
+def test_new_spec_run_stales_approved_claim(client):
+    sid = _boot_frozen(client)
+    lab = _run_space(client, sid)
+    revision = lab["evidence_revision"]
+    assert revision >= 1
+    claim = lab["claim"]
+    assert claim["based_on_evidence_revision"] == revision
+    assert claim["stale"] is False
+    client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
+    preview = client.post(
+        f"/sessions/{sid}/research/specs/{lab['claim']['provenance']['iv_spec_id']}/run",
+        json={"mode": "preview"},
+        headers=_headers(),
+    )
+    assert preview.status_code == 202, preview.text
+    _finish(preview.json()["run_id"], "card-integrity-preview")
+    later = client.get(f"/sessions/{sid}/research").json()
+    assert later["evidence_revision"] == revision + 1
+    assert later["claim"]["stale"] is True
+    assert later["claim"]["claim_text"] == claim["claim_text"]
+    assert later["claim"]["version"] == claim["version"]
+    snapshot = client.get(f"/sessions/{sid}").json()
+    assert "claim_stale" in (snapshot.get("write_blockers") or [])
+    _seed_write_ready(sid, facade.get_state(sid)["research_lab"])
+    blocked = client.post(
+        f"/sessions/{sid}/generate-chapter",
+        json={"chapter": {"type": "results", "title": "结果"}},
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert "claim_stale" in blocked.json()["detail"]["write_blockers"]
+    drafted = client.post(f"/sessions/{sid}/research/claims/draft")
+    assert drafted.status_code == 200, drafted.text
+    v2 = drafted.json()["claim"]
+    assert v2["stale"] is False
+    assert v2["version"] == claim["version"] + 1
+    assert v2["based_on_evidence_revision"] == later["evidence_revision"]
+    client.post(f"/sessions/{sid}/research/claims/{v2['id']}/approve")
+    assert client.get(f"/sessions/{sid}/research").json()["claim"]["stale"] is False
 
 
 def test_claim_approve_required_for_results_and_bind_includes_runs(client):

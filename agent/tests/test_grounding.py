@@ -81,6 +81,25 @@ def test_no_treatment_row_returns_empty():
     assert check_grounding(state, "引言没有主表。") == []
 
 
+def test_unsupported_claim_wording_is_not_grounded():
+    forbidden = "One more year of education raises everyone's wage by 13%."
+    state = make_write_ready_state(
+        research_lab={
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": True,
+                    "unsupported_wording": forbidden,
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    content = _content_with_true_table() + "\n" + forbidden
+    failures = check_grounding(state, content)
+    assert "wording_exceeds_evidence" in failures
+
+
 def test_does_not_parse_identification_report():
     """不解析 identification_diag.report 里的小数。"""
     state = make_write_ready_state(

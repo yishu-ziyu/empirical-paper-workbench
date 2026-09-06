@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import session_factory
 from models.research_session import ResearchSession
 from models.run import Run, RunEvent
+from services.research_lab import merge_spec_run_lab, strip_spec_run_result
 
 
 ACTIVE_STATUSES = ("PENDING", "RUNNING", "RECONCILING")
@@ -31,8 +32,8 @@ RunStatus = Literal[
     "FAILED",
     "CANCELLED",
 ]
-RunKind = Literal["prewrite", "upload_pipeline"]
-SUPPORTED_RUN_KINDS = ("prewrite", "upload_pipeline")
+RunKind = Literal["prewrite", "upload_pipeline", "spec_run"]
+SUPPORTED_RUN_KINDS = ("prewrite", "upload_pipeline", "spec_run")
 
 
 class LeaseLost(RuntimeError):
@@ -575,6 +576,8 @@ class RunRepository:
                 if run.session_id != session_id:
                     raise LeaseLost(f"run {run_id} moved to another session")
                 safe_result = _json_safe(result)
+                if run.kind == "spec_run":
+                    safe_result = strip_spec_run_result(safe_result)
                 if run.kind == "upload_pipeline":
                     csv_path = safe_result.get("csv_path")
                     if not isinstance(csv_path, str) or not _is_readable_file(csv_path):
@@ -584,25 +587,37 @@ class RunRepository:
                 missing = object()
                 current_state = dict(session.state or {})
                 changed: dict[str, Any] = {}
-                for key, value in safe_result.items():
-                    if key == "_source_run_id":
-                        changed[key] = value
-                        continue
-                    initial_value = initial_state.get(key, missing)
-                    if initial_value == value:
-                        continue
-                    current_value = (
-                        session.csv_path
-                        if key == "csv_path"
-                        else current_state.get(key, missing)
-                    )
-                    if current_value == initial_value:
-                        changed[key] = value
-                if "csv_path" in changed:
-                    csv_path = changed.pop("csv_path")
-                    session.csv_path = str(csv_path) if csv_path else None
-                if run.kind == "upload_pipeline":
-                    changed["upload_readiness"] = "READY"
+                if run.kind == "spec_run":
+                    incoming_lab = safe_result.get("research_lab")
+                    if isinstance(incoming_lab, dict):
+                        current_lab = current_state.get("research_lab")
+                        base = dict(current_lab) if isinstance(current_lab, dict) else {}
+                        changed["research_lab"] = merge_spec_run_lab(base, incoming_lab)
+                    incoming_deg = safe_result.get("degradations")
+                    if isinstance(incoming_deg, list) and incoming_deg:
+                        changed["degradations"] = list(
+                            current_state.get("degradations") or []
+                        ) + incoming_deg
+                else:
+                    for key, value in safe_result.items():
+                        if key == "_source_run_id":
+                            changed[key] = value
+                            continue
+                        initial_value = initial_state.get(key, missing)
+                        if initial_value == value:
+                            continue
+                        current_value = (
+                            session.csv_path
+                            if key == "csv_path"
+                            else current_state.get(key, missing)
+                        )
+                        if current_value == initial_value:
+                            changed[key] = value
+                    if "csv_path" in changed:
+                        csv_path = changed.pop("csv_path")
+                        session.csv_path = str(csv_path) if csv_path else None
+                    if run.kind == "upload_pipeline":
+                        changed["upload_readiness"] = "READY"
                 session.state = {**current_state, **changed}
                 run.result = safe_result
                 run.status = "SUCCEEDED"

@@ -53,6 +53,7 @@ from schemas.responses import (
     SnapshotDatasetResponse,
     UploadResponse,
 )
+from services.research_lab import lab_from_state, public_research
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
 
 router = APIRouter()
@@ -407,6 +408,8 @@ async def get_session_info(
         extra["degradations"] = public_degradations(
             await run_in_threadpool(facade.get_degradations, session_id)
         )
+        if lab_from_state(state) is not None:
+            extra["research"] = public_research(state)
     except Exception:
         extra = {}
     extra["dataset"] = await _snapshot_dataset(session_id)

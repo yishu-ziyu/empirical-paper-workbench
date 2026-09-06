@@ -11,7 +11,7 @@ from numbers import Real
 from typing import Any, Iterable, Mapping
 
 from .data_eda import compute_csv_eda
-from .readiness import claim_mode
+from .readiness import claim_mode, current_research_claim
 
 
 _MISSING = "未提供"
@@ -567,6 +567,7 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
     effective_claim, execution_notice = method_execution_binding(
         state, claim_method, requested_claim
     )
+    ledger = current_research_claim(dict(state)) or {}
     return {
         "research_question": rd.get("question") or state.get("research_question") or "",
         "method": requested_method,
@@ -589,4 +590,10 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
         "robustness_status": robustness_status(state),
         "heterogeneity_evidence": format_heterogeneity_evidence(state),
         "policy_evidence": format_policy_evidence(state),
+        "claim_supported_wording": str(ledger.get("supported_wording") or _MISSING),
+        "claim_conditionally_supported_wording": str(
+            ledger.get("conditionally_supported_wording") or _MISSING
+        ),
+        "claim_unsupported_wording": str(ledger.get("unsupported_wording") or _MISSING),
+        "claim_run_facts": str(ledger.get("run_facts") or _MISSING),
     }

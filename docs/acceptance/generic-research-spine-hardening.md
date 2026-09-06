@@ -1,6 +1,6 @@
 # 验收契约：Generic Research Spine 加固（Expectation → Run → Surprise → Explanation → Recovery）
 
-Status: open
+Status: closed（2026-09-07 validator 独立复核 ACCEPT，28/28；报告要点与本 Evidence 节一致。C13 时间线已补独立归档 `assets/generic-spine-hardening-2026-09-07/m3-showme-timeline.json`；C6 检查程序修正大小写笔误，断言未变）
 
 基线：`main @ ac62d4a0457c80e480aa335a362040acc650b3af`，分支 `review/generic-research-spine-hardening`。
 事实来源：`card-canonical-research-experience-validator.md` 追加的 J–Q first-user audit（2026-09-06，verdict B）。
@@ -32,7 +32,7 @@ Status: open
 - [ ] C3 evaluate_surprise 只消费 criteria — 程序: `python -m pytest backend/tests -k "surprise" -x -q`（含新增/改写测试）— 预期: ① 判据 IV<OLS + 真实量级 runs（OLS 0.0747 / IV 0.1315）→ `status="Unexpected"`、observed 表达 IV > OLS、kind 为 ordering mismatch 族；② 判据满足时 `Expected`；③ sign（positive/negative）与 distance（approx + tolerance）算子有确定性测试；④ 无判据（纯文本）→ `Expected` + 不抛错。
 - [ ] C4 keyword contract 删除 — 程序: `grep -rn "_mentions_iv\|_mentions_similar\|_mentions_positive" backend/ frontend/src/ ; echo EXIT:$?` — 预期: 无匹配（EXIT:1）。`evaluate_surprise` 不再有任何自由文本短语分支。
 - [ ] C5 命名通用 + API drift 门 — 程序: `grep -rn "CardExpectation" backend/ frontend/src/ | wc -l` 为 0；类型名 `ExpectationCriterion` / `EvidenceMetricRef`（或等价通用名）；`make check-api-drift` 绿 — 预期: openapi.json、docs/api/openapi.json、frontend/types/api.ts 同步包含 criteria 模型。
-- [ ] C6 UI 显式判定块 — 程序: `cd frontend && npx vitest run src/components/__tests__ -t expectation -q`（含新增断言）+ 浏览器抽查 — 预期: Expectation 编辑器在 textarea 下方渲染 `Surprise condition · 意外判定` 块，显示当前判据（如 "IV estimate < OLS estimate"）；改 textarea 文本不改变该块；提供显式控件修改判据（改后保存即生效），无任何"从文本重猜"路径。
+- [ ] C6 UI 显式判定块 — 程序: `cd frontend && npx vitest run src/components/__tests__ -t "Expectation" -q`（含新增断言）+ 浏览器抽查 — 预期: Expectation 编辑器在 textarea 下方渲染 `Surprise condition · 意外判定` 块，显示当前判据（如 "IV estimate < OLS estimate"）；改 textarea 文本不改变该块；提供显式控件修改判据（改后保存即生效），无任何"从文本重猜"路径。
 - [ ] C7 真实数据验收 — 程序: 浏览器走 Card 真实会话：把预期原文改成 `我觉得 IV 应该会更小一些，但并不确定。`，判据块仍显式为 IV<OLS；Freeze→Run→查看后端 `GET /research` — 预期: `surprise.status="Unexpected"`、`observed` 表达 IV > OLS（真实系数 0.0747/0.1315 量级）。证据归档。
 
 ### M2 — Run specifications 完整状态转换

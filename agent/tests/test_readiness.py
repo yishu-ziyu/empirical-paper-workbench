@@ -44,6 +44,47 @@ def test_results_ready_when_write_ready():
     assert blockers == []
 
 
+def test_results_blocked_when_claims_exist_unapproved():
+    state = make_write_ready_state(
+        research_lab={
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": False,
+                    "supported_wording": "Education is positively associated with earnings.",
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    ok, blockers = paper_ready_to_write(state, "results")
+    assert ok is False
+    assert "claim_unapproved" in blockers
+    intro_ok, intro_blockers = paper_ready_to_write(state, "intro")
+    assert intro_ok is True
+    assert intro_blockers == []
+
+
+def test_results_ready_when_claim_approved():
+    state = make_write_ready_state(
+        research_lab={
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": True,
+                    "unsupported_wording": (
+                        "One more year of education raises everyone's wage by 13%."
+                    ),
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    ok, blockers = paper_ready_to_write(state, "results")
+    assert ok is True
+    assert blockers == []
+
+
 def test_lit_review_needs_literature_node():
     state = make_state(identification_diag={"report": "ok"})
     ok, blockers = paper_ready_to_write(state, "lit_review")

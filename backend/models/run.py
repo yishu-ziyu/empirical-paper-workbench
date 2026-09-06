@@ -29,7 +29,7 @@ class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('prewrite', 'upload_pipeline')",
+            "kind IN ('prewrite', 'upload_pipeline', 'spec_run')",
             name="ck_runs_supported_kind",
         ),
         Index("ix_runs_claim", "status", "lease_expires_at", "created_at"),

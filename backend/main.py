@@ -180,6 +180,7 @@ from routers.labels import router as labels_router  # noqa: E402
 from routers.outline import router as outline_router  # noqa: E402
 from routers.paper_draft import router as paper_draft_router  # noqa: E402
 from routers.progress import router as progress_router  # noqa: E402
+from routers.research import router as research_router  # noqa: E402
 from routers.review import router as review_router  # noqa: E402
 from routers.runs import router as runs_router  # noqa: E402
 from routers.run_execution import router as run_execution_router  # noqa: E402
@@ -193,6 +194,7 @@ app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(evidence_router)
 app.include_router(sessions_router)
+app.include_router(research_router)
 app.include_router(ws_router)
 app.include_router(labels_router)
 app.include_router(outline_router)

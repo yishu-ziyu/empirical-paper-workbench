@@ -26,17 +26,22 @@ _TREATMENT_ALIASES = frozenset({"treat", "treatment"})
 
 def check_grounding(state: dict, content: str) -> list[str]:
     """Return zero or more of:
-    missing_estimate_number, invented_number, invented_table
+    missing_estimate_number, invented_number, invented_table,
+    wording_exceeds_evidence
     """
-    estimate = state.get("estimate") if isinstance(state, dict) else None
-    if not isinstance(estimate, dict):
-        return []
-    treatment_row = estimate.get("treatment_row")
-    if not isinstance(treatment_row, str) or not treatment_row:
-        return []
-
     text = content or ""
     failures: List[str] = []
+    payload = state if isinstance(state, dict) else {}
+    if _wording_exceeds_evidence(payload, text):
+        failures.append("wording_exceeds_evidence")
+
+    estimate = payload.get("estimate") if isinstance(payload, dict) else None
+    if not isinstance(estimate, dict):
+        return failures
+    treatment_row = estimate.get("treatment_row")
+    if not isinstance(treatment_row, str) or not treatment_row:
+        return failures
+
     if treatment_row not in text:
         failures.append("missing_estimate_number")
 
@@ -46,6 +51,25 @@ def check_grounding(state: dict, content: str) -> list[str]:
         if _count_result_headers(text) >= 2:
             failures.append("invented_table")
     return failures
+
+
+def _wording_exceeds_evidence(state: dict, text: str) -> bool:
+    lab = state.get("research_lab")
+    if not isinstance(lab, dict):
+        return False
+    claims = [item for item in (lab.get("claims") or []) if isinstance(item, dict)]
+    cid = lab.get("current_claim_id")
+    claim = None
+    if cid:
+        claim = next((item for item in claims if item.get("id") == cid), None)
+    if claim is None and isinstance(lab.get("claim"), dict):
+        claim = lab.get("claim")
+    if claim is None and claims:
+        claim = claims[-1]
+    if not isinstance(claim, dict):
+        return False
+    forbidden = str(claim.get("unsupported_wording") or "").strip()
+    return bool(forbidden) and forbidden in (text or "")
 
 
 def _norm_label(label: str) -> str:

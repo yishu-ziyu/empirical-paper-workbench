@@ -156,6 +156,36 @@ def test_data_desc_preserves_explicitly_empty_controls():
     assert "控制变量：无（state 明确为空）" in user
 
 
+def test_results_bind_includes_approved_claim_wording_and_run_facts():
+    state = make_write_ready_state(
+        research_lab={
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": True,
+                    "supported_wording": "Education is positively associated with earnings.",
+                    "conditionally_supported_wording": (
+                        "Under the college-proximity IV assumptions, IV estimates "
+                        "suggest a positive local causal return to schooling."
+                    ),
+                    "unsupported_wording": (
+                        "One more year of education raises everyone's wage by 13%."
+                    ),
+                    "run_facts": "OLS spec_id=ols_full_controls coef=0.08 n=3010",
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    bound = bind_chapter_kwargs(state, {"type": "results"})
+    _, user = get_prompt("results").render(**bound)
+    assert "Education is positively associated with earnings." in user
+    assert "positive local causal return" in user
+    assert "raises everyone's wage by 13%" in user
+    assert "OLS spec_id=ols_full_controls coef=0.08 n=3010" in user
+    assert bound["claim"] == "association"
+
+
 def test_methods_binds_actual_estimate_spec_and_unknown_covariance():
     ready = make_write_ready_state()
     estimate = {

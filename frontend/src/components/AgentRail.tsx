@@ -1,5 +1,6 @@
 import type { WorkspaceApi } from '../lib/workspace'
 import { formatStatValue } from '../lib/readoutTable'
+import { useAgentCursor } from '../lib/agentCursor/context'
 import type { WorkspaceDecision, WorkspaceSuggestion } from './WorkspaceDecisionRail'
 import WorkspaceDecisionRail from './WorkspaceDecisionRail'
 
@@ -46,7 +47,25 @@ function LinkedEvidenceCard({
   hasSuccessfulEstimate: boolean
   onOpenEvidence: () => void
 }) {
-  const grounded = hasSuccessfulEstimate && !ws.identFailed && ws.writeBlockers.length === 0
+  const claim = ws.research?.claim ?? ws.research?.claims?.[0]
+  const claimsExist = Boolean(claim?.id) || (ws.research?.claims?.length ?? 0) > 0
+  const resultsChapter = ws.writtenChapters.find((chapter) => chapter.type === 'results')
+  const unsupported = claim?.unsupported_wording?.trim()
+  const wordingExceeds = Boolean(
+    unsupported && resultsChapter?.content?.includes(unsupported),
+  )
+  const claimOk =
+    !claimsExist ||
+    (Boolean(claim?.approved_by_user) &&
+      !wordingExceeds &&
+      !resultsChapter?.stale &&
+      !resultsChapter?.needs_regeneration)
+  const grounded =
+    hasSuccessfulEstimate &&
+    !ws.identFailed &&
+    ws.writeBlockers.length === 0 &&
+    claimOk &&
+    resultsChapter?.grounded !== false
   return (
     <section
       data-testid="linked-evidence"
@@ -135,6 +154,19 @@ export default function AgentRail({
   onOpenEvidence,
 }: AgentRailProps) {
   const task = deriveCurrentTask(ws)
+  const cursor = useAgentCursor()
+  const unexpected = ws.research?.surprise?.status === 'Unexpected'
+  const cursorActive =
+    cursor.presentation.status === 'running' ||
+    cursor.presentation.status === 'paused' ||
+    cursor.presentation.status === 'awaiting-confirm' ||
+    cursor.presentation.status === 'done' ||
+    cursor.presentation.status === 'aborted'
+  const showMe =
+    unexpected &&
+    (cursor.presentation.status === 'idle' ||
+      cursor.presentation.status === 'done' ||
+      cursor.presentation.status === 'aborted')
   return (
     <div data-testid="agent-rail" className="space-y-4 px-4 py-4">
       {showLinkedEvidence ? (
@@ -165,6 +197,73 @@ export default function AgentRail({
           <p className="mt-1.5 text-[12px] leading-5 text-wb-faint">空闲。系统会在需要你时停下。</p>
         )}
       </section>
+
+      {showMe ? (
+        <section
+          data-testid="agent-cursor-prompt"
+          className="rounded-lg border border-wb-line bg-wb-surface px-3 py-2.5"
+        >
+          <p className="text-[13px] font-medium text-wb-ink">这个变化值得检查</p>
+          <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
+            {ws.research?.surprise?.observed || 'OLS and IV do not match the recorded expectation.'}
+          </p>
+          <button
+            type="button"
+            data-testid="agent-cursor-show-me"
+            data-agent-cursor-control=""
+            onClick={cursor.playShowMe}
+            className="wb-press mt-2.5 rounded-md border border-wb-line bg-wb-subtle px-2.5 py-1 text-[12px] text-wb-ink"
+          >
+            Show me
+          </button>
+        </section>
+      ) : null}
+
+      {cursor.presentation.status === 'awaiting-confirm' &&
+      cursor.presentation.awaiting === 'runPreview' ? (
+        <section className="rounded-lg border border-wb-line bg-wb-surface px-3 py-2.5">
+          <p className="text-[13px] font-medium text-wb-ink">Run this preview?</p>
+          <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
+            Executes a real specification run. Canonical estimate stays put.
+          </p>
+          <button
+            type="button"
+            data-testid="agent-cursor-run-preview"
+            data-agent-cursor-control=""
+            onClick={cursor.confirmRunPreview}
+            className="wb-press mt-2.5 rounded-md bg-wb-ink px-2.5 py-1 text-[12px] font-medium text-white"
+          >
+            Run Preview
+          </button>
+        </section>
+      ) : null}
+
+      {cursorActive ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-testid="agent-cursor-cancel"
+            data-agent-cursor-control=""
+            onClick={cursor.cancel}
+            className="wb-press rounded-md border border-wb-line px-2.5 py-1 text-[12px] text-wb-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="agent-cursor-replay"
+            data-agent-cursor-control=""
+            onClick={cursor.replay}
+            className="wb-press rounded-md border border-wb-line px-2.5 py-1 text-[12px] text-wb-ink"
+          >
+            Replay
+          </button>
+        </div>
+      ) : null}
+
+      {cursor.presentation.status === 'paused' ? (
+        <p className="text-[12px] text-wb-muted">Paused. Replay to restart, or Cancel.</p>
+      ) : null}
 
       <WorkspaceDecisionRail decision={decision} waiting={waiting} suggestions={suggestions} />
     </div>

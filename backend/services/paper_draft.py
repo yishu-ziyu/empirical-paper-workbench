@@ -325,6 +325,9 @@ def _ungrounded_numbers(state: Mapping[str, Any], chapter: Mapping[str, Any]) ->
         )
     }
     allowed = _number_tokens(truth) | _number_tokens(bound)
+    forbidden_wording = bound.get("claim_unsupported_wording")
+    if forbidden_wording and str(forbidden_wording) not in {"", "未提供"}:
+        allowed -= _number_tokens(forbidden_wording)
     content = str(chapter.get("content") or "")
     return sorted(_number_tokens(content) - allowed)
 

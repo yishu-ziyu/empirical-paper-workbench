@@ -363,6 +363,19 @@ class RunRepository:
         async with self._factory() as db:
             return await db.get(Run, run_id)
 
+    async def active_run(self, session_id: str) -> Run | None:
+        """Public projection of the in-flight run a client can reattach to."""
+        async with self._factory() as db:
+            return await self._active_run(db, session_id)
+
+    async def latest_run(self, session_id: str, kind: str | None = None) -> Run | None:
+        """Most recent run for a session, optionally restricted to one kind."""
+        async with self._factory() as db:
+            query = select(Run).where(Run.session_id == session_id)
+            if kind is not None:
+                query = query.where(Run.kind == kind)
+            return await db.scalar(query.order_by(Run.created_at.desc()).limit(1))
+
     async def resolve_upload(
         self,
         idempotency_key: str,

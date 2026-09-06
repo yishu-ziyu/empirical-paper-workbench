@@ -65,3 +65,16 @@ export function literatureLabel(source: string | null | undefined): string {
   if (source === 'mock') return '示例文献'
   return source
 }
+
+// Evidence 大数字的人读格式：显示层定长，精确值仍由接口与 title 保留。
+export function formatStatValue(
+  value: unknown,
+  kind: 'coef' | 'se' | 'p' | 'n',
+): string {
+  const n = Number(value)
+  if (value == null || !Number.isFinite(n)) return '—'
+  if (kind === 'n') return n.toLocaleString('en-US')
+  if (kind === 'p') return n < 1e-4 ? '< 0.0001' : n.toFixed(4)
+  if (n !== 0 && (Math.abs(n) >= 1e5 || Math.abs(n) < 1e-4)) return n.toExponential(3)
+  return n.toFixed(4)
+}

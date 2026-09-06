@@ -67,7 +67,6 @@ export default function DeskPage({
   const [askText, setAskText] = useState('')
   const [asked, setAsked] = useState('')
   const [replyError, setReplyError] = useState('')
-  const [agentPane, setAgentPane] = useState<'shape' | 'clean' | 'estimate' | 'write'>('shape')
   const paperRef = useRef<HTMLTextAreaElement>(null)
   const timerRef = useRef<number | null>(null)
   const mediaRef = useRef<MediaRecorder | null>(null)
@@ -280,22 +279,6 @@ export default function DeskPage({
         : voiceStatus === 'denied'
           ? t('desk.voiceDenied')
           : t('desk.listen')
-
-  const paneTitle =
-    agentPane === 'clean'
-      ? '上传后自动进行，每一步都留记录'
-      : agentPane === 'estimate'
-        ? '主结果表会先于正文出现在这里'
-        : agentPane === 'write'
-          ? '写一章停一次，你确认后再写下一章'
-          : '把你的想法，整理成能估计的研究问题'
-
-  const agentRows = [
-    ['shape', '问', '把想法变成问题', '说清在比较什么、关心什么结果'],
-    ['clean', '洗', '检查数据', '自动查缺失和异常，全程留记录'],
-    ['estimate', '估', '算出主结果', '先看见估计表，再动笔写'],
-    ['write', '章', '逐章写正文', '每一章都停下来等你确认'],
-  ] as const
 
   function sendComposer() {
     if (busy) return
@@ -651,91 +634,18 @@ export default function DeskPage({
     </div>
   )
 
-  const rightPane = (
-    <div className="flex h-full min-h-0 flex-col bg-[#fbfbfa]">
-      <div className="border-b border-black/[0.06] px-4 py-3">
-        <p className="font-mono text-[14px] font-bold">研究进度</p>
-        <p className="mt-1 text-[13px] text-muted">{paneTitle}</p>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[13.5px] leading-7">
-        <div data-testid="agent-queue" className="mb-5 space-y-1.5">
-          {agentRows.map(([id, mark, name, hint]) => (
-            <button
-              key={id}
-              type="button"
-              data-testid={`agent-row-${id}`}
-              onClick={() => setAgentPane(id)}
-              className={`flex w-full items-center gap-2.5 rounded-[12px] px-2.5 py-2 text-left ${
-                agentPane === id ? 'bg-[#ebece9] text-ink' : 'text-muted hover:bg-[#f1f1ef] hover:text-ink'
-              }`}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/[0.08] text-[11px]">
-                {mark}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium">{name}</span>
-                <span className="block truncate text-[11.5px] text-muted">{hint}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="border-t border-black/[0.06] pt-4">
-          {agentPane === 'shape' && (
-            <>
-              <p className="mb-3 text-[12px] text-muted">你的原话都会保留，我只帮你把问题补齐到能估计。</p>
-              {card?.intent === 'research' ? (
-                <dl className="space-y-2">
-                  <div><dt className="text-[12px] text-muted">问题</dt><dd>{title || '—'}</dd></div>
-                  <div><dt className="text-[12px] text-muted">线索</dt><dd>{card.heard.join(' · ') || '—'}</dd></div>
-                  <div><dt className="text-[12px] text-muted">比较 / 结果</dt><dd>{card.comparison} · {card.outcome}</dd></div>
-                </dl>
-              ) : (
-                <p className="text-muted">
-                  {card?.intent === 'conversation'
-                    ? '还不知道你想研究什么。先说一个你注意到的现象，或者一个想验证的问题。'
-                    : '先在下面说一句你的想法；问题定下来后，研究设定会显示在这里。'}
-                </p>
-              )}
-            </>
-          )}
-          {agentPane === 'clean' && (
-            <ul className="space-y-1 text-muted">
-              <li>变量概览：每个字段是什么、有多少</li>
-              <li>缺失值：缺在哪里、怎么处理</li>
-              <li>异常值：明显不合理的记录怎么处理</li>
-              <li>每一步都留记录，之后可以回查</li>
-              <li className="pt-2">上传数据后，这里会逐项亮起来。</li>
-            </ul>
-          )}
-          {agentPane === 'estimate' && <p className="text-muted">还没有主结果。上传数据、定好方向后，主结果表会出现在这里——先看见它，再写正文。</p>}
-          {agentPane === 'write' && (
-            <ol className="space-y-1 text-muted">
-              <li>01 引言 · 待写</li><li>02 文献综述 · 待写</li><li>03 数据描述 · 待写</li>
-              <li>04 方法 · 待写</li><li>05 结果 · 等主结果</li><li>06 结论 · 待写</li>
-            </ol>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-
   return (
     <ResizableWorkspace
       storageKey="econpaper.direction.layout.v2"
       testId="desk-page"
       leftTestId="desk-left-sidebar"
       centerTestId="desk-center"
-      rightTestId="agent-window"
       className="h-screen bg-white text-ink"
       leftDefault={224}
-      rightDefault={320}
       leftClassName="border-r border-black/[0.06] bg-white"
       centerClassName="bg-[#fffefb]"
-      rightClassName="border-l border-black/[0.06] bg-[#fbfbfa]"
       left={leftPane}
       center={centerPane}
-      right={rightPane}
     />
   )
 }

@@ -91,8 +91,30 @@ class CreateSessionResponse(BaseModel):
     session_id: str
 
 
+class SnapshotDatasetResponse(BaseModel):
+    """Project Snapshot 的数据集元信息（全部来自后端 session 元数据）。
+
+    C1：前端不再为 name/rows/columns 维护 sessionStorage 副本。
+    """
+
+    name: Optional[str] = None
+    rows: Optional[int] = None
+    columns: List[str] = Field(default_factory=list)
+
+
+class SnapshotActiveRunResponse(BaseModel):
+    """Project Snapshot 的进行中 run（来自 RunRepository 的 durable 队列）。
+
+    C3：刷新恢复凭它重新订阅 /runs/{id}/events，不再读 localStorage 句柄。
+    """
+
+    run_id: str
+    kind: Literal["prewrite", "upload_pipeline"]
+    status: str
+
+
 class SessionInfoResponse(BaseModel):
-    """GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。"""
+    """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
     session_id: str
     exists: bool
@@ -113,6 +135,69 @@ class SessionInfoResponse(BaseModel):
     outline: List[OutlineChapterResponse] = Field(default_factory=list)
     body_chapters: List[ChapterResponse] = Field(default_factory=list)
     research_direction: Any = None
+    dataset: Optional[SnapshotDatasetResponse] = None
+    active_run: Optional[SnapshotActiveRunResponse] = None
+    degradations: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# evidence.py (main-estimate read model, C2)
+# ---------------------------------------------------------------------------
+
+
+class EvidenceIdentificationResponse(BaseModel):
+    """识别验真读数（identification_verify 节点产物）。"""
+
+    star_rating: Optional[int] = None
+    failed: bool = False
+    report: Optional[str] = None
+
+
+class EvidenceRobustnessResponse(BaseModel):
+    """稳健性审计状态（robustness_check 节点产物摘要）。"""
+
+    status: Optional[str] = None
+    ran: bool = False
+
+
+class EvidenceProvenanceResponse(BaseModel):
+    """结论溯源链：spec → estimator → run → dataset → trace/artifacts。
+
+    全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。
+    """
+
+    run_id: Optional[str] = None
+    run_status: Optional[str] = None
+    run_events_url: Optional[str] = None
+    dataset: Optional[SnapshotDatasetResponse] = None
+    trace_events: List[Dict[str, Any]] = Field(default_factory=list)
+    manifest: Optional[Dict[str, Any]] = None
+    artifacts: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class EvidenceResponse(BaseModel):
+    """GET /sessions/{id}/evidence 返回体。
+
+    estimate 缺失时 ``available=false`` + ``blockers``，不报 500：
+    数字先于正文，失败也要显式。
+    """
+
+    session_id: str
+    available: bool = False
+    blockers: List[str] = Field(default_factory=list)
+    estimate: Optional[Dict[str, Any]] = None
+    results: Optional[str] = None
+    claim: Optional[str] = None
+    specification: Optional[Dict[str, Any]] = None
+    identification: EvidenceIdentificationResponse = Field(
+        default_factory=EvidenceIdentificationResponse
+    )
+    robustness: EvidenceRobustnessResponse = Field(
+        default_factory=EvidenceRobustnessResponse
+    )
+    provenance: EvidenceProvenanceResponse = Field(
+        default_factory=EvidenceProvenanceResponse
+    )
 
 
 # ---------------------------------------------------------------------------

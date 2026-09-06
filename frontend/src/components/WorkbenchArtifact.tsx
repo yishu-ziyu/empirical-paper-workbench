@@ -308,6 +308,12 @@ export default function WorkbenchArtifact({
                 space={ws.research.specification_space}
                 onFreeze={ws.handleFreezeSpecSpace}
                 onRun={ws.handleRunSpecSpace}
+                running={ws.activeRun?.kind === 'spec_run'}
+                progress={ws.specRunProgress}
+                failure={ws.specRunFailure}
+                onRetryRun={() => {
+                  void ws.handleRunSpecSpace()
+                }}
               />
             ) : null}
             <p data-testid="direction-summary" className="text-sm text-ink">

@@ -4629,6 +4629,53 @@
         "title": "EvidenceIdentificationResponse",
         "description": "识别验真读数（identification_verify 节点产物）。"
       },
+      "EvidenceMetricRef": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "estimator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimator"
+          },
+          "spec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric"
+        ],
+        "title": "EvidenceMetricRef",
+        "description": "Reference to a quantity produced by a specification run.\n\n``metric`` is an open string (``estimate.coef`` today; future estimands\nlike ``att`` or ``rd_local`` plug in without a schema change). The run to\nread is picked by ``spec_id`` when given, otherwise by ``estimator``\n(matched against a run's estimator/method label)."
+      },
       "EvidenceProvenanceResponse": {
         "properties": {
           "run_id": {
@@ -4818,6 +4865,112 @@
         "title": "EvidenceRobustnessResponse",
         "description": "稳健性审计状态（robustness_check 节点产物摘要）。"
       },
+      "ExpectationCriterion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sign",
+              "ordering",
+              "distance"
+            ],
+            "title": "Kind"
+          },
+          "left": {
+            "$ref": "#/components/schemas/EvidenceMetricRef"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "gt",
+              "lt",
+              "approx",
+              "positive",
+              "negative"
+            ],
+            "title": "Operator"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceMetricRef"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          },
+          "tolerance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpectationCriterionTolerance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "seed",
+              "user"
+            ],
+            "title": "Source",
+            "default": "user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "left",
+          "operator",
+          "label"
+        ],
+        "title": "ExpectationCriterion",
+        "description": "Structured surprise condition. Never re-derived from free text.\n\n``right`` is either another metric reference (ordering/approx) or a\nconstant float. ``source`` records who authored the criterion: the\nteaching-case seed or the user via an explicit control."
+      },
+      "ExpectationCriterionTolerance": {
+        "properties": {
+          "abs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abs"
+          },
+          "rel": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rel"
+          }
+        },
+        "type": "object",
+        "title": "ExpectationCriterionTolerance"
+      },
       "ExpectationHistoryItemResponse": {
         "properties": {
           "version": {
@@ -4928,6 +5081,13 @@
             },
             "type": "array",
             "title": "History"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/ExpectationCriterion"
+            },
+            "type": "array",
+            "title": "Criteria"
           }
         },
         "type": "object",
@@ -4959,6 +5119,20 @@
               }
             ],
             "title": "Locale"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpectationCriterion"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria"
           }
         },
         "type": "object",

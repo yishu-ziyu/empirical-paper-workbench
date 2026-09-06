@@ -5,14 +5,16 @@ project the same public model. LangGraph raw state is not exposed.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from agent.engine.readiness import claim_revision_is_stale
-from schemas.responses import ResearchLabResponse
+from schemas.responses import ExpectationCriterion, ResearchLabResponse
 
 
 CARD_TEACHING_CASE = "card_1995"
@@ -244,6 +246,28 @@ def seed_card_lab(
                 "kind": "seed",
             }
         ],
+        # Structured surprise condition (M1). One seed criterion: the IV
+        # estimate should come out below the OLS estimate. Nothing is ever
+        # re-parsed from the free text above.
+        "criteria": [
+            {
+                "id": "criterion.seed.iv-below-ols",
+                "kind": "ordering",
+                "operator": "lt",
+                "left": {
+                    "metric": "estimate.coef",
+                    "estimator": "iv",
+                    "label": "IV estimate",
+                },
+                "right": {
+                    "metric": "estimate.coef",
+                    "estimator": "ols",
+                    "label": "OLS estimate",
+                },
+                "label": "IV estimate < OLS estimate",
+                "source": "seed",
+            }
+        ],
     }
     definitions = card_specification_definitions(columns)
     return {
@@ -358,12 +382,37 @@ def require_lab(state: dict[str, Any]) -> dict[str, Any]:
     return lab
 
 
+def normalize_criteria(criteria: Any) -> list[dict[str, Any]]:
+    """Validate submitted criteria against the public schema.
+
+    Raises HTTP 422 on a malformed criterion so an invalid explicit edit
+    never silently drops or rewrites the user's condition. Valid criteria
+    are stored exactly as submitted (no default-field inflation).
+    """
+    if criteria is None:
+        return []
+    if not isinstance(criteria, list):
+        raise HTTPException(status_code=422, detail="criteria must be a list")
+    normalized: list[dict[str, Any]] = []
+    for item in criteria:
+        try:
+            ExpectationCriterion.model_validate(item)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=f"invalid criterion: {exc}") from exc
+        if isinstance(item, dict):
+            normalized.append(json.loads(json.dumps(item)))
+        else:
+            normalized.append(json.loads(ExpectationCriterion.model_validate(item).model_dump_json(exclude_none=True)))
+    return normalized
+
+
 def update_expectation(
     lab: dict[str, Any],
     *,
     text: str,
     confidence: str,
     locale: str | None,
+    criteria: Any = None,
 ) -> dict[str, Any]:
     cleaned = text.strip()
     if not cleaned:
@@ -384,6 +433,14 @@ def update_expectation(
             "kind": "edit",
         }
     )
+    # Explicit criteria travel with the PUT and are stored verbatim; a PUT
+    # without them keeps the existing criteria untouched. There is no path
+    # that re-derives criteria from the free text.
+    next_criteria = (
+        normalize_criteria(criteria)
+        if criteria is not None
+        else list(current.get("criteria") or [])
+    )
     lab["expectation"] = {
         **current,
         "text": cleaned,
@@ -392,12 +449,13 @@ def update_expectation(
         "version": version,
         "updated_at": now,
         "history": history,
+        "criteria": next_criteria,
     }
     events = list(lab.get("decision_events") or [])
     events.append(
         _event(
             "expectation_set",
-            {"version": version, "confidence": confidence},
+            {"version": version, "confidence": confidence, "criteria": len(next_criteria)},
         )
     )
     lab["decision_events"] = events
@@ -573,31 +631,117 @@ def _as_float(value: Any) -> Optional[float]:
         return None
 
 
-def _mentions_iv_smaller(text: str) -> bool:
-    folded = text.casefold()
-    return any(
-        token in folded
-        for token in (
-            "iv may be smaller",
-            "iv smaller",
-            "iv 可能比 ols 更小",
-            "iv可能比ols更小",
-        )
+def _criterion_metric_label(ref: dict[str, Any]) -> str:
+    label = ref.get("label")
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    estimator = ref.get("estimator")
+    if isinstance(estimator, str) and estimator.strip():
+        return f"{estimator.strip().upper()} estimate"
+    return str(ref.get("metric") or "metric")
+
+
+def _format_criterion_value(value: float) -> str:
+    text = f"{value:.4f}"
+    return text
+
+
+def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[float]:
+    """Resolve an EvidenceMetricRef against completed specification runs.
+
+    ``estimate.coef`` resolves by ``spec_id`` first (latest completed run),
+    then by matching ``estimator``/``method``. Any other metric is a
+    deliberate extension point (future DiD/RD estimands) and resolves to
+    None until its producer exists — the criterion then stays silent rather
+    than inventing a number.
+    """
+    if not isinstance(ref, dict):
+        return None
+    metric = str(ref.get("metric") or "")
+    if metric != "estimate.coef":
+        return None
+    spec_id = ref.get("spec_id")
+    if isinstance(spec_id, str) and spec_id:
+        for run in reversed(completed):
+            if str(run.get("spec_id") or "") == spec_id:
+                return _as_float(run.get("coef"))
+    estimator = ref.get("estimator")
+    if isinstance(estimator, str) and estimator.strip():
+        wanted = estimator.strip().casefold()
+        for run in reversed(completed):
+            method = str(run.get("method") or "").casefold()
+            run_estimator = str(run.get("estimator") or "").casefold()
+            if wanted in {method, run_estimator}:
+                return _as_float(run.get("coef"))
+    return None
+
+
+def _criterion_violation(
+    criterion: dict[str, Any],
+    completed: list[dict[str, Any]],
+) -> Optional[tuple[str, str]]:
+    """Judge one criterion. Returns (kind, observed) when violated."""
+    operator = str(criterion.get("operator") or "")
+    left_ref = criterion.get("left") if isinstance(criterion.get("left"), dict) else {}
+    left_value = _criterion_ref_value(left_ref, completed)
+    if left_value is None:
+        return None
+    left_label = _criterion_metric_label(left_ref)
+    kind = str(criterion.get("kind") or "")
+    right = criterion.get("right")
+
+    if kind == "sign":
+        if operator == "positive" and left_value < 0:
+            return "direction_mismatch", f"{left_label} {_format_criterion_value(left_value)} is not positive"
+        if operator == "negative" and left_value > 0:
+            return "direction_mismatch", f"{left_label} {_format_criterion_value(left_value)} is not negative"
+        return None
+
+    right_value = (
+        right if isinstance(right, (int, float)) and not isinstance(right, bool)
+        else _criterion_ref_value(right if isinstance(right, dict) else {}, completed)
+    )
+    if right_value is None:
+        return None
+    right_label = (
+        _criterion_metric_label(right)
+        if isinstance(right, dict)
+        else f"constant {right_value:g}"
     )
 
+    if kind == "ordering":
+        if operator == "lt" and left_value > right_value:
+            return "ordering_mismatch", (
+                f"{left_label} {_format_criterion_value(left_value)} > "
+                f"{right_label} {_format_criterion_value(right_value)}"
+            )
+        if operator == "gt" and left_value < right_value:
+            return "ordering_mismatch", (
+                f"{left_label} {_format_criterion_value(left_value)} < "
+                f"{right_label} {_format_criterion_value(right_value)}"
+            )
+        return None
 
-def _mentions_iv_larger(text: str) -> bool:
-    folded = text.casefold()
-    return "iv may be larger" in folded or "iv larger" in folded
+    if kind == "distance":
+        tolerance = criterion.get("tolerance") if isinstance(criterion.get("tolerance"), dict) else {}
+        abs_tol = _as_float(tolerance.get("abs"))
+        rel_tol = _as_float(tolerance.get("rel"))
+        if abs_tol is None and rel_tol is None:
+            rel_tol = 0.25
+        allowed = abs_tol if abs_tol is not None else 0.0
+        if rel_tol is not None:
+            scale = max(abs(left_value), abs(right_value), 1e-12)
+            allowed = max(allowed, rel_tol * scale)
+        diff = abs(left_value - right_value)
+        if diff > allowed:
+            return "magnitude", (
+                f"{left_label} {_format_criterion_value(left_value)} vs "
+                f"{right_label} {_format_criterion_value(right_value)} "
+                f"(difference {_format_criterion_value(diff)} exceeds ±{_format_criterion_value(allowed)})"
+            )
+        return None
 
-
-def _mentions_similar(text: str) -> bool:
-    folded = text.casefold()
-    return any(token in folded for token in ("similar", "roughly the same", "大致相当"))
-
-
-def _mentions_positive(text: str) -> bool:
-    return "positive" in text.casefold() or "为正" in text
+    return None
 
 
 def evaluate_surprise(
@@ -607,7 +751,11 @@ def evaluate_surprise(
     ols_spec_id: str,
     iv_spec_id: str,
 ) -> Optional[dict[str, Any]]:
-    """Deterministic surprise. LLM must not generate this object."""
+    """Deterministic surprise, judged only from structured criteria.
+
+    LLM must not generate this object. The free expectation text is carried
+    through verbatim as context; it never feeds the judgment.
+    """
     completed = [
         run
         for run in runs
@@ -615,45 +763,31 @@ def evaluate_surprise(
     ]
     if not completed:
         return None
-    by_spec: dict[str, dict[str, Any]] = {}
-    for run in completed:
-        spec_id = run.get("spec_id")
-        if spec_id and spec_id not in by_spec:
-            by_spec[str(spec_id)] = run
-    ols = by_spec.get(ols_spec_id)
-    iv = by_spec.get(iv_spec_id)
     text = str((expectation or {}).get("text") or "")
+    criteria = [
+        item
+        for item in (expectation or {}).get("criteria") or []
+        if isinstance(item, dict) and item.get("id")
+    ]
+    if not criteria:
+        return {
+            "status": "Expected",
+            "kind": None,
+            "kinds": [],
+            "expected": text or None,
+            "observed": None,
+        }
     kinds: list[str] = []
     expected_bits: list[str] = []
     observed_bits: list[str] = []
-    ols_coef = _as_float((ols or {}).get("coef")) if ols else None
-    iv_coef = _as_float((iv or {}).get("coef")) if iv else None
-
-    if _mentions_positive(text) and ols_coef is not None and ols_coef < 0:
-        kinds.append("direction_mismatch")
-        expected_bits.append("OLS positive")
-        observed_bits.append("OLS negative")
-    if _mentions_positive(text) and iv_coef is not None and iv_coef < 0:
-        kinds.append("direction_mismatch")
-        expected_bits.append("positive return")
-        observed_bits.append("IV negative")
-
-    if ols_coef is not None and iv_coef is not None:
-        relative = abs(iv_coef - ols_coef) / max(abs(ols_coef), 1e-6)
-        ordered = relative > 0.05
-        if ordered and _mentions_iv_smaller(text) and iv_coef > ols_coef:
-            kinds.append("ordering_mismatch")
-            expected_bits.append("IV may be smaller than OLS")
-            observed_bits.append("IV > OLS")
-        elif ordered and _mentions_iv_larger(text) and iv_coef < ols_coef:
-            kinds.append("ordering_mismatch")
-            expected_bits.append("IV may be larger than OLS")
-            observed_bits.append("IV < OLS")
-        if _mentions_similar(text) and relative > 0.25:
-            kinds.append("magnitude")
-            expected_bits.append("OLS and IV similar")
-            observed_bits.append("relative difference > 0.25")
-
+    for criterion in criteria:
+        violation = _criterion_violation(criterion, completed)
+        if violation is None:
+            continue
+        kind, observed = violation
+        kinds.append(kind)
+        expected_bits.append(str(criterion.get("label") or criterion.get("id")))
+        observed_bits.append(observed)
     if not kinds:
         return {
             "status": "Expected",

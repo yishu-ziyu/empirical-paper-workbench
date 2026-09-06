@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import EdaSidebar from './components/EdaSidebar'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import ThreeColumn from './components/ThreeColumn'
 import LoginPage from './pages/LoginPage'
@@ -7,28 +6,33 @@ import RegisterPage from './pages/RegisterPage'
 import DeskPage from './pages/DeskPage'
 import AgentSpikePage from './pages/AgentSpikePage'
 import GuidePage from './pages/GuidePage'
-import { BrandMark, LangPills } from './components/UnauthHeader'
-import { CsvDropZone } from './components/CsvDropZone'
-import DirectionForm from './components/DirectionForm'
-import InstrumentReadout from './components/InstrumentReadout'
-import WriteLoop from './components/WriteLoop'
-import ChapterWriter from './components/ChapterWriter'
-import ChapterList from './components/ChapterList'
+import { LangPills } from './components/UnauthHeader'
 import DocExportDialog from './components/DocExportDialog'
 import CodeExportDialog from './components/CodeExportDialog'
 import ReviewGateDialog from './components/ReviewGateDialog'
-import StepTimeline from './components/StepTimeline'
-import WorkspaceDecisionRail, {
-  type WorkspaceDecision,
-  type WorkspaceSuggestion,
-} from './components/WorkspaceDecisionRail'
-import SubmissionStatus from './components/SubmissionStatus'
+import WorkbenchSidebar, {
+  type WorkbenchViewId,
+  type SidebarItem,
+} from './components/WorkbenchSidebar'
+import AgentRail from './components/AgentRail'
+import type { WorkspaceDecision, WorkspaceSuggestion } from './components/WorkspaceDecisionRail'
 import ReadingFocus from './components/ReadingFocus'
-import ResearchComputer from './components/ResearchComputer'
 import type { ResizableWorkspaceHandle } from './components/ResizableWorkspace'
 import { useT } from './lib/i18n'
 import { DEV_AUTH_BYPASS, useSession } from './lib/session'
-import { useWorkspace, toDirectionInitial } from './lib/workspace'
+import { useWorkspace } from './lib/workspace'
+import { formatStatValue } from './lib/readoutTable'
+import WorkbenchArtifact from './components/WorkbenchArtifact'
+
+const VIEW_LABEL: Record<WorkbenchViewId, string> = {
+  overview: 'Overview',
+  question: 'Research Question',
+  data: 'Data',
+  design: 'Design · Specification',
+  evidence: 'Evidence',
+  literature: 'Literature',
+  paper: 'Paper',
+}
 
 function App() {
   const { t } = useT()
@@ -37,43 +41,48 @@ function App() {
 
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
   const workspaceRef = useRef<ResizableWorkspaceHandle>(null)
-  const evidenceRef = useRef<HTMLDetailsElement>(null)
-  const [evidenceOpen, setEvidenceOpen] = useState(false)
 
   const spikeRoute =
     window.location.pathname === '/spike' ||
     new URLSearchParams(window.location.search).get('spike') === '1'
 
   const openDirection = () => {
-    ws.setWorkbenchTab('paper')
+    ws.setWorkbenchTab('question')
     ws.setDirectionOpen(true)
   }
-
   const openEvidence = () => {
-    ws.setWorkbenchTab('paper')
-    setEvidenceOpen(true)
+    ws.setWorkbenchTab('evidence')
     workspaceRef.current?.expandRight()
   }
 
+  // 方向一确认，中栏回到论文工作区（写作流）；刷新恢复的落地在
+  // workspace.ts 里决定（有研究内容时直接落 Overview）。
   useEffect(() => {
-    if (!evidenceOpen) return
-    const frame = window.requestAnimationFrame(() => {
-      evidenceRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [evidenceOpen])
+    if (ws.directionSummary && ws.workbenchTab === 'question') {
+      ws.setWorkbenchTab('paper')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.directionSummary])
 
   const pendingChapter = ws.writtenChapters.find(
     (chapter) => Boolean(chapter.content) && chapter.status !== 'approved',
   )
 
   // 只选择一件最先需要作者处理的事，其他提示留在可展开建议中。
+  // 输入全部来自 snapshot 投影字段（C6），这里只做 presentation 推导。
   let blockingDecision: WorkspaceDecision | null = null
   if (ws.identFailed) {
     blockingDecision = {
       title: '研究设计需要重开',
       reason: ws.identReport || '识别未通过，先改研究设计再写正文。',
       actionLabel: '修改研究设计',
+      onAction: openDirection,
+    }
+  } else if (ws.runFailure) {
+    blockingDecision = {
+      title: '上一次运行失败',
+      reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
+      actionLabel: '重新运行',
       onAction: openDirection,
     }
   } else if (ws.writeBlockers.length > 0) {
@@ -131,45 +140,12 @@ function App() {
     !ws.identFailed &&
       (ws.estimateMeta?.status === 'ok' || ws.treatmentRow || ws.mainResults),
   )
-  const submissionBlockers = Array.from(
-    new Set(
-      [
-        !sessionId ? '尚未建立研究会话' : null,
-        !ws.directionSummary ? '研究方向尚未提交' : null,
-        ws.directionOpen ? '研究方向仍在修改' : null,
-        ws.directionBusy ? '研究方向仍在运行' : null,
-        !hasSuccessfulEstimate ? '尚未形成可用主结果' : null,
-        ws.identFailed ? '识别诊断未通过，需要重开研究设计' : null,
-        ws.outline.length === 0 ? '论文大纲尚未形成' : null,
-        ws.outline.length > 0 && !ws.outlineLocked ? '论文大纲尚未确认' : null,
-        ws.writeBusy ? '章节仍在生成' : null,
-        !ws.canExport ? '尚未写出可提交的章节' : null,
-        incompleteChapterCount > 0
-          ? `还有 ${incompleteChapterCount} 个章节尚未形成正文`
-          : null,
-        pendingApprovalCount > 0 ? `还有 ${pendingApprovalCount} 个章节待你确认` : null,
-        ...ws.writeBlockers,
-      ].filter((item): item is string => Boolean(item)),
-    ),
-  )
-  const submissionReady = ws.canExport && submissionBlockers.length === 0
-  const submissionPassed = [
-    sessionId ? '研究会话已建立' : null,
-    ws.directionSummary ? '研究方向已提交' : null,
-    ws.directionSummary && !ws.directionOpen && !ws.directionBusy ? '研究方向已确认' : null,
-    hasSuccessfulEstimate ? '可用主结果已记录' : null,
-    ws.outline.length > 0 ? '论文大纲已形成' : null,
-    ws.outline.length > 0 && ws.outlineLocked ? '论文大纲已确认' : null,
-    ws.canExport && incompleteChapterCount === 0 ? '所有大纲章节已有正文' : null,
-    ws.canExport && pendingApprovalCount === 0 ? '所有章节已确认' : null,
-  ].filter((item): item is string => Boolean(item))
-
   const decisionSuggestions: WorkspaceSuggestion[] = []
   if (ws.hasReadout) {
     decisionSuggestions.push({
       title: '查看证据解释',
       detail: '识别说明、稳健性和运行摘要不会打断论文正文。',
-      actionLabel: '打开 Research Computer',
+      actionLabel: '打开 Evidence',
       onAction: openEvidence,
     })
   }
@@ -323,542 +299,327 @@ function App() {
     )
   }
 
+  const projectName =
+    ws.directionSummary ||
+    ws.shapedQuestion ||
+    ws.csvName ||
+    t('app.hint')
+
+  const sidebarItems: SidebarItem[] = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      hint: ws.directionSummary
+        ? '研究进行中'
+        : sessionId
+          ? '统计与进度'
+          : '从上传数据开始',
+      status: 'pending',
+    },
+    {
+      id: 'question',
+      label: 'Research Question',
+      hint: ws.directionSummary ? '已确认' : '待确认方向',
+      status: ws.directionSummary
+        ? ws.directionOpen
+          ? 'active'
+          : 'done'
+        : 'pending',
+    },
+    {
+      id: 'data',
+      label: 'Data',
+      hint: ws.csvName
+        ? `${ws.csvName}${ws.csvRows != null ? ` · ${ws.csvRows} 行` : ''}`
+        : '未上传',
+      status:
+        ws.uploadReadiness === 'FAILED' || ws.uploadReadiness === 'CANCELLED'
+          ? 'blocked'
+          : ws.csvName
+            ? 'done'
+            : ws.uploading
+              ? 'active'
+              : 'pending',
+    },
+    {
+      id: 'design',
+      label: 'Design · Specification',
+      hint: ws.directionSummary ? ws.directionRecord?.method || '已设定' : '待方向',
+      status: ws.identFailed ? 'blocked' : ws.directionSummary ? 'done' : 'pending',
+    },
+    {
+      id: 'evidence',
+      label: 'Evidence',
+      hint: hasSuccessfulEstimate
+        ? `β ${formatStatValue(ws.estimateMeta?.coef, 'coef')}`
+        : ws.directionBusy
+          ? '估计中'
+          : '暂无主结果',
+      status: hasSuccessfulEstimate ? 'done' : ws.directionBusy ? 'active' : 'pending',
+    },
+    {
+      id: 'literature',
+      label: 'Literature',
+      hint: ws.literatureSource ? `来源：${ws.literatureSource}` : '未检索',
+      status: ws.literatureSource ? 'done' : 'pending',
+    },
+    {
+      id: 'paper',
+      label: 'Paper',
+      hint:
+        ws.outline.length > 0
+          ? `${writtenTypes.size}/${ws.outline.length} 章有正文`
+          : '待大纲',
+      status:
+        ws.canExport && incompleteChapterCount === 0 && pendingApprovalCount === 0
+          ? 'done'
+          : ws.writeBusy
+            ? 'active'
+            : ws.outline.length > 0
+              ? 'active'
+              : 'pending',
+    },
+  ]
+
+  const selectView = (id: WorkbenchViewId) => {
+    ws.setWorkbenchTab(id)
+    if (id === 'data' && sessionId) ws.setEdaOpen(true)
+  }
+
+  const headerSubtitle = ws.directionSummary
+    ? ws.directionSummary
+    : sessionId
+      ? '尚未设定研究方向；先在 Research Question 提交方向。'
+      : '上传数据后开始研究。'
+
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-x-auto overflow-y-hidden bg-bg text-ink font-sans selection:bg-accent/20">
+    <div
+      data-testid="workbench-shell"
+      className="flex h-screen min-h-0 flex-col overflow-hidden bg-wb-canvas font-sans text-wb-ink selection:bg-wb-primary/20"
+    >
       {uploadLiveRegion}
+      {firstScreenInput}
       {ws.globalError && (
         <div
           data-testid="global-error-toast"
-          className="fixed right-4 top-4 z-50 animate-slide-up rounded border border-danger/30 bg-panel px-4 py-2 text-sm text-danger"
+          className="fixed right-4 top-4 z-50 animate-slide-up rounded-md border border-wb-danger/30 bg-wb-surface px-4 py-2 text-sm text-wb-danger shadow-sm"
         >
           ⚠ {ws.globalError}
         </div>
       )}
-      <header className="grid h-[56px] shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border bg-cream px-5">
-        <div className="flex items-center gap-3">
-          <BrandMark />
-        </div>
-        <div className="flex items-center rounded-lg bg-bg p-0.5">
-          {([
-            ['paper', t('workbench.tabPaper')],
-            ['data', t('workbench.tabData')],
-            ['format', t('workbench.tabFormat')],
-          ] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              data-testid={`workbench-tab-${id}`}
-              onClick={() => {
-                ws.setWorkbenchTab(id)
-                if (id === 'data' && sessionId) ws.setEdaOpen(true)
-              }}
-              className={`rounded-md px-3.5 py-1.5 text-[13px] transition-colors duration-200 ${
-                ws.workbenchTab === id
-                  ? 'bg-accent text-white'
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center justify-end gap-2.5">
-          {sessionId ? (
-            <span data-testid="session-ready" hidden />
-          ) : (
-            <span className="text-xs text-muted font-mono">{t('app.hint')}</span>
-          )}
-          <input
-            ref={ws.fileInputRef}
-            type="file"
-            accept=".csv,.dta,.xlsx,.xls"
-            data-testid="file-input"
-            onChange={ws.handleFileSelect}
-            className="hidden"
-          />
-          <button
-            data-testid="upload-btn"
-            onClick={() => ws.fileInputRef.current?.click()}
-            disabled={ws.uploading}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors duration-200 hover:bg-accent/90 disabled:opacity-50"
-          >
-            {ws.uploading && (
-              <svg
-                className="h-3 w-3 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  strokeDasharray="31.4 31.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
-            {ws.uploading ? t('app.uploading') : t('app.upload')}
-          </button>
-          <button
-            data-testid="export-doc-btn"
-            onClick={() => ws.setDocExportOpen(true)}
-            disabled={!ws.canExport}
-            className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:opacity-40"
-          >
-            {t('app.exportDoc')}
-          </button>
-          <button
-            data-testid="export-code-btn"
-            onClick={() => ws.setCodeExportOpen(true)}
-            disabled={!ws.canExport}
-            className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:opacity-40"
-          >
-            {t('app.exportCode')}
-          </button>
-          {ws.uploadError && (
-            <span
-              data-testid="upload-error"
-              className="rounded bg-panel px-2 py-0.5 text-xs text-danger"
-            >
-              {ws.uploadError}
-            </span>
-          )}
-          {ws.uploadNeedsReselect && sessionId ? (
-            <button
-              type="button"
-              data-testid="upload-reselect-btn"
-              onClick={() => ws.fileInputRef.current?.click()}
-              className="rounded border border-border px-2 py-1 text-xs text-accent transition-colors hover:bg-panel"
-            >
-              {t('app.uploadReselect')}
-            </button>
-          ) : null}
-          {!sessionId && (
-            <button
-              type="button"
-              data-testid="open-guide-btn"
-              onClick={() => ws.openGuide()}
-              className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
-            >
-              {t('guide.nowAgain')}
-            </button>
-          )}
-          {!DEV_AUTH_BYPASS &&
-            (authed ? (
-              <button
-                onClick={ws.handleLogout}
-                className="rounded border border-border px-2 py-1 text-xs text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
-              >
-                {t('app.logout')}
-              </button>
-            ) : (
-              <button
-                data-testid="open-login-btn"
-                onClick={() => setAuthPage('login')}
-                className="text-xs text-muted transition-colors duration-200 hover:text-ink"
-              >
-                {t('app.login')}
-              </button>
-            ))}
-          <LangPills />
-        </div>
-      </header>
 
       <ThreeColumn
         ref={workspaceRef}
         outline={
           <ErrorBoundary>
-            <WorkspaceDecisionRail
-              decision={blockingDecision}
-              waiting={waitingMessage}
-              suggestions={decisionSuggestions}
+            <WorkbenchSidebar
+              items={sidebarItems}
+              activeId={ws.workbenchTab}
+              onSelect={selectView}
             >
-              <section data-testid="paper-navigation" className="border-t border-border pt-4">
-                <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-                  {t('bench.chapters')}
-                </h2>
-                {ws.outline.length > 0 && !ws.identFailed ? (
-                  <div data-testid="chapter-write-dock">
-                    <p className="mb-2 text-xs leading-6 text-muted">{t('bench.pickChapter')}</p>
-                    <ChapterList
-                      body_chapters={ws.railItems}
-                      currentIndex={ws.currentChapterIndex}
-                      onSelectChapter={ws.handleSelectChapter}
-                    />
-                    {ws.outline.map((ch) => (
-                      <button
-                        key={ch.type}
-                        type="button"
-                        data-testid={`write-chapter-${ch.type}`}
-                        className="sr-only"
-                        disabled={ws.writeBusy}
-                        aria-label={`${t('bench.writeChapter')} ${ch.type}`}
-                        onClick={() => {
-                          const idx = ws.outline.findIndex((item) => item.type === ch.type)
-                          ws.handleSelectChapter(idx)
-                        }}
-                      />
-                    ))}
-                  </div>
+              <div className="px-4 pb-3 pt-2">
+                {sessionId ? (
+                  <span data-testid="session-ready" hidden />
                 ) : (
-                  <p className="text-xs leading-6 text-muted">{t('bench.noChapters')}</p>
+                  <button
+                    type="button"
+                    data-testid="open-guide-btn"
+                    onClick={() => ws.openGuide()}
+                    className="text-xs text-wb-muted transition-colors hover:text-wb-ink"
+                  >
+                    {t('guide.nowAgain')}
+                  </button>
                 )}
-                <div className="mt-6 border-t border-border pt-4">
-                  {sessionId ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        ws.setWorkbenchTab('data')
-                        ws.setEdaOpen(true)
-                      }}
-                      className="text-sm text-accent transition-colors duration-200 hover:text-accent/80"
-                    >
-                      {t('bench.openData')}
-                    </button>
-                  ) : (
-                    <p className="text-xs text-muted">{t('app.uploadToExplore')}</p>
-                  )}
-                </div>
-              </section>
-            </WorkspaceDecisionRail>
+              </div>
+            </WorkbenchSidebar>
           </ErrorBoundary>
         }
         editor={
           <ErrorBoundary>
-            <div
-              data-testid="paper-surface"
-              aria-label="持续形成的论文"
-              className="mx-auto max-w-[46rem] px-6 py-10 sm:px-10"
+            {/* 主区顶部：面包屑 + 项目标题 + 动作区（契约 C1） */}
+            <header
+              data-testid="workbench-header"
+              className="sticky top-0 z-10 border-b border-wb-line bg-wb-canvas/90 px-6 pb-3 pt-3 backdrop-blur-sm"
             >
-              <SubmissionStatus
-                canExport={submissionReady}
-                blockers={submissionBlockers}
-                passed={submissionPassed}
-                onGenerate={() => ws.setDocExportOpen(true)}
-              />
-              {ws.workbenchTab === 'data' && (
-                <section className="mb-6">
-                  <h2 className="mb-4 font-serif text-[1.35rem] text-ink">
-                    {t('workbench.dataTitle')}
-                  </h2>
-                  <CsvDropZone
-                    uploading={ws.uploading}
-                    onBrowse={() => ws.fileInputRef.current?.click()}
-                    onFile={(file) => {
-                      void ws.takeCsv(file)
-                    }}
-                  />
-                  {sessionId && ws.edaOpen ? (
-                    <div className="mt-4">
-                      <EdaSidebar
-                        sessionId={sessionId}
-                        onClose={() => ws.setEdaOpen(false)}
-                      />
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-muted">{t('workbench.dataEmpty')}</p>
+              <div className="flex min-h-[26px] flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <nav
+                  data-testid="workbench-breadcrumb"
+                  aria-label="面包屑"
+                  className="flex min-w-0 items-center gap-1.5 text-[12px] text-wb-muted"
+                >
+                  <span>项目</span>
+                  <span aria-hidden className="text-wb-faint">›</span>
+                  <span
+                    data-testid="project-name"
+                    className="max-w-[36ch] truncate"
+                    title={projectName}
+                  >
+                    {projectName}
+                  </span>
+                  <span aria-hidden className="text-wb-faint">›</span>
+                  <span data-testid="breadcrumb-current" className="text-wb-ink">
+                    {VIEW_LABEL[ws.workbenchTab]}
+                  </span>
+                </nav>
+                <div className="flex items-center gap-2.5">
+                  {ws.csvName && !ws.uploadNeedsReselect ? null : (
+                    <button
+                      data-testid="upload-btn"
+                      onClick={() => ws.fileInputRef.current?.click()}
+                      disabled={ws.uploading}
+                      className="wb-press inline-flex items-center gap-1.5 rounded-md border border-wb-line-strong bg-wb-surface px-2.5 py-1 text-[12px] font-medium text-wb-ink hover:bg-wb-subtle disabled:opacity-50"
+                    >
+                      {ws.uploading ? t('app.uploading') : t('app.upload')}
+                    </button>
                   )}
-                </section>
-              )}
-              {ws.workbenchTab === 'format' && (
-                <section
-                  data-testid="format-pane"
-                  className="mb-8 rounded-lg border border-border bg-panel p-6"
-                >
-                  <h2 className="font-serif text-lg text-ink">{t('workbench.formatTitle')}</h2>
-                  <p className="mt-2 text-sm leading-6 text-muted">
-                    {t('workbench.formatBody')}
-                  </p>
-                  <div className="mt-5 flex flex-wrap gap-2">
+                  {ws.uploadError && (
+                    <span
+                      data-testid="upload-error"
+                      className="rounded bg-wb-danger-soft px-2 py-0.5 text-xs text-wb-danger"
+                    >
+                      {ws.uploadError}
+                    </span>
+                  )}
+                  {ws.uploadNeedsReselect && sessionId ? (
                     <button
                       type="button"
-                      data-testid="format-export-doc-btn"
-                      onClick={() => ws.setDocExportOpen(true)}
-                      title={!sessionId || !ws.canExport ? t('app.exportLockedHint') : undefined}
-                      disabled={!sessionId || !ws.canExport}
-                      className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
+                      data-testid="upload-reselect-btn"
+                      onClick={() => ws.fileInputRef.current?.click()}
+                      className="rounded-md border border-wb-line px-2 py-1 text-xs text-wb-primary transition-colors hover:bg-wb-surface"
                     >
-                      {t('app.exportDoc')}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="format-export-code-btn"
-                      onClick={() => ws.setCodeExportOpen(true)}
-                      title={!sessionId || !ws.canExport ? t('app.exportLockedHint') : undefined}
-                      disabled={!sessionId || !ws.canExport}
-                      className="rounded border border-border px-3 py-1.5 text-xs text-ink transition-colors duration-200 hover:bg-cream disabled:opacity-40"
-                    >
-                      {t('app.exportCode')}
-                    </button>
-                  </div>
-                </section>
-              )}
-              {ws.degraded && (
-                <div
-                  data-testid="degradation-banner"
-                  className="mb-2 animate-slide-up rounded border border-warning/30 bg-panel px-3 py-1.5 text-xs text-warning"
-                >
-                  {t('app.degradedBanner')}
-                </div>
-              )}
-              {!ws.hasReadout && (
-                <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
-                  {t('guide.nowDirection')}
-                </p>
-              )}
-              {ws.hasReadout && !ws.writtenChapter?.content && !ws.writeBusy && (
-                <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
-                  {t('guide.nowWrite')}
-                </p>
-              )}
-              {ws.hasReadout && Boolean(ws.writtenChapter?.content) &&
-                (() => {
-                  const pending = ws.outline.find((ch) => !writtenTypes.has(ch.type))
-                  if (pending) {
-                    return (
-                      <p
-                        data-testid="now-hint"
-                        className="mb-6 font-serif text-[15px] leading-7 text-ink"
-                      >
-                        {t('guide.nowProgress')
-                          .replace('{done}', String(writtenTypes.size))
-                          .replace('{total}', String(ws.outline.length))
-                          .replace('{title}', pending.title)}
-                      </p>
-                    )
-                  }
-                  return (
-                    <p
-                      data-testid="now-hint"
-                      className="mb-6 font-serif text-[15px] leading-7 text-ink"
-                    >
-                      {t('guide.nowExport')}
-                    </p>
-                  )
-                })()}
-              <StepTimeline
-                sessionId={sessionId}
-                directionSummary={ws.directionSummary}
-                cleaningReport={ws.cleaningReport}
-                estimate={ws.estimateMeta}
-                estimateBusy={ws.directionBusy}
-                hasReadout={ws.hasReadout}
-                identFailed={ws.identFailed}
-                outline={ws.outline}
-                currentChapterIndex={ws.currentChapterIndex}
-                writtenChapters={ws.writtenChapters}
-                writeBusy={ws.writeBusy}
-              />
-              <WriteLoop
-                fileName={ws.csvName}
-                rows={ws.csvRows}
-                cols={ws.csvCols ?? (ws.dataColumns.length || null)}
-                direction={ws.directionRecord}
-                outline={ws.outline}
-                outlineLocked={ws.outlineLocked}
-                hasDirection={Boolean(ws.directionSummary)}
-                hasOutline={ws.outline.length > 0 && !ws.identFailed}
-                hasChapter={Boolean(ws.writtenChapter?.content)}
-                isResultsPart={ws.outline[ws.currentChapterIndex]?.type === 'results'}
-                partIndex={ws.currentChapterIndex + 1}
-                writeBusy={ws.writeBusy}
-                onAddMore={() => ws.setDirectionOpen(true)}
-                onGoPart1={() => ws.setWorkbenchTab('paper')}
-                onApplyGenerate={ws.handleApplyGenerate}
-                onReviseOutline={() => ws.setDirectionOpen(true)}
-                onApproveOutline={ws.handleApproveOutline}
-                onRefine={ws.handleRefine}
-              />
-              <section
-                data-testid="direction-section"
-                className="mb-8 rounded-lg border border-border bg-panel p-6"
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="font-serif text-[1.15rem] text-ink">
-                    {t('app.directionTitle')}
-                  </h2>
-                  {!ws.directionOpen && ws.directionSummary ? (
-                    <button
-                      type="button"
-                      data-testid="edit-direction-btn"
-                      onClick={() => ws.setDirectionOpen(true)}
-                      disabled={Boolean(ws.directionDisabledReason)}
-                      title={ws.directionDisabledReason || undefined}
-                      className="text-xs text-accent"
-                    >
-                      {t('bench.editDirection')}
+                      {t('app.uploadReselect')}
                     </button>
                   ) : null}
+                  {!DEV_AUTH_BYPASS &&
+                    (authed ? (
+                      <button
+                        onClick={ws.handleLogout}
+                        className="rounded-md px-1.5 py-1 text-xs text-wb-muted transition-colors duration-150 hover:text-wb-ink"
+                      >
+                        {t('app.logout')}
+                      </button>
+                    ) : (
+                      <button
+                        data-testid="open-login-btn"
+                        onClick={() => setAuthPage('login')}
+                        className="rounded-md px-1.5 py-1 text-xs text-wb-muted transition-colors duration-150 hover:text-wb-ink"
+                      >
+                        {t('app.login')}
+                      </button>
+                    ))}
+                  <LangPills />
                 </div>
-                {ws.directionOpen ? (
-                  <DirectionForm
-                    onSubmit={ws.handleDirectionSubmit}
-                    initialQuestion={ws.shapedQuestion}
-                    initial={
-                      toDirectionInitial(ws.directionRecord) ??
-                      ws.sampleDirection ??
-                      (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
-                    }
-                    columns={ws.dataColumns}
-                    disabled={Boolean(ws.directionDisabledReason)}
-                    disabledReason={ws.directionDisabledReason}
-                  />
-                ) : (
-                  <p data-testid="direction-summary" className="text-sm text-ink">
-                    {ws.directionSummary || t('bench.directionSettled')}
-                  </p>
-                )}
-                {ws.directionBusy && (
-                  <p role="status" aria-live="polite" className="mt-2 text-xs text-muted">
-                    {t('app.directionWorking')}
-                  </p>
-                )}
-              </section>
-              {ws.hasReadout && (
-                <InstrumentReadout
-                  claim={ws.claim}
-                  starRating={ws.starRating}
-                  treatmentRow={ws.treatmentRow}
-                  results={ws.mainResults}
-                  literatureSource={ws.literatureSource}
-                  robustnessStatus={ws.robustnessStatus}
-                  writeBlockers={ws.writeBlockers}
-                  identificationFailed={ws.identFailed}
-                  question={ws.shapedQuestion || null}
-                />
-              )}
-              {ws.hasReadout && (
-                <section data-testid="evidence-entry" className="mb-6 rounded-lg border border-border bg-panel px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">结论入口</p>
-                      <p data-testid="evidence-conclusion" className="mt-1 text-sm leading-6 text-ink">
-                        {ws.identFailed
-                          ? '识别未通过，当前不能把结果读成可靠结论。'
-                          : ws.claim
-                            ? `当前主张：${ws.claim}`
-                            : '主结果已记录。'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      data-testid="evidence-why"
-                      onClick={openEvidence}
-                      className="rounded-full border border-border px-3 py-1.5 text-xs text-ink transition-colors hover:bg-cream"
-                    >
-                      为什么？看证据
-                    </button>
-                  </div>
-                </section>
-              )}
-              {ws.identReport && (
-                <details className="mb-4 rounded border border-border bg-paper px-3 py-2">
-                  <summary className="cursor-pointer font-mono text-xs text-muted">
-                    识别说明
-                  </summary>
-                  <pre
-                    data-testid="ident-report"
-                    className="mt-2 whitespace-pre-wrap text-xs"
+              </div>
+              <div className="mt-1 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0">
+                  <h1
+                    data-testid="workbench-title"
+                    className="max-w-[52ch] truncate font-serif text-[21px] font-semibold leading-tight tracking-[-0.01em] text-wb-ink"
+                    title={ws.shapedQuestion || projectName}
                   >
-                    {ws.identReport}
-                  </pre>
-                </details>
-              )}
-              {ws.writeBusy ? (
-                <p
-                  data-testid="chapter-writing"
-                  className="font-serif text-sm leading-7 text-muted"
-                >
-                  {t('bench.writing').replace(
-                    '{title}',
-                    ws.outline.find((ch) => ch.type === ws.writingType)?.title ||
-                      ws.writingType ||
-                      '',
-                  )}
-                </p>
-              ) : ws.writtenChapter?.content ? (
-                <div className="mb-6">
-                  <ChapterWriter
-                    key={`${ws.writtenChapter.type}:${ws.writtenChapter.chapter_index ?? ws.currentChapterIndex}`}
-                    chapter={ws.writtenChapter}
-                    sessionId={sessionId ?? undefined}
-                    chapterIndex={
-                      ws.writtenChapter.chapter_index ?? ws.currentChapterIndex
-                    }
-                    versions={ws.writtenChapter.versions}
-                    onApprove={ws.handleApprove}
-                    onSaveEdit={ws.handleSaveEdit}
-                  />
+                    {ws.shapedQuestion || projectName}
+                  </h1>
+                  <p
+                    data-testid="workbench-subtitle"
+                    className="mt-0.5 max-w-[68ch] truncate font-mono text-[12px] text-wb-muted"
+                  >
+                    {headerSubtitle}
+                  </p>
                 </div>
-              ) : (
-                <p className="font-serif text-[15px] leading-[1.8] text-muted">
-                  {t('bench.paperEmpty')}
-                </p>
-              )}
-            </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="run-btn"
+                    onClick={openDirection}
+                    className="wb-press inline-flex items-center gap-1.5 rounded-md bg-wb-primary px-3.5 py-1.5 text-[12.5px] font-medium text-white transition-colors duration-150 hover:bg-wb-primary-strong"
+                  >
+                    {ws.directionBusy ? t('app.directionWorking') : 'Run'}
+                  </button>
+                  <button
+                    data-testid="export-doc-btn"
+                    onClick={() => ws.setDocExportOpen(true)}
+                    disabled={!ws.canExport}
+                    className="wb-press rounded-md border border-wb-line-strong bg-wb-surface px-2.5 py-1.5 text-[12px] text-wb-ink transition-colors duration-150 hover:bg-wb-subtle disabled:opacity-40"
+                  >
+                    {t('app.exportDoc')}
+                  </button>
+                  <button
+                    data-testid="export-code-btn"
+                    onClick={() => ws.setCodeExportOpen(true)}
+                    disabled={!ws.canExport}
+                    className="wb-press rounded-md border border-wb-line-strong bg-wb-surface px-2.5 py-1.5 text-[12px] text-wb-ink transition-colors duration-150 hover:bg-wb-subtle disabled:opacity-40"
+                  >
+                    {t('app.exportCode')}
+                  </button>
+                </div>
+              </div>
+            </header>
+            <WorkbenchArtifact
+              ws={ws}
+              sessionId={sessionId}
+              hasSuccessfulEstimate={hasSuccessfulEstimate}
+              onOpenDirection={openDirection}
+              onOpenEvidence={openEvidence}
+              onSelectView={selectView}
+              onOpenCode={() => ws.setCodeExportOpen(true)}
+            />
           </ErrorBoundary>
         }
         agent={
           <ErrorBoundary>
-            <ResearchComputer
-              paperPath={{
-                uploading: ws.uploading,
-                hasSession: Boolean(sessionId),
-                hasDirection: Boolean(ws.directionSummary),
-                directionOpen: ws.directionOpen,
-                hasReadout: ws.hasReadout,
-                hasOutline: ws.outline.length > 0,
-                writing: ws.writeBusy,
-                hasChapter: Boolean(ws.writtenChapter?.content),
-                awaitingApprove: ws.writtenChapter?.status === 'generated',
-                canExport: ws.canExport,
-                hasExported: ws.hasExported,
-                cleaningSteps: Array.isArray(ws.cleaningReport?.steps)
-                  ? ws.cleaningReport.steps
-                  : undefined,
-              }}
-              onSelectPath={(id) => {
-                if (id === 'upload_data' || id === 'clean_data') {
-                  ws.setWorkbenchTab('data')
-                  if (sessionId) ws.setEdaOpen(true)
-                } else if (id === 'translate_code') {
-                  ws.setWorkbenchTab('format')
-                  if (sessionId) ws.setCodeExportOpen(true)
-                } else if (id === 'export_docx') {
-                  ws.setWorkbenchTab('format')
-                  if (sessionId) ws.setDocExportOpen(true)
-                } else {
-                  ws.setWorkbenchTab('paper')
-                }
-              }}
-              sessionId={sessionId}
-              review={ws.review}
-              onDecision={() => {
-                if (sessionId) void ws.refreshReview(sessionId)
-              }}
-              degradations={ws.degradations}
-              csvName={ws.csvName}
-              csvRows={ws.csvRows}
-              csvCols={ws.csvCols}
-              directionSummary={ws.directionSummary}
-              directionMethod={ws.directionRecord?.method}
-              directionDv={ws.directionRecord?.dv}
-              directionIv={ws.directionRecord?.iv}
-              hasReadout={ws.hasReadout}
+            <AgentRail
+              ws={ws}
+              decision={blockingDecision}
+              waiting={waitingMessage}
+              suggestions={decisionSuggestions}
+              showLinkedEvidence={ws.workbenchTab === 'paper'}
               hasSuccessfulEstimate={hasSuccessfulEstimate}
-              identFailed={ws.identFailed}
-              identReport={ws.identReport}
-              robustnessStatus={ws.robustnessStatus}
-              estimate={ws.estimateMeta}
-              evidenceOpen={evidenceOpen}
-              evidenceRef={evidenceRef}
-              onEvidenceOpenChange={setEvidenceOpen}
+              onOpenEvidence={openEvidence}
             />
           </ErrorBoundary>
         }
       />
+
+      <footer
+        data-testid="run-status-bar"
+        className="flex h-8 shrink-0 items-center gap-4 overflow-hidden border-t border-wb-line bg-wb-surface px-5 font-mono text-[11px] text-wb-muted"
+      >
+        <span data-testid="run-state" className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 rounded-full ${
+              ws.uploading || ws.directionBusy
+                ? 'wb-dot-running bg-wb-primary'
+                : ws.runFailure
+                  ? 'bg-wb-danger'
+                  : 'bg-wb-success'
+            }`}
+          />
+          {ws.uploading
+            ? '数据清理中…'
+            : ws.directionBusy
+              ? '正在估计…'
+              : ws.activeRun
+                ? `后台 run ${ws.activeRun.run_id.slice(0, 8)} 进行中`
+                : ws.runFailure
+                  ? `上次运行失败：${ws.runFailure}`
+                  : '空闲'}
+        </span>
+        {ws.degraded ? (
+          <span data-testid="run-degradations" className="text-wb-warning">
+            {ws.degradations.length} 条降级记录
+          </span>
+        ) : null}
+        {sessionId ? (
+          <span
+            data-testid="run-trace-hint"
+            className="truncate"
+            title={`/api/sessions/${sessionId}/trace`}
+          >
+            运行记录与 trace 可查
+          </span>
+        ) : null}
+      </footer>
 
       <ReadingFocus
         enabled={Boolean(sessionId) && ws.workbenchTab === 'paper'}

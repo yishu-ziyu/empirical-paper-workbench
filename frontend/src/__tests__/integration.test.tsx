@@ -164,10 +164,12 @@ describe('前端集成测试', () => {
 
     renderWithI18n(<App />)
 
+    // 刷新恢复有研究内容时落在 Overview；读数详情在 Paper 视图
     await waitFor(() => {
-      expect(screen.getByTestId('direction-section')).toBeInTheDocument()
+      expect(screen.getByTestId('rail-paper')).toBeInTheDocument()
     })
     expect(screen.queryByText(/test-789/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('rail-paper'))
     expect(await screen.findByTestId('instrument-readout')).toBeInTheDocument()
     expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
 

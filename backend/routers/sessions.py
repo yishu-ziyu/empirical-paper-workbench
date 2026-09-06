@@ -49,6 +49,8 @@ from schemas.responses import (
     CreateSessionResponse,
     DatasetMetaResponse,
     SessionInfoResponse,
+    SnapshotActiveRunResponse,
+    SnapshotDatasetResponse,
     UploadResponse,
 )
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
@@ -135,8 +137,9 @@ def _validated_upload_key(raw: str | None) -> str:
     return str(parsed)
 
 
-def _dataset_meta(df: pd.DataFrame) -> DatasetMetaResponse:
+def _dataset_meta(df: pd.DataFrame, name: str | None = None) -> DatasetMetaResponse:
     return DatasetMetaResponse(
+        name=name,
         columns=[str(column) for column in df.columns],
         rows=int(len(df)),
         dtypes={str(column): str(dtype) for column, dtype in df.dtypes.items()},
@@ -144,9 +147,11 @@ def _dataset_meta(df: pd.DataFrame) -> DatasetMetaResponse:
     )
 
 
-def _normalize_dataframe(df: pd.DataFrame) -> tuple[bytes, DatasetMetaResponse]:
+def _normalize_dataframe(
+    df: pd.DataFrame, name: str | None = None
+) -> tuple[bytes, DatasetMetaResponse]:
     """Serialize and profile a parsed table away from the API event loop."""
-    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(df)
+    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(df, name)
 
 
 def _upload_response(admission) -> UploadResponse:
@@ -157,6 +162,7 @@ def _upload_response(admission) -> UploadResponse:
         status="PENDING",
         events_url=f"/api/runs/{admission.run.run_id}/events",
         dataset_meta=DatasetMetaResponse(
+            name=metadata.get("name") if isinstance(metadata.get("name"), str) else None,
             columns=[str(item) for item in metadata.get("columns") or []],
             rows=metadata.get("rows"),
             dtypes=dict(metadata.get("dtypes") or {}),
@@ -248,7 +254,11 @@ async def upload(
 
     # 2b. Normalize to a canonical in-house CSV so every downstream stage
     #     (profiling, cleaning, code export) only ever faces a CSV.
-    csv_bytes, dataset_meta = await run_in_threadpool(_normalize_dataframe, df)
+    #     The original file name is recorded server-side so the Project
+    #     Snapshot can restore the workspace without client-side copies.
+    csv_bytes, dataset_meta = await run_in_threadpool(
+        _normalize_dataframe, df, file.filename or ""
+    )
     session_id = str(uuid.uuid4())
     user_id = current_user.id if current_user else None
     csv_path: Path | None = None
@@ -373,10 +383,12 @@ async def get_session_info(
     session_id: str,
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> SessionInfoResponse:
-    """Return session existence and basic info.
+    """Return the Project Snapshot: the single research-state read model.
 
-    Used by the frontend to verify a saved sessionId is still valid
-    after a page refresh (localStorage recovery flow).
+    C1: besides the instrument readouts this carries the dataset metadata
+    (server-side), the in-flight durable run (RunRepository), and the visible
+    degradation summary. The frontend restores from this payload alone and
+    keeps no sessionStorage copies of these fields.
     """
     await run_in_threadpool(require_session_ownership, session_id, current_user)
     has_dataset = False
@@ -392,13 +404,54 @@ async def get_session_info(
         readiness = state.get("upload_readiness")
         if readiness in {"PROCESSING", "READY", "FAILED", "CANCELLED"}:
             extra["upload_readiness"] = readiness
+        extra["degradations"] = public_degradations(
+            await run_in_threadpool(facade.get_degradations, session_id)
+        )
     except Exception:
         extra = {}
+    extra["dataset"] = await _snapshot_dataset(session_id)
+    extra["active_run"] = await _snapshot_active_run(session_id)
     return SessionInfoResponse(
         session_id=session_id,
         exists=True,
         has_dataset=has_dataset,
         **extra,
+    )
+
+
+async def _snapshot_dataset(session_id: str) -> Optional[SnapshotDatasetResponse]:
+    """Project dataset metadata from session storage (no client-side copy)."""
+    try:
+        entry = await run_in_threadpool(facade.get_session_entry, session_id)
+    except Exception:
+        return None
+    meta = {
+        key: value
+        for key, value in entry.items()
+        if key not in {"state", "csv_path", "user_id", "charls_config"}
+    }
+    columns = [str(item) for item in meta.get("columns") or []]
+    rows = meta.get("rows") if isinstance(meta.get("rows"), int) else None
+    name = meta.get("name") if isinstance(meta.get("name"), str) else None
+    if name is None:
+        csv_path = entry.get("csv_path")
+        if csv_path and Path(csv_path).name != f"{session_id}.csv":
+            name = Path(csv_path).name
+    return SnapshotDatasetResponse(name=name, rows=rows, columns=columns)
+
+
+async def _snapshot_active_run(
+    session_id: str,
+) -> Optional[SnapshotActiveRunResponse]:
+    """Expose the durable in-flight run so refresh can reattach to it."""
+    try:
+        run = await RunRepository().active_run(session_id)
+    except Exception:
+        return None
+    if run is None:
+        return None
+    return SnapshotActiveRunResponse(
+        run_id=run.run_id, kind=run.kind, status=run.status
     )
 
 

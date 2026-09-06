@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  LS_ACTIVE_RUN_KEY,
   LS_PENDING_RUN_KEY,
   LS_PENDING_UPLOAD_KEY,
   acceptUploadRun,
@@ -9,13 +8,26 @@ import {
   beginUploadIntent,
   createRestoreSnapshotGate,
   directionGateForReadiness,
-  recoverAcceptedRun,
+  recoverFromSnapshot,
   resolvePendingUpload,
+  type WorkspaceSnapshot,
 } from '../workspace'
+
+function snapshotWith(
+  overrides: Partial<WorkspaceSnapshot> = {},
+): WorkspaceSnapshot {
+  return {
+    session_id: 'session-1',
+    exists: true,
+    has_dataset: true,
+    ...overrides,
+  } as WorkspaceSnapshot
+}
 
 describe('workspace run recovery ordering', () => {
   afterEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     vi.unstubAllGlobals()
   })
 
@@ -41,7 +53,23 @@ describe('workspace run recovery ordering', () => {
     expect(order).toEqual(['session', 'run'])
   })
 
-  it('replays a pending command with its original idempotency key', async () => {
+  it('attaches to the durable active_run from the backend snapshot without reading storage handles', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      recoverFromSnapshot(
+        'session-1',
+        snapshotWith({
+          active_run: { run_id: 'run-live', kind: 'prewrite', status: 'RUNNING' },
+        }),
+      ),
+    ).resolves.toEqual({ kind: 'run', runId: 'run-live', runKind: 'prewrite' })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(localStorage.getItem(`${LS_PENDING_RUN_KEY}:session-1`)).toBeNull()
+  })
+
+  it('replays a pending command with its original idempotency key when no run is active', async () => {
     localStorage.setItem(
       `${LS_PENDING_RUN_KEY}:session-1`,
       JSON.stringify({
@@ -69,62 +97,28 @@ describe('workspace run recovery ordering', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(recoverAcceptedRun('session-1')).resolves.toEqual({
-      run_id: 'run-recovered',
-      session_id: 'session-1',
-      status: 'PENDING',
-      events_url: '/api/runs/run-recovered/events',
-      kind: 'prewrite',
-    })
+    await expect(
+      recoverFromSnapshot('session-1', snapshotWith()),
+    ).resolves.toEqual({ kind: 'run', runId: 'run-recovered', runKind: 'prewrite' })
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/sessions/session-1/direction',
       expect.objectContaining({
         headers: expect.objectContaining({ 'Idempotency-Key': 'stable-command-key' }),
       }),
     )
-    expect(JSON.parse(localStorage.getItem(`${LS_ACTIVE_RUN_KEY}:session-1`) || '{}')).toEqual({
-      runId: 'run-recovered',
-      eventsUrl: '/api/runs/run-recovered/events',
-      kind: 'prewrite',
-    })
+    // C3: no run-handle copies in web storage; the durable queue is the owner.
+    expect(localStorage.getItem('econpaper_active_run_id:session-1')).toBeNull()
     expect(localStorage.getItem(`${LS_PENDING_RUN_KEY}:session-1`)).toBeNull()
   })
 
-  it('does not recover an active run into a different session', async () => {
-    localStorage.setItem(
-      `${LS_ACTIVE_RUN_KEY}:session-1`,
-      JSON.stringify({
-        runId: 'run-1',
-        eventsUrl: '/api/runs/run-1/events',
-      }),
-    )
+  it('returns null for a settled session without active run or pending command', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(recoverAcceptedRun('session-2')).resolves.toBeNull()
+    await expect(
+      recoverFromSnapshot('session-1', snapshotWith()),
+    ).resolves.toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('keeps recovery handles isolated across sessions', async () => {
-    localStorage.setItem(
-      `${LS_ACTIVE_RUN_KEY}:session-1`,
-      JSON.stringify({ runId: 'run-1', eventsUrl: '/api/runs/run-1/events' }),
-    )
-    localStorage.setItem(
-      `${LS_ACTIVE_RUN_KEY}:session-2`,
-      JSON.stringify({ runId: 'run-2', eventsUrl: '/api/runs/run-2/events' }),
-    )
-
-    await expect(recoverAcceptedRun('session-1')).resolves.toEqual({
-      run_id: 'run-1',
-      events_url: '/api/runs/run-1/events',
-      kind: 'prewrite',
-    })
-    await expect(recoverAcceptedRun('session-2')).resolves.toEqual({
-      run_id: 'run-2',
-      events_url: '/api/runs/run-2/events',
-      kind: 'prewrite',
-    })
   })
 
   it('does not replay a direction rejected as session busy', async () => {
@@ -276,26 +270,6 @@ describe('workspace run recovery ordering', () => {
       }),
     )
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('body')
-  })
-
-  it('restores kind-less handles as prewrite and keeps upload handles distinct', async () => {
-    localStorage.setItem(
-      `${LS_ACTIVE_RUN_KEY}:session-legacy`,
-      JSON.stringify({ runId: 'run-legacy', eventsUrl: '/api/runs/run-legacy/events' }),
-    )
-    localStorage.setItem(
-      `${LS_ACTIVE_RUN_KEY}:session-upload`,
-      JSON.stringify({
-        runId: 'run-upload',
-        eventsUrl: '/api/runs/run-upload/events',
-        kind: 'upload_pipeline',
-      }),
-    )
-
-    await expect(recoverAcceptedRun('session-legacy')).resolves.toMatchObject({ kind: 'prewrite' })
-    await expect(recoverAcceptedRun('session-upload')).resolves.toMatchObject({
-      kind: 'upload_pipeline',
-    })
   })
 
   it('blocks direction for explicit non-ready upload states but preserves legacy sessions', () => {

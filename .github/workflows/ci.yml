@@ -19,6 +19,7 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             agent/requirements.txt
+            requirements-dev.txt
 
       # backend/tests 会 import agent.*：backend/.venv 里同时装两份 requirements
       # （重叠依赖版本完全一致，无冲突）。StatsPAI 从 PyPI 装（CI 没有 sibling 仓），
@@ -26,13 +27,13 @@ jobs:
       - name: 安装 backend venv（含 agent 依赖 + StatsPAI）
         run: |
           python -m venv backend/.venv
-          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt
+          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt -r requirements-dev.txt
           backend/.venv/bin/pip install StatsPAI
 
       - name: 安装 agent venv
         run: |
           python -m venv agent/.venv
-          agent/.venv/bin/pip install -r agent/requirements.txt
+          agent/.venv/bin/pip install -r agent/requirements.txt -r requirements-dev.txt
           agent/.venv/bin/pip install StatsPAI
 
       # make test-agent / test-backend 严格传播失败（任一失败 job 即红）
@@ -84,6 +85,7 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             agent/requirements.txt
+            requirements-dev.txt
 
       - uses: actions/setup-node@v4
         with:
@@ -97,7 +99,7 @@ jobs:
       - name: 安装后端依赖（含 agent 依赖）
         run: |
           python -m venv backend/.venv
-          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt
+          backend/.venv/bin/pip install -r backend/requirements.txt -r agent/requirements.txt -r requirements-dev.txt
 
       - name: 安装前端依赖
         working-directory: frontend

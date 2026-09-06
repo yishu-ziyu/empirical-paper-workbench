@@ -142,6 +142,48 @@ def snapshot_state(session_id: str, label: str, state: dict) -> Optional[str]:
         return None
 
 
+def persist_code_translations(
+    session_id: str,
+    run_id: str,
+    translations: list[dict],
+) -> list[dict]:
+    """Write takeable code files under outputs/code/<run_id>/ and register them."""
+    if not session_id or not run_id or not translations:
+        return []
+    dest_dir = ensure_private_directory(
+        run_dir(session_id) / "outputs" / "code" / run_id
+    )
+    copied: list[dict] = []
+    for item in translations:
+        if not isinstance(item, dict):
+            continue
+        filename = Path(str(item.get("filename") or "analysis.txt")).name
+        if not filename:
+            continue
+        dest = dest_dir / filename
+        try:
+            dest.write_text(str(item.get("code") or ""), encoding="utf-8")
+            ensure_private_file(dest)
+            rel = str(dest.relative_to(run_dir(session_id)))
+            copied.append(
+                {
+                    "path": rel,
+                    "bytes": dest.stat().st_size,
+                    "filename": filename,
+                    "run_id": run_id,
+                    "lang": item.get("lang"),
+                }
+            )
+        except Exception:
+            continue
+    if copied:
+        manifest = read_manifest(session_id) or {}
+        entries = list(manifest.get("code") or [])
+        entries.append({"ts": _now_iso(), "run_id": run_id, "files": copied})
+        write_manifest(session_id, code=entries)
+    return copied
+
+
 def register_export(session_id: str, paths: list[Path]) -> list[dict]:
     """把导出产物复制进 outputs/export/ 并登记到 manifest.exports。
 

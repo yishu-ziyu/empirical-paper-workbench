@@ -280,15 +280,28 @@ def test_compare_ols_iv_names_identification(client):
     assert body["coef_b"] is not None
 
 
-def test_surprise_ordering_mismatch_on_default_expectation():
+def _seed_criterion() -> dict:
+    return {
+        "id": "criterion.seed.iv-below-ols",
+        "kind": "ordering",
+        "operator": "lt",
+        "left": {"metric": "estimate.coef", "estimator": "iv", "label": "IV estimate"},
+        "right": {"metric": "estimate.coef", "estimator": "ols", "label": "OLS estimate"},
+        "label": "IV estimate < OLS estimate",
+        "source": "seed",
+    }
+
+
+def test_surprise_ordering_mismatch_on_real_magnitudes():
     expectation = {
-        "text": "I expect OLS to be positive. If ability creates upward bias, IV may be smaller."
+        "text": "I expect OLS to be positive. If ability creates upward bias, IV may be smaller.",
+        "criteria": [_seed_criterion()],
     }
     surprise = evaluate_surprise(
         expectation,
         [
-            {"spec_id": "ols_region_dummies", "coef": 0.07, "status": "ok"},
-            {"spec_id": "iv_region_dummies", "coef": 0.13, "status": "ok"},
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.0747, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.1315, "status": "ok"},
         ],
         ols_spec_id="ols_region_dummies",
         iv_spec_id="iv_region_dummies",
@@ -296,26 +309,126 @@ def test_surprise_ordering_mismatch_on_default_expectation():
     assert surprise is not None
     assert surprise["status"] == "Unexpected"
     assert surprise["kind"] == "ordering_mismatch"
+    assert "ordering_mismatch" in surprise["kinds"]
+    assert surprise["expected"] == "IV estimate < OLS estimate"
+    # Observed must carry the actual numbers and express IV > OLS.
+    assert "0.1315" in surprise["observed"]
+    assert "0.0747" in surprise["observed"]
+    assert ">" in surprise["observed"]
 
 
-def test_surprise_direction_and_magnitude_rules():
-    direction = evaluate_surprise(
-        {"text": "I expect OLS to be positive."},
-        [{"spec_id": "ols_full_controls", "coef": -0.2, "status": "ok"}],
-        ols_spec_id="ols_full_controls",
-        iv_spec_id="iv_nearc4_full",
-    )
-    assert direction["kind"] == "direction_mismatch"
-    magnitude = evaluate_surprise(
-        {"text": "OLS and IV should be similar."},
+def test_surprise_expected_when_criterion_holds():
+    expectation = {
+        "text": "IV below OLS.",
+        "criteria": [_seed_criterion()],
+    }
+    surprise = evaluate_surprise(
+        expectation,
         [
-            {"spec_id": "ols_full_controls", "coef": 0.08, "status": "ok"},
-            {"spec_id": "iv_nearc4_full", "coef": 0.13, "status": "ok"},
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.13, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.09, "status": "ok"},
         ],
-        ols_spec_id="ols_full_controls",
-        iv_spec_id="iv_nearc4_full",
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
     )
-    assert magnitude["kind"] == "magnitude"
+    assert surprise is not None
+    assert surprise["status"] == "Expected"
+    assert surprise["kind"] is None
+    assert surprise["kinds"] == []
+
+
+def test_surprise_sign_operator_deterministic():
+    positive = {
+        "id": "criterion.iv-positive",
+        "kind": "sign",
+        "operator": "positive",
+        "left": {"metric": "estimate.coef", "estimator": "iv", "label": "IV estimate"},
+        "label": "IV estimate is positive",
+        "source": "user",
+    }
+    violated = evaluate_surprise(
+        {"text": "IV positive.", "criteria": [positive]},
+        [{"spec_id": "iv_region_dummies", "method": "iv", "coef": -0.2, "status": "ok"}],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert violated["status"] == "Unexpected"
+    assert violated["kind"] == "direction_mismatch"
+    satisfied = evaluate_surprise(
+        {"text": "IV positive.", "criteria": [positive]},
+        [{"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.2, "status": "ok"}],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert satisfied["status"] == "Expected"
+
+
+def test_surprise_distance_operator_with_tolerance():
+    approx = {
+        "id": "criterion.iv-approx-ols",
+        "kind": "distance",
+        "operator": "approx",
+        "left": {"metric": "estimate.coef", "estimator": "iv", "label": "IV estimate"},
+        "right": {"metric": "estimate.coef", "estimator": "ols", "label": "OLS estimate"},
+        "tolerance": {"rel": 0.05},
+        "label": "IV ≈ OLS",
+        "source": "user",
+    }
+    violated = evaluate_surprise(
+        {"text": "similar.", "criteria": [approx]},
+        [
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.08, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.13, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert violated["status"] == "Unexpected"
+    assert violated["kind"] == "magnitude"
+    satisfied = evaluate_surprise(
+        {"text": "similar.", "criteria": [approx]},
+        [
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.08, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.0805, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert satisfied["status"] == "Expected"
+
+
+def test_surprise_without_criteria_stays_expected():
+    surprise = evaluate_surprise(
+        {"text": "Free-form text with the words iv smaller similar positive."},
+        [
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.07, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.13, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise is not None
+    assert surprise["status"] == "Expected"
+    assert surprise["kind"] is None
+
+
+def test_surprise_unresolvable_metric_stays_silent():
+    criterion = {
+        "id": "criterion.future-att",
+        "kind": "sign",
+        "operator": "positive",
+        "left": {"metric": "att", "estimator": "did", "label": "ATT"},
+        "label": "ATT positive",
+        "source": "user",
+    }
+    surprise = evaluate_surprise(
+        {"text": "text", "criteria": [criterion]},
+        [{"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.07, "status": "ok"}],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise is not None
+    assert surprise["status"] == "Expected"
 
 
 def test_card_default_expectation_is_unexpected_after_runs(client):

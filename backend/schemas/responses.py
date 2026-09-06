@@ -148,6 +148,44 @@ class ExpectationHistoryItemResponse(BaseModel):
     kind: str = "edit"
 
 
+class EvidenceMetricRef(BaseModel):
+    """Reference to a quantity produced by a specification run.
+
+    ``metric`` is an open string (``estimate.coef`` today; future estimands
+    like ``att`` or ``rd_local`` plug in without a schema change). The run to
+    read is picked by ``spec_id`` when given, otherwise by ``estimator``
+    (matched against a run's estimator/method label).
+    """
+
+    metric: str
+    estimator: Optional[str] = None
+    spec_id: Optional[str] = None
+    label: Optional[str] = None
+
+
+class ExpectationCriterionTolerance(BaseModel):
+    abs: Optional[float] = None
+    rel: Optional[float] = None
+
+
+class ExpectationCriterion(BaseModel):
+    """Structured surprise condition. Never re-derived from free text.
+
+    ``right`` is either another metric reference (ordering/approx) or a
+    constant float. ``source`` records who authored the criterion: the
+    teaching-case seed or the user via an explicit control.
+    """
+
+    id: str
+    kind: Literal["sign", "ordering", "distance"]
+    left: EvidenceMetricRef
+    operator: Literal["gt", "lt", "approx", "positive", "negative"]
+    right: Optional[Union[EvidenceMetricRef, float]] = None
+    tolerance: Optional[ExpectationCriterionTolerance] = None
+    label: str
+    source: Literal["seed", "user"] = "user"
+
+
 class ExpectationResponse(BaseModel):
     text: str = ""
     text_zh: Optional[str] = None
@@ -156,6 +194,7 @@ class ExpectationResponse(BaseModel):
     version: int = 1
     updated_at: Optional[str] = None
     history: List[ExpectationHistoryItemResponse] = Field(default_factory=list)
+    criteria: List[ExpectationCriterion] = Field(default_factory=list)
 
 
 class ResearchQuestionResponse(BaseModel):

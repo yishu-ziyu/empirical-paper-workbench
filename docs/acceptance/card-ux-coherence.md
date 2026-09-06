@@ -18,7 +18,10 @@ Baseline（2026-09-06，分支 `review/card-ux-coherence`，从已合并 PR #28 
 ## Change
 
 将 Card canonical journey 从“功能完整”收敛为一条 evidence-first、context-aware、direct-manipulation-first 的高质量体验：
-1. **Evidence Lab 视觉重排**：Surprise → Results Space → Compare / Why did it move? → Next-best Challenge → Claim Ledger；未 review 前只显轻量提示“Draft claim ready · 已可以整理结论”，完成 Compare / Challenge 或点击 Review claim 后 Claim Ledger 展开为主区域。
+1. **Evidence Lab 视觉重排与状态真值一致性**：
+   - 视觉顺序：Surprise → Results Space → Compare / Why did it move? → Next-best Challenge → Claim Ledger。
+   - **Review existing draft is presentation-only**：未 review 前只显轻量提示“Draft claim ready · 已可以整理结论”；用户点击“Review claim”时，若已有 non-stale draft Claim，作为纯展示动作展开 Claim Ledger 主账本，**严禁调用后端 draft command，Claim id / version / based_on_evidence_revision / decision_events 保持不变**；仅当 Claim stale 或用户明确点击“Review new evidence”时才调用后端 draft 生成新 version。
+   - **Accepted challenge comes only from backend snapshot**：Next-best Challenge 是否 accepted 严格只读 `research.next_challenge.status === 'accepted'`，禁止前端用乐观本地状态伪造 accepted 或提前展开 Claim；请求中仅展示 local busy，请求失败时 Accept challenge 按钮保持可见且 Claim 不展开；只有后端 snapshot 真实返回 status=accepted 时才展开 Claim 并显示 Accepted。
 2. **Agent Rail 上下文感知**：Question 态只显示 Question/Expectation/Design 相关动作，不泄漏 Evidence 的“IV > OLS / Show me”；Evidence 态才显示 Unexpected result / Show me / Challenge / Cursor controls；Paper 态只保留 Linked Evidence 与当前写作审批；任意时刻最多 1 个 primary decision card。
 3. **Agent Cursor 编排升级**：固定 10 步 Card script（OLS定位高亮 → IV定位高亮 → 自动对比选择 → Compare 面板即时 0.0747→0.1315 Δ/% → unchanged 淡化 → estimator/identification 高亮 → intent 识别策略变化 → 约 3-4s 收束“This is the main change. / 主要变化来自这里”）；Cursor label 始终贴紧 target，不被 sticky header 裁切，scroll/resize 重新定位，用户 pointer/keyboard 操作 yield。
 4. **Specification runs UI 去重**：同一 spec_id 多 runs 默认只展示当前/最新有效 run；提供轻量历史入口（如 Preview · 2 runs / History 2）；表格与散点图无无标识同名行；Compare 可切换 run history。
@@ -35,6 +38,7 @@ Baseline（2026-09-06，分支 `review/card-ux-coherence`，从已合并 PR #28 
 - 不算：Agent Cursor 回退到坐标、CSS 自由 selector 或破坏 semantic-target 架构。
 - 不算：同时向用户推 4 个下一步。
 - 不算：向 PR #28 增加代码（必须在 `review/card-ux-coherence` 分支独立开 PR）。
+- 不算：前端乐观伪造 accepted 状态或在 Review existing draft 时产生多余 Claim version 与 decision_events。
 
 ## Evaluator
 
@@ -44,7 +48,7 @@ Baseline（2026-09-06，分支 `review/card-ux-coherence`，从已合并 PR #28 
 
 ## Checks
 
-- [x] C1 Evidence Lab 顺序与 Claim 折叠 — 程序: `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx` + 浏览器 DOM — 预期: Results Space / Compare 排在 Claim 前；未交互前 Claim 呈现为“Draft claim ready · 已可以整理结论”；交互（Compare/Challenge）或主动点击“Review claim”后展示 Claim Ledger 主账本。
+- [x] C1 Evidence Lab 顺序、Claim 纯展示展开与后端真值一致性 — 程序: `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx` + `pytest backend/tests/test_card_claim_ledger.py` — 预期: Results Space / Compare 排在 Claim 前；Review existing non-stale draft 是纯展示动作（不调用 draft endpoint，version 不变，不新增 claim_drafted event）；stale Claim 时 Review new evidence 调用 draft endpoint 产生新 version；Challenge accepted 状态严格由后端 snapshot 驱动，失败请求不伪造 accepted，Claim 不展开。
 - [x] C2 Agent Rail context-aware — 程序: `cd frontend && npx vitest run src/components/__tests__/AgentRail.test.tsx src/__tests__/App.test.tsx` + 浏览器 DOM — 预期: Question 视图不显示“Show me”或“IV > OLS”卡片；Paper 视图只显示 Linked Evidence 与写作审批；Evidence 视图才展示 Show me / Surprise；任何视图最多 1 个 primary decision card。
 - [x] C3 Agent Cursor 10 步 Choreography 与粘性定位 — 程序: `cd frontend && npx vitest run src/lib/__tests__/agentCursor.test.ts src/components/__tests__/AgentCursorLayer.test.tsx` + 浏览器 DOM — 预期: Show me 脚本完整覆盖 OLS → IV → Compare (0.0747→0.1315 Δ/%) → fadeUnchanged → estimator highlight → “Identification strategy changed / 识别策略发生变化” → “This is the main change. / 主要变化来自这里。”；cursor 浮层不被 sticky header 裁切，resize/scroll 重新对齐 target，用户交互 yield。
 - [x] C4 Spec runs UI 去重与历史入口 — 程序: `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx` + 浏览器 DOM — 预期: 同一 spec_id 多 runs 时只渲染 1 行主 entry 并展示 History / Preview runs 标记；Choice matrix 与 scatter plot 不出现同名无法区分重复项；可通过历史切换 Compare 所选 run。
@@ -57,11 +61,16 @@ Baseline（2026-09-06，分支 `review/card-ux-coherence`，从已合并 PR #28 
 
 ### 1. 单元与集成测试输出
 
-- **EvidenceLab**:
+- **EvidenceLab (包含 Review claim 纯展示与 Challenge 真实 snapshot 门禁)**:
   ```
-  ✓ src/components/__tests__/EvidenceLab.test.tsx (5 tests)
+  ✓ src/components/__tests__/EvidenceLab.test.tsx (9 tests)
   Test Files  1 passed (1)
-  Tests  5 passed (5)
+  Tests  9 passed (9)
+  ```
+- **Backend Card Claim Ledger & Version Consistency**:
+  ```
+  tests/test_card_claim_ledger.py ........... [100%]
+  ============================= 11 passed in 18.00s ==============================
   ```
 - **AgentRail & App context-awareness**:
   ```

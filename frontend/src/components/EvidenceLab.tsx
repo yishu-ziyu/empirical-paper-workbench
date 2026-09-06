@@ -332,7 +332,6 @@ export default function EvidenceLab({
   const runs = (research.specification_runs ?? []).filter((run) => run.status !== 'error')
   const [specRunOverrides, setSpecRunOverrides] = useState<Record<string, string>>({})
   const [reviewClaimRequested, setReviewClaimRequested] = useState(false)
-  const [hasAcceptedChallenge, setHasAcceptedChallenge] = useState(false)
 
   const specGroups = useMemo(() => {
     const map = new Map<string, SpecRun[]>()
@@ -389,7 +388,6 @@ export default function EvidenceLab({
     claim?.approved_by_user ||
       reviewClaimRequested ||
       selected.length === 2 ||
-      hasAcceptedChallenge ||
       challenge?.status === 'accepted',
   )
 
@@ -811,16 +809,21 @@ export default function EvidenceLab({
               </span>
             ) : null}
           </p>
-          {challenge.status !== 'accepted' && !hasAcceptedChallenge ? (
+          {challenge.status !== 'accepted' ? (
             <button
               type="button"
               data-testid="evidence-challenge-accept"
               disabled={busy || !onAcceptChallenge}
-              onClick={() => {
+              onClick={async () => {
                 if (!onAcceptChallenge || !challenge.id) return
                 setBusy(true)
-                setHasAcceptedChallenge(true)
-                void onAcceptChallenge(challenge.id).finally(() => setBusy(false))
+                try {
+                  await onAcceptChallenge(challenge.id)
+                } catch {
+                  // error handled by workspace / toast; UI remains un-accepted
+                } finally {
+                  setBusy(false)
+                }
               }}
               className="wb-press mt-2 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
@@ -851,7 +854,9 @@ export default function EvidenceLab({
                   data-testid="evidence-review-claim"
                   onClick={() => {
                     setReviewClaimRequested(true)
-                    void onDraftClaim?.()
+                    if (claim?.stale) {
+                      void onDraftClaim?.()
+                    }
                   }}
                   className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
                 >

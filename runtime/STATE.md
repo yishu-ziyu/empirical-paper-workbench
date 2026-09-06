@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| 20260906-card-research-semantics-consistency | `runtime/tasks/20260906-card-research-semantics-consistency.md` | complete | `review/workbench-v2` | 2026-09-06 | validator ACCEPT；浏览器 S5–S7 过；待 CI |
 | 20260906-card-canonical-research-experience | `runtime/tasks/20260906-card-canonical-research-experience.md` | complete | `review/workbench-v2` | 2026-09-06 | validator ACCEPT；CI 待 Card commit |
 | 20260902-run-cancellation | `runtime/tasks/20260902-run-cancellation.md` | complete | `chore/local-workspace-cleanup` | 2026-09-02 | Select the next full-stack issue |
 | 20260902-upload-event-loop | `runtime/tasks/20260902-upload-event-loop.md` | complete | `chore/local-workspace-cleanup` | 2026-09-02 | Select the next full-stack issue |

@@ -21,7 +21,12 @@ _CAVEAT_EN = re.compile(
     re.IGNORECASE,
 )
 _CAVEAT_ZH = re.compile(r"在工具变量假设成立时|IV 估计表明|局部因果回报")
-_SENTENCE_SPLIT = re.compile(r"(?<=[。！？.!?])\s+")
+_POPULATION_EN = re.compile(
+    r"\beveryone(?:['’]s)?\b|\ball\s+workers\b|\ball\s+people\b",
+    re.IGNORECASE,
+)
+_POPULATION_ZH = re.compile(r"所有人|每个人|普遍提高")
+_SENTENCE_SPLIT = re.compile(r"(?<=[。！？!?])\s*|(?<=\.)(?=\s+|[A-Z])")
 
 
 def _sentences(text: str) -> list[str]:
@@ -32,12 +37,24 @@ def _sentences(text: str) -> list[str]:
     return [part.strip() for part in parts if part.strip()]
 
 
-def _has_unconditional_causal(sentence: str) -> bool:
-    if not (_CAUSAL_EN.search(sentence) or _CAUSAL_ZH.search(sentence)):
+def _has_causal(sentence: str) -> bool:
+    return bool(_CAUSAL_EN.search(sentence) or _CAUSAL_ZH.search(sentence))
+
+
+def _has_caveat(sentence: str) -> bool:
+    return bool(_CAVEAT_EN.search(sentence) or _CAVEAT_ZH.search(sentence))
+
+
+def _has_population_wide(sentence: str) -> bool:
+    return bool(_POPULATION_EN.search(sentence) or _POPULATION_ZH.search(sentence))
+
+
+def _sentence_exceeds(sentence: str) -> bool:
+    if not _has_causal(sentence):
         return False
-    if _CAVEAT_EN.search(sentence) or _CAVEAT_ZH.search(sentence):
-        return False
-    return True
+    if _has_population_wide(sentence):
+        return True
+    return not _has_caveat(sentence)
 
 
 def wording_exceeds_evidence(claim: Mapping[str, Any] | None, content: str) -> bool:
@@ -47,4 +64,4 @@ def wording_exceeds_evidence(claim: Mapping[str, Any] | None, content: str) -> b
     forbidden = str(payload.get("unsupported_wording") or "").strip()
     if forbidden and forbidden in text:
         return True
-    return any(_has_unconditional_causal(sentence) for sentence in _sentences(text))
+    return any(_sentence_exceeds(sentence) for sentence in _sentences(text))

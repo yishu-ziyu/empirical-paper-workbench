@@ -50,10 +50,11 @@ function LinkedEvidenceCard({
   const claim = ws.research?.claim ?? ws.research?.claims?.[0]
   const claimsExist = Boolean(claim?.id) || (ws.research?.claims?.length ?? 0) > 0
   const resultsChapter = ws.writtenChapters.find((chapter) => chapter.type === 'results')
+  const labRevision = ws.research?.evidence_revision
   const revisionMismatch =
-    claim?.based_on_evidence_revision != null &&
-    ws.research?.evidence_revision != null &&
-    claim.based_on_evidence_revision !== ws.research.evidence_revision
+    labRevision != null &&
+    (claim?.based_on_evidence_revision == null ||
+      claim.based_on_evidence_revision !== labRevision)
   const claimOk =
     !claimsExist ||
     (Boolean(claim?.approved_by_user) &&

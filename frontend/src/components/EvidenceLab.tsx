@@ -202,7 +202,7 @@ function ClaimLedgerSection({
       className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
     >
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-        Claim Ledger · 主张账本
+        Claim Ledger（结论账本）
       </p>
       {stale ? (
         <p data-testid="claim-stale" className="mt-2 text-[13px] leading-6 text-wb-ink">
@@ -220,7 +220,7 @@ function ClaimLedgerSection({
       <dl className="mt-3 space-y-2 text-[13px] leading-6">
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Supported
+            Supported（当前证据支持）
           </dt>
           <dd data-testid="claim-supported" className="text-wb-ink">
             {claim.supported_wording}
@@ -228,7 +228,7 @@ function ClaimLedgerSection({
         </div>
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Conditionally supported
+            Conditionally supported（有条件支持）
           </dt>
           <dd data-testid="claim-conditional" className="text-wb-muted">
             {claim.conditionally_supported_wording}
@@ -236,7 +236,7 @@ function ClaimLedgerSection({
         </div>
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Unsupported
+            Unsupported（当前证据不支持）
           </dt>
           <dd data-testid="claim-unsupported" className="text-wb-faint">
             {claim.unsupported_wording}
@@ -330,12 +330,68 @@ export default function EvidenceLab({
   onDraftClaim?: () => Promise<void>
 }) {
   const runs = (research.specification_runs ?? []).filter((run) => run.status !== 'error')
-  const comparable = comparableIds(runs)
+  const [specRunOverrides, setSpecRunOverrides] = useState<Record<string, string>>({})
+  const [reviewClaimRequested, setReviewClaimRequested] = useState(false)
+  const [hasAcceptedChallenge, setHasAcceptedChallenge] = useState(false)
+
+  const specGroups = useMemo(() => {
+    const map = new Map<string, SpecRun[]>()
+    for (const run of runs) {
+      const list = map.get(run.spec_id) || []
+      list.push(run)
+      map.set(run.spec_id, list)
+    }
+    return map
+  }, [runs])
+
+  const displayedRuns = useMemo(() => {
+    const result: SpecRun[] = []
+    for (const [spec_id, groupRuns] of specGroups.entries()) {
+      const overrideId = specRunOverrides[spec_id]
+      const chosen = groupRuns.find((r) => r.id === overrideId) || groupRuns[groupRuns.length - 1]
+      result.push(chosen)
+    }
+    return result
+  }, [specGroups, specRunOverrides])
+
+  const comparable = useMemo(() => comparableIds(displayedRuns), [displayedRuns])
   const [selected, setSelected] = useState<string[]>([])
   const [hovered, setHovered] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [serverCompare, setServerCompare] = useState<CompareModel | null>(null)
   const cursor = useAgentCursor()
+  const reportDelta = cursor.reportDelta
+
+  const claim = research.claim ?? research.claims?.[0]
+  const requiredSpec = (claim?.provenance as { iv_spec_id?: string } | undefined)?.iv_spec_id
+  const mismatch = Boolean(
+    claim?.approved_by_user &&
+      !claim?.stale &&
+      requiredSpec &&
+      research.canonical_spec_id !== requiredSpec,
+  )
+  const supportingRunId =
+    (claim?.provenance as { iv_run_id?: string } | undefined)?.iv_run_id ||
+    claim?.supporting_run_ids?.[1]
+
+  const challenge = research.next_challenge as
+    | {
+        id?: string
+        rationale?: string
+        rationale_zh?: string
+        status?: string
+        target?: string
+      }
+    | null
+    | undefined
+
+  const isClaimExpanded = Boolean(
+    claim?.approved_by_user ||
+      reviewClaimRequested ||
+      selected.length === 2 ||
+      hasAcceptedChallenge ||
+      challenge?.status === 'accepted',
+  )
 
   const selectedRuns = selected
     .map((id) => runs.find((run) => run.id === id || run.spec_id === id))
@@ -365,12 +421,23 @@ export default function EvidenceLab({
     const pair = cursor.presentation.comparePair
     if (!pair || cursor.presentation.status === 'idle') return
     const mapped = pair
-      .map((sid) => runs.find((run) => semanticIdsFor(run, comparable).includes(sid)))
+      .map(
+        (sid) =>
+          displayedRuns.find((run) => semanticIdsFor(run, comparable).includes(sid)) ||
+          runs.find((run) => semanticIdsFor(run, comparable).includes(sid)),
+      )
       .filter((run): run is SpecRun => Boolean(run))
     if (mapped.length === 2) {
-      setSelected([mapped[0].id, mapped[1].id])
+      const nextA = mapped[0].id
+      const nextB = mapped[1].id
+      setSelected((prev) => {
+        if (prev.length === 2 && prev[0] === nextA && prev[1] === nextB) {
+          return prev
+        }
+        return [nextA, nextB]
+      })
     }
-  }, [comparable, cursor.presentation.comparePair, cursor.presentation.status, runs])
+  }, [comparable, cursor.presentation.comparePair, cursor.presentation.status, displayedRuns, runs])
 
   useEffect(() => {
     if (!leftId || !rightId || !onCompare) {
@@ -386,13 +453,15 @@ export default function EvidenceLab({
     }
   }, [leftId, onCompare, rightId])
 
+  const deltaAbs = comparison?.deltaAbs ?? null
+  const deltaPct = comparison?.deltaPct ?? null
   useEffect(() => {
-    if (!comparison) {
-      cursor.reportDelta(null)
+    if (deltaAbs == null) {
+      reportDelta(null)
       return
     }
-    cursor.reportDelta({ deltaAbs: comparison.deltaAbs, deltaPct: comparison.deltaPct })
-  }, [comparison, cursor])
+    reportDelta({ deltaAbs, deltaPct })
+  }, [deltaAbs, deltaPct, reportDelta])
 
   const toggle = (run: SpecRun) => {
     setSelected((current) => {
@@ -403,7 +472,7 @@ export default function EvidenceLab({
   }
 
   const points = useMemo(() => {
-    const coefs = runs
+    const coefs = displayedRuns
       .map((run) => run.coef)
       .filter((value): value is number => typeof value === 'number')
     const min = coefs.length ? Math.min(...coefs) : 0
@@ -418,8 +487,12 @@ export default function EvidenceLab({
     const top = 28
     const innerW = width - left - right
     const x = (coef: number) => left + ((coef - lo) / (hi - lo)) * innerW
-    const ols = runs.filter((run) => choiceValue(run, 'estimator') === 'ols' || run.method === 'ols')
-    const iv = runs.filter((run) => choiceValue(run, 'estimator') === 'iv' || run.method === 'iv')
+    const ols = displayedRuns.filter(
+      (run) => choiceValue(run, 'estimator') === 'ols' || run.method === 'ols',
+    )
+    const iv = displayedRuns.filter(
+      (run) => choiceValue(run, 'estimator') === 'iv' || run.method === 'iv',
+    )
     const place = (group: SpecRun[], lane: number) =>
       group.map((run, index) => {
         const coef = typeof run.coef === 'number' ? run.coef : 0
@@ -440,82 +513,31 @@ export default function EvidenceLab({
         { label: 'IV', y: top + 130 },
       ],
     }
-  }, [runs])
+  }, [displayedRuns])
 
   const surprise = research.surprise
-  const challenge = research.next_challenge as
-    | {
-        id?: string
-        rationale?: string
-        status?: string
-        target?: string
-      }
-    | null
-    | undefined
-
-  const claim = research.claim ?? research.claims?.[0]
-  const requiredSpec = (claim?.provenance as { iv_spec_id?: string } | undefined)?.iv_spec_id
-  const mismatch = Boolean(
-    claim?.approved_by_user &&
-      !claim?.stale &&
-      requiredSpec &&
-      research.canonical_spec_id !== requiredSpec,
-  )
-  const supportingRunId =
-    (claim?.provenance as { iv_run_id?: string } | undefined)?.iv_run_id ||
-    claim?.supporting_run_ids?.[1]
 
   return (
     <section data-testid="evidence-lab" className="mx-auto max-w-[52rem] space-y-6 px-6 py-8">
+      {/* 1. Header */}
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Evidence Lab · 证据实验室
+          Evidence Lab（证据实验室）
         </p>
         <h2 className="mt-1 font-serif text-[1.35rem] text-wb-ink">
-          {claim ? 'Claim Ledger' : 'Results space'}
+          {isClaimExpanded ? 'Claim Ledger' : 'Results space'}
         </h2>
       </header>
 
-      {claim ? (
-        <ClaimLedgerSection
-          claim={claim}
-          busy={busy}
-          mismatch={mismatch}
-          onApprove={onApproveClaim}
-          onPreparePaper={onPreparePaper}
-          onPromoteSupporting={
-            supportingRunId && onPromote
-              ? async () => {
-                  setBusy(true)
-                  try {
-                    await onPromote(supportingRunId)
-                  } finally {
-                    setBusy(false)
-                  }
-                }
-              : undefined
-          }
-          onReviewEvidence={
-            onDraftClaim
-              ? async () => {
-                  setBusy(true)
-                  try {
-                    await onDraftClaim()
-                  } finally {
-                    setBusy(false)
-                  }
-                }
-              : undefined
-          }
-        />
-      ) : null}
-
+      {/* 2. Surprise */}
       {surprise ? (
         <div
           data-testid="evidence-surprise"
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
         >
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">Surprise</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
+            Surprise（意外）
+          </p>
           <p className="mt-1 text-[14px] text-wb-ink">{surprise.status}</p>
           {surprise.expected ? (
             <p className="mt-1 text-[12px] text-wb-muted">Expected: {surprise.expected}</p>
@@ -526,6 +548,7 @@ export default function EvidenceLab({
         </div>
       ) : null}
 
+      {/* 3. Results Space: Scatter Plot */}
       <svg
         data-testid="evidence-results-space"
         viewBox={`0 0 ${points.width} ${points.height}`}
@@ -590,6 +613,7 @@ export default function EvidenceLab({
         })}
       </svg>
 
+      {/* 3. Results Space: Choice Matrix */}
       <section data-testid="evidence-choice-matrix">
         <h3 className="mb-2 font-serif text-[1.1rem] text-wb-ink">Choice matrix</h3>
         <div className="overflow-x-auto rounded-md border border-wb-line">
@@ -604,7 +628,8 @@ export default function EvidenceLab({
               </tr>
             </thead>
             <tbody>
-              {runs.map((run) => {
+              {displayedRuns.map((run) => {
+                const groupRuns = specGroups.get(run.spec_id) || [run]
                 const isSelected = selected.includes(run.id)
                 return (
                   <tr
@@ -615,7 +640,37 @@ export default function EvidenceLab({
                       isSelected ? 'bg-wb-subtle' : 'bg-wb-surface'
                     }`}
                   >
-                    <td className="px-3 py-2 text-wb-ink">{run.label || run.spec_id}</td>
+                    <td className="px-3 py-2 text-wb-ink">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{run.label || run.spec_id}</span>
+                        {groupRuns.length > 1 ? (
+                          <button
+                            type="button"
+                            data-testid={`evidence-history-${run.spec_id}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const curIdx = groupRuns.findIndex((r) => r.id === run.id)
+                              const nextIdx = (curIdx + 1) % groupRuns.length
+                              const nextRun = groupRuns[nextIdx]
+                              setSpecRunOverrides((prev) => ({
+                                ...prev,
+                                [run.spec_id]: nextRun.id,
+                              }))
+                              setSelected((curr) => {
+                                if (curr.includes(run.id)) {
+                                  return curr.map((id) => (id === run.id ? nextRun.id : id))
+                                }
+                                return curr
+                              })
+                            }}
+                            className="rounded border border-wb-line bg-wb-subtle px-1.5 py-0.5 font-mono text-[10px] text-wb-muted hover:text-wb-ink"
+                            title={`Switch run (${groupRuns.findIndex((r) => r.id === run.id) + 1}/${groupRuns.length})`}
+                          >
+                            History {groupRuns.length} (Preview · {groupRuns.length} runs)
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
                     {DIMS.map((dim) => {
                       const unchanged =
                         cursor.presentation.fadeUnchanged &&
@@ -640,8 +695,12 @@ export default function EvidenceLab({
         </div>
       </section>
 
-      <section data-testid="evidence-compare" className="rounded-md border border-wb-line bg-wb-surface px-3 py-3">
-        <h3 className="font-serif text-[1.1rem] text-wb-ink">Compare</h3>
+      {/* 4. Compare / Why did it move? */}
+      <section
+        data-testid="evidence-compare"
+        className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
+      >
+        <h3 className="font-serif text-[1.1rem] text-wb-ink">Compare（比较）</h3>
         {comparison && selectedRuns.length === 2 ? (
           <div className="mt-2 space-y-1 text-[13px] leading-6 text-wb-ink">
             <p data-testid="evidence-compare-delta">
@@ -662,38 +721,38 @@ export default function EvidenceLab({
         ) : (
           <p className="mt-2 text-[13px] text-wb-muted">Select two specifications to compare.</p>
         )}
-      </section>
 
-      {selectedRuns[0] ? (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            data-testid="evidence-promote"
-            disabled={busy || !onPromote}
-            onClick={() => {
-              if (!onPromote || !selectedRuns[0]) return
-              setBusy(true)
-              void onPromote(selectedRuns[0].id).finally(() => setBusy(false))
-            }}
-            className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
-          >
-            Promote to canonical
-          </button>
-          <button
-            type="button"
-            data-testid="evidence-revert"
-            disabled={busy || !onRevert}
-            onClick={() => {
-              if (!onRevert) return
-              setBusy(true)
-              void onRevert().finally(() => setBusy(false))
-            }}
-            className="wb-press rounded-md border border-wb-line px-3 py-1.5 text-[12px] text-wb-ink disabled:opacity-50"
-          >
-            Revert canonical
-          </button>
-        </div>
-      ) : null}
+        {selectedRuns[0] ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="evidence-promote"
+              disabled={busy || !onPromote}
+              onClick={() => {
+                if (!onPromote || !selectedRuns[0]) return
+                setBusy(true)
+                void onPromote(selectedRuns[0].id).finally(() => setBusy(false))
+              }}
+              className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+            >
+              Promote to canonical
+            </button>
+            <button
+              type="button"
+              data-testid="evidence-revert"
+              disabled={busy || !onRevert}
+              onClick={() => {
+                if (!onRevert) return
+                setBusy(true)
+                void onRevert().finally(() => setBusy(false))
+              }}
+              className="wb-press rounded-md border border-wb-line px-3 py-1.5 text-[12px] text-wb-ink disabled:opacity-50"
+            >
+              Revert canonical
+            </button>
+          </div>
+        ) : null}
+      </section>
 
       {cursor.presentation.previewCommand ? (
         <section
@@ -735,16 +794,24 @@ export default function EvidenceLab({
         </section>
       ) : null}
 
+      {/* 5. Next-best Challenge */}
       {challenge?.id ? (
         <section
           data-testid="evidence-challenge"
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-            Next-best challenge
+            Next-best Challenge（下一步最有价值的检验）
           </p>
-          <p className="mt-1 text-[13px] leading-6 text-wb-ink">{challenge.rationale}</p>
-          {challenge.status !== 'accepted' ? (
+          <p className="mt-1 text-[13px] leading-6 text-wb-ink">
+            {challenge.rationale}
+            {challenge.rationale_zh ? (
+              <span className="mt-1 block text-[12px] text-wb-muted">
+                {challenge.rationale_zh}
+              </span>
+            ) : null}
+          </p>
+          {challenge.status !== 'accepted' && !hasAcceptedChallenge ? (
             <button
               type="button"
               data-testid="evidence-challenge-accept"
@@ -752,6 +819,7 @@ export default function EvidenceLab({
               onClick={() => {
                 if (!onAcceptChallenge || !challenge.id) return
                 setBusy(true)
+                setHasAcceptedChallenge(true)
                 void onAcceptChallenge(challenge.id).finally(() => setBusy(false))
               }}
               className="wb-press mt-2 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
@@ -763,6 +831,70 @@ export default function EvidenceLab({
           )}
         </section>
       ) : null}
+
+      {/* 6. Claim Ledger */}
+      {claim ? (
+        <div data-testid="evidence-claim-ledger">
+          {!isClaimExpanded ? (
+            <section className="rounded-md border border-wb-line bg-wb-surface px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
+                    Claim Ledger（结论账本）
+                  </p>
+                  <p className="mt-1 text-[13px] font-medium text-wb-ink">
+                    Draft claim ready · 已可以整理结论
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-testid="evidence-review-claim"
+                  onClick={() => {
+                    setReviewClaimRequested(true)
+                    void onDraftClaim?.()
+                  }}
+                  className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
+                >
+                  Review claim · 整理结论
+                </button>
+              </div>
+            </section>
+          ) : (
+            <ClaimLedgerSection
+              claim={claim}
+              busy={busy}
+              mismatch={mismatch}
+              onApprove={onApproveClaim}
+              onPreparePaper={onPreparePaper}
+              onPromoteSupporting={
+                supportingRunId && onPromote
+                  ? async () => {
+                      setBusy(true)
+                      try {
+                        await onPromote(supportingRunId)
+                      } finally {
+                        setBusy(false)
+                      }
+                    }
+                  : undefined
+              }
+              onReviewEvidence={
+                onDraftClaim
+                  ? async () => {
+                      setBusy(true)
+                      try {
+                        await onDraftClaim()
+                      } finally {
+                        setBusy(false)
+                      }
+                    }
+                  : undefined
+              }
+            />
+          )}
+        </div>
+      ) : null}
     </section>
   )
 }
+

@@ -157,14 +157,17 @@ export default function AgentRail({
 }: AgentRailProps) {
   const task = deriveCurrentTask(ws)
   const cursor = useAgentCursor()
+  const isEvidence = ws.workbenchTab === 'evidence'
   const unexpected = ws.research?.surprise?.status === 'Unexpected'
   const cursorActive =
-    cursor.presentation.status === 'running' ||
-    cursor.presentation.status === 'paused' ||
-    cursor.presentation.status === 'awaiting-confirm' ||
-    cursor.presentation.status === 'done' ||
-    cursor.presentation.status === 'aborted'
+    isEvidence &&
+    (cursor.presentation.status === 'running' ||
+      cursor.presentation.status === 'paused' ||
+      cursor.presentation.status === 'awaiting-confirm' ||
+      cursor.presentation.status === 'done' ||
+      cursor.presentation.status === 'aborted')
   const showMe =
+    isEvidence &&
     unexpected &&
     (cursor.presentation.status === 'idle' ||
       cursor.presentation.status === 'done' ||

@@ -396,3 +396,28 @@ This report is ACCEPT.
 - 视口：IAB 面板实际渲染 1309×818（工具限制，非产品）；1440×900 专项在受管 Chrome 完成。
 - 早期两次"按钮无响应"的坐标点击后经 el.click() 复核为审计者工具缩放误差（raster 缩放），**已撤回相应产品结论**；矩阵行/History 死交互结论用 el.click() 复核后维持。
 - 汇报中"busy 反馈缺失"基于 1s/3s/9s 采样帧，未排除极短暂指示；标注为采样级证据。
+
+---
+
+# Audit Supplement（2026-09-07，generic-research-spine-hardening 加固后复核）
+
+对应修复分支 `review/generic-research-spine-hardening`，验收契约 `docs/acceptance/generic-research-spine-hardening.md`。证据归档 `docs/acceptance/assets/generic-spine-hardening-2026-09-07/`。
+
+## 对 J–Q 各断点的复核结论（真实浏览器）
+
+| J–Q 断点 | 修复后复核 |
+| --- | --- |
+| P2/J-10 Surprise 白名单失效 | 结构化 `ExpectationCriterion`（seed: IV estimate < OLS estimate）替代关键词；改写中文预期后判据保持显式，真实 specs（0.0747/0.1315）→ Unexpected · Observed "IV estimate 0.1315 > OLS estimate 0.0747" ✓ |
+| K2/P1 Run specifications 真空 | 点击即 "Running k/12"（真实逐 spec SSE 进度）+ rail 当前任务同步；完成自动进 Evidence；失败显示 `spec_run_failed` 单一失败卡 + Retry ✓ |
+| P4/N Cursor 运行时缺陷 | 根因＝`await animate(motionValue,…)` promise 永不 settle 导致脚本冻结在 point 步。修复后：菱形逐步贴合目标（样本级 ~1px）、Show me 全程 ≈5.8s ≤6s、scroll 后仍贴合、pointerdown 即时暂停 + Resume 续播、Cancel 后高亮/cursor 全清、reduced-motion ≈0.4s 完成 ✓ |
+| K9/E Expectation 保存静默失败 | 503 注入：编辑器内错误卡 + 文本保留 + 后端真值不变 + 无 unhandledrejection + Retry 成功 ✓ |
+| J-0 失败态四种矛盾信号 | boot 注入 FAILED：单一 "Boot failed · 启动失败" 卡（upload_pipeline_failed + Retry Card + Back to desk），无"仍在进行/去冻结/重新选择文件"同屏 ✓ |
+| K5/P5 无回桌入口 | 会话内 "New study · 回工作台" 单击回空桌；Try Card 重开新研究落 Question 页（修复了跨会话视图残留）✓ |
+| K4/P5 矩阵行/History 2 "死交互" | **不可复现（automation/语义伪象）**：硬刷新后 el.click() 单击 OLS 行、再单击 IV 行，从 "Select two specifications…" 占位重建 0.0747→0.1315 对比；History 按钮真实切换 run（title "Switch run (1/2)"↔"(2/2)"）。审计观察到"无效果"的机理：① toggle 语义下点击已选中行会反选、Compare 消失，观感像死；② challenge preview 与 exploratory 是同一 spec 的重复估计，两个 run 系数逐位相同（0.13150383…），History 切换无可见变化。记录在案，不为过审改交互语义 |
+| BrokenPipe（J-0 infra） | repo-owned launcher 下确定性复现（`python -m runner | true` → run 误标 FAILED），独立 issue 跟踪：https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；本分支只在 docs/local-runner.md 记录本地运行前置条件，不在研究节点吞异常 |
+
+## 方法附注
+
+- 复核旅程：New study 回空桌 → Try Card（含注入 boot FAILED 一次后 Retry/Back to desk）→ RQ 改写中文预期（含 PUT 503 注入 + Retry）→ Freeze → Run specifications（k/12 反馈）→ 自动转 Evidence → Unexpected → Show me（时间线采样）→ Compare 0.0747→0.1315 → Accept challenge（revision 1→2、claim stale）→ Review new evidence（v2、based_on 2、stale 清除）→ Approve → Promote supporting specification（canonical=iv_region_dummies）→ Write Results（真实数字 0.1315/0.0550/0.0168/N=3010）→ Linked Evidence（基于证据）。
+- spec_run FAILED 注入在本复核的上一会话完成（同一构建），恢复后 Retry → 自动转 Evidence。
+- 全程 console 无 uncaught exception / unhandledrejection。

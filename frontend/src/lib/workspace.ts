@@ -760,6 +760,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     clearAllCommandStorage()
     clearStoredSessionId()
     switchSession(null)
+    // 新研究从问题卡开始，不携带上一个会话停留的视图。
+    setWorkbenchTab('question')
     setShowGuide(false)
     setDeskOpen(true)
     setUploadError(null)

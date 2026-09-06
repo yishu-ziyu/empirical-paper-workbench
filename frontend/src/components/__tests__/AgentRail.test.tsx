@@ -142,4 +142,84 @@ describe('AgentRail linked evidence', () => {
     )
     expect(screen.getByTestId('evidence-grounded-badge')).toHaveAttribute('data-grounded', 'false')
   })
+
+  test('C2 Question tab does not leak Evidence "Show me" or "IV > OLS"', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'question',
+          research: {
+            surprise: { status: 'Unexpected', observed: 'IV > OLS' },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-prompt')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+    expect(screen.queryByText(/这个变化值得检查/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/IV > OLS/)).not.toBeInTheDocument()
+  })
+
+  test('C2 Paper tab shows Linked Evidence and never leaks Show me or Unexpected result', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'paper',
+          research: {
+            surprise: { status: 'Unexpected', observed: 'IV > OLS' },
+          },
+        })}
+        decision={{
+          title: '写作暂时被阻塞',
+          reason: '识别未通过',
+        }}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={true}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('linked-evidence')).toBeInTheDocument()
+    expect(screen.queryByTestId('agent-cursor-prompt')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+    expect(screen.queryByText(/这个变化值得检查/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('decision-blocker-title')).toHaveTextContent('写作暂时被阻塞')
+    // Max 1 primary decision card
+    expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
+  })
+
+  test('C2 Evidence tab displays Unexpected result prompt and Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: { status: 'Unexpected', observed: 'IV > OLS' },
+          },
+        })}
+        decision={{
+          title: 'Unexpected result',
+          reason: 'IV > OLS',
+        }}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('agent-cursor-prompt')).toBeInTheDocument()
+    expect(screen.getByTestId('agent-cursor-show-me')).toBeInTheDocument()
+    expect(screen.getByText(/这个变化值得检查/)).toBeInTheDocument()
+    expect(screen.getByTestId('agent-cursor-prompt')).toHaveTextContent('IV > OLS')
+    expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
+  })
 })
+

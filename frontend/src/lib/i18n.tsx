@@ -563,6 +563,19 @@ const zh = {
   'journey.step8.title': '⑧ 导出',
   'journey.step8.desc': 'tex / pdf / docx',
   'journey.intervene': '可介入',
+
+  // Card Canonical concepts
+  'canonical.researchQuestion': 'Research Question（研究问题）',
+  'canonical.expectation': 'Expectation（预期）',
+  'canonical.admissibleSpace': 'Admissible Space（合理规格空间）',
+  'canonical.evidenceLab': 'Evidence Lab（证据实验室）',
+  'canonical.surprise': 'Surprise（意外）',
+  'canonical.compare': 'Compare（比较）',
+  'canonical.nextBestChallenge': 'Next-best Challenge（下一步最有价值的检验）',
+  'canonical.claimLedger': 'Claim Ledger（结论账本）',
+  'canonical.supported': 'Supported（当前证据支持）',
+  'canonical.conditionallySupported': 'Conditionally supported（有条件支持）',
+  'canonical.unsupported': 'Unsupported（当前证据不支持）',
 }
 
 const en: typeof zh = {
@@ -1089,6 +1102,19 @@ const en: typeof zh = {
   'journey.step8.title': '⑧ Export',
   'journey.step8.desc': 'tex / pdf / docx',
   'journey.intervene': 'Intervene',
+
+  // Card Canonical concepts
+  'canonical.researchQuestion': 'Research Question',
+  'canonical.expectation': 'Expectation',
+  'canonical.admissibleSpace': 'Admissible Space',
+  'canonical.evidenceLab': 'Evidence Lab',
+  'canonical.surprise': 'Surprise',
+  'canonical.compare': 'Compare',
+  'canonical.nextBestChallenge': 'Next-best Challenge',
+  'canonical.claimLedger': 'Claim Ledger',
+  'canonical.supported': 'Supported',
+  'canonical.conditionallySupported': 'Conditionally supported',
+  'canonical.unsupported': 'Unsupported',
 }
 
 // ── Context ──

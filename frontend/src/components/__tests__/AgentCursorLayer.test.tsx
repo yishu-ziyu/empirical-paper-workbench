@@ -103,4 +103,36 @@ describe('AgentCursorLayer', () => {
     expect(travelDurationMs(true)).toBe(0)
     window.matchMedia = restore
   })
+
+  test('cursor clamps to y >= 56 to avoid sticky header clipping', async () => {
+    render(
+      <AgentCursorRoot
+        workbenchTab="evidence"
+        research={null}
+        onOpenEvidence={vi.fn()}
+        onRunPreview={vi.fn(async () => undefined)}
+      >
+        <Target id="evidence.spec.ols" />
+        <Controls />
+      </AgentCursorRoot>,
+    )
+    const targetEl = screen.getByTestId('evidence.spec.ols')
+    targetEl.getBoundingClientRect = () => ({
+      left: 100,
+      top: 10,
+      width: 20,
+      height: 20,
+      right: 120,
+      bottom: 30,
+      x: 100,
+      y: 10,
+      toJSON: () => {},
+    })
+    targetEl.scrollIntoView = vi.fn()
+    fireEvent.click(screen.getByTestId('agent-cursor-show-me'))
+    await vi.waitFor(() => {
+      expect(targetEl.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
+    })
+  })
 })
+

@@ -441,3 +441,36 @@ def test_evidence_contract_unchanged_with_claims(client):
     assert "estimate" in body
     assert "provenance" in body
     assert "claims" not in body
+
+
+def test_claim_presentation_only_review_preserves_version_and_events_stale_bumps(client):
+    sid = _boot_frozen(client)
+    lab = _run_space(client, sid)
+    claim = lab["claim"]
+    assert claim["version"] == 1
+    events_initial = lab.get("decision_events") or []
+    draft_events_initial = [e for e in events_initial if e.get("kind") == "claim_drafted"]
+    assert len(draft_events_initial) == 1
+
+    # Presentation-only review: without calling draft endpoint, Claim version remains 1 and events are untouched
+    lab_current = client.get(f"/sessions/{sid}/research").json()
+    assert lab_current["claim"]["version"] == 1
+    draft_events_after = [
+        e for e in (lab_current.get("decision_events") or []) if e.get("kind") == "claim_drafted"
+    ]
+    assert len(draft_events_after) == 1
+
+    # Calling draft endpoint (Review new evidence / redraft) bumps version and appends event
+    draft_resp = client.post(
+        f"/sessions/{sid}/research/claims/draft",
+        headers=_headers(),
+    )
+    assert draft_resp.status_code == 200, draft_resp.text
+    lab_redrafted = draft_resp.json()
+    assert lab_redrafted["claim"]["version"] == 2
+    draft_events_redrafted = [
+        e for e in (lab_redrafted.get("decision_events") or []) if e.get("kind") == "claim_drafted"
+    ]
+    assert len(draft_events_redrafted) == 2
+    assert draft_events_redrafted[-1]["payload"].get("version") == 2
+

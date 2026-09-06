@@ -75,92 +75,118 @@ function App() {
 
   // 只选择一件最先需要作者处理的事，其他提示留在可展开建议中。
   // 输入全部来自 snapshot 投影字段（C6），这里只做 presentation 推导。
+  const currentTab = ws.workbenchTab || 'question'
+  const isEvidenceTab = currentTab === 'evidence'
+  const isPaperTab = currentTab === 'paper'
+  const isQuestionGroup = !isEvidenceTab && !isPaperTab
+
   let blockingDecision: WorkspaceDecision | null = null
-  if (ws.identFailed) {
-    blockingDecision = {
-      title: '研究设计需要重开',
-      reason: ws.identReport || '识别未通过，先改研究设计再写正文。',
-      actionLabel: '修改研究设计',
-      onAction: openDirection,
+
+  if (isQuestionGroup) {
+    if (ws.identFailed) {
+      blockingDecision = {
+        title: '研究设计需要重开',
+        reason: ws.identReport || '识别未通过，先改研究设计再写正文。',
+        actionLabel: '修改研究设计',
+        onAction: openDirection,
+      }
+    } else if (ws.runFailure) {
+      blockingDecision = {
+        title: '上一次运行失败',
+        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
+        actionLabel: '重新运行',
+        onAction: openDirection,
+      }
+    } else if (
+      ws.research?.teaching_case &&
+      !ws.research.specification_space?.frozen_at &&
+      !ws.directionBusy
+    ) {
+      blockingDecision = {
+        title: '确认 Admissible Space',
+        reason: '先冻结合理规格空间，再看比较结果。比较结果不会在冻结前出现。',
+        actionLabel: '查看规格空间',
+        onAction: () => ws.setWorkbenchTab('design'),
+      }
+    } else if (
+      !ws.research?.teaching_case &&
+      ws.directionOpen &&
+      !ws.directionBusy &&
+      !ws.directionDisabledReason
+    ) {
+      blockingDecision = {
+        title: ws.directionSummary ? '确认修改后的研究方向' : '确认研究方向',
+        reason: ws.directionSummary
+          ? '研究方向正在修改；提交这次修改后，系统才会按新设计继续。'
+          : '需要你确认研究问题、变量和方法；确认后系统才会运行估计。',
+        actionLabel: '打开研究方向',
+        onAction: openDirection,
+      }
     }
-  } else if (ws.runFailure) {
-    blockingDecision = {
-      title: '上一次运行失败',
-      reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
-      actionLabel: '重新运行',
-      onAction: openDirection,
+  } else if (isEvidenceTab) {
+    if (ws.runFailure) {
+      blockingDecision = {
+        title: '上一次运行失败',
+        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
+        actionLabel: '重新运行',
+        onAction: openDirection,
+      }
+    } else if (
+      ws.research?.teaching_case &&
+      Boolean(ws.research.specification_space?.frozen_at) &&
+      !(ws.research.specification_runs && ws.research.specification_runs.length) &&
+      !ws.activeRun
+    ) {
+      blockingDecision = {
+        title: 'Run specifications',
+        reason: 'Admissible space is frozen. Run the included specifications to see real estimates.',
+        actionLabel: 'Run specifications',
+        onAction: () => {
+          ws.setWorkbenchTab('evidence')
+          void ws.handleRunSpecSpace()
+        },
+      }
+    } else if (ws.research?.surprise?.status === 'Unexpected') {
+      blockingDecision = {
+        title: 'Unexpected result',
+        reason:
+          ws.research.surprise.observed ||
+          'Observed estimates do not match the recorded expectation.',
+      }
     }
-  } else if (ws.writeBlockers.length > 0) {
-    blockingDecision = {
-      title: '写作暂时被阻塞',
-      reason: ws.writeBlockers[0],
-      actionLabel: '查看论文工作区',
-      onAction: () => ws.setWorkbenchTab('paper'),
-    }
-  } else if (
-    ws.research?.teaching_case &&
-    !ws.research.specification_space?.frozen_at &&
-    !ws.directionBusy
-  ) {
-    blockingDecision = {
-      title: '确认 Admissible Space',
-      reason: '先冻结合理规格空间，再看比较结果。比较结果不会在冻结前出现。',
-      actionLabel: '查看规格空间',
-      onAction: () => ws.setWorkbenchTab('design'),
-    }
-  } else if (
-    ws.research?.teaching_case &&
-    Boolean(ws.research.specification_space?.frozen_at) &&
-    !(ws.research.specification_runs && ws.research.specification_runs.length) &&
-    !ws.activeRun
-  ) {
-    blockingDecision = {
-      title: 'Run specifications',
-      reason: 'Admissible space is frozen. Run the included specifications to see real estimates.',
-      actionLabel: 'Run specifications',
-      onAction: () => {
-        ws.setWorkbenchTab('evidence')
-        void ws.handleRunSpecSpace()
-      },
-    }
-  } else if (ws.research?.surprise?.status === 'Unexpected') {
-    blockingDecision = {
-      title: 'Unexpected result',
-      reason:
-        ws.research.surprise.observed ||
-        'Observed estimates do not match the recorded expectation.',
-    }
-  } else if (
-    !ws.research?.teaching_case &&
-    ws.directionOpen &&
-    !ws.directionBusy &&
-    !ws.directionDisabledReason
-  ) {
-    blockingDecision = {
-      title: ws.directionSummary ? '确认修改后的研究方向' : '确认研究方向',
-      reason: ws.directionSummary
-        ? '研究方向正在修改；提交这次修改后，系统才会按新设计继续。'
-        : '需要你确认研究问题、变量和方法；确认后系统才会运行估计。',
-      actionLabel: '打开研究方向',
-      onAction: openDirection,
-    }
-  } else if (ws.outline.length > 0 && !ws.outlineLocked && !ws.writeBusy && !ws.writtenChapter?.content) {
-    blockingDecision = {
-      title: '确认论文大纲',
-      reason: '大纲已形成，等待你确认章节结构后开始写作。',
-      actionLabel: '查看大纲',
-      onAction: () => ws.setWorkbenchTab('paper'),
-    }
-  } else if (pendingChapter) {
-    blockingDecision = {
-      title: '确认当前章节',
-      reason: `“${pendingChapter.title || pendingChapter.type}”已生成，等待你批准、修改或打回重写。`,
-      actionLabel: '查看章节',
-      onAction: () => {
-        const index = ws.outline.findIndex((chapter) => chapter.type === pendingChapter.type)
-        if (index >= 0) ws.handleSelectChapter(index)
-        ws.setWorkbenchTab('paper')
-      },
+  } else if (isPaperTab) {
+    if (ws.runFailure) {
+      blockingDecision = {
+        title: '上一次运行失败',
+        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
+        actionLabel: '重新运行',
+        onAction: openDirection,
+      }
+    } else if (ws.writeBlockers.length > 0) {
+      blockingDecision = {
+        title: '写作暂时被阻塞',
+        reason: ws.writeBlockers[0],
+        actionLabel: '查看论文工作区',
+        onAction: () => ws.setWorkbenchTab('paper'),
+      }
+    } else if (pendingChapter) {
+      blockingDecision = {
+        title: '确认当前章节',
+        reason: `“${pendingChapter.title || pendingChapter.type}”已生成，等待你批准、修改或打回重写。`,
+        actionLabel: '查看章节',
+        onAction: () => {
+          const index = ws.outline.findIndex((chapter) => chapter.type === pendingChapter.type)
+          if (index >= 0) ws.handleSelectChapter(index)
+          ws.setWorkbenchTab('paper')
+        },
+      }
+    } else if (ws.outline.length > 0 && !ws.outlineLocked && !ws.writeBusy && !ws.writtenChapter?.content) {
+      blockingDecision = {
+        title: '确认论文大纲',
+        reason: '大纲已形成，等待你确认章节结构后开始写作。',
+        actionLabel: '查看大纲',
+        onAction: () => ws.setWorkbenchTab('paper'),
+      }
     }
   }
 
@@ -184,21 +210,23 @@ function App() {
       (ws.estimateMeta?.status === 'ok' || ws.treatmentRow || ws.mainResults),
   )
   const decisionSuggestions: WorkspaceSuggestion[] = []
-  if (ws.hasReadout) {
-    decisionSuggestions.push({
-      title: '查看证据解释',
-      detail: '识别说明、稳健性和运行摘要不会打断论文正文。',
-      actionLabel: '打开 Evidence',
-      onAction: openEvidence,
-    })
-  }
-  if (ws.degradations.length > 0) {
-    decisionSuggestions.push({
-      title: '有降级记录可查看',
-      detail: `${ws.degradations[0].node}: ${ws.degradations[0].reason}`,
-      actionLabel: '查看运行记录',
-      onAction: openEvidence,
-    })
+  if (isPaperTab) {
+    if (ws.hasReadout) {
+      decisionSuggestions.push({
+        title: '查看证据解释',
+        detail: '识别说明、稳健性和运行摘要不会打断论文正文。',
+        actionLabel: '打开 Evidence',
+        onAction: openEvidence,
+      })
+    }
+    if (ws.degradations.length > 0) {
+      decisionSuggestions.push({
+        title: '有降级记录可查看',
+        detail: `${ws.degradations[0].node}: ${ws.degradations[0].reason}`,
+        actionLabel: '查看运行记录',
+        onAction: openEvidence,
+      })
+    }
   }
 
   const handleLogin = useCallback(

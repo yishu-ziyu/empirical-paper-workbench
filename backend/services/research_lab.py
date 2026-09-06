@@ -818,8 +818,14 @@ def next_card_challenge(lab: dict[str, Any]) -> Optional[dict[str, Any]]:
             "id": "challenge.instrument_strength",
             "target": "instrument_strength",
             "rationale": (
-                "College proximity may be a weak instrument after the "
-                f"comparable controls (effective F={f_text})."
+                "Instrument strength deserves inspection. "
+                f"Effective F = {f_text}. "
+                "Strength diagnostics alone do not establish instrument validity."
+            ),
+            "rationale_zh": (
+                "工具变量强度值得检查。"
+                f"Effective F = {f_text}。"
+                "强度诊断本身不能证明工具变量有效。"
             ),
             "proposed_specification_change": {
                 "spec_id": iv_id,

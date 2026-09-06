@@ -51,7 +51,52 @@ def paper_ready_to_write(state: dict, chapter_type: str) -> tuple[bool, list[str
         missing.append("no_robustness")
     if "literature" in need and not literature_ran(state):
         missing.append("no_literature")
+    if chapter_type == "results" and research_claims_exist(state):
+        claim = current_research_claim(state)
+        if not claim or not claim.get("approved_by_user"):
+            missing.append("claim_unapproved")
     return (not missing, missing)
+
+
+def research_claims_exist(state: dict) -> bool:
+    lab = state.get("research_lab")
+    if not isinstance(lab, dict):
+        return False
+    claims = lab.get("claims") or []
+    return any(isinstance(item, dict) and item.get("id") for item in claims)
+
+
+def current_research_claim(state: dict) -> dict | None:
+    lab = state.get("research_lab")
+    if not isinstance(lab, dict):
+        return None
+    claims = [item for item in (lab.get("claims") or []) if isinstance(item, dict)]
+    cid = lab.get("current_claim_id")
+    if cid:
+        for item in claims:
+            if item.get("id") == cid:
+                return item
+    existing = lab.get("claim")
+    if isinstance(existing, dict) and existing.get("id"):
+        return existing
+    return claims[-1] if claims else None
+
+
+def results_is_grounded(state: dict, chapter: dict | None = None) -> bool:
+    chapter = chapter if isinstance(chapter, dict) else {}
+    if chapter.get("stale") or chapter.get("needs_regeneration"):
+        return False
+    content = str(chapter.get("content") or "")
+    claim = current_research_claim(state)
+    if research_claims_exist(state):
+        if not claim or not claim.get("approved_by_user"):
+            return False
+        forbidden = str(claim.get("unsupported_wording") or "").strip()
+        if forbidden and forbidden in content:
+            return False
+        return True
+    est = state.get("estimate") or {}
+    return isinstance(est, dict) and est.get("status") in ("ok", "degraded")
 
 
 def estimate_ran(state: dict) -> bool:

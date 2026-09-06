@@ -38,6 +38,7 @@ export const LS_PENDING_RUN_KEY = 'econpaper_pending_run_command'
 export const LS_PENDING_UPLOAD_KEY = 'econpaper_pending_upload'
 
 export const SAMPLE_CSV = '/samples/course-panel.csv'
+export const CARD_DEMO_FILENAME = 'card_1995.csv'
 export const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',
   dv: 'income',
@@ -58,6 +59,7 @@ type DirectionAcceptance =
 export type WorkspaceSnapshot = components['schemas']['SessionInfoResponse']
 export type SnapshotDataset = components['schemas']['SnapshotDatasetResponse']
 export type EvidenceModel = components['schemas']['EvidenceResponse']
+export type ResearchLab = NonNullable<WorkspaceSnapshot['research']>
 
 type StoredPendingRun = {
   idempotencyKey: string
@@ -153,6 +155,16 @@ async function uploadResponse(response: Response): Promise<UploadAcceptance> {
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new RunRequestError(response.status)
   return payload as UploadAcceptance
+}
+
+export async function acceptCardDemoRun(
+  idempotencyKey: string,
+): Promise<UploadAcceptance> {
+  const response = await apiFetch(`${API_BASE}/demos/card`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey, ...authHeaders() },
+  })
+  return uploadResponse(response)
 }
 
 export async function acceptUploadRun(
@@ -394,7 +406,8 @@ export function snapshotHasDesk(data: WorkspaceSnapshot): boolean {
       (data.outline && data.outline.length) ||
       (data.body_chapters && data.body_chapters.length) ||
       data.research_direction ||
-      data.dataset,
+      data.dataset ||
+      data.research,
   )
 }
 
@@ -403,7 +416,30 @@ export function snapshotHasDesk(data: WorkspaceSnapshot): boolean {
  * 直接落在 Overview。仅有数据集（刚上传、还没提交方向）不算：
  * 此时用户应该停在研究问题表单，而不是被甩到仪表盘。
  */
+export function researchQuestionPrompt(
+  research: ResearchLab | null | undefined,
+): string | null {
+  const q = research?.question
+  if (!q || typeof q !== 'object') return null
+  const en = typeof q.prompt_en === 'string' ? q.prompt_en.trim() : ''
+  const zh = typeof q.prompt_zh === 'string' ? q.prompt_zh.trim() : ''
+  return en || zh || null
+}
+
+export function hasConfirmedResearchQuestion(
+  research: ResearchLab | null | undefined,
+  directionSummary?: string | null,
+): boolean {
+  return Boolean(
+    directionSummary ||
+      researchQuestionPrompt(research) ||
+      research?.question ||
+      research?.teaching_case,
+  )
+}
+
 export function snapshotHasResearchContent(data: WorkspaceSnapshot): boolean {
+  const lab = data.research
   return Boolean(
     data.claim ||
       data.results ||
@@ -412,7 +448,10 @@ export function snapshotHasResearchContent(data: WorkspaceSnapshot): boolean {
       data.identification_report ||
       (Array.isArray(data.outline) && data.outline.length) ||
       (Array.isArray(data.body_chapters) && data.body_chapters.length) ||
-      data.research_direction,
+      data.research_direction ||
+      lab?.specification_space?.frozen_at ||
+      (Array.isArray(lab?.specification_runs) && lab.specification_runs.length > 0) ||
+      lab?.claim,
   )
 }
 
@@ -514,6 +553,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const [evidenceRefreshKey, setEvidenceRefreshKey] = useState(0)
   // snapshot.active_run 投影：Overview「上次运行」卡与 Agent 栏当前任务共用。
   const [activeRun, setActiveRun] = useState<WorkspaceSnapshot['active_run']>(null)
+  const [research, setResearch] = useState<ResearchLab | null>(null)
 
   const showGlobalError = useCallback((message: string) => {
     setGlobalError(message)
@@ -529,6 +569,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setDirectionBusy(false)
     setUploading(false)
     setActiveRun(null)
+    setResearch(null)
   }, [])
 
   const switchSession = useCallback(
@@ -616,6 +657,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       )
     }
     if (data.dataset) setDataset(data.dataset)
+    setResearch(data.research ?? null)
     setLiteratureSource(data.literature_source ?? null)
     setWriteBlockers(Array.isArray(data.write_blockers) ? data.write_blockers : [])
     setIdentFailed(Boolean(data.identification_failed))
@@ -638,9 +680,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
     if (summary) {
       setDirectionSummary(summary)
       setDirectionOpen(false)
+    } else if (data.research?.teaching_case) {
+      setDirectionOpen(false)
     }
     const asked = researchDirection?.question?.trim()
+    const prompt = researchQuestionPrompt(data.research)
     if (asked) setShapedQuestion(asked)
+    else if (prompt) setShapedQuestion(prompt)
     if (researchDirection) {
       const rd = researchDirection
       const controls = asControlList(rd.controls)
@@ -1170,6 +1216,234 @@ export function useWorkspace(opts: WorkspaceOptions) {
     }
   }, [uploadCsv])
 
+  const handleTryCard = useCallback(async () => {
+    sessionStorage.removeItem(LS_SAMPLE_KEY)
+    setSampleDirection(null)
+    invalidateSessionWork()
+    uploadRecoveryEpochRef.current += 1
+    const intent = beginUploadIntent(CARD_DEMO_FILENAME)
+    uploadOperationRef.current = intent.idempotencyKey
+    setUploading(true)
+    setCleaningReport(null)
+    setUploadError(null)
+    setUploadNeedsReselect(false)
+    setUploadStatus(t('app.uploadSubmitting'))
+    let sid: string | null = null
+    let controller: AbortController | null = null
+    const isCurrent = () => uploadOperationRef.current === intent.idempotencyKey
+    try {
+      const accepted = await acceptCardDemoRun(intent.idempotencyKey)
+      if (!isCurrent()) return
+      sid = accepted.session_id
+      applyUploadMetadata(accepted, CARD_DEMO_FILENAME)
+      if (!isCurrent()) return
+      const snap = await fetchSessionSnapshot(accepted.session_id).catch(() => null)
+      if (snap && isCurrent()) applySnapshot(snap)
+      if (!accepted.run_id || !accepted.events_url) {
+        clearPendingUpload(intent.idempotencyKey)
+        uploadOperationRef.current = null
+        setUploadReadiness('READY')
+        setUploadStatus(t('app.uploadReady'))
+        setUploading(false)
+        return
+      }
+      setUploadReadiness('PROCESSING')
+      setUploading(true)
+      setUploadStatus(t('app.uploadProcessing'))
+      controller = new AbortController()
+      runAbortRef.current?.abort()
+      runAbortRef.current = controller
+      const result = await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+      if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
+      clearPendingUpload(intent.idempotencyKey)
+      uploadOperationRef.current = null
+      setUploadReadiness('READY')
+      setUploadStatus(t('app.uploadReady'))
+      setUploading(false)
+      applySnapshot(result as WorkspaceSnapshot)
+      applySnapshot(await fetchSessionSnapshot(accepted.session_id))
+    } catch (err) {
+      if (isCurrent()) handleUploadRunError(err, sid, null)
+    } finally {
+      if (runAbortRef.current === controller) runAbortRef.current = null
+      if (isCurrent()) setUploading(false)
+    }
+  }, [applySnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t])
+
+  const handleSaveExpectation = useCallback(
+    async (payload: { text: string; confidence: 'low' | 'medium' | 'high'; locale?: string }) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/expectation`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(payload),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      applySnapshot(await fetchSessionSnapshot(sid))
+    },
+    [applySnapshot],
+  )
+
+  const handleFreezeSpecSpace = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const resp = await apiFetch(
+      `${API_BASE}/sessions/${sid}/research/specification-space/freeze`,
+      {
+        method: 'POST',
+        headers: authHeaders(),
+      },
+    )
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    applySnapshot(await fetchSessionSnapshot(sid))
+  }, [applySnapshot])
+
+  const waitForSpecRun = useCallback(
+    async (sid: string, accepted: { run_id: string; events_url: string }) => {
+      const controller = new AbortController()
+      runAbortRef.current?.abort()
+      runAbortRef.current = controller
+      setActiveRun({ run_id: accepted.run_id, kind: 'spec_run', status: 'PENDING' })
+      try {
+        await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+        if (activeSessionRef.current !== sid) return
+        applySnapshot(await fetchSessionSnapshot(sid))
+        setEvidenceRefreshKey((key) => key + 1)
+      } finally {
+        if (runAbortRef.current === controller) runAbortRef.current = null
+      }
+    },
+    [applySnapshot],
+  )
+
+  const handleRunSpecSpace = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const resp = await apiFetch(
+      `${API_BASE}/sessions/${sid}/research/specification-space/run`,
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID(), ...authHeaders() },
+      },
+    )
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const accepted = (await resp.json()) as RunAccepted
+    await waitForSpecRun(sid, accepted)
+  }, [waitForSpecRun])
+
+  const handleRunSpec = useCallback(
+    async (specId: string, mode: 'canonical' | 'preview' = 'preview') => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/specs/${specId}/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ mode }),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const accepted = (await resp.json()) as RunAccepted
+      await waitForSpecRun(sid, accepted)
+    },
+    [waitForSpecRun],
+  )
+
+  const handleCompareSpecs = useCallback(async (a: string, b: string) => {
+    const sid = activeSessionRef.current
+    if (!sid) return null
+    const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ a, b }),
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    return resp.json()
+  }, [])
+
+  const handlePromotePreview = useCallback(
+    async (runId: string) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/preview/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ run_id: runId }),
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      applySnapshot(await fetchSessionSnapshot(sid))
+    },
+    [applySnapshot],
+  )
+
+  const handleRevertPreview = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/preview/revert`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    applySnapshot(await fetchSessionSnapshot(sid))
+  }, [applySnapshot])
+
+  const handleAcceptChallenge = useCallback(
+    async (challengeId: string) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const resp = await apiFetch(
+        `${API_BASE}/sessions/${sid}/research/challenges/${challengeId}/accept`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID(), ...authHeaders() },
+        },
+      )
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const accepted = (await resp.json()) as RunAccepted
+      await waitForSpecRun(sid, accepted)
+    },
+    [waitForSpecRun],
+  )
+
+  const handleApproveClaim = useCallback(
+    async (claimId: string) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const resp = await apiFetch(
+        `${API_BASE}/sessions/${sid}/research/claims/${claimId}/approve`,
+        {
+          method: 'POST',
+          headers: authHeaders(),
+        },
+      )
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      applySnapshot(await fetchSessionSnapshot(sid))
+    },
+    [applySnapshot],
+  )
+
+  const handlePreparePaper = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const prepared = await apiFetch(`${API_BASE}/sessions/${sid}/research/prepare-paper`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    if (!prepared.ok) throw new Error(`HTTP ${prepared.status}`)
+    applySnapshot(await fetchSessionSnapshot(sid))
+    const written = await apiFetch(`${API_BASE}/sessions/${sid}/generate-chapter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ chapter: { type: 'results', title: '结果' } }),
+    })
+    if (!written.ok) throw new Error(`HTTP ${written.status}`)
+    applySnapshot(await fetchSessionSnapshot(sid))
+    setWorkbenchTab('paper')
+  }, [applySnapshot])
+
   const handleDirectionSubmit = useCallback(
     async (data: DirectionFormData) => {
       if (directionGateForReadiness(uploadReadiness).disabled) {
@@ -1616,6 +1890,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     runFailure,
     evidenceRefreshKey,
     activeRun,
+    research,
     // derived
     hasReadout,
     canExport,
@@ -1648,6 +1923,17 @@ export function useWorkspace(opts: WorkspaceOptions) {
     takeCsv,
     handleFileSelect,
     handleTrySample,
+    handleTryCard,
+    handleSaveExpectation,
+    handleFreezeSpecSpace,
+    handleRunSpecSpace,
+    handleRunSpec,
+    handleCompareSpecs,
+    handlePromotePreview,
+    handleRevertPreview,
+    handleAcceptChallenge,
+    handleApproveClaim,
+    handlePreparePaper,
     handleDirectionSubmit,
     handleWriteChapter,
     handleSelectChapter,

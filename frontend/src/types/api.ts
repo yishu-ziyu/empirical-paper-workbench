@@ -377,6 +377,230 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/demos/card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Boot Card Demo
+         * @description Empty-desk Card boot: real extract through the existing upload pipeline.
+         */
+        post: operations["boot_card_demo_demos_card_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Research */
+        get: operations["get_research_sessions__session_id__research_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/expectation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Expectation */
+        put: operations["put_expectation_sessions__session_id__research_expectation_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/specification-space/freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freeze Space */
+        post: operations["freeze_space_sessions__session_id__research_specification_space_freeze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/specification-space/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Specification Space */
+        post: operations["run_specification_space_sessions__session_id__research_specification_space_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/specs/{spec_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run One Specification */
+        post: operations["run_one_specification_sessions__session_id__research_specs__spec_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compare Specs */
+        post: operations["compare_specs_sessions__session_id__research_compare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/preview/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote Preview */
+        post: operations["promote_preview_sessions__session_id__research_preview_promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/preview/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revert Preview */
+        post: operations["revert_preview_sessions__session_id__research_preview_revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/challenges/{challenge_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Challenge */
+        post: operations["accept_challenge_sessions__session_id__research_challenges__challenge_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/claims/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft Research Claim */
+        post: operations["draft_research_claim_sessions__session_id__research_claims_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/claims/{claim_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Research Claim */
+        post: operations["approve_research_claim_sessions__session_id__research_claims__claim_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/research/prepare-paper": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Research Paper */
+        post: operations["prepare_research_paper_sessions__session_id__research_prepare_paper_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/labels": {
         parameters: {
             query?: never;
@@ -1247,6 +1471,12 @@ export interface components {
             grounding_failures?: string[];
             /** Structure Failures */
             structure_failures?: string[];
+            /** Stale */
+            stale?: boolean | null;
+            /** Needs Regeneration */
+            needs_regeneration?: boolean | null;
+            /** Grounded */
+            grounded?: boolean | null;
         } & {
             [key: string]: unknown;
         };
@@ -1318,6 +1548,70 @@ export interface components {
             } | null;
         };
         /**
+         * ClaimLedgerResponse
+         * @description Deterministic Claim Ledger entry (not the paper-draft main-estimate claim).
+         */
+        ClaimLedgerResponse: {
+            /** Id */
+            id: string;
+            /**
+             * Claim Text
+             * @default
+             */
+            claim_text: string;
+            /**
+             * Claim Type
+             * @default association
+             */
+            claim_type: string;
+            /**
+             * Supported Wording
+             * @default
+             */
+            supported_wording: string;
+            /**
+             * Conditionally Supported Wording
+             * @default
+             */
+            conditionally_supported_wording: string;
+            /**
+             * Unsupported Wording
+             * @default
+             */
+            unsupported_wording: string;
+            /** Supporting Run Ids */
+            supporting_run_ids?: string[];
+            /** Counter Evidence */
+            counter_evidence?: string[];
+            /** Sensitive Dimensions */
+            sensitive_dimensions?: string[];
+            /** Unresolved Assumptions */
+            unresolved_assumptions?: string[];
+            /**
+             * Evidence Status
+             * @default draft
+             */
+            evidence_status: string;
+            /**
+             * Approved By User
+             * @default false
+             */
+            approved_by_user: boolean;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+            /** Run Facts */
+            run_facts?: string | null;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * CreateSessionResponse
          * @description POST /sessions 返回体。
          */
@@ -1350,6 +1644,44 @@ export interface components {
             session_id?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /** DatasetProvenanceResponse */
+        DatasetProvenanceResponse: {
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Citation
+             * @default
+             */
+            citation: string;
+            /**
+             * Checksum
+             * @default
+             */
+            checksum: string;
+            /**
+             * Redistribution
+             * @default
+             */
+            redistribution: string;
+            /** Extract Kind */
+            extract_kind?: string | null;
+        };
+        /** DecisionEventResponse */
+        DecisionEventResponse: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** At */
+            at: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
         };
         /** DeskChatTurn */
         DeskChatTurn: {
@@ -1761,6 +2093,67 @@ export interface components {
              */
             ran: boolean;
         };
+        /** ExpectationHistoryItemResponse */
+        ExpectationHistoryItemResponse: {
+            /** Version */
+            version: number;
+            /** Text */
+            text: string;
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /** Locale */
+            locale?: string | null;
+            /** At */
+            at: string;
+            /**
+             * Kind
+             * @default edit
+             */
+            kind: string;
+        };
+        /** ExpectationResponse */
+        ExpectationResponse: {
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /** Text Zh */
+            text_zh?: string | null;
+            /**
+             * Confidence
+             * @default medium
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /** Locale */
+            locale?: string | null;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+            /** Updated At */
+            updated_at?: string | null;
+            /** History */
+            history?: components["schemas"]["ExpectationHistoryItemResponse"][];
+        };
+        /** ExpectationUpdateRequest */
+        ExpectationUpdateRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /** Locale */
+            locale?: string | null;
+        };
         /**
          * FilterConditionItem
          * @description filter 条件项。
@@ -2128,6 +2521,11 @@ export interface components {
             /** Body Chapters */
             body_chapters?: components["schemas"]["ProgressChapterSummary"][];
         };
+        /** PromoteRequest */
+        PromoteRequest: {
+            /** Run Id */
+            run_id: string;
+        };
         /** QueueFullResponse */
         QueueFullResponse: {
             /** Error */
@@ -2190,6 +2588,76 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** ResearchChoiceResponse */
+        ResearchChoiceResponse: {
+            /** Dimension */
+            dimension: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * ResearchLabResponse
+         * @description Research lab read model (GET /sessions/{id}/research and snapshot.research).
+         */
+        ResearchLabResponse: {
+            /** Teaching Case */
+            teaching_case?: string | null;
+            provenance?: components["schemas"]["DatasetProvenanceResponse"] | null;
+            question?: components["schemas"]["ResearchQuestionResponse"] | null;
+            expectation?: components["schemas"]["ExpectationResponse"] | null;
+            specification_space?: components["schemas"]["SpecificationSpaceResponse"] | null;
+            /** Specification Runs */
+            specification_runs?: components["schemas"]["SpecificationRunResponse"][];
+            /** Decision Events */
+            decision_events?: components["schemas"]["DecisionEventResponse"][];
+            /** Canonical Spec Id */
+            canonical_spec_id?: string | null;
+            /** Next Challenge */
+            next_challenge?: {
+                [key: string]: unknown;
+            } | null;
+            surprise?: components["schemas"]["SurpriseResponse"] | null;
+            /** Claims */
+            claims?: components["schemas"]["ClaimLedgerResponse"][];
+            /** Current Claim Id */
+            current_claim_id?: string | null;
+            claim?: components["schemas"]["ClaimLedgerResponse"] | null;
+        };
+        /** ResearchQuestionResponse */
+        ResearchQuestionResponse: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
+            /**
+             * Prompt En
+             * @default
+             */
+            prompt_en: string;
+            /** Prompt Zh */
+            prompt_zh?: string | null;
+            /** Outcome */
+            outcome?: {
+                [key: string]: unknown;
+            };
+            /** Treatment */
+            treatment?: {
+                [key: string]: unknown;
+            };
+            /** Causal Threat */
+            causal_threat?: {
+                [key: string]: unknown;
+            };
+            /** Identification */
+            identification?: {
+                [key: string]: unknown;
+            };
+            /** Estimand */
+            estimand?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ResumeRequest
@@ -2345,7 +2813,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "prewrite" | "upload_pipeline";
+            kind: "prewrite" | "upload_pipeline" | "spec_run";
             /**
              * Status
              * @enum {string}
@@ -2356,7 +2824,7 @@ export interface components {
             /** Lease Epoch */
             lease_epoch: number;
             /** Result */
-            result?: components["schemas"]["DirectionResponse"] | components["schemas"]["UploadRunResultResponse"] | null;
+            result?: components["schemas"]["DirectionResponse"] | components["schemas"]["UploadRunResultResponse"] | components["schemas"]["SpecRunResultResponse"] | null;
             /** Error */
             error?: string | null;
         };
@@ -2439,6 +2907,7 @@ export interface components {
             degradations?: {
                 [key: string]: unknown;
             }[];
+            research?: components["schemas"]["ResearchLabResponse"] | null;
         };
         /**
          * SnapshotActiveRunResponse
@@ -2453,7 +2922,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "prewrite" | "upload_pipeline";
+            kind: "prewrite" | "upload_pipeline" | "spec_run";
             /** Status */
             status: string;
         };
@@ -2480,6 +2949,197 @@ export interface components {
             version?: string | null;
             /** Role */
             role?: string | null;
+        };
+        /** SpecCompareRequest */
+        SpecCompareRequest: {
+            /** A */
+            a: string;
+            /** B */
+            b: string;
+        };
+        /** SpecCompareResponse */
+        SpecCompareResponse: {
+            /** Coef A */
+            coef_a?: number | null;
+            /** Coef B */
+            coef_b?: number | null;
+            /** Delta Abs */
+            delta_abs?: number | null;
+            /** Delta Pct */
+            delta_pct?: number | null;
+            /** Changed */
+            changed?: {
+                [key: string]: unknown;
+            }[];
+            /** Unchanged */
+            unchanged?: {
+                [key: string]: unknown;
+            }[];
+            /** Why Moved */
+            why_moved?: string | null;
+            /** Intent */
+            intent?: string | null;
+            /** A */
+            a?: {
+                [key: string]: unknown;
+            };
+            /** B */
+            b?: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /** SpecRunRequest */
+        SpecRunRequest: {
+            /**
+             * Mode
+             * @default preview
+             * @enum {string}
+             */
+            mode: "canonical" | "preview";
+        };
+        /** SpecRunResultResponse */
+        SpecRunResultResponse: {
+            /**
+             * Ok
+             * @default true
+             * @constant
+             */
+            ok: true;
+            /**
+             * Specification Run Count
+             * @default 0
+             */
+            specification_run_count: number;
+        };
+        /** SpecificationDefinitionResponse */
+        SpecificationDefinitionResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Rationale */
+            rationale: string;
+            /** Dimension */
+            dimension: string;
+            /** Value */
+            value: string;
+            /**
+             * Admissible
+             * @default true
+             */
+            admissible: boolean;
+            /**
+             * User Decision
+             * @default include
+             */
+            user_decision: string;
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
+            /** Choices */
+            choices?: components["schemas"]["ResearchChoiceResponse"][];
+        };
+        /**
+         * SpecificationRunResponse
+         * @description Immutable result of one admissible specification execution.
+         */
+        SpecificationRunResponse: {
+            /** Id */
+            id: string;
+            /** Spec Id */
+            spec_id: string;
+            /**
+             * Spec Version
+             * @default 1
+             */
+            spec_version: number;
+            /** Label */
+            label?: string | null;
+            /** Choices */
+            choices?: components["schemas"]["ResearchChoiceResponse"][];
+            /** Estimator */
+            estimator?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Formula */
+            formula?: string | null;
+            /** Covariance */
+            covariance?: string | null;
+            /** Analysis Dataset */
+            analysis_dataset?: {
+                [key: string]: unknown;
+            } | null;
+            /** Producer Run Id */
+            producer_run_id?: string | null;
+            /** Coef */
+            coef?: number | null;
+            /** Se */
+            se?: number | null;
+            /** P */
+            p?: number | null;
+            /** N */
+            n?: number | null;
+            /** Diagnostics */
+            diagnostics?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Status
+             * @default ok
+             */
+            status: string;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            };
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Relation
+             * @default exploratory
+             * @enum {string}
+             */
+            relation: "canonical" | "preview" | "exploratory";
+        } & {
+            [key: string]: unknown;
+        };
+        /** SpecificationSpaceResponse */
+        SpecificationSpaceResponse: {
+            /**
+             * Status
+             * @default proposed
+             */
+            status: string;
+            /** Frozen At */
+            frozen_at?: string | null;
+            /**
+             * Frozen Before Results
+             * @default false
+             */
+            frozen_before_results: boolean;
+            /**
+             * Revealed
+             * @default false
+             */
+            revealed: boolean;
+            /** Definitions */
+            definitions?: components["schemas"]["SpecificationDefinitionResponse"][];
+        };
+        /** SurpriseResponse */
+        SurpriseResponse: {
+            /** Status */
+            status?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /** Kinds */
+            kinds?: string[];
+            /** Expected */
+            expected?: string | null;
+            /** Observed */
+            observed?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -3195,6 +3855,448 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    boot_card_demo_demos_card_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+            /** @description Idempotency key was reused for different input */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The durable run queue is full */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_research_sessions__session_id__research_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_expectation_sessions__session_id__research_expectation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpectationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_space_sessions__session_id__research_specification_space_freeze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_specification_space_sessions__session_id__research_specification_space_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_one_specification_sessions__session_id__research_specs__spec_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                spec_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_specs_sessions__session_id__research_compare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpecCompareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecCompareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_preview_sessions__session_id__research_preview_promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_preview_sessions__session_id__research_preview_revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_challenge_sessions__session_id__research_challenges__challenge_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                challenge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAcceptedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_research_claim_sessions__session_id__research_claims_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_research_claim_sessions__session_id__research_claims__claim_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_research_paper_sessions__session_id__research_prepare_paper_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchLabResponse"];
                 };
             };
             /** @description Validation Error */

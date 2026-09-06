@@ -165,11 +165,18 @@ class AgentFacade:
             for item in (state.get("outline") or [])
             if isinstance(item, dict)
         ]
-        body_chapters = [
-            item
-            for item in (state.get("body_chapters") or [])
-            if isinstance(item, dict)
-        ]
+        from agent.engine.readiness import results_is_grounded
+
+        body_chapters = []
+        for item in state.get("body_chapters") or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "results":
+                chapter = dict(item)
+                chapter["grounded"] = results_is_grounded(state, chapter)
+                body_chapters.append(chapter)
+            else:
+                body_chapters.append(item)
         return {
             "claim": state.get("claim"),
             "star_rating": state.get("star_rating"),

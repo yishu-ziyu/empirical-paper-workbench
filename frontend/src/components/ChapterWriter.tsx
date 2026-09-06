@@ -50,6 +50,7 @@ export interface ChapterWriterProps {
   onRollback?: (versionIndex: number) => void
   /** T-08c: {t('chapter.save')}{t('chapter.edit')}回调（集成阶段调 POST /sessions/{id}/edit-chapter）。失败请 reject，组件会留在编辑态保住草稿。第二个参数是进入编辑时的章节序号，避免切章后写到新选中的章。 */
   onSaveEdit?: (content: string, chapterIndex?: number) => void | Promise<void>
+  onJumpToClaim?: () => void
 }
 
 const BADGE_CLASS = 'bg-paper text-muted border border-border'
@@ -67,6 +68,7 @@ export default function ChapterWriter({
   onRollback,
   onSaveEdit,
   chapterIndex,
+  onJumpToClaim,
   // sessionId — 接口保留供集成阶段直接 fetch 使用，当前组件走回调模式。
 }: ChapterWriterProps) {
   const { t } = useT()
@@ -136,6 +138,26 @@ export default function ChapterWriter({
         <h3 className="text-sm font-semibold">{chapter.title}</h3>
         <ApprovalBadge chapter={chapter} />
       </div>
+
+      {chapter.stale || chapter.needs_regeneration ? (
+        <p
+          data-testid="chapter-stale"
+          className="rounded-md border border-wb-line bg-wb-subtle px-3 py-2 text-[12px] text-wb-muted"
+        >
+          Stale · needs regeneration
+        </p>
+      ) : null}
+
+      {onJumpToClaim ? (
+        <button
+          type="button"
+          data-testid="paper-claim-link"
+          onClick={onJumpToClaim}
+          className="text-[12px] text-wb-muted underline-offset-2 hover:text-wb-ink hover:underline"
+        >
+          View Claim / Evidence
+        </button>
+      ) : null}
 
       {isEditing || isStreaming ? (
         <div data-testid="chapter-codemirror" className="rounded border border-border">

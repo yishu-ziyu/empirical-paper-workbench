@@ -427,12 +427,6 @@ export default function WorkbenchArtifact({
 
           {paperTab === 'writing' && (
             <div data-testid="paper-writing" className="wb-pane-enter space-y-5">
-              <SubmissionStatus
-                canExport={submissionReady}
-                blockers={submissionBlockers}
-                passed={submissionPassed}
-                onGenerate={() => ws.setDocExportOpen(true)}
-              />
               {ws.outline.length > 0 && !ws.identFailed ? (
                 <section data-testid="paper-navigation" className="rounded-lg border border-wb-line bg-wb-surface px-4 py-3">
                   <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
@@ -448,65 +442,7 @@ export default function WorkbenchArtifact({
                   />
                 </section>
               ) : null}
-              <StepTimeline
-                sessionId={sessionId}
-                directionSummary={ws.directionSummary}
-                cleaningReport={ws.cleaningReport}
-                estimate={ws.estimateMeta}
-                estimateBusy={ws.directionBusy}
-                hasReadout={ws.hasReadout}
-                identFailed={ws.identFailed}
-                outline={ws.outline}
-                currentChapterIndex={ws.currentChapterIndex}
-                writtenChapters={ws.writtenChapters}
-                writeBusy={ws.writeBusy}
-              />
-              <WriteLoop
-                fileName={ws.csvName}
-                rows={ws.csvRows}
-                cols={ws.csvCols ?? (ws.dataColumns.length || null)}
-                direction={ws.directionRecord}
-                outline={ws.outline}
-                outlineLocked={ws.outlineLocked}
-                hasDirection={Boolean(ws.directionSummary)}
-                hasOutline={ws.outline.length > 0 && !ws.identFailed}
-                hasChapter={Boolean(ws.writtenChapter?.content)}
-                isResultsPart={ws.outline[ws.currentChapterIndex]?.type === 'results'}
-                partIndex={ws.currentChapterIndex + 1}
-                writeBusy={ws.writeBusy}
-                onAddMore={onOpenDirection}
-                onGoPart1={() => setPaperTab('writing')}
-                onApplyGenerate={ws.handleApplyGenerate}
-                onReviseOutline={onOpenDirection}
-                onApproveOutline={ws.handleApproveOutline}
-                onRefine={ws.handleRefine}
-              />
-              {ws.hasReadout && (
-                <InstrumentReadout
-                  claim={ws.claim}
-                  starRating={ws.starRating}
-                  treatmentRow={ws.treatmentRow}
-                  results={ws.mainResults}
-                  literatureSource={ws.literatureSource}
-                  robustnessStatus={ws.robustnessStatus}
-                  writeBlockers={ws.writeBlockers}
-                  identificationFailed={ws.identFailed}
-                  question={ws.shapedQuestion || null}
-                />
-              )}
-              {ws.identReport && (
-                <details className="rounded border border-border bg-paper px-3 py-2">
-                  <summary className="cursor-pointer font-mono text-xs text-muted">
-                    识别说明
-                  </summary>
-                  <pre
-                    data-testid="ident-report"
-                    className="mt-2 whitespace-pre-wrap text-xs"
-                  >
-                    {ws.identReport}
-                  </pre>
-                </details>
-              )}
+
               {ws.writeBusy ? (
                 <p
                   data-testid="chapter-writing"
@@ -541,6 +477,82 @@ export default function WorkbenchArtifact({
                   {t('bench.paperEmpty')}
                 </p>
               )}
+
+              <details
+                data-testid="research-trace"
+                className="rounded-lg border border-wb-line bg-wb-surface"
+              >
+                <summary className="cursor-pointer px-4 py-3 font-serif text-[14px] text-wb-ink">
+                  Research trace · 研究记录
+                </summary>
+                <div className="space-y-5 border-t border-wb-line p-4">
+                  <SubmissionStatus
+                    canExport={submissionReady}
+                    blockers={submissionBlockers}
+                    passed={submissionPassed}
+                    onGenerate={() => ws.setDocExportOpen(true)}
+                  />
+                  <StepTimeline
+                    sessionId={sessionId}
+                    directionSummary={ws.directionSummary}
+                    cleaningReport={ws.cleaningReport}
+                    estimate={ws.estimateMeta}
+                    estimateBusy={ws.directionBusy}
+                    hasReadout={ws.hasReadout}
+                    identFailed={ws.identFailed}
+                    outline={ws.outline}
+                    currentChapterIndex={ws.currentChapterIndex}
+                    writtenChapters={ws.writtenChapters}
+                    writeBusy={ws.writeBusy}
+                  />
+                  <WriteLoop
+                    fileName={ws.csvName}
+                    rows={ws.csvRows}
+                    cols={ws.csvCols ?? (ws.dataColumns.length || null)}
+                    direction={ws.directionRecord}
+                    outline={ws.outline}
+                    outlineLocked={ws.outlineLocked}
+                    hasDirection={Boolean(ws.directionSummary)}
+                    hasOutline={ws.outline.length > 0 && !ws.identFailed}
+                    hasChapter={Boolean(ws.writtenChapter?.content)}
+                    isResultsPart={ws.outline[ws.currentChapterIndex]?.type === 'results'}
+                    partIndex={ws.currentChapterIndex + 1}
+                    writeBusy={ws.writeBusy}
+                    onAddMore={onOpenDirection}
+                    onGoPart1={() => setPaperTab('writing')}
+                    onApplyGenerate={ws.handleApplyGenerate}
+                    onReviseOutline={onOpenDirection}
+                    onApproveOutline={ws.handleApproveOutline}
+                    onRefine={ws.handleRefine}
+                  />
+                  {ws.hasReadout && (
+                    <InstrumentReadout
+                      claim={ws.claim}
+                      starRating={ws.starRating}
+                      treatmentRow={ws.treatmentRow}
+                      results={ws.mainResults}
+                      literatureSource={ws.literatureSource}
+                      robustnessStatus={ws.robustnessStatus}
+                      writeBlockers={ws.writeBlockers}
+                      identificationFailed={ws.identFailed}
+                      question={ws.shapedQuestion || null}
+                    />
+                  )}
+                  {ws.identReport && (
+                    <details className="rounded border border-border bg-paper px-3 py-2">
+                      <summary className="cursor-pointer font-mono text-xs text-muted">
+                        识别说明
+                      </summary>
+                      <pre
+                        data-testid="ident-report"
+                        className="mt-2 whitespace-pre-wrap text-xs"
+                      >
+                        {ws.identReport}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              </details>
             </div>
           )}
 

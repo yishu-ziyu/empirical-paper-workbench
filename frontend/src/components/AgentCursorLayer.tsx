@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { animate } from 'motion'
 import { motion, useMotionValue } from 'motion/react'
 import { AgentCursorProvider, useAgentCursor, type AgentCursorHost } from '../lib/agentCursor/context'
@@ -36,9 +36,12 @@ function moveCursorTo(
   el: Element,
   reduced: boolean,
 ): Promise<void> {
+  if (typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
   const rect = el.getBoundingClientRect()
   const targetX = rect.left + rect.width / 2 - 6
-  const targetY = rect.top + rect.height / 2 - 6
+  const targetY = Math.max(56, rect.top + rect.height / 2 - 6)
   const duration = travelDurationMs(reduced) / 1000
   opacity.set(1)
   if (reduced || duration <= 0) {
@@ -175,11 +178,33 @@ export default function AgentCursorRoot({
   const x = useMotionValue(24)
   const y = useMotionValue(96)
   const opacity = useMotionValue(0)
+  const activeTargetRef = useRef<Element | null>(null)
 
   const moveTo = useCallback<AgentCursorHost['moveTo']>(
-    (el, opts) => moveCursorTo(x, y, opacity, el, opts.reduced),
+    (el, opts) => {
+      activeTargetRef.current = el
+      return moveCursorTo(x, y, opacity, el, opts.reduced)
+    },
     [opacity, x, y],
   )
+
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      const el = activeTargetRef.current
+      if (!el || !document.body.contains(el)) return
+      const rect = el.getBoundingClientRect()
+      const targetX = rect.left + rect.width / 2 - 6
+      const targetY = Math.max(56, rect.top + rect.height / 2 - 6)
+      x.set(targetX)
+      y.set(targetY)
+    }
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [x, y])
 
   return (
     <AgentCursorProvider

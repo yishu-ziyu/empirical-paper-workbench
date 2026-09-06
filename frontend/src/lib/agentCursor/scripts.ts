@@ -37,9 +37,9 @@ export const CARD_SHOW_ME_SCRIPT: AgentScript = {
   id: CARD_SHOW_ME_SCRIPT_ID,
   steps: [
     { op: 'point', target: TARGET.ols },
-    { op: 'pause', ms: 640 },
+    { op: 'pause', ms: 700 },
     { op: 'point', target: TARGET.iv },
-    { op: 'pause', ms: 480 },
+    { op: 'pause', ms: 700 },
     {
       op: 'compare',
       a: TARGET.ols,
@@ -47,14 +47,21 @@ export const CARD_SHOW_ME_SCRIPT: AgentScript = {
       intent: 'Identification strategy changed',
       intentZh: '识别策略发生变化',
     },
-    { op: 'pause', ms: 520 },
+    { op: 'fadeUnchanged' },
     {
       op: 'point',
       target: TARGET.estimator,
       intent: 'Identification strategy changed',
       intentZh: '识别策略发生变化',
     },
-    { op: 'fadeUnchanged' },
+    { op: 'pause', ms: 2500 },
+    {
+      op: 'point',
+      target: TARGET.estimator,
+      intent: 'This is the main change.',
+      intentZh: '主要变化来自这里。',
+    },
+    { op: 'pause', ms: 1200 },
     { op: 'stop' },
   ],
 }

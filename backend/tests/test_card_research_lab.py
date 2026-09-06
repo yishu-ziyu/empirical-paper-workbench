@@ -177,3 +177,39 @@ def test_research_lab_reattached_if_upload_drops_unknown_keys(client, monkeypatc
 
     result = asyncio.run(stored_result())
     assert (result.get("research_lab") or {}).get("teaching_case") == "card_1995"
+
+
+def test_challenge_wording_neutral_effective_f():
+    from services.research_lab import next_card_challenge
+
+    lab = {
+        "specification_space": {
+            "definitions": [
+                {
+                    "id": "ols_region_dummies",
+                    "admissible": True,
+                },
+                {
+                    "id": "iv_region_dummies",
+                    "admissible": True,
+                },
+            ],
+        },
+        "specification_runs": [
+            {
+                "spec_id": "iv_region_dummies",
+                "diagnostics": {"F_eff": 14.14, "first_stage_F": 14.14},
+            }
+        ],
+    }
+    challenge = next_card_challenge(lab)
+    assert challenge is not None
+    assert "may be a weak instrument" not in challenge["rationale"]
+    assert "Instrument strength deserves inspection" in challenge["rationale"]
+    assert "Effective F = 14.14" in challenge["rationale"]
+    assert "Strength diagnostics alone do not establish instrument validity" in challenge["rationale"]
+    assert "工具变量强度值得检查" in challenge["rationale_zh"]
+    assert "强度诊断本身不能证明工具变量有效" in challenge["rationale_zh"]
+
+
+

@@ -89,6 +89,48 @@ def test_results_blocked_when_claim_stale():
     assert results_is_grounded(state, {"type": "results", "content": "ok"}) is False
 
 
+def test_missing_based_on_is_stale_when_evidence_revision_is_zero():
+    state = make_write_ready_state(
+        research_lab={
+            "evidence_revision": 0,
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": True,
+                    "stale": False,
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    ok, blockers = paper_ready_to_write(state, "results")
+    assert ok is False
+    assert "claim_stale" in blockers
+    assert results_is_grounded(state, {"type": "results", "content": "ok"}) is False
+
+
+def test_missing_based_on_revision_blocks_results_when_lab_has_revision():
+    state = make_write_ready_state(
+        research_lab={
+            "evidence_revision": 3,
+            "canonical_spec_id": "iv_region_dummies",
+            "claims": [
+                {
+                    "id": "claim.card.education-earnings",
+                    "approved_by_user": True,
+                    "stale": False,
+                    "provenance": {"iv_spec_id": "iv_region_dummies"},
+                }
+            ],
+            "current_claim_id": "claim.card.education-earnings",
+        }
+    )
+    ok, blockers = paper_ready_to_write(state, "results")
+    assert ok is False
+    assert "claim_stale" in blockers
+    assert results_is_grounded(state, {"type": "results", "content": "ok"}) is False
+
+
 def test_results_ready_when_claim_approved():
     state = make_write_ready_state(
         research_lab={

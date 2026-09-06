@@ -91,22 +91,28 @@ def _lab(state: dict) -> dict | None:
     return lab if isinstance(lab, dict) else None
 
 
-def _claim_is_stale(state: dict, claim: dict | None) -> bool:
+def claim_revision_is_stale(lab: dict | None, claim: dict | None) -> bool:
+    """Fail closed when the lab has an evidence_revision (including 0)."""
     if not isinstance(claim, dict):
         return False
     if claim.get("stale"):
         return True
-    lab = _lab(state)
-    if lab is None:
+    if not isinstance(lab, dict):
+        return False
+    current = lab.get("evidence_revision")
+    if current is None:
         return False
     based = claim.get("based_on_evidence_revision")
-    current = lab.get("evidence_revision")
-    if based is None or current is None:
-        return False
+    if based is None:
+        return True
     try:
         return int(based) != int(current)
     except (TypeError, ValueError):
         return True
+
+
+def _claim_is_stale(state: dict, claim: dict | None) -> bool:
+    return claim_revision_is_stale(_lab(state), claim)
 
 
 def _canonical_mismatches_claim(state: dict, claim: dict | None) -> bool:

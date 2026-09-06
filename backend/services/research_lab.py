@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from fastapi import HTTPException
 
+from agent.engine.readiness import claim_revision_is_stale
 from schemas.responses import ResearchLabResponse
 
 
@@ -919,7 +920,7 @@ def promote_run(lab: dict[str, Any], run: dict[str, Any], estimate: dict[str, An
         )
     )
     lab["decision_events"] = events
-    return bump_evidence_revision(lab)
+    return lab
 
 
 def revert_canonical(lab: dict[str, Any]) -> tuple[dict[str, Any], Optional[dict[str, Any]]]:
@@ -945,7 +946,6 @@ def revert_canonical(lab: dict[str, Any]) -> tuple[dict[str, Any], Optional[dict
     events = list(lab.get("decision_events") or [])
     events.append(_event("preview_revert", {"canonical_spec_id": previous_spec}))
     lab["decision_events"] = events
-    lab = bump_evidence_revision(lab)
     return lab, restored if isinstance(restored, dict) else None
 
 
@@ -996,14 +996,7 @@ def require_claim_ready_for_paper(lab: dict[str, Any]) -> dict[str, Any]:
     claim = current_claim(lab)
     if not claim or not claim.get("approved_by_user"):
         raise HTTPException(status_code=409, detail="claim_unapproved")
-    based = claim.get("based_on_evidence_revision")
-    revision = lab.get("evidence_revision")
-    stale = bool(claim.get("stale"))
-    try:
-        stale = stale or based is None or int(based) != int(revision or 0)
-    except (TypeError, ValueError):
-        stale = True
-    if stale:
+    if claim_revision_is_stale(lab, claim):
         raise HTTPException(
             status_code=409,
             detail={
@@ -1264,14 +1257,7 @@ def approve_card_claim(lab: dict[str, Any], claim_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"claim {claim_id} not found")
     if not claim.get("supporting_run_ids"):
         raise HTTPException(status_code=409, detail="claim has no supporting specification runs")
-    based = claim.get("based_on_evidence_revision")
-    revision = lab.get("evidence_revision")
-    stale = bool(claim.get("stale"))
-    try:
-        stale = stale or based is None or int(based) != int(revision or 0)
-    except (TypeError, ValueError):
-        stale = True
-    if stale:
+    if claim_revision_is_stale(lab, claim):
         raise HTTPException(
             status_code=409,
             detail={

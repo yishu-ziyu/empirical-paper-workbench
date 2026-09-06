@@ -13,6 +13,8 @@ from services.research_lab import (
     CARD_CONDITIONAL_WORDING,
     CARD_SUPPORTED_WORDING,
     CARD_UNSUPPORTED_WORDING,
+    promote_run,
+    revert_canonical,
 )
 
 
@@ -112,48 +114,123 @@ def test_space_run_auto_drafts_card_claim_fields(client):
     assert snapshot["research"]["claims"][0]["id"] == claim["id"]
 
 
+def test_promote_and_revert_do_not_bump_evidence_revision_or_stale_claim():
+    claim = {
+        "id": "claim.card.education-earnings",
+        "approved_by_user": True,
+        "stale": False,
+        "based_on_evidence_revision": 2,
+        "version": 1,
+    }
+    lab = {
+        "evidence_revision": 2,
+        "canonical_spec_id": "ols_region_dummies",
+        "canonical_history": [],
+        "decision_events": [],
+        "claims": [claim],
+        "current_claim_id": claim["id"],
+        "claim": claim,
+        "specification_runs": [
+            {
+                "id": "run-ols",
+                "spec_id": "ols_region_dummies",
+                "relation": "canonical",
+                "status": "ok",
+            },
+            {
+                "id": "run-iv",
+                "spec_id": "iv_region_dummies",
+                "relation": "exploratory",
+                "status": "ok",
+            },
+        ],
+    }
+    promoted = promote_run(lab, lab["specification_runs"][1], {"coef": 0.13})
+    assert promoted["evidence_revision"] == 2
+    assert promoted["canonical_spec_id"] == "iv_region_dummies"
+    assert promoted["claim"]["stale"] is not True
+    assert promoted["claim"]["approved_by_user"] is True
+    assert promoted["claim"]["based_on_evidence_revision"] == 2
+    assert any(event.get("kind") == "preview_promote" for event in promoted["decision_events"])
+    assert promoted["canonical_history"]
+    assert not any(event.get("kind") == "claim_drafted" for event in promoted["decision_events"])
+
+    reverted, restored = revert_canonical(promoted)
+    assert reverted["evidence_revision"] == 2
+    assert reverted["canonical_spec_id"] == "ols_region_dummies"
+    assert reverted["claim"]["stale"] is not True
+    assert reverted["claim"]["approved_by_user"] is True
+    assert any(event.get("kind") == "preview_revert" for event in reverted["decision_events"])
+    assert restored == {"coef": 0.13}
+
+
 def test_prepare_paper_does_not_implicitly_promote_canonical(client):
     sid = _boot_frozen(client)
     lab = _run_space(client, sid)
+    revision_n = lab["evidence_revision"]
+    claim = lab["claim"]
     ols = next(run for run in lab["specification_runs"] if run["method"] == "ols")
     iv = next(
         run
         for run in lab["specification_runs"]
         if run["spec_id"] == lab["claim"]["provenance"]["iv_spec_id"]
     )
+    approved = client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["claim"]["based_on_evidence_revision"] == revision_n
+
     promoted = client.post(
         f"/sessions/{sid}/research/preview/promote",
         json={"run_id": ols["id"]},
     )
     assert promoted.status_code == 200, promoted.text
     assert promoted.json()["canonical_spec_id"] == ols["spec_id"]
-    # Promote bumps evidence revision; redraft + approve on the new revision.
-    client.post(f"/sessions/{sid}/research/claims/draft")
-    claim = client.get(f"/sessions/{sid}/research").json()["claim"]
-    client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
-    before = client.get(f"/sessions/{sid}").json()
+    after_ols = client.get(f"/sessions/{sid}/research").json()
+    assert after_ols["evidence_revision"] == revision_n
+    assert after_ols["claim"]["stale"] is not True
+    assert after_ols["claim"]["approved_by_user"] is True
+    assert after_ols["claim"]["version"] == claim["version"]
+    assert after_ols["claim"]["id"] == claim["id"]
+    drafted_after_ols = [
+        event for event in (after_ols.get("decision_events") or []) if event.get("kind") == "claim_drafted"
+    ]
+
     prepared = client.post(f"/sessions/{sid}/research/prepare-paper")
     assert prepared.status_code == 409, prepared.text
     detail = prepared.json()["detail"]
     assert detail["code"] == "canonical_mismatch"
-    after = client.get(f"/sessions/{sid}").json()
-    assert after["research"]["canonical_spec_id"] == ols["spec_id"]
-    assert (after.get("estimate") or {}).get("coef") == (before.get("estimate") or {}).get("coef") or after[
-        "research"
-    ]["canonical_spec_id"] == ols["spec_id"]
+    mismatch = client.get(f"/sessions/{sid}/research").json()
+    assert mismatch["canonical_spec_id"] == ols["spec_id"]
+    assert mismatch["evidence_revision"] == revision_n
+    assert mismatch["claim"]["stale"] is not True
+    assert mismatch["claim"]["approved_by_user"] is True
 
     explicit = client.post(
         f"/sessions/{sid}/research/preview/promote",
         json={"run_id": iv["id"]},
     )
     assert explicit.status_code == 200, explicit.text
-    client.post(f"/sessions/{sid}/research/claims/draft")
-    claim = client.get(f"/sessions/{sid}/research").json()["claim"]
-    client.post(f"/sessions/{sid}/research/claims/{claim['id']}/approve")
+    after_iv = client.get(f"/sessions/{sid}/research").json()
+    assert after_iv["canonical_spec_id"] == iv["spec_id"]
+    assert after_iv["evidence_revision"] == revision_n
+    assert after_iv["claim"]["stale"] is not True
+    assert after_iv["claim"]["approved_by_user"] is True
+    assert after_iv["claim"]["version"] == claim["version"]
+    drafted_after_iv = [
+        event for event in (after_iv.get("decision_events") or []) if event.get("kind") == "claim_drafted"
+    ]
+    assert drafted_after_iv == drafted_after_ols
+    approve_events = [
+        event for event in (after_iv.get("decision_events") or []) if event.get("kind") == "claim_approved"
+    ]
+    assert len(approve_events) == 1
+
     prepared = client.post(f"/sessions/{sid}/research/prepare-paper")
     assert prepared.status_code == 200, prepared.text
     snapshot = client.get(f"/sessions/{sid}").json()
     assert snapshot["research"]["canonical_spec_id"] == iv["spec_id"]
+    assert snapshot["research"]["evidence_revision"] == revision_n
+    assert snapshot["research"]["claim"]["stale"] is not True
     written = client.post(
         f"/sessions/{sid}/generate-chapter",
         json={"chapter": {"type": "results", "title": "结果"}},
@@ -303,11 +380,38 @@ def test_promote_marks_results_stale(client):
     assert results["stale"] is True
     assert results["needs_regeneration"] is True
     assert results["grounded"] is False
+    assert snapshot["research"]["evidence_revision"] == lab["evidence_revision"]
+    assert snapshot["research"]["claim"]["stale"] is not True
+    assert snapshot["research"]["claim"]["approved_by_user"] is True
     approve = client.post(
         f"/sessions/{sid}/approve-chapter",
         json={"chapter_type": "results", "force": True},
     )
     assert approve.status_code == 200, approve.text
+
+
+def test_missing_based_on_revision_is_stale_when_lab_has_revision(client):
+    sid = _boot_frozen(client)
+    lab = _run_space(client, sid)
+    claim = dict(lab["claim"])
+    claim["approved_by_user"] = True
+    claim["stale"] = False
+    claim.pop("based_on_evidence_revision", None)
+    lab["claim"] = claim
+    lab["claims"] = [claim]
+    lab["evidence_revision"] = 3
+    _seed_write_ready(sid, lab)
+
+    snapshot = client.get(f"/sessions/{sid}").json()
+    assert "claim_stale" in (snapshot.get("write_blockers") or [])
+    results = next(ch for ch in snapshot["body_chapters"] if ch.get("type") == "results")
+    assert results["grounded"] is False
+
+    prepared = client.post(f"/sessions/{sid}/research/prepare-paper")
+    assert prepared.status_code == 409, prepared.text
+    detail = prepared.json()["detail"]
+    code = detail.get("code") if isinstance(detail, dict) else detail
+    assert code == "claim_stale"
 
 
 def test_sessions_without_claims_keep_old_write_gate(client):

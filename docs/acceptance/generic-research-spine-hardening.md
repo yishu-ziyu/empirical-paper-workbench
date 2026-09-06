@@ -73,7 +73,25 @@ Status: open
 
 ## Evidence
 
-（实现完成后逐条回填：命令输出摘录、浏览器截图/timeline 路径、issue URL。validator 报告另附。）
+（浏览器实证由主 agent 于 2026-09-07 完成并归档；逐条摘要如下，完整时间线/截图见 `docs/acceptance/assets/generic-spine-hardening-2026-09-07/`，复核记录见 `card-canonical-research-experience-validator.md` 末尾 Audit Supplement。）
+
+- C1/C2/C3/C5/C9(后端)/C18/C24(静态)：implementer 循环内 `make test` 全绿（agent 819 passed/1 skip，backend 433 passed/8 既有环境 skip，frontend 384 passed），check-api-drift 三段 ✅，`_mentions_*` grep 空，CardExpectation 零命中。
+- C6/C7：真实会话改写 `我觉得 IV 应该会更小一些，但并不确定。` → 判据块保持 "IV estimate < OLS estimate"（ja01-expectation-zh-criterion.png）；真实 specs → `surprise.status=Unexpected`、`observed="IV estimate 0.1315 > OLS estimate 0.0747"`（REST 双向核对）。
+- C8/C9/C10：runLog 采样 `D Running 0/12 → 1/12 → 8/12`（按钮 disabled + rail "正在运行规格 k/12"）；完成后自动转 Evidence、Show me 出现（ja02-evidence-unexpected-showme.png）。
+- C11：注入 run FAILED → Design 页 `spec_run_failed` 失败卡 + Retry（m2-spec-run-failure-card.png，6s 出现）；解除注入 Retry → 真实跑完自动转 Evidence；无 unhandledrejection。
+- C12：终态后 rail 回"空闲"、无"后台运行监控中"。
+- C13/C14：Show me 时间线（120ms 采样）：keyFrames OLS(122ms)→IV(962ms)→compare+intent(1922ms)→estimator(2761ms)→"This is the main change."(4803ms)，done ≈5.8s ≤6s；每步 cursor 中心（+6,+8 偏移）与高亮框中心差 ≈1px ≤24px；scroll 后重采样仍贴合。
+- C15：真实 pointerdown 注入 → "已暂停" + Resume 控件；1.5s 后仍暂停（不自动丢失）；Resume 后续播至末步（"This is the main change."），非重播。
+- C16：Cancel 后 `agent-cursor-highlight-*` 0 个、cursor opacity 0。
+- C17：matchMedia patch 模拟 reduced motion → 全脚本 ≈0.4s 完成、data-reduced-motion=true、位置贴合。
+- C19：challenge experience 脚本（Show preview→awaitConfirm→Run Preview→compare）vitest 全过；旅程内 Accept challenge 链路真实走通。
+- C20：503 注入：编辑器错误卡（m4a-expectation-save-failure.png）、textarea 保留、后端 version/text 不变（REST 复核）、无 unhandledrejection、Retry 成功。
+- C21：boot 注入 FAILED（4s 出现）：单一 "Boot failed · 启动失败" 卡 + Retry Card + Back to desk（m4b-boot-failure-single-surface.png）；programmatically 验证同屏无 "仍在进行"/"确认 Admissible Space"/"重新选择文件"。
+- C22：`new-study-entry` 单击回空桌、localStorage 会话清除、Try Card 可见（m4c-new-study-empty-desk.png）；New study→Try Card 落 Question 页。
+- C23：矩阵行与 History 均可交互（见 supplement 判定表）——死交互不可复现，机理记录于 Audit Supplement，未改交互语义。
+- C24：repo-owned launcher 确定性复现 BrokenPipe→run 误标 FAILED；独立 issue https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；docs/local-runner.md 记录前置条件；研究节点无 BrokenPipe 吞噬。
+- C25/C26/C27：clean first-user journey 全程走通（ supplement 方法附注），全程 console 零错误；evidence_revision 1→2、claim v1→v2、stale→redraft→approve、explicit Promote（canonical=iv_region_dummies）、grounded 门（Results 基于证据）、provenance 均保持。
+- C28：`make test`、`tsc --noEmit`、`npm run lint`、`npm run build` 全部 0 退出（最终提交后复跑记录见 PR 描述）。
 
 ## Named relaxations
 

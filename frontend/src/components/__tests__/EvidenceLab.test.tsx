@@ -159,6 +159,7 @@ describe('EvidenceLab', () => {
 
   test('renders claim ledger and approve control after reviewing claim', async () => {
     const onApproveClaim = vi.fn(async () => undefined)
+    const onDraftClaim = vi.fn(async () => undefined)
     render(
       <EvidenceLab
         research={research}
@@ -166,6 +167,7 @@ describe('EvidenceLab', () => {
         onRevert={vi.fn(async () => undefined)}
         onAcceptChallenge={vi.fn(async () => undefined)}
         onApproveClaim={onApproveClaim}
+        onDraftClaim={onDraftClaim}
       />,
     )
     // Before review: lightweight card shown, full claim ledger folded
@@ -177,6 +179,7 @@ describe('EvidenceLab', () => {
     // Clicking review claim expands full claim ledger
     fireEvent.click(screen.getByTestId('evidence-review-claim'))
     expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+    expect(onDraftClaim).not.toHaveBeenCalled()
     expect(screen.getByTestId('claim-supported')).toHaveTextContent(
       'Education is positively associated with earnings.',
     )
@@ -188,6 +191,137 @@ describe('EvidenceLab', () => {
     )
     fireEvent.click(screen.getByTestId('claim-approve'))
     expect(onApproveClaim).toHaveBeenCalledWith('claim.card.education-earnings')
+  })
+
+  test('Review claim on non-stale draft Claim is presentation-only and does NOT call onDraftClaim', () => {
+    const onDraftClaim = vi.fn(async () => undefined)
+    const nonStaleResearch = {
+      ...research,
+      claim: {
+        ...research.claim!,
+        version: 1,
+        stale: false,
+      },
+    }
+    render(
+      <EvidenceLab
+        research={nonStaleResearch as unknown as ResearchLab}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onDraftClaim={onDraftClaim}
+      />,
+    )
+    // Claim ledger initially folded
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+    expect(screen.getByTestId('evidence-review-claim')).toBeInTheDocument()
+
+    // Click Review claim
+    fireEvent.click(screen.getByTestId('evidence-review-claim'))
+
+    // Full Claim Ledger expands
+    expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+    // onDraftClaim is strictly NOT called
+    expect(onDraftClaim).not.toHaveBeenCalled()
+  })
+
+  test('Review new evidence on stale Claim calls onDraftClaim to produce new version', () => {
+    const onDraftClaim = vi.fn(async () => undefined)
+    const staleResearch = {
+      ...research,
+      claim: {
+        ...research.claim!,
+        version: 1,
+        stale: true,
+        approved_by_user: true, // expanded so Review new evidence is directly accessible
+      },
+    }
+    render(
+      <EvidenceLab
+        research={staleResearch as unknown as ResearchLab}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onDraftClaim={onDraftClaim}
+      />,
+    )
+    const reviewEvidenceBtn = screen.getByTestId('claim-review-evidence')
+    expect(reviewEvidenceBtn).toBeInTheDocument()
+    fireEvent.click(reviewEvidenceBtn)
+    expect(onDraftClaim).toHaveBeenCalledTimes(1)
+  })
+
+  test('Challenge accept failure: onAcceptChallenge rejects, Accept button remains visible, Claim does not expand, no fake accepted UI', async () => {
+    const onAcceptChallenge = vi.fn(async () => {
+      throw new Error('Network failure')
+    })
+    render(
+      <EvidenceLab
+        research={research}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+    const acceptBtn = screen.getByTestId('evidence-challenge-accept')
+    expect(acceptBtn).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+
+    // Click accept which fails
+    fireEvent.click(acceptBtn)
+
+    // Wait for reject microtasks to settle
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Accept button remains visible, no "Accepted" text, Claim does NOT expand
+    expect(screen.getByTestId('evidence-challenge-accept')).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+  })
+
+  test('Challenge accept success: onAcceptChallenge succeeds, snapshot rerender with status=accepted expands Claim and displays Accepted', async () => {
+    const onAcceptChallenge = vi.fn(async () => undefined)
+    const { rerender } = render(
+      <EvidenceLab
+        research={research}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+    const acceptBtn = screen.getByTestId('evidence-challenge-accept')
+    expect(acceptBtn).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+
+    // Click accept which succeeds
+    fireEvent.click(acceptBtn)
+    expect(onAcceptChallenge).toHaveBeenCalledWith('challenge.instrument_strength')
+
+    // Rerender with backend snapshot reflecting status=accepted
+    const acceptedResearch = {
+      ...research,
+      next_challenge: {
+        ...research.next_challenge,
+        status: 'accepted',
+      },
+    } as unknown as ResearchLab
+
+    rerender(
+      <EvidenceLab
+        research={acceptedResearch}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+
+    // Accept button is now replaced with Accepted text, and Claim Ledger expands
+    expect(screen.queryByTestId('evidence-challenge-accept')).not.toBeInTheDocument()
+    expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
   })
 
   test('C1 Visual order: Results space and Compare precede Claim Ledger; Compare expands claim', () => {

@@ -12,16 +12,18 @@ estimate 缺失时返回 ``available=false`` + ``blockers``，不报 500：失�
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 
 from agent.engine.readiness import robustness_ran
 from auth import get_optional_user, require_session_ownership
 from facade import facade
+from models.user import User
 from run_repository import RunRepository
 from routers.run_execution import public_instrument_fields, _public_value
 from schemas.responses import (
+    EvidenceCodeArtifactResponse,
     EvidenceIdentificationResponse,
     EvidenceProvenanceResponse,
     EvidenceResponse,
@@ -36,24 +38,66 @@ router = APIRouter()
 _TRACE_TAIL_LIMIT = 20
 
 
-def _dataset_from_entry(entry: dict) -> Optional[SnapshotDatasetResponse]:
-    """Dataset metadata from session storage (metadata_json + csv_path)."""
-    meta = {
-        key: value
-        for key, value in entry.items()
-        if key not in {"state", "csv_path", "user_id", "charls_config"}
-    }
-    columns = [str(item) for item in meta.get("columns") or []]
-    rows = meta.get("rows") if isinstance(meta.get("rows"), int) else None
-    name = meta.get("name") if isinstance(meta.get("name"), str) else None
-    if name is None:
-        csv_path = entry.get("csv_path")
-        if csv_path:
-            leaf = Path(str(csv_path)).name
-            session_id = (entry.get("state") or {}).get("session_id")
-            if leaf != f"{session_id}.csv":
-                name = leaf
-    return SnapshotDatasetResponse(name=name, rows=rows, columns=columns)
+def _producer_run_id(estimate: Any) -> Optional[str]:
+    if not isinstance(estimate, dict):
+        return None
+    raw = estimate.get("source_run_id")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _dataset_from_estimate(estimate: Any) -> Optional[SnapshotDatasetResponse]:
+    """Analysis-input identity stamped on the estimate — never upload metadata."""
+    if not isinstance(estimate, dict):
+        return None
+    raw = estimate.get("analysis_dataset")
+    if not isinstance(raw, dict):
+        return None
+    path = raw.get("path") if isinstance(raw.get("path"), str) and raw.get("path") else None
+    digest = raw.get("hash") if isinstance(raw.get("hash"), str) and raw.get("hash") else None
+    version = (
+        str(raw["version"]) if raw.get("version") is not None and raw.get("version") != "" else None
+    )
+    if not (path or digest or version):
+        return None
+    columns = [str(item) for item in (raw.get("columns") or [])]
+    rows = raw.get("rows") if isinstance(raw.get("rows"), int) else None
+    name = raw.get("name") if isinstance(raw.get("name"), str) else None
+    role = raw.get("role") if isinstance(raw.get("role"), str) else None
+    return SnapshotDatasetResponse(
+        name=name,
+        rows=rows,
+        columns=columns,
+        path=path,
+        hash=digest,
+        version=version,
+        role=role,
+    )
+
+
+def _code_for_run(
+    session_id: str, producer_id: Optional[str]
+) -> list[EvidenceCodeArtifactResponse]:
+    if not producer_id:
+        return []
+    prefix = f"outputs/code/{producer_id}/"
+    found: list[EvidenceCodeArtifactResponse] = []
+    for item in run_store.list_files(session_id):
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        if not isinstance(path, str) or not path.startswith(prefix):
+            continue
+        found.append(
+            EvidenceCodeArtifactResponse(
+                path=path,
+                bytes=item.get("bytes") if isinstance(item.get("bytes"), int) else None,
+                filename=Path(path).name,
+                run_id=producer_id,
+            )
+        )
+    return found
 
 
 def _evidence_blockers(state: dict) -> list[str]:
@@ -93,14 +137,9 @@ def _robustness(fields: dict, state: dict) -> EvidenceRobustnessResponse:
     )
 
 
-def _provenance(session_id: str) -> EvidenceProvenanceResponse:
-    """Combine run_store artifacts with session storage into a source chain."""
-    dataset: Optional[SnapshotDatasetResponse] = None
-    try:
-        dataset = _dataset_from_entry(facade.get_session_entry(session_id))
-    except Exception:
-        dataset = None
-
+def _provenance(session_id: str, estimate: Any) -> EvidenceProvenanceResponse:
+    """Combine run_store artifacts with the estimate's recorded lineage."""
+    producer_id = _producer_run_id(estimate)
     trace_events = [
         event
         for event in (
@@ -116,19 +155,23 @@ def _provenance(session_id: str) -> EvidenceProvenanceResponse:
         if isinstance(item, dict) and item.get("path")
     ]
     return EvidenceProvenanceResponse(
-        dataset=dataset,
+        dataset=_dataset_from_estimate(estimate),
+        code=_code_for_run(session_id, producer_id),
         trace_events=trace_events,
         manifest=manifest if isinstance(manifest, dict) else None,
         artifacts=artifacts,
     )
 
 
-async def _attach_latest_run(
-    session_id: str, provenance: EvidenceProvenanceResponse
+async def _attach_producer_run(
+    estimate: Any, provenance: EvidenceProvenanceResponse
 ) -> None:
-    """Fill run identity from the durable queue (latest prewrite run)."""
+    """Fill run identity from estimate.source_run_id only. Never the newest prewrite."""
+    producer_id = _producer_run_id(estimate)
+    if not producer_id:
+        return
     try:
-        run = await RunRepository().latest_run(session_id, kind="prewrite")
+        run = await RunRepository().get(producer_id)
     except Exception:
         return
     if run is None:
@@ -154,14 +197,15 @@ async def get_evidence(
 
     fields = public_instrument_fields(state)
     estimate = fields.get("estimate")
+    raw_estimate = state.get("estimate") if isinstance(state.get("estimate"), dict) else None
     available = bool(
         isinstance(estimate, dict)
         and estimate.get("produced_by") == "estimate"
         and estimate.get("status") != "error"
     )
     results = state.get("results")
-    provenance = _provenance(session_id)
-    await _attach_latest_run(session_id, provenance)
+    provenance = _provenance(session_id, raw_estimate)
+    await _attach_producer_run(raw_estimate, provenance)
 
     return EvidenceResponse(
         session_id=session_id,

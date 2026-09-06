@@ -43,6 +43,26 @@ def _default_owner() -> str:
     return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
 
 
+def _stamp_estimate_producer(
+    result: dict, run_id: str, initial_state: dict
+) -> dict:
+    """Bind estimate to this run only when this run produced or replaced it."""
+    estimate = result.get("estimate")
+    if not isinstance(estimate, dict):
+        return result
+    if estimate.get("produced_by") != "estimate":
+        return result
+    initial_estimate = (
+        initial_state.get("estimate") if isinstance(initial_state, dict) else None
+    )
+    if estimate == initial_estimate:
+        return result
+    existing = estimate.get("source_run_id")
+    if isinstance(existing, str) and existing.strip():
+        return result
+    return {**result, "estimate": {**estimate, "source_run_id": run_id}}
+
+
 def _upload_attempt_workspace(
     session_id: str,
     run_id: str,
@@ -186,6 +206,7 @@ async def process_one_run(
     try:
         initial_state = dict(claimed.payload["initial_state"])
         if claimed.kind == "prewrite":
+            initial_state["source_run_id"] = claimed.run_id
             direction = claimed.payload["research_direction"]
             state = await asyncio.to_thread(
                 execute_prewrite_supervised,
@@ -233,6 +254,12 @@ async def process_one_run(
             _remove_upload_attempt(upload_attempt)
     else:
         result = {**state, "_source_run_id": claimed.run_id}
+        if claimed.kind == "prewrite":
+            result = _stamp_estimate_producer(
+                result,
+                claimed.run_id,
+                dict((claimed.payload or {}).get("initial_state") or {}),
+            )
         for attempt in range(3):
             try:
                 await repo.complete(

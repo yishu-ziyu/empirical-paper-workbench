@@ -92,14 +92,20 @@ class CreateSessionResponse(BaseModel):
 
 
 class SnapshotDatasetResponse(BaseModel):
-    """Project Snapshot 的数据集元信息（全部来自后端 session 元数据）。
+    """Dataset identity for Snapshot / Evidence.
 
-    C1：前端不再为 name/rows/columns 维护 sessionStorage 副本。
+    Snapshot still projects upload session metadata (name/rows/columns).
+    Evidence ``provenance.dataset`` uses the analysis input identity
+    (path/hash/version/role) recorded on the estimate payload.
     """
 
     name: Optional[str] = None
     rows: Optional[int] = None
     columns: List[str] = Field(default_factory=list)
+    path: Optional[str] = None
+    hash: Optional[str] = None
+    version: Optional[str] = None
+    role: Optional[str] = None
 
 
 class SnapshotActiveRunResponse(BaseModel):
@@ -160,16 +166,28 @@ class EvidenceRobustnessResponse(BaseModel):
     ran: bool = False
 
 
+class EvidenceCodeArtifactResponse(BaseModel):
+    """A takeable code file associated with the estimate producer run."""
+
+    path: str
+    bytes: Optional[int] = None
+    filename: Optional[str] = None
+    run_id: Optional[str] = None
+    lang: Optional[str] = None
+
+
 class EvidenceProvenanceResponse(BaseModel):
     """结论溯源链：spec → estimator → run → dataset → trace/artifacts。
 
     全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。
+    Run 层只认 estimate.source_run_id；Dataset 层只认 estimate.analysis_dataset。
     """
 
     run_id: Optional[str] = None
     run_status: Optional[str] = None
     run_events_url: Optional[str] = None
     dataset: Optional[SnapshotDatasetResponse] = None
+    code: List[EvidenceCodeArtifactResponse] = Field(default_factory=list)
     trace_events: List[Dict[str, Any]] = Field(default_factory=list)
     manifest: Optional[Dict[str, Any]] = None
     artifacts: List[Dict[str, Any]] = Field(default_factory=list)

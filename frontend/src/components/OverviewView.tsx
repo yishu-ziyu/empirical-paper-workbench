@@ -1,6 +1,10 @@
 import type { WorkspaceApi } from '../lib/workspace'
 import type { WorkbenchViewId } from './WorkbenchSidebar'
-import { formatStatValue, parseEstimateRows } from '../lib/readoutTable'
+import {
+  formatStatValue,
+  normalizeEstimateTableSource,
+  parseEstimateRows,
+} from '../lib/readoutTable'
 
 export interface OverviewViewProps {
   ws: WorkspaceApi
@@ -151,10 +155,10 @@ export default function OverviewView({
 
   const doneCount = stations.filter((s) => s.status === 'done').length
   const tableRows = parseEstimateRows(
-    (ws.mainResults as string | null) ??
-      (ws.estimateMeta?.results as string | null) ??
-      (ws.estimateMeta?.table_rows as string | null) ??
-      (ws.estimateMeta?.treatment_row as string | null),
+    normalizeEstimateTableSource(ws.mainResults) ??
+      normalizeEstimateTableSource(ws.estimateMeta?.results) ??
+      normalizeEstimateTableSource(ws.estimateMeta?.table_rows) ??
+      normalizeEstimateTableSource(ws.estimateMeta?.treatment_row),
   )
 
   const lastRunText = ws.activeRun

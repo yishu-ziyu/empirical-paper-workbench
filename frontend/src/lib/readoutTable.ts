@@ -23,6 +23,16 @@ function isMarkdownTableChrome(cells: string[]): boolean {
   )
 }
 
+export function normalizeEstimateTableSource(raw: unknown): string | null {
+  if (raw == null) return null
+  if (Array.isArray(raw)) {
+    const lines = raw.filter((row): row is string => typeof row === 'string')
+    return lines.length ? lines.join('\n') : null
+  }
+  if (typeof raw === 'string') return raw
+  return null
+}
+
 export function parseEstimateRows(raw: string | null | undefined): EstimateRow[] {
   if (!raw) return []
   const rows: EstimateRow[] = []

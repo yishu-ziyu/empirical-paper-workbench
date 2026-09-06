@@ -3630,6 +3630,64 @@
         "title": "EditChapterResponse",
         "description": "POST /sessions/{id}/edit-chapter 返回体。\n\n与 regenerate 同形：改过的章 + 全表。instruction 走 generate_chapter\n时附带评审字段；content 落盘不审，评审字段为空。"
       },
+      "EvidenceCodeArtifactResponse": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "EvidenceCodeArtifactResponse",
+        "description": "A takeable code file associated with the estimate producer run."
+      },
       "EvidenceIdentificationResponse": {
         "properties": {
           "star_rating": {
@@ -3709,6 +3767,13 @@
               }
             ]
           },
+          "code": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceCodeArtifactResponse"
+            },
+            "type": "array",
+            "title": "Code"
+          },
           "trace_events": {
             "items": {
               "additionalProperties": true,
@@ -3740,7 +3805,7 @@
         },
         "type": "object",
         "title": "EvidenceProvenanceResponse",
-        "description": "结论溯源链：spec → estimator → run → dataset → trace/artifacts。\n\n全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。"
+        "description": "结论溯源链：spec → estimator → run → dataset → trace/artifacts。\n\n全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。\nRun 层只认 estimate.source_run_id；Dataset 层只认 estimate.analysis_dataset。"
       },
       "EvidenceResponse": {
         "properties": {
@@ -5589,11 +5654,55 @@
             },
             "type": "array",
             "title": "Columns"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
           }
         },
         "type": "object",
         "title": "SnapshotDatasetResponse",
-        "description": "Project Snapshot 的数据集元信息（全部来自后端 session 元数据）。\n\nC1：前端不再为 name/rows/columns 维护 sessionStorage 副本。"
+        "description": "Dataset identity for Snapshot / Evidence.\n\nSnapshot still projects upload session metadata (name/rows/columns).\nEvidence ``provenance.dataset`` uses the analysis input identity\n(path/hash/version/role) recorded on the estimate payload."
       },
       "TokenResponse": {
         "properties": {

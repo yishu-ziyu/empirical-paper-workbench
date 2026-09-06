@@ -1,0 +1,5 @@
+# Test-only extras for backend/.venv and agent/.venv.
+# Installed by make install-backend / make install-agent and CI.
+# Keep pytest out of production requirements.txt.
+pytest>=8.0
+pytest-asyncio>=0.24

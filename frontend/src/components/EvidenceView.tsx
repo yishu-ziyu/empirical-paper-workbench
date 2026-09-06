@@ -1,6 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { fetchSessionEvidence, type EvidenceModel } from '../lib/workspace'
-import { claimLabel, formatStatValue, parseEstimateRows } from '../lib/readoutTable'
+import {
+  claimLabel,
+  formatStatValue,
+  normalizeEstimateTableSource,
+  parseEstimateRows,
+} from '../lib/readoutTable'
 import type { DirectionFormData } from './DirectionForm'
 
 /**
@@ -23,7 +28,6 @@ export interface EvidenceViewProps {
   refreshKey?: number
   fallbackEstimate?: Record<string, any> | null
   direction?: DirectionFormData | null
-  hasCode?: boolean
   onOpenCode?: () => void
 }
 
@@ -32,7 +36,6 @@ export default function EvidenceView({
   refreshKey,
   fallbackEstimate,
   direction,
-  hasCode = false,
   onOpenCode,
 }: EvidenceViewProps) {
   const [evidence, setEvidence] = useState<EvidenceModel | null>(null)
@@ -98,21 +101,18 @@ export default function EvidenceView({
         : null,
   ].filter((chip): chip is string => Boolean(chip))
 
-  const tableSource = (() => {
-    if (typeof evidence?.results === 'string' && evidence.results.trim()) return evidence.results
-    if (typeof estimate?.results === 'string' && estimate.results.trim()) return estimate.results
-    if (Array.isArray(estimate?.table_rows)) {
-      const lines = (estimate.table_rows as unknown[]).filter(
-        (row): row is string => typeof row === 'string',
-      )
-      if (lines.length) return lines.join('\n')
-    }
-    if (typeof estimate?.table_rows === 'string' && estimate.table_rows.trim()) {
-      return estimate.table_rows
-    }
-    return typeof estimate?.treatment_row === 'string' ? estimate.treatment_row : null
-  })()
+  const tableSource =
+    (typeof evidence?.results === 'string' && evidence.results.trim()
+      ? evidence.results
+      : null) ??
+    (typeof estimate?.results === 'string' && estimate.results.trim()
+      ? estimate.results
+      : null) ??
+    normalizeEstimateTableSource(estimate?.table_rows) ??
+    normalizeEstimateTableSource(estimate?.treatment_row)
   const tableRows = parseEstimateRows(tableSource)
+  const codeArtifacts = Array.isArray(provenance?.code) ? provenance.code : []
+  const hasCodeArtifact = codeArtifacts.length > 0
 
   const detailRows: Array<{ label: string; value: string }> = direction
     ? [
@@ -193,20 +193,20 @@ export default function EvidenceView({
       detail: (
         <span>
           {dataset
-            ? `${dataset.name ?? '未命名'} · ${dataset.rows ?? '?'} 行 · ${
-                dataset.columns?.length ?? 0
-              } 列`
+            ? `${dataset.name ?? '未命名'}${dataset.role ? ` · ${dataset.role}` : ''} · ${
+                dataset.rows ?? '?'
+              } 行 · ${dataset.columns?.length ?? 0} 列`
             : '暂无'}
         </span>
       ),
-      present: Boolean(dataset),
+      present: Boolean(dataset?.path || dataset?.hash || dataset?.version),
     },
     {
       id: 'code',
       title: 'Code · 代码',
       detail: (
         <span>
-          {hasCode ? (
+          {hasCodeArtifact ? (
             <button
               type="button"
               data-testid="evidence-code-link"
@@ -220,7 +220,7 @@ export default function EvidenceView({
           )}
         </span>
       ),
-      present: hasCode,
+      present: hasCodeArtifact,
     },
   ]
   const presentCount = layers.filter((layer) => layer.present).length
@@ -268,9 +268,9 @@ export default function EvidenceView({
 
       {chips.length > 0 && (
         <div data-testid="evidence-chips" className="mb-4 flex flex-wrap gap-1.5">
-          {chips.map((chip) => (
+          {chips.map((chip, index) => (
             <span
-              key={chip}
+              key={`${index}-${chip}`}
               className="rounded-full border border-wb-line bg-wb-subtle px-2.5 py-0.5 font-mono text-[11px] text-wb-muted"
             >
               {chip}

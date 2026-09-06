@@ -290,7 +290,6 @@ export default function WorkbenchArtifact({
               refreshKey={ws.evidenceRefreshKey}
               fallbackEstimate={ws.estimateMeta}
               direction={ws.directionRecord}
-              hasCode={ws.canExport}
               onOpenCode={onOpenCode}
             />
           ) : (

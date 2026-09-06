@@ -35,7 +35,7 @@ validator 子代理独立复核程序化检查项；主 agent 负责浏览器实
 
 - [ ] C1 Shell 信息架构 — 程序: 浏览器截图 1280×800 + 1440×900（归档 `docs/acceptance/evidence-visual-phase/`）+ DOM 断言 — 预期: 左侧项目 sidebar（Overview / Research Question / Data / Design·Specification / Evidence / Literature / Paper，当前项高亮，可折叠）；主区顶部面包屑 + 项目标题（研究问题）+ 动作区（Run / 导出论文 / 导出代码）；右侧 Agent 栏；底部 run 状态条。旧顶部 tab（paper/data/format）与左研究轨被 sidebar+视图吸收，不再有双重导航。1280/1440 无文档级横向溢出，右栏无崩坏。
 - [ ] C2 Overview 页（真实数据）— 程序: 浏览器实弹（样例 Golden Path 会话）+ DOM 断言 — 预期: 统计卡行（Dataset 名/行数、Sample 行数、Main method、Last run 状态/时间）全部来自 snapshot；研究进度 stepper 六站（Data cleaned→Design specified→Main estimate→Robustness→Literature→Paper）状态与 snapshot 真相一致（如 robustness_status="ran"→完成、estimate error→红色受阻态、方向未提交→前两站后 pending）；Key Results 表渲染真实 estimate.table_rows；点击 stepper/卡片能跳对应视图。验证手段：跑两次方向（成功一次、坏列失败一次）stepper 状态必须跟着变。
-- [ ] C3 Evidence 视图升级 — 程序: 浏览器实弹 + DOM 断言 + curl 对照 — 预期: 标题为主张句（真实 claim）；chips 来自真实 spec（method/公式）；回归表渲染真实 table_rows；Specification Details 来自真实 research_direction；右侧溯源链时间线（Result 数字→Specification→Estimator→Run（run_id 可点）→Dataset→Code 层），某层无数据显式「暂无」，可溯源完整性卡片如实反映（能追几层写几层，不无脑写 Fully traceable）。
+- [ ] C3 Evidence 视图升级 — 程序: 浏览器实弹 + DOM 断言 + curl 对照 — 预期: 标题为主张句（真实 claim）；chips 来自真实 spec（method/公式）；回归表渲染真实 table_rows；Specification Details 来自真实 research_direction；右侧溯源链时间线六层（Result 数字→Specification→Estimator→实际 producer Run（run_id 可点）→实际 analysis Dataset→实际 Code artifact）。Fully traceable 只在六层都有真实 lineage 时出现。heuristic、latest_run、UI readiness（含 canExport / 已生成章节）、session-level guess 任一存在都不得计为 present。旧表述「生成过章节 → 6/6」已被 `docs/acceptance/workbench-v2-provenance-lineage.md` 取代，不得再作为完成标准。某层无数据显式「暂无」，可溯源完整性卡片如实反映（能追几层写几层，不无脑写 Fully traceable）。
 - [ ] C4 Paper 视图 + Linked Evidence — 程序: 浏览器实弹 + DOM 断言 — 预期: Writing / Preview / History 三个 tab 可用（Preview 走既有 LaTeX 渲染、History 走既有章节版本）；右侧 Linked Evidence 栏：真实主结果摘要卡（β/SE/p/N）+「基于证据」徽标——该徽标由 snapshot 写作门状态驱动（results 被阻时显示未 grounded 与缺失项），点击可跳 Evidence 视图。
 - [ ] C5 Agent 栏语义 — 程序: 浏览器实弹（run 进行中/完成/失败三态）+ DOM 断言 — 预期: run 进行中→当前任务区显示运行中任务与说明；出现需要决策的事→下一步决策卡（amber 语义色）；空闲→无任务不空转；run 失败→显式失败与下一步。动效只出现在状态/空间变化处。
 - [ ] C6 十维度自审归档 — 程序: `docs/acceptance/evidence-visual-phase/self-review.md` — 预期: 每个主要界面（Shell+Overview / Evidence / Paper）一段十维度自审（hierarchy、typography、spacing rhythm、information density、state clarity、unnecessary cards/borders、motion purpose、provenance readability、desktop resize behavior、专业工具感 vs AI landing page 感），附修改前后截图路径；无 card soup（内容面优先 plain surface，层级靠 typography/spacing/alignment/dividers 而非 shadow 堆叠）、无大面积玻璃。
@@ -58,7 +58,9 @@ validator 子代理独立复核程序化检查项；主 agent 负责浏览器实
 - **C3 Evidence**：标题「当前主张：相关」（真实 claim 走 claimLabel）；chips OLS · income ~ age + treat · controls treat；
   回归表真实两行；设定详情（income/age/treat/OLS/undergrad）来自 research_direction；溯源链六层
   （Result→Specification→Estimator→Run(run_id 可点)→Dataset→Code），新会话 Code 层「暂无」→ 完整性卡如实
-  「可溯源 5/6 层」，生成过章节的会话 6/6 Fully traceable——两态均有截图/断言。数字与
+  「可溯源 5/6 层」。视觉阶段曾把「生成过章节」计为 Code present / 6/6 Fully traceable；该 heuristic
+  已被 `workbench-v2-provenance-lineage.md` 取代：Code 层只认关联当前 estimate producer run 的真实
+  code artifact，缺 artifact 即使能导出论文也只能 5/6。数字与
   `GET /sessions/{id}/evidence`（coef -0.06870135850794869, se 0.008348243185348042, n 24, table_rows 在端点中原样存在）
   及 statsmodels 独立复算（coef -0.06870135850794397，差 ≈4.7e-12）一致。
 - **C4 Paper**：Writing/Preview/History 三 tab（`paper-tab-*`）可用：Preview 渲染已保存正文纸面、History 渲染真实版本

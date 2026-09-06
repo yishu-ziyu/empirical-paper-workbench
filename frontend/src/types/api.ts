@@ -1655,6 +1655,22 @@ export interface components {
             grounding_failures?: string[];
         };
         /**
+         * EvidenceCodeArtifactResponse
+         * @description A takeable code file associated with the estimate producer run.
+         */
+        EvidenceCodeArtifactResponse: {
+            /** Path */
+            path: string;
+            /** Bytes */
+            bytes?: number | null;
+            /** Filename */
+            filename?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Lang */
+            lang?: string | null;
+        };
+        /**
          * EvidenceIdentificationResponse
          * @description 识别验真读数（identification_verify 节点产物）。
          */
@@ -1674,6 +1690,7 @@ export interface components {
          * @description 结论溯源链：spec → estimator → run → dataset → trace/artifacts。
          *
          *     全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。
+         *     Run 层只认 estimate.source_run_id；Dataset 层只认 estimate.analysis_dataset。
          */
         EvidenceProvenanceResponse: {
             /** Run Id */
@@ -1683,6 +1700,8 @@ export interface components {
             /** Run Events Url */
             run_events_url?: string | null;
             dataset?: components["schemas"]["SnapshotDatasetResponse"] | null;
+            /** Code */
+            code?: components["schemas"]["EvidenceCodeArtifactResponse"][];
             /** Trace Events */
             trace_events?: {
                 [key: string]: unknown;
@@ -2440,9 +2459,11 @@ export interface components {
         };
         /**
          * SnapshotDatasetResponse
-         * @description Project Snapshot 的数据集元信息（全部来自后端 session 元数据）。
+         * @description Dataset identity for Snapshot / Evidence.
          *
-         *     C1：前端不再为 name/rows/columns 维护 sessionStorage 副本。
+         *     Snapshot still projects upload session metadata (name/rows/columns).
+         *     Evidence ``provenance.dataset`` uses the analysis input identity
+         *     (path/hash/version/role) recorded on the estimate payload.
          */
         SnapshotDatasetResponse: {
             /** Name */
@@ -2451,6 +2472,14 @@ export interface components {
             rows?: number | null;
             /** Columns */
             columns?: string[];
+            /** Path */
+            path?: string | null;
+            /** Hash */
+            hash?: string | null;
+            /** Version */
+            version?: string | null;
+            /** Role */
+            role?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {

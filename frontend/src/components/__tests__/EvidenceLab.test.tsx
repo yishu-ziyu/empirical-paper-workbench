@@ -107,13 +107,28 @@ const research = {
 } as unknown as ResearchLab
 
 describe('EvidenceLab', () => {
-  test('renders results space, matrix and compare from research payload', () => {
+  test('renders results space, matrix and compare from research payload', async () => {
+    const onCompare = vi.fn(async () => ({
+      coef_a: 0.08,
+      coef_b: 0.13,
+      delta_abs: 0.05,
+      delta_pct: 62.5,
+      changed: [
+        { dimension: 'estimator', a: 'ols', b: 'iv' },
+        { dimension: 'identification', a: 'none', b: 'nearc4' },
+      ],
+      unchanged: [
+        { dimension: 'experience', a: 'quadratic', b: 'quadratic' },
+      ],
+      why_moved: 'Identification strategy changed',
+    }))
     render(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
         onRevert={vi.fn(async () => undefined)}
         onAcceptChallenge={vi.fn(async () => undefined)}
+        onCompare={onCompare}
       />,
     )
     expect(screen.getByTestId('evidence-lab')).toBeInTheDocument()
@@ -129,11 +144,12 @@ describe('EvidenceLab', () => {
 
     fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
     fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
-    expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('βA → βB')
-    expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('Δ')
-    expect(screen.getByTestId('evidence-compare-intent')).toHaveTextContent(
+    expect(await screen.findByTestId('evidence-compare-intent')).toHaveTextContent(
       'Identification strategy changed',
     )
+    expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('βA → βB')
+    expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('Δ')
+    expect(onCompare).toHaveBeenCalled()
   })
 
   test('renders claim ledger and approve control', async () => {
@@ -159,5 +175,38 @@ describe('EvidenceLab', () => {
     )
     fireEvent.click(screen.getByTestId('claim-approve'))
     expect(onApproveClaim).toHaveBeenCalledWith('claim.card.education-earnings')
+  })
+
+  test('mismatch after approve offers explicit promote and still allows write results', () => {
+    const onPromote = vi.fn(async () => undefined)
+    const onPreparePaper = vi.fn(async () => undefined)
+    const approved = {
+      ...research.claim!,
+      id: 'claim.card.education-earnings',
+      approved_by_user: true,
+      stale: false,
+      provenance: { iv_spec_id: 'iv_region_dummies', iv_run_id: 'run-iv' },
+    }
+    render(
+      <EvidenceLab
+        research={{
+          ...research,
+          canonical_spec_id: 'ols_region_dummies',
+          claim: approved,
+          claims: [approved],
+        }}
+        onPromote={onPromote}
+        onPreparePaper={onPreparePaper}
+      />,
+    )
+    expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
+      '当前 Claim 依赖 IV specification，但正式主规格不是该 IV。',
+    )
+    expect(screen.getByTestId('claim-promote-supporting')).toBeInTheDocument()
+    expect(screen.getByTestId('claim-write-results')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('claim-write-results'))
+    expect(onPreparePaper).toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('claim-promote-supporting'))
+    expect(onPromote).toHaveBeenCalledWith('run-iv')
   })
 })

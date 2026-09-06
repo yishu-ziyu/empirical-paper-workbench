@@ -305,6 +305,7 @@ def seed_card_lab(
         "next_challenge": None,
         "surprise": None,
         "canonical_history": [],
+        "evidence_revision": 0,
         "claims": [],
         "current_claim_id": None,
         "claim": None,
@@ -744,12 +745,18 @@ def find_run(lab: dict[str, Any], token: str) -> dict[str, Any]:
 
 
 def merge_spec_run_lab(current: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
-    """Keep live lab fields; merge immutable runs from a spec_run worker."""
+    """Keep live lab fields; merge immutable runs from a spec_run worker.
+
+    Worker snapshots can lag a concurrent Promote / Claim approve. Never copy
+    canonical or claims from the worker. New run ids bump evidence_revision
+    against the live lab so an approved Claim becomes stale exactly once.
+    """
     merged = dict(current)
     existing = [
         dict(run) for run in (merged.get("specification_runs") or []) if isinstance(run, dict)
     ]
     index = {run.get("id"): i for i, run in enumerate(existing)}
+    added = False
     for run in incoming.get("specification_runs") or []:
         if not isinstance(run, dict) or not run.get("id"):
             continue
@@ -759,6 +766,7 @@ def merge_spec_run_lab(current: dict[str, Any], incoming: dict[str, Any]) -> dic
         else:
             index[rid] = len(existing)
             existing.append(dict(run))
+            added = True
     merged["specification_runs"] = existing
 
     events = [
@@ -773,23 +781,22 @@ def merge_spec_run_lab(current: dict[str, Any], incoming: dict[str, Any]) -> dic
             seen.add(event.get("id"))
     merged["decision_events"] = events
 
-    for key in (
-        "surprise",
-        "next_challenge",
-        "canonical_spec_id",
-        "canonical_history",
-        "claims",
-        "current_claim_id",
-        "claim",
-    ):
+    for key in ("surprise", "next_challenge"):
         if incoming.get(key) is not None:
             merged[key] = incoming[key]
+
+    if current_claim(merged) is None:
+        for key in ("claims", "current_claim_id", "claim"):
+            if incoming.get(key) is not None:
+                merged[key] = incoming[key]
 
     space = dict(merged.get("specification_space") or {})
     incoming_space = incoming.get("specification_space") or {}
     if existing or incoming_space.get("revealed"):
         space["revealed"] = True
     merged["specification_space"] = space
+    if added:
+        merged = bump_evidence_revision(merged)
     return merged
 
 
@@ -852,6 +859,32 @@ def next_card_challenge(lab: dict[str, Any]) -> Optional[dict[str, Any]]:
     }
 
 
+def bump_evidence_revision(lab: dict[str, Any]) -> dict[str, Any]:
+    """New completed evidence. Existing claims keep their text and become stale."""
+    current = int(lab.get("evidence_revision") or 0) + 1
+    lab["evidence_revision"] = current
+    claims = []
+    for item in lab.get("claims") or []:
+        if not isinstance(item, dict):
+            continue
+        updated = dict(item)
+        based = updated.get("based_on_evidence_revision")
+        try:
+            stale = based is None or int(based) != current
+        except (TypeError, ValueError):
+            stale = True
+        if stale:
+            updated["stale"] = True
+        claims.append(updated)
+    lab["claims"] = claims
+    current_id = lab.get("current_claim_id")
+    if current_id:
+        lab["claim"] = next((item for item in claims if item.get("id") == current_id), lab.get("claim"))
+    elif claims:
+        lab["claim"] = claims[-1]
+    return lab
+
+
 def promote_run(lab: dict[str, Any], run: dict[str, Any], estimate: dict[str, Any] | None) -> dict[str, Any]:
     history = list(lab.get("canonical_history") or [])
     history.append(
@@ -886,7 +919,7 @@ def promote_run(lab: dict[str, Any], run: dict[str, Any], estimate: dict[str, An
         )
     )
     lab["decision_events"] = events
-    return lab
+    return bump_evidence_revision(lab)
 
 
 def revert_canonical(lab: dict[str, Any]) -> tuple[dict[str, Any], Optional[dict[str, Any]]]:
@@ -912,6 +945,7 @@ def revert_canonical(lab: dict[str, Any]) -> tuple[dict[str, Any], Optional[dict
     events = list(lab.get("decision_events") or [])
     events.append(_event("preview_revert", {"canonical_spec_id": previous_spec}))
     lab["decision_events"] = events
+    lab = bump_evidence_revision(lab)
     return lab, restored if isinstance(restored, dict) else None
 
 
@@ -951,20 +985,59 @@ def card_paper_outline() -> list[dict[str, str]]:
     ]
 
 
-def prepare_card_paper_state(state: dict[str, Any], lab: dict[str, Any]) -> dict[str, Any]:
-    """Promote comparable evidence into write-ready canonical state for Results."""
-    claim = lab.get("claim") if isinstance(lab.get("claim"), dict) else None
+def _claim_required_spec_id(claim: dict[str, Any] | None) -> str | None:
+    if not isinstance(claim, dict):
+        return None
+    required = (claim.get("provenance") or {}).get("iv_spec_id")
+    return str(required) if required else None
+
+
+def require_claim_ready_for_paper(lab: dict[str, Any]) -> dict[str, Any]:
+    claim = current_claim(lab)
     if not claim or not claim.get("approved_by_user"):
         raise HTTPException(status_code=409, detail="claim_unapproved")
-    definitions = (lab.get("specification_space") or {}).get("definitions") or []
-    _ols_id, iv_id = comparable_spec_ids(definitions)
+    based = claim.get("based_on_evidence_revision")
+    revision = lab.get("evidence_revision")
+    stale = bool(claim.get("stale"))
+    try:
+        stale = stale or based is None or int(based) != int(revision or 0)
+    except (TypeError, ValueError):
+        stale = True
+    if stale:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "claim_stale",
+                "message": "New evidence available · 结论需要重新审视",
+            },
+        )
+    required = _claim_required_spec_id(claim)
+    if required and lab.get("canonical_spec_id") != required:
+        iv_run = _latest_completed_run(
+            [item for item in (lab.get("specification_runs") or []) if isinstance(item, dict)],
+            required,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "canonical_mismatch",
+                "message": "当前 Claim 依赖 IV specification，但正式主规格不是该 IV。",
+                "canonical_spec_id": lab.get("canonical_spec_id"),
+                "required_spec_id": required,
+                "promote_run_id": (iv_run or {}).get("id"),
+            },
+        )
+    return claim
+
+
+def prepare_card_paper_state(state: dict[str, Any], lab: dict[str, Any]) -> dict[str, Any]:
+    """Fill write-ready fields from the current canonical spec. Never promotes."""
+    require_claim_ready_for_paper(lab)
+    spec_id = lab.get("canonical_spec_id")
     runs = [item for item in (lab.get("specification_runs") or []) if isinstance(item, dict)]
-    run = next((item for item in runs if item.get("spec_id") == iv_id), None)
-    if run is None:
-        run = next((item for item in runs if item.get("method") == "iv"), None)
+    run = _latest_completed_run(runs, str(spec_id)) if spec_id else None
     if run is None:
         raise HTTPException(status_code=409, detail="no_specification_run")
-    lab = promote_run(lab, run, state.get("estimate") if isinstance(state.get("estimate"), dict) else None)
     estimate = estimate_payload_from_run(run)
     csv_path = lab.get("extract_csv_path") or state.get("csv_path")
     from pathlib import Path
@@ -996,7 +1069,7 @@ def prepare_card_paper_state(state: dict[str, Any], lab: dict[str, Any]) -> dict
         "dv": OUTCOME,
         "iv": TREATMENT,
         "instrument": INSTRUMENT,
-        "method": "iv",
+        "method": "iv" if (run.get("method") == "iv" or "ivreg" in str(spec.get("estimator") or "")) else "ols",
         "controls": spec.get("controls") or [],
         "claim": "association",
     }
@@ -1101,7 +1174,9 @@ def draft_card_claim_payload(lab: dict[str, Any]) -> Optional[dict[str, Any]]:
         "unresolved_assumptions": list(CARD_UNRESOLVED_ASSUMPTIONS),
         "evidence_status": evidence_status,
         "approved_by_user": False,
+        "stale": False,
         "version": 1,
+        "based_on_evidence_revision": int(lab.get("evidence_revision") or 0),
         "run_facts": _claim_run_facts(ols, iv),
         "provenance": {
             "ols_run_id": ols.get("id"),
@@ -1147,7 +1222,9 @@ def maybe_draft_card_claim(lab: dict[str, Any], *, force: bool = False) -> dict[
         drafted["id"] = existing.get("id") or drafted["id"]
         drafted["version"] = int(existing.get("version") or 1) + 1
         drafted["approved_by_user"] = False
+        drafted["stale"] = False
         drafted["evidence_status"] = "draft"
+        drafted["based_on_evidence_revision"] = int(lab.get("evidence_revision") or 0)
     _store_claim(lab, drafted)
     events = list(lab.get("decision_events") or [])
     events.append(
@@ -1187,8 +1264,24 @@ def approve_card_claim(lab: dict[str, Any], claim_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"claim {claim_id} not found")
     if not claim.get("supporting_run_ids"):
         raise HTTPException(status_code=409, detail="claim has no supporting specification runs")
+    based = claim.get("based_on_evidence_revision")
+    revision = lab.get("evidence_revision")
+    stale = bool(claim.get("stale"))
+    try:
+        stale = stale or based is None or int(based) != int(revision or 0)
+    except (TypeError, ValueError):
+        stale = True
+    if stale:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "claim_stale",
+                "message": "New evidence available · 结论需要重新审视",
+            },
+        )
     updated = dict(claim)
     updated["approved_by_user"] = True
+    updated["stale"] = False
     updated["evidence_status"] = "approved"
     _store_claim(lab, updated)
     events = list(lab.get("decision_events") or [])

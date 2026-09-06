@@ -3639,10 +3639,26 @@
             "title": "Approved By User",
             "default": false
           },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
           "version": {
             "type": "integer",
             "title": "Version",
             "default": 1
+          },
+          "based_on_evidence_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Evidence Revision"
           },
           "run_facts": {
             "anyOf": [
@@ -6130,6 +6146,11 @@
               }
             ],
             "title": "Canonical Spec Id"
+          },
+          "evidence_revision": {
+            "type": "integer",
+            "title": "Evidence Revision",
+            "default": 0
           },
           "next_challenge": {
             "anyOf": [

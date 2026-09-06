@@ -1598,10 +1598,17 @@ export interface components {
              */
             approved_by_user: boolean;
             /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
              * Version
              * @default 1
              */
             version: number;
+            /** Based On Evidence Revision */
+            based_on_evidence_revision?: number | null;
             /** Run Facts */
             run_facts?: string | null;
             /** Provenance */
@@ -2613,6 +2620,11 @@ export interface components {
             decision_events?: components["schemas"]["DecisionEventResponse"][];
             /** Canonical Spec Id */
             canonical_spec_id?: string | null;
+            /**
+             * Evidence Revision
+             * @default 0
+             */
+            evidence_revision: number;
             /** Next Challenge */
             next_challenge?: {
                 [key: string]: unknown;

@@ -55,6 +55,39 @@ describe('AgentRail linked evidence', () => {
     expect(screen.getByTestId('evidence-grounded-badge')).toHaveAttribute('data-grounded', 'true')
   })
 
+  test('stale claim is not marked grounded', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          research: {
+            evidence_revision: 2,
+            claims: [
+              {
+                id: 'claim.card.education-earnings',
+                approved_by_user: true,
+                stale: true,
+                based_on_evidence_revision: 1,
+              },
+            ],
+            claim: {
+              id: 'claim.card.education-earnings',
+              approved_by_user: true,
+              stale: true,
+              based_on_evidence_revision: 1,
+            },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence
+        hasSuccessfulEstimate
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('evidence-grounded-badge')).toHaveAttribute('data-grounded', 'false')
+  })
+
   test('unsupported wording is not marked grounded', () => {
     render(
       <AgentRail

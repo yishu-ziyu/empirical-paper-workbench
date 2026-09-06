@@ -264,7 +264,9 @@ class ClaimLedgerResponse(BaseModel):
     unresolved_assumptions: List[str] = Field(default_factory=list)
     evidence_status: str = "draft"
     approved_by_user: bool = False
+    stale: bool = False
     version: int = 1
+    based_on_evidence_revision: Optional[int] = None
     run_facts: Optional[str] = None
     provenance: Dict[str, Any] = Field(default_factory=dict)
 
@@ -282,6 +284,7 @@ class ResearchLabResponse(BaseModel):
     specification_runs: List[SpecificationRunResponse] = Field(default_factory=list)
     decision_events: List[DecisionEventResponse] = Field(default_factory=list)
     canonical_spec_id: Optional[str] = None
+    evidence_revision: int = 0
     next_challenge: Optional[Dict[str, Any]] = None
     surprise: Optional[SurpriseResponse] = None
     claims: List[ClaimLedgerResponse] = Field(default_factory=list)

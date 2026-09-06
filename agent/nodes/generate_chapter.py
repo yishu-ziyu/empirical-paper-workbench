@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..engine.bind import bind_chapter_kwargs
-from ..engine.readiness import paper_ready_to_write, resolve_slot
+from ..engine.readiness import paper_ready_to_write, resolve_slot, results_is_grounded
 from ..prompts import get_prompt
 from ..protocols import GenerateChapterOutput
 from ..state import EconPaperState
@@ -207,7 +207,11 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         "chapter_index": idx,
         "generation_source": generation_source,
         "generation_degraded": generation_degraded,
+        "stale": False,
+        "needs_regeneration": False,
     }
+    if str(chapter_type) == "results":
+        new_chapter["grounded"] = results_is_grounded(state, new_chapter)
     body_chapters[idx] = new_chapter
 
     return {

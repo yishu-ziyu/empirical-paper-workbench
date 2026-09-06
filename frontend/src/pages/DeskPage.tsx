@@ -14,6 +14,7 @@ export interface DeskPageProps {
   uploading?: boolean
   uploadError?: string | null
   onOpenGuide?: () => void
+  onTryCard?: () => void
   onLogin?: () => void
   onRegister?: () => void
   authed?: boolean
@@ -49,6 +50,7 @@ export default function DeskPage({
   uploading = false,
   uploadError = null,
   onOpenGuide,
+  onTryCard,
   onLogin,
   onRegister,
   authed,
@@ -412,6 +414,17 @@ export default function DeskPage({
                     {t(key)}
                   </button>
                 ))}
+              </div>
+              <div className="mt-5">
+                <button
+                  type="button"
+                  data-testid="desk-try-card"
+                  onClick={() => onTryCard?.()}
+                  disabled={uploading}
+                  className="rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  Try a real study · Card
+                </button>
               </div>
               <p className="mt-5 text-[13px] text-muted">
                 {t('desk.haveDataQ')}{' '}

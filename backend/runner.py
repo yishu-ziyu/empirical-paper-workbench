@@ -17,6 +17,8 @@ import run_store
 from config import ensure_private_directory
 from database import create_tables
 from run_repository import LeaseLost, RunRepository, UploadResultInvalid
+from services.research_lab import reattach_research_lab
+from services.spec_run import execute_spec_run
 from agent.engine.cancellation import ExecutionCancelled
 from prewrite_supervisor import (
     RemoteExecutionError,
@@ -92,6 +94,10 @@ def _remove_upload_attempt(path: Path | None) -> None:
 
 
 def _stable_failure(exc: Exception, run_kind: str) -> str:
+    from services.spec_run import SpecRunRejected
+
+    if isinstance(exc, SpecRunRejected):
+        return exc.code
     if isinstance(exc, UploadResultInvalid):
         return "UnreadableOutput: upload_pipeline output_validation failed"
     if isinstance(exc, RemoteExecutionError):
@@ -232,6 +238,15 @@ async def process_one_run(
                 progress_callback=progress,
                 cancellation_check=lease_lost.is_set,
             )
+            state = reattach_research_lab(state, initial_state)
+        elif claimed.kind == "spec_run":
+            state = await asyncio.to_thread(
+                execute_spec_run,
+                claimed.session_id,
+                claimed.run_id,
+                claimed.payload,
+                progress,
+            )
         else:
             raise RuntimeError("unsupported run kind")
     except (ExecutionCancelled, LeaseLost):
@@ -254,6 +269,10 @@ async def process_one_run(
             _remove_upload_attempt(upload_attempt)
     else:
         result = {**state, "_source_run_id": claimed.run_id}
+        if claimed.kind == "spec_run":
+            from services.research_lab import strip_spec_run_result
+
+            result = strip_spec_run_result(result)
         if claimed.kind == "prewrite":
             result = _stamp_estimate_producer(
                 result,

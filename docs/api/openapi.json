@@ -757,6 +757,700 @@
         }
       }
     },
+    "/demos/card": {
+      "post": {
+        "summary": "Boot Card Demo",
+        "description": "Empty-desk Card boot: real extract through the existing upload pipeline.",
+        "operationId": "boot_card_demo_demos_card_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key was reused for different input"
+          },
+          "429": {
+            "description": "The durable run queue is full"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research": {
+      "get": {
+        "summary": "Get Research",
+        "operationId": "get_research_sessions__session_id__research_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/expectation": {
+      "put": {
+        "summary": "Put Expectation",
+        "operationId": "put_expectation_sessions__session_id__research_expectation_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpectationUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/specification-space/freeze": {
+      "post": {
+        "summary": "Freeze Space",
+        "operationId": "freeze_space_sessions__session_id__research_specification_space_freeze_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/specification-space/run": {
+      "post": {
+        "summary": "Run Specification Space",
+        "operationId": "run_specification_space_sessions__session_id__research_specification_space_run_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/specs/{spec_id}/run": {
+      "post": {
+        "summary": "Run One Specification",
+        "operationId": "run_one_specification_sessions__session_id__research_specs__spec_id__run_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "spec_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spec Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/compare": {
+      "post": {
+        "summary": "Compare Specs",
+        "operationId": "compare_specs_sessions__session_id__research_compare_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecCompareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecCompareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/preview/promote": {
+      "post": {
+        "summary": "Promote Preview",
+        "operationId": "promote_preview_sessions__session_id__research_preview_promote_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/preview/revert": {
+      "post": {
+        "summary": "Revert Preview",
+        "operationId": "revert_preview_sessions__session_id__research_preview_revert_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/challenges/{challenge_id}/accept": {
+      "post": {
+        "summary": "Accept Challenge",
+        "operationId": "accept_challenge_sessions__session_id__research_challenges__challenge_id__accept_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Challenge Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/claims/draft": {
+      "post": {
+        "summary": "Draft Research Claim",
+        "operationId": "draft_research_claim_sessions__session_id__research_claims_draft_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/claims/{claim_id}/approve": {
+      "post": {
+        "summary": "Approve Research Claim",
+        "operationId": "approve_research_claim_sessions__session_id__research_claims__claim_id__approve_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/research/prepare-paper": {
+      "post": {
+        "summary": "Prepare Research Paper",
+        "operationId": "prepare_research_paper_sessions__session_id__research_prepare_paper_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchLabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/labels": {
       "get": {
         "summary": "Export Labels",
@@ -2702,6 +3396,39 @@
             },
             "type": "array",
             "title": "Structure Failures"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale"
+          },
+          "needs_regeneration": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Regeneration"
+          },
+          "grounded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grounded"
           }
         },
         "additionalProperties": true,
@@ -2843,6 +3570,121 @@
         "title": "CharlsDetectResponse",
         "description": "GET /sessions/{id}/charls/detect 返回体。"
       },
+      "ClaimLedgerResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "claim_text": {
+            "type": "string",
+            "title": "Claim Text",
+            "default": ""
+          },
+          "claim_type": {
+            "type": "string",
+            "title": "Claim Type",
+            "default": "association"
+          },
+          "supported_wording": {
+            "type": "string",
+            "title": "Supported Wording",
+            "default": ""
+          },
+          "conditionally_supported_wording": {
+            "type": "string",
+            "title": "Conditionally Supported Wording",
+            "default": ""
+          },
+          "unsupported_wording": {
+            "type": "string",
+            "title": "Unsupported Wording",
+            "default": ""
+          },
+          "supporting_run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Supporting Run Ids"
+          },
+          "counter_evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Counter Evidence"
+          },
+          "sensitive_dimensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sensitive Dimensions"
+          },
+          "unresolved_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved Assumptions"
+          },
+          "evidence_status": {
+            "type": "string",
+            "title": "Evidence Status",
+            "default": "draft"
+          },
+          "approved_by_user": {
+            "type": "boolean",
+            "title": "Approved By User",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          },
+          "based_on_evidence_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Based On Evidence Revision"
+          },
+          "run_facts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Facts"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ClaimLedgerResponse",
+        "description": "Deterministic Claim Ledger entry (not the paper-draft main-estimate claim)."
+      },
       "CreateSessionResponse": {
         "properties": {
           "session_id": {
@@ -2952,6 +3794,71 @@
         "type": "object",
         "title": "DatasetMetaResponse",
         "description": "单个数据集的元信息（upload 返回 / state.uploaded_datasets[]）。"
+      },
+      "DatasetProvenanceResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": ""
+          },
+          "citation": {
+            "type": "string",
+            "title": "Citation",
+            "default": ""
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum",
+            "default": ""
+          },
+          "redistribution": {
+            "type": "string",
+            "title": "Redistribution",
+            "default": ""
+          },
+          "extract_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extract Kind"
+          }
+        },
+        "type": "object",
+        "title": "DatasetProvenanceResponse"
+      },
+      "DecisionEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "at"
+        ],
+        "title": "DecisionEventResponse"
       },
       "DeskChatTurn": {
         "properties": {
@@ -3911,6 +4818,156 @@
         "title": "EvidenceRobustnessResponse",
         "description": "稳健性审计状态（robustness_check 节点产物摘要）。"
       },
+      "ExpectationHistoryItemResponse": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "default": "medium"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": "edit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "text",
+          "at"
+        ],
+        "title": "ExpectationHistoryItemResponse"
+      },
+      "ExpectationResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "text_zh": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Zh"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "default": "medium"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ExpectationHistoryItemResponse"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "title": "ExpectationResponse"
+      },
+      "ExpectationUpdateRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "confidence"
+        ],
+        "title": "ExpectationUpdateRequest"
+      },
       "FilterConditionItem": {
         "properties": {
           "col": {
@@ -4834,6 +5891,20 @@
         "title": "ProgressResponse",
         "description": "GET /sessions/{id}/progress 返回体。"
       },
+      "PromoteRequest": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "PromoteRequest"
+      },
       "QueueFullResponse": {
         "properties": {
           "error": {
@@ -4979,6 +6050,214 @@
           "password"
         ],
         "title": "RegisterRequest"
+      },
+      "ResearchChoiceResponse": {
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dimension",
+          "value"
+        ],
+        "title": "ResearchChoiceResponse"
+      },
+      "ResearchLabResponse": {
+        "properties": {
+          "teaching_case": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Teaching Case"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetProvenanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchQuestionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpectationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specification_space": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecificationSpaceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "specification_runs": {
+            "items": {
+              "$ref": "#/components/schemas/SpecificationRunResponse"
+            },
+            "type": "array",
+            "title": "Specification Runs"
+          },
+          "decision_events": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionEventResponse"
+            },
+            "type": "array",
+            "title": "Decision Events"
+          },
+          "canonical_spec_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Spec Id"
+          },
+          "evidence_revision": {
+            "type": "integer",
+            "title": "Evidence Revision",
+            "default": 0
+          },
+          "next_challenge": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Challenge"
+          },
+          "surprise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SurpriseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimLedgerResponse"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "current_claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Claim Id"
+          },
+          "claim": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimLedgerResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ResearchLabResponse",
+        "description": "Research lab read model (GET /sessions/{id}/research and snapshot.research)."
+      },
+      "ResearchQuestionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "default": ""
+          },
+          "prompt_en": {
+            "type": "string",
+            "title": "Prompt En",
+            "default": ""
+          },
+          "prompt_zh": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Zh"
+          },
+          "outcome": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Outcome"
+          },
+          "treatment": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Treatment"
+          },
+          "causal_threat": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Causal Threat"
+          },
+          "identification": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Identification"
+          },
+          "estimand": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Estimand"
+          }
+        },
+        "type": "object",
+        "title": "ResearchQuestionResponse"
       },
       "ResumeRequest": {
         "properties": {
@@ -5318,7 +6597,8 @@
             "type": "string",
             "enum": [
               "prewrite",
-              "upload_pipeline"
+              "upload_pipeline",
+              "spec_run"
             ],
             "title": "Kind"
           },
@@ -5349,6 +6629,9 @@
               },
               {
                 "$ref": "#/components/schemas/UploadRunResultResponse"
+              },
+              {
+                "$ref": "#/components/schemas/SpecRunResultResponse"
               },
               {
                 "type": "null"
@@ -5586,6 +6869,16 @@
             },
             "type": "array",
             "title": "Degradations"
+          },
+          "research": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchLabResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5606,7 +6899,8 @@
             "type": "string",
             "enum": [
               "prewrite",
-              "upload_pipeline"
+              "upload_pipeline",
+              "spec_run"
             ],
             "title": "Kind"
           },
@@ -5703,6 +6997,512 @@
         "type": "object",
         "title": "SnapshotDatasetResponse",
         "description": "Dataset identity for Snapshot / Evidence.\n\nSnapshot still projects upload session metadata (name/rows/columns).\nEvidence ``provenance.dataset`` uses the analysis input identity\n(path/hash/version/role) recorded on the estimate payload."
+      },
+      "SpecCompareRequest": {
+        "properties": {
+          "a": {
+            "type": "string",
+            "minLength": 1,
+            "title": "A"
+          },
+          "b": {
+            "type": "string",
+            "minLength": 1,
+            "title": "B"
+          }
+        },
+        "type": "object",
+        "required": [
+          "a",
+          "b"
+        ],
+        "title": "SpecCompareRequest"
+      },
+      "SpecCompareResponse": {
+        "properties": {
+          "coef_a": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coef A"
+          },
+          "coef_b": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coef B"
+          },
+          "delta_abs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Abs"
+          },
+          "delta_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Pct"
+          },
+          "changed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "unchanged": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Unchanged"
+          },
+          "why_moved": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why Moved"
+          },
+          "intent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intent"
+          },
+          "a": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "A"
+          },
+          "b": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "B"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "SpecCompareResponse"
+      },
+      "SpecRunRequest": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "canonical",
+              "preview"
+            ],
+            "title": "Mode",
+            "default": "preview"
+          }
+        },
+        "type": "object",
+        "title": "SpecRunRequest"
+      },
+      "SpecRunResultResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true,
+            "title": "Ok",
+            "default": true
+          },
+          "specification_run_count": {
+            "type": "integer",
+            "title": "Specification Run Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "SpecRunResultResponse"
+      },
+      "SpecificationDefinitionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "dimension": {
+            "type": "string",
+            "title": "Dimension"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "admissible": {
+            "type": "boolean",
+            "title": "Admissible",
+            "default": true
+          },
+          "user_decision": {
+            "type": "string",
+            "title": "User Decision",
+            "default": "include"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchChoiceResponse"
+            },
+            "type": "array",
+            "title": "Choices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "rationale",
+          "dimension",
+          "value"
+        ],
+        "title": "SpecificationDefinitionResponse"
+      },
+      "SpecificationRunResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "spec_id": {
+            "type": "string",
+            "title": "Spec Id"
+          },
+          "spec_version": {
+            "type": "integer",
+            "title": "Spec Version",
+            "default": 1
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchChoiceResponse"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "estimator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimator"
+          },
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "covariance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covariance"
+          },
+          "analysis_dataset": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysis Dataset"
+          },
+          "producer_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producer Run Id"
+          },
+          "coef": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coef"
+          },
+          "se": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Se"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P"
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          },
+          "diagnostics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnostics"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Provenance"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "canonical",
+              "preview",
+              "exploratory"
+            ],
+            "title": "Relation",
+            "default": "exploratory"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "spec_id"
+        ],
+        "title": "SpecificationRunResponse",
+        "description": "Immutable result of one admissible specification execution."
+      },
+      "SpecificationSpaceResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "proposed"
+          },
+          "frozen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen At"
+          },
+          "frozen_before_results": {
+            "type": "boolean",
+            "title": "Frozen Before Results",
+            "default": false
+          },
+          "revealed": {
+            "type": "boolean",
+            "title": "Revealed",
+            "default": false
+          },
+          "definitions": {
+            "items": {
+              "$ref": "#/components/schemas/SpecificationDefinitionResponse"
+            },
+            "type": "array",
+            "title": "Definitions"
+          }
+        },
+        "type": "object",
+        "title": "SpecificationSpaceResponse"
+      },
+      "SurpriseResponse": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "SurpriseResponse"
       },
       "TokenResponse": {
         "properties": {

@@ -15,12 +15,17 @@ import WorkbenchSidebar, {
   type SidebarItem,
 } from './components/WorkbenchSidebar'
 import AgentRail from './components/AgentRail'
+import AgentCursorRoot from './components/AgentCursorLayer'
 import type { WorkspaceDecision, WorkspaceSuggestion } from './components/WorkspaceDecisionRail'
 import ReadingFocus from './components/ReadingFocus'
 import type { ResizableWorkspaceHandle } from './components/ResizableWorkspace'
 import { useT } from './lib/i18n'
 import { DEV_AUTH_BYPASS, useSession } from './lib/session'
-import { useWorkspace } from './lib/workspace'
+import {
+  hasConfirmedResearchQuestion,
+  researchQuestionPrompt,
+  useWorkspace,
+} from './lib/workspace'
 import { formatStatValue } from './lib/readoutTable'
 import WorkbenchArtifact from './components/WorkbenchArtifact'
 
@@ -92,7 +97,45 @@ function App() {
       actionLabel: '查看论文工作区',
       onAction: () => ws.setWorkbenchTab('paper'),
     }
-  } else if (ws.directionOpen && !ws.directionBusy && !ws.directionDisabledReason) {
+  } else if (
+    ws.research?.teaching_case &&
+    !ws.research.specification_space?.frozen_at &&
+    !ws.directionBusy
+  ) {
+    blockingDecision = {
+      title: '确认 Admissible Space',
+      reason: '先冻结合理规格空间，再看比较结果。比较结果不会在冻结前出现。',
+      actionLabel: '查看规格空间',
+      onAction: () => ws.setWorkbenchTab('design'),
+    }
+  } else if (
+    ws.research?.teaching_case &&
+    Boolean(ws.research.specification_space?.frozen_at) &&
+    !(ws.research.specification_runs && ws.research.specification_runs.length) &&
+    !ws.activeRun
+  ) {
+    blockingDecision = {
+      title: 'Run specifications',
+      reason: 'Admissible space is frozen. Run the included specifications to see real estimates.',
+      actionLabel: 'Run specifications',
+      onAction: () => {
+        ws.setWorkbenchTab('evidence')
+        void ws.handleRunSpecSpace()
+      },
+    }
+  } else if (ws.research?.surprise?.status === 'Unexpected') {
+    blockingDecision = {
+      title: 'Unexpected result',
+      reason:
+        ws.research.surprise.observed ||
+        'Observed estimates do not match the recorded expectation.',
+    }
+  } else if (
+    !ws.research?.teaching_case &&
+    ws.directionOpen &&
+    !ws.directionBusy &&
+    !ws.directionDisabledReason
+  ) {
     blockingDecision = {
       title: ws.directionSummary ? '确认修改后的研究方向' : '确认研究方向',
       reason: ws.directionSummary
@@ -288,6 +331,9 @@ function App() {
           uploadError={ws.uploadError}
           onPickData={() => ws.fileInputRef.current?.click()}
           onOpenGuide={() => ws.openGuide()}
+          onTryCard={() => {
+            void ws.handleTryCard()
+          }}
           onLogin={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('login')}
           onRegister={DEV_AUTH_BYPASS ? undefined : () => setAuthPage('register')}
           onConfirm={(title) => {
@@ -299,9 +345,16 @@ function App() {
     )
   }
 
+  const cardQuestion = researchQuestionPrompt(ws.research)
+  const questionConfirmed = hasConfirmedResearchQuestion(
+    ws.research,
+    ws.directionSummary,
+  )
   const projectName =
+    cardQuestion ||
     ws.directionSummary ||
     ws.shapedQuestion ||
+    (ws.research?.teaching_case ? 'Teaching case · Card 1995' : null) ||
     ws.csvName ||
     t('app.hint')
 
@@ -319,9 +372,9 @@ function App() {
     {
       id: 'question',
       label: 'Research Question',
-      hint: ws.directionSummary ? '已确认' : '待确认方向',
-      status: ws.directionSummary
-        ? ws.directionOpen
+      hint: questionConfirmed ? '已确认' : '待确认方向',
+      status: questionConfirmed
+        ? ws.directionOpen && !ws.research?.teaching_case
           ? 'active'
           : 'done'
         : 'pending',
@@ -344,8 +397,18 @@ function App() {
     {
       id: 'design',
       label: 'Design · Specification',
-      hint: ws.directionSummary ? ws.directionRecord?.method || '已设定' : '待方向',
-      status: ws.identFailed ? 'blocked' : ws.directionSummary ? 'done' : 'pending',
+      hint: ws.directionSummary
+        ? ws.directionRecord?.method || '已设定'
+        : ws.research?.specification_space?.frozen_at
+          ? 'Admissible space frozen'
+          : ws.research?.teaching_case
+            ? '待冻结'
+            : '待方向',
+      status: ws.identFailed
+        ? 'blocked'
+        : ws.directionSummary || ws.research?.specification_space?.frozen_at
+          ? 'done'
+          : 'pending',
     },
     {
       id: 'evidence',
@@ -388,9 +451,13 @@ function App() {
 
   const headerSubtitle = ws.directionSummary
     ? ws.directionSummary
-    : sessionId
-      ? '尚未设定研究方向；先在 Research Question 提交方向。'
-      : '上传数据后开始研究。'
+    : ws.research?.teaching_case
+      ? 'Teaching case · Card 1995 · 教育是否提高工资'
+      : cardQuestion
+        ? cardQuestion
+        : sessionId
+          ? '尚未设定研究方向；先在 Research Question 提交方向。'
+          : '上传数据后开始研究。'
 
   return (
     <div
@@ -408,6 +475,18 @@ function App() {
         </div>
       )}
 
+      <AgentCursorRoot
+        workbenchTab={ws.workbenchTab}
+        research={ws.research}
+        onOpenEvidence={() => ws.setWorkbenchTab('evidence')}
+        onRunPreview={async (specId) => {
+          await ws.handleRunSpec(specId, 'preview')
+        }}
+        onPromote={async () => {
+          const preview = ws.research?.specification_runs?.find((run) => run.relation === 'preview')
+          if (preview) await ws.handlePromotePreview(preview.id)
+        }}
+      >
       <ThreeColumn
         ref={workspaceRef}
         outline={
@@ -515,9 +594,9 @@ function App() {
                   <h1
                     data-testid="workbench-title"
                     className="max-w-[52ch] truncate font-serif text-[21px] font-semibold leading-tight tracking-[-0.01em] text-wb-ink"
-                    title={ws.shapedQuestion || projectName}
+                    title={cardQuestion || ws.shapedQuestion || projectName}
                   >
-                    {ws.shapedQuestion || projectName}
+                    {cardQuestion || ws.shapedQuestion || projectName}
                   </h1>
                   <p
                     data-testid="workbench-subtitle"
@@ -579,6 +658,7 @@ function App() {
           </ErrorBoundary>
         }
       />
+      </AgentCursorRoot>
 
       <footer
         data-testid="run-status-bar"

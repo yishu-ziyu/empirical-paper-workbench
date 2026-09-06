@@ -35,11 +35,13 @@ export type AgentScript = {
 
 export const CARD_SHOW_ME_SCRIPT: AgentScript = {
   id: CARD_SHOW_ME_SCRIPT_ID,
+  // 健康路径墙钟预算 ≤6s（C14）：4 次旅行 ×420ms + 500+500+1600+600ms
+  // = 5720ms。requireTarget 的 2500ms 兜底只落在缺目标异常路径。
   steps: [
     { op: 'point', target: TARGET.ols },
-    { op: 'pause', ms: 700 },
+    { op: 'pause', ms: 500 },
     { op: 'point', target: TARGET.iv },
-    { op: 'pause', ms: 700 },
+    { op: 'pause', ms: 500 },
     {
       op: 'compare',
       a: TARGET.ols,
@@ -54,14 +56,14 @@ export const CARD_SHOW_ME_SCRIPT: AgentScript = {
       intent: 'Identification strategy changed',
       intentZh: '识别策略发生变化',
     },
-    { op: 'pause', ms: 2500 },
+    { op: 'pause', ms: 1600 },
     {
       op: 'point',
       target: TARGET.estimator,
       intent: 'This is the main change.',
       intentZh: '主要变化来自这里。',
     },
-    { op: 'pause', ms: 1200 },
+    { op: 'pause', ms: 600 },
     { op: 'stop' },
   ],
 }

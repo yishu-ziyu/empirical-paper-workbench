@@ -85,6 +85,105 @@ def test_nine_col_path_marks_region_specs_unavailable(client, monkeypatch):
     assert by_id["iv_nearc4_linear"]["admissible"] is True
 
 
+def test_seed_expectation_carries_single_structured_criterion(client):
+    """C1: Card seed establishes exactly one structured ordering criterion."""
+    sid = _boot(client)["session_id"]
+    lab = client.get(f"/sessions/{sid}/research").json()
+    criteria = lab["expectation"]["criteria"]
+    assert isinstance(criteria, list) and len(criteria) == 1
+    criterion = criteria[0]
+    assert criterion["source"] == "seed"
+    assert criterion["kind"] == "ordering"
+    assert criterion["operator"] == "lt"
+    assert criterion["left"]["metric"] == "estimate.coef"
+    assert criterion["left"]["estimator"] == "iv"
+    assert criterion["right"]["metric"] == "estimate.coef"
+    assert criterion["right"]["estimator"] == "ols"
+    assert "IV estimate < OLS estimate" in criterion["label"]
+
+
+def _strip_nones(value):
+    """Drop schema-injected null fields for verbatim comparison."""
+    if isinstance(value, dict):
+        return {k: _strip_nones(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_strip_nones(item) for item in value]
+    return value
+
+
+def test_expectation_put_explicit_criteria_persist_verbatim(client):
+    """C2①: a PUT carrying criteria stores them exactly as submitted.
+
+    The read model projects the full public schema (optional keys may be
+    null); every submitted key/value must come back unchanged.
+    """
+    sid = _boot(client)["session_id"]
+    criteria = [
+        {
+            "id": "criterion.user.iv-above-ols",
+            "kind": "ordering",
+            "operator": "gt",
+            "left": {"metric": "estimate.coef", "estimator": "iv"},
+            "right": {"metric": "estimate.coef", "estimator": "ols"},
+            "label": "IV estimate > OLS estimate",
+            "source": "user",
+        }
+    ]
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "Now I think IV is larger.",
+            "confidence": "high",
+            "criteria": criteria,
+        },
+    )
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]
+    assert _strip_nones(stored["criteria"]) == criteria
+    # criteria sit beside version/history in the same response
+    assert stored["version"] == 2
+    assert len(stored["history"]) >= 2
+
+
+def test_expectation_put_without_criteria_keeps_existing(client):
+    """C2②: editing text alone never re-derives or drops the criteria."""
+    sid = _boot(client)["session_id"]
+    before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    assert before
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "我觉得 IV 应该会更小一些，但并不确定。随意写的别的句子。",
+            "confidence": "low",
+        },
+    )
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]
+    assert stored["criteria"] == before
+
+
+def test_expectation_put_rejects_malformed_criterion(client):
+    sid = _boot(client)["session_id"]
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "bad criterion",
+            "confidence": "medium",
+            "criteria": [{"id": "x", "kind": "nonsense", "left": {}, "operator": "sideways"}],
+        },
+    )
+    assert put.status_code == 422
+
+
+def test_expectation_response_includes_criteria_with_version_history(client):
+    """C2③: the ExpectationResponse read model carries criteria."""
+    sid = _boot(client)["session_id"]
+    lab = client.get(f"/sessions/{sid}/research").json()
+    expect = lab["expectation"]
+    for key in ("criteria", "version", "history"):
+        assert key in expect
+
+
 def test_expectation_put_round_trips_and_is_not_a_chat_message(client):
     sid = _boot(client)["session_id"]
     body = {

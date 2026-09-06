@@ -1398,7 +1398,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       } catch (error) {
         if (!isCurrentWait() || activeSessionRef.current !== sid) return
         if (error instanceof DOMException && error.name === 'AbortError') return
-        // 失败不假成功：快照重取 + 明确失败类别 + Retry 出口（C11）。
+        // 失败不假成功：快照重取（尽力而为）+ 明确失败类别 + Retry 出口（C11）。
         const fresh = await fetchSessionSnapshot(sid).catch(() => null)
         if (fresh) applySnapshot(fresh)
         setSpecRunProgress(null)

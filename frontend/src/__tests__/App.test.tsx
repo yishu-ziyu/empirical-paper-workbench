@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import App from '../App'
 import { I18nProvider } from '../lib/i18n'
 import { API_BASE } from '../lib/apiBase'
-import { CLEAN_STEPS, PAPER_NODES } from '../lib/paperPath'
+import { CLEAN_STEPS } from '../lib/paperPath'
 import { CAPSULE_DELAY_MS, READING_NOTICE_MS } from '../components/ReadingFocus'
 
 function renderWithI18n(ui: React.ReactElement) {
@@ -13,6 +13,7 @@ function renderWithI18n(ui: React.ReactElement) {
 
 class AppFakeEventSource {
   static latest: AppFakeEventSource | null = null
+  static urls: string[] = []
   onmessage: ((event: MessageEvent<string>) => void) | null = null
   onerror: (() => void) | null = null
   closed = false
@@ -21,6 +22,7 @@ class AppFakeEventSource {
   constructor(url: string) {
     this.url = url
     AppFakeEventSource.latest = this
+    AppFakeEventSource.urls.push(url)
   }
 
   close() {
@@ -35,6 +37,7 @@ describe('App 三栏布局', () => {
     sessionStorage.clear()
     localStorage.setItem("econpaper_access_token", "test-token-for-auth")
     AppFakeEventSource.latest = null
+    AppFakeEventSource.urls = []
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -172,51 +175,51 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('agent-panel-content')).not.toBeInTheDocument()
   })
 
-  test('工作台右栏是锁定论文路径，不含额外站点', async () => {
+  test('工作台：左 sidebar 七个视图入口，右 Agent 栏，无双重导航', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
     localStorage.setItem('econpaper_session_id', 'test-sess')
     renderWithI18n(<App />)
-    expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
+    expect(await screen.findByTestId('workbench-header')).toBeInTheDocument()
     const rightPane = screen.getByTestId('agent-panel')
-    expect(rightPane).toContainElement(screen.getByTestId('paper-path'))
     expect(rightPane).toHaveAttribute('data-open', 'true')
     const desk = screen.getByTestId('desk-columns')
     expect(desk).toContainElement(rightPane)
     expect(desk.className).not.toMatch(/grid-cols-1|lg:grid-cols/)
-    expect(rightPane).toHaveStyle({ width: '280px' })
-    expect(screen.getByTestId('outline-panel')).toHaveStyle({ width: '220px' })
+    expect(rightPane).toHaveStyle({ width: '304px' })
+    expect(screen.getByTestId('sidebar-panel')).toHaveStyle({ width: '236px' })
     expect(screen.getByTestId('left-resize-handle')).toBeInTheDocument()
     expect(screen.getByTestId('right-resize-handle')).toBeInTheDocument()
-    for (const id of PAPER_NODES) {
-      expect(rightPane).toContainElement(screen.getByTestId(`paper-path-${id}`))
+    // C1：sidebar 七个入口，当前项高亮
+    for (const id of ['overview', 'question', 'data', 'design', 'evidence', 'literature', 'paper']) {
+      expect(screen.getByTestId(`rail-${id}`)).toBeInTheDocument()
     }
-    expect(screen.getByTestId('paper-path-set_direction')).toHaveAttribute('data-status', 'paused')
-    for (const id of CLEAN_STEPS) {
-      expect(rightPane).toContainElement(screen.getByTestId(`clean-step-${id}`))
-      expect(screen.getByTestId(`clean-step-${id}`)).toHaveAttribute('data-status', 'pending')
-    }
-    expect(screen.getByTestId('workbench-tab-paper')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-tab-data')).toBeInTheDocument()
-    expect(screen.getByTestId('workbench-tab-format')).toBeInTheDocument()
-    expect(screen.queryByTestId('paper-path-generate_title')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('paper-path-identification_verify')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('paper-path-search_literature')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('paper-path-eda')).not.toBeInTheDocument()
+    expect(screen.getByTestId('rail-overview')).toBeInTheDocument()
+    expect(screen.getByTestId('run-status-bar')).toBeInTheDocument()
+    // C1：面包屑 + 项目标题 + 动作区
+    expect(screen.getByTestId('workbench-breadcrumb')).toBeInTheDocument()
+    expect(screen.getByTestId('project-name')).toBeInTheDocument()
+    expect(screen.getByTestId('workbench-title')).toBeInTheDocument()
+    expect(screen.getByTestId('run-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('export-doc-btn')).toBeInTheDocument()
+    expect(screen.getByTestId('export-code-btn')).toBeInTheDocument()
+    // 旧导航已被 sidebar+视图吸收：右栏不再有研究进度树，也不再有双重导航
+    expect(screen.queryByTestId('paper-path')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('research-computer')).not.toBeInTheDocument()
+    expect(rightPane).toContainElement(screen.getByTestId('decision-rail'))
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
   })
 
-  test('右栏命名「研究进度」，并分成研究结构、数据与设计、证据写作和运行记录', async () => {
+  test('右栏是 Agent 栏：当前任务区 + 下一步决策卡', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
     localStorage.setItem('econpaper_session_id', 'test-sess')
     renderWithI18n(<App />)
 
-    expect(await screen.findByTestId('research-computer')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '研究进度' })).toBeInTheDocument()
-    expect(screen.getByTestId('research-structure')).toBeInTheDocument()
-    expect(screen.getByTestId('research-data-design')).toBeInTheDocument()
-    expect(screen.getByTestId('research-evidence-writing')).toBeInTheDocument()
-    expect(screen.getByTestId('research-run-records')).toBeInTheDocument()
-    expect(screen.getByTestId('research-computer')).toContainElement(screen.getByTestId('paper-path'))
+    expect(await screen.findByTestId('agent-rail')).toBeInTheDocument()
+    expect(screen.getByTestId('agent-current-task')).toBeInTheDocument()
+    expect(screen.getByTestId('decision-rail')).toBeInTheDocument()
+    expect(screen.getByTestId('decision-suggestions')).toBeInTheDocument()
+    // 空闲时不空转：没有运行中的任务就不显示任务卡
+    expect(screen.getByTestId('agent-current-task')).toHaveAttribute('data-busy', 'false')
   })
 
   test('提交状态显示真实阻塞与已通过条件', async () => {
@@ -230,6 +233,9 @@ describe('App 三栏布局', () => {
     )
     renderWithI18n(<App />)
 
+    // 无方向的会话默认停在问题卡；提交状态在 Paper 视图
+    await screen.findByTestId('direction-section')
+    fireEvent.click(screen.getByTestId('rail-paper'))
     const status = await screen.findByTestId('submission-status')
     expect(status).toHaveTextContent(/暂不可提交 · \d+/)
     fireEvent.click(screen.getByTestId('submission-toggle'))
@@ -258,6 +264,8 @@ describe('App 三栏布局', () => {
       }),
     )
     renderWithI18n(<App />)
+    // 刷新恢复有研究内容时落在 Overview；提交状态在 Paper 视图
+    fireEvent.click(await screen.findByTestId('rail-paper'))
 
     const status = await screen.findByTestId('submission-status')
     expect(screen.queryByTestId('submission-generate')).not.toBeInTheDocument()
@@ -288,6 +296,7 @@ describe('App 三栏布局', () => {
       }),
     )
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-paper'))
 
     const generate = await screen.findByTestId('submission-generate')
     expect(generate).toHaveTextContent('生成提交包')
@@ -295,7 +304,7 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('doc-export-dialog')).toBeInTheDocument()
   })
 
-  test('证据入口会展开右栏，手动收起说明后仍可再次打开', async () => {
+  test('Overview 的证据入口跳 Evidence 视图，右栏收起后可再次打开', async () => {
     localStorage.setItem('econpaper_session_id', 'test-sess')
     vi.stubGlobal(
       'fetch',
@@ -313,23 +322,20 @@ describe('App 三栏布局', () => {
     )
     renderWithI18n(<App />)
 
+    // 刷新恢复落在 Overview，「为什么？看证据」入口在这里
     await screen.findByTestId('evidence-why')
     fireEvent.click(screen.getByTestId('right-collapse-btn'))
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
 
     fireEvent.click(screen.getByTestId('evidence-why'))
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
-    const details = screen.getByTestId('research-evidence-explanation') as HTMLDetailsElement
-    expect(details.open).toBe(true)
+    expect(screen.getByTestId('evidence-view')).toBeInTheDocument()
 
-    act(() => {
-      details.open = false
-      fireEvent(details, new Event('toggle'))
-    })
-    expect(details.open).toBe(false)
-
+    // 回 Overview 后仍可再次进入 Evidence
+    fireEvent.click(screen.getByTestId('rail-overview'))
+    expect(screen.getByTestId('overview-view')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('evidence-why'))
-    expect(details.open).toBe(true)
+    expect(screen.getByTestId('evidence-view')).toBeInTheDocument()
   })
 
   test('左栏一次只显示一个阻塞决策，优先提示识别失败', async () => {
@@ -364,12 +370,14 @@ describe('App 三栏布局', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
     renderWithI18n(<App />)
 
+    // 专注阅读只在论文（Paper）视图生效：先从问题卡切到论文
+    fireEvent.click(screen.getByTestId('rail-paper'))
     expect(screen.queryByTestId('focus-reading-prompt')).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(READING_NOTICE_MS))
     expect(screen.getByTestId('focus-reading-prompt')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('focus-reading-enter'))
-    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('sidebar-panel')).toHaveAttribute('data-open', 'false')
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
     expect(screen.getByTestId('focus-reading-open-left')).toBeInTheDocument()
     expect(screen.getByTestId('focus-reading-open-right')).toBeInTheDocument()
@@ -377,7 +385,7 @@ describe('App 三栏布局', () => {
     act(() => vi.advanceTimersByTime(CAPSULE_DELAY_MS))
     expect(screen.getByTestId('focus-reading-capsule')).toHaveTextContent('专注阅读')
     fireEvent.click(screen.getByTestId('focus-reading-capsule'))
-    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'true')
+    expect(screen.getByTestId('sidebar-panel')).toHaveAttribute('data-open', 'true')
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
   })
 
@@ -387,16 +395,17 @@ describe('App 三栏布局', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
     renderWithI18n(<App />)
 
+    fireEvent.click(screen.getByTestId('rail-paper'))
     fireEvent.click(screen.getByTestId('left-collapse-btn'))
-    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    expect(screen.getByTestId('sidebar-panel')).toHaveAttribute('data-open', 'false')
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
 
     act(() => vi.advanceTimersByTime(READING_NOTICE_MS))
     fireEvent.click(screen.getByTestId('focus-reading-enter'))
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'false')
 
-    fireEvent.click(screen.getByTestId('workbench-tab-format'))
-    expect(screen.getByTestId('outline-panel')).toHaveAttribute('data-open', 'false')
+    fireEvent.click(screen.getByTestId('rail-data'))
+    expect(screen.getByTestId('sidebar-panel')).toHaveAttribute('data-open', 'false')
     expect(screen.getByTestId('agent-panel')).toHaveAttribute('data-open', 'true')
   })
 
@@ -409,25 +418,33 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('desk-columns')).not.toHaveTextContent(/\d+%/)
   })
 
-  test('Format 页有导出 CTA；路径 translate_code / export_docx 打开现有对话框', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ exists: true }) }))
+  test('导出论文 / 导出代码常驻顶部动作区，写出章节后可用并打开对话框', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          exists: true,
+          claim: 'association',
+          results: '| age | 0.1 |',
+          estimate: { status: 'ok', treatment_row: 'age | 0.1' },
+          outline: [{ type: 'intro', title: '引言' }],
+          body_chapters: [
+            { type: 'intro', title: '引言', content: '正文', status: 'approved' },
+          ],
+          research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+        }),
+    }))
     localStorage.setItem('econpaper_session_id', 'test-sess')
     renderWithI18n(<App />)
-    expect(await screen.findByTestId('paper-path')).toBeInTheDocument()
+    await screen.findByTestId('workbench-header')
 
-    fireEvent.click(screen.getByTestId('workbench-tab-format'))
-    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
-    expect(screen.getByTestId('format-export-doc-btn')).toHaveTextContent('导出论文')
-    expect(screen.getByTestId('format-export-code-btn')).toHaveTextContent('导出代码')
+    fireEvent.click(screen.getByTestId('export-doc-btn'))
+    expect(screen.getByTestId('doc-export-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('close-button'))
 
-    fireEvent.click(screen.getByTestId('paper-path-translate_code').querySelector('button')!)
-    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('export-code-btn'))
     expect(screen.getByTestId('code-export-dialog')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('code-export-close'))
-
-    fireEvent.click(screen.getByTestId('paper-path-export_docx').querySelector('button')!)
-    expect(screen.getByTestId('format-pane')).toBeInTheDocument()
-    expect(screen.getByTestId('doc-export-dialog')).toBeInTheDocument()
   })
 
   test('上传 CSV 成功后 sessionId 从 response 获取并显示', async () => {
@@ -461,7 +478,10 @@ describe('App 三栏布局', () => {
       expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     })
     expect(screen.getByTestId('session-ready')).toBeInTheDocument()
-    expect(screen.getByTestId('session-file')).toHaveTextContent('test.csv')
+    // 数据集元信息来自后端 dataset_meta，展示在 Data 视图
+    fireEvent.click(screen.getByTestId('rail-data'))
+    expect(await screen.findByTestId('dataset-summary')).toHaveTextContent('test.csv')
+    fireEvent.click(screen.getByTestId('rail-question'))
     expect(screen.getByTestId('direction-form')).toBeInTheDocument()
     expect(screen.queryByText(/sess-abc-123/i)).not.toBeInTheDocument()
     expect(screen.getByTestId('export-doc-btn')).toBeDisabled()
@@ -526,16 +546,10 @@ describe('App 三栏布局', () => {
     await waitFor(() => expect(AppFakeEventSource.latest?.url).toBe('/api/runs/run-upload-202/events'))
     expect(pendingAtRequest).toMatchObject({ fileName: 'panel.csv', idempotencyKey: expect.any(String) })
     expect(localStorage.getItem('econpaper_session_id')).toBe('sess-upload-202')
-    expect(JSON.parse(sessionStorage.getItem('econpaper_csv_meta') || '{}')).toMatchObject({
-      sessionId: 'sess-upload-202',
-      name: 'panel.csv',
-      rows: 2,
-      cols: 2,
-    })
-    expect(JSON.parse(localStorage.getItem('econpaper_active_run_id:sess-upload-202') || '{}')).toMatchObject({
-      runId: 'run-upload-202',
-      kind: 'upload_pipeline',
-    })
+    // C3：run 句柄与数据集元信息不再写入前端存储；研究真相只在上传意图（R2）与后端
+    expect(localStorage.getItem('econpaper_active_run_id:sess-upload-202')).toBeNull()
+    expect(sessionStorage.getItem('econpaper_csv_meta')).toBeNull()
+    expect(sessionStorage.getItem('econpaper_data_columns')).toBeNull()
     expect(screen.getByTestId('upload-live-status')).toHaveTextContent('正在清理')
     expect(screen.getByTestId('direction-disabled-reason')).toHaveTextContent('数据清理完成后')
     expect(screen.queryByText('正在估计主结果并检索文献…')).not.toBeInTheDocument()
@@ -548,11 +562,12 @@ describe('App 三栏布局', () => {
       )
     })
     await waitFor(() => {
-      expect(localStorage.getItem('econpaper_active_run_id:sess-upload-202')).toBeNull()
       expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
     })
     expect(screen.queryByTestId('direction-disabled-reason')).not.toBeInTheDocument()
-    expect(screen.getByTestId('clean-step-profiling')).toHaveAttribute('data-status', 'completed')
+    // 清理结果在 Overview stepper 的「数据清洗」站如实显示
+    fireEvent.click(screen.getByTestId('rail-overview'))
+    expect(screen.getByTestId('overview-step-data')).toHaveAttribute('data-status', 'done')
   })
 
   test('新上传一开始就清除上一份数据的清理结果', async () => {
@@ -578,6 +593,8 @@ describe('App 三栏布局', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     renderWithI18n(<App />)
+    // 清理步骤摘要在论文视图的时间线里：先切过去
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     expect(await screen.findByText('8/8 ✓')).toBeInTheDocument()
 
     fireEvent.change(screen.getByTestId('file-input'), {
@@ -743,39 +760,35 @@ describe('App 三栏布局', () => {
     )
     await Promise.resolve()
     expect(localStorage.getItem('econpaper_session_id')).toBe('sess-second')
-    expect(screen.getByTestId('session-file')).toHaveTextContent('second.csv')
+    // 数据集展示来自最新 upload 响应的 dataset_meta（Data 视图），晚到的旧结果不覆盖
+    fireEvent.click(screen.getByTestId('rail-data'))
+    expect(await screen.findByTestId('dataset-summary')).toHaveTextContent('second.csv')
     expect(keys[1]).not.toBe(keys[0])
   })
 
   test.each([
     [401, '登录已失效'],
     [403, '没有权限'],
-  ])('恢复上传遇到 %i 时清理敏感句柄并给出恢复提示', async (status, message) => {
+  ])('恢复上传遇到 %i 时清理句柄并给出恢复提示', async (status, message) => {
     vi.stubGlobal('EventSource', AppFakeEventSource)
     localStorage.setItem('econpaper_session_id', 'sess-protected')
-    localStorage.setItem('econpaper_seen_guide', '1')
-    localStorage.setItem(
-      'econpaper_active_run_id:sess-protected',
-      JSON.stringify({
-        runId: 'run-protected',
-        eventsUrl: '/api/runs/run-protected/events',
-        kind: 'upload_pipeline',
-      }),
-    )
-    localStorage.setItem(
-      'econpaper_pending_upload',
-      JSON.stringify({ idempotencyKey: 'protected-key', fileName: 'protected.csv' }),
-    )
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
         const href = String(url)
         if (href.endsWith('/sessions/sess-protected')) {
           return Promise.resolve(
-            new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            }),
+            new Response(
+              JSON.stringify({
+                exists: true,
+                upload_readiness: 'PROCESSING',
+                active_run: { run_id: 'run-protected', kind: 'upload_pipeline', status: 'RUNNING' },
+              }),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
           )
         }
         if (href.endsWith('/runs/run-protected')) {
@@ -800,28 +813,26 @@ describe('App 三栏布局', () => {
     expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
   })
 
-  test('恢复中的上传 Run 已不存在时清理 handle 并回到上传引导', async () => {
+  test('恢复中的上传 Run 已不存在时回到上传引导', async () => {
     vi.stubGlobal('EventSource', AppFakeEventSource)
     localStorage.setItem('econpaper_session_id', 'sess-missing-run')
-    localStorage.setItem('econpaper_seen_guide', '1')
-    localStorage.setItem(
-      'econpaper_active_run_id:sess-missing-run',
-      JSON.stringify({
-        runId: 'run-missing-upload',
-        eventsUrl: '/api/runs/run-missing-upload/events',
-        kind: 'upload_pipeline',
-      }),
-    )
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation((url: string) => {
         const href = String(url)
         if (href.endsWith('/sessions/sess-missing-run')) {
           return Promise.resolve(
-            new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            }),
+            new Response(
+              JSON.stringify({
+                exists: true,
+                upload_readiness: 'PROCESSING',
+                active_run: { run_id: 'run-missing-upload', kind: 'upload_pipeline', status: 'RUNNING' },
+              }),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
           )
         }
         if (href.endsWith('/runs/run-missing-upload')) {
@@ -838,7 +849,6 @@ describe('App 三栏布局', () => {
     expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
     expect(screen.getByTestId('upload-error')).toHaveTextContent('未找到这次数据处理')
     expect(localStorage.getItem('econpaper_session_id')).toBeNull()
-    expect(localStorage.getItem('econpaper_active_run_id:sess-missing-run')).toBeNull()
   })
 
   test('刷新后用全局 key 解析已接纳上传，不再发送文件体', async () => {
@@ -885,16 +895,6 @@ describe('App 三栏布局', () => {
   test('刷新时新上传意图优先于旧上传 Run', async () => {
     vi.stubGlobal('EventSource', AppFakeEventSource)
     localStorage.setItem('econpaper_session_id', 'sess-old')
-    localStorage.setItem('econpaper_seen_guide', '1')
-    localStorage.setItem(
-      'econpaper_active_run_id:sess-old',
-      JSON.stringify({
-        runId: 'run-old',
-        eventsUrl: '/api/runs/run-old/events',
-        kind: 'upload_pipeline',
-        idempotencyKey: '11111111-1111-4111-8111-111111111111',
-      }),
-    )
     localStorage.setItem(
       'econpaper_pending_upload',
       JSON.stringify({
@@ -920,10 +920,18 @@ describe('App 三栏布局', () => {
       }
       if (href.endsWith('/sessions/sess-old')) {
         return Promise.resolve(
-          new Response(JSON.stringify({ exists: true, upload_readiness: 'PROCESSING' }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }),
+          new Response(
+            JSON.stringify({
+              exists: true,
+              upload_readiness: 'PROCESSING',
+              // 旧 upload run 仍在跑：新意图必须独占处理权，restore 不重复 attach
+              active_run: { run_id: 'run-old', kind: 'upload_pipeline', status: 'RUNNING' },
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          ),
         )
       }
       if (href.endsWith('/sessions/sess-new')) {
@@ -945,10 +953,11 @@ describe('App 三栏布局', () => {
 
     await waitFor(() => expect(localStorage.getItem('econpaper_session_id')).toBe('sess-new'))
     expect(mockFetch.mock.calls.some((call) => String(call[0]).endsWith('/upload/resolve'))).toBe(true)
-    expect(JSON.parse(localStorage.getItem('econpaper_active_run_id:sess-new') || '{}')).toMatchObject({
-      runId: 'run-new',
-      idempotencyKey: '22222222-2222-4222-8222-222222222222',
-    })
+    // C3：run 句柄不落 localStorage；attach 走内存中的 events 订阅
+    await waitFor(() =>
+      expect(AppFakeEventSource.latest?.url).toBe('/api/runs/run-new/events'),
+    )
+    expect(AppFakeEventSource.urls.filter((url) => url.includes('run-old'))).toEqual([])
   })
 
   test('刷新解析 404 时清理 key 并回到可重新选文件的空桌', async () => {
@@ -1044,8 +1053,8 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('info-confirm')).toBeInTheDocument()
     expect(screen.getByTestId('chapter-pause')).toBeInTheDocument()
     expect(screen.getByTestId('outline-approve-btn')).toBeInTheDocument()
-    expect(screen.getByTestId('agent-panel')).toContainElement(screen.getByTestId('paper-path'))
-    expect(screen.getByTestId('agent-panel')).toContainElement(screen.getByTestId('clean-step-profiling'))
+    expect(screen.getByTestId('agent-panel')).toContainElement(screen.getByTestId('decision-rail'))
+    expect(screen.getByTestId('agent-panel')).toContainElement(screen.getByTestId('agent-current-task'))
     expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
   })
 
@@ -1076,11 +1085,14 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    // 刷新恢复落在 Overview；读数详情在 Paper 视图
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     expect(await screen.findByTestId('instrument-readout')).toBeInTheDocument()
     expect(screen.getByTestId('readout-claim')).toHaveTextContent('相关')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('treat')
     expect(screen.getByTestId('readout-table')).toHaveTextContent('0.08')
-    expect(screen.getByTestId('direction-summary')).toHaveTextContent('DiD')
+    // 方向摘要在主区头部副标题（DiD · oop ~ treat_post）
+    expect(screen.getByTestId('workbench-subtitle')).toHaveTextContent('DiD')
     expect(screen.getByTestId('write-chapter-intro')).toBeInTheDocument()
     expect(screen.queryByTestId('editor-content')).not.toBeInTheDocument()
   })
@@ -1153,7 +1165,7 @@ describe('App 三栏布局', () => {
     expect(String(sampleUpload![0])).not.toMatch(/localhost:8000|127\.0\.0\.1:8000/)
   })
 
-  test('刷新后仍保留课设样例预填', async () => {
+  test('刷新后仍保留课设样例预填，列名来自后端 snapshot', async () => {
     sessionStorage.setItem(
       'econpaper_sample_direction',
       JSON.stringify({
@@ -1165,16 +1177,28 @@ describe('App 三栏布局', () => {
         template: 'undergrad',
       }),
     )
-    sessionStorage.setItem(
-      'econpaper_data_columns',
-      JSON.stringify(['id', 'year', 'income', 'treat', 'age']),
-    )
     localStorage.setItem('econpaper_session_id', 'sess-sample')
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+      vi.fn().mockImplementation((url: string) => {
+        if (String(url).endsWith('/sessions/sess-sample')) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                exists: true,
+                dataset: {
+                  name: 'course-panel.csv',
+                  rows: 4,
+                  columns: ['id', 'year', 'income', 'treat', 'age'],
+                },
+              }),
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
+        })
       }),
     )
     renderWithI18n(<App />)
@@ -1379,6 +1403,7 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     expect(await screen.findByTestId('refine-send-btn')).toBeInTheDocument()
     expect(screen.getByTestId('refine-send-btn').tagName).toBe('BUTTON')
     await user.type(screen.getByTestId('refine-input'), '写短一点')
@@ -1414,6 +1439,7 @@ describe('App 三栏布局', () => {
               estimate: { treatment_row: '| age | 0.1 | 0.0 | 0.0 |' },
               results: '| age | 0.1 |',
               outline: [{ type: 'intro', title: '引言' }],
+              dataset: { name: 'macro.csv', rows: 42, columns: ['gdp', 'pop', 'income'] },
               research_direction: {
                 method: 'OLS',
                 dv: 'income',
@@ -1428,6 +1454,7 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     expect(await screen.findByTestId('info-confirm')).toBeInTheDocument()
     // U1: 到大纲阶段后信息卡默认折叠，先展开再断言
     fireEvent.click(screen.getByTestId('info-expand'))
@@ -1682,6 +1709,7 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     expect(await screen.findByTestId('pause-apply')).toBeInTheDocument()
     expect(screen.getByTestId('chapter-pause')).toHaveTextContent('配置第 2 部分')
     await user.click(screen.getByTestId('pause-apply'))
@@ -1727,18 +1755,15 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-paper'))
     fireEvent.click(await screen.findByTestId('info-expand'))
     expect(await screen.findByTestId('info-dataset')).toBeInTheDocument()
     expect(screen.getByTestId('info-dataset')).toHaveTextContent('CSV')
     expect(screen.getByTestId('info-dataset')).not.toHaveTextContent('macro.csv')
   })
 
-  test('logout clears csv meta so a later session cannot inherit the file', async () => {
+  test('logout clears the session so a later session cannot inherit its data', async () => {
     const user = userEvent.setup()
-    sessionStorage.setItem(
-      'econpaper_csv_meta',
-      JSON.stringify({ sessionId: 'test-sess', name: 'macro.csv', rows: 42, cols: 8 }),
-    )
     localStorage.setItem('econpaper_session_id', 'test-sess')
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       const href = String(url)
@@ -1753,6 +1778,7 @@ describe('App 三栏布局', () => {
               robustness_status: 'ran',
               estimate: { treatment_row: '| age | 0.1 |' },
               outline: [{ type: 'intro', title: '引言' }],
+              dataset: { name: 'macro.csv', rows: 42, columns: ['gdp'] },
               research_direction: { method: 'OLS', dv: 'income', iv: 'age', question: 'q' },
             }),
         })
@@ -1761,11 +1787,13 @@ describe('App 三栏布局', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
-    fireEvent.click(await screen.findByTestId('info-expand'))
-    expect(await screen.findByTestId('info-dataset')).toHaveTextContent('macro.csv')
+    // 数据集信息来自后端 snapshot（Data 视图展示）
+    fireEvent.click(await screen.findByTestId('rail-data'))
+    expect(await screen.findByTestId('dataset-summary')).toHaveTextContent('macro.csv')
     await user.click(screen.getByRole('button', { name: '退出' }))
     // 空桌直入语义：退出后回到可立即输入/上传的空桌，而不是落地页
     expect(await screen.findByTestId('desk-page')).toBeInTheDocument()
+    expect(localStorage.getItem('econpaper_session_id')).toBeNull()
     expect(sessionStorage.getItem('econpaper_csv_meta')).toBeNull()
   })
 

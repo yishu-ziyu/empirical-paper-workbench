@@ -15,6 +15,7 @@ facade.record_degradation 的条目模式把回退记录进 estimate payload。
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -28,6 +29,83 @@ from ..state import EconPaperState
 
 logger = logging.getLogger(__name__)
 _FE_DROPPED_LINE = "FE dropped; pooled OLS"
+
+
+def _sha256_file(path: Path) -> Optional[str]:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def _dataset_entry_for_path(datasets: Any, csv_path: str) -> Optional[Dict[str, Any]]:
+    if not isinstance(datasets, list):
+        return None
+    for item in datasets:
+        if isinstance(item, dict) and str(item.get("path") or "") == csv_path:
+            return item
+    return None
+
+
+def analysis_dataset_identity(
+    state: EconPaperState, csv_path: Any
+) -> Optional[Dict[str, Any]]:
+    """Identity of the file the estimator actually reads (not the raw upload)."""
+    if not csv_path:
+        return None
+    path = str(csv_path)
+    cleaned = _dataset_entry_for_path(state.get("cleaned_datasets"), path)
+    uploaded = _dataset_entry_for_path(state.get("uploaded_datasets"), path)
+    matched = cleaned or uploaded
+    role = "cleaned" if cleaned is not None else "raw"
+    name = None
+    rows = None
+    columns: List[str] = []
+    version = None
+    if matched:
+        if isinstance(matched.get("name"), str) and matched["name"]:
+            name = matched["name"]
+        if isinstance(matched.get("rows"), int):
+            rows = matched["rows"]
+        raw_columns = matched.get("columns") or []
+        if isinstance(raw_columns, list):
+            columns = [str(item) for item in raw_columns]
+        if matched.get("version") is not None:
+            version = str(matched["version"])
+    if name is None:
+        leaf = Path(path).name
+        if leaf:
+            name = leaf
+    file_path = Path(path)
+    digest = _sha256_file(file_path) if file_path.is_file() else None
+    identity: Dict[str, Any] = {
+        "name": name,
+        "path": path,
+        "hash": digest,
+        "role": role,
+        "rows": rows,
+        "columns": columns,
+    }
+    if version is not None:
+        identity["version"] = version
+    return identity
+
+
+def _stamp_estimate_lineage(state: EconPaperState, out: EstimateOutput) -> EstimateOutput:
+    payload = out.get("estimate")
+    if not isinstance(payload, dict):
+        return out
+    run_id = state.get("source_run_id")
+    if isinstance(run_id, str) and run_id.strip():
+        payload["source_run_id"] = run_id.strip()
+    identity = analysis_dataset_identity(state, state.get("csv_path"))
+    if identity is not None:
+        payload["analysis_dataset"] = identity
+    return out
 
 
 def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
@@ -831,7 +909,7 @@ def estimate(state: EconPaperState) -> EstimateOutput:
 
             agent_out = run_estimate_agent(state)
             if agent_out is not None:
-                return agent_out
+                return _stamp_estimate_lineage(state, agent_out)
         except Exception as exc:
             agent_error = str(exc) or type(exc).__name__
             logger.warning("estimate agent 失败，回退固定分派: %s", exc, exc_info=True)
@@ -848,7 +926,7 @@ def estimate(state: EconPaperState) -> EstimateOutput:
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             ]
-    return out
+    return _stamp_estimate_lineage(state, out)
 
 
 __all__ = ["estimate", "effect_from_fit"]

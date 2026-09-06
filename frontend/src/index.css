@@ -15,6 +15,27 @@
   --success: #2f6b4f;
   --warning: #8a6a12;
   --danger: #9b3d30;
+
+  /* Workbench v2 palette (contract R5): near-white neutral surfaces with
+     semantic signal colors. Scoped to the workbench main path only —
+     Desk and Guide keep the paper/ink/green board above. */
+  --wb-canvas: #fafafa;
+  --wb-surface: #ffffff;
+  --wb-subtle: #f5f5f4;
+  --wb-line: rgba(28, 25, 23, 0.08);
+  --wb-line-strong: rgba(28, 25, 23, 0.16);
+  --wb-ink: #1c1917;
+  --wb-muted: #78716c;
+  --wb-faint: #a8a29e;
+  --wb-primary: #2563eb;
+  --wb-primary-strong: #1d4ed8;
+  --wb-primary-soft: rgba(37, 99, 235, 0.09);
+  --wb-success: #15803d;
+  --wb-success-soft: rgba(21, 128, 61, 0.1);
+  --wb-warning: #b45309;
+  --wb-warning-soft: rgba(180, 83, 9, 0.1);
+  --wb-danger: #b91c1c;
+  --wb-danger-soft: rgba(185, 28, 28, 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -133,6 +154,44 @@ body {
 
 .animate-listen {
   animation: listen-ring 1.6s ease-out infinite;
+}
+
+/* ── Workbench v2 motion primitives (Emil rules) ───────────────────
+   Only pane/artifact/status/decision transitions animate. Every rule
+   names its properties (no `transition: all`), stays in the 150-250ms
+   ease-out band, and is killed by the global reduced-motion clamp. */
+@keyframes wb-pane-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wb-pane-enter {
+  animation: wb-pane-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Stat cards: 40ms stagger, decoration only — never blocks interaction. */
+.wb-stagger > * {
+  animation: wb-pane-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.wb-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.wb-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.wb-stagger > *:nth-child(4) { animation-delay: 120ms; }
+
+/* Press feedback for workbench buttons/rows. */
+.wb-press {
+  transition: transform 160ms ease-out;
+}
+.wb-press:active {
+  transform: scale(0.97);
+}
+
+/* Quiet running indicator: a status dot may breathe, nothing else moves. */
+@keyframes wb-dot-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.wb-dot-running {
+  animation: wb-dot-breathe 1.4s ease-in-out infinite;
 }
 
 @layer components {

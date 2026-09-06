@@ -44,7 +44,7 @@ install-frontend:
 install-backend:
 	cd backend && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
-	pip install -r requirements.txt; \
+	pip install -r requirements.txt -r ../requirements-dev.txt; \
 	pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
 	pip install "pyfixest==0.60.0" || true
 	backend/.venv/bin/python -m pip install -e "$(DEPENDENCY_ROOT)/StatsPAI"
@@ -52,7 +52,7 @@ install-backend:
 install-agent:
 	cd agent && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
-	pip install -r requirements.txt; \
+	pip install -r requirements.txt -r ../requirements-dev.txt; \
 	pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
 	pip install "pyfixest==0.60.0" || true
 	agent/.venv/bin/python -m pip install -e "$(DEPENDENCY_ROOT)/StatsPAI"

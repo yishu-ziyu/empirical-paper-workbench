@@ -218,6 +218,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Evidence
+         * @description Project the main-estimate read model plus its full provenance chain.
+         */
+        get: operations["get_evidence_sessions__session_id__evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -293,10 +313,12 @@ export interface paths {
         };
         /**
          * Get Session Info
-         * @description Return session existence and basic info.
+         * @description Return the Project Snapshot: the single research-state read model.
          *
-         *     Used by the frontend to verify a saved sessionId is still valid
-         *     after a page refresh (localStorage recovery flow).
+         *     C1: besides the instrument readouts this carries the dataset metadata
+         *     (server-side), the in-flight durable run (RunRepository), and the visible
+         *     degradation summary. The frontend restores from this payload alone and
+         *     keeps no sessionStorage copies of these fields.
          */
         get: operations["get_session_info_sessions__session_id__get"];
         put?: never;
@@ -1633,6 +1655,113 @@ export interface components {
             grounding_failures?: string[];
         };
         /**
+         * EvidenceCodeArtifactResponse
+         * @description A takeable code file associated with the estimate producer run.
+         */
+        EvidenceCodeArtifactResponse: {
+            /** Path */
+            path: string;
+            /** Bytes */
+            bytes?: number | null;
+            /** Filename */
+            filename?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Lang */
+            lang?: string | null;
+        };
+        /**
+         * EvidenceIdentificationResponse
+         * @description 识别验真读数（identification_verify 节点产物）。
+         */
+        EvidenceIdentificationResponse: {
+            /** Star Rating */
+            star_rating?: number | null;
+            /**
+             * Failed
+             * @default false
+             */
+            failed: boolean;
+            /** Report */
+            report?: string | null;
+        };
+        /**
+         * EvidenceProvenanceResponse
+         * @description 结论溯源链：spec → estimator → run → dataset → trace/artifacts。
+         *
+         *     全部组合既有存储（facade state + run_store + RunRepository），不建第二存储。
+         *     Run 层只认 estimate.source_run_id；Dataset 层只认 estimate.analysis_dataset。
+         */
+        EvidenceProvenanceResponse: {
+            /** Run Id */
+            run_id?: string | null;
+            /** Run Status */
+            run_status?: string | null;
+            /** Run Events Url */
+            run_events_url?: string | null;
+            dataset?: components["schemas"]["SnapshotDatasetResponse"] | null;
+            /** Code */
+            code?: components["schemas"]["EvidenceCodeArtifactResponse"][];
+            /** Trace Events */
+            trace_events?: {
+                [key: string]: unknown;
+            }[];
+            /** Manifest */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Artifacts */
+            artifacts?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * EvidenceResponse
+         * @description GET /sessions/{id}/evidence 返回体。
+         *
+         *     estimate 缺失时 ``available=false`` + ``blockers``，不报 500：
+         *     数字先于正文，失败也要显式。
+         */
+        EvidenceResponse: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Blockers */
+            blockers?: string[];
+            /** Estimate */
+            estimate?: {
+                [key: string]: unknown;
+            } | null;
+            /** Results */
+            results?: string | null;
+            /** Claim */
+            claim?: string | null;
+            /** Specification */
+            specification?: {
+                [key: string]: unknown;
+            } | null;
+            identification?: components["schemas"]["EvidenceIdentificationResponse"];
+            robustness?: components["schemas"]["EvidenceRobustnessResponse"];
+            provenance?: components["schemas"]["EvidenceProvenanceResponse"];
+        };
+        /**
+         * EvidenceRobustnessResponse
+         * @description 稳健性审计状态（robustness_check 节点产物摘要）。
+         */
+        EvidenceRobustnessResponse: {
+            /** Status */
+            status?: string | null;
+            /**
+             * Ran
+             * @default false
+             */
+            ran: boolean;
+        };
+        /**
          * FilterConditionItem
          * @description filter 条件项。
          */
@@ -2261,7 +2390,7 @@ export interface components {
         };
         /**
          * SessionInfoResponse
-         * @description GET /sessions/{id} 返回体：会话存在性 + 刷新后要保住的读数。
+         * @description GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。
          */
         SessionInfoResponse: {
             /** Session Id */
@@ -2304,6 +2433,53 @@ export interface components {
             body_chapters?: components["schemas"]["ChapterResponse"][];
             /** Research Direction */
             research_direction?: unknown;
+            dataset?: components["schemas"]["SnapshotDatasetResponse"] | null;
+            active_run?: components["schemas"]["SnapshotActiveRunResponse"] | null;
+            /** Degradations */
+            degradations?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * SnapshotActiveRunResponse
+         * @description Project Snapshot 的进行中 run（来自 RunRepository 的 durable 队列）。
+         *
+         *     C3：刷新恢复凭它重新订阅 /runs/{id}/events，不再读 localStorage 句柄。
+         */
+        SnapshotActiveRunResponse: {
+            /** Run Id */
+            run_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "prewrite" | "upload_pipeline";
+            /** Status */
+            status: string;
+        };
+        /**
+         * SnapshotDatasetResponse
+         * @description Dataset identity for Snapshot / Evidence.
+         *
+         *     Snapshot still projects upload session metadata (name/rows/columns).
+         *     Evidence ``provenance.dataset`` uses the analysis input identity
+         *     (path/hash/version/role) recorded on the estimate payload.
+         */
+        SnapshotDatasetResponse: {
+            /** Name */
+            name?: string | null;
+            /** Rows */
+            rows?: number | null;
+            /** Columns */
+            columns?: string[];
+            /** Path */
+            path?: string | null;
+            /** Hash */
+            hash?: string | null;
+            /** Version */
+            version?: string | null;
+            /** Role */
+            role?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -2722,6 +2898,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EdaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evidence_sessions__session_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceResponse"];
                 };
             };
             /** @description Validation Error */

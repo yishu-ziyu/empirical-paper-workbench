@@ -2,6 +2,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from agent import upstream
 
 
@@ -28,6 +30,10 @@ def test_default_dependency_root_does_not_depend_on_cwd(tmp_path, monkeypatch):
     assert upstream._resolve_dependency_root() == upstream.WORKSPACE_ROOT / "dependencies"
 
 
+@pytest.mark.skipif(
+    not upstream.STATSPAI_REPO_PATH.exists(),
+    reason="CI installs StatsPAI from PyPI; sibling checkout is local-only",
+)
 def test_dependency_status_reports_actual_editable_source():
     status = upstream.get_dependency_status()
     statspai = status["statspai"]

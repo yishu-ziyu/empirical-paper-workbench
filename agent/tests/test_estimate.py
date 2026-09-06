@@ -19,6 +19,47 @@ def test_estimate_empty_without_spec():
     assert out2["estimate"]["status"] == "error"
 
 
+def test_estimate_stamps_source_run_id_and_cleaned_dataset(tmp_path):
+    import hashlib
+
+    import pandas as pd
+
+    raw = tmp_path / "raw.csv"
+    cleaned = tmp_path / "cleaned.csv"
+    pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [0, 1, 0, 1]}).to_csv(raw, index=False)
+    pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0, 5.0], "x": [0, 1, 0, 1, 1]}).to_csv(
+        cleaned, index=False
+    )
+    out = estimate(
+        {
+            "csv_path": str(cleaned),
+            "source_run_id": "run-producer-1",
+            "uploaded_datasets": [{"name": "raw.csv", "path": str(raw), "rows": 4}],
+            "cleaned_datasets": [
+                {
+                    "name": "cleaned.csv",
+                    "path": str(cleaned),
+                    "rows": 5,
+                    "columns": ["y", "x"],
+                }
+            ],
+            "main_specification": {
+                "formula": "y ~ x",
+                "treatment": "x",
+                "outcome": "y",
+            },
+        }
+    )
+    payload = out["estimate"]
+    assert payload["source_run_id"] == "run-producer-1"
+    identity = payload["analysis_dataset"]
+    assert identity["path"] == str(cleaned)
+    assert identity["role"] == "cleaned"
+    assert identity["hash"] == hashlib.sha256(cleaned.read_bytes()).hexdigest()
+    assert identity["hash"] != hashlib.sha256(raw.read_bytes()).hexdigest()
+    assert identity["name"] == "cleaned.csv"
+
+
 def test_estimate_writes_treatment_row(tmp_path):
     import pandas as pd
 

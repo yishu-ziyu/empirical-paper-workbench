@@ -25,7 +25,16 @@ TEMPLATE_CONTRACTS = {
     "lit_review": ["research_question", "key_references", "citation_indices", *_REVISION],
     "data_desc": ["data_summary", "eda_results", *_REVISION],
     "methods": ["method", "research_question", *_REVISION],
-    "results": ["results", "robustness_table", "method", *_REVISION],
+    "results": [
+        "results",
+        "robustness_table",
+        "method",
+        "claim_supported_wording",
+        "claim_conditionally_supported_wording",
+        "claim_unsupported_wording",
+        "claim_run_facts",
+        *_REVISION,
+    ],
     "conclusion": ["results", "research_question", *_REVISION],
 }
 

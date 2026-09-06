@@ -26,17 +26,22 @@ _TREATMENT_ALIASES = frozenset({"treat", "treatment"})
 
 def check_grounding(state: dict, content: str) -> list[str]:
     """Return zero or more of:
-    missing_estimate_number, invented_number, invented_table
+    missing_estimate_number, invented_number, invented_table,
+    wording_exceeds_evidence
     """
-    estimate = state.get("estimate") if isinstance(state, dict) else None
-    if not isinstance(estimate, dict):
-        return []
-    treatment_row = estimate.get("treatment_row")
-    if not isinstance(treatment_row, str) or not treatment_row:
-        return []
-
     text = content or ""
     failures: List[str] = []
+    payload = state if isinstance(state, dict) else {}
+    if _wording_exceeds_evidence(payload, text):
+        failures.append("wording_exceeds_evidence")
+
+    estimate = payload.get("estimate") if isinstance(payload, dict) else None
+    if not isinstance(estimate, dict):
+        return failures
+    treatment_row = estimate.get("treatment_row")
+    if not isinstance(treatment_row, str) or not treatment_row:
+        return failures
+
     if treatment_row not in text:
         failures.append("missing_estimate_number")
 
@@ -46,6 +51,14 @@ def check_grounding(state: dict, content: str) -> list[str]:
         if _count_result_headers(text) >= 2:
             failures.append("invented_table")
     return failures
+
+
+def _wording_exceeds_evidence(state: dict, text: str) -> bool:
+    from agent.engine.claim_wording import wording_exceeds_evidence
+    from agent.engine.readiness import current_research_claim
+
+    claim = current_research_claim(state if isinstance(state, dict) else {})
+    return wording_exceeds_evidence(claim, text)
 
 
 def _norm_label(label: str) -> str:

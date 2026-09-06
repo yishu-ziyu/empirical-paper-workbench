@@ -77,7 +77,7 @@ export default function OverviewView({
       view: 'design',
       status: ws.identFailed
         ? 'blocked'
-        : ws.directionSummary
+        : ws.directionSummary || ws.research?.specification_space?.frozen_at
           ? 'done'
           : ws.directionBusy
             ? 'active'
@@ -86,7 +86,11 @@ export default function OverviewView({
         ? '识别未通过'
         : ws.directionSummary
           ? ws.directionRecord?.method || '已提交'
-          : '待方向',
+          : ws.research?.specification_space?.frozen_at
+            ? 'Admissible space frozen'
+            : ws.research?.teaching_case
+              ? '待冻结'
+              : '待方向',
     },
     {
       id: 'estimate',

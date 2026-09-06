@@ -1,0 +1,26 @@
+# econpaper Codex Task State
+
+- Task ID: 20260906-card-canonical-research-experience
+- Status: complete
+- Git context: `review/workbench-v2` @ `226546b`（开工时干净）
+- Goal: Card canonical research experience — Question → Expectation → Admissible Space → real runs → Surprise → Diagnose → Challenge → Claim Ledger → grounded Paper，含 semantic Agent Cursor
+- Hard bar: `docs/acceptance/card-canonical-research-experience.md` C25 浏览器全程 + C27 门禁 + C29 validator ACCEPT
+- Session / run ID:
+- Current research stage: M5 全程浏览器 + validator ACCEPT
+- Current review / approval gate: 契约 Status: closed
+- Verified facts:
+  - Baseline tests 绿（frontend 322, backend 389/8skip, agent 805/1skip, build, api-drift）
+  - estimate 节点已支持 `statspai.ivreg`；identification 已有 first-stage F
+  - Run kinds：`prewrite` / `upload_pipeline` / `spec_run`。spec_run 结果剥离 estimate 后只 merge research_lab
+  - comparable 34-col：ols_region_dummies / iv_region_dummies；9-col 走 ols_full_controls / iv_nearc4_full
+  - 34 列 Card extract 在 StatsPAI `papers/data_card1995.csv` sha256 `eda514228a77327ab9aa20df72b89256cdec579482fa9dbbe4e3d757748c9bf2`；9 列在 `datasets.card_1995`
+  - comparable spec（smsa66+reg661-668）OLS 0.07469 / IV 0.13150 / HC1 partial F 14.14；短公式不是该 anchor
+- `run_upload` 用 `{**state, **node(state)}`，`research_lab` 放进 initial_state 会被保留，除非 node 覆盖同名键
+- Current hypothesis: `research_lab` blob + `spec_run` kind 是最小可审计模型
+- Changed files: M4 Claim Ledger in `research_lab.claims[]`, draft/approve routes, results write gate, bind wording, Evidence Lab claim section, paper jump/stale；详见 `docs/acceptance/card-canonical-m4-implementer.md`
+- Failed paths:
+- Data / output evidence locations: `docs/acceptance/evidence-card-canonical/`（session `5cafe0c4-00e9-41d5-85ef-24792cf71d75`，1280/1440）
+- Test evidence: agent 809/1skip；backend 416/8skip；frontend 345；api-drift。validator `docs/acceptance/card-canonical-research-experience-validator.md`
+- Pending external state: GitHub Actions CI on the Card commit
+- Next action: commit + push + PR so CI runs on this work
+- Updated at: 2026-09-06 (M5 closed)

@@ -51,7 +51,102 @@ def paper_ready_to_write(state: dict, chapter_type: str) -> tuple[bool, list[str
         missing.append("no_robustness")
     if "literature" in need and not literature_ran(state):
         missing.append("no_literature")
+    if chapter_type == "results" and research_claims_exist(state):
+        claim = current_research_claim(state)
+        if not claim or not claim.get("approved_by_user"):
+            missing.append("claim_unapproved")
+        elif _claim_is_stale(state, claim):
+            missing.append("claim_stale")
+        elif _canonical_mismatches_claim(state, claim):
+            missing.append("canonical_mismatch")
     return (not missing, missing)
+
+
+def research_claims_exist(state: dict) -> bool:
+    lab = state.get("research_lab")
+    if not isinstance(lab, dict):
+        return False
+    claims = lab.get("claims") or []
+    return any(isinstance(item, dict) and item.get("id") for item in claims)
+
+
+def current_research_claim(state: dict) -> dict | None:
+    lab = state.get("research_lab")
+    if not isinstance(lab, dict):
+        return None
+    claims = [item for item in (lab.get("claims") or []) if isinstance(item, dict)]
+    cid = lab.get("current_claim_id")
+    if cid:
+        for item in claims:
+            if item.get("id") == cid:
+                return item
+    existing = lab.get("claim")
+    if isinstance(existing, dict) and existing.get("id"):
+        return existing
+    return claims[-1] if claims else None
+
+
+def _lab(state: dict) -> dict | None:
+    lab = state.get("research_lab")
+    return lab if isinstance(lab, dict) else None
+
+
+def claim_revision_is_stale(lab: dict | None, claim: dict | None) -> bool:
+    """Fail closed when the lab has an evidence_revision (including 0)."""
+    if not isinstance(claim, dict):
+        return False
+    if claim.get("stale"):
+        return True
+    if not isinstance(lab, dict):
+        return False
+    current = lab.get("evidence_revision")
+    if current is None:
+        return False
+    based = claim.get("based_on_evidence_revision")
+    if based is None:
+        return True
+    try:
+        return int(based) != int(current)
+    except (TypeError, ValueError):
+        return True
+
+
+def _claim_is_stale(state: dict, claim: dict | None) -> bool:
+    return claim_revision_is_stale(_lab(state), claim)
+
+
+def _canonical_mismatches_claim(state: dict, claim: dict | None) -> bool:
+    if not isinstance(claim, dict):
+        return False
+    lab = _lab(state)
+    if lab is None:
+        return False
+    required = (claim.get("provenance") or {}).get("iv_spec_id")
+    if not required:
+        return False
+    return lab.get("canonical_spec_id") != required
+
+
+def results_is_grounded(state: dict, chapter: dict | None = None) -> bool:
+    from .claim_wording import wording_exceeds_evidence
+
+    chapter = chapter if isinstance(chapter, dict) else {}
+    if chapter.get("stale") or chapter.get("needs_regeneration"):
+        return False
+    content = str(chapter.get("content") or "")
+    claim = current_research_claim(state)
+    if research_claims_exist(state):
+        if not claim or not claim.get("approved_by_user"):
+            return False
+        if _claim_is_stale(state, claim):
+            return False
+        if _canonical_mismatches_claim(state, claim):
+            return False
+        if wording_exceeds_evidence(claim, content):
+            return False
+        return True
+    est = state.get("estimate") or {}
+    return isinstance(est, dict) and est.get("status") in ("ok", "degraded")
 
 
 def estimate_ran(state: dict) -> bool:

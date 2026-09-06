@@ -38,6 +38,11 @@ USER_TEMPLATE = (
     "异质性证据是未运行/未提供时，不得生成地区、行业、性别差异或数字。"
     "任何具体数字必须能在上述绑定输入中逐字找到；禁止未绑定数字；"
     "主张类型为 association 或计量方法为 OLS 时，禁止因果表述。"
+    "\n\nClaim Ledger（写作边界，禁止改写）："
+    "\n允许主张：{claim_supported_wording}"
+    "\n有条件主张：{claim_conditionally_supported_wording}"
+    "\n禁止主张（写入则不得标 grounded）：{claim_unsupported_wording}"
+    "\n支撑规格数字：{claim_run_facts}"
     + REVISION_BLOCK
 )
 
@@ -53,4 +58,8 @@ def render(**kwargs) -> tuple[str, str]:
     filled.setdefault("robustness_status", "未运行")
     filled.setdefault("heterogeneity_evidence", "未运行/未提供")
     filled.setdefault("estimate_facts", "未提供")
+    filled.setdefault("claim_supported_wording", "未提供")
+    filled.setdefault("claim_conditionally_supported_wording", "未提供")
+    filled.setdefault("claim_unsupported_wording", "未提供")
+    filled.setdefault("claim_run_facts", "未提供")
     return SYSTEM_PROMPT, USER_TEMPLATE.format(**filled)

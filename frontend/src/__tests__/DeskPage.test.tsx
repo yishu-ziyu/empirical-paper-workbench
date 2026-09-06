@@ -74,6 +74,17 @@ describe('DeskPage', () => {
     expect(screen.getByTestId('desk-paper')).toHaveValue(starterChips[0]!.textContent)
   })
 
+  test('空桌有 Card 教学案例入口', async () => {
+    const user = userEvent.setup()
+    const onTryCard = vi.fn()
+    renderDesk({ onTryCard })
+    const entry = screen.getByTestId('desk-try-card')
+    expect(entry).toHaveTextContent('Try a real study')
+    expect(entry).toHaveTextContent('Card')
+    await user.click(entry)
+    expect(onTryCard).toHaveBeenCalledTimes(1)
+  })
+
   test('C3 desk-upload-inline 触发上传入口', async () => {
     const user = userEvent.setup()
     const onPickData = vi.fn()

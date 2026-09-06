@@ -3,6 +3,7 @@ import { CsvDropZone } from './CsvDropZone'
 import DirectionForm from './DirectionForm'
 import EdaSidebar from './EdaSidebar'
 import EvidenceView from './EvidenceView'
+import EvidenceLab from './EvidenceLab'
 import InstrumentReadout from './InstrumentReadout'
 import OverviewView from './OverviewView'
 import StepTimeline from './StepTimeline'
@@ -15,6 +16,12 @@ import type { WorkbenchViewId } from './WorkbenchSidebar'
 import type { WorkspaceApi } from '../lib/workspace'
 import { toDirectionInitial } from '../lib/workspace'
 import { useT } from '../lib/i18n'
+import {
+  ExpectationEditor,
+  ResearchQuestionCard,
+  SpecificationSpacePanel,
+  TeachingCaseBadge,
+} from './ResearchLabPanels'
 
 export interface WorkbenchArtifactProps {
   ws: WorkspaceApi
@@ -94,7 +101,13 @@ export default function WorkbenchArtifact({
     ws.canExport && pendingApprovalCount === 0 ? '所有章节已确认' : null,
   ].filter((item): item is string => Boolean(item))
 
-  const nowHintText = !ws.hasReadout
+  const nowHintText = ws.research?.teaching_case && !ws.hasReadout
+    ? ws.research.specification_runs && ws.research.specification_runs.length
+      ? '规格已运行。到 Evidence 看结果空间与 Surprise。'
+      : ws.research.specification_space?.frozen_at
+      ? 'Admissible space 已冻结。比较结果会在真实运行后出现。'
+      : '确认研究问题与预期，然后在 Design 冻结 Admissible Space。'
+    : !ws.hasReadout
     ? t('guide.nowDirection')
     : !ws.writtenChapter?.content && !ws.writeBusy
       ? t('guide.nowWrite')
@@ -134,6 +147,11 @@ export default function WorkbenchArtifact({
       aria-label="当前研究工件"
       className="min-w-0"
     >
+      {ws.research?.teaching_case && ws.workbenchTab === 'overview' ? (
+        <div className="px-6 pt-6">
+          <TeachingCaseBadge teachingCase={ws.research.teaching_case} />
+        </div>
+      ) : null}
       {ws.workbenchTab === 'overview' && (
         <OverviewView
           ws={ws}
@@ -155,47 +173,84 @@ export default function WorkbenchArtifact({
               {t('app.degradedBanner')}
             </div>
           )}
+          <TeachingCaseBadge teachingCase={ws.research?.teaching_case} />
           <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
             {nowHintText}
           </p>
+          {ws.research?.question ? (
+            <ResearchQuestionCard question={ws.research.question} />
+          ) : null}
+          {ws.research?.expectation ? (
+            <ExpectationEditor
+              expectation={ws.research.expectation}
+              onSave={ws.handleSaveExpectation}
+            />
+          ) : null}
           <section
             data-testid="direction-section"
             className="mb-8 rounded-lg border border-border bg-panel p-6"
           >
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="font-serif text-[1.15rem] text-ink">
-                {t('app.directionTitle')}
-              </h2>
-              {!ws.directionOpen && ws.directionSummary ? (
-                <button
-                  type="button"
-                  data-testid="edit-direction-btn"
-                  onClick={() => ws.setDirectionOpen(true)}
-                  disabled={Boolean(ws.directionDisabledReason)}
-                  title={ws.directionDisabledReason || undefined}
-                  className="text-xs text-accent"
-                >
-                  {t('bench.editDirection')}
-                </button>
-              ) : null}
-            </div>
-            {ws.directionOpen ? (
-              <DirectionForm
-                onSubmit={ws.handleDirectionSubmit}
-                initialQuestion={ws.shapedQuestion}
-                initial={
-                  toDirectionInitial(ws.directionRecord) ??
-                  ws.sampleDirection ??
-                  (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
-                }
-                columns={ws.dataColumns}
-                disabled={Boolean(ws.directionDisabledReason)}
-                disabledReason={ws.directionDisabledReason}
-              />
+            {ws.research?.teaching_case ? (
+              <details>
+                <summary className="cursor-pointer font-mono text-xs text-muted">
+                  Technical details
+                </summary>
+                <div className="mt-4">
+                  <h2 className="mb-3 font-serif text-[1.15rem] text-ink">
+                    {t('app.directionTitle')}
+                  </h2>
+                  <DirectionForm
+                    onSubmit={ws.handleDirectionSubmit}
+                    initialQuestion={ws.shapedQuestion}
+                    initial={
+                      toDirectionInitial(ws.directionRecord) ??
+                      ws.sampleDirection ??
+                      (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
+                    }
+                    columns={ws.dataColumns}
+                    disabled={Boolean(ws.directionDisabledReason)}
+                    disabledReason={ws.directionDisabledReason}
+                  />
+                </div>
+              </details>
             ) : (
-              <p data-testid="direction-summary" className="text-sm text-ink">
-                {ws.directionSummary || t('bench.directionSettled')}
-              </p>
+              <>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="font-serif text-[1.15rem] text-ink">
+                    {t('app.directionTitle')}
+                  </h2>
+                  {!ws.directionOpen && ws.directionSummary ? (
+                    <button
+                      type="button"
+                      data-testid="edit-direction-btn"
+                      onClick={() => ws.setDirectionOpen(true)}
+                      disabled={Boolean(ws.directionDisabledReason)}
+                      title={ws.directionDisabledReason || undefined}
+                      className="text-xs text-accent"
+                    >
+                      {t('bench.editDirection')}
+                    </button>
+                  ) : null}
+                </div>
+                {ws.directionOpen ? (
+                  <DirectionForm
+                    onSubmit={ws.handleDirectionSubmit}
+                    initialQuestion={ws.shapedQuestion}
+                    initial={
+                      toDirectionInitial(ws.directionRecord) ??
+                      ws.sampleDirection ??
+                      (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
+                    }
+                    columns={ws.dataColumns}
+                    disabled={Boolean(ws.directionDisabledReason)}
+                    disabledReason={ws.directionDisabledReason}
+                  />
+                ) : (
+                  <p data-testid="direction-summary" className="text-sm text-ink">
+                    {ws.directionSummary || t('bench.directionSettled')}
+                  </p>
+                )}
+              </>
             )}
             {ws.directionBusy && (
               <p role="status" aria-live="polite" className="mt-2 text-xs text-muted">
@@ -241,12 +296,20 @@ export default function WorkbenchArtifact({
       {ws.workbenchTab === 'design' && (
         <div className="mx-auto max-w-[46rem] px-6 py-8 sm:px-8">
           <section data-testid="design-view" className="space-y-4">
+            <TeachingCaseBadge teachingCase={ws.research?.teaching_case} />
             <header>
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
                 Design · 研究设定
               </p>
               <h2 className="mt-1 font-serif text-[1.35rem] text-ink">识别与设定</h2>
             </header>
+            {ws.research?.specification_space ? (
+              <SpecificationSpacePanel
+                space={ws.research.specification_space}
+                onFreeze={ws.handleFreezeSpecSpace}
+                onRun={ws.handleRunSpecSpace}
+              />
+            ) : null}
             <p data-testid="direction-summary" className="text-sm text-ink">
               {ws.directionSummary || t('bench.directionSettled')}
             </p>
@@ -284,7 +347,18 @@ export default function WorkbenchArtifact({
 
       {ws.workbenchTab === 'evidence' && (
         <>
-          {sessionId ? (
+          {ws.research?.specification_runs && ws.research.specification_runs.length > 0 ? (
+            <EvidenceLab
+              research={ws.research}
+              onPromote={ws.handlePromotePreview}
+              onRevert={ws.handleRevertPreview}
+              onAcceptChallenge={ws.handleAcceptChallenge}
+              onApproveClaim={ws.handleApproveClaim}
+              onPreparePaper={ws.handlePreparePaper}
+              onCompare={ws.handleCompareSpecs}
+              onDraftClaim={ws.handleDraftClaim}
+            />
+          ) : sessionId ? (
             <EvidenceView
               sessionId={sessionId}
               refreshKey={ws.evidenceRefreshKey}
@@ -456,6 +530,11 @@ export default function WorkbenchArtifact({
                   versions={ws.writtenChapter.versions}
                   onApprove={ws.handleApprove}
                   onSaveEdit={ws.handleSaveEdit}
+                  onJumpToClaim={
+                    ws.writtenChapter.type === 'results'
+                      ? () => onSelectView('evidence')
+                      : undefined
+                  }
                 />
               ) : (
                 <p className="font-serif text-[15px] leading-[1.8] text-muted">

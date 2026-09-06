@@ -55,6 +55,69 @@ describe('App 三栏布局', () => {
     expect(screen.queryByTestId('journey-stage-0')).not.toBeInTheDocument()
   })
 
+  test('空桌 Card 入口调用 /demos/card 而不是课设 SAMPLE_CSV', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/demos/card')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-card-demo',
+              run_id: 'run-card-demo',
+              status: 'PENDING',
+              events_url: '/api/runs/run-card-demo/events',
+              dataset_meta: {
+                name: 'card_1995.csv',
+                columns: ['lwage', 'educ', 'nearc4'],
+                rows: 3010,
+              },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/sessions/sess-card-demo')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              exists: true,
+              has_dataset: true,
+              session_id: 'sess-card-demo',
+              dataset: { name: 'card_1995.csv', rows: 3010, columns: ['lwage', 'educ'] },
+              research: {
+                teaching_case: 'card_1995',
+                question: {
+                  prompt_en: 'Does education increase earnings?',
+                  outcome: { name: 'lwage', label: 'Log wage', gloss: '对数工资' },
+                  treatment: { name: 'educ', label: 'Years of education' },
+                  causal_threat: { label: 'Ability and family background' },
+                  identification: { instrument: 'nearc4', label: 'College proximity (nearc4)' },
+                  estimand: { ols: 'OLS association', iv: 'IV local causal return' },
+                },
+                expectation: { text: 'OLS positive', confidence: 'medium', version: 1, history: [] },
+                specification_space: { status: 'proposed', frozen_at: null, definitions: [] },
+              },
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    fireEvent.click(screen.getByTestId('desk-try-card'))
+
+    await waitFor(() => {
+      const demoCalls = mockFetch.mock.calls.filter((call) => String(call[0]).includes('/demos/card'))
+      expect(demoCalls.length).toBeGreaterThan(0)
+    })
+    expect(mockFetch.mock.calls.some((call) => String(call[0]).includes('/samples/course-panel.csv'))).toBe(false)
+    expect(await screen.findByTestId('teaching-case-badge')).toBeInTheDocument()
+  })
+
   test('C2 seenGuide 不再是进门条件：seen_guide 键存在与否首屏都是 desk-page', () => {
     const seeds: Array<[string, () => void]> = [
       ['未看过落地页（无键）', () => {}],

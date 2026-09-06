@@ -105,7 +105,7 @@ async def _upgrade_postgres_run_schema(conn) -> None:
         await conn.scalar(
             text(
                 "SELECT count(*) FROM runs "
-                "WHERE kind NOT IN ('prewrite', 'upload_pipeline')"
+                "WHERE kind NOT IN ('prewrite', 'upload_pipeline', 'spec_run')"
             )
         )
         or 0
@@ -166,14 +166,14 @@ async def _upgrade_postgres_run_schema(conn) -> None:
             "AND conrelid = 'runs'::regclass"
         )
     )
-    if check_definition is None or "upload_pipeline" not in str(check_definition):
+    if check_definition is None or "spec_run" not in str(check_definition):
         await conn.execute(
             text("ALTER TABLE runs DROP CONSTRAINT IF EXISTS ck_runs_supported_kind")
         )
         await conn.execute(
             text(
                 "ALTER TABLE runs ADD CONSTRAINT ck_runs_supported_kind "
-                "CHECK (kind IN ('prewrite', 'upload_pipeline'))"
+                "CHECK (kind IN ('prewrite', 'upload_pipeline', 'spec_run'))"
             )
         )
 
@@ -328,6 +328,7 @@ async def _upgrade_sqlite_run_schema(conn) -> None:
     event_fks = await conn.execute(text("PRAGMA foreign_key_list(run_events)"))
     current = (
         "upload_pipeline" in run_sql
+        and "spec_run" in run_sql
         and "uq_runs_upload_idempotency" in run_indexes
         and "uq_runs_session_active" in run_indexes
         and await _sqlite_has_unique_columns(
@@ -362,7 +363,7 @@ async def _upgrade_sqlite_run_schema(conn) -> None:
         await conn.scalar(
             text(
                 f"SELECT count(*) FROM runs WHERE {kind_expr} "
-                "NOT IN ('prewrite', 'upload_pipeline')"
+                "NOT IN ('prewrite', 'upload_pipeline', 'spec_run')"
             )
         )
         or 0
@@ -475,7 +476,7 @@ async def _upgrade_sqlite_run_schema(conn) -> None:
             "lease_epoch INTEGER NOT NULL, next_event_seq INTEGER NOT NULL, "
             "created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, "
             "CONSTRAINT ck_runs_supported_kind "
-            "CHECK (kind IN ('prewrite', 'upload_pipeline')), "
+            "CHECK (kind IN ('prewrite', 'upload_pipeline', 'spec_run')), "
             "CONSTRAINT uq_runs_idempotency "
             "UNIQUE (session_id, kind, idempotency_key), "
             "CONSTRAINT fk_runs_session FOREIGN KEY(session_id) "

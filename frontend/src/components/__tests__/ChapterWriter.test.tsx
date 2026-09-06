@@ -60,6 +60,31 @@ describe('ChapterWriter 章节写作器', () => {
     expect(paper.textContent).not.toContain('# 引言')
   })
 
+  test('results chapter exposes claim jump and stale state', async () => {
+    const onJumpToClaim = vi.fn()
+    renderWithI18n(
+      <ChapterWriter
+        {...baseProps}
+        onJumpToClaim={onJumpToClaim}
+        chapter={{
+          type: 'results',
+          title: '结果',
+          status: 'generated',
+          content: 'Education is positively associated with earnings.',
+          stale: true,
+          needs_regeneration: true,
+          grounded: false,
+          generation_degraded: false,
+          review_degraded: false,
+          review_typed: false,
+        }}
+      />,
+    )
+    expect(screen.getByTestId('chapter-stale')).toHaveTextContent('needs regeneration')
+    await userEvent.click(screen.getByTestId('paper-claim-link'))
+    expect(onJumpToClaim).toHaveBeenCalled()
+  })
+
   test('渲染章节类型 badge', () => {
     renderWithI18n(<ChapterWriter {...baseProps} chapter={introChapter} />)
     const badge = screen.getByTestId('chapter-type-badge')

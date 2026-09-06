@@ -53,6 +53,9 @@ class ChapterResponse(BaseModel):
     review_status: Optional[Literal["passed", "failed", "degraded"]] = None
     grounding_failures: List[str] = Field(default_factory=list)
     structure_failures: List[str] = Field(default_factory=list)
+    stale: Optional[bool] = None
+    needs_regeneration: Optional[bool] = None
+    grounded: Optional[bool] = None
 
     model_config = {"extra": "allow"}
 
@@ -115,8 +118,178 @@ class SnapshotActiveRunResponse(BaseModel):
     """
 
     run_id: str
-    kind: Literal["prewrite", "upload_pipeline"]
+    kind: Literal["prewrite", "upload_pipeline", "spec_run"]
     status: str
+
+
+class ResearchChoiceResponse(BaseModel):
+    dimension: str
+    value: str
+
+
+class SpecificationDefinitionResponse(BaseModel):
+    id: str
+    label: str
+    rationale: str
+    dimension: str
+    value: str
+    admissible: bool = True
+    user_decision: str = "include"
+    unavailable_reason: Optional[str] = None
+    choices: List[ResearchChoiceResponse] = Field(default_factory=list)
+
+
+class ExpectationHistoryItemResponse(BaseModel):
+    version: int
+    text: str
+    confidence: Literal["low", "medium", "high"] = "medium"
+    locale: Optional[str] = None
+    at: str
+    kind: str = "edit"
+
+
+class ExpectationResponse(BaseModel):
+    text: str = ""
+    text_zh: Optional[str] = None
+    confidence: Literal["low", "medium", "high"] = "medium"
+    locale: Optional[str] = None
+    version: int = 1
+    updated_at: Optional[str] = None
+    history: List[ExpectationHistoryItemResponse] = Field(default_factory=list)
+
+
+class ResearchQuestionResponse(BaseModel):
+    id: str = ""
+    prompt_en: str = ""
+    prompt_zh: Optional[str] = None
+    outcome: Dict[str, Any] = Field(default_factory=dict)
+    treatment: Dict[str, Any] = Field(default_factory=dict)
+    causal_threat: Dict[str, Any] = Field(default_factory=dict)
+    identification: Dict[str, Any] = Field(default_factory=dict)
+    estimand: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SpecificationSpaceResponse(BaseModel):
+    status: str = "proposed"
+    frozen_at: Optional[str] = None
+    frozen_before_results: bool = False
+    revealed: bool = False
+    definitions: List[SpecificationDefinitionResponse] = Field(default_factory=list)
+
+
+class DecisionEventResponse(BaseModel):
+    id: str
+    kind: str
+    at: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DatasetProvenanceResponse(BaseModel):
+    source: str = ""
+    citation: str = ""
+    checksum: str = ""
+    redistribution: str = ""
+    extract_kind: Optional[str] = None
+
+
+class SpecificationRunResponse(BaseModel):
+    """Immutable result of one admissible specification execution."""
+
+    id: str
+    spec_id: str
+    spec_version: int = 1
+    label: Optional[str] = None
+    choices: List[ResearchChoiceResponse] = Field(default_factory=list)
+    estimator: Optional[str] = None
+    method: Optional[str] = None
+    formula: Optional[str] = None
+    covariance: Optional[str] = None
+    analysis_dataset: Optional[Dict[str, Any]] = None
+    producer_run_id: Optional[str] = None
+    coef: Optional[float] = None
+    se: Optional[float] = None
+    p: Optional[float] = None
+    n: Optional[int] = None
+    diagnostics: Optional[Dict[str, Any]] = None
+    status: str = "ok"
+    provenance: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+    relation: Literal["canonical", "preview", "exploratory"] = "exploratory"
+
+    model_config = {"extra": "allow"}
+
+
+class SurpriseResponse(BaseModel):
+    status: Optional[str] = None
+    kind: Optional[str] = None
+    kinds: List[str] = Field(default_factory=list)
+    expected: Optional[str] = None
+    observed: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class SpecCompareResponse(BaseModel):
+    coef_a: Optional[float] = None
+    coef_b: Optional[float] = None
+    delta_abs: Optional[float] = None
+    delta_pct: Optional[float] = None
+    changed: List[Dict[str, Any]] = Field(default_factory=list)
+    unchanged: List[Dict[str, Any]] = Field(default_factory=list)
+    why_moved: Optional[str] = None
+    intent: Optional[str] = None
+    a: Dict[str, Any] = Field(default_factory=dict)
+    b: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"extra": "allow"}
+
+
+class SpecRunResultResponse(BaseModel):
+    ok: Literal[True] = True
+    specification_run_count: int = 0
+
+
+class ClaimLedgerResponse(BaseModel):
+    """Deterministic Claim Ledger entry (not the paper-draft main-estimate claim)."""
+
+    id: str
+    claim_text: str = ""
+    claim_type: str = "association"
+    supported_wording: str = ""
+    conditionally_supported_wording: str = ""
+    unsupported_wording: str = ""
+    supporting_run_ids: List[str] = Field(default_factory=list)
+    counter_evidence: List[str] = Field(default_factory=list)
+    sensitive_dimensions: List[str] = Field(default_factory=list)
+    unresolved_assumptions: List[str] = Field(default_factory=list)
+    evidence_status: str = "draft"
+    approved_by_user: bool = False
+    stale: bool = False
+    version: int = 1
+    based_on_evidence_revision: Optional[int] = None
+    run_facts: Optional[str] = None
+    provenance: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"extra": "allow"}
+
+
+class ResearchLabResponse(BaseModel):
+    """Research lab read model (GET /sessions/{id}/research and snapshot.research)."""
+
+    teaching_case: Optional[str] = None
+    provenance: Optional[DatasetProvenanceResponse] = None
+    question: Optional[ResearchQuestionResponse] = None
+    expectation: Optional[ExpectationResponse] = None
+    specification_space: Optional[SpecificationSpaceResponse] = None
+    specification_runs: List[SpecificationRunResponse] = Field(default_factory=list)
+    decision_events: List[DecisionEventResponse] = Field(default_factory=list)
+    canonical_spec_id: Optional[str] = None
+    evidence_revision: int = 0
+    next_challenge: Optional[Dict[str, Any]] = None
+    surprise: Optional[SurpriseResponse] = None
+    claims: List[ClaimLedgerResponse] = Field(default_factory=list)
+    current_claim_id: Optional[str] = None
+    claim: Optional[ClaimLedgerResponse] = None
 
 
 class SessionInfoResponse(BaseModel):
@@ -144,6 +317,7 @@ class SessionInfoResponse(BaseModel):
     dataset: Optional[SnapshotDatasetResponse] = None
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
+    research: Optional[ResearchLabResponse] = None
 
 
 # ---------------------------------------------------------------------------

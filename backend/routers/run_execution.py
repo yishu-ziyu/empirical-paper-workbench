@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -15,7 +15,7 @@ from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
 from run_repository import RunRepository, RunStatus, TERMINAL_STATUSES
-from schemas.responses import DirectionResponse
+from schemas.responses import DirectionResponse, SpecRunResultResponse
 
 
 router = APIRouter()
@@ -32,11 +32,11 @@ class UploadRunResultResponse(BaseModel):
 class RunStatusResponse(BaseModel):
     run_id: str
     session_id: str
-    kind: Literal["prewrite", "upload_pipeline"]
+    kind: Literal["prewrite", "upload_pipeline", "spec_run"]
     status: RunStatus
     attempt: int
     lease_epoch: int
-    result: DirectionResponse | UploadRunResultResponse | None = None
+    result: Union[DirectionResponse, UploadRunResultResponse, SpecRunResultResponse] | None = None
     error: str | None = None
 
 
@@ -57,7 +57,7 @@ _PRIVATE_KEY_PARTS = (
 _STABLE_LABEL = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 _STABLE_ERROR = re.compile(
     r"^[A-Za-z][A-Za-z0-9_]{0,63}: "
-    r"(?:prewrite execution|upload_pipeline (?:execution|output_validation|[A-Za-z0-9_.-]+)) failed$"
+    r"(?:prewrite execution|upload_pipeline (?:execution|output_validation|[A-Za-z0-9_.-]+)|spec_run execution) failed$"
 )
 _PRIVATE_TEXT_MARKERS = (
     "/users/",
@@ -148,13 +148,18 @@ def public_instrument_fields(state: dict) -> dict[str, Any]:
 
 def _public_result(
     kind: str, state: dict | None
-) -> DirectionResponse | UploadRunResultResponse | None:
+) -> DirectionResponse | UploadRunResultResponse | SpecRunResultResponse | None:
     if not isinstance(state, dict):
         return None
     if kind == "upload_pipeline":
         return UploadRunResultResponse(
             cleaning_report=public_cleaning_report(state.get("cleaning_report")),
         )
+    if kind == "spec_run":
+        lab = state.get("research_lab") if isinstance(state.get("research_lab"), dict) else {}
+        runs = lab.get("specification_runs") if isinstance(lab, dict) else []
+        count = len(runs) if isinstance(runs, list) else 0
+        return SpecRunResultResponse(ok=True, specification_run_count=count)
     fields = public_instrument_fields(state)
     return DirectionResponse(
         **fields,
@@ -167,7 +172,11 @@ def _public_error(kind: str, error: str | None) -> str | None:
         return None
     if _STABLE_ERROR.fullmatch(error):
         return error
-    return "upload_pipeline_failed" if kind == "upload_pipeline" else "prewrite_failed"
+    if kind == "upload_pipeline":
+        return "upload_pipeline_failed"
+    if kind == "spec_run":
+        return "spec_run_failed"
+    return "prewrite_failed"
 
 
 def _public_event(event, *, kind: str) -> dict[str, Any]:

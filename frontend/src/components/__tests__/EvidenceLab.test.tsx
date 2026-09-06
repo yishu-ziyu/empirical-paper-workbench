@@ -18,7 +18,10 @@ const research = {
   },
   next_challenge: {
     id: 'challenge.instrument_strength',
-    rationale: 'Inspect first-stage strength of college proximity.',
+    rationale:
+      'Instrument strength deserves inspection. Effective F = 14.14. Strength diagnostics alone do not establish instrument validity.',
+    rationale_zh:
+      '工具变量强度值得检查。Effective F = 14.14。强度诊断本身不能证明工具变量有效。',
     status: 'proposed',
   },
   specification_space: {
@@ -140,7 +143,9 @@ describe('EvidenceLab', () => {
     expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Unexpected')
     expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Expected')
     expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Observed')
-    expect(screen.getByTestId('evidence-challenge')).toHaveTextContent('first-stage')
+    expect(screen.getByTestId('evidence-challenge')).toHaveTextContent('Instrument strength deserves inspection')
+    expect(screen.getByTestId('evidence-challenge')).toHaveTextContent('Effective F = 14.14')
+    expect(screen.getByTestId('evidence-challenge')).not.toHaveTextContent('may be a weak instrument')
 
     fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
     fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
@@ -152,8 +157,9 @@ describe('EvidenceLab', () => {
     expect(onCompare).toHaveBeenCalled()
   })
 
-  test('renders claim ledger and approve control', async () => {
+  test('renders claim ledger and approve control after reviewing claim', async () => {
     const onApproveClaim = vi.fn(async () => undefined)
+    const onDraftClaim = vi.fn(async () => undefined)
     render(
       <EvidenceLab
         research={research}
@@ -161,9 +167,19 @@ describe('EvidenceLab', () => {
         onRevert={vi.fn(async () => undefined)}
         onAcceptChallenge={vi.fn(async () => undefined)}
         onApproveClaim={onApproveClaim}
+        onDraftClaim={onDraftClaim}
       />,
     )
+    // Before review: lightweight card shown, full claim ledger folded
+    expect(screen.getByTestId('evidence-claim-ledger')).toBeInTheDocument()
+    expect(screen.getByTestId('evidence-review-claim')).toBeInTheDocument()
+    expect(screen.getByText(/Draft claim ready · 已可以整理结论/)).toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+
+    // Clicking review claim expands full claim ledger
+    fireEvent.click(screen.getByTestId('evidence-review-claim'))
     expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+    expect(onDraftClaim).not.toHaveBeenCalled()
     expect(screen.getByTestId('claim-supported')).toHaveTextContent(
       'Education is positively associated with earnings.',
     )
@@ -175,6 +191,224 @@ describe('EvidenceLab', () => {
     )
     fireEvent.click(screen.getByTestId('claim-approve'))
     expect(onApproveClaim).toHaveBeenCalledWith('claim.card.education-earnings')
+  })
+
+  test('Review claim on non-stale draft Claim is presentation-only and does NOT call onDraftClaim', () => {
+    const onDraftClaim = vi.fn(async () => undefined)
+    const nonStaleResearch = {
+      ...research,
+      claim: {
+        ...research.claim!,
+        version: 1,
+        stale: false,
+      },
+    }
+    render(
+      <EvidenceLab
+        research={nonStaleResearch as unknown as ResearchLab}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onDraftClaim={onDraftClaim}
+      />,
+    )
+    // Claim ledger initially folded
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+    expect(screen.getByTestId('evidence-review-claim')).toBeInTheDocument()
+
+    // Click Review claim
+    fireEvent.click(screen.getByTestId('evidence-review-claim'))
+
+    // Full Claim Ledger expands
+    expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+    // onDraftClaim is strictly NOT called
+    expect(onDraftClaim).not.toHaveBeenCalled()
+  })
+
+  test('Review new evidence on stale Claim calls onDraftClaim to produce new version', () => {
+    const onDraftClaim = vi.fn(async () => undefined)
+    const staleResearch = {
+      ...research,
+      claim: {
+        ...research.claim!,
+        version: 1,
+        stale: true,
+        approved_by_user: true, // expanded so Review new evidence is directly accessible
+      },
+    }
+    render(
+      <EvidenceLab
+        research={staleResearch as unknown as ResearchLab}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onDraftClaim={onDraftClaim}
+      />,
+    )
+    const reviewEvidenceBtn = screen.getByTestId('claim-review-evidence')
+    expect(reviewEvidenceBtn).toBeInTheDocument()
+    fireEvent.click(reviewEvidenceBtn)
+    expect(onDraftClaim).toHaveBeenCalledTimes(1)
+  })
+
+  test('Challenge accept failure: onAcceptChallenge rejects, Accept button remains visible, Claim does not expand, no fake accepted UI', async () => {
+    const onAcceptChallenge = vi.fn(async () => {
+      throw new Error('Network failure')
+    })
+    render(
+      <EvidenceLab
+        research={research}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+    const acceptBtn = screen.getByTestId('evidence-challenge-accept')
+    expect(acceptBtn).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+
+    // Click accept which fails
+    fireEvent.click(acceptBtn)
+
+    // Wait for reject microtasks to settle
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Accept button remains visible, no "Accepted" text, Claim does NOT expand
+    expect(screen.getByTestId('evidence-challenge-accept')).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+  })
+
+  test('Challenge accept success: onAcceptChallenge succeeds, snapshot rerender with status=accepted expands Claim and displays Accepted', async () => {
+    const onAcceptChallenge = vi.fn(async () => undefined)
+    const { rerender } = render(
+      <EvidenceLab
+        research={research}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+    const acceptBtn = screen.getByTestId('evidence-challenge-accept')
+    expect(acceptBtn).toBeInTheDocument()
+    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
+
+    // Click accept which succeeds
+    fireEvent.click(acceptBtn)
+    expect(onAcceptChallenge).toHaveBeenCalledWith('challenge.instrument_strength')
+
+    // Rerender with backend snapshot reflecting status=accepted
+    const acceptedResearch = {
+      ...research,
+      next_challenge: {
+        ...research.next_challenge,
+        status: 'accepted',
+      },
+    } as unknown as ResearchLab
+
+    rerender(
+      <EvidenceLab
+        research={acceptedResearch}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={onAcceptChallenge}
+      />,
+    )
+
+    // Accept button is now replaced with Accepted text, and Claim Ledger expands
+    expect(screen.queryByTestId('evidence-challenge-accept')).not.toBeInTheDocument()
+    expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+  })
+
+  test('C1 Visual order: Results space and Compare precede Claim Ledger; Compare expands claim', () => {
+    render(
+      <EvidenceLab
+        research={research}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+      />,
+    )
+    const resultsSpace = screen.getByTestId('evidence-results-space')
+    const compare = screen.getByTestId('evidence-compare')
+    const claimLedgerWrapper = screen.getByTestId('evidence-claim-ledger')
+
+    // DOM order check: results space precedes compare, and compare precedes claim ledger
+    expect(resultsSpace.compareDocumentPosition(compare) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(compare.compareDocumentPosition(claimLedgerWrapper) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // Selecting two specifications automatically expands Claim Ledger
+    fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
+    fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
+    expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
+  })
+
+  test('C4 Spec runs UI deduplication with multiple runs for same spec_id and history switcher', () => {
+    const multiRunResearch = {
+      ...research,
+      specification_runs: [
+        {
+          id: 'run-ols-1',
+          spec_id: 'ols_region_dummies',
+          label: 'OLS · 1966 region dummies',
+          method: 'ols',
+          coef: 0.074,
+          status: 'ok',
+          relation: 'exploratory',
+          choices: [choice('estimator', 'ols')],
+        },
+        {
+          id: 'run-ols-2',
+          spec_id: 'ols_region_dummies',
+          label: 'OLS · 1966 region dummies',
+          method: 'ols',
+          coef: 0.08,
+          status: 'ok',
+          relation: 'exploratory',
+          choices: [choice('estimator', 'ols')],
+        },
+        {
+          id: 'run-iv',
+          spec_id: 'iv_region_dummies',
+          label: 'IV · nearc4 with 1966 region dummies',
+          method: 'iv',
+          coef: 0.13,
+          status: 'ok',
+          relation: 'canonical',
+          choices: [choice('estimator', 'iv')],
+        },
+      ],
+    } as unknown as ResearchLab
+
+    render(
+      <EvidenceLab
+        research={multiRunResearch}
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+      />,
+    )
+
+    // Only 1 row for ols_region_dummies is rendered in choice matrix
+    const rows = screen.getAllByTestId('evidence-matrix-ols_region_dummies')
+    expect(rows).toHaveLength(1)
+
+    // History button shows 2 runs
+    const historyBtn = screen.getByTestId('evidence-history-ols_region_dummies')
+    expect(historyBtn).toBeInTheDocument()
+    expect(historyBtn).toHaveTextContent(/2 runs/i)
+    expect(historyBtn).toHaveTextContent(/History 2/i)
+
+    // Default displayed is latest run (run-ols-2: 0.0800)
+    expect(rows[0]).toHaveTextContent('0.0800')
+
+    // Click history switcher to switch to run-ols-1 (0.0740)
+    fireEvent.click(historyBtn)
+    expect(screen.getByTestId('evidence-matrix-ols_region_dummies')).toHaveTextContent('0.0740')
   })
 
   test('mismatch after approve offers explicit promote and still allows write results', () => {

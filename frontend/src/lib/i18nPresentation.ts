@@ -22,7 +22,7 @@ type ChangedDim = { dimension?: string; a?: string; b?: string }
 
 /** Backend display-only mirror of one resolved criterion side. */
 type CriterionOutcomeRef = {
-  source?: 'metric' | 'constant' | null
+  source?: 'metric' | 'constant' | string | null
   metric?: string | null
   estimator?: string | null
   spec_id?: string | null
@@ -32,7 +32,7 @@ type CriterionOutcomeRef = {
 
 type CriterionOutcomeLike = {
   id?: string | null
-  outcome?: 'satisfied' | 'violated' | 'unresolved' | null
+  outcome?: string | null
   kind?: string | null
   operator?: string | null
   left?: CriterionOutcomeRef | null
@@ -43,7 +43,7 @@ type CriterionOutcomeLike = {
 type SurpriseLike = {
   status?: string | null
   criterion_outcomes?: CriterionOutcomeLike[] | null
-} | null
+} | null | undefined
 
 export const CARD_SPEC_IDS = [
   'ols_linear_exper',
@@ -286,7 +286,7 @@ const CLAIM_STATUS_KEYS: Record<string, string> = {
 }
 
 export function displayClaimExplanation(
-  evidenceStatus: string | undefined,
+  evidenceStatus: string | null | undefined,
   t: Translate,
   teachingCase?: string | null,
 ): string | null {

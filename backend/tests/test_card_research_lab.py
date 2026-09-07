@@ -107,6 +107,10 @@ def test_seed_expectation_carries_single_structured_criterion(client):
     assert criterion["right"]["metric"] == "estimate.coef"
     assert criterion["right"]["estimator"] == "ols"
     assert criterion["right"]["spec_id"] == ols_id
+    extract = lab["provenance"]["extract_kind"]
+    if extract == "wooldridge_card_34":
+        assert iv_id == "iv_region_dummies"
+        assert ols_id == "ols_region_dummies"
     assert "IV estimate < OLS estimate" in criterion["label"]
     seed_history = lab["expectation"]["history"][0]
     assert seed_history["criteria"][0]["left"]["spec_id"] == iv_id
@@ -193,6 +197,15 @@ def _put_criteria(client, sid: str, criteria: list, text: str = "criteria edit")
     )
 
 
+def _flipped_gt_criterion(seed: dict) -> dict:
+    return {
+        **seed,
+        "operator": "gt",
+        "label": "IV estimate > OLS estimate",
+        "source": "user",
+    }
+
+
 def test_expectation_put_rejects_invalid_criterion_combinations(client):
     sid = _boot(client)["session_id"]
     before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
@@ -231,6 +244,16 @@ def test_expectation_put_rejects_invalid_criterion_combinations(client):
             "left": iv,
             "tolerance": {"abs": 0.1},
             "label": "illegal sign tolerance",
+            "source": "user",
+        },
+        {
+            "id": "c.ordering-with-tolerance",
+            "kind": "ordering",
+            "operator": "lt",
+            "left": iv,
+            "right": ols,
+            "tolerance": {"abs": 0.1},
+            "label": "illegal ordering tolerance",
             "source": "user",
         },
     ]
@@ -293,6 +316,22 @@ def test_expectation_put_rejects_negative_tolerance(client):
     assert put.status_code == 422
     stored = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
     assert stored == before
+
+
+def test_expectation_put_keeps_exact_spec_id(client):
+    sid = _boot(client)["session_id"]
+    seed = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"][0]
+    assert seed["left"]["spec_id"]
+    assert seed["right"]["spec_id"]
+    put = _put_criteria(client, sid, [_flipped_gt_criterion(seed)])
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]["criteria"][0]
+    assert stored["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert stored["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert stored["operator"] == "gt"
+    later = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"][0]
+    assert later["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert later["right"]["spec_id"] == seed["right"]["spec_id"]
 
 
 def test_expectation_response_includes_criteria_with_version_history(client):
@@ -396,15 +435,6 @@ def test_research_lab_reattached_if_upload_drops_unknown_keys(client, monkeypatc
 
     result = asyncio.run(stored_result())
     assert (result.get("research_lab") or {}).get("teaching_case") == "card_1995"
-
-
-def _flipped_gt_criterion(seed: dict) -> dict:
-    return {
-        **seed,
-        "operator": "gt",
-        "label": "IV estimate > OLS estimate",
-        "source": "user",
-    }
 
 
 def test_pre_reveal_criterion_history_keeps_full_snapshots(client):

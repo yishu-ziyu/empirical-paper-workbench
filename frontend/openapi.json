@@ -4964,7 +4964,7 @@
           "label"
         ],
         "title": "ExpectationCriterion",
-        "description": "Structured surprise condition. Never re-derived from free text.\n\n``right`` is either another metric reference (ordering/approx) or a\nconstant float. ``source`` records who authored the criterion: the\nteaching-case seed or the user via an explicit control.\n\nLegal combinations:\n- sign: operator positive|negative; right empty; tolerance empty\n- ordering: operator lt|gt; right required\n- distance: operator approx; right required"
+        "description": "Structured surprise condition. Never re-derived from free text.\n\n``right`` is either another metric reference (ordering/approx) or a\nconstant float. ``source`` records who authored the criterion: the\nteaching-case seed or the user via an explicit control.\n\nLegal combinations:\n- sign: operator positive|negative; right empty; tolerance empty\n- ordering: operator lt|gt; right required; tolerance empty\n- distance: operator approx; right required"
       },
       "ExpectationCriterionTolerance": {
         "properties": {

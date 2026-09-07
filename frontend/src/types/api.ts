@@ -2141,7 +2141,7 @@ export interface components {
          *
          *     Legal combinations:
          *     - sign: operator positive|negative; right empty; tolerance empty
-         *     - ordering: operator lt|gt; right required
+         *     - ordering: operator lt|gt; right required; tolerance empty
          *     - distance: operator approx; right required
          */
         ExpectationCriterion: {

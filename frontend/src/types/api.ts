@@ -1626,6 +1626,16 @@ export interface components {
             /** Session Id */
             session_id: string;
         };
+        /** CriterionOutcomeResponse */
+        CriterionOutcomeResponse: {
+            /** Id */
+            id: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "satisfied" | "violated" | "unresolved";
+        };
         /**
          * DatasetMetaResponse
          * @description 单个数据集的元信息（upload 返回 / state.uploaded_datasets[]）。
@@ -2029,9 +2039,11 @@ export interface components {
          * @description Reference to a quantity produced by a specification run.
          *
          *     ``metric`` is an open string (``estimate.coef`` today; future estimands
-         *     like ``att`` or ``rd_local`` plug in without a schema change). The run to
-         *     read is picked by ``spec_id`` when given, otherwise by ``estimator``
-         *     (matched against a run's estimator/method label).
+         *     like ``att`` or ``rd_local`` plug in without a schema change). When
+         *     ``spec_id`` is present it is the only allowed selector: the evaluator
+         *     must not fall back to another run with the same ``estimator``. When
+         *     ``spec_id`` is absent, ``estimator`` may match a run's estimator/method
+         *     label. At least one of ``spec_id`` or ``estimator`` is required.
          */
         EvidenceMetricRef: {
             /** Metric */
@@ -2126,6 +2138,11 @@ export interface components {
          *     ``right`` is either another metric reference (ordering/approx) or a
          *     constant float. ``source`` records who authored the criterion: the
          *     teaching-case seed or the user via an explicit control.
+         *
+         *     Legal combinations:
+         *     - sign: operator positive|negative; right empty; tolerance empty
+         *     - ordering: operator lt|gt; right required
+         *     - distance: operator approx; right required
          */
         ExpectationCriterion: {
             /** Id */
@@ -2181,6 +2198,8 @@ export interface components {
              * @default edit
              */
             kind: string;
+            /** Criteria */
+            criteria?: components["schemas"]["ExpectationCriterion"][];
         };
         /** ExpectationResponse */
         ExpectationResponse: {
@@ -3214,6 +3233,16 @@ export interface components {
             expected?: string | null;
             /** Observed */
             observed?: string | null;
+            /** Expectation Version */
+            expectation_version?: number | null;
+            /** Criterion Ids */
+            criterion_ids?: string[];
+            /** Evaluated Criterion Ids */
+            evaluated_criterion_ids?: string[];
+            /** Unresolved Criterion Ids */
+            unresolved_criterion_ids?: string[];
+            /** Criterion Outcomes */
+            criterion_outcomes?: components["schemas"]["CriterionOutcomeResponse"][];
         } & {
             [key: string]: unknown;
         };

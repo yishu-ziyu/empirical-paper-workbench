@@ -292,6 +292,34 @@ def _seed_criterion() -> dict:
     }
 
 
+def _bound_criterion() -> dict:
+    return {
+        "id": "criterion.seed.iv-below-ols",
+        "kind": "ordering",
+        "operator": "lt",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": "iv_region_dummies",
+            "label": "IV estimate",
+        },
+        "right": {
+            "metric": "estimate.coef",
+            "estimator": "ols",
+            "spec_id": "ols_region_dummies",
+            "label": "OLS estimate",
+        },
+        "label": "IV estimate < OLS estimate",
+        "source": "seed",
+    }
+
+
+_COMPARABLE_RUNS = [
+    {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.0747, "status": "ok"},
+    {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.1315, "status": "ok"},
+]
+
+
 def test_surprise_ordering_mismatch_on_real_magnitudes():
     expectation = {
         "text": "I expect OLS to be positive. If ability creates upward bias, IV may be smaller.",
@@ -422,13 +450,204 @@ def test_surprise_unresolvable_metric_stays_silent():
         "source": "user",
     }
     surprise = evaluate_surprise(
-        {"text": "text", "criteria": [criterion]},
+        {"text": "text", "version": 3, "criteria": [criterion]},
         [{"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.07, "status": "ok"}],
         ols_spec_id="ols_region_dummies",
         iv_spec_id="iv_region_dummies",
     )
     assert surprise is not None
-    assert surprise["status"] == "Expected"
+    assert surprise["status"] == "Unevaluated"
+    assert surprise["status"] != "Expected"
+    assert surprise["evaluated_criterion_ids"] == []
+    assert surprise["unresolved_criterion_ids"] == ["criterion.future-att"]
+    assert surprise["expectation_version"] == 3
+    assert surprise["criterion_ids"] == ["criterion.future-att"]
+    assert surprise["criterion_outcomes"] == [
+        {"id": "criterion.future-att", "outcome": "unresolved"}
+    ]
+
+
+def test_surprise_binds_exact_spec_and_ignores_later_ols_preview():
+    expectation = {"text": "IV below OLS.", "version": 1, "criteria": [_bound_criterion()]}
+    initial = evaluate_surprise(
+        expectation,
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert initial["status"] == "Unexpected"
+    assert "0.1315" in initial["observed"]
+    assert "0.0747" in initial["observed"]
+    drifted = evaluate_surprise(
+        expectation,
+        [
+            *_COMPARABLE_RUNS,
+            {
+                "spec_id": "ols_linear_exper",
+                "method": "ols",
+                "estimator": "ols",
+                "coef": 0.2000,
+                "status": "ok",
+            },
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert drifted["status"] == initial["status"]
+    assert drifted["observed"] == initial["observed"]
+    assert "0.2000" not in (drifted["observed"] or "")
+    assert drifted["evaluated_criterion_ids"] == ["criterion.seed.iv-below-ols"]
+    assert drifted["unresolved_criterion_ids"] == []
+    assert drifted["expectation_version"] == 1
+    assert drifted["criterion_ids"] == ["criterion.seed.iv-below-ols"]
+
+
+def test_surprise_missing_spec_id_does_not_fallback_to_estimator():
+    criterion = {
+        "id": "criterion.missing-spec",
+        "kind": "ordering",
+        "operator": "lt",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": "iv_does_not_exist",
+            "label": "IV estimate",
+        },
+        "right": {
+            "metric": "estimate.coef",
+            "estimator": "ols",
+            "spec_id": "ols_does_not_exist",
+            "label": "OLS estimate",
+        },
+        "label": "missing specs",
+        "source": "user",
+    }
+    surprise = evaluate_surprise(
+        {"text": "text", "version": 2, "criteria": [criterion]},
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise["status"] == "Unevaluated"
+    assert surprise["status"] != "Expected"
+    assert surprise["evaluated_criterion_ids"] == []
+    assert surprise["unresolved_criterion_ids"] == ["criterion.missing-spec"]
+    assert surprise["observed"] is None
+
+
+def test_surprise_equality_boundary_is_a_violation():
+    equal_runs = [
+        {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.08, "status": "ok"},
+        {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.08, "status": "ok"},
+    ]
+    lt = evaluate_surprise(
+        {"text": "lt", "criteria": [_bound_criterion()]},
+        equal_runs,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert lt["status"] == "Unexpected"
+    assert lt["kind"] == "ordering_mismatch"
+    gt_criterion = {**_bound_criterion(), "operator": "gt", "label": "IV estimate > OLS estimate"}
+    gt = evaluate_surprise(
+        {"text": "gt", "criteria": [gt_criterion]},
+        equal_runs,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert gt["status"] == "Unexpected"
+    assert gt["kind"] == "ordering_mismatch"
+
+
+def test_surprise_zero_boundary_is_a_violation():
+    zero_iv = [{"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.0, "status": "ok"}]
+    positive = {
+        "id": "criterion.iv-positive",
+        "kind": "sign",
+        "operator": "positive",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": "iv_region_dummies",
+            "label": "IV estimate",
+        },
+        "label": "IV estimate is positive",
+        "source": "user",
+    }
+    negative = {**positive, "id": "criterion.iv-negative", "operator": "negative", "label": "IV estimate is negative"}
+    pos = evaluate_surprise(
+        {"text": "pos", "criteria": [positive]},
+        zero_iv,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert pos["status"] == "Unexpected"
+    assert pos["kind"] == "direction_mismatch"
+    neg = evaluate_surprise(
+        {"text": "neg", "criteria": [negative]},
+        zero_iv,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert neg["status"] == "Unexpected"
+    assert neg["kind"] == "direction_mismatch"
+
+
+def test_surprise_inconclusive_when_partially_resolved_without_violation():
+    criteria = [
+        _bound_criterion(),
+        {
+            "id": "criterion.future-att",
+            "kind": "sign",
+            "operator": "positive",
+            "left": {"metric": "att", "estimator": "did", "label": "ATT"},
+            "label": "ATT positive",
+            "source": "user",
+        },
+    ]
+    # IV 0.09 < OLS 0.13 satisfies the ordering criterion; ATT is unresolved.
+    surprise = evaluate_surprise(
+        {"text": "mixed", "version": 4, "criteria": criteria},
+        [
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.13, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.09, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise["status"] == "Inconclusive"
+    assert surprise["status"] != "Expected"
+    assert surprise["evaluated_criterion_ids"] == ["criterion.seed.iv-below-ols"]
+    assert surprise["unresolved_criterion_ids"] == ["criterion.future-att"]
+    assert surprise["expectation_version"] == 4
+
+
+def test_surprise_does_not_drift_after_real_ols_linear_preview(client):
+    sid = _ready(client)
+    lab = _run_space(client, sid)
+    criterion = lab["expectation"]["criteria"][0]
+    assert criterion["left"]["spec_id"] == "iv_region_dummies"
+    assert criterion["right"]["spec_id"] == "ols_region_dummies"
+    surprise = lab["surprise"]
+    assert surprise["status"] == "Unexpected"
+    assert "0.1315" in surprise["observed"]
+    assert "0.0747" in surprise["observed"]
+    observed_before = surprise["observed"]
+    resp = client.post(
+        f"/sessions/{sid}/research/specs/ols_linear_exper/run",
+        json={"mode": "preview"},
+        headers=_headers(),
+    )
+    assert resp.status_code == 202, resp.text
+    _finish(resp.json()["run_id"], "card-m1-p0-preview")
+    later = client.get(f"/sessions/{sid}/research").json()
+    assert any(run["spec_id"] == "ols_linear_exper" for run in later["specification_runs"])
+    assert later["surprise"]["status"] == "Unexpected"
+    assert later["surprise"]["observed"] == observed_before
+    assert later["surprise"]["evaluated_criterion_ids"] == [criterion["id"]]
+    assert later["surprise"]["unresolved_criterion_ids"] == []
+    assert later["surprise"]["criterion_ids"] == [criterion["id"]]
+    assert later["surprise"]["expectation_version"] == lab["expectation"]["version"]
 
 
 def test_card_default_expectation_is_unexpected_after_runs(client):

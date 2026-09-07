@@ -221,6 +221,46 @@ describe('AgentRail linked evidence', () => {
     expect(screen.getByTestId('agent-cursor-prompt')).toHaveTextContent('IV > OLS')
     expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
   })
+
+  test('Unevaluated does not show Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: { status: 'Unevaluated', observed: null },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+  })
+
+  test('Inconclusive does not show Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: { status: 'Inconclusive' },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+  })
 })
 
 describe('AgentRail spec_run progress (M2)', () => {

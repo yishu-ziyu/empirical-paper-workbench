@@ -22,8 +22,18 @@ const seedExpectation: Expectation = {
       id: 'criterion.seed.iv-below-ols',
       kind: 'ordering',
       operator: 'lt',
-      left: { metric: 'estimate.coef', estimator: 'iv', label: 'IV estimate' },
-      right: { metric: 'estimate.coef', estimator: 'ols', label: 'OLS estimate' },
+      left: {
+        metric: 'estimate.coef',
+        estimator: 'iv',
+        spec_id: 'iv_region_dummies',
+        label: 'IV estimate',
+      },
+      right: {
+        metric: 'estimate.coef',
+        estimator: 'ols',
+        spec_id: 'ols_region_dummies',
+        label: 'OLS estimate',
+      },
       label: 'IV estimate < OLS estimate',
       source: 'seed',
     },
@@ -33,8 +43,15 @@ const seedExpectation: Expectation = {
 function renderEditor(
   onSave: (payload: SavePayload) => Promise<void> = async () => undefined,
   expectation: Expectation = seedExpectation,
+  criteriaLocked = false,
 ) {
-  return render(<ExpectationEditor expectation={expectation} onSave={onSave} />)
+  return render(
+    <ExpectationEditor
+      expectation={expectation}
+      onSave={onSave}
+      criteriaLocked={criteriaLocked}
+    />,
+  )
 }
 
 describe('ExpectationEditor surprise criteria (M1)', () => {
@@ -76,6 +93,38 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     expect(payload.criteria![0]!.operator).toBe('gt')
     expect(payload.criteria![0]!.kind).toBe('ordering')
     expect(payload.criteria![0]!.source).toBe('user')
+  })
+
+  test('preserves exact spec_id refs when the direction control changes', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(onSave)
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-gt-ols' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const payload = onSave.mock.calls[0]![0]
+    const next = payload.criteria![0]!
+    expect(next.operator).toBe('gt')
+    expect(next.kind).toBe('ordering')
+    expect(next.left.spec_id).toBe('iv_region_dummies')
+    expect(next.left.estimator).toBe('iv')
+    expect((next.right as { spec_id?: string }).spec_id).toBe('ols_region_dummies')
+    expect((next.right as { estimator?: string }).estimator).toBe('ols')
+  })
+
+  test('locked criterion select stays disabled after results are revealed', () => {
+    renderEditor(async () => undefined, seedExpectation, true)
+    expect(screen.getByTestId('expectation-criterion-select')).toBeDisabled()
+    expect(screen.getByTestId('expectation-criterion-locked')).toHaveTextContent(
+      '结果已经揭晓；本轮意外判定已锁定，不能事后改写。',
+    )
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-gt-ols' },
+    })
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
+      'IV estimate < OLS estimate',
+    )
   })
 
   test('approx and sign options map to their criterion kinds', async () => {

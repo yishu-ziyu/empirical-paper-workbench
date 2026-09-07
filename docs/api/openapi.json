@@ -3699,6 +3699,29 @@
         "title": "CreateSessionResponse",
         "description": "POST /sessions 返回体。"
       },
+      "CriterionOutcomeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "satisfied",
+              "violated",
+              "unresolved"
+            ],
+            "title": "Outcome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "outcome"
+        ],
+        "title": "CriterionOutcomeResponse"
+      },
       "DatasetMetaResponse": {
         "properties": {
           "name": {
@@ -4674,7 +4697,7 @@
           "metric"
         ],
         "title": "EvidenceMetricRef",
-        "description": "Reference to a quantity produced by a specification run.\n\n``metric`` is an open string (``estimate.coef`` today; future estimands\nlike ``att`` or ``rd_local`` plug in without a schema change). The run to\nread is picked by ``spec_id`` when given, otherwise by ``estimator``\n(matched against a run's estimator/method label)."
+        "description": "Reference to a quantity produced by a specification run.\n\n``metric`` is an open string (``estimate.coef`` today; future estimands\nlike ``att`` or ``rd_local`` plug in without a schema change). When\n``spec_id`` is present it is the only allowed selector: the evaluator\nmust not fall back to another run with the same ``estimator``. When\n``spec_id`` is absent, ``estimator`` may match a run's estimator/method\nlabel. At least one of ``spec_id`` or ``estimator`` is required."
       },
       "EvidenceProvenanceResponse": {
         "properties": {
@@ -4941,7 +4964,7 @@
           "label"
         ],
         "title": "ExpectationCriterion",
-        "description": "Structured surprise condition. Never re-derived from free text.\n\n``right`` is either another metric reference (ordering/approx) or a\nconstant float. ``source`` records who authored the criterion: the\nteaching-case seed or the user via an explicit control."
+        "description": "Structured surprise condition. Never re-derived from free text.\n\n``right`` is either another metric reference (ordering/approx) or a\nconstant float. ``source`` records who authored the criterion: the\nteaching-case seed or the user via an explicit control.\n\nLegal combinations:\n- sign: operator positive|negative; right empty; tolerance empty\n- ordering: operator lt|gt; right required\n- distance: operator approx; right required"
       },
       "ExpectationCriterionTolerance": {
         "properties": {
@@ -5010,6 +5033,13 @@
             "type": "string",
             "title": "Kind",
             "default": "edit"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/ExpectationCriterion"
+            },
+            "type": "array",
+            "title": "Criteria"
           }
         },
         "type": "object",
@@ -7672,6 +7702,45 @@
               }
             ],
             "title": "Observed"
+          },
+          "expectation_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectation Version"
+          },
+          "criterion_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Criterion Ids"
+          },
+          "evaluated_criterion_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluated Criterion Ids"
+          },
+          "unresolved_criterion_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unresolved Criterion Ids"
+          },
+          "criterion_outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/CriterionOutcomeResponse"
+            },
+            "type": "array",
+            "title": "Criterion Outcomes"
           }
         },
         "additionalProperties": true,

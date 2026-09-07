@@ -158,3 +158,4 @@ validator 报告：`generic-research-spine-hardening-m1-p0-r3-validator.md`（Ve
 - C23：目标原文明示"可复现则修 / 确认 automation artifact 则记录"二选一，由复现证据裁决。
 - C14 的 6s 在本地 dev（ECONPAPER_LLM=mock、本机 Chrome/IAB）实测为准；不在 CI 环境复测时长。
 - 种子判据 label 允许中英双语文案变体，断言针对算子语义（iv lt ols）而非精确字符串字面。
+- C40 对照 Card 种子路径：断言 Unexpected + IV>OLS + OLS/IV 量级（约 0.07 / 0.13）。不得把某一平台的四位小数字面（本地 0.0747/0.1315，CI 曾为 0.0740/0.1323）当成统计结果被改写。不改估计器。

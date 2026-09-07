@@ -1,7 +1,7 @@
 # econpaper Codex Task State
 
 - Task ID: 20260907-m1-expectation-criterion-p0
-- Status: active
+- Status: complete
 - Git context: `review/generic-research-spine-hardening` / PR #31
 - Goal: 只修 M1 ExpectationCriterion 最后研究语义（P0-1..P0-4）。M0/M2/M3/M4 不改。不 merge。
 - Hard bar: `docs/acceptance/generic-research-spine-hardening.md` C29–C37 全绿；seed 绑定 exact comparable spec_id；后来的 OLS preview 不漂移 Surprise；非法组合 422；equality/zero 边界；unresolved → Unevaluated；post-reveal criterion 409 锁定。
@@ -13,7 +13,7 @@
 - Changed files:
 - Failed paths:
 - Data / output evidence locations: `docs/acceptance/generic-research-spine-hardening.md`
-- Test evidence:
+- Test evidence: make test 819+444+390；C29–C36 定向 pytest/vitest 全绿；tsc/lint/build 0
 - Pending external state: push PR #31，不 merge
-- Next action: 立契后改 seed/evaluator/schema/UI/lock，补回归，跑质量门，push
+- Next action: 无（已 push 前收尾）
 - Updated at: 2026-09-07

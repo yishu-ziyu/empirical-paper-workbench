@@ -157,6 +157,62 @@ describe('EvidenceLab', () => {
     expect(onCompare).toHaveBeenCalled()
   })
 
+  test('Unevaluated does not masquerade as Expected', () => {
+    render(
+      <EvidenceLab
+        research={
+          {
+            ...research,
+            surprise: {
+              status: 'Unevaluated',
+              expected: 'ATT positive',
+              observed: null,
+              unresolved_criterion_ids: ['criterion.future-att'],
+            },
+          } as unknown as ResearchLab
+        }
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onCompare={vi.fn(async () => ({}))}
+      />,
+    )
+    const card = screen.getByTestId('evidence-surprise')
+    expect(card).toHaveAttribute('data-status', 'Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-unevaluated')).toHaveTextContent(
+      '尚未判定：所需证据还没有产生',
+    )
+    expect(card).not.toHaveTextContent('Expected')
+  })
+
+  test('Inconclusive does not masquerade as Expected', () => {
+    render(
+      <EvidenceLab
+        research={
+          {
+            ...research,
+            surprise: {
+              status: 'Inconclusive',
+              expected: 'IV estimate < OLS estimate',
+              unresolved_criterion_ids: ['criterion.future-att'],
+            },
+          } as unknown as ResearchLab
+        }
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onCompare={vi.fn(async () => ({}))}
+      />,
+    )
+    const card = screen.getByTestId('evidence-surprise')
+    expect(card).toHaveAttribute('data-status', 'Inconclusive')
+    expect(screen.getByTestId('evidence-surprise-inconclusive')).toHaveTextContent(
+      '部分判定：有的所需证据还没有产生',
+    )
+    expect(card).not.toHaveTextContent('Expected')
+  })
+
   test('renders claim ledger and approve control after reviewing claim', async () => {
     const onApproveClaim = vi.fn(async () => undefined)
     const onDraftClaim = vi.fn(async () => undefined)

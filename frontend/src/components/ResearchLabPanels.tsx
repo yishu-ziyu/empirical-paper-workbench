@@ -109,20 +109,30 @@ const OLS_METRIC: EvidenceMetricRef = {
   label: 'OLS estimate',
 }
 
+function metricRefFromRight(
+  right: ExpectationCriterion['right'] | undefined,
+): EvidenceMetricRef | undefined {
+  if (right != null && typeof right === 'object') return right
+  return undefined
+}
+
 function criterionForOption(
   option: CriterionOption,
-  source: 'seed' | 'user',
-  existingId?: string,
+  existing: ExpectationCriterion | null,
+  preservedRight?: EvidenceMetricRef,
 ): ExpectationCriterion {
-  const id = existingId || `criterion.user.${option}`
+  const id = existing?.id || `criterion.user.${option}`
+  const source: 'seed' | 'user' = existing ? 'user' : 'user'
+  const left = existing?.left ?? IV_METRIC
+  const right = metricRefFromRight(existing?.right) ?? preservedRight ?? OLS_METRIC
   switch (option) {
     case 'iv-lt-ols':
       return {
         id,
         kind: 'ordering',
         operator: 'lt',
-        left: IV_METRIC,
-        right: OLS_METRIC,
+        left,
+        right,
         label: 'IV estimate < OLS estimate',
         source,
       }
@@ -131,8 +141,8 @@ function criterionForOption(
         id,
         kind: 'ordering',
         operator: 'gt',
-        left: IV_METRIC,
-        right: OLS_METRIC,
+        left,
+        right,
         label: 'IV estimate > OLS estimate',
         source,
       }
@@ -141,8 +151,8 @@ function criterionForOption(
         id,
         kind: 'distance',
         operator: 'approx',
-        left: IV_METRIC,
-        right: OLS_METRIC,
+        left,
+        right,
         tolerance: { rel: 0.25 },
         label: 'IV estimate ≈ OLS estimate (±25%)',
         source,
@@ -152,7 +162,7 @@ function criterionForOption(
         id,
         kind: 'sign',
         operator: 'positive',
-        left: IV_METRIC,
+        left,
         label: 'IV estimate is positive',
         source,
       }
@@ -161,7 +171,7 @@ function criterionForOption(
         id,
         kind: 'sign',
         operator: 'negative',
-        left: IV_METRIC,
+        left,
         label: 'IV estimate is negative',
         source,
       }
@@ -188,6 +198,7 @@ function optionForCriterion(criterion: ExpectationCriterion): CriterionOption | 
 export function ExpectationEditor({
   expectation,
   onSave,
+  criteriaLocked = false,
 }: {
   expectation: NonNullable<ResearchLab['expectation']>
   onSave: (payload: {
@@ -195,6 +206,7 @@ export function ExpectationEditor({
     confidence: 'low' | 'medium' | 'high'
     criteria?: ExpectationCriterion[]
   }) => Promise<void>
+  criteriaLocked?: boolean
 }) {
   const [text, setText] = useState(expectation.text || '')
   const [confidence, setConfidence] = useState<'low' | 'medium' | 'high'>(
@@ -203,12 +215,16 @@ export function ExpectationEditor({
   const [criteria, setCriteria] = useState<ExpectationCriterion[]>(
     expectation.criteria ?? [],
   )
+  const [preservedRight, setPreservedRight] = useState<EvidenceMetricRef | undefined>(
+    () => metricRefFromRight(expectation.criteria?.[0]?.right),
+  )
   const [busy, setBusy] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
   useEffect(() => {
     setText(expectation.text || '')
     setConfidence(expectation.confidence || 'medium')
     setCriteria(expectation.criteria ?? [])
+    setPreservedRight(metricRefFromRight(expectation.criteria?.[0]?.right))
     setSaveFailed(false)
   }, [expectation.text, expectation.confidence, expectation.version, expectation.criteria])
 
@@ -216,12 +232,10 @@ export function ExpectationEditor({
   const selectedOption = primary ? optionForCriterion(primary) : null
 
   const changeCriterion = (option: CriterionOption) => {
-    // 显式修改：替换第一条判据，保留其余判据；文本不动。
-    const next = criterionForOption(
-      option,
-      primary?.source === 'seed' ? 'user' : (primary?.source ?? 'user'),
-      primary?.id,
-    )
+    if (criteriaLocked) return
+    const next = criterionForOption(option, primary, preservedRight)
+    const nextRight = metricRefFromRight(next.right)
+    if (nextRight) setPreservedRight(nextRight)
     setCriteria(criteria.length > 0 ? [next, ...criteria.slice(1)] : [next])
   }
 
@@ -283,11 +297,12 @@ export function ExpectationEditor({
           <select
             data-testid="expectation-criterion-select"
             value={selectedOption ?? ''}
+            disabled={criteriaLocked}
             onChange={(event) => {
               const value = event.target.value as CriterionOption | ''
               if (value) changeCriterion(value)
             }}
-            className="rounded border border-wb-line bg-wb-surface px-2 py-1 text-[12px] text-wb-ink"
+            className="rounded border border-wb-line bg-wb-surface px-2 py-1 text-[12px] text-wb-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="" disabled>
               选择判定方向…
@@ -298,9 +313,15 @@ export function ExpectationEditor({
               </option>
             ))}
           </select>
-          <span className="text-[11px] text-wb-faint">
-            保存时随预期一起显式提交；改上方文字不会改变判定。
-          </span>
+          {criteriaLocked ? (
+            <span data-testid="expectation-criterion-locked" className="text-[11px] text-wb-muted">
+              结果已经揭晓；本轮意外判定已锁定，不能事后改写。
+            </span>
+          ) : (
+            <span className="text-[11px] text-wb-faint">
+              保存时随预期一起显式提交；改上方文字不会改变判定。
+            </span>
+          )}
         </label>
       </div>
       {saveFailed ? (

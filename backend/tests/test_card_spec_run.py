@@ -426,9 +426,29 @@ def test_surprise_distance_operator_with_tolerance():
     assert satisfied["status"] == "Expected"
 
 
-def test_surprise_without_criteria_stays_expected():
+def _assert_no_criteria_unevaluated(surprise, *, version=None):
+    assert surprise is not None
+    assert surprise["status"] == "Unevaluated"
+    assert surprise["status"] != "Expected"
+    assert surprise["unevaluated_reason"] == "no_criteria"
+    assert surprise["kind"] is None
+    assert surprise["kinds"] == []
+    assert surprise["expected"] is None
+    assert surprise["criterion_ids"] == []
+    assert surprise["evaluated_criterion_ids"] == []
+    assert surprise["unresolved_criterion_ids"] == []
+    assert surprise["criterion_outcomes"] == []
+    if version is not None:
+        assert surprise["expectation_version"] == version
+
+
+def test_surprise_without_criteria_is_unevaluated():
     surprise = evaluate_surprise(
-        {"text": "Free-form text with the words iv smaller similar positive."},
+        {
+            "text": "Free-form text with the words iv smaller similar positive.",
+            "version": 2,
+            "criteria": [],
+        },
         [
             {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.07, "status": "ok"},
             {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.13, "status": "ok"},
@@ -436,9 +456,56 @@ def test_surprise_without_criteria_stays_expected():
         ols_spec_id="ols_region_dummies",
         iv_spec_id="iv_region_dummies",
     )
-    assert surprise is not None
-    assert surprise["status"] == "Expected"
-    assert surprise["kind"] is None
+    _assert_no_criteria_unevaluated(surprise, version=2)
+
+
+def test_surprise_missing_criteria_key_is_unevaluated():
+    surprise = evaluate_surprise(
+        {"text": "Legacy free text only.", "version": 1},
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    _assert_no_criteria_unevaluated(surprise, version=1)
+
+
+def test_surprise_unparsed_items_are_no_criteria():
+    surprise = evaluate_surprise(
+        {
+            "text": "iv smaller similar positive",
+            "version": 3,
+            "criteria": [
+                {"label": "iv smaller"},
+                "not-a-dict",
+                {},
+            ],
+        },
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    _assert_no_criteria_unevaluated(surprise, version=3)
+
+
+def test_surprise_no_completed_runs_returns_none():
+    assert (
+        evaluate_surprise(
+            {"text": "anything", "criteria": []},
+            [],
+            ols_spec_id="ols_region_dummies",
+            iv_spec_id="iv_region_dummies",
+        )
+        is None
+    )
+    assert (
+        evaluate_surprise(
+            {"text": "anything", "criteria": [_seed_criterion()]},
+            [{"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.07, "status": "failed"}],
+            ols_spec_id="ols_region_dummies",
+            iv_spec_id="iv_region_dummies",
+        )
+        is None
+    )
 
 
 def test_surprise_unresolvable_metric_stays_silent():
@@ -459,6 +526,8 @@ def test_surprise_unresolvable_metric_stays_silent():
     assert surprise is not None
     assert surprise["status"] == "Unevaluated"
     assert surprise["status"] != "Expected"
+    assert surprise.get("unevaluated_reason") != "no_criteria"
+    assert surprise.get("unevaluated_reason") == "unresolved_metrics"
     assert surprise["evaluated_criterion_ids"] == []
     assert surprise["unresolved_criterion_ids"] == ["criterion.future-att"]
     assert surprise["expectation_version"] == 3
@@ -662,6 +731,93 @@ def test_card_default_expectation_is_unexpected_after_runs(client):
     assert surprise["kind"] == "ordering_mismatch"
     assert lab["next_challenge"]
     assert lab["next_challenge"]["id"]
+
+
+def test_empty_criteria_write_run_read_is_unevaluated(client):
+    accepted = _boot(client)
+    _finish(accepted["run_id"], "card-m2-upload-empty-criteria")
+    sid = accepted["session_id"]
+    notes = "我觉得 IV 应该会更小一些，但并不确定。"
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={"text": notes, "confidence": "low", "criteria": []},
+    )
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]
+    assert stored["text"] == notes
+    assert stored["criteria"] == []
+    frozen = client.post(f"/sessions/{sid}/research/specification-space/freeze")
+    assert frozen.status_code == 200, frozen.text
+    lab = _run_space(client, sid)
+    assert lab["expectation"]["text"] == notes
+    assert lab["expectation"]["criteria"] == []
+    surprise = lab["surprise"]
+    assert surprise["status"] == "Unevaluated"
+    assert surprise["status"] != "Expected"
+    assert surprise["unevaluated_reason"] == "no_criteria"
+    assert surprise["criterion_ids"] == []
+    assert surprise.get("expected") is None
+
+
+def test_without_criteria_api_does_not_regress_seeded_card(client):
+    sid = _ready(client)
+    lab = _run_space(client, sid)
+    assert lab["expectation"]["criteria"]
+    surprise = lab["surprise"]
+    assert surprise["status"] == "Unexpected"
+    assert surprise["status"] != "Unevaluated"
+    assert "0.0747" in surprise["observed"]
+    assert "0.1315" in surprise["observed"]
+
+
+def test_without_criteria_api_stale_expected_is_not_served(client):
+    accepted = _boot(client)
+    _finish(accepted["run_id"], "card-m1-p0-stale-expected")
+    sid = accepted["session_id"]
+    notes = "Free-form notes only."
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={"text": notes, "confidence": "low", "criteria": []},
+    )
+    assert put.status_code == 200, put.text
+    state = facade.get_state(sid)
+    lab = dict(state["research_lab"])
+    lab["surprise"] = {
+        "status": "Expected",
+        "kind": None,
+        "kinds": [],
+        "expected": notes,
+        "observed": None,
+        "criterion_ids": [],
+        "evaluated_criterion_ids": [],
+        "unresolved_criterion_ids": [],
+        "criterion_outcomes": [],
+    }
+    lab["specification_runs"] = [
+        {
+            "id": "run-ols-stale",
+            "spec_id": "ols_region_dummies",
+            "method": "ols",
+            "coef": 0.0747,
+            "status": "ok",
+        },
+        {
+            "id": "run-iv-stale",
+            "spec_id": "iv_region_dummies",
+            "method": "iv",
+            "coef": 0.1315,
+            "status": "ok",
+        },
+    ]
+    facade.update_state(sid, research_lab=lab)
+    got = client.get(f"/sessions/{sid}/research").json()
+    assert got["expectation"]["text"] == notes
+    assert got["expectation"]["criteria"] == []
+    surprise = got["surprise"]
+    assert surprise is not None
+    assert surprise["status"] == "Unevaluated"
+    assert surprise["status"] != "Expected"
+    assert surprise["unevaluated_reason"] == "no_criteria"
 
 
 def test_accept_challenge_creates_preview_run(client):

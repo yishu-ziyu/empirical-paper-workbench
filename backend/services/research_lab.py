@@ -366,6 +366,38 @@ def current_claim(lab: dict[str, Any] | None) -> Optional[dict[str, Any]]:
     return None
 
 
+def _structured_criteria(expectation: dict[str, Any] | None) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in (expectation or {}).get("criteria") or []
+        if isinstance(item, dict) and item.get("id")
+    ]
+
+
+def _public_surprise(lab: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Serve live evaluation when runs exist; never leak stale empty-criteria Expected."""
+    expectation = lab.get("expectation") if isinstance(lab.get("expectation"), dict) else {}
+    runs = [run for run in (lab.get("specification_runs") or []) if isinstance(run, dict)]
+    definitions = (lab.get("specification_space") or {}).get("definitions") or []
+    ols_id, iv_id = comparable_spec_ids(definitions)
+    live = evaluate_surprise(
+        expectation,
+        runs,
+        ols_spec_id=ols_id,
+        iv_spec_id=iv_id,
+    )
+    if live is not None:
+        return live
+    stored = lab.get("surprise")
+    if (
+        isinstance(stored, dict)
+        and stored.get("status") == "Expected"
+        and not _structured_criteria(expectation)
+    ):
+        return None
+    return stored if stored is None or isinstance(stored, dict) else None
+
+
 def public_research(state: dict[str, Any] | None) -> ResearchLabResponse:
     lab = lab_from_state(state)
     if lab is None:
@@ -377,6 +409,7 @@ def public_research(state: dict[str, Any] | None) -> ResearchLabResponse:
     projected["claim"] = current
     if current and not projected.get("current_claim_id"):
         projected["current_claim_id"] = current.get("id")
+    projected["surprise"] = _public_surprise(projected)
     return ResearchLabResponse.model_validate(projected)
 
 
@@ -864,7 +897,7 @@ def evaluate_surprise(
     - all criteria resolved and satisfied → Expected
     - zero criteria resolvable → Unevaluated
     - some resolved, some unresolved, no violation → Inconclusive
-    - no criteria (free text only) → Expected
+    - no structured criteria → Unevaluated (no_criteria); free text is not a judgment
     """
     _ = (ols_spec_id, iv_spec_id)
     completed = [
@@ -875,25 +908,22 @@ def evaluate_surprise(
     if not completed:
         return None
     text = str((expectation or {}).get("text") or "")
-    criteria = [
-        item
-        for item in (expectation or {}).get("criteria") or []
-        if isinstance(item, dict) and item.get("id")
-    ]
+    criteria = _structured_criteria(expectation)
     expectation_version = _expectation_version(expectation)
     criterion_ids = [str(item.get("id")) for item in criteria]
     if not criteria:
         return {
-            "status": "Expected",
+            "status": "Unevaluated",
             "kind": None,
             "kinds": [],
-            "expected": text or None,
+            "expected": None,
             "observed": None,
             "expectation_version": expectation_version,
             "criterion_ids": [],
             "evaluated_criterion_ids": [],
             "unresolved_criterion_ids": [],
             "criterion_outcomes": [],
+            "unevaluated_reason": "no_criteria",
         }
     kinds: list[str] = []
     expected_bits: list[str] = []
@@ -913,10 +943,12 @@ def evaluate_surprise(
             kinds.append(kind)
             expected_bits.append(str(criterion.get("label") or cid))
             observed_bits.append(observed)
+    unevaluated_reason = None
     if kinds:
         status = "Unexpected"
     elif not evaluated_ids:
         status = "Unevaluated"
+        unevaluated_reason = "unresolved_metrics"
     elif unresolved_ids:
         status = "Inconclusive"
     else:
@@ -937,6 +969,8 @@ def evaluate_surprise(
         "unresolved_criterion_ids": unresolved_ids,
         "criterion_outcomes": outcomes,
     }
+    if unevaluated_reason is not None:
+        payload["unevaluated_reason"] = unevaluated_reason
     return payload
 
 

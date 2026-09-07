@@ -540,7 +540,12 @@ export default function EvidenceLab({
           <p className="mt-1 text-[14px] text-wb-ink" data-testid="evidence-surprise-status">
             {surprise.status}
           </p>
-          {surprise.status === 'Unevaluated' ? (
+          {surprise.status === 'Unevaluated' && surprise.unevaluated_reason === 'no_criteria' ? (
+            <p data-testid="evidence-surprise-no-criteria" className="mt-1 text-[12px] text-wb-muted">
+              尚未判定：尚未设置可检验的预期。
+            </p>
+          ) : null}
+          {surprise.status === 'Unevaluated' && surprise.unevaluated_reason !== 'no_criteria' ? (
             <p data-testid="evidence-surprise-unevaluated" className="mt-1 text-[12px] text-wb-muted">
               尚未判定：所需证据还没有产生
             </p>

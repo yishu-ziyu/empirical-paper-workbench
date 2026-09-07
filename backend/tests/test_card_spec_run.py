@@ -763,11 +763,19 @@ def test_without_criteria_api_does_not_regress_seeded_card(client):
     sid = _ready(client)
     lab = _run_space(client, sid)
     assert lab["expectation"]["criteria"]
+    ols_id, iv_id = comparable_spec_ids(lab["specification_space"]["definitions"])
+    ols_run = next(run for run in lab["specification_runs"] if run["spec_id"] == ols_id)
+    iv_run = next(run for run in lab["specification_runs"] if run["spec_id"] == iv_id)
     surprise = lab["surprise"]
     assert surprise["status"] == "Unexpected"
     assert surprise["status"] != "Unevaluated"
-    assert "0.0747" in surprise["observed"]
-    assert "0.1315" in surprise["observed"]
+    assert surprise.get("unevaluated_reason") != "no_criteria"
+    assert f"{iv_run['coef']:.4f}" in (surprise["observed"] or "")
+    assert f"{ols_run['coef']:.4f}" in (surprise["observed"] or "")
+    assert iv_run["coef"] > ols_run["coef"]
+    # Magnitude, not a single platform's 4-decimal literal (CI: 0.0740/0.1323).
+    assert 0.05 < ols_run["coef"] < 0.10
+    assert 0.10 < iv_run["coef"] < 0.16
 
 
 def test_without_criteria_api_stale_expected_is_not_served(client):

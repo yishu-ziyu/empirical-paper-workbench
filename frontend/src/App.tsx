@@ -27,6 +27,7 @@ import {
   useWorkspace,
 } from './lib/workspace'
 import { formatStatValue } from './lib/readoutTable'
+import { displaySurpriseObserved } from './lib/i18nPresentation'
 import WorkbenchArtifact from './components/WorkbenchArtifact'
 
 function App() {
@@ -152,8 +153,11 @@ function App() {
       blockingDecision = {
         title: t('decision.unexpected'),
         reason:
-          ws.research.surprise.observed ||
-          t('decision.runSpecsReason'),
+          displaySurpriseObserved(
+            ws.research.expectation?.criteria,
+            ws.research.specification_runs,
+            t,
+          ) || t('agent.unexpectedObserved'),
       }
     }
   } else if (isPaperTab) {

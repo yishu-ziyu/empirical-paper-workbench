@@ -221,5 +221,129 @@ describe('AgentRail linked evidence', () => {
     expect(screen.getByTestId('agent-cursor-prompt')).toHaveTextContent('IV > OLS')
     expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
   })
+
+  test('Unevaluated does not show Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: { status: 'Unevaluated', observed: null },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+  })
+
+  test('no_criteria Unevaluated does not show Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: {
+              status: 'Unevaluated',
+              unevaluated_reason: 'no_criteria',
+              observed: null,
+              expected: null,
+            },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('agent-cursor-prompt')).not.toBeInTheDocument()
+  })
+
+  test('Inconclusive does not show Show me', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          workbenchTab: 'evidence',
+          research: {
+            surprise: { status: 'Inconclusive' },
+          },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={true}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('agent-cursor-show-me')).not.toBeInTheDocument()
+  })
+})
+
+describe('AgentRail spec_run progress (M2)', () => {
+  test('shows real per-spec progress while a spec_run is active', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          activeRun: { run_id: 'run-spec-1', kind: 'spec_run', status: 'RUNNING' },
+          specRunProgress: { done: 3, total: 12 },
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    const task = screen.getByTestId('agent-current-task')
+    expect(task).toHaveAttribute('data-busy', 'true')
+    expect(task).toHaveTextContent('正在运行规格 3/12')
+    expect(task).not.toHaveTextContent('空闲')
+    expect(task).not.toHaveTextContent('后台运行监控中')
+  })
+
+  test('indeterminate wording when the progress denominator is unknown', () => {
+    render(
+      <AgentRail
+        ws={ws({
+          activeRun: { run_id: 'run-spec-2', kind: 'spec_run', status: 'RUNNING' },
+          specRunProgress: null,
+        })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('agent-current-task')).toHaveTextContent('正在运行规格…')
+  })
+
+  test('terminal spec_run clears the background-run claim (no stale monitoring)', () => {
+    render(
+      <AgentRail
+        ws={ws({ activeRun: null, specRunProgress: null })}
+        decision={null}
+        waiting={null}
+        suggestions={[]}
+        showLinkedEvidence={false}
+        hasSuccessfulEstimate={false}
+        onOpenEvidence={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('agent-current-task')).toHaveAttribute('data-busy', 'false')
+    expect(screen.queryByText(/后台运行监控中/)).not.toBeInTheDocument()
+  })
 })
 

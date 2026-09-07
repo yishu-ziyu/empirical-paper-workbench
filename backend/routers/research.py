@@ -1,7 +1,7 @@
 """Research lab read model and Card demo boot commands."""
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -13,6 +13,7 @@ from facade import facade
 from models.user import User
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
+    ExpectationCriterion,
     ResearchLabResponse,
     RunAcceptedResponse,
     SpecCompareResponse,
@@ -45,6 +46,10 @@ class ExpectationUpdateRequest(BaseModel):
     text: str = Field(min_length=1)
     confidence: Literal["low", "medium", "high"]
     locale: Optional[str] = None
+    # Explicit structured surprise conditions. Absent (None) keeps the
+    # current criteria; a submitted list is stored verbatim. Criteria are
+    # never re-derived from text.
+    criteria: Optional[List[ExpectationCriterion]] = None
 
 
 class SpecRunRequest(BaseModel):
@@ -129,6 +134,11 @@ async def put_expectation(
             text=body.text,
             confidence=body.confidence,
             locale=body.locale,
+            criteria=(
+                None
+                if body.criteria is None
+                else [item.model_dump(mode="json", exclude_none=True) for item in body.criteria]
+            ),
         )
         return facade.update_state(session_id, research_lab=updated)
 

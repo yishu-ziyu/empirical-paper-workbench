@@ -5,14 +5,16 @@ project the same public model. LangGraph raw state is not exposed.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from agent.engine.readiness import claim_revision_is_stale
-from schemas.responses import ResearchLabResponse
+from schemas.responses import ExpectationCriterion, ResearchLabResponse
 
 
 CARD_TEACHING_CASE = "card_1995"
@@ -221,12 +223,33 @@ def seed_card_lab(
     provenance: dict[str, Any],
 ) -> dict[str, Any]:
     now = _now()
+    definitions = card_specification_definitions(columns)
+    ols_id, iv_id = comparable_spec_ids(definitions)
     expectation_text = (
         "I expect OLS to be positive. If ability creates upward bias, IV may be smaller."
     )
     expectation_zh = (
         "预计 OLS 为正；如果能力造成向上偏误，IV 可能比 OLS 更小。"
     )
+    seed_criterion = {
+        "id": "criterion.seed.iv-below-ols",
+        "kind": "ordering",
+        "operator": "lt",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": iv_id,
+            "label": "IV estimate",
+        },
+        "right": {
+            "metric": "estimate.coef",
+            "estimator": "ols",
+            "spec_id": ols_id,
+            "label": "OLS estimate",
+        },
+        "label": "IV estimate < OLS estimate",
+        "source": "seed",
+    }
     expectation = {
         "text": expectation_text,
         "text_zh": expectation_zh,
@@ -242,10 +265,16 @@ def seed_card_lab(
                 "locale": "en",
                 "at": now,
                 "kind": "seed",
+                "criteria": [dict(seed_criterion)],
             }
         ],
+        # Structured surprise condition (M1). One seed criterion: the IV
+        # estimate should come out below the OLS estimate, bound to the
+        # comparable spec pair. Nothing is ever re-parsed from the free
+        # text above. estimator is display metadata; spec_id is the
+        # authoritative selector.
+        "criteria": [dict(seed_criterion)],
     }
-    definitions = card_specification_definitions(columns)
     return {
         "teaching_case": CARD_TEACHING_CASE,
         "provenance": provenance,
@@ -337,6 +366,38 @@ def current_claim(lab: dict[str, Any] | None) -> Optional[dict[str, Any]]:
     return None
 
 
+def _structured_criteria(expectation: dict[str, Any] | None) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in (expectation or {}).get("criteria") or []
+        if isinstance(item, dict) and item.get("id")
+    ]
+
+
+def _public_surprise(lab: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Serve live evaluation when runs exist; never leak stale empty-criteria Expected."""
+    expectation = lab.get("expectation") if isinstance(lab.get("expectation"), dict) else {}
+    runs = [run for run in (lab.get("specification_runs") or []) if isinstance(run, dict)]
+    definitions = (lab.get("specification_space") or {}).get("definitions") or []
+    ols_id, iv_id = comparable_spec_ids(definitions)
+    live = evaluate_surprise(
+        expectation,
+        runs,
+        ols_spec_id=ols_id,
+        iv_spec_id=iv_id,
+    )
+    if live is not None:
+        return live
+    stored = lab.get("surprise")
+    if (
+        isinstance(stored, dict)
+        and stored.get("status") == "Expected"
+        and not _structured_criteria(expectation)
+    ):
+        return None
+    return stored if stored is None or isinstance(stored, dict) else None
+
+
 def public_research(state: dict[str, Any] | None) -> ResearchLabResponse:
     lab = lab_from_state(state)
     if lab is None:
@@ -348,6 +409,7 @@ def public_research(state: dict[str, Any] | None) -> ResearchLabResponse:
     projected["claim"] = current
     if current and not projected.get("current_claim_id"):
         projected["current_claim_id"] = current.get("id")
+    projected["surprise"] = _public_surprise(projected)
     return ResearchLabResponse.model_validate(projected)
 
 
@@ -358,12 +420,68 @@ def require_lab(state: dict[str, Any]) -> dict[str, Any]:
     return lab
 
 
+def normalize_criteria(criteria: Any) -> list[dict[str, Any]]:
+    """Validate submitted criteria against the public schema.
+
+    Raises HTTP 422 on a malformed criterion so an invalid explicit edit
+    never silently drops or rewrites the user's condition. Valid criteria
+    are stored exactly as submitted (no default-field inflation).
+    """
+    if criteria is None:
+        return []
+    if not isinstance(criteria, list):
+        raise HTTPException(status_code=422, detail="criteria must be a list")
+    normalized: list[dict[str, Any]] = []
+    for item in criteria:
+        try:
+            ExpectationCriterion.model_validate(item)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=f"invalid criterion: {exc}") from exc
+        if isinstance(item, dict):
+            normalized.append(json.loads(json.dumps(item)))
+        else:
+            normalized.append(json.loads(ExpectationCriterion.model_validate(item).model_dump_json(exclude_none=True)))
+    return normalized
+
+
+def _canonical_criteria(criteria: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        json.loads(ExpectationCriterion.model_validate(item).model_dump_json(exclude_none=True))
+        for item in criteria
+    ]
+
+
+def criteria_equivalent(left: Any, right: Any) -> bool:
+    left_list = [item for item in (left or []) if isinstance(item, dict)]
+    right_list = [item for item in (right or []) if isinstance(item, dict)]
+    try:
+        return _canonical_criteria(left_list) == _canonical_criteria(right_list)
+    except ValidationError:
+        return False
+
+
+def _criterion_event_refs(criteria: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    for item in criteria:
+        refs.append(
+            {
+                "id": item.get("id"),
+                "kind": item.get("kind"),
+                "operator": item.get("operator"),
+                "left": item.get("left"),
+                "right": item.get("right"),
+            }
+        )
+    return refs
+
+
 def update_expectation(
     lab: dict[str, Any],
     *,
     text: str,
     confidence: str,
     locale: str | None,
+    criteria: Any = None,
 ) -> dict[str, Any]:
     cleaned = text.strip()
     if not cleaned:
@@ -372,6 +490,23 @@ def update_expectation(
         raise HTTPException(status_code=422, detail="invalid confidence")
     now = _now()
     current = dict(lab.get("expectation") or {})
+    current_criteria = list(current.get("criteria") or [])
+    revealed = bool((lab.get("specification_space") or {}).get("revealed"))
+    # Explicit criteria travel with the PUT and are stored verbatim; a PUT
+    # without them keeps the existing criteria untouched. There is no path
+    # that re-derives criteria from the free text.
+    if criteria is not None:
+        next_criteria = normalize_criteria(criteria)
+        if revealed and not criteria_equivalent(next_criteria, current_criteria):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "expectation_criterion_locked",
+                    "message": "结果已经揭晓；本轮意外判定已锁定，不能事后改写。",
+                },
+            )
+    else:
+        next_criteria = current_criteria
     version = int(current.get("version") or 0) + 1
     history = list(current.get("history") or [])
     history.append(
@@ -382,6 +517,7 @@ def update_expectation(
             "locale": locale or current.get("locale") or "en",
             "at": now,
             "kind": "edit",
+            "criteria": [dict(item) for item in next_criteria],
         }
     )
     lab["expectation"] = {
@@ -392,12 +528,19 @@ def update_expectation(
         "version": version,
         "updated_at": now,
         "history": history,
+        "criteria": next_criteria,
     }
     events = list(lab.get("decision_events") or [])
     events.append(
         _event(
             "expectation_set",
-            {"version": version, "confidence": confidence},
+            {
+                "expectation_version": version,
+                "confidence": confidence,
+                "criterion_ids": [item.get("id") for item in next_criteria],
+                "criteria": _criterion_event_refs(next_criteria),
+                "phase": "post_reveal" if revealed else "pre_reveal",
+            },
         )
     )
     lab["decision_events"] = events
@@ -573,31 +716,168 @@ def _as_float(value: Any) -> Optional[float]:
         return None
 
 
-def _mentions_iv_smaller(text: str) -> bool:
-    folded = text.casefold()
-    return any(
-        token in folded
-        for token in (
-            "iv may be smaller",
-            "iv smaller",
-            "iv 可能比 ols 更小",
-            "iv可能比ols更小",
-        )
+def _criterion_metric_label(ref: dict[str, Any]) -> str:
+    label = ref.get("label")
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    estimator = ref.get("estimator")
+    if isinstance(estimator, str) and estimator.strip():
+        return f"{estimator.strip().upper()} estimate"
+    return str(ref.get("metric") or "metric")
+
+
+def _format_criterion_value(value: float) -> str:
+    text = f"{value:.4f}"
+    return text
+
+
+def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[float]:
+    """Resolve an EvidenceMetricRef against completed specification runs.
+
+    ``estimate.coef`` with an explicit ``spec_id`` resolves only that
+    spec_id (latest completed run of it). Missing spec_id is unresolved;
+    the evaluator must not fall back to another run with the same
+    estimator. When ``spec_id`` is absent, ``estimator``/``method`` may
+    match. Any other metric is a deliberate extension point (future
+    DiD/RD estimands) and resolves to None until its producer exists.
+    """
+    if not isinstance(ref, dict):
+        return None
+    metric = str(ref.get("metric") or "")
+    if metric != "estimate.coef":
+        return None
+    spec_id = ref.get("spec_id")
+    if isinstance(spec_id, str) and spec_id.strip():
+        wanted_spec = spec_id.strip()
+        for run in reversed(completed):
+            if str(run.get("spec_id") or "") == wanted_spec:
+                return _as_float(run.get("coef"))
+        return None
+    estimator = ref.get("estimator")
+    if isinstance(estimator, str) and estimator.strip():
+        wanted = estimator.strip().casefold()
+        for run in reversed(completed):
+            method = str(run.get("method") or "").casefold()
+            run_estimator = str(run.get("estimator") or "").casefold()
+            if wanted in {method, run_estimator}:
+                return _as_float(run.get("coef"))
+    return None
+
+
+def _evaluate_criterion(
+    criterion: dict[str, Any],
+    completed: list[dict[str, Any]],
+) -> tuple[str, Optional[str], Optional[str]]:
+    """Judge one criterion.
+
+    Returns ``(outcome, kind, observed)`` where outcome is
+    ``satisfied``, ``violated``, or ``unresolved``.
+    """
+    operator = str(criterion.get("operator") or "")
+    left_ref = criterion.get("left") if isinstance(criterion.get("left"), dict) else {}
+    left_value = _criterion_ref_value(left_ref, completed)
+    kind = str(criterion.get("kind") or "")
+    right = criterion.get("right")
+
+    if kind == "sign":
+        if left_value is None:
+            return "unresolved", None, None
+        left_label = _criterion_metric_label(left_ref)
+        if operator == "positive":
+            if left_value > 0:
+                return "satisfied", None, None
+            return (
+                "violated",
+                "direction_mismatch",
+                f"{left_label} {_format_criterion_value(left_value)} is not positive",
+            )
+        if operator == "negative":
+            if left_value < 0:
+                return "satisfied", None, None
+            return (
+                "violated",
+                "direction_mismatch",
+                f"{left_label} {_format_criterion_value(left_value)} is not negative",
+            )
+        return "unresolved", None, None
+
+    if left_value is None:
+        return "unresolved", None, None
+    left_label = _criterion_metric_label(left_ref)
+
+    if isinstance(right, (int, float)) and not isinstance(right, bool):
+        right_value: Optional[float] = float(right)
+    elif isinstance(right, dict):
+        right_value = _criterion_ref_value(right, completed)
+    else:
+        right_value = None
+    if right_value is None:
+        return "unresolved", None, None
+    right_label = (
+        _criterion_metric_label(right)
+        if isinstance(right, dict)
+        else f"constant {right_value:g}"
     )
 
+    if kind == "ordering":
+        if operator == "lt":
+            if left_value < right_value:
+                return "satisfied", None, None
+            cmp = ">" if left_value > right_value else "="
+            return (
+                "violated",
+                "ordering_mismatch",
+                (
+                    f"{left_label} {_format_criterion_value(left_value)} {cmp} "
+                    f"{right_label} {_format_criterion_value(right_value)}"
+                ),
+            )
+        if operator == "gt":
+            if left_value > right_value:
+                return "satisfied", None, None
+            cmp = "<" if left_value < right_value else "="
+            return (
+                "violated",
+                "ordering_mismatch",
+                (
+                    f"{left_label} {_format_criterion_value(left_value)} {cmp} "
+                    f"{right_label} {_format_criterion_value(right_value)}"
+                ),
+            )
+        return "unresolved", None, None
 
-def _mentions_iv_larger(text: str) -> bool:
-    folded = text.casefold()
-    return "iv may be larger" in folded or "iv larger" in folded
+    if kind == "distance":
+        tolerance = criterion.get("tolerance") if isinstance(criterion.get("tolerance"), dict) else {}
+        abs_tol = _as_float(tolerance.get("abs"))
+        rel_tol = _as_float(tolerance.get("rel"))
+        if abs_tol is None and rel_tol is None:
+            rel_tol = 0.25
+        allowed = abs_tol if abs_tol is not None else 0.0
+        if rel_tol is not None:
+            scale = max(abs(left_value), abs(right_value), 1e-12)
+            allowed = max(allowed, rel_tol * scale)
+        diff = abs(left_value - right_value)
+        if diff > allowed:
+            return (
+                "violated",
+                "magnitude",
+                (
+                    f"{left_label} {_format_criterion_value(left_value)} vs "
+                    f"{right_label} {_format_criterion_value(right_value)} "
+                    f"(difference {_format_criterion_value(diff)} exceeds ±{_format_criterion_value(allowed)})"
+                ),
+            )
+        return "satisfied", None, None
+
+    return "unresolved", None, None
 
 
-def _mentions_similar(text: str) -> bool:
-    folded = text.casefold()
-    return any(token in folded for token in ("similar", "roughly the same", "大致相当"))
-
-
-def _mentions_positive(text: str) -> bool:
-    return "positive" in text.casefold() or "为正" in text
+def _expectation_version(expectation: dict[str, Any] | None) -> Optional[int]:
+    raw = (expectation or {}).get("version")
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def evaluate_surprise(
@@ -607,7 +887,19 @@ def evaluate_surprise(
     ols_spec_id: str,
     iv_spec_id: str,
 ) -> Optional[dict[str, Any]]:
-    """Deterministic surprise. LLM must not generate this object."""
+    """Deterministic surprise, judged only from structured criteria.
+
+    LLM must not generate this object. The free expectation text is carried
+    through verbatim as context; it never feeds the judgment.
+
+    Aggregation:
+    - any resolved criterion violated → Unexpected
+    - all criteria resolved and satisfied → Expected
+    - zero criteria resolvable → Unevaluated
+    - some resolved, some unresolved, no violation → Inconclusive
+    - no structured criteria → Unevaluated (no_criteria); free text is not a judgment
+    """
+    _ = (ols_spec_id, iv_spec_id)
     completed = [
         run
         for run in runs
@@ -615,60 +907,71 @@ def evaluate_surprise(
     ]
     if not completed:
         return None
-    by_spec: dict[str, dict[str, Any]] = {}
-    for run in completed:
-        spec_id = run.get("spec_id")
-        if spec_id and spec_id not in by_spec:
-            by_spec[str(spec_id)] = run
-    ols = by_spec.get(ols_spec_id)
-    iv = by_spec.get(iv_spec_id)
     text = str((expectation or {}).get("text") or "")
+    criteria = _structured_criteria(expectation)
+    expectation_version = _expectation_version(expectation)
+    criterion_ids = [str(item.get("id")) for item in criteria]
+    if not criteria:
+        return {
+            "status": "Unevaluated",
+            "kind": None,
+            "kinds": [],
+            "expected": None,
+            "observed": None,
+            "expectation_version": expectation_version,
+            "criterion_ids": [],
+            "evaluated_criterion_ids": [],
+            "unresolved_criterion_ids": [],
+            "criterion_outcomes": [],
+            "unevaluated_reason": "no_criteria",
+        }
     kinds: list[str] = []
     expected_bits: list[str] = []
     observed_bits: list[str] = []
-    ols_coef = _as_float((ols or {}).get("coef")) if ols else None
-    iv_coef = _as_float((iv or {}).get("coef")) if iv else None
-
-    if _mentions_positive(text) and ols_coef is not None and ols_coef < 0:
-        kinds.append("direction_mismatch")
-        expected_bits.append("OLS positive")
-        observed_bits.append("OLS negative")
-    if _mentions_positive(text) and iv_coef is not None and iv_coef < 0:
-        kinds.append("direction_mismatch")
-        expected_bits.append("positive return")
-        observed_bits.append("IV negative")
-
-    if ols_coef is not None and iv_coef is not None:
-        relative = abs(iv_coef - ols_coef) / max(abs(ols_coef), 1e-6)
-        ordered = relative > 0.05
-        if ordered and _mentions_iv_smaller(text) and iv_coef > ols_coef:
-            kinds.append("ordering_mismatch")
-            expected_bits.append("IV may be smaller than OLS")
-            observed_bits.append("IV > OLS")
-        elif ordered and _mentions_iv_larger(text) and iv_coef < ols_coef:
-            kinds.append("ordering_mismatch")
-            expected_bits.append("IV may be larger than OLS")
-            observed_bits.append("IV < OLS")
-        if _mentions_similar(text) and relative > 0.25:
-            kinds.append("magnitude")
-            expected_bits.append("OLS and IV similar")
-            observed_bits.append("relative difference > 0.25")
-
-    if not kinds:
-        return {
-            "status": "Expected",
-            "kind": None,
-            "kinds": [],
-            "expected": text or None,
-            "observed": None,
-        }
-    return {
-        "status": "Unexpected",
-        "kind": kinds[0],
+    evaluated_ids: list[str] = []
+    unresolved_ids: list[str] = []
+    outcomes: list[dict[str, str]] = []
+    for criterion in criteria:
+        cid = str(criterion.get("id"))
+        outcome, kind, observed = _evaluate_criterion(criterion, completed)
+        outcomes.append({"id": cid, "outcome": outcome})
+        if outcome == "unresolved":
+            unresolved_ids.append(cid)
+            continue
+        evaluated_ids.append(cid)
+        if outcome == "violated" and kind and observed:
+            kinds.append(kind)
+            expected_bits.append(str(criterion.get("label") or cid))
+            observed_bits.append(observed)
+    unevaluated_reason = None
+    if kinds:
+        status = "Unexpected"
+    elif not evaluated_ids:
+        status = "Unevaluated"
+        unevaluated_reason = "unresolved_metrics"
+    elif unresolved_ids:
+        status = "Inconclusive"
+    else:
+        status = "Expected"
+    payload: dict[str, Any] = {
+        "status": status,
+        "kind": kinds[0] if kinds else None,
         "kinds": kinds,
-        "expected": "; ".join(dict.fromkeys(expected_bits)) or text,
-        "observed": "; ".join(dict.fromkeys(observed_bits)),
+        "expected": (
+            "; ".join(dict.fromkeys(expected_bits))
+            if expected_bits
+            else ("; ".join(str(item.get("label") or item.get("id")) for item in criteria) or text or None)
+        ),
+        "observed": "; ".join(dict.fromkeys(observed_bits)) if observed_bits else None,
+        "expectation_version": expectation_version,
+        "criterion_ids": criterion_ids,
+        "evaluated_criterion_ids": evaluated_ids,
+        "unresolved_criterion_ids": unresolved_ids,
+        "criterion_outcomes": outcomes,
     }
+    if unevaluated_reason is not None:
+        payload["unevaluated_reason"] = unevaluated_reason
+    return payload
 
 
 def compare_specification_runs(

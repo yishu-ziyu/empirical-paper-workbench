@@ -149,3 +149,57 @@ describe('AgentCursorPlayer', () => {
     expect(driver.promote).not.toHaveBeenCalled()
   })
 })
+
+describe('Show me choreography budget (M3/C14)', () => {
+  test('healthy-path wall clock from script data is ≤ 6s', () => {
+    const travel = travelDurationMs(false)
+    let total = 0
+    for (const step of CARD_SHOW_ME_SCRIPT.steps) {
+      if (step.op === 'pause') total += step.ms
+      else if (step.op === 'point') total += travel
+      else if (step.op === 'compare') total += travel * 2
+    }
+    // 6 travels ×420ms + 500+500+1600+600ms pauses = 5720ms
+    expect(total).toBeLessThanOrEqual(6000)
+    expect(total).toBeGreaterThan(0)
+  })
+
+  test('reduced-motion path stays within budget too', () => {
+    const travel = travelDurationMs(true)
+    expect(travel).toBe(0)
+    let total = 0
+    for (const step of CARD_SHOW_ME_SCRIPT.steps) {
+      if (step.op === 'pause') total += Math.min(step.ms, 80)
+      else if (step.op === 'point') total += travel
+      else if (step.op === 'compare') total += travel * 2
+    }
+    expect(total).toBeLessThanOrEqual(600)
+  })
+
+  test('pause mid-play then resume continues from the current step (C15)', async () => {
+    const localRegistry = new SemanticTargetRegistry()
+    localRegistry.register(TARGET.ols, document.createElement('div'))
+    localRegistry.register(TARGET.iv, document.createElement('div'))
+    localRegistry.register(TARGET.estimator, document.createElement('th'))
+    const driver = mockDriver(localRegistry)
+    const player = new AgentCursorPlayer(driver)
+    let moves = 0
+    driver.moveTo = async () => {
+      moves += 1
+      if (moves === 3) player.pause()
+    }
+    const playing = player.play(CARD_SHOW_ME_SCRIPT)
+    await vi.waitFor(() => {
+      expect(player.state.status).toBe('paused')
+    })
+    expect(moves).toBe(3)
+    player.resume()
+    expect(player.state.status).toBe('running')
+    const result = await playing
+    // Resume continues from the current step: all 6 travels still run and
+    // the script reaches done with the final intent.
+    expect(result.status).toBe('done')
+    expect(moves).toBe(6)
+    expect(result.intent).toBe('This is the main change.')
+  })
+})

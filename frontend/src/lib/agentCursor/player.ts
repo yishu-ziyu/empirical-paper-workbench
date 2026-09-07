@@ -134,6 +134,10 @@ export class AgentCursorPlayer {
           status: 'aborted',
           abortReason: err.reason,
           awaiting: null,
+          // abort 即清理：高亮与比较对不残留到下一次播放（C16）。
+          highlighted: [],
+          comparePair: null,
+          fadeUnchanged: false,
         })
         return this.presentation
       }

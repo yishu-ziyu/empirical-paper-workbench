@@ -99,10 +99,32 @@ async function pollRun(
   }
 }
 
+/** 投影给调用者的 run 事件（只含稳定标签字段，不含任何私有载荷）。 */
+export type RunProgressEvent = {
+  seq?: number
+  type: string
+  kind?: string
+  status?: string
+  node?: string
+  specId?: string
+}
+
+function projectEvent(raw: Record<string, unknown>): RunProgressEvent {
+  return {
+    seq: typeof raw.seq === 'number' ? raw.seq : undefined,
+    type: typeof raw.type === 'string' ? raw.type : 'run.progress',
+    kind: typeof raw.kind === 'string' ? raw.kind : undefined,
+    status: typeof raw.status === 'string' ? raw.status : undefined,
+    node: typeof raw.node === 'string' ? raw.node : undefined,
+    specId: typeof raw.spec_id === 'string' ? raw.spec_id : undefined,
+  }
+}
+
 export function waitForRun(
   runId: string,
   eventsUrl = `${API_BASE}/runs/${runId}/events`,
   signal?: AbortSignal,
+  onEvent?: (event: RunProgressEvent) => void,
 ): Promise<Record<string, any>> {
   if (typeof EventSource === 'undefined') return pollRun(runId, signal)
 
@@ -162,8 +184,16 @@ export function waitForRun(
 
     source.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { status?: RunStatus['status'] }
-        if (payload.status && TERMINAL.has(payload.status)) void finish()
+        const payload = JSON.parse(event.data) as Record<string, unknown>
+        if (onEvent) {
+          try {
+            onEvent(projectEvent(payload))
+          } catch {
+            // A progress callback must never break the run wait.
+          }
+        }
+        const status = payload.status as RunStatus['status'] | undefined
+        if (status && TERMINAL.has(status)) void finish()
       } catch {
         // A malformed progress event is non-authoritative; keep the stream open.
       }

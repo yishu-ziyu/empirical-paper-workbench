@@ -531,13 +531,33 @@ export default function EvidenceLab({
       {surprise ? (
         <div
           data-testid="evidence-surprise"
+          data-status={surprise.status ?? ''}
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
             Surprise（意外）
           </p>
-          <p className="mt-1 text-[14px] text-wb-ink">{surprise.status}</p>
-          {surprise.expected ? (
+          <p className="mt-1 text-[14px] text-wb-ink" data-testid="evidence-surprise-status">
+            {surprise.status}
+          </p>
+          {surprise.status === 'Unevaluated' && surprise.unevaluated_reason === 'no_criteria' ? (
+            <p data-testid="evidence-surprise-no-criteria" className="mt-1 text-[12px] text-wb-muted">
+              尚未判定：尚未设置可检验的预期。
+            </p>
+          ) : null}
+          {surprise.status === 'Unevaluated' && surprise.unevaluated_reason !== 'no_criteria' ? (
+            <p data-testid="evidence-surprise-unevaluated" className="mt-1 text-[12px] text-wb-muted">
+              尚未判定：所需证据还没有产生
+            </p>
+          ) : null}
+          {surprise.status === 'Inconclusive' ? (
+            <p data-testid="evidence-surprise-inconclusive" className="mt-1 text-[12px] text-wb-muted">
+              部分判定：有的所需证据还没有产生
+            </p>
+          ) : null}
+          {surprise.status !== 'Unevaluated' &&
+          surprise.status !== 'Inconclusive' &&
+          surprise.expected ? (
             <p className="mt-1 text-[12px] text-wb-muted">Expected: {surprise.expected}</p>
           ) : null}
           {surprise.observed ? (

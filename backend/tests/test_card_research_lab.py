@@ -9,7 +9,7 @@ import pytest
 from facade import facade
 from models.run import Run
 from run_repository import RunRepository
-from services.research_lab import REQUIRED_CARD_COLUMNS
+from services.research_lab import REQUIRED_CARD_COLUMNS, comparable_spec_ids, evaluate_surprise
 
 
 def _headers(key: str | None = None) -> dict[str, str]:
@@ -83,6 +83,264 @@ def test_nine_col_path_marks_region_specs_unavailable(client, monkeypatch):
         assert by_id[spec_id]["user_decision"] == "unavailable"
         assert by_id[spec_id]["unavailable_reason"] == "missing_columns"
     assert by_id["iv_nearc4_linear"]["admissible"] is True
+    criterion = lab["expectation"]["criteria"][0]
+    assert criterion["left"]["spec_id"] == "iv_nearc4_full"
+    assert criterion["right"]["spec_id"] == "ols_full_controls"
+    assert criterion["left"]["estimator"] == "iv"
+    assert criterion["right"]["estimator"] == "ols"
+
+
+def test_seed_expectation_carries_single_structured_criterion(client):
+    """C1 / C29: Card seed establishes one ordering criterion bound to comparable specs."""
+    sid = _boot(client)["session_id"]
+    lab = client.get(f"/sessions/{sid}/research").json()
+    criteria = lab["expectation"]["criteria"]
+    assert isinstance(criteria, list) and len(criteria) == 1
+    criterion = criteria[0]
+    assert criterion["source"] == "seed"
+    assert criterion["kind"] == "ordering"
+    assert criterion["operator"] == "lt"
+    assert criterion["left"]["metric"] == "estimate.coef"
+    assert criterion["left"]["estimator"] == "iv"
+    ols_id, iv_id = comparable_spec_ids(lab["specification_space"]["definitions"])
+    assert criterion["left"]["spec_id"] == iv_id
+    assert criterion["right"]["metric"] == "estimate.coef"
+    assert criterion["right"]["estimator"] == "ols"
+    assert criterion["right"]["spec_id"] == ols_id
+    extract = lab["provenance"]["extract_kind"]
+    if extract == "wooldridge_card_34":
+        assert iv_id == "iv_region_dummies"
+        assert ols_id == "ols_region_dummies"
+    assert "IV estimate < OLS estimate" in criterion["label"]
+    seed_history = lab["expectation"]["history"][0]
+    assert seed_history["criteria"][0]["left"]["spec_id"] == iv_id
+    assert seed_history["criteria"][0]["right"]["spec_id"] == ols_id
+
+
+def _strip_nones(value):
+    """Drop schema-injected null fields for verbatim comparison."""
+    if isinstance(value, dict):
+        return {k: _strip_nones(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_strip_nones(item) for item in value]
+    return value
+
+
+def test_expectation_put_explicit_criteria_persist_verbatim(client):
+    """C2①: a PUT carrying criteria stores them exactly as submitted.
+
+    The read model projects the full public schema (optional keys may be
+    null); every submitted key/value must come back unchanged.
+    """
+    sid = _boot(client)["session_id"]
+    criteria = [
+        {
+            "id": "criterion.user.iv-above-ols",
+            "kind": "ordering",
+            "operator": "gt",
+            "left": {"metric": "estimate.coef", "estimator": "iv"},
+            "right": {"metric": "estimate.coef", "estimator": "ols"},
+            "label": "IV estimate > OLS estimate",
+            "source": "user",
+        }
+    ]
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "Now I think IV is larger.",
+            "confidence": "high",
+            "criteria": criteria,
+        },
+    )
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]
+    assert _strip_nones(stored["criteria"]) == criteria
+    # criteria sit beside version/history in the same response
+    assert stored["version"] == 2
+    assert len(stored["history"]) >= 2
+
+
+def test_expectation_put_without_criteria_keeps_existing(client):
+    """C2②: editing text alone never re-derives or drops the criteria."""
+    sid = _boot(client)["session_id"]
+    before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    assert before
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "我觉得 IV 应该会更小一些，但并不确定。随意写的别的句子。",
+            "confidence": "low",
+        },
+    )
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]
+    assert stored["criteria"] == before
+
+
+def test_expectation_put_rejects_malformed_criterion(client):
+    sid = _boot(client)["session_id"]
+    put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "bad criterion",
+            "confidence": "medium",
+            "criteria": [{"id": "x", "kind": "nonsense", "left": {}, "operator": "sideways"}],
+        },
+    )
+    assert put.status_code == 422
+
+
+def _put_criteria(client, sid: str, criteria: list, text: str = "criteria edit"):
+    return client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={"text": text, "confidence": "medium", "criteria": criteria},
+    )
+
+
+def _flipped_gt_criterion(seed: dict) -> dict:
+    return {
+        **seed,
+        "operator": "gt",
+        "label": "IV estimate > OLS estimate",
+        "source": "user",
+    }
+
+
+def test_expectation_put_rejects_invalid_criterion_combinations(client):
+    sid = _boot(client)["session_id"]
+    before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    iv = {"metric": "estimate.coef", "estimator": "iv", "spec_id": "iv_region_dummies"}
+    ols = {"metric": "estimate.coef", "estimator": "ols", "spec_id": "ols_region_dummies"}
+    illegal = [
+        {
+            "id": "c.sign-with-right",
+            "kind": "sign",
+            "operator": "positive",
+            "left": iv,
+            "right": ols,
+            "label": "illegal sign",
+            "source": "user",
+        },
+        {
+            "id": "c.ordering-missing-right",
+            "kind": "ordering",
+            "operator": "lt",
+            "left": iv,
+            "label": "illegal ordering",
+            "source": "user",
+        },
+        {
+            "id": "c.distance-missing-right",
+            "kind": "distance",
+            "operator": "approx",
+            "left": iv,
+            "label": "illegal distance",
+            "source": "user",
+        },
+        {
+            "id": "c.sign-with-tolerance",
+            "kind": "sign",
+            "operator": "positive",
+            "left": iv,
+            "tolerance": {"abs": 0.1},
+            "label": "illegal sign tolerance",
+            "source": "user",
+        },
+        {
+            "id": "c.ordering-with-tolerance",
+            "kind": "ordering",
+            "operator": "lt",
+            "left": iv,
+            "right": ols,
+            "tolerance": {"abs": 0.1},
+            "label": "illegal ordering tolerance",
+            "source": "user",
+        },
+    ]
+    for item in illegal:
+        put = _put_criteria(client, sid, [item])
+        assert put.status_code == 422, item["id"]
+    stored = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    assert stored == before
+
+
+def test_expectation_put_rejects_empty_selector(client):
+    sid = _boot(client)["session_id"]
+    before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    put = _put_criteria(
+        client,
+        sid,
+        [
+            {
+                "id": "c.empty-selector",
+                "kind": "sign",
+                "operator": "positive",
+                "left": {"metric": "estimate.coef"},
+                "label": "no selector",
+                "source": "user",
+            }
+        ],
+    )
+    assert put.status_code == 422
+    stored = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    assert stored == before
+
+
+def test_expectation_put_rejects_negative_tolerance(client):
+    sid = _boot(client)["session_id"]
+    before = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    put = _put_criteria(
+        client,
+        sid,
+        [
+            {
+                "id": "c.neg-tol",
+                "kind": "distance",
+                "operator": "approx",
+                "left": {
+                    "metric": "estimate.coef",
+                    "estimator": "iv",
+                    "spec_id": "iv_region_dummies",
+                },
+                "right": {
+                    "metric": "estimate.coef",
+                    "estimator": "ols",
+                    "spec_id": "ols_region_dummies",
+                },
+                "tolerance": {"rel": -0.1},
+                "label": "negative tolerance",
+                "source": "user",
+            }
+        ],
+    )
+    assert put.status_code == 422
+    stored = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"]
+    assert stored == before
+
+
+def test_expectation_put_keeps_exact_spec_id(client):
+    sid = _boot(client)["session_id"]
+    seed = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"][0]
+    assert seed["left"]["spec_id"]
+    assert seed["right"]["spec_id"]
+    put = _put_criteria(client, sid, [_flipped_gt_criterion(seed)])
+    assert put.status_code == 200, put.text
+    stored = put.json()["expectation"]["criteria"][0]
+    assert stored["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert stored["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert stored["operator"] == "gt"
+    later = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"][0]
+    assert later["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert later["right"]["spec_id"] == seed["right"]["spec_id"]
+
+
+def test_expectation_response_includes_criteria_with_version_history(client):
+    """C2③: the ExpectationResponse read model carries criteria."""
+    sid = _boot(client)["session_id"]
+    lab = client.get(f"/sessions/{sid}/research").json()
+    expect = lab["expectation"]
+    for key in ("criteria", "version", "history"):
+        assert key in expect
 
 
 def test_expectation_put_round_trips_and_is_not_a_chat_message(client):
@@ -177,6 +435,102 @@ def test_research_lab_reattached_if_upload_drops_unknown_keys(client, monkeypatc
 
     result = asyncio.run(stored_result())
     assert (result.get("research_lab") or {}).get("teaching_case") == "card_1995"
+
+
+def test_pre_reveal_criterion_history_keeps_full_snapshots(client):
+    sid = _boot(client)["session_id"]
+    seed = client.get(f"/sessions/{sid}/research").json()["expectation"]["criteria"][0]
+    assert seed["operator"] == "lt"
+    put = _put_criteria(
+        client,
+        sid,
+        [_flipped_gt_criterion(seed)],
+        text="Now I think IV is larger.",
+    )
+    assert put.status_code == 200, put.text
+    expectation = put.json()["expectation"]
+    history = expectation["history"]
+    assert history[0]["criteria"][0]["operator"] == "lt"
+    assert history[0]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert history[0]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert seed["left"]["spec_id"]
+    assert seed["right"]["spec_id"]
+    assert history[-1]["criteria"][0]["operator"] == "gt"
+    assert history[-1]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert history[-1]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    events = put.json()["decision_events"]
+    set_event = next(item for item in reversed(events) if item["kind"] == "expectation_set")
+    payload = set_event["payload"]
+    assert payload["expectation_version"] == expectation["version"]
+    assert payload["criterion_ids"] == [seed["id"]]
+    assert payload["criteria"][0]["kind"] == "ordering"
+    assert payload["criteria"][0]["operator"] == "gt"
+    assert payload["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert payload["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert payload["phase"] == "pre_reveal"
+    assert payload.get("criteria") != len(expectation["criteria"])
+
+
+def test_post_reveal_criterion_lock_allows_text_but_rejects_criteria_change(client):
+    sid = _boot(client)["session_id"]
+    seeded = client.get(f"/sessions/{sid}/research").json()
+    before = seeded["expectation"]
+    seed = before["criteria"][0]
+    history_len = len(before["history"])
+    surprise_before = evaluate_surprise(
+        before,
+        [
+            {"spec_id": "ols_region_dummies", "method": "ols", "coef": 0.0747, "status": "ok"},
+            {"spec_id": "iv_region_dummies", "method": "iv", "coef": 0.1315, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    state = facade.get_state(sid)
+    lab = dict(state["research_lab"])
+    space = dict(lab.get("specification_space") or {})
+    space["revealed"] = True
+    lab["specification_space"] = space
+    lab["surprise"] = surprise_before
+    facade.update_state(sid, research_lab=lab)
+    lab = client.get(f"/sessions/{sid}/research").json()
+    assert lab["specification_space"]["revealed"] is True
+    surprise_before = lab["surprise"]
+    text_put = client.put(
+        f"/sessions/{sid}/research/expectation",
+        json={
+            "text": "我觉得 IV 应该会更小一些，但并不确定。",
+            "confidence": "low",
+            "criteria": before["criteria"],
+        },
+    )
+    assert text_put.status_code == 200, text_put.text
+    after_text = text_put.json()
+    assert after_text["expectation"]["text"] == "我觉得 IV 应该会更小一些，但并不确定。"
+    assert after_text["expectation"]["criteria"][0]["operator"] == "lt"
+    assert after_text["expectation"]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert after_text["expectation"]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert after_text["surprise"]["status"] == surprise_before["status"]
+    assert after_text["surprise"]["observed"] == surprise_before["observed"]
+    assert after_text["surprise"]["expectation_version"] == surprise_before["expectation_version"]
+    assert after_text["surprise"]["criterion_ids"] == [seed["id"]]
+    locked = _put_criteria(client, sid, [_flipped_gt_criterion(seed)], text="try to rewrite after reveal")
+    assert locked.status_code == 409, locked.text
+    detail = locked.json()["detail"]
+    assert detail["code"] == "expectation_criterion_locked"
+    later = client.get(f"/sessions/{sid}/research").json()
+    assert later["expectation"]["criteria"][0]["operator"] == "lt"
+    assert later["expectation"]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert later["expectation"]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert later["expectation"]["text"] == "我觉得 IV 应该会更小一些，但并不确定。"
+    assert later["surprise"]["observed"] == surprise_before["observed"]
+    assert later["surprise"]["status"] == surprise_before["status"]
+    assert len(later["expectation"]["history"]) == history_len + 1
+    set_event = next(
+        item for item in reversed(later["decision_events"]) if item["kind"] == "expectation_set"
+    )
+    assert set_event["payload"]["phase"] == "post_reveal"
+    assert set_event["payload"]["criteria"][0]["operator"] == "lt"
 
 
 def test_challenge_wording_neutral_effective_f():

@@ -2098,3 +2098,35 @@ def test_sse_resumes_after_last_event_id(client):
         assert '"status":"SUCCEEDED"' in response.text
     finally:
         facade.drop_session(sid)
+
+
+def test_public_event_projects_spec_id_for_spec_run_progress():
+    """M2/C9: spec_run progress spec_id rides the SSE projection (stable ids only)."""
+    from routers.run_execution import _public_event
+
+    class Event:
+        seq = 7
+        event_type = "run.progress"
+
+        def __init__(self, payload):
+            self.payload = payload
+
+    public = _public_event(
+        Event({"node": "spec_run", "status": "running", "spec_id": "ols_full_controls"}),
+        kind="spec_run",
+    )
+    assert public["seq"] == 7
+    assert public["type"] == "run.progress"
+    assert public["kind"] == "spec_run"
+    assert public["status"] == "running"
+    assert public["node"] == "spec_run"
+    assert public["spec_id"] == "ols_full_controls"
+
+    # 非 stable label（空格/特殊字符）不放行；私有键不出现
+    hostile = _public_event(
+        Event({"spec_id": "not a stable id!", "path": "/tmp/secret", "status": "running"}),
+        kind="spec_run",
+    )
+    assert "spec_id" not in hostile
+    assert "path" not in hostile
+    assert hostile["status"] == "running"

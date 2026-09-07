@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +139,90 @@ class SpecificationDefinitionResponse(BaseModel):
     choices: List[ResearchChoiceResponse] = Field(default_factory=list)
 
 
+class EvidenceMetricRef(BaseModel):
+    """Reference to a quantity produced by a specification run.
+
+    ``metric`` is an open string (``estimate.coef`` today; future estimands
+    like ``att`` or ``rd_local`` plug in without a schema change). When
+    ``spec_id`` is present it is the only allowed selector: the evaluator
+    must not fall back to another run with the same ``estimator``. When
+    ``spec_id`` is absent, ``estimator`` may match a run's estimator/method
+    label. At least one of ``spec_id`` or ``estimator`` is required.
+    """
+
+    metric: str
+    estimator: Optional[str] = None
+    spec_id: Optional[str] = None
+    label: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_selector(self) -> "EvidenceMetricRef":
+        spec_id = (self.spec_id or "").strip()
+        estimator = (self.estimator or "").strip()
+        if not spec_id and not estimator:
+            raise ValueError("EvidenceMetricRef requires spec_id or estimator")
+        return self
+
+
+class ExpectationCriterionTolerance(BaseModel):
+    abs: Optional[float] = None
+    rel: Optional[float] = None
+
+    @model_validator(mode="after")
+    def non_negative(self) -> "ExpectationCriterionTolerance":
+        if self.abs is not None and self.abs < 0:
+            raise ValueError("tolerance.abs must be >= 0")
+        if self.rel is not None and self.rel < 0:
+            raise ValueError("tolerance.rel must be >= 0")
+        return self
+
+
+class ExpectationCriterion(BaseModel):
+    """Structured surprise condition. Never re-derived from free text.
+
+    ``right`` is either another metric reference (ordering/approx) or a
+    constant float. ``source`` records who authored the criterion: the
+    teaching-case seed or the user via an explicit control.
+
+    Legal combinations:
+    - sign: operator positive|negative; right empty; tolerance empty
+    - ordering: operator lt|gt; right required; tolerance empty
+    - distance: operator approx; right required
+    """
+
+    id: str
+    kind: Literal["sign", "ordering", "distance"]
+    left: EvidenceMetricRef
+    operator: Literal["gt", "lt", "approx", "positive", "negative"]
+    right: Optional[Union[EvidenceMetricRef, float]] = None
+    tolerance: Optional[ExpectationCriterionTolerance] = None
+    label: str
+    source: Literal["seed", "user"] = "user"
+
+    @model_validator(mode="after")
+    def legal_combination(self) -> "ExpectationCriterion":
+        if self.kind == "sign":
+            if self.operator not in {"positive", "negative"}:
+                raise ValueError("sign criteria require operator positive or negative")
+            if self.right is not None:
+                raise ValueError("sign criteria must not include right")
+            if self.tolerance is not None:
+                raise ValueError("sign criteria must not include tolerance")
+        elif self.kind == "ordering":
+            if self.operator not in {"lt", "gt"}:
+                raise ValueError("ordering criteria require operator lt or gt")
+            if self.right is None:
+                raise ValueError("ordering criteria require right")
+            if self.tolerance is not None:
+                raise ValueError("ordering criteria must not include tolerance")
+        elif self.kind == "distance":
+            if self.operator != "approx":
+                raise ValueError("distance criteria require operator approx")
+            if self.right is None:
+                raise ValueError("distance criteria require right")
+        return self
+
+
 class ExpectationHistoryItemResponse(BaseModel):
     version: int
     text: str
@@ -146,6 +230,7 @@ class ExpectationHistoryItemResponse(BaseModel):
     locale: Optional[str] = None
     at: str
     kind: str = "edit"
+    criteria: List[ExpectationCriterion] = Field(default_factory=list)
 
 
 class ExpectationResponse(BaseModel):
@@ -156,6 +241,7 @@ class ExpectationResponse(BaseModel):
     version: int = 1
     updated_at: Optional[str] = None
     history: List[ExpectationHistoryItemResponse] = Field(default_factory=list)
+    criteria: List[ExpectationCriterion] = Field(default_factory=list)
 
 
 class ResearchQuestionResponse(BaseModel):
@@ -219,12 +305,23 @@ class SpecificationRunResponse(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class CriterionOutcomeResponse(BaseModel):
+    id: str
+    outcome: Literal["satisfied", "violated", "unresolved"]
+
+
 class SurpriseResponse(BaseModel):
     status: Optional[str] = None
     kind: Optional[str] = None
     kinds: List[str] = Field(default_factory=list)
     expected: Optional[str] = None
     observed: Optional[str] = None
+    expectation_version: Optional[int] = None
+    criterion_ids: List[str] = Field(default_factory=list)
+    evaluated_criterion_ids: List[str] = Field(default_factory=list)
+    unresolved_criterion_ids: List[str] = Field(default_factory=list)
+    criterion_outcomes: List[CriterionOutcomeResponse] = Field(default_factory=list)
+    unevaluated_reason: Optional[Literal["no_criteria", "unresolved_metrics"]] = None
 
     model_config = {"extra": "allow"}
 

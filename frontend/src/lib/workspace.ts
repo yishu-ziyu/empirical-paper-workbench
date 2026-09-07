@@ -51,6 +51,7 @@ export const SAMPLE_DIRECTION = {
 type ReviewInfo = components['schemas']['ReviewInfoResponse']
 type WrittenChapter = components['schemas']['ChapterResponse']
 type RunAccepted = components['schemas']['RunAcceptedResponse']
+type ExpectationCriterion = components['schemas']['ExpectationCriterion']
 type DirectionAcceptance =
   | RunAccepted
   | { immediate_result: Record<string, any> }
@@ -455,6 +456,15 @@ export function snapshotHasResearchContent(data: WorkspaceSnapshot): boolean {
   )
 }
 
+/** 前端可数的 included specs 总数（spec_run 进度分母；拿不到为 0 → indeterminate）。 */
+export function includedSpecCount(research: ResearchLab | null | undefined): number {
+  const definitions = research?.specification_space?.definitions ?? []
+  return definitions.filter(
+    (item) =>
+      item.admissible && (item.user_decision == null || item.user_decision === 'include'),
+  ).length
+}
+
 export function useWorkspace(opts: WorkspaceOptions) {
   const { sessionId, setSessionId, setAuthed, t } = opts
 
@@ -554,6 +564,22 @@ export function useWorkspace(opts: WorkspaceOptions) {
   // snapshot.active_run 投影：Overview「上次运行」卡与 Agent 栏当前任务共用。
   const [activeRun, setActiveRun] = useState<WorkspaceSnapshot['active_run']>(null)
   const [research, setResearch] = useState<ResearchLab | null>(null)
+  // spec_run 进度（M2）：来自真实 run 事件的逐 spec 计数；拿不到 total 时
+  // 保持 null（indeterminate），绝不虚构分母。
+  const [specRunProgress, setSpecRunProgress] = useState<{
+    done: number
+    total: number
+  } | null>(null)
+  // spec_run 终态失败（M2/C11）：稳定错误类别，Design 页就地显示 + Retry。
+  const [specRunFailure, setSpecRunFailure] = useState<{ category: string } | null>(null)
+  // Card boot（upload_pipeline）终态失败（M4/C21）：单一 terminal failure 真相。
+  const [bootFailure, setBootFailure] = useState<{
+    category: string
+    kind: 'card' | 'upload'
+  } | null>(null)
+  // research 的镜像 ref：run 等待回调里读取最新研究状态而不重挂回调。
+  const researchRef = useRef<ResearchLab | null>(null)
+  researchRef.current = research
 
   const showGlobalError = useCallback((message: string) => {
     setGlobalError(message)
@@ -570,6 +596,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setUploading(false)
     setActiveRun(null)
     setResearch(null)
+    setSpecRunProgress(null)
+    setSpecRunFailure(null)
+    setBootFailure(null)
   }, [])
 
   const switchSession = useCallback(
@@ -724,6 +753,21 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [setAuthed, switchSession],
   )
 
+  // 会话内导航（M4/C22）：回空桌开始新研究。不清 auth、不清 localStorage
+  // 里的「看过」记录；只解除当前会话与未投递的本地命令意图。
+  const handleNewStudy = useCallback(() => {
+    uploadOperationRef.current = null
+    clearAllCommandStorage()
+    clearStoredSessionId()
+    switchSession(null)
+    // 新研究从问题卡开始，不携带上一个会话停留的视图。
+    setWorkbenchTab('question')
+    setShowGuide(false)
+    setDeskOpen(true)
+    setUploadError(null)
+    setUploadStatus(null)
+  }, [switchSession])
+
   const handleUploadRunError = useCallback(
     (error: unknown, _sid: string | null, _runId: string | null) => {
       if (error instanceof DOMException && error.name === 'AbortError') return
@@ -748,9 +792,23 @@ export function useWorkspace(opts: WorkspaceOptions) {
         return
       }
       if (error instanceof RunTerminalError) {
+        const pending = readPendingUploadIntent()
         clearPendingUpload()
         uploadOperationRef.current = null
+        // 终态 run 不再「仍在进行」：立即解除后台运行投影（C21）。
+        setActiveRun(null)
         setUploadReadiness(error.status)
+        if (error.status === 'FAILED' && pending?.fileName === CARD_DEMO_FILENAME) {
+          // Card boot 终态失败的单一真相（C21）：failure 卡统一承载，
+          // 不再叠加「重选文件」类多路信号。普通上传失败保持既有重选路径。
+          setBootFailure({
+            category: error.message || 'upload_pipeline_FAILED',
+            kind: 'card',
+          })
+          setUploadError(null)
+          setUploadStatus(null)
+          return
+        }
         setUploadNeedsReselect(true)
         const message =
           error.status === 'CANCELLED' ? t('app.uploadCancelled') : t('app.uploadFailedReselect')
@@ -1271,7 +1329,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
   }, [applySnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t])
 
   const handleSaveExpectation = useCallback(
-    async (payload: { text: string; confidence: 'low' | 'medium' | 'high'; locale?: string }) => {
+    async (payload: {
+      text: string
+      confidence: 'low' | 'medium' | 'high'
+      locale?: string
+      criteria?: ExpectationCriterion[]
+    }) => {
       const sid = activeSessionRef.current
       if (!sid) return
       const resp = await apiFetch(`${API_BASE}/sessions/${sid}/research/expectation`, {
@@ -1300,18 +1363,57 @@ export function useWorkspace(opts: WorkspaceOptions) {
   }, [applySnapshot])
 
   const waitForSpecRun = useCallback(
-    async (sid: string, accepted: { run_id: string; events_url: string }) => {
+    async (
+      sid: string,
+      accepted: { run_id: string; events_url: string },
+      opts?: { transitionToEvidence?: boolean },
+    ): Promise<void> => {
       const controller = new AbortController()
       runAbortRef.current?.abort()
       runAbortRef.current = controller
       setActiveRun({ run_id: accepted.run_id, kind: 'spec_run', status: 'PENDING' })
+      setSpecRunFailure(null)
+      const knownTotal = includedSpecCount(researchRef.current)
+      const seen = new Set<string>()
+      setSpecRunProgress(knownTotal > 0 ? { done: 0, total: knownTotal } : null)
+      const isCurrentWait = () => runAbortRef.current === controller
       try {
-        await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+        await waitForRun(accepted.run_id, accepted.events_url, controller.signal, (event) => {
+          if (!event.specId || seen.has(event.specId)) return
+          seen.add(event.specId)
+          const total = includedSpecCount(researchRef.current)
+          // 分母未知（如刷新恢复后重挂）时保持 indeterminate，不虚构。
+          setSpecRunProgress(total > 0 ? { done: seen.size, total } : null)
+        })
         if (activeSessionRef.current !== sid) return
+        // 成功终态：真相以快照为准，本地运行态一律解除（C10/C12）。
         applySnapshot(await fetchSessionSnapshot(sid))
+        setSpecRunProgress(null)
+        if (isCurrentWait()) {
+          runAbortRef.current = null
+          setActiveRun(null)
+        }
         setEvidenceRefreshKey((key) => key + 1)
-      } finally {
-        if (runAbortRef.current === controller) runAbortRef.current = null
+        if (opts?.transitionToEvidence && researchRef.current) {
+          setWorkbenchTab('evidence')
+        }
+      } catch (error) {
+        if (!isCurrentWait() || activeSessionRef.current !== sid) return
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        // 失败不假成功：快照重取（尽力而为）+ 明确失败类别 + Retry 出口（C11）。
+        const fresh = await fetchSessionSnapshot(sid).catch(() => null)
+        if (fresh) applySnapshot(fresh)
+        setSpecRunProgress(null)
+        if (isCurrentWait()) {
+          runAbortRef.current = null
+          setActiveRun(null)
+        }
+        setEvidenceRefreshKey((key) => key + 1)
+        const category =
+          error instanceof RunTerminalError
+            ? error.message || `run_${error.status.toLowerCase()}`
+            : 'spec_run_failed'
+        setSpecRunFailure({ category })
       }
     },
     [applySnapshot],
@@ -1338,7 +1440,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
       return
     }
     const accepted = (await resp.json()) as RunAccepted
-    await waitForSpecRun(sid, accepted)
+    // waitForSpecRun 内部承接失败（记录 specRunFailure），reject 不再逃逸。
+    try {
+      await waitForSpecRun(sid, accepted, { transitionToEvidence: true })
+    } catch {
+      /* 由 waitForSpecRun 记录为 specRunFailure，避免 unhandledrejection */
+    }
   }, [showGlobalError, waitForSpecRun])
 
   const handleRunSpec = useCallback(
@@ -1920,6 +2027,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
     evidenceRefreshKey,
     activeRun,
     research,
+    specRunProgress,
+    specRunFailure,
+    bootFailure,
     // derived
     hasReadout,
     canExport,
@@ -1946,6 +2056,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setCurrentChapterIndex,
     showGlobalError,
     handleLogout,
+    handleNewStudy,
     ensureSession,
     refreshReview,
     uploadCsv,

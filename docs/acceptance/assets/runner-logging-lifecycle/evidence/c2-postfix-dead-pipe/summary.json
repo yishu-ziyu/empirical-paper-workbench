@@ -1,0 +1,186 @@
+{
+  "phase": "post",
+  "condition": "dead-pipe",
+  "port": 8002,
+  "state_root": "/tmp/econpaper-runner-logging-post-dead-pipe/state",
+  "backend_pid": 60187,
+  "runner_pid": 60214,
+  "idempotency_key": "b7da7134-fd41-49b3-8169-cc205b8f5be6",
+  "run_id": "d43a6dd8-9561-454b-8606-28fc6ddcacd5",
+  "session_id": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09",
+  "run_api": {
+    "run_id": "d43a6dd8-9561-454b-8606-28fc6ddcacd5",
+    "session_id": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09",
+    "kind": "upload_pipeline",
+    "status": "SUCCEEDED",
+    "attempt": 1,
+    "lease_epoch": 1,
+    "result": {
+      "cleaning_report": {
+        "steps": [
+          {
+            "name": "profiling",
+            "status": "success",
+            "duration": 0.007704
+          },
+          {
+            "name": "merge",
+            "status": "success",
+            "duration": 5e-06
+          },
+          {
+            "name": "missing",
+            "status": "success",
+            "duration": 0.003982
+          },
+          {
+            "name": "outliers",
+            "status": "success",
+            "duration": 0.051079
+          },
+          {
+            "name": "transform",
+            "status": "success",
+            "duration": 0.021881
+          },
+          {
+            "name": "filter",
+            "status": "success",
+            "duration": 0.021044
+          },
+          {
+            "name": "balance",
+            "status": "success",
+            "duration": 8e-06
+          },
+          {
+            "name": "audit",
+            "status": "success",
+            "duration": 0.000318
+          }
+        ]
+      },
+      "upload_readiness": "READY"
+    },
+    "error": null
+  },
+  "session_api": {
+    "session_id": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09",
+    "upload_readiness": "READY",
+    "keys": [
+      "active_run",
+      "body_chapters",
+      "claim",
+      "cleaning_report",
+      "dataset",
+      "degradations",
+      "estimate",
+      "exists",
+      "has_dataset",
+      "identification_failed",
+      "identification_report",
+      "literature_source",
+      "outline",
+      "research",
+      "research_direction",
+      "results",
+      "robustness_status",
+      "session_id",
+      "star_rating",
+      "upload_readiness",
+      "write_blockers"
+    ],
+    "dataset_count": 0,
+    "has_research_lab": true,
+    "active_run": null,
+    "degradations": []
+  },
+  "db": {
+    "run": {
+      "run_id": "d43a6dd8-9561-454b-8606-28fc6ddcacd5",
+      "session_id": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09",
+      "kind": "upload_pipeline",
+      "status": "SUCCEEDED",
+      "error": null,
+      "attempt": 1,
+      "lease_owner": null,
+      "created_at": "2026-09-07 18:03:42.324261",
+      "updated_at": "2026-09-07 18:03:43.304458"
+    },
+    "run_events": [
+      {
+        "seq": 1,
+        "event_type": "run.accepted",
+        "created_at": "2026-09-07 18:03:42.325738"
+      },
+      {
+        "seq": 2,
+        "event_type": "run.claimed",
+        "created_at": "2026-09-07 18:03:42.335244"
+      },
+      {
+        "seq": 3,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:03:43.059902"
+      },
+      {
+        "seq": 4,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:03:43.084159"
+      },
+      {
+        "seq": 5,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:03:43.091271"
+      },
+      {
+        "seq": 6,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:03:43.167683"
+      },
+      {
+        "seq": 7,
+        "event_type": "run.succeeded",
+        "created_at": "2026-09-07 18:03:43.308094"
+      }
+    ],
+    "run_event_count": 7,
+    "session_state_excerpt": {
+      "upload_readiness": "READY",
+      "has_uploaded_datasets": true,
+      "dataset_meta_keys": null,
+      "csv_path_present": true
+    }
+  },
+  "uploads_listing": [
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09.csv",
+      "bytes": 332282
+    }
+  ],
+  "runs_listing": [
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09/attempts/d43a6dd8-9561-454b-8606-28fc6ddcacd5/epoch-1/03_outliers_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09/attempts/d43a6dd8-9561-454b-8606-28fc6ddcacd5/epoch-1/04_transform_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09/attempts/d43a6dd8-9561-454b-8606-28fc6ddcacd5/epoch-1/05_filter_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09/attempts/d43a6dd8-9561-454b-8606-28fc6ddcacd5/epoch-1/clean.do",
+      "bytes": 606
+    },
+    {
+      "path": "49f9196f-8500-4e2d-b3a7-0d5e6ad27c09/attempts/d43a6dd8-9561-454b-8606-28fc6ddcacd5/epoch-1/clean.py",
+      "bytes": 658
+    }
+  ],
+  "logging_evidence_lines": 16469,
+  "backend.log_lines": 288,
+  "runner_file_log_lines": 242
+}

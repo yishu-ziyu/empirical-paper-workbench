@@ -66,6 +66,12 @@ backend/.venv/bin/python \
 # --phase post --condition dead-pipe|healthy-stderr 同理（隔离端口 8002、独立 ECONPAPER_LOCAL_STATE_ROOT、自启进程）
 ```
 
+**C1 复跑注意**：修复前 FAILED 复现必须针对**修复前代码**执行——在临时
+worktree 里检出证据提交 `c88a2b0`（fix 提交 `13cd837` 的父提交，此时产品代码
+尚无修复）运行同一 harness；在分支 HEAD 上复跑 `--phase pre` 只会得到
+SUCCEEDED（那正是 C2 的预期，不是 C1）。C1 证据（FAILED + traceback + 业务已
+提交）已提交于 `evidence/c1-prefix-dead-pipe/`，复跑仅用于验证证据真实性。
+
 - **C1 PASS（修复前复现）** — `evidence/c1-prefix-dead-pipe/`：runner 子进程 fd1+fd2 指向同一条读端已关闭的 PIPE（`runner-lsof.txt`：fd1/fd2 同一 `PIPE 0xae7c…` 设备号），真实 `POST /demos/card` → run 终态 **FAILED**，error=`BrokenPipeError: upload_pipeline execution failed`（summary.json `run_api.status/error`）；业务已实际提交：uploads 目录存在 332282 字节的 `<session>.csv`、DB session state `has_uploaded_datasets=true`（summary.json `uploads_listing`/`db.session_state_excerpt`）。实际异常产生位置 traceback 留档（`runner-logging-evidence.log`，sitecustomize 只读包装 `handleError`/std stream 抓栈，不吞不改）：
   `prewrite_supervisor.py:460 execute_upload_supervised → :321 _execute_supervised → multiprocessing/popen_spawn_posix.py:32 → popen_fork.py:16 → multiprocessing/util.py:438 _flush_std_streams → sys.stdout.flush()` 抛 BrokenPipeError 穿透进业务执行，被 `_stable_failure` 误标。日志 emit 失败本身（`logging.handleError called` ×144）被 CPython 3.12 handleError 吸收，真正的杀手是 spawn 起子进程时的无保护 std 流 flush。
 - **C2 PASS（修复后两条件均 SUCCEEDED）** — `evidence/c2-postfix-dead-pipe/` 与 `evidence/c2-postfix-healthy-stderr/`（与提交代码一致的最终复跑）：两条件 run 终态均 **SUCCEEDED**、`error=None`、`upload_readiness=READY`、`run_events` 7 条（含 4 条 `run.progress` worker 事件）、attempts 产物（`03_outliers_0.csv`/`clean.do` 等）落盘、run 记录唯一终态唯一（summary.json）。死管道条件下：控制台 handler 降级（`runner-file.log` 首部恰好 1 条 `WARNING runner log channel stderr is unavailable (BrokenPipeError…) ; remaining channels: file(…/runner.log)`），文件日志 242 行持续可用；健康条件下：`runner-console.log` 与 `runner-file.log` 均有 SQL/INFO 记录、降级记录 0 条。

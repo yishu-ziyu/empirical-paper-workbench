@@ -93,13 +93,6 @@ def _child_main(
     liveness_receiver: Connection,
     child_executor: Callable[..., dict] | None,
 ) -> None:
-    # Spawn does not inherit the parent's logging configuration; re-apply the
-    # output-channel backstop so a dead console pipe cannot escape through
-    # this child into a RemoteExecutionError (issue #30). No file handler
-    # here: supervised children must not race on the same rotating file.
-    from runner_logging import configure_runner_logging
-
-    configure_runner_logging(child=True)
     stage = "process_group"
     liveness_stop = threading.Event()
     try:
@@ -125,6 +118,16 @@ def _child_main(
             name="runner-liveness-watchdog",
         ).start()
         stage = "executor"
+
+        # Spawn does not inherit the parent's logging configuration; re-apply
+        # the output-channel backstop so a dead console pipe cannot escape
+        # through this child into a RemoteExecutionError (issue #30). Done
+        # after the ready handshake to keep spawn startup latency minimal,
+        # and without a file handler so supervised children never race on the
+        # same rotating file (see runner_logging).
+        from runner_logging import configure_runner_logging
+
+        configure_runner_logging(child=True)
 
         def progress(node: str, status: str, detail: dict) -> None:
             sender.send(("progress", node, status, detail))

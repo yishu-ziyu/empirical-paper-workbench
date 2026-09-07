@@ -51,8 +51,6 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
-from config import _state_path, ensure_private_directory
-
 RUNNER_LOG_FILE_ENV = "ECONPAPER_RUNNER_LOG_FILE"
 DEFAULT_LOG_PARTS = ("log", "runner.log")
 MAX_LOG_BYTES = 5 * 1024 * 1024
@@ -88,6 +86,10 @@ def _trace_degradation_once(failed_channel: str, exc: BaseException) -> None:
 
 def default_log_file() -> Path:
     """Default runner log file, overridable via ``ECONPAPER_RUNNER_LOG_FILE``."""
+    # Imported lazily: the spawn-child path must not pay for the app config
+    # import (child-startup latency), and it never uses this function.
+    from config import _state_path
+
     return _state_path(RUNNER_LOG_FILE_ENV, *DEFAULT_LOG_PARTS)
 
 
@@ -100,6 +102,11 @@ class SelfDisablingStreamHandler(logging.StreamHandler):
     the handler becomes a no-op, so a dead pipe can never trigger a
     "--- Logging error ---" storm.
     """
+
+    # Marker attribute instead of isinstance(): module re-imports (the
+    # "import re-entry" form this module must survive) recreate classes and
+    # would silently break identity-based detection.
+    _econpaper_channel_guard = True
 
     def __init__(self, stream: Any, channel_name: str) -> None:
         super().__init__(stream)
@@ -137,7 +144,7 @@ def _remaining_channel_description(exclude_channel: str | None = None) -> str:
             continue
         if isinstance(handler, RotatingFileHandler):
             parts.append(f"file({getattr(handler, 'baseFilename', '?')})")
-        elif isinstance(handler, SelfDisablingStreamHandler):
+        elif getattr(handler, "_econpaper_channel_guard", False):
             if handler.channel_name != exclude_channel:
                 parts.append(handler.channel_name)
         else:
@@ -158,6 +165,10 @@ class TolerantStream:
     Business ``BrokenPipeError`` from sockets, subprocess pipes, or provider
     calls does not pass through this class and still propagates unchanged.
     """
+
+    # Marker attribute (see SelfDisablingStreamHandler) so detection survives
+    # module re-imports that would invalidate isinstance identity checks.
+    _econpaper_tolerant = True
 
     def __init__(self, stream: Any, channel_name: str) -> None:
         self._stream = stream
@@ -188,7 +199,7 @@ class TolerantStream:
 
 
 def _underlying_stream(stream: Any) -> Any:
-    if isinstance(stream, TolerantStream):
+    if getattr(stream, "_econpaper_tolerant", False):
         return stream._stream
     return stream
 
@@ -201,13 +212,15 @@ def harden_standard_streams() -> None:
     """
     for name in ("stdout", "stderr"):
         stream = getattr(sys, name, None)
-        if stream is None or isinstance(stream, TolerantStream):
+        if stream is None or getattr(stream, "_econpaper_tolerant", False):
             continue
         setattr(sys, name, TolerantStream(stream, name))
 
 
 def _build_file_handler(path: Path) -> RotatingFileHandler | None:
     """Best-effort file channel; None degrades the runner to console-only."""
+    from config import ensure_private_directory
+
     try:
         ensure_private_directory(path.parent)
         handler = RotatingFileHandler(

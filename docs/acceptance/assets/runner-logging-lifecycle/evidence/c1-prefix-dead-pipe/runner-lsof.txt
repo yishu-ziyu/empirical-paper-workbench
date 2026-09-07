@@ -1,0 +1,6 @@
+# condition=dead-pipe phase=pre runner_pid=51984
+COMMAND   PID      USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  51984 mahaoxuan    0r   CHR                3,2      0t0  336 /dev/null
+Python  51984 mahaoxuan    1   PIPE 0x15e013822a6cc0a9    16384      
+Python  51984 mahaoxuan    2   PIPE 0x15e013822a6cc0a9    16384      
+

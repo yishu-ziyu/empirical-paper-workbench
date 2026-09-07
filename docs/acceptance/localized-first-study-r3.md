@@ -1,6 +1,6 @@
 # 验收契约：PR #32 r3 — Claim 状态映射诚实化、Surprise 消费后端事实、判据阈值不丢失、非空 Results 真实旅程
 
-Status: open          # open | closed。最后一步才改 closed。
+Status: closed          # validator ACCEPT（r3-validator.md），Evidence 簿记勘误完成，核心画面已归档。
 
 审阅 HEAD（开工时）：e2233d8cbb2789faea0baabd7c4214c474902a56（review/localized-first-study）
 
@@ -96,7 +96,7 @@ validator 子代理独立复核（只读代码 + 跑程序 + 对照本契约出 
 
 ### C4 — 非空 Results 真实旅程（真实后端 + runner，ECONPAPER_LLM=mock，DEBUG=true，隔离新会话）
 
-zh 与 en 各走一遍（两个独立新会话，无数据库手工修改、无手工注入正文；全程走公共 API）。zh 会话 f53900e0-8e34-46cd-8925-a424ed8717b2，en 会话 5b4c3539-abf6-423e-9186-8fc950bc2983。两遍步骤一致：
+zh 与 en 各走一遍（两个独立新会话，无数据库手工修改、无手工注入正文；全程走公共 API）。en 会话 5b4c3539-abf6-423e-9186-8fc950bc2983；zh 会话 e6df83df-2652-48e5-bb96-8b057f1cde1c（勘误：初稿误记为 f53900e0-…，validator 独立核验 uvicorn.log 后更正）。两遍步骤一致：
 
 1. `POST /demos/card`（Idempotency-Key）→202→runner 真实跑完 upload pipeline→`upload_readiness=READY`。
 2. freeze specification-space →200；`POST .../specification-space/run` →202→12 个真实 OLS/IV run（如 iv_region_dummies coef=0.13150383625543327, ols_region_dummies coef=0.07469325559311334, status=ok）。
@@ -130,7 +130,8 @@ Placeholder chapter content from LLM
 8. 回跳验证：`GET /evidence` → `available=true, estimate.coef=0.13150383625543327, estimate.source_run_id=<promote 的 producer run>`；`GET /sessions/{id}` → `results` 非空（len=128）。
 9. **生成实际模式（如实标注）**：`generation_source="mock", generation_degraded=true, review_source="mock", review_degraded=false` —— 本机按运行配方用 `ECONPAPER_LLM=mock`，正文 prose 为 mock 占位，结果表为真实 canonical estimate 数字（generate_chapter.py: results 章节 = prose + state.results 表）。非降级模板路径之外的伪造。
 10. UI 层断言（组件测试，代浏览器走查）：`EvidenceLab.test.tsx > C4 mismatch notice follows the interface language...`（mismatch 主提示 zh `当前结论依赖的设定，并不是现在的主分析。` / en `This claim depends on a specification that is not the current primary analysis.`；显式按钮 `把支撑设定设为主分析` / `Set the supporting specification as primary`）；`> mismatch after approve offers explicit promote and still allows write results`（promote 调用 `run-iv`、write-results 调 prepare）。切语言不触发研究写入：`languageSwitchDisplayOnly.test.tsx`（r2 断言方式，Scene D）。
-11. 完整请求/响应留档：/tmp/econpaper-r3/journey-log-final.json（15374 行，含两遍旅程每次调用的 status+response；摘录即上）。
+11. 请求/响应留档（勘误，validator 指出后更正）：/tmp/econpaper-r3/journey-log-final.json 仅含 en 一遍的完整调用留档（每次调用的 status+response）——zh 遍的 JSON 留档被随后的 en-only 重跑覆盖；zh 遍真实发生由服务端 /tmp/econpaper-r3/uvicorn.log 的完整请求序列独立证实（validator 逐条核验，含 boot/freeze/approve/409/promote/200/generate/回跳）。
+12. **补充实弹（validator ACCEPT 后，主 agent 收尾轮）**：`make dev` 标准配方（8000/5173，backend/.env 的真实 LLM 配置生效）再走一遍完整旅程（会话 07c446cc-6eb9-4c87-9fb1-d0df73fa8ad1），同一门禁序列：12 run → approve → prepare 409 canonical_mismatch（required_spec_id=iv_region_dummies）→ 显式 promote → prepare 200 → Results 章节。**本轮生成模式：`generation_source="llm", generation_degraded=false, review_source="llm", review_degraded=false`（真实模型，非 mock 非降级）**，Results 含 1750 字符真实中文 prose（基准回归/稳健性/异质性）+ 主结果表 educ coef=0.13150383625543327。故 C4 两种模式均已实测：implementer 轮 mock（prose 占位、结果表真实）+ 收尾轮真实 LLM（prose 与结果表均真实生成）。
 
 ### C5 — 全量回归 + 报告
 
@@ -153,6 +154,8 @@ $ npm run build   # ✓ built in 1.78s
 - 无新增 skip：`git grep -n '\.skip\|skipIf' -- frontend/src backend/tests` = 5 处，与 e2233d8 基线完全一致（test_outline×2、test_postgres_upload_recovery、test_prewrite_supervisor、test_s3，均原有）。
 - r1/r2 历史文档未动；本文件为 r3 契约（开工前已存在，未改 Checks），新增 `docs/acceptance/localized-first-study-r3-implementer.md`。
 - 三个展示反例修复前后对照（当前源码的 DOM/网络断言而非截图）：C1 insufficient（EvidenceLab 组件断言 forbid `正向关联`）；C2 伪观察值（Scene D + 后端 unsupported-metric/failed-run 测试 + 实弹 payload）；C3 阈值丢失（`±5%`≠`±25%`、`IV 估计 < 0.1`、默认 `±25%` 组件断言）。修复前行为由 git 历史承载（runCoef/displayClaimExplanation 旧实现见 e2233d8）。
+- **最新构建核心画面（收尾轮实弹，dev server 5173 + 会话 07c446cc，sips 核对 1479×966 PNG）**：`docs/acceptance/shots/r3/` 四张——`zh-evidence.png`（C1 approved zh：`结论已获批准，以批准时点的证据版本为准…` + 原文查看；C2 zh：`观察到: IV 估计 0.1315 > OLS 估计 0.0747`）、`zh-question-criteria.png`（C3：判据标签 `IV 估计 < OLS 估计` + spec 身份 `iv_region_dummies · ols_region_dummies` + distance 选项 `IV ≈ OLS（±25%）`）、`zh-paper-results.png`（C4：非空 Results 正文含基准回归/稳健性 + 主结果表 0.1315… + 「查看研究结论与证据」入口）、`en-evidence.png`（C1/C2 en：`Approved conclusion…` / `Observed: IV estimate 0.1315 > OLS estimate 0.0747`，同一份后端事实）。证据回跳在实弹中点击验证：Results 章节入口 → 研究结论 claim-ledger。
+- validator 独立复核：`docs/acceptance/localized-first-study-r3-validator.md` — C1–C5 全 PASS，红线全守，结论 **ACCEPT**（要求修正 Evidence 簿记两处失准，已按实更正：zh 会话 id、JSON 留档覆盖描述）。
 
 ## Named relaxations
 

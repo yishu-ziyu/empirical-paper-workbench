@@ -1,6 +1,6 @@
 # 验收契约：issue #30 — runner 日志输出断管不得把成功的研究任务误标 FAILED
 
-Status: open          # open | closed。最后一步才改 closed。
+Status: closed          # validator ACCEPT（独立复跑 C1–C6 全 PASS）+ CI 5/5（含预存在 flake 重跑披露），Evidence 已闭环。
 
 分支：`fix/runner-logging-lifecycle`（自 main `452a8954ca4736d98526d5141c1d098186b09e99` 切出）  
 对应 issue：yishu-ziyu/empirical-paper-workbench#30
@@ -81,6 +81,10 @@ SUCCEEDED（那正是 C2 的预期，不是 C1）。C1 证据（FAILED + traceba
 - **C6 PASS（红线）** — `git diff main..HEAD --stat -- backend/` = 上述 3 个文件；研究节点/统计/Claim 门禁/evidence_revision/任务队列零改动；契约文件除 Evidence 节外未改动，Status 保持 open。
 - **C7 PASS（全量 gates）** — `make test`（agent+backend+frontend 三套）全绿；backend 单独复跑 `467 passed, 8 skipped, 0 failed`；`frontend npx tsc --noEmit` exit 0、`npm run lint` 0 errors（6 条既有 warning）、`npm run build` 成功；`git grep -n '\.skip\|skipIf' -- frontend/src backend/tests` 与 main `452a895` 基线一致（5 处：test_outline×2、test_postgres_upload_recovery、test_prewrite_supervisor、test_s3），无新增 skip。注意：backend `test_prewrite_supervisor` 的两个取消延迟断言（<1.0s 预算）在与其他 gate 并行抢 CPU 时会翻flaky（本机实测），静默串行运行稳定全绿——复核时请勿并行压测。
 - **C8（交付物）** — 证据均为仓库内路径（`docs/acceptance/assets/runner-logging-lifecycle/`），无 /tmp-only 依赖；PR 由 orchestrator 开出，描述请引用本节与上述证据目录。
+
+- **Validator 独立复核：ACCEPT（2026-09-08）** — validator 与实现隔离，只依据契约复跑：C1 在临时 worktree `c88a2b0`（修复前代码，检出后核实无 `runner_logging` 引用）复跑 harness 得 FAILED + 同款 error + 同一 PIPE 设备号 + 62237 行 traceback 留档，与提交证据逐项吻合；C2 两条件（端口 8003/8004 独立 state root）复跑均 SUCCEEDED 且 `run_events`/产物/降级留痕逐项核实；C3–C6 复跑 pytest 11/11 与 diff 核实全 PASS；C7 本地 gates 全绿。红线核对：隔离纪律全程未触碰 5173/8000，临时 worktree 已清理。结论 **ACCEPT**，无根因需返修；遗留两项推送后程序性收尾（CI 确认、PR 引用证据），见下。
+- **C7 CI（推送后闭环）+ 预存在 flake 披露** — 首轮 CI（HEAD `b433181`，run 34154796792）四项 pass，`后端 + Agent pytest` 失败于 `test_card_spec_run.py::test_empty_criteria_write_run_read_is_unevaluated`（`surprise` 为 None → TypeError）。核实为**预存在时序 flake，与本 PR 无关**：该测试属 r3（PR #32）新增，本次 diff 未触碰 spec_run → surprise 链路（`git diff main..HEAD -- backend/services backend/facade …` 为空）；同文件在 main CI（`87c5e5b`→`452a895` push run 34148187799 与 #32 分支两次 CI）均通过；本机单测 15/15、全量 `make test` 两轮（实现者 + validator 串行复跑）全过；失败按套件字母序发生在本 PR 新增测试**之前**（c < r），非新测试污染。机理：`evaluate_surprise`（research_lab.py:379-381）在 `completed`（ok/degraded）runs 尚不可见时返回 None，CI 2 核慢机放大了该窗口。同 commit 重跑该 job 5m10s 通过 → CI **5/5 全绿**。建议后续独立小任务修该测试的轮询窗口（不构成本契约检查项，不在本 PR 夹带）。
+- **C8 闭环** — PR：`https://github.com/yishu-ziyu/empirical-paper-workbench/pull/33`（base main，HEAD 含本契约关闭提交）；描述已引用本节与证据目录；issue #30 保持 OPEN 等外部验收，不自行合并。
 
 实施备注（给 validator）：修复形态为 `backend/runner_logging.py`（`raiseExceptions=False` 兜底 + root logger 挂 RotatingFileHandler（默认 `_state_path("ECONPAPER_RUNNER_LOG_FILE","log","runner.log")`，目录创建失败降级为仅控制台不炸启动）+ 自禁用 stderr 控制台 handler + 进程级一次性降级留痕 + `sys.stdout/stderr` 容错包装（关闭 spawn flush 逃逸路径，业务 socket/pipes 不经过该包装））；接入点仅 `runner.main()` 开头与 `prewrite_supervisor._child_main`（ready 握手之后，保 spawn 启动延迟与 main 持平；子进程不挂文件 handler，避免多进程同文件轮转竞争）。复现 harness 是只读留证（sitecustomize 包装 handleError/std 流仅记录后原样重抛），未改动任何业务代码。
 

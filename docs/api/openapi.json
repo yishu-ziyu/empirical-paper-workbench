@@ -3715,12 +3715,14 @@
             "title": "Outcome"
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "required": [
           "id",
           "outcome"
         ],
-        "title": "CriterionOutcomeResponse"
+        "title": "CriterionOutcomeResponse",
+        "description": "One criterion's judgment + the backend's own resolution facts.\n\nBeyond ``{id, outcome}``, satisfied/violated entries carry read-only\ndisplay fields produced by the evaluator itself (never re-derived\nclient-side):\n\n- ``kind`` / ``operator``: the criterion's own judgment shape;\n- ``left``: ``{source: \"metric\", metric, estimator, spec_id,\n  run_id, value}`` — the run the evaluator actually read;\n- ``right``: the same metric shape, or ``{source: \"constant\",\n  value}`` for a numeric constant;\n- ``tolerance``: ``{abs, rel}`` — the distance tolerance actually\n  in force, including the backend rel=0.25 default when both are\n  empty.\n\nUnresolved entries stay plain ``{id, outcome}``: nothing\nhalf-resolved may look like an observation. The fields are\ndisplay-only mirrors; judgment semantics never read them."
       },
       "DatasetMetaResponse": {
         "properties": {

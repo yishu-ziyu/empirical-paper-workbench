@@ -144,7 +144,7 @@ export default function ChapterWriter({
           data-testid="chapter-stale"
           className="rounded-md border border-wb-line bg-wb-subtle px-3 py-2 text-[12px] text-wb-muted"
         >
-          Stale · needs regeneration
+          {t('paper.staleChapter')}
         </p>
       ) : null}
 
@@ -158,7 +158,7 @@ export default function ChapterWriter({
                 : 'bg-wb-warning-soft text-wb-warning'
             }`}
           >
-            {chapter.grounded !== false ? '基于证据' : '未 grounded'}
+            {chapter.grounded !== false ? t('paper.grounded') : t('paper.notGrounded')}
           </span>
           <button
             type="button"
@@ -166,7 +166,7 @@ export default function ChapterWriter({
             onClick={onJumpToClaim}
             className="text-[12px] text-wb-muted underline-offset-2 hover:text-wb-ink hover:underline"
           >
-            View Claim / Evidence
+            {t('paper.viewClaim')}
           </button>
         </div>
       ) : null}

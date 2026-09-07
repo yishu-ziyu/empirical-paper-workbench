@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useT } from '../lib/i18n'
 
 export interface WorkspaceDecision {
   title: string
@@ -31,10 +32,11 @@ export default function WorkspaceDecisionRail({
   suggestions = [],
   children,
 }: WorkspaceDecisionRailProps) {
+  const { t } = useT()
   return (
     <section data-testid="decision-rail" className="space-y-3">
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-        下一步
+        {t('decision.next')}
       </p>
 
       {decision ? (
@@ -43,7 +45,7 @@ export default function WorkspaceDecisionRail({
           className="rounded-lg border border-wb-warning/35 bg-wb-warning-soft p-3"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-warning">
-            需要你确认
+            {t('decision.needYou')}
           </p>
           <h3 data-testid="decision-blocker-title" className="mt-1.5 text-[13px] font-medium text-wb-ink">
             {decision.title}
@@ -64,13 +66,13 @@ export default function WorkspaceDecisionRail({
         </article>
       ) : (
         <p data-testid="decision-rail-waiting" className="text-[12px] leading-5 text-wb-muted">
-          {waiting || '当前没有阻塞决策。系统会在需要你介入时停下。'}
+          {waiting || t('decision.none')}
         </p>
       )}
 
       <details data-testid="decision-suggestions" className="rounded-lg border border-wb-line bg-wb-surface">
         <summary className="wb-press cursor-pointer px-3 py-2 text-[12px] text-wb-ink">
-          非阻塞建议{suggestions.length ? ` · ${suggestions.length}` : ''}
+          {t('decision.suggestions')}{suggestions.length ? ` · ${suggestions.length}` : ''}
         </summary>
         <div className="border-t border-wb-line px-3 py-2.5">
           {suggestions.length ? (
@@ -92,7 +94,7 @@ export default function WorkspaceDecisionRail({
               ))}
             </ul>
           ) : (
-            <p className="text-[12px] leading-4 text-wb-muted">暂无建议，继续按当前研究路径推进。</p>
+            <p className="text-[12px] leading-4 text-wb-muted">{t('decision.suggestionsEmpty')}</p>
           )}
         </div>
       </details>

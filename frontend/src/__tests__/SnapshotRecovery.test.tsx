@@ -188,10 +188,10 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     renderWithI18n(<App />)
 
     expect(await screen.findByTestId('project-name')).toHaveTextContent(
-      'Does education increase earnings?',
+      '教育是否提高工资?',
     )
     expect(screen.getByTestId('workbench-title')).toHaveTextContent(
-      'Does education increase earnings?',
+      '教育是否提高工资?',
     )
     expect(screen.getByTestId('project-name')).not.toHaveTextContent('card_1995.csv')
     expect(screen.getByTestId('workbench-title')).not.toHaveTextContent('card_1995.csv')
@@ -200,12 +200,12 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     expect(screen.getByTestId('workbench-subtitle')).not.toHaveTextContent(
       '尚未设定研究方向',
     )
-    expect(screen.getByTestId('rail-design')).toHaveTextContent('Admissible space frozen')
+    expect(screen.getByTestId('rail-design')).toHaveTextContent('分析方案已确认')
 
     fireEvent.click(screen.getByTestId('rail-question'))
     expect(await screen.findByTestId('teaching-case-badge')).toBeInTheDocument()
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('Log wage')
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('Years of education')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('对数工资')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('受教育年限')
     expect(screen.getByTestId('expectation-editor').querySelector('textarea')).toHaveValue(
       'I expect OLS to be positive.',
     )
@@ -216,7 +216,7 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     fireEvent.click(screen.getByTestId('rail-design'))
     expect(screen.getByTestId('spec-space')).toBeInTheDocument()
     expect(screen.getByTestId('spec-space-freeze')).toBeInTheDocument()
-    expect(screen.getByTestId('spec-space')).toHaveTextContent('OLS · linear experience')
+    expect(screen.getByTestId('spec-space')).toHaveTextContent('OLS · 线性经验')
   })
 
   test('storage 清空后从 snapshot 恢复 specification_runs 与 claim', async () => {
@@ -300,12 +300,12 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     renderWithI18n(<App />)
 
     expect(await screen.findByTestId('project-name')).toHaveTextContent(
-      'Does education increase earnings?',
+      '教育是否提高工资?',
     )
     expect(screen.getByTestId('rail-question')).toHaveTextContent('已确认')
     fireEvent.click(screen.getByTestId('rail-question'))
     expect(await screen.findByTestId('research-question-card')).toHaveTextContent(
-      'Does education increase earnings?',
+      '教育是否提高工资?',
     )
     expect(screen.getByTestId('expectation-editor').querySelector('textarea')).toHaveValue(
       'I expect OLS to be positive.',
@@ -315,8 +315,8 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     expect(screen.getByTestId('claim-supported')).toHaveTextContent(
       'Education is positively associated with earnings.',
     )
-    expect(screen.getByTestId('claim-approved')).toHaveTextContent('Approved')
-    expect(screen.getByTestId('evidence-lab')).toHaveTextContent('OLS · linear experience')
+    expect(screen.getByTestId('claim-approved')).toHaveTextContent('已批准')
+    expect(screen.getByTestId('evidence-lab')).toHaveTextContent('OLS · 线性经验')
   })
 })
 

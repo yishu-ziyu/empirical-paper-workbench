@@ -731,7 +731,14 @@ def _format_criterion_value(value: float) -> str:
     return text
 
 
-def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[float]:
+def _run_id_of(run: dict[str, Any]) -> Optional[str]:
+    run_id = run.get("id")
+    return str(run_id) if run_id is not None else None
+
+
+def _resolve_criterion_ref(
+    ref: Any, completed: list[dict[str, Any]]
+) -> tuple[Optional[float], Optional[str]]:
     """Resolve an EvidenceMetricRef against completed specification runs.
 
     ``estimate.coef`` with an explicit ``spec_id`` resolves only that
@@ -740,19 +747,23 @@ def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[
     estimator. When ``spec_id`` is absent, ``estimator``/``method`` may
     match. Any other metric is a deliberate extension point (future
     DiD/RD estimands) and resolves to None until its producer exists.
+
+    Returns ``(value, run_id)``; both are None when nothing resolved. A
+    matched run whose coef is missing yields ``(None, run_id)`` — the
+    run was found but the quantity is not readable off it.
     """
     if not isinstance(ref, dict):
-        return None
+        return None, None
     metric = str(ref.get("metric") or "")
     if metric != "estimate.coef":
-        return None
+        return None, None
     spec_id = ref.get("spec_id")
     if isinstance(spec_id, str) and spec_id.strip():
         wanted_spec = spec_id.strip()
         for run in reversed(completed):
             if str(run.get("spec_id") or "") == wanted_spec:
-                return _as_float(run.get("coef"))
-        return None
+                return _as_float(run.get("coef")), _run_id_of(run)
+        return None, None
     estimator = ref.get("estimator")
     if isinstance(estimator, str) and estimator.strip():
         wanted = estimator.strip().casefold()
@@ -760,8 +771,73 @@ def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[
             method = str(run.get("method") or "").casefold()
             run_estimator = str(run.get("estimator") or "").casefold()
             if wanted in {method, run_estimator}:
-                return _as_float(run.get("coef"))
-    return None
+                return _as_float(run.get("coef")), _run_id_of(run)
+    return None, None
+
+
+def _criterion_ref_value(ref: Any, completed: list[dict[str, Any]]) -> Optional[float]:
+    value, _run_id = _resolve_criterion_ref(ref, completed)
+    return value
+
+
+def _effective_tolerance(criterion: dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
+    """Effective (abs, rel) tolerance for a distance criterion.
+
+    Both empty means the backend default rel=0.25 — the display layer
+    must show the tolerance the judgment actually used, never invent a
+    different one.
+    """
+    tolerance = (
+        criterion.get("tolerance") if isinstance(criterion.get("tolerance"), dict) else {}
+    )
+    abs_tol = _as_float(tolerance.get("abs"))
+    rel_tol = _as_float(tolerance.get("rel"))
+    if abs_tol is None and rel_tol is None:
+        rel_tol = 0.25
+    return abs_tol, rel_tol
+
+
+def _criterion_display_facts(
+    criterion: dict[str, Any], completed: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Read-only structured resolution facts for a RESOLVED criterion.
+
+    Attached to criterion_outcomes so the frontend renders observed
+    values from the backend's own resolution (spec_id / run_id / value)
+    instead of re-selecting runs client-side. Judgment semantics never
+    read these fields.
+    """
+    left_ref = criterion.get("left") if isinstance(criterion.get("left"), dict) else {}
+    left_value, left_run_id = _resolve_criterion_ref(left_ref, completed)
+    facts: dict[str, Any] = {
+        "kind": str(criterion.get("kind") or "") or None,
+        "operator": str(criterion.get("operator") or "") or None,
+        "left": {
+            "source": "metric",
+            "metric": left_ref.get("metric"),
+            "estimator": left_ref.get("estimator"),
+            "spec_id": left_ref.get("spec_id"),
+            "run_id": left_run_id,
+            "value": left_value,
+        },
+    }
+    right = criterion.get("right")
+    if isinstance(right, (int, float)) and not isinstance(right, bool):
+        facts["right"] = {"source": "constant", "value": float(right)}
+    elif isinstance(right, dict):
+        right_value, right_run_id = _resolve_criterion_ref(right, completed)
+        facts["right"] = {
+            "source": "metric",
+            "metric": right.get("metric"),
+            "estimator": right.get("estimator"),
+            "spec_id": right.get("spec_id"),
+            "run_id": right_run_id,
+            "value": right_value,
+        }
+    if str(criterion.get("kind") or "") == "distance":
+        abs_tol, rel_tol = _effective_tolerance(criterion)
+        facts["tolerance"] = {"abs": abs_tol, "rel": rel_tol}
+    return facts
 
 
 def _evaluate_criterion(
@@ -847,11 +923,7 @@ def _evaluate_criterion(
         return "unresolved", None, None
 
     if kind == "distance":
-        tolerance = criterion.get("tolerance") if isinstance(criterion.get("tolerance"), dict) else {}
-        abs_tol = _as_float(tolerance.get("abs"))
-        rel_tol = _as_float(tolerance.get("rel"))
-        if abs_tol is None and rel_tol is None:
-            rel_tol = 0.25
+        abs_tol, rel_tol = _effective_tolerance(criterion)
         allowed = abs_tol if abs_tol is not None else 0.0
         if rel_tol is not None:
             scale = max(abs(left_value), abs(right_value), 1e-12)
@@ -930,11 +1002,17 @@ def evaluate_surprise(
     observed_bits: list[str] = []
     evaluated_ids: list[str] = []
     unresolved_ids: list[str] = []
-    outcomes: list[dict[str, str]] = []
+    outcomes: list[dict[str, Any]] = []
     for criterion in criteria:
         cid = str(criterion.get("id"))
         outcome, kind, observed = _evaluate_criterion(criterion, completed)
-        outcomes.append({"id": cid, "outcome": outcome})
+        entry: dict[str, Any] = {"id": cid, "outcome": outcome}
+        if outcome != "unresolved":
+            # Structured display facts only for resolved criteria; an
+            # unresolved item stays exactly {id, outcome} so nothing
+            # half-resolved can be mistaken for an observation.
+            entry.update(_criterion_display_facts(criterion, completed))
+        outcomes.append(entry)
         if outcome == "unresolved":
             unresolved_ids.append(cid)
             continue

@@ -1,6 +1,6 @@
 # 验收契约：Generic Research Spine 加固（Expectation → Run → Surprise → Explanation → Recovery）
 
-Status: ready for external review（2026-09-07 空判据分支：本地 validator 按 C38–C42 程序 ACCEPT。契约不 closed、PR 不 merge。C1–C37 既有证据保留，未弱化。C3④ / C34「无判据纯文本仍为 Expected」是当时的仓库契约特例，已废止；新裁决见 C38–C42。M0 / M2 / M3 / M4 实现未改。issue #30 不在本 PR。）
+Status: closed（外部最终验收 ACCEPT。被验收 HEAD `0192c74d3190234f7836524f9a952980bc704f9f`；squash merge 到 main 为 `87c5e5b726911130d4490efd10194ed4241817a5`。本闭环记录随 `review/localized-first-study` 文档提交补上，不是 main 上单独的未审提交。C1–C42 既有证据保留，未弱化。issue #30 不在 PR #31。）
 
 基线：`review/generic-research-spine-hardening @ 1aa5e95cc66704d5755518eec099831e5c1c2b73`（PR #31 OPEN）。
 事实来源：`card-canonical-research-experience-validator.md` 追加的 J–Q first-user audit（2026-09-06，verdict B）。

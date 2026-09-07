@@ -306,8 +306,30 @@ class SpecificationRunResponse(BaseModel):
 
 
 class CriterionOutcomeResponse(BaseModel):
+    """One criterion's judgment + the backend's own resolution facts.
+
+    Beyond ``{id, outcome}``, satisfied/violated entries carry read-only
+    display fields produced by the evaluator itself (never re-derived
+    client-side):
+
+    - ``kind`` / ``operator``: the criterion's own judgment shape;
+    - ``left``: ``{source: "metric", metric, estimator, spec_id,
+      run_id, value}`` — the run the evaluator actually read;
+    - ``right``: the same metric shape, or ``{source: "constant",
+      value}`` for a numeric constant;
+    - ``tolerance``: ``{abs, rel}`` — the distance tolerance actually
+      in force, including the backend rel=0.25 default when both are
+      empty.
+
+    Unresolved entries stay plain ``{id, outcome}``: nothing
+    half-resolved may look like an observation. The fields are
+    display-only mirrors; judgment semantics never read them.
+    """
+
     id: str
     outcome: Literal["satisfied", "violated", "unresolved"]
+
+    model_config = {"extra": "allow"}
 
 
 class SurpriseResponse(BaseModel):

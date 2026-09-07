@@ -692,6 +692,189 @@ def test_surprise_inconclusive_when_partially_resolved_without_violation():
     assert surprise["expectation_version"] == 4
 
 
+def test_criterion_outcomes_carry_structured_resolution_facts():
+    runs = [
+        {"id": "run-ols-a", "spec_id": "ols_region_dummies", "method": "ols", "coef": 0.0747, "status": "ok"},
+        {"id": "run-iv-a", "spec_id": "iv_region_dummies", "method": "iv", "coef": 0.1315, "status": "ok"},
+    ]
+    surprise = evaluate_surprise(
+        {"text": "text", "version": 1, "criteria": [_bound_criterion()]},
+        runs,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    (outcome,) = surprise["criterion_outcomes"]
+    assert outcome["id"] == "criterion.seed.iv-below-ols"
+    assert outcome["outcome"] == "violated"
+    assert outcome["kind"] == "ordering"
+    assert outcome["operator"] == "lt"
+    assert outcome["left"] == {
+        "source": "metric",
+        "metric": "estimate.coef",
+        "estimator": "iv",
+        "spec_id": "iv_region_dummies",
+        "run_id": "run-iv-a",
+        "value": 0.1315,
+    }
+    assert outcome["right"] == {
+        "source": "metric",
+        "metric": "estimate.coef",
+        "estimator": "ols",
+        "spec_id": "ols_region_dummies",
+        "run_id": "run-ols-a",
+        "value": 0.0747,
+    }
+    assert "tolerance" not in outcome  # ordering has no tolerance
+
+
+def test_criterion_outcomes_constant_right_and_effective_tolerance():
+    approx_constant = {
+        "id": "criterion.iv-approx-const",
+        "kind": "distance",
+        "operator": "approx",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": "iv_region_dummies",
+            "label": "IV estimate",
+        },
+        "right": 0.1,
+        "label": "IV ≈ 0.1",
+        "source": "user",
+    }
+    surprise = evaluate_surprise(
+        {"text": "text", "criteria": [approx_constant]},
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    (outcome,) = surprise["criterion_outcomes"]
+    assert outcome["outcome"] == "satisfied"
+    assert outcome["right"] == {"source": "constant", "value": 0.1}
+    # Both tolerance slots empty -> the backend default rel=0.25 is what the
+    # judgment actually used; the display mirror must say so.
+    assert outcome["tolerance"] == {"abs": None, "rel": 0.25}
+    explicit = {**approx_constant, "tolerance": {"rel": 0.05}}
+    surprise2 = evaluate_surprise(
+        {"text": "text", "criteria": [explicit]},
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise2["criterion_outcomes"][0]["tolerance"] == {"abs": None, "rel": 0.05}
+
+
+def test_criterion_outcomes_sign_has_no_right_and_failed_runs_do_not_feed_display():
+    positive = {
+        "id": "criterion.iv-positive",
+        "kind": "sign",
+        "operator": "positive",
+        "left": {
+            "metric": "estimate.coef",
+            "estimator": "iv",
+            "spec_id": "iv_region_dummies",
+            "label": "IV estimate",
+        },
+        "label": "IV estimate is positive",
+        "source": "user",
+    }
+    runs = [
+        {"id": "run-iv-ok", "spec_id": "iv_region_dummies", "method": "iv", "coef": 0.13, "status": "ok"},
+        # Appended failed run of the same spec with a residual coef: the
+        # backend judgment ignores it, and so must the display facts.
+        {"id": "run-iv-failed", "spec_id": "iv_region_dummies", "method": "iv", "coef": -0.4, "status": "failed"},
+    ]
+    surprise = evaluate_surprise(
+        {"text": "text", "criteria": [positive]},
+        runs,
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    (outcome,) = surprise["criterion_outcomes"]
+    assert outcome["outcome"] == "satisfied"
+    assert "right" not in outcome
+    assert outcome["left"]["run_id"] == "run-iv-ok"
+    assert outcome["left"]["value"] == 0.13
+
+
+def test_criterion_outcomes_partial_unresolved_keeps_plain_entry():
+    criteria = [
+        _bound_criterion(),
+        {
+            "id": "criterion.future-att",
+            "kind": "sign",
+            "operator": "positive",
+            "left": {"metric": "att", "estimator": "did", "label": "ATT"},
+            "label": "ATT positive",
+            "source": "user",
+        },
+    ]
+    surprise = evaluate_surprise(
+        {"text": "mixed", "criteria": criteria},
+        [
+            {"id": "run-ols-x", "spec_id": "ols_region_dummies", "method": "ols", "coef": 0.13, "status": "ok"},
+            {"id": "run-iv-x", "spec_id": "iv_region_dummies", "method": "iv", "coef": 0.09, "status": "ok"},
+        ],
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise["criterion_outcomes"] == [
+        {
+            "id": "criterion.seed.iv-below-ols",
+            "outcome": "satisfied",
+            "kind": "ordering",
+            "operator": "lt",
+            "left": {
+                "source": "metric",
+                "metric": "estimate.coef",
+                "estimator": "iv",
+                "spec_id": "iv_region_dummies",
+                "run_id": "run-iv-x",
+                "value": 0.09,
+            },
+            "right": {
+                "source": "metric",
+                "metric": "estimate.coef",
+                "estimator": "ols",
+                "spec_id": "ols_region_dummies",
+                "run_id": "run-ols-x",
+                "value": 0.13,
+            },
+        },
+        # Unresolved stays exactly {id, outcome}: no other metric's coef
+        # is borrowed to fake an observation.
+        {"id": "criterion.future-att", "outcome": "unresolved"},
+    ]
+
+
+def test_criterion_outcomes_unsupported_metric_never_fabricates_even_with_coef_runs():
+    # Same spec_id as a coef-bearing run, but the metric is not
+    # estimate.coef: the criterion stays unresolved and no display facts
+    # are attached (frontend must show nothing for it).
+    criterion = {
+        "id": "criterion.first-stage-f",
+        "kind": "sign",
+        "operator": "positive",
+        "left": {
+            "metric": "diagnostics.first_stage_F",
+            "estimator": "iv",
+            "spec_id": "iv_region_dummies",
+            "label": "First-stage F",
+        },
+        "label": "First-stage F positive",
+        "source": "user",
+    }
+    surprise = evaluate_surprise(
+        {"text": "text", "criteria": [criterion]},
+        list(_COMPARABLE_RUNS),
+        ols_spec_id="ols_region_dummies",
+        iv_spec_id="iv_region_dummies",
+    )
+    assert surprise["criterion_outcomes"] == [
+        {"id": "criterion.first-stage-f", "outcome": "unresolved"}
+    ]
+
+
 def test_surprise_does_not_drift_after_real_ols_linear_preview(client):
     sid = _ready(client)
     lab = _run_space(client, sid)

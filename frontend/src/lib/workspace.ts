@@ -419,11 +419,14 @@ export function snapshotHasDesk(data: WorkspaceSnapshot): boolean {
  */
 export function researchQuestionPrompt(
   research: ResearchLab | null | undefined,
+  lang?: 'zh' | 'en',
 ): string | null {
   const q = research?.question
   if (!q || typeof q !== 'object') return null
   const en = typeof q.prompt_en === 'string' ? q.prompt_en.trim() : ''
   const zh = typeof q.prompt_zh === 'string' ? q.prompt_zh.trim() : ''
+  if (lang === 'zh') return zh || en || null
+  if (lang === 'en') return en || zh || null
   return en || zh || null
 }
 
@@ -467,6 +470,8 @@ export function includedSpecCount(research: ResearchLab | null | undefined): num
 
 export function useWorkspace(opts: WorkspaceOptions) {
   const { sessionId, setSessionId, setAuthed, t } = opts
+  const tRef = useRef(t)
+  tRef.current = t
 
   const [edaOpen, setEdaOpen] = useState(false)
   const [outline, setOutline] = useState<OutlineChapter[]>([])
@@ -774,21 +779,23 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setUploading(false)
       if (error instanceof RunRequestError && (error.status === 401 || error.status === 403)) {
         returnToUploadDesk(
-          error.status === 401 ? t('app.uploadAuthRequired') : t('app.uploadPermissionRequired'),
+          error.status === 401
+            ? tRef.current('app.uploadAuthRequired')
+            : tRef.current('app.uploadPermissionRequired'),
           error.status === 401,
         )
         return
       }
       if (error instanceof RunRequestError && error.status === 404) {
-        returnToUploadDesk(t('app.uploadMissing'))
+        returnToUploadDesk(tRef.current('app.uploadMissing'))
         return
       }
       if (error instanceof RunRequestError && error.status < 500) {
         clearPendingUpload()
         uploadOperationRef.current = null
         setUploadNeedsReselect(true)
-        setUploadError(t('app.uploadFailedReselect'))
-        setUploadStatus(t('app.uploadFailedReselect'))
+        setUploadError(tRef.current('app.uploadFailedReselect'))
+        setUploadStatus(tRef.current('app.uploadFailedReselect'))
         return
       }
       if (error instanceof RunTerminalError) {
@@ -811,19 +818,23 @@ export function useWorkspace(opts: WorkspaceOptions) {
         }
         setUploadNeedsReselect(true)
         const message =
-          error.status === 'CANCELLED' ? t('app.uploadCancelled') : t('app.uploadFailedReselect')
+          error.status === 'CANCELLED'
+            ? tRef.current('app.uploadCancelled')
+            : tRef.current('app.uploadFailedReselect')
         setUploadError(message)
         setUploadStatus(message)
         return
       }
-      setUploadError(t('app.uploadRetryRefresh'))
-      setUploadStatus(t('app.uploadRetryRefresh'))
+      setUploadError(tRef.current('app.uploadRetryRefresh'))
+      setUploadStatus(tRef.current('app.uploadRetryRefresh'))
     },
-    [returnToUploadDesk, t],
+    [returnToUploadDesk],
   )
 
   // 会话回填：刷新后从后端 Project Snapshot 恢复工作区（C3）。
-  // 研究状态与进行中的 run 全部来自 snapshot；active_run 存在则重新订阅。
+  // Bound to mount / stored session / session epoch — not display language.
+  // Language switch must not re-GET the snapshot, jump to Overview, or
+  // rebuild EventSource. Recovery strings are read from tRef.
   useEffect(() => {
     const saved = readStoredSessionId()
     if (!saved) return
@@ -839,7 +850,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       const isUpload = command.kind === 'run' && command.runKind === 'upload_pipeline'
       if (isUpload) {
         setUploading(true)
-        setUploadStatus(t('app.uploadRecovering'))
+        setUploadStatus(tRef.current('app.uploadRecovering'))
       } else if (command.kind === 'run') {
         setDirectionBusy(true)
       }
@@ -857,7 +868,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
             clearPendingUpload()
             uploadOperationRef.current = null
             setUploadReadiness('READY')
-            setUploadStatus(t('app.uploadReady'))
+            setUploadStatus(tRef.current('app.uploadReady'))
           }
           snapshotGate.applyRun(() => applySnapshot(result as WorkspaceSnapshot))
         })
@@ -890,7 +901,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       .then((data) => {
         if (!isCurrent()) return
         if (data.exists === false) {
-          returnToUploadDesk(t('app.uploadMissing'))
+          returnToUploadDesk(tRef.current('app.uploadMissing'))
           return
         }
         snapshotGate.applySession(() => applySnapshot(data))
@@ -925,7 +936,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
         runAbortRef.current = null
       }
     }
-  }, [applySnapshot, handleUploadRunError, returnToUploadDesk, showGlobalError, t])
+    // t / language is intentionally not a dependency: restore is session-bound.
+  }, [applySnapshot, handleUploadRunError, returnToUploadDesk, showGlobalError])
 
   useEffect(() => {
     if (sessionId) {
@@ -1117,7 +1129,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     let cancelled = false
     setUploading(true)
     setUploadError(null)
-    setUploadStatus(t('app.uploadRecovering'))
+    setUploadStatus(tRef.current('app.uploadRecovering'))
     let sid: string | null = null
     let controller: AbortController | null = null
     const isCurrent = () =>
@@ -1135,7 +1147,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
           clearPendingUpload(pending.idempotencyKey)
           uploadOperationRef.current = null
           setUploadReadiness('READY')
-          setUploadStatus(t('app.uploadReady'))
+          setUploadStatus(tRef.current('app.uploadReady'))
           setUploading(false)
           return null
         }
@@ -1150,7 +1162,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         clearPendingUpload(pending.idempotencyKey)
         uploadOperationRef.current = null
         setUploadReadiness('READY')
-        setUploadStatus(t('app.uploadReady'))
+        setUploadStatus(tRef.current('app.uploadReady'))
         setUploading(false)
         applySnapshot(result as WorkspaceSnapshot)
         const fresh = await fetchSessionSnapshot(sid).catch(() => null)
@@ -1162,8 +1174,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
           clearPendingUpload(pending.idempotencyKey)
           uploadOperationRef.current = null
           setUploadNeedsReselect(true)
-          setUploadError(t('app.uploadNotAccepted'))
-          setUploadStatus(t('app.uploadNotAccepted'))
+          setUploadError(tRef.current('app.uploadNotAccepted'))
+          setUploadStatus(tRef.current('app.uploadNotAccepted'))
           setUploading(false)
           return
         }
@@ -1180,7 +1192,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         runAbortRef.current = null
       }
     }
-  }, [applySnapshot, applyUploadMetadata, handleUploadRunError, t])
+  }, [applySnapshot, applyUploadMetadata, handleUploadRunError])
 
   const uploadCsv = useCallback(
     async (file: File) => {

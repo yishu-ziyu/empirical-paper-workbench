@@ -2077,13 +2077,13 @@ describe('App 三栏布局', () => {
     renderWithI18n(<App />)
     fireEvent.click(await screen.findByTestId('rail-design'))
     const runButton = await screen.findByTestId('spec-space-run')
-    expect(runButton).toHaveTextContent('Run specifications')
+    expect(runButton).toHaveTextContent('运行分析方案')
     expect(runButton).toBeEnabled()
 
     fireEvent.click(runButton)
     const running = await screen.findByTestId('spec-space-run-status')
-    expect(running).toHaveTextContent('正在运行规格 0/2')
-    expect(screen.getByTestId('spec-space-run')).toHaveTextContent('Running 0/2')
+    expect(running).toHaveTextContent('正在运行分析方案 0/2')
+    expect(screen.getByTestId('spec-space-run')).toHaveTextContent('正在运行 0/2')
     expect(screen.getByTestId('spec-space-run')).toBeDisabled()
 
     // 逐 spec 进度事件（SSE 投影 spec_id）
@@ -2101,7 +2101,7 @@ describe('App 三栏布局', () => {
       )
     })
     await waitFor(() => {
-      expect(screen.getByTestId('spec-space-run')).toHaveTextContent('Running 1/2')
+      expect(screen.getByTestId('spec-space-run')).toHaveTextContent('正在运行 1/2')
     })
 
     // 终态：成功 → 快照重取 → 自动切到 Evidence，activeRun 清空

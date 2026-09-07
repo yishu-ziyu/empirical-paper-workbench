@@ -146,7 +146,7 @@ export default function StepTimeline({
   return (
     <div data-testid="step-timeline" className="mb-6 flex flex-col gap-2.5">
       <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-        {lang === 'zh' ? '步骤卡 · 每步可追溯' : 'Steps · traceable'}
+        {t('deskSteps.kicker')}
       </p>
 
       <Card

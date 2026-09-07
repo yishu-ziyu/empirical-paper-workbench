@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useT } from '../lib/i18n'
 import { animate } from 'motion'
 import { motion, useMotionValue } from 'motion/react'
 import { AgentCursorProvider, useAgentCursor, type AgentCursorHost } from '../lib/agentCursor/context'
@@ -137,12 +138,17 @@ function AgentCursorPointer({
   opacity: ReturnType<typeof useMotionValue<number>>
 }) {
   const { presentation } = useAgentCursor()
+  const { t, lang } = useT()
   const visible =
     presentation.status === 'running' ||
     presentation.status === 'paused' ||
     presentation.status === 'awaiting-confirm' ||
     presentation.status === 'done'
   const reduced = prefersReducedMotion()
+  const intent =
+    lang === 'zh'
+      ? presentation.intentZh || t('agent.looking')
+      : presentation.intent || t('agent.looking')
 
   useEffect(() => {
     if (!visible) opacity.set(0)
@@ -161,17 +167,12 @@ function AgentCursorPointer({
           className="mt-0.5 h-2.5 w-2.5 rotate-45 border border-wb-ink bg-wb-surface"
         />
         <div className="max-w-[16rem] rounded-md border border-wb-line bg-wb-surface px-2 py-1 shadow-sm">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">Agent</p>
-          {presentation.intent ? (
-            <p data-testid="agent-cursor-intent" className="text-[12px] leading-4 text-wb-ink">
-              {presentation.intent}
-            </p>
-          ) : (
-            <p className="text-[12px] leading-4 text-wb-muted">Looking</p>
-          )}
-          {presentation.intentZh ? (
-            <p className="text-[11px] leading-4 text-wb-muted">{presentation.intentZh}</p>
-          ) : null}
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
+            {t('agent.identity')}
+          </p>
+          <p data-testid="agent-cursor-intent" className="text-[12px] leading-4 text-wb-ink">
+            {intent}
+          </p>
         </div>
       </div>
     </motion.div>

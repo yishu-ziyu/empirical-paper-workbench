@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react'
 import type { components } from '../types/api'
 import type { ResearchLab } from '../lib/workspace'
+import { useT } from '../lib/i18n'
+import {
+  criterionSpecIdentities,
+  displayCriterionLabel,
+  displayEstimand,
+  displaySpecLabel,
+  displaySpecRationale,
+} from '../lib/i18nPresentation'
+import { MethodHelp, TaskHelp } from './TaskHelp'
 
 type ExpectationCriterion = components['schemas']['ExpectationCriterion']
 type EvidenceMetricRef = components['schemas']['EvidenceMetricRef']
 
-function field(label: string, value: string, gloss?: string) {
+function field(label: string, value: string) {
   return (
     <div className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5">
       <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
         {label}
-        {gloss ? <span className="ml-1 font-sans normal-case tracking-normal text-wb-muted">（{gloss}）</span> : null}
       </dt>
       <dd className="mt-1 text-[14px] leading-6 text-wb-ink">{value}</dd>
     </div>
@@ -28,54 +36,77 @@ function named(raw: unknown): {
 }
 
 export function TeachingCaseBadge({ teachingCase }: { teachingCase?: string | null }) {
+  const { t } = useT()
   if (!teachingCase) return null
   return (
     <p
       data-testid="teaching-case-badge"
       className="mb-4 inline-flex rounded-full border border-wb-line bg-wb-subtle px-2.5 py-1 font-mono text-[11px] text-wb-muted"
     >
-      Teaching case · Card 1995
+      {t('workbench.teachingCase')} Card 1995
     </p>
   )
 }
 
+function displayNamed(
+  raw: ReturnType<typeof named>,
+  lang: 'zh' | 'en',
+): string {
+  if (lang === 'zh') {
+    return raw.gloss || raw.label || raw.name || raw.text || raw.instrument || '—'
+  }
+  return raw.label || raw.name || raw.text || raw.instrument || raw.gloss || '—'
+}
+
 export function ResearchQuestionCard({ question }: { question: NonNullable<ResearchLab['question']> }) {
+  const { t, lang } = useT()
   const outcome = named(question.outcome)
   const treatment = named(question.treatment)
   const threat = named(question.causal_threat)
   const ident = named(question.identification)
-  const estimand = question.estimand && typeof question.estimand === 'object'
-    ? (question.estimand as Record<string, string>)
-    : {}
+  const promptEn = typeof question.prompt_en === 'string' ? question.prompt_en.trim() : ''
+  const promptZh = typeof question.prompt_zh === 'string' ? question.prompt_zh.trim() : ''
+  const primary = lang === 'zh' ? promptZh || promptEn : promptEn || promptZh
+  const original = lang === 'zh' ? (promptZh && promptEn ? promptEn : '') : promptEn && promptZh ? promptZh : ''
+  const originalLang = lang === 'zh' ? 'en' : 'zh-CN'
   return (
     <section data-testid="research-question-card" className="mb-6 space-y-3">
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Research Question（研究问题）
+          {t('question.kicker')}
         </p>
         <h2 className="mt-1 font-serif text-[1.35rem] text-wb-ink">
-          {question.prompt_en || 'Research question'}
+          {primary || t('question.fallback')}
         </h2>
-        {question.prompt_zh ? (
-          <p className="mt-1 text-[13px] text-wb-muted">{question.prompt_zh}</p>
+        {original ? (
+          <details className="mt-1">
+            <summary className="cursor-pointer text-[12px] text-wb-muted">{t('question.original')}</summary>
+            <p lang={originalLang} className="mt-1 text-[13px] text-wb-muted">
+              {original}
+            </p>
+          </details>
         ) : null}
       </header>
       <dl className="grid gap-2 sm:grid-cols-2">
-        {field('Outcome', outcome.label || outcome.name || '—', outcome.gloss)}
-        {field('Treatment', treatment.label || treatment.name || '—', treatment.gloss)}
-        {field('Causal threat', threat.text || threat.label || '—', threat.gloss)}
-        {field(
-          'Candidate identification',
-          ident.label || ident.instrument || '—',
-          ident.gloss,
-        )}
+        {field(t('question.outcome'), displayNamed(outcome, lang))}
+        {field(t('question.treatment'), displayNamed(treatment, lang))}
+        {field(t('question.threat'), displayNamed(threat, lang))}
+        {field(t('question.identification'), displayNamed(ident, lang))}
       </dl>
       <div className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-          Estimand
+          {t('question.estimand')}
         </p>
-        <p className="mt-1 text-[14px] leading-6 text-wb-ink">{estimand.ols || '—'}</p>
-        <p className="mt-1 text-[14px] leading-6 text-wb-ink">{estimand.iv || '—'}</p>
+        <p className="mt-1 text-[14px] leading-6 text-wb-ink">
+          {displayEstimand('ols', t, { questionId: question.id })}
+        </p>
+        <p className="mt-1 text-[14px] leading-6 text-wb-ink">
+          {displayEstimand('iv', t, { questionId: question.id })}
+        </p>
+        <div className="mt-2 space-y-2">
+          <MethodHelp method="OLS" />
+          <MethodHelp method="IV" />
+        </div>
       </div>
     </section>
   )
@@ -90,12 +121,12 @@ type CriterionOption =
   | 'iv-positive'
   | 'iv-negative'
 
-const CRITERION_OPTIONS: Array<{ value: CriterionOption; label: string }> = [
-  { value: 'iv-lt-ols', label: 'IV < OLS' },
-  { value: 'iv-gt-ols', label: 'IV > OLS' },
-  { value: 'iv-approx-ols', label: 'IV ≈ OLS (±25%)' },
-  { value: 'iv-positive', label: '预期为正' },
-  { value: 'iv-negative', label: '预期为负' },
+const CRITERION_OPTIONS: Array<{ value: CriterionOption; labelKey: string }> = [
+  { value: 'iv-lt-ols', labelKey: 'expectation.opt.ivLtOls' },
+  { value: 'iv-gt-ols', labelKey: 'expectation.opt.ivGtOls' },
+  { value: 'iv-approx-ols', labelKey: 'expectation.opt.ivApprox' },
+  { value: 'iv-positive', labelKey: 'expectation.opt.positive' },
+  { value: 'iv-negative', labelKey: 'expectation.opt.negative' },
 ]
 
 function comparableSpecIdsFromDefinitions(
@@ -227,6 +258,7 @@ export function ExpectationEditor({
   criteriaLocked?: boolean
   specificationSpace?: ResearchLab['specification_space']
 }) {
+  const { t } = useT()
   const [text, setText] = useState(expectation.text || '')
   const [confidence, setConfidence] = useState<'low' | 'medium' | 'high'>(
     expectation.confidence || 'medium',
@@ -276,9 +308,9 @@ export function ExpectationEditor({
     <section data-testid="expectation-editor" className="mb-6 space-y-3">
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Expectation（预期）
+          {t('expectation.kicker')}
         </p>
-        <h3 className="mt-1 font-serif text-[1.15rem] text-wb-ink">Before seeing results</h3>
+        <h3 className="mt-1 font-serif text-[1.15rem] text-wb-ink">{t('expectation.before')}</h3>
       </header>
       <textarea
         value={text}
@@ -291,29 +323,42 @@ export function ExpectationEditor({
         className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
       >
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-          Surprise condition · 意外判定
+          {t('expectation.condition')}
         </p>
         {criteria.length > 0 ? (
           <ul className="mt-1.5 space-y-1">
-            {criteria.map((criterion) => (
-              <li
-                key={criterion.id}
-                data-testid="expectation-criterion"
-                data-source={criterion.source}
-                className="flex items-center gap-2 text-[13px] leading-5 text-wb-ink"
-              >
-                <span aria-hidden className="text-wb-primary">◇</span>
-                {criterion.label}
-              </li>
-            ))}
+            {criteria.map((criterion) => {
+              const specIds = criterionSpecIdentities(criterion)
+              const identity = [specIds.left, specIds.right].filter(Boolean).join(' · ')
+              return (
+                <li
+                  key={criterion.id}
+                  data-testid="expectation-criterion"
+                  data-source={criterion.source}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-5 text-wb-ink"
+                >
+                  <span aria-hidden className="text-wb-primary">◇</span>
+                  {displayCriterionLabel(criterion, t)}
+                  {identity ? (
+                    <span
+                      data-testid="criterion-spec-ids"
+                      title={identity}
+                      className="rounded border border-wb-line bg-wb-subtle px-1.5 py-0.5 font-mono text-[10px] text-wb-muted"
+                    >
+                      {identity}
+                    </span>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <p className="mt-1.5 text-[12px] text-wb-muted">
-            还没有结构化判据；可用下方控件添加。
+            {t('expectation.noCriteria')}
           </p>
         )}
         <label className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-wb-muted">
-          判定方向
+          {t('expectation.direction')}
           <select
             data-testid="expectation-criterion-select"
             value={selectedOption ?? ''}
@@ -325,21 +370,21 @@ export function ExpectationEditor({
             className="rounded border border-wb-line bg-wb-surface px-2 py-1 text-[12px] text-wb-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="" disabled>
-              选择判定方向…
+              {t('expectation.choose')}
             </option>
             {CRITERION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </option>
             ))}
           </select>
           {criteriaLocked ? (
             <span data-testid="expectation-criterion-locked" className="text-[11px] text-wb-muted">
-              结果已经揭晓；本轮意外判定已锁定，不能事后改写。
+              {t('expectation.locked')}
             </span>
           ) : (
             <span className="text-[11px] text-wb-faint">
-              保存时随预期一起显式提交；改上方文字不会改变判定。
+              {t('expectation.saveHint')}
             </span>
           )}
         </label>
@@ -351,7 +396,7 @@ export function ExpectationEditor({
           className="flex flex-wrap items-center gap-3 rounded-md border border-wb-danger/30 bg-wb-danger-soft px-3 py-2"
         >
           <p className="text-[12px] text-wb-danger">
-            保存失败（网络或服务暂不可用）。你的修改仍保留在下方输入框里。
+            {t('expectation.saveFailed')}
           </p>
           <button
             type="button"
@@ -362,13 +407,13 @@ export function ExpectationEditor({
             }}
             className="wb-press rounded-md border border-wb-line bg-wb-surface px-2.5 py-1 text-[12px] text-wb-ink disabled:opacity-50"
           >
-            Retry
+            {t('expectation.retry')}
           </button>
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-[12px] text-wb-muted">
-          Confidence
+          {t('expectation.confidence')}
           <select
             data-testid="expectation-confidence"
             value={confidence}
@@ -377,20 +422,21 @@ export function ExpectationEditor({
             }
             className="ml-2 rounded border border-wb-line bg-wb-surface px-2 py-1 text-[12px] text-wb-ink"
           >
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
+            <option value="low">{t('expectation.conf.low')}</option>
+            <option value="medium">{t('expectation.conf.medium')}</option>
+            <option value="high">{t('expectation.conf.high')}</option>
           </select>
         </label>
         <button
           type="button"
+          data-testid="expectation-save"
           disabled={busy || !text.trim()}
           onClick={() => {
             void save()
           }}
           className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
         >
-          Save expectation
+          {t('expectation.save')}
         </button>
       </div>
     </section>
@@ -417,26 +463,32 @@ export function SpecificationSpacePanel({
   failure?: { category: string } | null
   onRetryRun?: () => void
 }) {
+  const { t, lang } = useT()
   const [busy, setBusy] = useState(false)
   const definitions = space.definitions ?? []
   const runLabel = running
     ? progress
-      ? `Running ${progress.done}/${progress.total}`
-      : 'Running specifications…'
-    : 'Run specifications'
+      ? t('spec.running', { done: progress.done, total: progress.total })
+      : t('spec.runningIndeterminate')
+    : t('spec.run')
   return (
     <section data-testid="spec-space" className="space-y-3">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-            Admissible Space（合理规格空间）
+            {t('spec.kicker')}
           </p>
-          <h2 className="mt-1 font-serif text-[1.35rem] text-ink">Proposed specifications</h2>
+          <h2 className="mt-1 font-serif text-[1.35rem] text-ink">{t('spec.title')}</h2>
           <p className="mt-1 text-[13px] text-wb-muted">
             {space.frozen_at
-              ? `Frozen ${new Date(space.frozen_at).toLocaleString()}`
-              : 'Confirm this space before any comparison results.'}
+              ? t('spec.frozenAt', { time: new Date(space.frozen_at).toLocaleString() })
+              : t('spec.confirmBefore')}
           </p>
+          <TaskHelp
+            testId="help-confirm-plans"
+            summary={t('spec.helpFreeze')}
+            details={t('spec.helpFreezeMore')}
+          />
         </div>
         <div className="flex flex-wrap gap-2">
         <button
@@ -449,7 +501,7 @@ export function SpecificationSpacePanel({
           }}
           className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
         >
-          {space.frozen_at ? 'Admissible space frozen' : 'Freeze admissible space'}
+          {space.frozen_at ? t('spec.frozen') : t('spec.freeze')}
         </button>
         {space.frozen_at && onRun ? (
           <button
@@ -476,8 +528,8 @@ export function SpecificationSpacePanel({
           className="rounded-md border border-wb-line bg-wb-subtle px-3 py-2 text-[12px] text-wb-muted"
         >
           {progress
-            ? `正在运行规格 ${progress.done}/${progress.total}；完成后自动进入 Evidence。`
-            : '正在运行规格…完成后自动进入 Evidence。'}
+            ? t('spec.runStatus', { done: progress.done, total: progress.total })
+            : t('spec.runStatusIndeterminate')}
         </p>
       ) : null}
       {failure ? (
@@ -487,9 +539,7 @@ export function SpecificationSpacePanel({
           className="flex flex-wrap items-center gap-3 rounded-md border border-wb-danger/30 bg-wb-danger-soft px-3 py-2"
         >
           <p className="text-[12px] text-wb-danger">
-            规格运行失败（
-            <span className="font-mono">{failure.category}</span>
-            ）。没有产生任何结果；可重试。
+            {t('spec.runFailed', { category: failure.category })}
           </p>
           {onRetryRun ? (
             <button
@@ -498,7 +548,7 @@ export function SpecificationSpacePanel({
               onClick={onRetryRun}
               className="wb-press rounded-md border border-wb-line bg-wb-surface px-2.5 py-1 text-[12px] text-wb-ink"
             >
-              Retry
+              {t('spec.retry')}
             </button>
           ) : null}
         </div>
@@ -509,11 +559,15 @@ export function SpecificationSpacePanel({
             key={item.id}
             className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
           >
-            <p className="text-[14px] font-medium text-wb-ink">{item.label}</p>
-            <p className="mt-1 text-[12px] leading-5 text-wb-muted">{item.rationale}</p>
+            <p className="text-[14px] font-medium text-wb-ink">
+              {displaySpecLabel(item.id, t, lang, item.label)}
+            </p>
+            <p className="mt-1 text-[12px] leading-5 text-wb-muted">
+              {displaySpecRationale(item.id, t, lang, item.rationale)}
+            </p>
             <p className="mt-1 font-mono text-[11px] text-wb-faint">
               {item.id} · {item.dimension}={item.value} ·{' '}
-              {item.admissible ? item.user_decision : 'unavailable'}
+              {item.admissible ? item.user_decision : t('spec.unavailable')}
             </p>
           </li>
         ))}

@@ -3,7 +3,7 @@ import type { ProxyOptions } from 'vite'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
-const backend = 'http://127.0.0.1:8000'
+const backend = process.env.ECONPAPER_BACKEND_URL || 'http://127.0.0.1:8000'
 
 const apiProxy: Record<string, ProxyOptions> = {
   '/api': {

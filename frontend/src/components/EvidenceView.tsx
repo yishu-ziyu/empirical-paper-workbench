@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useT } from '../lib/i18n'
 import { fetchSessionEvidence, type EvidenceModel } from '../lib/workspace'
 import {
   claimLabel,
@@ -38,6 +39,7 @@ export default function EvidenceView({
   direction,
   onOpenCode,
 }: EvidenceViewProps) {
+  const { t } = useT()
   const [evidence, setEvidence] = useState<EvidenceModel | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -71,10 +73,10 @@ export default function EvidenceView({
   const dataset = provenance?.dataset ?? null
   const blockers = evidence?.blockers ?? []
   const statCards = [
-    { label: 'β 系数', kind: 'coef', value: estimate?.coef, testId: 'evidence-coef' },
-    { label: 'SE 标准误', kind: 'se', value: estimate?.se, testId: 'evidence-se' },
-    { label: 'p 值', kind: 'p', value: estimate?.p, testId: 'evidence-p' },
-    { label: 'N 样本量', kind: 'n', value: estimate?.n, testId: 'evidence-n' },
+    { label: t('evidenceView.statCoef'), kind: 'coef', value: estimate?.coef, testId: 'evidence-coef' },
+    { label: t('evidenceView.statSe'), kind: 'se', value: estimate?.se, testId: 'evidence-se' },
+    { label: t('evidenceView.statP'), kind: 'p', value: estimate?.p, testId: 'evidence-p' },
+    { label: t('evidenceView.statN'), kind: 'n', value: estimate?.n, testId: 'evidence-n' },
   ] as const
 
   const specLabel =
@@ -114,16 +116,17 @@ export default function EvidenceView({
   const codeArtifacts = Array.isArray(provenance?.code) ? provenance.code : []
   const hasCodeArtifact = codeArtifacts.length > 0
 
+  const none = t('legacy.none')
   const detailRows: Array<{ label: string; value: string }> = direction
     ? [
-        { label: '因变量', value: direction.dv || '—' },
-        { label: '自变量', value: direction.iv || '—' },
+        { label: t('evidenceView.dv'), value: direction.dv || '—' },
+        { label: t('evidenceView.iv'), value: direction.iv || '—' },
         {
-          label: '控制变量',
+          label: t('evidenceView.controls'),
           value: direction.controls.length > 0 ? direction.controls.join(', ') : '—',
         },
-        { label: '方法', value: direction.method || '—' },
-        { label: '模板', value: direction.template || '—' },
+        { label: t('evidenceView.method'), value: direction.method || '—' },
+        { label: t('evidenceView.template'), value: direction.template || '—' },
       ]
     : []
 
@@ -135,7 +138,7 @@ export default function EvidenceView({
   const layers: ProvenanceLayer[] = [
     {
       id: 'result',
-      title: 'Result · 结果数字',
+      title: t('legacy.result'),
       detail: (
         <span className="font-mono tabular-nums">
           β {formatStatValue(estimate?.coef, 'coef')}
@@ -146,16 +149,16 @@ export default function EvidenceView({
     },
     {
       id: 'specification',
-      title: 'Specification · 研究设定',
-      detail: <span>{specLabel ?? '暂无'}</span>,
+      title: t('legacy.specification'),
+      detail: <span>{specLabel ?? none}</span>,
       present: Boolean(specLabel),
     },
     {
       id: 'estimator',
-      title: 'Estimator · 估计量',
+      title: t('legacy.estimator'),
       detail: (
         <span>
-          {estimate?.estimator ? String(estimate.estimator) : '暂无'}
+          {estimate?.estimator ? String(estimate.estimator) : none}
           {estimate?.formula ? ` · ${String(estimate.formula)}` : ''}
         </span>
       ),
@@ -163,7 +166,7 @@ export default function EvidenceView({
     },
     {
       id: 'run',
-      title: 'Run · 运行',
+      title: t('legacy.run'),
       detail: (
         <span>
           {provenance?.run_id ? (
@@ -178,10 +181,10 @@ export default function EvidenceView({
               {provenance.run_status ? ` · ${provenance.run_status}` : ''}
             </>
           ) : (
-            '暂无'
+            none
           )}
           {provenance?.trace_events?.length
-            ? ` · ${provenance.trace_events.length} 条 trace 事件`
+            ? ` · ${t('evidenceView.traceEvents', { n: provenance.trace_events.length })}`
             : ''}
         </span>
       ),
@@ -189,21 +192,22 @@ export default function EvidenceView({
     },
     {
       id: 'dataset',
-      title: 'Dataset · 数据集',
+      title: t('legacy.dataset'),
       detail: (
         <span>
           {dataset
-            ? `${dataset.name ?? '未命名'}${dataset.role ? ` · ${dataset.role}` : ''} · ${
-                dataset.rows ?? '?'
-              } 行 · ${dataset.columns?.length ?? 0} 列`
-            : '暂无'}
+            ? `${dataset.name ?? t('evidenceView.unnamed')}${dataset.role ? ` · ${dataset.role}` : ''} · ${t(
+                'evidenceView.rowsCols',
+                { rows: dataset.rows ?? '?', cols: dataset.columns?.length ?? 0 },
+              )}`
+            : none}
         </span>
       ),
       present: Boolean(dataset?.path || dataset?.hash || dataset?.version),
     },
     {
       id: 'code',
-      title: 'Code · 代码',
+      title: t('legacy.code'),
       detail: (
         <span>
           {hasCodeArtifact ? (
@@ -213,10 +217,10 @@ export default function EvidenceView({
               onClick={onOpenCode}
               className="text-wb-primary underline-offset-2 hover:underline"
             >
-              查看可复现代码 →
+              {t('evidenceView.viewCode')}
             </button>
           ) : (
-            '暂无'
+            none
           )}
         </span>
       ),
@@ -231,16 +235,18 @@ export default function EvidenceView({
     <div data-testid="evidence-view" className="wb-pane-enter mx-auto max-w-[52rem] px-6 py-8 sm:px-8">
       <header className="mb-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Evidence · 结论与来源
+          {t('legacy.evidenceKicker')}
         </p>
         {evidence?.claim || fallbackEstimate != null ? (
           <h2 data-testid="evidence-claim" className="mt-1.5 font-serif text-[1.3rem] leading-snug text-wb-ink">
             {evidence?.claim
-              ? `当前主张：${claimLabel(evidence.claim)}`
-              : '当前主张：主结果已记录'}
+              ? t('evidenceView.currentClaim', { text: claimLabel(evidence.claim) })
+              : t('evidenceView.mainRecorded')}
           </h2>
         ) : (
-          <h2 className="mt-1.5 font-serif text-[1.3rem] leading-snug text-wb-ink">主结果证据</h2>
+          <h2 className="mt-1.5 font-serif text-[1.3rem] leading-snug text-wb-ink">
+            {t('evidenceView.mainEvidence')}
+          </h2>
         )}
       </header>
 
@@ -249,7 +255,7 @@ export default function EvidenceView({
           data-testid="evidence-failed"
           className="mb-4 rounded-lg border border-wb-danger/30 bg-wb-danger-soft px-4 py-3 text-[13px] leading-6 text-wb-danger"
         >
-          估计没有跑成，当前不存在可引用的主结果数字。下一步：修改研究设计或数据列后重新运行。
+          {t('evidenceView.estimateFailed')}
         </div>
       ) : null}
       {missing ? (
@@ -257,12 +263,12 @@ export default function EvidenceView({
           data-testid="evidence-missing"
           className="mb-4 rounded-lg border border-wb-line bg-wb-surface px-4 py-3 text-[13px] leading-6 text-wb-muted"
         >
-          还没有主结果。先提交研究方向，系统会真实估计并在这里给出数字。
+          {t('evidenceView.noMain')}
         </div>
       ) : null}
       {loadError ? (
         <p data-testid="evidence-load-error" className="mb-3 text-xs text-wb-warning">
-          证据暂不可读：{loadError}
+          {t('evidenceView.unreadable', { error: loadError })}
         </p>
       ) : null}
 
@@ -304,16 +310,16 @@ export default function EvidenceView({
             data-testid="evidence-table"
             className="rounded-lg border border-wb-line bg-wb-surface px-4 py-3.5"
           >
-            <h3 className="text-[13px] font-semibold text-wb-ink">回归结果</h3>
+            <h3 className="text-[13px] font-semibold text-wb-ink">{t('evidenceView.regression')}</h3>
             {tableRows.length > 0 ? (
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-wb-line-strong text-[11px] text-wb-muted">
-                      <th className="py-1.5 pr-3 font-medium">变量</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">系数</th>
-                      <th className="py-1.5 pr-3 text-right font-medium">标准误</th>
-                      <th className="py-1.5 text-right font-medium">p 值</th>
+                      <th className="py-1.5 pr-3 font-medium">{t('overview.variable')}</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">{t('overview.coef')}</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">{t('overview.se')}</th>
+                      <th className="py-1.5 text-right font-medium">{t('overview.p')}</th>
                     </tr>
                   </thead>
                   <tbody className="font-mono text-[12.5px] tabular-nums text-wb-ink">
@@ -330,30 +336,30 @@ export default function EvidenceView({
               </div>
             ) : (
               <p className="mt-2 text-[12.5px] text-wb-muted">
-                {failed ? '估计失败，没有回归表。' : '暂无回归表。'}
+                {failed ? t('evidenceView.noTableFailed') : t('evidenceView.noTable')}
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-wb-line pt-2.5 text-[12px] text-wb-muted">
               <span data-testid="evidence-identification">
-                识别：
+                {t('evidenceView.identification')}：
                 {evidence?.identification?.failed
-                  ? '未通过'
+                  ? t('evidenceView.identFail')
                   : evidence?.identification?.report
-                    ? `通过（${
+                    ? `${t('evidenceView.identPass')}（${
                         evidence?.identification?.star_rating != null
                           ? '★'.repeat(evidence.identification.star_rating) +
                             '☆'.repeat(3 - evidence.identification.star_rating)
                           : '—'
                       }）`
-                    : '暂无'}
+                    : t('evidenceView.identNone')}
               </span>
               <span data-testid="evidence-robustness">
-                稳健性：
+                {t('evidenceView.robustness')}：
                 {evidence?.robustness?.ran
                   ? evidence?.robustness?.status === 'degraded'
-                    ? '已跑（降级）'
-                    : '已跑'
-                  : '暂无'}
+                    ? t('evidenceView.robustDegraded')
+                    : t('evidenceView.robustRan')
+                  : t('evidenceView.identNone')}
               </span>
             </div>
           </section>
@@ -362,7 +368,7 @@ export default function EvidenceView({
             data-testid="evidence-spec-details"
             className="rounded-lg border border-wb-line bg-wb-surface px-4 py-3.5"
           >
-            <h3 className="text-[13px] font-semibold text-wb-ink">设定详情</h3>
+            <h3 className="text-[13px] font-semibold text-wb-ink">{t('evidenceView.specDetails')}</h3>
             {detailRows.length > 0 ? (
               <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12.5px] sm:grid-cols-[auto_1fr]">
                 {detailRows.map((row) => (
@@ -374,7 +380,7 @@ export default function EvidenceView({
               </dl>
             ) : (
               <p data-testid="evidence-spec" className="mt-2 font-mono text-xs leading-6 text-wb-muted">
-                {specLabel ?? '暂无'}
+                {specLabel ?? none}
               </p>
             )}
             {spec ? (
@@ -399,12 +405,12 @@ export default function EvidenceView({
         {/* 右：Result Provenance 溯源链时间线 */}
         <aside
           data-testid="evidence-provenance"
-          aria-label="结果溯源链"
+          aria-label={t('evidenceView.ariaProvenance')}
           className="rounded-lg border border-wb-line bg-wb-surface px-3.5 py-3.5"
         >
-          <h3 className="text-[13px] font-semibold text-wb-ink">Result Provenance</h3>
+          <h3 className="text-[13px] font-semibold text-wb-ink">{t('evidenceView.provenanceTitle')}</h3>
           <p className="mt-0.5 text-[11px] leading-4 text-wb-faint">
-            追这个数字从哪来
+            {t('evidenceView.provenanceLead')}
             {estimate?.coef != null ? `：β ${formatStatValue(estimate.coef, 'coef')}` : ''}。
           </p>
           <ol className="mt-3">
@@ -459,15 +465,20 @@ export default function EvidenceView({
           >
             {fullyTraceable ? (
               <p>
-                <span className="font-semibold">Fully traceable</span>
+                <span className="font-semibold">{t('evidenceView.fullyTraceable')}</span>
                 <br />
-                结果到数据与代码的每一步都可检视。
+                {t('evidenceView.fullyTraceableBody')}
               </p>
             ) : (
               <p>
-                <span className="font-semibold">可溯源 {presentCount}/{layers.length} 层</span>
+                <span className="font-semibold">
+                  {t('evidenceView.traceability', {
+                    present: presentCount,
+                    total: layers.length,
+                  })}
+                </span>
                 <br />
-                还缺：{missingLayers.join('、')}.
+                {t('evidenceView.missingLayers', { layers: missingLayers.join('、') })}
               </p>
             )}
           </div>

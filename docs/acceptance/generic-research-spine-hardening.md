@@ -1,6 +1,6 @@
 # 验收契约：Generic Research Spine 加固（Expectation → Run → Surprise → Explanation → Recovery）
 
-Status: closed（2026-09-07 PR #31 外部独立验收 REQUEST CHANGES 后，只修 M1 P0。validator 按 C29–C37 程序复核 ACCEPT。C1–C28 既有证据保留，未弱化。M0 / M2 / M3 / M4 实现未改。）
+Status: closed（2026-09-07 第二次外部独立验收 REQUEST CHANGES 后，只修 M1 P0 r2。validator 按 C29–C37 程序复核 ACCEPT。C1–C28 既有证据保留，未弱化。M0 / M2 / M3 / M4 实现未改。）
 
 基线：`main @ ac62d4a0457c80e480aa335a362040acc650b3af`，分支 `review/generic-research-spine-hardening`。
 事实来源：`card-canonical-research-experience-validator.md` 追加的 J–Q first-user audit（2026-09-06，verdict B）。
@@ -110,19 +110,20 @@ M0 / M2 / M3 / M4 已认可：Run specifications 进度与自动转场、Agent C
 - C25/C26/C27：clean first-user journey 全程走通（ supplement 方法附注），全程 console 零错误；evidence_revision 1→2、claim v1→v2、stale→redraft→approve、explicit Promote（canonical=iv_region_dummies）、grounded 门（Results 基于证据）、provenance 均保持。
 - C28：`make test`、`tsc --noEmit`、`npm run lint`、`npm run build` 全部 0 退出（最终提交后复跑记录见 PR 描述）。
 
-### M1 P0 Evidence（2026-09-07 external review follow-up）
+### M1 P0 Evidence（2026-09-07 第二次外部独立验收 r2）
 
-validator 只按 C29–C37 程序复核，不看实现对话。M2/M3/M4 源文件未改。
+validator 报告：`generic-research-spine-hardening-m1-p0-r2-validator.md`（Verdict ACCEPT）。implementer 摘要：`generic-research-spine-hardening-m1-p0-r2-implementer.md`。M2/M3/M4 源文件未改。浏览器证据：`docs/acceptance/assets/generic-spine-hardening-2026-09-07/r2-*.png`。会话 `acb244dd-4e06-43c4-aed8-4cb948ee86bd`。
 
-- C29：34 列 seed `left.spec_id=iv_region_dummies`、`right.spec_id=ols_region_dummies`，estimator 仍为 iv/ols 展示字段；9 列 `iv_nearc4_full` / `ols_full_controls`。
-- C30：comparable OLS=0.0747 / IV=0.1315 → Unexpected；追加 `ols_linear_exper` preview 或 coef=0.2000 的同 estimator run 后 observed 仍含 0.0747/0.1315，不含 0.2000。不存在的 spec_id → Unevaluated，不 fallback。
-- C31：vitest `preserves exact spec_id`：改 IV>OLS 后 left/right spec_id 仍为 `iv_region_dummies` / `ols_region_dummies`。
-- C32：sign+right、ordering 缺 right、distance 缺 right、sign+tolerance、空 selector、负 tolerance → HTTP 422，state 中 seed criteria 未变。
-- C33：IV=OLS=0.08 时 lt 与 gt 均为 Unexpected；coef=0 时 positive 与 negative 均为 Unexpected。
-- C34：unresolvable ATT → Unevaluated（不再 Expected）；部分解析无 violation → Inconclusive；无判据仍 Expected。Surprise 含 `evaluated_criterion_ids` / `unresolved_criterion_ids` / `expectation_version`。UI Unevaluated 文案「尚未判定：所需证据还没有产生」，无 Show me；Inconclusive 同样不伪装成 Expected。
-- C35：揭晓前 IV<OLS → IV>OLS，history 两版均含完整 spec_id；`expectation_set.payload.phase=pre_reveal`，带 criterion ids / kind / operator / left / right。
-- C36：revealed 后改 text 200 且 operator 仍为 lt；改 criteria → 409 `expectation_criterion_locked`；Surprise observed / criterion_ids 不被污染。UI select disabled + 锁定说明。
-- C37：`make test` agent 819 passed / 1 skip，backend 444 passed / 8 skip，frontend 390 passed；`tsc --noEmit` 0；lint 0 error（5 条既有 warning）；`npm run build` 0。push PR #31，不 merge。
+- C29：34 列 seed `left.spec_id=iv_region_dummies`、`right.spec_id=ols_region_dummies`；9 列 `iv_nearc4_full` / `ols_full_controls`。estimator 仍为展示字段。validator pytest 2 passed。
+- C30：comparable OLS=0.0747 / IV=0.1315 → Unexpected；追加 `ols_linear_exper` preview 后 observed 仍为 `IV estimate 0.1315 > OLS estimate 0.0747`。不存在的 spec_id → Unevaluated，不 fallback。live Card 在 linear preview（0.0932，2 runs）后 Surprise 仍绑 comparable pair。
+- C31：删除 `IV_METRIC` / `OLS_METRIC`。改判定方向 / sign / approx 往返保留 spec_id；空 criteria 新造绑 comparable spec_ids。vitest 2 passed。
+- C32：sign+right、ordering 缺 right、distance 缺 right、sign+tolerance、ordering+tolerance、空 selector、负 tolerance → HTTP 422。validator 3 passed。
+- C33：IV=OLS=0.08 时 lt/gt 均为 Unexpected；coef=0 时 positive/negative 均为 Unexpected。
+- C34：unresolvable ATT → Unevaluated（不再 Expected）；部分解析无 violation → Inconclusive；无判据仍 Expected。Surprise 含 `evaluated_criterion_ids` / `unresolved_criterion_ids` / `expectation_version`。UI Unevaluated 文案「尚未判定：所需证据还没有产生」，无 Show me。
+- C35：揭晓前 IV<OLS → IV>OLS，history 两版均含完整 spec_id；`expectation_set.payload.phase=pre_reveal`。
+- C36：revealed 后改 text 200 且 operator 仍为 lt、spec_id 保留；改 criteria → 409 `expectation_criterion_locked`；Surprise `expectation_version=2` + `criterion_ids` 不被污染。UI select disabled +「结果已经揭晓；本轮意外判定已锁定，不能事后改写。」（r2-criterion-locked.png）。
+- C37：validator `check-api-drift` 3/3；agent 819 passed / 1 skip；backend 445 passed / 8 skip；frontend 393 passed；`tsc --noEmit` 0；lint 0 error（5 既有 warning）；`npm run build` 0。push PR #31，不 merge。
+- 浏览器 Card：自然语言「我觉得 IV 应该会更小一些，但并不确定。」判据仍为 exact `iv_region_dummies` < `ols_region_dummies`（r2-expectation-zh-criterion.png）。Run 后 Unexpected · Observed `IV estimate 0.1315 > OLS estimate 0.0747`，Show me 出现（r2-evidence-unexpected.png）。linear preview 不漂移。揭晓后 text 可改、criterion 锁定。
 
 ## Named relaxations
 

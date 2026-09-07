@@ -98,15 +98,28 @@ const CRITERION_OPTIONS: Array<{ value: CriterionOption; label: string }> = [
   { value: 'iv-negative', label: '预期为负' },
 ]
 
-const IV_METRIC: EvidenceMetricRef = {
-  metric: 'estimate.coef',
-  estimator: 'iv',
-  label: 'IV estimate',
+function comparableSpecIdsFromDefinitions(
+  definitions: Array<{ id?: string; admissible?: boolean }> | undefined,
+): { olsId: string; ivId: string } {
+  const byId = new Map<string, { id?: string; admissible?: boolean }>()
+  for (const item of definitions ?? []) {
+    if (item.id) byId.set(item.id, item)
+  }
+  const ols = byId.get('ols_region_dummies')
+  const iv = byId.get('iv_region_dummies')
+  if (ols?.admissible && iv?.admissible) {
+    return { olsId: 'ols_region_dummies', ivId: 'iv_region_dummies' }
+  }
+  return { olsId: 'ols_full_controls', ivId: 'iv_nearc4_full' }
 }
-const OLS_METRIC: EvidenceMetricRef = {
-  metric: 'estimate.coef',
-  estimator: 'ols',
-  label: 'OLS estimate',
+
+function boundMetric(estimator: 'iv' | 'ols', specId: string): EvidenceMetricRef {
+  return {
+    metric: 'estimate.coef',
+    estimator,
+    spec_id: specId,
+    label: estimator === 'iv' ? 'IV estimate' : 'OLS estimate',
+  }
 }
 
 function metricRefFromRight(
@@ -119,12 +132,16 @@ function metricRefFromRight(
 function criterionForOption(
   option: CriterionOption,
   existing: ExpectationCriterion | null,
-  preservedRight?: EvidenceMetricRef,
+  preservedRight: EvidenceMetricRef | undefined,
+  comparable: { olsId: string; ivId: string },
 ): ExpectationCriterion {
   const id = existing?.id || `criterion.user.${option}`
   const source: 'seed' | 'user' = existing ? 'user' : 'user'
-  const left = existing?.left ?? IV_METRIC
-  const right = metricRefFromRight(existing?.right) ?? preservedRight ?? OLS_METRIC
+  const left = existing?.left ?? boundMetric('iv', comparable.ivId)
+  const right =
+    metricRefFromRight(existing?.right) ??
+    preservedRight ??
+    boundMetric('ols', comparable.olsId)
   switch (option) {
     case 'iv-lt-ols':
       return {
@@ -199,6 +216,7 @@ export function ExpectationEditor({
   expectation,
   onSave,
   criteriaLocked = false,
+  specificationSpace,
 }: {
   expectation: NonNullable<ResearchLab['expectation']>
   onSave: (payload: {
@@ -207,6 +225,7 @@ export function ExpectationEditor({
     criteria?: ExpectationCriterion[]
   }) => Promise<void>
   criteriaLocked?: boolean
+  specificationSpace?: ResearchLab['specification_space']
 }) {
   const [text, setText] = useState(expectation.text || '')
   const [confidence, setConfidence] = useState<'low' | 'medium' | 'high'>(
@@ -230,10 +249,11 @@ export function ExpectationEditor({
 
   const primary = criteria[0] ?? null
   const selectedOption = primary ? optionForCriterion(primary) : null
+  const comparable = comparableSpecIdsFromDefinitions(specificationSpace?.definitions)
 
   const changeCriterion = (option: CriterionOption) => {
     if (criteriaLocked) return
-    const next = criterionForOption(option, primary, preservedRight)
+    const next = criterionForOption(option, primary, preservedRight, comparable)
     const nextRight = metricRefFromRight(next.right)
     if (nextRight) setPreservedRight(nextRight)
     setCriteria(criteria.length > 0 ? [next, ...criteria.slice(1)] : [next])

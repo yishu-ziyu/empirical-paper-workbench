@@ -185,6 +185,7 @@ export default function WorkbenchArtifact({
               expectation={ws.research.expectation}
               onSave={ws.handleSaveExpectation}
               criteriaLocked={Boolean(ws.research.specification_space?.revealed)}
+              specificationSpace={ws.research.specification_space}
             />
           ) : null}
           <section

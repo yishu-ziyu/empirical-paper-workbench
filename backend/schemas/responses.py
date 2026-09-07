@@ -186,7 +186,7 @@ class ExpectationCriterion(BaseModel):
 
     Legal combinations:
     - sign: operator positive|negative; right empty; tolerance empty
-    - ordering: operator lt|gt; right required
+    - ordering: operator lt|gt; right required; tolerance empty
     - distance: operator approx; right required
     """
 
@@ -213,6 +213,8 @@ class ExpectationCriterion(BaseModel):
                 raise ValueError("ordering criteria require operator lt or gt")
             if self.right is None:
                 raise ValueError("ordering criteria require right")
+            if self.tolerance is not None:
+                raise ValueError("ordering criteria must not include tolerance")
         elif self.kind == "distance":
             if self.operator != "approx":
                 raise ValueError("distance criteria require operator approx")

@@ -40,16 +40,40 @@ const seedExpectation: Expectation = {
   ],
 }
 
+type SpecSpace = NonNullable<ResearchLab['specification_space']>
+
+function specSpace(
+  definitions: Array<{ id: string; admissible: boolean }>,
+): SpecSpace {
+  return {
+    status: 'proposed',
+    frozen_before_results: false,
+    revealed: false,
+    definitions: definitions.map((item) => ({
+      id: item.id,
+      label: item.id,
+      rationale: '',
+      dimension: 'estimator',
+      value: item.id,
+      admissible: item.admissible,
+      user_decision: 'include',
+      choices: [],
+    })),
+  }
+}
+
 function renderEditor(
   onSave: (payload: SavePayload) => Promise<void> = async () => undefined,
   expectation: Expectation = seedExpectation,
   criteriaLocked = false,
+  specificationSpace?: SpecSpace,
 ) {
   return render(
     <ExpectationEditor
       expectation={expectation}
       onSave={onSave}
       criteriaLocked={criteriaLocked}
+      specificationSpace={specificationSpace}
     />,
   )
 }
@@ -113,6 +137,73 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     expect((next.right as { estimator?: string }).estimator).toBe('ols')
   })
 
+  test('preserves exact spec_id through sign and approx and back', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(onSave)
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-positive' },
+    })
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-approx-ols' },
+    })
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-lt-ols' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const next = onSave.mock.calls[0]![0].criteria![0]!
+    expect(next.kind).toBe('ordering')
+    expect(next.operator).toBe('lt')
+    expect(next.left.spec_id).toBe('iv_region_dummies')
+    expect((next.right as { spec_id?: string }).spec_id).toBe('ols_region_dummies')
+  })
+
+  test('fabricated criterion binds comparable 34-col spec_ids, not estimator-only refs', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(
+      onSave,
+      { text: 'no criteria yet', confidence: 'medium', version: 1, history: [], criteria: [] },
+      false,
+      specSpace([
+        { id: 'ols_region_dummies', admissible: true },
+        { id: 'iv_region_dummies', admissible: true },
+      ]),
+    )
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-lt-ols' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const next = onSave.mock.calls[0]![0].criteria![0]!
+    expect(next.left.spec_id).toBe('iv_region_dummies')
+    expect(next.left.estimator).toBe('iv')
+    expect((next.right as { spec_id?: string }).spec_id).toBe('ols_region_dummies')
+    expect((next.right as { estimator?: string }).estimator).toBe('ols')
+  })
+
+  test('fabricated criterion binds 9-col comparable spec_ids when region specs are inadmissible', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(
+      onSave,
+      { text: 'no criteria yet', confidence: 'medium', version: 1, history: [], criteria: [] },
+      false,
+      specSpace([
+        { id: 'ols_region_dummies', admissible: false },
+        { id: 'iv_region_dummies', admissible: false },
+        { id: 'ols_full_controls', admissible: true },
+        { id: 'iv_nearc4_full', admissible: true },
+      ]),
+    )
+    fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
+      target: { value: 'iv-gt-ols' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    const next = onSave.mock.calls[0]![0].criteria![0]!
+    expect(next.left.spec_id).toBe('iv_nearc4_full')
+    expect((next.right as { spec_id?: string }).spec_id).toBe('ols_full_controls')
+  })
+
   test('locked criterion select stays disabled after results are revealed', () => {
     renderEditor(async () => undefined, seedExpectation, true)
     expect(screen.getByTestId('expectation-criterion-select')).toBeDisabled()
@@ -145,6 +236,8 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     const payload = onSave.mock.calls[0]![0]
     expect(payload.criteria![0]!.kind).toBe('sign')
     expect(payload.criteria![0]!.operator).toBe('positive')
+    expect(payload.criteria![0]!.left.spec_id).toBe('iv_region_dummies')
+    expect(payload.criteria![0]!.right).toBeUndefined()
   })
 
   test('save failure shows an in-editor error and keeps the draft text; retry succeeds', async () => {

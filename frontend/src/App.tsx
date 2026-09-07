@@ -153,11 +153,7 @@ function App() {
       blockingDecision = {
         title: t('decision.unexpected'),
         reason:
-          displaySurpriseObserved(
-            ws.research.expectation?.criteria,
-            ws.research.specification_runs,
-            t,
-          ) || t('agent.unexpectedObserved'),
+          displaySurpriseObserved(ws.research?.surprise, t) || t('agent.unexpectedObserved'),
       }
     }
   } else if (isPaperTab) {

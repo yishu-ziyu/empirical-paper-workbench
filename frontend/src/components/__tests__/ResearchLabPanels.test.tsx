@@ -266,6 +266,115 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       expect(screen.queryByTestId('expectation-save-error')).not.toBeInTheDocument(),
     )
   })
+
+  test('C3 approx criterion label carries the effective tolerance in the real component', () => {
+    const approx: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-approx-ols',
+          kind: 'distance',
+          operator: 'approx',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_region_dummies',
+            label: 'IV estimate',
+          },
+          right: {
+            metric: 'estimate.coef',
+            estimator: 'ols',
+            spec_id: 'ols_region_dummies',
+            label: 'OLS estimate',
+          },
+          tolerance: { rel: 0.05 },
+          label: 'IV ≈ OLS (±5%)',
+          source: 'user',
+        },
+      ],
+    }
+    renderEditor(async () => undefined, approx)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
+      'IV 估计 ≈ OLS 估计 ±5%',
+    )
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent('±25%')
+    // ±25% (and the both-empty backend default) must be distinguishable
+    const defaulted = {
+      ...approx,
+      criteria: [{ ...approx.criteria[0]!, tolerance: undefined }],
+    }
+    renderEditor(async () => undefined, defaulted)
+    expect(screen.getAllByTestId('expectation-criterion')[1]).toHaveTextContent('±25%')
+  })
+
+  test('C3 ordering against a numeric constant shows the full string, not generic', () => {
+    const orderingConst: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-lt-const',
+          kind: 'ordering',
+          operator: 'lt',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_nearc4_full',
+            label: 'IV estimate',
+          },
+          right: 0.1,
+          label: 'IV estimate < 0.1',
+          source: 'user',
+        } as ExpectationCriterion,
+      ],
+    }
+    renderEditor(async () => undefined, orderingConst)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 < 0.1')
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent('可检验判定')
+  })
+
+  test('C3 same-estimator different-spec refs expose their spec identity visibly', () => {
+    const twoIvSpecs: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-approx-ols',
+          kind: 'distance',
+          operator: 'approx',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_nearc4_full',
+            label: 'IV estimate',
+          },
+          right: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_region_dummies',
+            label: 'IV estimate (region dummies)',
+          },
+          tolerance: { rel: 0.25 },
+          label: 'IV ≈ IV (region)',
+          source: 'user',
+        },
+      ],
+    }
+    renderEditor(async () => undefined, twoIvSpecs)
+    const identity = screen.getByTestId('criterion-spec-ids')
+    expect(identity).toHaveTextContent('iv_nearc4_full')
+    expect(identity).toHaveTextContent('iv_region_dummies')
+    expect(identity).toBeVisible()
+  })
+
+  test('C3 criteria block stays display-only: no criterion mutation on render', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(onSave)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 < OLS 估计')
+    // The stored snapshot (spec ids, label) is untouched until an explicit save
+    expect(screen.getByTestId('criterion-spec-ids')).toHaveTextContent(
+      'iv_region_dummies · ols_region_dummies',
+    )
+    expect(onSave).not.toHaveBeenCalled()
+  })
 })
 
 describe('SpecificationSpacePanel run state (M2)', () => {

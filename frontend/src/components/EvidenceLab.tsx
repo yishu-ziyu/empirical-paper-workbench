@@ -556,7 +556,7 @@ export default function EvidenceLab({
   const surprise = research.surprise
   const criteria = research.expectation?.criteria
   const surpriseExpected = displaySurpriseExpected(criteria, t)
-  const surpriseObserved = displaySurpriseObserved(criteria, runs, t)
+  const surpriseObserved = displaySurpriseObserved(surprise, t)
 
   return (
     <section

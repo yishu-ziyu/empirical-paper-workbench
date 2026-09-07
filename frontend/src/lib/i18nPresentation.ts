@@ -18,16 +18,32 @@ type CriterionLike = {
   tolerance?: { abs?: number | null; rel?: number | null } | null
 }
 
-type SpecRunLike = {
-  id?: string | null
-  spec_id?: string | null
-  method?: string | null
+type ChangedDim = { dimension?: string; a?: string; b?: string }
+
+/** Backend display-only mirror of one resolved criterion side. */
+type CriterionOutcomeRef = {
+  source?: 'metric' | 'constant' | null
+  metric?: string | null
   estimator?: string | null
-  coef?: number | null
-  status?: string | null
+  spec_id?: string | null
+  run_id?: string | null
+  value?: number | null
 }
 
-type ChangedDim = { dimension?: string; a?: string; b?: string }
+type CriterionOutcomeLike = {
+  id?: string | null
+  outcome?: 'satisfied' | 'violated' | 'unresolved' | null
+  kind?: string | null
+  operator?: string | null
+  left?: CriterionOutcomeRef | null
+  right?: CriterionOutcomeRef | null
+  tolerance?: { abs?: number | null; rel?: number | null } | null
+}
+
+type SurpriseLike = {
+  status?: string | null
+  criterion_outcomes?: CriterionOutcomeLike[] | null
+} | null
 
 export const CARD_SPEC_IDS = [
   'ols_linear_exper',
@@ -79,17 +95,56 @@ function estimatorWord(estimator: string | null | undefined, t: Translate): stri
   return t('presentation.estimator.metric')
 }
 
+/** Compact number for constants and tolerances: 0.1 stays 0.1, 0.02 stays 0.02. */
+function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value)) return String(value)
+  const rounded = Math.round(value * 1e6) / 1e6
+  return String(rounded)
+}
+
+/** rel 0.05 -> "5%", 0.25 -> "25%", 0.125 -> "12.5%". */
+function formatRelTolerance(rel: number): string {
+  if (!Number.isFinite(rel)) return `${rel}%`
+  const pct = rel * 100
+  return `${Math.round(pct * 100) / 100}%`
+}
+
+/**
+ * Effective tolerance text, matching the backend judgment exactly:
+ * both slots empty means the backend default rel=0.25 is in force
+ * (research_lab.py distance branch) — show that, never a different one.
+ */
+function toleranceText(
+  tolerance: { abs?: number | null; rel?: number | null } | null | undefined,
+): string | null {
+  let abs = typeof tolerance?.abs === 'number' ? tolerance.abs : null
+  let rel = typeof tolerance?.rel === 'number' ? tolerance.rel : null
+  if (abs == null && rel == null) rel = 0.25
+  const parts: string[] = []
+  if (abs != null) parts.push(`±${formatCompactNumber(abs)}`)
+  if (rel != null) parts.push(`±${formatRelTolerance(rel)}`)
+  return parts.length ? parts.join(' / ') : null
+}
+
+function rightHandText(
+  right: MetricRef | number | null | undefined,
+  t: Translate,
+): string | null {
+  if (right == null) return null
+  if (typeof right === 'object') return estimatorWord(right.estimator, t)
+  return formatCompactNumber(right)
+}
+
 export function displayCriterionLabel(criterion: CriterionLike | null | undefined, t: Translate): string {
   if (!criterion) return t('presentation.criterion.missing')
   const left = estimatorWord(
     typeof criterion.left === 'object' ? criterion.left?.estimator : undefined,
     t,
   )
-  const rightRef = criterion.right && typeof criterion.right === 'object' ? criterion.right : null
-  const right = rightRef ? estimatorWord(rightRef.estimator, t) : null
   const kind = String(criterion.kind || '')
   const operator = String(criterion.operator || '')
-  if (kind === 'ordering' && right) {
+  const right = rightHandText(criterion.right, t)
+  if (kind === 'ordering' && right != null) {
     if (operator === 'lt') return `${left} < ${right}`
     if (operator === 'gt') return `${left} > ${right}`
     if (operator === 'eq') return `${left} = ${right}`
@@ -98,10 +153,34 @@ export function displayCriterionLabel(criterion: CriterionLike | null | undefine
     if (operator === 'positive') return t('presentation.criterion.positive', { left })
     if (operator === 'negative') return t('presentation.criterion.negative', { left })
   }
-  if (kind === 'distance' && right) {
-    return t('presentation.criterion.approx', { left, right })
+  if (kind === 'distance' && right != null) {
+    const tol = toleranceText(criterion.tolerance)
+    const base = t('presentation.criterion.approx', { left, right })
+    return tol ? `${base} ${tol}` : base
   }
-  return t('presentation.criterion.generic')
+  // No friendly localized shape for this combination: keep the stored
+  // original condition visible instead of silently dropping it.
+  const generic = t('presentation.criterion.generic')
+  const label = typeof criterion.label === 'string' ? criterion.label.trim() : ''
+  return label ? `${generic} · ${label}` : generic
+}
+
+/**
+ * Identity of the specification each side points at. Display channel for
+ * "same estimator, different spec" — the label alone says "IV estimate"
+ * for both iv_nearc4_full and iv_region_dummies; the spec_id is the
+ * authoritative selector and must stay viewable.
+ */
+export function criterionSpecIdentities(
+  criterion: CriterionLike | null | undefined,
+): { left: string | null; right: string | null } {
+  const leftRef = criterion?.left && typeof criterion.left === 'object' ? criterion.left : null
+  const rightRef =
+    criterion?.right && typeof criterion.right === 'object' ? criterion.right : null
+  return {
+    left: (leftRef?.spec_id && String(leftRef.spec_id)) || null,
+    right: (rightRef?.spec_id && String(rightRef.spec_id)) || null,
+  }
 }
 
 export function displaySpecLabel(
@@ -145,30 +224,6 @@ export function displayCompareWhy(changed: ChangedDim[] | undefined, t: Translat
   return t('presentation.why.little')
 }
 
-function runCoef(
-  ref: MetricRef | null | undefined,
-  runs: SpecRunLike[],
-): number | null {
-  if (!ref) return null
-  const specId = ref.spec_id
-  if (specId) {
-    for (let i = runs.length - 1; i >= 0; i -= 1) {
-      if (runs[i].spec_id === specId && typeof runs[i].coef === 'number') return runs[i].coef as number
-    }
-    return null
-  }
-  const estimator = String(ref.estimator || '').toLowerCase()
-  if (!estimator) return null
-  for (let i = runs.length - 1; i >= 0; i -= 1) {
-    const method = String(runs[i].method || '').toLowerCase()
-    const runEstimator = String(runs[i].estimator || '').toLowerCase()
-    if (estimator === method || estimator === runEstimator) {
-      if (typeof runs[i].coef === 'number') return runs[i].coef as number
-    }
-  }
-  return null
-}
-
 function formatCoef(value: number): string {
   return value.toFixed(4)
 }
@@ -181,30 +236,53 @@ export function displaySurpriseExpected(
   return criteria.map((item) => displayCriterionLabel(item, t)).join(' · ')
 }
 
+/**
+ * Observed values come ONLY from the backend evaluator's structured
+ * criterion_outcomes (run_id + value it actually read). The frontend
+ * never selects runs or coefs itself; unresolved outcomes contribute
+ * nothing and are never filled from another metric's numbers.
+ */
 export function displaySurpriseObserved(
-  criteria: CriterionLike[] | undefined,
-  runs: SpecRunLike[] | undefined,
+  surprise: SurpriseLike,
   t: Translate,
 ): string | null {
-  if (!criteria || criteria.length === 0 || !runs) return null
+  const outcomes = surprise?.criterion_outcomes
+  if (!outcomes || outcomes.length === 0) return null
   const parts: string[] = []
-  for (const criterion of criteria) {
-    const leftRef = criterion.left
-    const rightRef = criterion.right && typeof criterion.right === 'object' ? criterion.right : undefined
-    const leftValue = runCoef(leftRef, runs)
-    const rightValue = rightRef ? runCoef(rightRef, runs) : null
-    if (leftValue == null) continue
-    const left = estimatorWord(leftRef?.estimator, t)
-    if (criterion.kind === 'sign') {
-      parts.push(`${left} ${formatCoef(leftValue)}`)
+  for (const outcome of outcomes) {
+    if (!outcome || outcome.outcome === 'unresolved') continue
+    const left = outcome.left
+    if (!left || typeof left.value !== 'number') continue
+    const leftText = `${estimatorWord(left.estimator, t)} ${formatCoef(left.value)}`
+    const right = outcome.right
+    if (!right || typeof right.value !== 'number') {
+      parts.push(leftText)
       continue
     }
-    if (rightValue == null) continue
-    const right = estimatorWord(rightRef?.estimator, t)
-    const cmp = leftValue > rightValue ? '>' : leftValue < rightValue ? '<' : '='
-    parts.push(`${left} ${formatCoef(leftValue)} ${cmp} ${right} ${formatCoef(rightValue)}`)
+    const cmp = left.value > right.value ? '>' : left.value < right.value ? '<' : '='
+    const rightText =
+      right.source === 'constant'
+        ? formatCoef(right.value)
+        : `${estimatorWord(right.estimator, t)} ${formatCoef(right.value)}`
+    parts.push(`${leftText} ${cmp} ${rightText}`)
   }
   return parts.length ? parts.join(' · ') : null
+}
+
+/**
+ * Map the backend's actual claim evidence_status set — supported /
+ * insufficient / draft / approved, plus the display branches
+ * conditional / unsupported — onto honest localized wording. Missing
+ * or unknown values stay conservatively neutral: no affirmation, no
+ * denial, and never the supported wording.
+ */
+const CLAIM_STATUS_KEYS: Record<string, string> = {
+  supported: 'presentation.claim.card.supported',
+  conditional: 'presentation.claim.card.conditional',
+  unsupported: 'presentation.claim.card.unsupported',
+  insufficient: 'presentation.claim.card.insufficient',
+  draft: 'presentation.claim.card.draft',
+  approved: 'presentation.claim.card.approved',
 }
 
 export function displayClaimExplanation(
@@ -213,8 +291,8 @@ export function displayClaimExplanation(
   teachingCase?: string | null,
 ): string | null {
   if (teachingCase !== 'card_1995') return null
-  const status = evidenceStatus === 'conditional' ? 'conditional' : evidenceStatus === 'unsupported' ? 'unsupported' : 'supported'
-  return t(`presentation.claim.card.${status}`)
+  const key = CLAIM_STATUS_KEYS[String(evidenceStatus ?? '').trim()]
+  return t(key ?? 'presentation.claim.card.unknown')
 }
 
 export function displayAssumption(raw: string, t: Translate): string {

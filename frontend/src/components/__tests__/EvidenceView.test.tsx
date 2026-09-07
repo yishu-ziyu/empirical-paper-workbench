@@ -101,6 +101,7 @@ describe('EvidenceView provenance layers', () => {
         'true',
       )
     })
-    expect(screen.getByTestId('evidence-traceability')).toHaveTextContent('Fully traceable')
+    expect(screen.getByTestId('evidence-traceability')).toHaveTextContent('完全可溯源')
+    expect(screen.getByTestId('evidence-traceability')).not.toHaveTextContent('Fully traceable')
   })
 })

@@ -1,6 +1,15 @@
 // ── i18n 双语支持 ──
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { workbenchEn, workbenchZh } from './i18nWorkbench'
 
 export type Lang = 'zh' | 'en'
@@ -1146,8 +1155,10 @@ function interpolate(template: string, vars?: TranslateVars): string {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getInitialLang)
+  const langRef = useRef(lang)
+  langRef.current = lang
 
-  const setLang = (next: Lang) => {
+  const setLang = useCallback((next: Lang) => {
     setLangState(next)
     applyDocumentLang(next)
     try {
@@ -1155,19 +1166,21 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     } catch {
       // localStorage unavailable
     }
-  }
+  }, [])
 
   useEffect(() => {
     applyDocumentLang(lang)
   }, [lang])
 
-  const t: Translate = (key, vars) => interpolate(dict[lang][key] ?? key, vars)
+  // Stable identity: language switch must re-render UI (lang in context)
+  // without giving workspace restore a new `t` dependency.
+  const t = useCallback<Translate>((key, vars) => {
+    return interpolate(dict[langRef.current][key] ?? key, vars)
+  }, [])
 
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  )
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t])
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 export function useT() {

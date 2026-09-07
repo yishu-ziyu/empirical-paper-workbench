@@ -101,7 +101,8 @@ describe('WorkbenchArtifact research lab', () => {
     expect(screen.getByTestId('research-question-card')).toHaveTextContent('受教育年限')
     expect(screen.getByTestId('research-question-card')).toHaveTextContent('能力与家庭背景')
     expect(screen.getByTestId('research-question-card')).toHaveTextContent('大学邻近')
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('OLS association')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('OLS 关联')
+    expect(screen.getByTestId('research-question-card')).not.toHaveTextContent('OLS association')
     expect(screen.getByTestId('expectation-editor')).toBeInTheDocument()
 
     rerender(

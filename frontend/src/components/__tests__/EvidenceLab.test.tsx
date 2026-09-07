@@ -1,5 +1,6 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { LangPills } from '../UnauthHeader'
 import type { ReactElement } from 'react'
 import EvidenceLab from '../EvidenceLab'
 import type { ResearchLab } from '../../lib/workspace'
@@ -29,6 +30,23 @@ const research = {
     rationale_zh:
       '工具变量强度值得检查。Effective F = 14.14。强度诊断本身不能证明工具变量有效。',
     status: 'proposed',
+  },
+  expectation: {
+    text: 'OLS positive; IV may be smaller.',
+    confidence: 'medium',
+    version: 1,
+    history: [],
+    criteria: [
+      {
+        id: 'criterion.seed.iv-below-ols',
+        kind: 'ordering',
+        operator: 'lt',
+        left: { metric: 'estimate.coef', estimator: 'iv', spec_id: 'iv_region_dummies' },
+        right: { metric: 'estimate.coef', estimator: 'ols', spec_id: 'ols_region_dummies' },
+        label: 'IV estimate < OLS estimate',
+        source: 'seed',
+      },
+    ],
   },
   specification_space: {
     status: 'frozen',
@@ -116,6 +134,10 @@ const research = {
 } as unknown as ResearchLab
 
 describe('EvidenceLab', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   test('renders results space, matrix and compare from research payload', async () => {
     const onCompare = vi.fn(async () => ({
       coef_a: 0.08,
@@ -157,11 +179,43 @@ describe('EvidenceLab', () => {
     fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
     fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
     expect(await screen.findByTestId('evidence-compare-intent')).toHaveTextContent(
-      'Identification strategy changed',
+      '识别策略改变了',
     )
     expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('βA → βB')
     expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('Δ')
     expect(onCompare).toHaveBeenCalled()
+    expect(screen.getByTestId('evidence-compare')).toHaveTextContent('方法')
+    expect(screen.getByTestId('evidence-compare')).not.toHaveTextContent('Method')
+  })
+
+  test('English chrome localizes compare dimensions and surprise', async () => {
+    const onCompare = vi.fn(async () => ({
+      coef_a: 0.08,
+      coef_b: 0.13,
+      changed: [{ dimension: 'estimator', a: 'ols', b: 'iv' }],
+      unchanged: [{ dimension: 'experience', a: 'quadratic', b: 'quadratic' }],
+    }))
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab
+          research={research}
+          onPromote={vi.fn(async () => undefined)}
+          onRevert={vi.fn(async () => undefined)}
+          onAcceptChallenge={vi.fn(async () => undefined)}
+          onCompare={onCompare}
+        />
+      </>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
+    fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
+    expect(await screen.findByTestId('evidence-compare-intent')).toHaveTextContent(
+      'Identification strategy changed',
+    )
+    expect(screen.getByTestId('evidence-compare')).toHaveTextContent('Method')
+    expect(screen.getByTestId('evidence-compare')).not.toHaveTextContent('方法')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unexpected')
   })
 
   test('Unevaluated does not masquerade as Expected', () => {

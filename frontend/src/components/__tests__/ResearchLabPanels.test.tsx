@@ -88,6 +88,9 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       '意外判定',
     )
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
+      'IV 估计 < OLS 估计',
+    )
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent(
       'IV estimate < OLS estimate',
     )
     expect(screen.getByTestId('expectation-criterion')).toHaveAttribute('data-source', 'seed')
@@ -99,7 +102,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: '我觉得 IV 应该会更小一些，但并不确定。' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate < OLS estimate',
+      'IV 估计 < OLS 估计',
     )
     expect(screen.getByTestId('expectation-criterion-select')).toHaveValue('iv-lt-ols')
   })
@@ -111,7 +114,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: 'iv-gt-ols' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate > OLS estimate',
+      'IV 估计 > OLS 估计',
     )
     fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
@@ -217,7 +220,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: 'iv-gt-ols' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate < OLS estimate',
+      'IV 估计 < OLS 估计',
     )
   })
 
@@ -227,12 +230,12 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-approx-ols' },
     })
-    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV estimate ≈ OLS')
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 ≈ OLS 估计')
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-positive' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate is positive',
+      'IV 估计 为正',
     )
     fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())

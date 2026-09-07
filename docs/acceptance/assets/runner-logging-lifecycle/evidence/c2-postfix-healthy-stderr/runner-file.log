@@ -1,0 +1,291 @@
+2026-09-08 02:04:04,161 INFO runner_logging runner logging lifecycle configured: file=/private/tmp/econpaper-runner-logging-post-healthy-stderr/state/log/runner.log console=stderr
+2026-09-08 02:04:04,163 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,163 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("users")
+2026-09-08 02:04:04,163 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("research_sessions")
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("session_degradations")
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("data_migrations")
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("runs")
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,164 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("run_events")
+2026-09-08 02:04:04,165 INFO sqlalchemy.engine.Engine [raw sql] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,165 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:04,167 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,171 INFO sqlalchemy.engine.Engine SELECT data_migrations.name AS data_migrations_name, data_migrations.applied_at AS data_migrations_applied_at 
+FROM data_migrations 
+WHERE data_migrations.name = ?
+2026-09-08 02:04:04,171 INFO sqlalchemy.engine.Engine [generated in 0.00017s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,172 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:04,175 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,175 INFO sqlalchemy.engine.Engine CREATE TABLE IF NOT EXISTS data_migrations (name VARCHAR(120) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)
+2026-09-08 02:04:04,175 INFO sqlalchemy.engine.Engine [generated in 0.00009s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,176 INFO sqlalchemy.engine.Engine UPDATE data_migrations SET name = name WHERE 0
+2026-09-08 02:04:04,176 INFO sqlalchemy.engine.Engine [generated in 0.00034s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,177 INFO sqlalchemy.engine.Engine SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'
+2026-09-08 02:04:04,177 INFO sqlalchemy.engine.Engine [generated in 0.00010s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,178 INFO sqlalchemy.engine.Engine PRAGMA index_list(runs)
+2026-09-08 02:04:04,178 INFO sqlalchemy.engine.Engine [generated in 0.00006s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,178 INFO sqlalchemy.engine.Engine PRAGMA foreign_key_list(runs)
+2026-09-08 02:04:04,179 INFO sqlalchemy.engine.Engine [generated in 0.00008s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,179 INFO sqlalchemy.engine.Engine PRAGMA foreign_key_list(run_events)
+2026-09-08 02:04:04,179 INFO sqlalchemy.engine.Engine [generated in 0.00008s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,179 INFO sqlalchemy.engine.Engine PRAGMA index_list(runs)
+2026-09-08 02:04:04,179 INFO sqlalchemy.engine.Engine [cached since 0.001682s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine PRAGMA index_info('uq_runs_upload_idempotency')
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine [generated in 0.00008s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine PRAGMA index_info('uq_runs_session_active')
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine [generated in 0.00008s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine PRAGMA index_info('sqlite_autoindex_runs_2')
+2026-09-08 02:04:04,180 INFO sqlalchemy.engine.Engine [generated in 0.00005s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,181 INFO sqlalchemy.engine.Engine INSERT OR IGNORE INTO data_migrations (name, applied_at) VALUES (?, CURRENT_TIMESTAMP)
+2026-09-08 02:04:04,181 INFO sqlalchemy.engine.Engine [generated in 0.00007s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,181 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:04,182 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,182 INFO sqlalchemy.engine.Engine SELECT research_sessions.csv_path, research_sessions.state 
+FROM research_sessions
+2026-09-08 02:04:04,182 INFO sqlalchemy.engine.Engine [generated in 0.00006s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,183 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:04,184 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,185 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:04,185 INFO sqlalchemy.engine.Engine [generated in 0.00005s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,187 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:04,187 INFO sqlalchemy.engine.Engine [generated in 0.00022s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,187 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:04,389 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,389 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:04,389 INFO sqlalchemy.engine.Engine [cached since 0.2049s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,390 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:04,390 INFO sqlalchemy.engine.Engine [cached since 0.2037s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,391 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:04,593 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,593 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:04,594 INFO sqlalchemy.engine.Engine [cached since 0.409s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,596 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:04,596 INFO sqlalchemy.engine.Engine [cached since 0.4094s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,600 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:04,805 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:04,805 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:04,805 INFO sqlalchemy.engine.Engine [cached since 0.6209s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,806 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:04,806 INFO sqlalchemy.engine.Engine [cached since 0.6198s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:04,807 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:05,011 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:05,011 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:05,011 INFO sqlalchemy.engine.Engine [cached since 0.8262s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,012 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:05,012 INFO sqlalchemy.engine.Engine [cached since 0.8258s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,013 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:05,216 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:05,216 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:05,216 INFO sqlalchemy.engine.Engine [cached since 1.031s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,217 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:05,217 INFO sqlalchemy.engine.Engine [cached since 1.031s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,218 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:05,424 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:05,424 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:05,424 INFO sqlalchemy.engine.Engine [cached since 1.239s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,426 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:05,426 INFO sqlalchemy.engine.Engine [cached since 1.239s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,429 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:05,631 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:05,631 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:05,631 INFO sqlalchemy.engine.Engine [cached since 1.447s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,632 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:05,632 INFO sqlalchemy.engine.Engine [cached since 1.446s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,633 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:05,839 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:05,839 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:05,839 INFO sqlalchemy.engine.Engine [cached since 1.655s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,901 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:05,901 INFO sqlalchemy.engine.Engine [cached since 1.714s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,906 INFO sqlalchemy.engine.Engine UPDATE runs SET status=?, attempt=?, lease_owner=?, lease_expires_at=?, lease_epoch=?, next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:05,906 INFO sqlalchemy.engine.Engine [generated in 0.00023s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,908 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:05,908 INFO sqlalchemy.engine.Engine [generated in 0.00031s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:05,909 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:06,164 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,166 INFO sqlalchemy.engine.Engine SELECT runs.run_id 
+FROM runs 
+WHERE runs.run_id = ? AND runs.status IN (?, ?) AND runs.lease_owner = ? AND runs.lease_epoch = ? AND runs.lease_expires_at > ?
+2026-09-08 02:04:06,166 INFO sqlalchemy.engine.Engine [generated in 0.00047s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,168 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:06,422 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,422 INFO sqlalchemy.engine.Engine SELECT runs.run_id 
+FROM runs 
+WHERE runs.run_id = ? AND runs.status IN (?, ?) AND runs.lease_owner = ? AND runs.lease_epoch = ? AND runs.lease_expires_at > ?
+2026-09-08 02:04:06,423 INFO sqlalchemy.engine.Engine [cached since 0.2573s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,424 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:06,677 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,678 INFO sqlalchemy.engine.Engine SELECT runs.run_id 
+FROM runs 
+WHERE runs.run_id = ? AND runs.status IN (?, ?) AND runs.lease_owner = ? AND runs.lease_epoch = ? AND runs.lease_expires_at > ?
+2026-09-08 02:04:06,678 INFO sqlalchemy.engine.Engine [cached since 0.5126s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,679 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:06,827 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,827 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:06,827 INFO sqlalchemy.engine.Engine [cached since 2.642s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,828 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:06,828 INFO sqlalchemy.engine.Engine [generated in 0.00010s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,829 INFO sqlalchemy.engine.Engine UPDATE runs SET next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:06,829 INFO sqlalchemy.engine.Engine [generated in 0.00012s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,830 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:06,830 INFO sqlalchemy.engine.Engine [cached since 0.9218s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,830 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:06,832 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,832 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:06,832 INFO sqlalchemy.engine.Engine [cached since 2.647s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,832 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:06,832 INFO sqlalchemy.engine.Engine [cached since 0.004431s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,833 INFO sqlalchemy.engine.Engine UPDATE runs SET next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:06,833 INFO sqlalchemy.engine.Engine [cached since 0.003844s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,833 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:06,833 INFO sqlalchemy.engine.Engine [cached since 0.9254s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,834 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:06,836 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,836 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:06,836 INFO sqlalchemy.engine.Engine [cached since 2.651s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,838 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:06,839 INFO sqlalchemy.engine.Engine [cached since 0.01099s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,839 INFO sqlalchemy.engine.Engine UPDATE runs SET next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:06,840 INFO sqlalchemy.engine.Engine [cached since 0.01073s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,841 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:06,841 INFO sqlalchemy.engine.Engine [cached since 0.9328s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,841 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:06,930 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,930 INFO sqlalchemy.engine.Engine SELECT runs.run_id 
+FROM runs 
+WHERE runs.run_id = ? AND runs.status IN (?, ?) AND runs.lease_owner = ? AND runs.lease_epoch = ? AND runs.lease_expires_at > ?
+2026-09-08 02:04:06,930 INFO sqlalchemy.engine.Engine [cached since 0.7651s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,931 INFO sqlalchemy.engine.Engine ROLLBACK
+2026-09-08 02:04:06,946 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:06,947 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:06,947 INFO sqlalchemy.engine.Engine [cached since 2.762s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,947 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:06,947 INFO sqlalchemy.engine.Engine [cached since 0.1195s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,948 INFO sqlalchemy.engine.Engine UPDATE runs SET next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:06,948 INFO sqlalchemy.engine.Engine [cached since 0.1191s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,949 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:06,949 INFO sqlalchemy.engine.Engine [cached since 1.041s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:06,950 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:07,155 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:07,155 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:07,155 INFO sqlalchemy.engine.Engine [cached since 2.971s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,156 INFO sqlalchemy.engine.Engine SELECT runs.session_id 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:07,156 INFO sqlalchemy.engine.Engine [generated in 0.00011s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,157 INFO sqlalchemy.engine.Engine SELECT research_sessions.session_id, research_sessions.user_id, research_sessions.state, research_sessions.csv_path, research_sessions.metadata_json, research_sessions.created_at, research_sessions.updated_at 
+FROM research_sessions 
+WHERE research_sessions.session_id = ?
+2026-09-08 02:04:07,157 INFO sqlalchemy.engine.Engine [generated in 0.00011s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,158 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE runs.run_id = ?
+2026-09-08 02:04:07,158 INFO sqlalchemy.engine.Engine [cached since 0.3306s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,160 INFO sqlalchemy.engine.Engine UPDATE research_sessions SET state=?, csv_path=?, updated_at=? WHERE research_sessions.session_id = ?
+2026-09-08 02:04:07,160 INFO sqlalchemy.engine.Engine [generated in 0.00060s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,161 INFO sqlalchemy.engine.Engine UPDATE runs SET status=?, result=?, lease_owner=?, lease_expires_at=?, next_event_seq=?, updated_at=? WHERE runs.run_id = ?
+2026-09-08 02:04:07,161 INFO sqlalchemy.engine.Engine [generated in 0.00034s] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,162 INFO sqlalchemy.engine.Engine INSERT INTO run_events (run_id, seq, event_type, payload, created_at) VALUES (?, ?, ?, ?, ?)
+2026-09-08 02:04:07,162 INFO sqlalchemy.engine.Engine [cached since 1.254s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,162 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:07,164 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:07,164 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:07,164 INFO sqlalchemy.engine.Engine [cached since 2.98s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,165 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:07,165 INFO sqlalchemy.engine.Engine [cached since 2.978s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,166 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:07,368 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:07,368 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:07,368 INFO sqlalchemy.engine.Engine [cached since 3.183s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,369 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:07,369 INFO sqlalchemy.engine.Engine [cached since 3.182s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,370 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:07,571 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:07,572 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:07,572 INFO sqlalchemy.engine.Engine [cached since 3.387s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,572 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:07,572 INFO sqlalchemy.engine.Engine [cached since 3.386s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,573 INFO sqlalchemy.engine.Engine COMMIT
+2026-09-08 02:04:07,778 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-09-08 02:04:07,778 INFO sqlalchemy.engine.Engine BEGIN IMMEDIATE
+2026-09-08 02:04:07,778 INFO sqlalchemy.engine.Engine [cached since 3.594s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,779 INFO sqlalchemy.engine.Engine SELECT runs.run_id, runs.session_id, runs.kind, runs.status, runs.payload, runs.result, runs.error, runs.idempotency_key, runs.attempt, runs.lease_owner, runs.lease_expires_at, runs.lease_epoch, runs.next_event_seq, runs.created_at, runs.updated_at 
+FROM runs 
+WHERE (runs.status = ? OR runs.status IN (?, ?) AND runs.lease_expires_at < ?) AND (EXISTS (SELECT research_sessions.session_id 
+FROM research_sessions 
+WHERE research_sessions.session_id = runs.session_id)) ORDER BY runs.created_at
+ LIMIT ? OFFSET ?
+2026-09-08 02:04:07,779 INFO sqlalchemy.engine.Engine [cached since 3.592s ago] [SQL parameters hidden due to hide_parameters=True]
+2026-09-08 02:04:07,780 INFO sqlalchemy.engine.Engine COMMIT

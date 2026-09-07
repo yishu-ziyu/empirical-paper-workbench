@@ -407,6 +407,13 @@ def main() -> int:
             (evidence_dir / name).write_text(text, encoding="utf-8")
             summary[f"{name}_lines"] = len(text.splitlines())
 
+    # The durable file channel configured through ECONPAPER_RUNNER_LOG_FILE.
+    runner_file_log = state_root / "log" / "runner.log"
+    if runner_file_log.exists():
+        text = runner_file_log.read_text(encoding="utf-8", errors="replace")
+        (evidence_dir / "runner-file.log").write_text(text, encoding="utf-8")
+        summary["runner_file_log_lines"] = len(text.splitlines())
+
     (evidence_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

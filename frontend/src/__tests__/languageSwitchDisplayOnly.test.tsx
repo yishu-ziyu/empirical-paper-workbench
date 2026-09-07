@@ -1,7 +1,7 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from '../App'
-import { I18nProvider } from '../lib/i18n'
+import { I18nProvider, useT, type Translate } from '../lib/i18n'
 import { htmlLangAttr } from '../lib/i18n'
 import { ExpectationEditor } from '../components/ResearchLabPanels'
 import { TaskHelp } from '../components/TaskHelp'
@@ -13,17 +13,28 @@ function renderWithI18n(ui: React.ReactElement) {
 
 class FakeEventSource {
   static latest: FakeEventSource | null = null
+  static constructed = 0
   onmessage: ((event: MessageEvent<string>) => void) | null = null
   onerror: (() => void) | null = null
   closed = false
   url: string
   constructor(url: string) {
     this.url = url
+    FakeEventSource.constructed += 1
     FakeEventSource.latest = this
   }
   close() {
     this.closed = true
   }
+}
+
+function snapshotRestoreGets(calls: unknown[][]) {
+  return calls.filter((call) => {
+    const href = String(call[0])
+    const init = (call[1] || {}) as RequestInit
+    const method = String(init.method || 'GET').toUpperCase()
+    return method === 'GET' && /\/sessions\/sess-lang\/?$/.test(href)
+  })
 }
 
 function researchWrites(calls: unknown[][]) {
@@ -92,6 +103,7 @@ describe('language switch is display-only', () => {
     sessionStorage.clear()
     localStorage.setItem('econpaper_access_token', 'test-token-for-auth')
     FakeEventSource.latest = null
+    FakeEventSource.constructed = 0
     vi.stubGlobal('EventSource', FakeEventSource)
   })
   afterEach(() => {
@@ -264,9 +276,11 @@ describe('language switch is display-only', () => {
       </div>,
     )
     expect(screen.getByTestId('expectation-criterion-locked')).toBeInTheDocument()
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 < OLS 估计')
     fireEvent.click(screen.getByRole('button', { name: 'English' }))
     expect(onSave).not.toHaveBeenCalled()
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV estimate < OLS estimate')
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent('IV 估计')
     expect(screen.getByTestId('expectation-criterion-select')).toBeDisabled()
   })
 
@@ -283,5 +297,224 @@ describe('language switch is display-only', () => {
     fireEvent.click(screen.getByTestId('task-help-toggle'))
     fireEvent.click(screen.getByTestId('task-help-toggle'))
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  test('stable translator identity still reads the new language after switch', () => {
+    const seen: Translate[] = []
+    function Probe() {
+      const { t } = useT()
+      seen.push(t)
+      return <span data-testid="probe">{t('nav.overview')}</span>
+    }
+    renderWithI18n(
+      <div>
+        <LangPills />
+        <Probe />
+      </div>,
+    )
+    expect(screen.getByTestId('probe')).toHaveTextContent('总览')
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(screen.getByTestId('probe')).toHaveTextContent('Overview')
+    fireEvent.click(screen.getByRole('button', { name: '中文' }))
+    expect(screen.getByTestId('probe')).toHaveTextContent('总览')
+    expect(new Set(seen).size).toBe(1)
+  })
+
+  test('Scene A: evidence Compare stays open across zh→en→zh without restore GET', async () => {
+    const snapshot = cardSnapshot({
+      specification_space: {
+        status: 'frozen',
+        frozen_at: '2026-09-06T00:00:00+00:00',
+        revealed: true,
+        definitions: [],
+      },
+      specification_runs: [
+        {
+          id: 'run-ols-exact',
+          spec_id: 'ols_region_dummies',
+          label: 'OLS · 1966 region dummies',
+          method: 'ols',
+          coef: 0.08,
+          se: 0.01,
+          status: 'ok',
+          relation: 'exploratory',
+          choices: [{ dimension: 'estimator', value: 'ols' }],
+        },
+        {
+          id: 'run-iv-exact',
+          spec_id: 'iv_region_dummies',
+          label: 'IV · nearc4 with 1966 region dummies',
+          method: 'iv',
+          coef: 0.13,
+          se: 0.05,
+          status: 'ok',
+          relation: 'canonical',
+          choices: [{ dimension: 'estimator', value: 'iv' }],
+        },
+      ],
+    })
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-lang')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(snapshot) })
+      }
+      if (href.includes('/research/compare')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              coef_a: 0.08,
+              coef_b: 0.13,
+              delta_abs: 0.05,
+              changed: [{ dimension: 'estimator', a: 'ols', b: 'iv' }],
+              unchanged: [],
+              why_moved: 'Identification strategy changed',
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    localStorage.setItem('econpaper_session_id', 'sess-lang')
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('workbench-shell')).toBeInTheDocument()
+    fireEvent.click(await screen.findByTestId('rail-evidence'))
+    expect(await screen.findByTestId('evidence-lab')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
+    fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
+    expect(await screen.findByTestId('evidence-compare-intent')).toBeInTheDocument()
+    expect(screen.getByTestId('evidence-lab')).toHaveAttribute(
+      'data-selected-ids',
+      'run-ols-exact,run-iv-exact',
+    )
+    expect(screen.getByTestId('evidence-compare')).toHaveAttribute('data-expanded', 'true')
+    const restoresBefore = snapshotRestoreGets(mockFetch.mock.calls).length
+    const sourcesBefore = FakeEventSource.constructed
+    const writesBefore = researchWrites(mockFetch.mock.calls).length
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByRole('button', { name: '中文' }))
+    expect(screen.getByTestId('rail-evidence')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('evidence-lab')).toBeInTheDocument()
+    expect(screen.queryByTestId('overview-view')).not.toBeInTheDocument()
+    expect(screen.getByTestId('evidence-lab')).toHaveAttribute(
+      'data-selected-ids',
+      'run-ols-exact,run-iv-exact',
+    )
+    expect(screen.getByTestId('evidence-compare')).toHaveAttribute('data-expanded', 'true')
+    expect(snapshotRestoreGets(mockFetch.mock.calls).length).toBe(restoresBefore)
+    expect(FakeEventSource.constructed).toBe(sourcesBefore)
+    expect(researchWrites(mockFetch.mock.calls).length).toBe(writesBefore)
+    const mutating = mockFetch.mock.calls.filter((call) => {
+      const href = String(call[0])
+      const method = String(((call[1] || {}) as RequestInit).method || 'GET').toUpperCase()
+      return method !== 'GET' && /claim|promote|canonical|expectation|specification/.test(href)
+    })
+    expect(mutating).toEqual([])
+  })
+
+  test('Scene B: spec_run in progress does not rebuild EventSource on language switch', async () => {
+    const snapshot = cardSnapshot({
+      specification_space: {
+        status: 'frozen',
+        frozen_at: '2026-09-06T00:00:00+00:00',
+        revealed: false,
+        definitions: [],
+      },
+    })
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-lang')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...snapshot,
+              active_run: {
+                run_id: 'run-spec-live',
+                kind: 'spec_run',
+                status: 'RUNNING',
+              },
+            }),
+        })
+      }
+      if (href.includes('/runs/run-spec-live')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ status: 'RUNNING', kind: 'spec_run' }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    localStorage.setItem('econpaper_session_id', 'sess-lang')
+    renderWithI18n(<App />)
+    expect(await screen.findByTestId('workbench-shell')).toBeInTheDocument()
+    await waitFor(() => expect(FakeEventSource.latest).not.toBeNull())
+    const source = FakeEventSource.latest
+    const restoresBefore = snapshotRestoreGets(mockFetch.mock.calls).length
+    const sourcesBefore = FakeEventSource.constructed
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByRole('button', { name: '中文' }))
+    expect(FakeEventSource.constructed).toBe(sourcesBefore)
+    expect(FakeEventSource.latest).toBe(source)
+    expect(source?.closed).toBe(false)
+    expect(snapshotRestoreGets(mockFetch.mock.calls).length).toBe(restoresBefore)
+    expect(screen.getByTestId('workbench-shell')).toBeInTheDocument()
+  })
+
+  test('Scene C: unsaved expectation, tab, selected run, and help survive language switch', async () => {
+    const snapshot = cardSnapshot({
+      specification_space: {
+        status: 'frozen',
+        frozen_at: '2026-09-06T00:00:00+00:00',
+        revealed: true,
+        definitions: [],
+      },
+      specification_runs: [
+        {
+          id: 'run-ols-exact',
+          spec_id: 'ols_region_dummies',
+          method: 'ols',
+          coef: 0.07,
+          status: 'ok',
+          choices: [{ dimension: 'estimator', value: 'ols' }],
+        },
+        {
+          id: 'run-iv-exact',
+          spec_id: 'iv_region_dummies',
+          method: 'iv',
+          coef: 0.13,
+          status: 'ok',
+          choices: [{ dimension: 'estimator', value: 'iv' }],
+        },
+      ],
+    })
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-lang')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(snapshot) })
+      }
+      if (href.includes('/research/compare')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ coef_a: 0.07, coef_b: 0.13, changed: [], unchanged: [] }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    localStorage.setItem('econpaper_session_id', 'sess-lang')
+    renderWithI18n(<App />)
+    fireEvent.click(await screen.findByTestId('rail-evidence'))
+    expect(await screen.findByTestId('evidence-lab')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
+    fireEvent.click(screen.getByTestId('help-promote-toggle'))
+    expect(screen.getByTestId('help-promote-details')).toBeInTheDocument()
+    const restoresBefore = snapshotRestoreGets(mockFetch.mock.calls).length
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(screen.getByTestId('rail-evidence')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('evidence-lab')).toHaveAttribute('data-selected-ids', 'run-ols-exact')
+    expect(screen.getByTestId('help-promote-details')).toBeInTheDocument()
+    expect(snapshotRestoreGets(mockFetch.mock.calls).length).toBe(restoresBefore)
   })
 })

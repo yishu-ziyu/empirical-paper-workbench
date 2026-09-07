@@ -1,7 +1,9 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import type { Ref } from 'react'
+import type { ReactElement, Ref } from 'react'
 import AgentCursorRoot from '../AgentCursorLayer'
+import { I18nProvider } from '../../lib/i18n'
+import { LangPills } from '../UnauthHeader'
 import { useSemanticTarget } from '../../lib/agentCursor/useSemanticTarget'
 import { semanticTargetRegistry } from '../../lib/agentCursor/registry'
 import { useAgentCursor } from '../../lib/agentCursor/context'
@@ -14,6 +16,10 @@ function Target({ id }: { id: string }) {
       {id}
     </div>
   )
+}
+
+function renderLayer(ui: ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
 }
 
 function Controls() {
@@ -41,13 +47,14 @@ function Controls() {
 describe('AgentCursorLayer', () => {
   beforeEach(() => {
     semanticTargetRegistry.clear()
+    localStorage.clear()
   })
   afterEach(() => {
     semanticTargetRegistry.clear()
   })
 
   test('mounts overlay with pointer-events none and Agent identity', () => {
-    render(
+    renderLayer(
       <AgentCursorRoot
         workbenchTab="evidence"
         research={null}
@@ -61,11 +68,12 @@ describe('AgentCursorLayer', () => {
     const layer = screen.getByTestId('agent-cursor-layer')
     expect(layer).toHaveClass('pointer-events-none')
     expect(screen.getByTestId('agent-cursor')).toHaveClass('pointer-events-none')
-    expect(screen.getByTestId('agent-cursor')).toHaveTextContent('Agent')
+    expect(screen.getByTestId('agent-cursor')).toHaveTextContent('研究助手')
+    expect(screen.getByTestId('agent-cursor')).not.toHaveTextContent('Looking')
   })
 
   test('Show me / cancel / replay are available', () => {
-    render(
+    renderLayer(
       <AgentCursorRoot
         workbenchTab="evidence"
         research={null}
@@ -93,7 +101,7 @@ describe('AgentCursorLayer', () => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       }) as unknown as MediaQueryList)
-    render(
+    renderLayer(
       <AgentCursorRoot
         workbenchTab="evidence"
         research={null}
@@ -109,7 +117,7 @@ describe('AgentCursorLayer', () => {
   })
 
   test('cursor clamps to y >= 56 to avoid sticky header clipping', async () => {
-    render(
+    renderLayer(
       <AgentCursorRoot
         workbenchTab="evidence"
         research={null}
@@ -142,7 +150,7 @@ describe('AgentCursorLayer', () => {
   test('M3 full Show me finishes without hanging (<=6s of script time)', async () => {
     vi.useFakeTimers()
     try {
-      render(
+      renderLayer(
         <AgentCursorRoot
           workbenchTab="evidence"
           research={null}
@@ -179,7 +187,7 @@ describe('AgentCursorLayer', () => {
       }) as unknown as MediaQueryList)
     vi.useFakeTimers()
     try {
-      render(
+      renderLayer(
         <AgentCursorRoot
           workbenchTab="evidence"
           research={null}
@@ -207,7 +215,7 @@ describe('AgentCursorLayer', () => {
   test('M3 cancel removes highlight boxes from the DOM (no layer residue)', async () => {
     vi.useFakeTimers()
     try {
-      render(
+      renderLayer(
         <AgentCursorRoot
           workbenchTab="evidence"
           research={null}
@@ -242,7 +250,7 @@ describe('AgentCursorLayer', () => {
   test('M3 pointerdown pauses mid-play and Resume continues to done', async () => {
     vi.useFakeTimers()
     try {
-      render(
+      renderLayer(
         <AgentCursorRoot
           workbenchTab="evidence"
           research={null}
@@ -272,5 +280,29 @@ describe('AgentCursorLayer', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  test('overlay shows only current UI language and does not replay on switch', () => {
+    renderLayer(
+      <AgentCursorRoot
+        workbenchTab="evidence"
+        research={null}
+        onOpenEvidence={vi.fn()}
+        onRunPreview={vi.fn(async () => undefined)}
+      >
+        <LangPills />
+        <Controls />
+      </AgentCursorRoot>,
+    )
+    expect(screen.getByTestId('agent-cursor')).toHaveTextContent('研究助手')
+    expect(screen.getByTestId('agent-cursor-intent')).toHaveTextContent('正在查看')
+    expect(screen.getByTestId('agent-cursor')).not.toHaveTextContent('Looking')
+    const status = screen.getByTestId('cursor-status').textContent
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(screen.getByTestId('agent-cursor')).toHaveTextContent('Agent')
+    expect(screen.getByTestId('agent-cursor-intent')).toHaveTextContent('Looking')
+    expect(screen.getByTestId('agent-cursor')).not.toHaveTextContent('正在查看')
+    expect(screen.getByTestId('agent-cursor')).not.toHaveTextContent('研究助手')
+    expect(screen.getByTestId('cursor-status')).toHaveTextContent(status || 'idle')
   })
 })

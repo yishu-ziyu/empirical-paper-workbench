@@ -9,9 +9,9 @@
 | 内部对象 / 工程名 | 中文主界面 | 英文主界面 | 一句话帮助 |
 |---|---|---|---|
 | Canonical / canonical spec | 当前主分析 | Primary analysis | 报告和导出默认引用的那条估计。 |
-| Promote | 设为主分析 | Set as primary analysis | 把选中的设定改成报告里的主结果；预览在你确认前不会顶替它。 |
+| Promote | 设为主分析 | Set as primary analysis | 改论文和导出默认引用的主结果；已有结论仍绑定当时的证据。 |
 | Claim Ledger | 研究结论 | Research claims | 要写入论文前，需要你确认的结论及其三种措辞。 |
-| Stale | 证据已更新，请重新核对 | Evidence updated — review needed | 估计或主分析变了，旧结论不能继续当作已核对。 |
+| Stale | 证据已更新，请重新核对 | Evidence updated — review needed | 相关证据更新了，旧结论不能继续当作已核对。 |
 | Provenance | 数据与计算来源 | Data & calculation sources | 这条数字从哪份数据、哪次运行、哪条设定来。 |
 | Grounded | 已关联当前证据 | Linked to current evidence | 正文里的数字和结论仍指向现在的证据，而不是过期稿。 |
 | Research Question | 研究问题 | Research question | 这篇研究要回答什么。 |

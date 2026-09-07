@@ -4,7 +4,8 @@ Status: open
 
 基线：`main @ 87c5e5b726911130d4490efd10194ed4241817a5`（PR #31 squash merge；被验收 HEAD `0192c74d3190234f7836524f9a952980bc704f9f`）。
 分支：`review/localized-first-study`。
-设计对照（已打开正文）：Will's S *Design Principles*（Stay Out of the Way / Freedom to Explore / Concise Language / Hierarchy）；*Onboarding Tutorials vs. Contextual Help*（拉取式帮助，可关闭可再开，不打断任务）；*Progressive Disclosure*（细节按请求展开，但不得藏起关键假设、证据缺失或失败原因）。
+Round 2 起点：PR #32 HEAD `c9d36387ea6e2f554376fa046527b802a825387c`。外部独立验收 **REQUEST CHANGES**（P0-1…P1-5）。历史 validator 报告 `docs/acceptance/localized-first-study-validator.md` **不得改写**。Round 2 独立复核写入 `docs/acceptance/localized-first-study-r2-validator.md`。
+设计对照（已打开正文）：Will's S *Design Principles*（Stay Out of the Way / Freedom to Explore / Concise Language / Hierarchy）；*Onboarding Tutorials vs. Contextual Help*（拉取式帮助，可关闭可再开，不打断任务）；*Progressive Disclosure*（细节按请求展开，但不得藏起关键假设、证据缺失或失败原因）。帮助与术语文案按 Concise Language：最短、准确，不把 Promote 说成改写 Claim，不把 mismatch 说成 stale。
 
 ## Change
 
@@ -22,6 +23,10 @@ Status: open
 - 不新增未经验证的隐私、不训练或精度承诺。旧文案里「完全自动写论文」「数据仅用于本次会话」等必须先对照实现再决定去留。
 - 不强制八步导览，不要求先看完 Agent 演示才能操作。
 - 不自行 merge。
+- 不进入 Phase C。不夹带 issue #30、DiD 或 Research Continuity 实现。
+- 不改写 `localized-first-study-validator.md` 的历史 REJECT。
+- 不为压 lint 而只删掉 restore effect 的 `t` 依赖；必须证明会话恢复的语义边界：语言切换不得重跑 restore。
+- 不对任意后端句子做正则翻译；不把展示翻译写回 criterion / specification / claim 原文。
 
 ## Evaluator
 
@@ -36,6 +41,11 @@ Status: open
 - [x] C5 任务旁帮助，非强制导览 — 程序: vitest 键盘/焦点 + 隔离浏览器抽查 — 预期: 确认方案旁说明为何先确认再看结果；设为主分析旁说明会影响哪些报告；证据更新后提供重新核对入口。帮助可键盘访问、可关闭、无焦点陷阱。Agent 演示仍为用户主动触发，可暂停/继续/退出。不增加强制八步导览。关键假设、证据缺失、失败原因不被「简化」隐藏。无判据 / 缺指标 / 失败 / 重试两种语言都有对应文案。
 - [x] C6 zh/en 分别走完 Card 到 Results 并回跳证据 — 程序: 隔离浏览器（或现有 Card API + 前端状态机测试补浏览器截图）zh 一次、en 一次 — 预期: 空桌 → 体验一项真实研究 → Question/Expectation → 确认分析方案 → 运行 → 结果与证据 → 研究结论 → Paper Results → 能回跳证据。失败态与重试在两种语言都覆盖。1280 与 1440 桌面检查：不裁切、不重叠。成对截图归档 `docs/acceptance/assets/localized-first-study/`。
 - [x] C7 研究语义与质量门不退化 — 程序: `make test`；`cd frontend && npx tsc --noEmit && npm run lint && npm run build`；`make check-api-drift` — 预期: 全部 0 退出；无新增 skip。空判据仍 Unevaluated + `no_criteria`；有判据 Card 仍 Unexpected（IV>OLS，量级约 0.07/0.13）。不改统计结果。独立 PR，push 后核对 CI 对应最新 HEAD，不 merge。本修复不证明所有产品能力可上线。
+- [ ] C8 语言切换真正 display-only，不得重跑会话恢复 — 程序: 扩展 `frontend/src/__tests__/languageSwitchDisplayOnly.test.tsx`（及必要时 workspace restore 单测）；监测 restore snapshot GET、EventSource 构造次数、当前 tab、selected run ids、Compare 展开；不得只过滤非 GET。场景 A：停在 Results & evidence，选中精确 OLS run 与 IV run，Compare 展开，切换 zh→en→zh — 仍停在 Results & evidence，两个具体 run id 不变，Compare 仍展开，不回 Overview，不新建 Claim/Promote/Run，restore snapshot GET 次数不因切换增加，不重新 apply snapshot / 不 `setWorkbenchTab('overview')`。场景 B：`spec_run` 进行中切换语言 — active run id 不变，EventSource 不重复建立，不 abort/recover/resubmit，运行状态自然继续。场景 C：未保存预期文本、当前 tab、selected run、帮助开闭按契约保留。实现：为 translator 建稳定引用，和/或让 workspace orchestration 与 `t` 解耦（ref 读当前文案）。禁止只删 dependency 压 lint。
+- [ ] C9 核心路径真正单语言展示 — 程序: vitest 覆盖 OverviewView / EvidenceView / ResearchLabPanels / EvidenceLab / AgentCursorLayer；源码 grep 硬编码中文 chrome；zh/en 成对截图。预期: Overview 统计卡与进度（数据集、样本行数、主方法、上次运行、研究进度、完成、主结果、当前设定下的主要估计、为什么看证据、变量/系数/标准误/p 值等）全部走 i18n。EvidenceView 主张、失败/缺失、统计卡、表头、识别、稳健性、设定详情、provenance、行/列/trace、代码入口全部按界面语言。ResearchQuestion estimand 按当前界面语言；criterion 展示由 kind/operator/refs 生成，不把存储英文 label 当中文 UI；Card specification label/rationale 按稳定 semantic id 生成中/英展示。不写回 criterion/specification state。不从自由文本猜翻译。Results：surprise expected/observed、compare why、changed/unchanged 维名、Card claim 决策面、unresolved assumptions 按结构化数据本地化。权威 Claim 原文/版本/approval/provenance 不变，可用当前语言解释并提供「查看原文」。Agent Cursor：zh 只显示中文 intent，en 只显示英文 intent；fallback 「正在查看」/ “Looking”；身份「研究助手」/ “Agent”；切换语言不重播、不移动目标、不改 presentation 状态。允许：变量名、公式、代码、用户原文、来源标题、Card 1995、OLS、IV、β、SE、p、N。OLS/IV 缩写保留，任务旁帮助用当前界面语言解释。
+- [ ] C10 Promote / Stale 帮助语义正确 — 程序: 读 `docs/product/terminology.md` 与 `frontend/src/lib/i18nWorkbench.ts`；新增文案语义回归测试。预期: Promote/设为主分析不得再说「研究结论所依据的数字会跟着当前主分析走」。正确：当前主分析改变论文和导出默认引用的主结果；已有 Claim 仍绑定形成它时的证据；Claim 与主分析不一致时显示 mismatch；系统不会静默改写 Claim。Stale 不得再说「主分析变化就让 Claim stale」。正确：新的、与 Claim 相关的证据产生或证据集合变化 → Claim 需要重新核对；Promote / Revert existing run 是 decision event，本身不增加 `evidence_revision`；mismatch 与 stale 是不同状态。
+- [ ] C11 能力盘点路径与恢复承诺诚实 — 程序: 读 `docs/product/capability-inventory.md` 并对照 `backend/routers` / OpenAPI。预期: 上传路径写 `POST /upload`，不是不存在的 `/uploads`。导出写 `GET /sessions/{id}/doc-export` 与 `GET /sessions/{id}/code-export`，不是笼统 `/export`。会话恢复：若只支持浏览器保存的 session id，描述为「当前浏览器里的最近研究会话可在刷新或重新打开后恢复」，不作项目列表/跨设备发现承诺。界面语言在最终 zh/en 路径通过前，不提前标「已在明确范围验证」。
+- [ ] C12 Round 2 最终验收证据 — 程序: 独立 validator 针对 PR 最终 HEAD 写 `docs/acceptance/localized-first-study-r2-validator.md`；实现侧重新生成成对截图。预期: 至少 zh/en empty desk、question+expectation、analysis plans、results & evidence、Agent Cursor mid-demo、research claim、Paper Results、evidence provenance view。1280 与 1440 至少覆盖核心工作台页面。删除或明确标记拍摄于旧 source 的陈旧截图；文件名与画面状态一致。另提供语言切换连续证据：Evidence Compare open → switch language → same tab / same run ids / same Compare state。不把论文正文原语言视为系统 chrome 混杂；Claim 决策、按钮、状态、帮助必须使用当前 UI 语言。保留历史 REJECT 原文。不 merge。
 
 ## Evidence
 
@@ -51,6 +61,8 @@ Status 仍为 open，待外部 validator。实现证据见 `docs/acceptance/loca
 
 PR #31 闭环记录：外部 ACCEPT 审阅 HEAD `0192c74d3190234f7836524f9a952980bc704f9f`，squash merge SHA `87c5e5b726911130d4490efd10194ed4241817a5`。该契约 Status 在本分支文档提交中改为 closed，注明上述 SHA；不在 main 上单独追加未审提交。
 
+Round 2（REQUEST CHANGES，C8–C12）证据见 `docs/acceptance/localized-first-study-r2-implementer.md`；独立复核见 `docs/acceptance/localized-first-study-r2-validator.md`。Status 在 r2 validator ACCEPT 且用户未要求 merge 之前保持 **open**。
+
 ## Named relaxations
 
 - C6 浏览器使用隔离任务空间，不连接用户日常浏览器。若本地 `make dev` 端口被用户占用，改用隔离端口，并在证据中写明。失败/重试以 vitest + 词条覆盖；未拍到 boot-failure 截图。部分 EN 工作台截图拍于决策栏词条落地前，源码已改为 `t()`，截图可能仍显示旧中文栏。
@@ -59,3 +71,6 @@ PR #31 闭环记录：外部 ACCEPT 审阅 HEAD `0192c74d3190234f7836524f9a95298
 - C3 混杂检查允许清单写在测试里：OLS/IV/CSV/Stata/Excel/Card 1995 等专名；用户自由文本；公式；代码。
 - Card 系数本地 0.0747/0.1315 与 CI 0.0740/0.1323 记入盘点「复现待核」，本轮不改估计器、不把差异写成已证实的平台浮点误差。
 - 用户理解程度不在本契约用 Agent 代替真人试用。
+- C8 以 vitest 拦截 `fetch` + 计数 `EventSource` 构造为主证明 restore 不重跑；隔离浏览器补 Compare 连续截图。未另做后端会话快照 diff（与 C4 同一豁免）。
+- C9 论文正文、Claim 权威原文、变量名、公式、代码、来源标题保持原语言，不算系统 chrome 混杂。
+- C12 旧截图若文件名与画面不符，删除或在文件旁 `.stale.md` 标注拍摄源；不得把旧 source 截图冒充最终 HEAD。

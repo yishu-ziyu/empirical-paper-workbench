@@ -4,15 +4,24 @@ import { useAgentCursor } from '../lib/agentCursor/context'
 import { useSemanticTarget, useSemanticTargets } from '../lib/agentCursor/useSemanticTarget'
 import { TARGET } from '../lib/agentCursor/scripts'
 import { useT } from '../lib/i18n'
+import {
+  displayAssumption,
+  displayClaimExplanation,
+  displayCompareWhy,
+  displayDimension,
+  displaySpecLabel,
+  displaySurpriseExpected,
+  displaySurpriseObserved,
+} from '../lib/i18nPresentation'
 import { MethodHelp, TaskHelp } from './TaskHelp'
 
 type SpecRun = NonNullable<ResearchLab['specification_runs']>[number]
 
 const DIMS = [
-  { key: 'estimator', label: 'Method' },
-  { key: 'experience', label: 'Experience' },
-  { key: 'region', label: 'Region' },
-  { key: 'demographics', label: 'Demographics' },
+  { key: 'estimator' },
+  { key: 'experience' },
+  { key: 'region' },
+  { key: 'demographics' },
 ] as const
 
 function choiceValue(run: SpecRun, dimension: string): string {
@@ -183,6 +192,7 @@ function ClaimLedgerSection({
   claim,
   busy,
   mismatch,
+  teachingCase,
   onApprove,
   onPreparePaper,
   onPromoteSupporting,
@@ -191,6 +201,7 @@ function ClaimLedgerSection({
   claim: ClaimLedger
   busy: boolean
   mismatch: boolean
+  teachingCase?: string | null
   onApprove?: (claimId: string) => Promise<void>
   onPreparePaper?: () => Promise<void>
   onPromoteSupporting?: () => Promise<void>
@@ -198,6 +209,8 @@ function ClaimLedgerSection({
 }) {
   const { t } = useT()
   const stale = Boolean(claim.stale)
+  const explanation = displayClaimExplanation(claim.evidence_status, t, teachingCase)
+  const original = claim.claim_text || claim.supported_wording
   return (
     <section
       id="claim-ledger"
@@ -224,9 +237,24 @@ function ClaimLedgerSection({
           {t('claim.mismatch')}
         </p>
       ) : null}
-      <p data-testid="claim-text" className="mt-2 font-serif text-[1.15rem] leading-7 text-wb-ink">
-        {claim.claim_text || claim.supported_wording}
+      {explanation ? (
+        <p data-testid="claim-explanation" className="mt-2 font-serif text-[1.15rem] leading-7 text-wb-ink">
+          {explanation}
+        </p>
+      ) : null}
+      <p data-testid="claim-text" className={explanation ? 'sr-only' : 'mt-2 font-serif text-[1.15rem] leading-7 text-wb-ink'}>
+        {original}
       </p>
+      {explanation && original ? (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-[12px] text-wb-muted">
+            {t('presentation.claim.viewOriginal')}
+          </summary>
+          <p lang="en" data-testid="claim-original" className="mt-1 text-[13px] text-wb-muted">
+            {original}
+          </p>
+        </details>
+      ) : null}
       <dl className="mt-3 space-y-2 text-[13px] leading-6">
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
@@ -255,7 +283,8 @@ function ClaimLedgerSection({
       </dl>
       {claim.unresolved_assumptions && claim.unresolved_assumptions.length > 0 ? (
         <p className="mt-3 text-[12px] leading-5 text-wb-muted">
-          {t('claim.unresolved')}: {claim.unresolved_assumptions.join(' · ')}
+          {t('claim.unresolved')}:{' '}
+          {claim.unresolved_assumptions.map((item) => displayAssumption(item, t)).join(' · ')}
         </p>
       ) : null}
       {stale ? (
@@ -525,9 +554,16 @@ export default function EvidenceLab({
   }, [displayedRuns])
 
   const surprise = research.surprise
+  const criteria = research.expectation?.criteria
+  const surpriseExpected = displaySurpriseExpected(criteria, t)
+  const surpriseObserved = displaySurpriseObserved(criteria, runs, t)
 
   return (
-    <section data-testid="evidence-lab" className="mx-auto max-w-[52rem] space-y-6 px-6 py-8">
+    <section
+      data-testid="evidence-lab"
+      data-selected-ids={selected.join(',')}
+      className="mx-auto max-w-[52rem] space-y-6 px-6 py-8"
+    >
       {/* 1. Header */}
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
@@ -577,14 +613,14 @@ export default function EvidenceLab({
           ) : null}
           {surprise.status !== 'Unevaluated' &&
           surprise.status !== 'Inconclusive' &&
-          surprise.expected ? (
+          surpriseExpected ? (
             <p className="mt-1 text-[12px] text-wb-muted">
-              {t('evidence.expected')}: {surprise.expected}
+              {t('evidence.expected')}: {surpriseExpected}
             </p>
           ) : null}
-          {surprise.observed ? (
+          {surpriseObserved ? (
             <p className="text-[12px] text-wb-muted">
-              {t('evidence.observed')}: {surprise.observed}
+              {t('evidence.observed')}: {surpriseObserved}
             </p>
           ) : null}
         </div>
@@ -688,7 +724,7 @@ export default function EvidenceLab({
                   >
                     <td className="px-3 py-2 text-wb-ink">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span>{run.label || run.spec_id}</span>
+                        <span>{displaySpecLabel(run.spec_id, t, lang, run.label)}</span>
                         {groupRuns.length > 1 ? (
                           <button
                             type="button"
@@ -744,6 +780,7 @@ export default function EvidenceLab({
       {/* 4. Compare / Why did it move? */}
       <section
         data-testid="evidence-compare"
+        data-expanded={selectedRuns.length === 2 ? 'true' : 'false'}
         className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
       >
         <h3 className="font-serif text-[1.1rem] text-wb-ink">{t('evidence.compare')}</h3>
@@ -755,13 +792,17 @@ export default function EvidenceLab({
               {comparison.deltaPct != null ? ` · ${comparison.deltaPct.toFixed(1)}%` : ''}
             </p>
             <p data-testid="evidence-compare-intent">
-              {comparison.why || '…'}
+              {displayCompareWhy(comparison.changed, t)}
             </p>
             <p className="text-[12px] text-wb-muted">
-              {t('evidence.changed')}: {comparison.changed.map((item) => item.dimension).join(', ') || t('evidence.none')}
+              {t('evidence.changed')}:{' '}
+              {comparison.changed.map((item) => displayDimension(item.dimension, t)).join(', ') ||
+                t('evidence.none')}
             </p>
             <p className="text-[12px] text-wb-muted">
-              {t('evidence.unchanged')}: {comparison.unchanged.map((item) => item.dimension).join(', ') || t('evidence.none')}
+              {t('evidence.unchanged')}:{' '}
+              {comparison.unchanged.map((item) => displayDimension(item.dimension, t)).join(', ') ||
+                t('evidence.none')}
             </p>
           </div>
         ) : (
@@ -934,6 +975,7 @@ export default function EvidenceLab({
               claim={claim}
               busy={busy}
               mismatch={mismatch}
+              teachingCase={research.teaching_case}
               onApprove={onApproveClaim}
               onPreparePaper={onPreparePaper}
               onPromoteSupporting={

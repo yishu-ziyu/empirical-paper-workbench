@@ -216,7 +216,7 @@ describe('C3 刷新恢复走后端 snapshot', () => {
     fireEvent.click(screen.getByTestId('rail-design'))
     expect(screen.getByTestId('spec-space')).toBeInTheDocument()
     expect(screen.getByTestId('spec-space-freeze')).toBeInTheDocument()
-    expect(screen.getByTestId('spec-space')).toHaveTextContent('OLS · linear experience')
+    expect(screen.getByTestId('spec-space')).toHaveTextContent('OLS · 线性经验')
   })
 
   test('storage 清空后从 snapshot 恢复 specification_runs 与 claim', async () => {
@@ -316,7 +316,7 @@ describe('C3 刷新恢复走后端 snapshot', () => {
       'Education is positively associated with earnings.',
     )
     expect(screen.getByTestId('claim-approved')).toHaveTextContent('已批准')
-    expect(screen.getByTestId('evidence-lab')).toHaveTextContent('OLS · linear experience')
+    expect(screen.getByTestId('evidence-lab')).toHaveTextContent('OLS · 线性经验')
   })
 })
 

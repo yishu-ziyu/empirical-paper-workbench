@@ -29,7 +29,7 @@ Card 系数：**本地 OLS/IV 约 0.0747 / 0.1315，CI 约 0.0740 / 0.1323。记
 
 - **用户任务**：把 CSV / Stata / Excel 送进研究会话，看到类型与清洗留痕。
 - **界面入口**：空桌「使用自己的数据」；工作台 Data；拖放 `CsvDropZone`。
-- **生产执行路径**：`POST /uploads` → `upload_pipeline` run → 清洗八步（profiling → merge → missing → outliers → transform → filter → balance → audit）。
+- **生产执行路径**：`POST /upload` → `upload_pipeline` run → 清洗八步（profiling → merge → missing → outliers → transform → filter → balance → audit）。
 - **持久化对象**：session dataset、cleaning report、run 档案、provenance（来源/校验和在 Card 种子上更完整）。
 - **已有验证**：`backend/tests/test_upload.py`、`test_clean.py`、`test_postgres_upload_recovery.py`；前端 `CsvDropZone` / `CleanWizard` 测。
 - **适用范围**：网页工作台；开发与测试环境。
@@ -211,7 +211,7 @@ Card 系数：**本地 OLS/IV 约 0.0747 / 0.1315，CI 约 0.0740 / 0.1323。记
 
 - **用户任务**：导出 Word / LaTeX / PDF 与 Python / Stata / R / EViews 脚本。
 - **界面入口**：工作台导出按钮；`DocExportDialog` / `CodeExportDialog`。
-- **生产执行路径**：`/export`、`/code-export`。
+- **生产执行路径**：`GET /sessions/{id}/doc-export`、`GET /sessions/{id}/code-export`。
 - **持久化对象**：导出文件（会话产出）。
 - **已有验证**：`test_doc_export.py`、`test_code_export.py`、对应前端测。
 - **适用范围**：已写出可导出章节。
@@ -224,16 +224,16 @@ Card 系数：**本地 OLS/IV 约 0.0747 / 0.1315，CI 约 0.0740 / 0.1323。记
 ## 会话恢复
 
 - **用户任务**：刷新或重开后回到同一研究，而不是从头编状态。
-- **界面入口**：同一 origin + 已存 session id。
+- **界面入口**：当前浏览器里保存的 session id。
 - **生产执行路径**：`GET /sessions/{id}` snapshot；`active_run` 重新订阅。
 - **持久化对象**：后端 snapshot；浏览器只存 session id 与短命令键。
 - **已有验证**：`SnapshotRecovery.test.tsx`；upload recovery 测。
-- **适用范围**：同一账号可访问的会话。
-- **依赖条件**：后端仍有该 session。
-- **限制**：清空 session id 等于新研究。界面语言在 `localStorage econpaper_lang`，不是研究状态。
-- **允许对外使用的描述**：刷新后研究状态从服务器恢复。
+- **适用范围**：当前浏览器里的最近研究会话。
+- **依赖条件**：后端仍有该 session；同一 origin 的 localStorage 仍有 session id。
+- **限制**：没有项目列表，也没有跨设备发现。清空 session id 等于新研究。界面语言在 `localStorage econpaper_lang`，不是研究状态。
+- **允许对外使用的描述**：当前浏览器里的最近研究会话可在刷新或重新打开后恢复。
 - **下一步**：无。
-- **状态**：已在明确范围验证（Card 与上传恢复范围内）。
+- **状态**：已在明确范围验证（当前浏览器 session id 恢复范围内）。
 
 ## 登录与归属
 
@@ -255,13 +255,13 @@ Card 系数：**本地 OLS/IV 约 0.0747 / 0.1315，CI 约 0.0740 / 0.1323。记
 - **界面入口**：空桌与工作台语言切换（`LangSwitch` / `LangPills`）。
 - **生产执行路径**：`I18nProvider` / `useT`；`localStorage econpaper_lang`；`document.documentElement.lang` 为 `zh-CN` 或 `en`。
 - **持久化对象**：仅浏览器语言偏好。研究对像不因切换而重写。
-- **已有验证**：本契约 C3–C4 测试（本轮补）。
+- **已有验证**：C3–C4 与本轮 C8–C9 测试（语言切换不重跑 restore；核心路径单语言）。
 - **适用范围**：系统 chrome。变量名、公式、用户原文、专名、OLS/IV 可保持原样。
 - **依赖条件**：无。
-- **限制**：**文稿语言未实现。** 没有「论文用中文/英文写」的开关。切换界面语言不得 PUT 翻译后的 criterion label，不得改 claim / canonical / evidence_revision。
+- **限制**：**文稿语言未实现。** 没有「论文用中文/英文写」的开关。切换界面语言不得 PUT 翻译后的 criterion label，不得改 claim / canonical / evidence_revision，不得重跑会话恢复。
 - **允许对外使用的描述**：界面可在中文与英文之间切换；只改变显示。
-- **下一步**：本轮完成核心路径分流。
-- **状态**：本轮目标为已在明确范围验证（核心路径）；实施前为已有实现但缺完整端到端证据。
+- **下一步**：独立 validator 按 C8–C12 复核。
+- **状态**：已有实现但缺完整端到端证据。
 
 ## 上手入口
 

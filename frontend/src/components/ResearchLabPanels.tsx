@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import type { components } from '../types/api'
 import type { ResearchLab } from '../lib/workspace'
 import { useT } from '../lib/i18n'
+import {
+  displayCriterionLabel,
+  displayEstimand,
+  displaySpecLabel,
+  displaySpecRationale,
+} from '../lib/i18nPresentation'
 import { MethodHelp, TaskHelp } from './TaskHelp'
 
 type ExpectationCriterion = components['schemas']['ExpectationCriterion']
@@ -57,9 +63,6 @@ export function ResearchQuestionCard({ question }: { question: NonNullable<Resea
   const treatment = named(question.treatment)
   const threat = named(question.causal_threat)
   const ident = named(question.identification)
-  const estimand = question.estimand && typeof question.estimand === 'object'
-    ? (question.estimand as Record<string, string>)
-    : {}
   const promptEn = typeof question.prompt_en === 'string' ? question.prompt_en.trim() : ''
   const promptZh = typeof question.prompt_zh === 'string' ? question.prompt_zh.trim() : ''
   const primary = lang === 'zh' ? promptZh || promptEn : promptEn || promptZh
@@ -93,8 +96,12 @@ export function ResearchQuestionCard({ question }: { question: NonNullable<Resea
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
           {t('question.estimand')}
         </p>
-        <p className="mt-1 text-[14px] leading-6 text-wb-ink">{estimand.ols || '—'}</p>
-        <p className="mt-1 text-[14px] leading-6 text-wb-ink">{estimand.iv || '—'}</p>
+        <p className="mt-1 text-[14px] leading-6 text-wb-ink">
+          {displayEstimand('ols', t, { questionId: question.id })}
+        </p>
+        <p className="mt-1 text-[14px] leading-6 text-wb-ink">
+          {displayEstimand('iv', t, { questionId: question.id })}
+        </p>
         <div className="mt-2 space-y-2">
           <MethodHelp method="OLS" />
           <MethodHelp method="IV" />
@@ -327,7 +334,7 @@ export function ExpectationEditor({
                 className="flex items-center gap-2 text-[13px] leading-5 text-wb-ink"
               >
                 <span aria-hidden className="text-wb-primary">◇</span>
-                {criterion.label}
+                {displayCriterionLabel(criterion, t)}
               </li>
             ))}
           </ul>
@@ -442,7 +449,7 @@ export function SpecificationSpacePanel({
   failure?: { category: string } | null
   onRetryRun?: () => void
 }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [busy, setBusy] = useState(false)
   const definitions = space.definitions ?? []
   const runLabel = running
@@ -538,8 +545,12 @@ export function SpecificationSpacePanel({
             key={item.id}
             className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
           >
-            <p className="text-[14px] font-medium text-wb-ink">{item.label}</p>
-            <p className="mt-1 text-[12px] leading-5 text-wb-muted">{item.rationale}</p>
+            <p className="text-[14px] font-medium text-wb-ink">
+              {displaySpecLabel(item.id, t, lang, item.label)}
+            </p>
+            <p className="mt-1 text-[12px] leading-5 text-wb-muted">
+              {displaySpecRationale(item.id, t, lang, item.rationale)}
+            </p>
             <p className="mt-1 font-mono text-[11px] text-wb-faint">
               {item.id} · {item.dimension}={item.value} ·{' '}
               {item.admissible ? item.user_decision : t('spec.unavailable')}

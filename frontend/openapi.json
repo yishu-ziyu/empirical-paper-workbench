@@ -7741,6 +7741,21 @@
             },
             "type": "array",
             "title": "Criterion Outcomes"
+          },
+          "unevaluated_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_criteria",
+                  "unresolved_metrics"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unevaluated Reason"
           }
         },
         "additionalProperties": true,

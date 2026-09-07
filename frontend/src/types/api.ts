@@ -3243,6 +3243,8 @@ export interface components {
             unresolved_criterion_ids?: string[];
             /** Criterion Outcomes */
             criterion_outcomes?: components["schemas"]["CriterionOutcomeResponse"][];
+            /** Unevaluated Reason */
+            unevaluated_reason?: ("no_criteria" | "unresolved_metrics") | null;
         } & {
             [key: string]: unknown;
         };

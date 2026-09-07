@@ -168,6 +168,7 @@ describe('EvidenceLab', () => {
               expected: 'ATT positive',
               observed: null,
               unresolved_criterion_ids: ['criterion.future-att'],
+              unevaluated_reason: 'unresolved_metrics',
             },
           } as unknown as ResearchLab
         }
@@ -183,7 +184,40 @@ describe('EvidenceLab', () => {
     expect(screen.getByTestId('evidence-surprise-unevaluated')).toHaveTextContent(
       '尚未判定：所需证据还没有产生',
     )
+    expect(screen.queryByTestId('evidence-surprise-no-criteria')).not.toBeInTheDocument()
     expect(card).not.toHaveTextContent('Expected')
+  })
+
+  test('no_criteria Unevaluated explains missing expectation, not missing evidence', () => {
+    render(
+      <EvidenceLab
+        research={
+          {
+            ...research,
+            surprise: {
+              status: 'Unevaluated',
+              expected: null,
+              observed: null,
+              unevaluated_reason: 'no_criteria',
+              criterion_ids: [],
+            },
+          } as unknown as ResearchLab
+        }
+        onPromote={vi.fn(async () => undefined)}
+        onRevert={vi.fn(async () => undefined)}
+        onAcceptChallenge={vi.fn(async () => undefined)}
+        onCompare={vi.fn(async () => ({}))}
+      />,
+    )
+    const card = screen.getByTestId('evidence-surprise')
+    expect(card).toHaveAttribute('data-status', 'Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-no-criteria')).toHaveTextContent(
+      '尚未判定：尚未设置可检验的预期。',
+    )
+    expect(screen.queryByTestId('evidence-surprise-unevaluated')).not.toBeInTheDocument()
+    expect(card).not.toHaveTextContent('Expected')
+    expect(card).not.toHaveTextContent('所需证据还没有产生')
   })
 
   test('Inconclusive does not masquerade as Expected', () => {

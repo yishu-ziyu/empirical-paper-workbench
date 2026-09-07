@@ -1,11 +1,11 @@
 # 验收契约：Generic Research Spine 加固（Expectation → Run → Surprise → Explanation → Recovery）
 
-Status: closed（2026-09-07 第二次外部独立验收 REQUEST CHANGES 后，只修 M1 P0 r2。validator 按 C29–C37 程序复核 ACCEPT。C1–C28 既有证据保留，未弱化。M0 / M2 / M3 / M4 实现未改。）
+Status: ready for external review（2026-09-07 空判据分支：本地 validator 按 C38–C42 程序 ACCEPT。契约不 closed、PR 不 merge。C1–C37 既有证据保留，未弱化。C3④ / C34「无判据纯文本仍为 Expected」是当时的仓库契约特例，已废止；新裁决见 C38–C42。M0 / M2 / M3 / M4 实现未改。issue #30 不在本 PR。）
 
-基线：`main @ ac62d4a0457c80e480aa335a362040acc650b3af`，分支 `review/generic-research-spine-hardening`。
+基线：`review/generic-research-spine-hardening @ 1aa5e95cc66704d5755518eec099831e5c1c2b73`（PR #31 OPEN）。
 事实来源：`card-canonical-research-experience-validator.md` 追加的 J–Q first-user audit（2026-09-06，verdict B）。
 本契约实现 M1–M4；Infra follow-up（BrokenPipe）只判定与记录，不在本分支修。
-外部复核范围：ExpectationCriterion 必须绑定确切 Evidence，schema/evaluator fail-closed，Expected / Unexpected / Unevaluated / Inconclusive 分开，揭晓后判据锁定。
+外部复核范围：空判据不得显示 Expected；采用现有 Unevaluated + 稳定原因码 `no_criteria`；正常 Card 判据不退化。
 
 部分已解析、部分 unresolved、且无 violation 的聚合状态稳定名为 **Inconclusive**。
 
@@ -32,7 +32,7 @@ Status: closed（2026-09-07 第二次外部独立验收 REQUEST CHANGES 后，�
 
 - [ ] C1 Card 种子建立结构化判据 — 程序: `cd econpaper && python -m pytest backend/tests -k "seed" -x -q`（含新增测试）— 预期: 新建 Card lab 的 `expectation.criteria` 恰含一条 `source="seed"` 判据：`kind="ordering"`、`operator="lt"`、`left` 指向 IV 系数、`right` 指向 OLS 系数、label 含 "IV estimate < OLS estimate"。
 - [ ] C2 PUT 语义：显式修改、绝不暗中重猜 — 程序: `python -m pytest backend/tests -k "expectation" -x -q`（含新增测试）— 预期: ① PUT 带 `criteria` 字段时按提交值原样持久化；② PUT 不带 `criteria` 时现有 criteria 保持不变（text 改成任何自由文本都不触发从文本重解析）；③ criteria 与 version/history 一起进 `ExpectationResponse`。
-- [ ] C3 evaluate_surprise 只消费 criteria — 程序: `python -m pytest backend/tests -k "surprise" -x -q`（含新增/改写测试）— 预期: ① 判据 IV<OLS + 真实量级 runs（OLS 0.0747 / IV 0.1315）→ `status="Unexpected"`、observed 表达 IV > OLS、kind 为 ordering mismatch 族；② 判据满足时 `Expected`；③ sign（positive/negative）与 distance（approx + tolerance）算子有确定性测试；④ 无判据（纯文本）→ `Expected` + 不抛错。
+- [ ] C3 evaluate_surprise 只消费 criteria — 程序: `python -m pytest backend/tests -k "surprise" -x -q`（含新增/改写测试）— 预期: ① 判据 IV<OLS + 真实量级 runs（OLS 0.0747 / IV 0.1315）→ `status="Unexpected"`、observed 表达 IV > OLS、kind 为 ordering mismatch 族；② 判据满足时 `Expected`；③ sign（positive/negative）与 distance（approx + tolerance）算子有确定性测试；④ **历史特例（已废止）**：无判据（纯文本）→ `Expected` + 不抛错。新裁决见 C38：无结构化判据 → `Unevaluated` + `unevaluated_reason="no_criteria"`，不得为 `Expected`。
 - [ ] C4 keyword contract 删除 — 程序: `grep -rn "_mentions_iv\|_mentions_similar\|_mentions_positive" backend/ frontend/src/ ; echo EXIT:$?` — 预期: 无匹配（EXIT:1）。`evaluate_surprise` 不再有任何自由文本短语分支。
 - [ ] C5 命名通用 + API drift 门 — 程序: `grep -rn "CardExpectation" backend/ frontend/src/ | wc -l` 为 0；类型名 `ExpectationCriterion` / `EvidenceMetricRef`（或等价通用名）；`make check-api-drift` 绿 — 预期: openapi.json、docs/api/openapi.json、frontend/types/api.ts 同步包含 criteria 模型。
 - [ ] C6 UI 显式判定块 — 程序: `cd frontend && npx vitest run src/components/__tests__ -t "Expectation" -q`（含新增断言）+ 浏览器抽查 — 预期: Expectation 编辑器在 textarea 下方渲染 `Surprise condition · 意外判定` 块，显示当前判据（如 "IV estimate < OLS estimate"）；改 textarea 文本不改变该块；提供显式控件修改判据（改后保存即生效），无任何"从文本重猜"路径。
@@ -47,10 +47,27 @@ M0 / M2 / M3 / M4 已认可：Run specifications 进度与自动转场、Agent C
 - [x] C31 UI 改判定方向必须保留已有 metric refs — 程序: `cd frontend && npx vitest run src/components/__tests__/ResearchLabPanels.test.tsx -t "preserves exact spec_id"` — 预期: 修改判定方向只改变 `kind` / `operator` / `tolerance` / `label` / `source`；已有 `left`/`right` 及 `spec_id` 原样保留；不得用前端 `IV_METRIC` / `OLS_METRIC` 常量覆盖精确引用。
 - [x] C32 criterion schema fail-closed，非法组合 422 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "invalid_criterion or empty_selector or negative_tolerance" -q` — 预期: 合法组合只有 (A) sign：operator 为 positive|negative，right 必须为空，tolerance 必须为空；(B) ordering：operator 为 lt|gt，right 必须存在；(C) distance：operator 为 approx，right 必须存在，tolerance.abs / tolerance.rel 若存在必须 >= 0。EvidenceMetricRef 至少要有 spec_id 或 estimator 之一；空 selector 无效。非法组合由 API 返回 422，不得写入 state。
 - [x] C33 严格数学边界 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "equality or zero_boundary" -q` — 预期: lt 只有 left < right 才满足，left >= right 都算违反；gt 只有 left > right 才满足，left <= right 都算违反；positive 只有 value > 0 才满足，value <= 0 都算违反；negative 只有 value < 0 才满足，value >= 0 都算违反。含 equality 与 zero 测试。
-- [x] C34 Expected / Unexpected / Unevaluated / Inconclusive 必须分开 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "surprise_unresolvable or surprise_inconclusive or surprise_without_criteria" -q` 与 `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx src/components/__tests__/AgentRail.test.tsx` — 预期: 每条 criterion 产生 satisfied / violated / unresolved。聚合：任意已解析 criterion violated → Unexpected；全部已解析且全部 satisfied → Expected；0 条可解析 → Unevaluated；部分已解析、部分 unresolved、且无 violation → Inconclusive。无判据纯文本仍为 Expected。Surprise read model 至少含 `evaluated_criterion_ids`、`unresolved_criterion_ids`、`expectation_version`。`test_surprise_unresolvable_metric_stays_silent` 不得再断言 status == Expected。UI：Unevaluated 不得显示绿色/肯定性的 Expected，须显示「尚未判定：所需证据还没有产生」，不出现 Show me；Inconclusive 同样不得伪装成 Expected，也不出现 Show me。
+- [x] C34 Expected / Unexpected / Unevaluated / Inconclusive 必须分开 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "surprise_unresolvable or surprise_inconclusive or surprise_without_criteria" -q` 与 `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx src/components/__tests__/AgentRail.test.tsx` — 预期: 每条 criterion 产生 satisfied / violated / unresolved。聚合：任意已解析 criterion violated → Unexpected；全部已解析且全部 satisfied → Expected；0 条可解析 → Unevaluated；部分已解析、部分 unresolved、且无 violation → Inconclusive。**历史特例（已废止）**：无判据纯文本仍为 Expected。新裁决见 C38–C40。Surprise read model 至少含 `evaluated_criterion_ids`、`unresolved_criterion_ids`、`expectation_version`。`test_surprise_unresolvable_metric_stays_silent` 不得再断言 status == Expected。UI：有判据但指标未产生时 Unevaluated 不得显示绿色/肯定性的 Expected，须显示「尚未判定：所需证据还没有产生」，不出现 Show me；Inconclusive 同样不得伪装成 Expected，也不出现 Show me。无判据的文案分流见 C39。
 - [x] C35 揭晓前 criterion 决策可审计 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "pre_reveal_criterion_history" -q` — 预期: 结果尚未 revealed 时，criterion 可从 IV<OLS 改为 IV>OLS；`ExpectationHistoryItem` 保存当时完整 criteria snapshot；`expectation_set` decision event 至少记录 `expectation_version`、criterion ids、kind/operator、left/right refs、`phase: pre_reveal`。不得只记录 criteria 数量。
 - [x] C36 揭晓后 criterion 锁定 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "post_reveal_criterion" -q` 与 `cd frontend && npx vitest run src/components/__tests__/ResearchLabPanels.test.tsx -t "locked"` — 预期: `specification_space.revealed == true` 后，同一 research revision 内不得静默修改 Surprise criteria。PUT 只改 text/confidence 且 criteria 与当前完全相同 → 允许。PUT 尝试改变 criteria → HTTP 409，`code = expectation_criterion_locked`。text 可修改且 criterion 原样保持；history / Surprise 不被污染。Surprise payload 能证明依据的是哪一版 expectation（`expectation_version` + criterion ids）。UI 禁用 criterion select，并说明「结果已经揭晓；本轮意外判定已锁定，不能事后改写。」本轮不实现 fork/new hypothesis。
 - [x] C37 既有 M2/M3/M4 旅程不退化，质量门复跑 — 程序: `make test`；`cd frontend && npx tsc --noEmit && npm run lint && npm run build` — 预期: 全部 0 退出；无新增 skip；M2/M3/M4 既有测试保持原断言。push 原 PR #31，不 merge。
+
+### M1 P0 r3 — 空判据不得显示 Expected（2026-09-07 外部复核）
+
+本轮只修 `evaluate_surprise` 在无结构化判据时把 Surprise 标成 Expected 的契约特例。不是实现者未按仓库契约执行：C3④ / C34 当时写明「无判据纯文本仍为 Expected」，`test_surprise_without_criteria_stays_expected` 固化了该例外。新裁决：没有可检验的判据 ≠ 成功检验了预期。
+
+M0 / M2 / M3 / M4、C29–C33 / C35–C36、Card 有判据时的 Unexpected / Expected / Inconclusive 路径本轮不得改。不新增科研引擎，不自动补判据，不从自由文本重猜，不自动显示 Show me，不改统计结果，不修 issue #30，不把阶段 B/C 夹带进 PR #31。
+
+两类 Unevaluated 必须分开，不得混用同一句解释：
+
+- 没有判据 → `status="Unevaluated"` + `unevaluated_reason="no_criteria"` → 「尚未判定：尚未设置可检验的预期。」
+- 已有判据但指标尚未产生 → `status="Unevaluated"`，`unevaluated_reason` 不得为 `no_criteria`（可用 `unresolved_metrics` 或省略）→ 「尚未判定：所需证据还没有产生」
+
+- [x] C38 无结构化判据不得为 Expected — 程序: `PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m pytest -q --tb=short -p no:cacheprovider --basetemp=$(mktemp -d /tmp/ep-backend-XXXXXX) backend/tests/test_card_spec_run.py -k "surprise_without_criteria or surprise_missing_criteria or surprise_unparsed or surprise_unresolvable or surprise_inconclusive or surprise_expected_when or surprise_ordering_mismatch or surprise_no_completed"` — 预期: ① `criteria=[]` 且已有完成运行 → `status="Unevaluated"` 且 `!= "Expected"`，`unevaluated_reason="no_criteria"`，`criterion_ids=[]`，不抛错。② 旧记录缺 `criteria` 键（仅自由文本）且已有完成运行 → 同上。③ 列表里条目全部无法解析为带 `id` 的 criterion → 同上（视为无判据，不重猜）。④ 有合法 criterion 但指标均未产生（全部 unresolved）→ `Unevaluated` 且 `!= Expected`，`unevaluated_reason` 不是 `no_criteria`，`unresolved_criterion_ids` 非空。⑤ 部分已解析、部分 unresolved、无 violation → `Inconclusive`。⑥ 全部已解析且全部 satisfied → `Expected`。⑦ 任意 violated → `Unexpected`。⑧ 无完成运行（`completed=[]`）→ 返回 `None`（既有行为保留：Surprise 尚未形成，不是 Expected）。旧测试名 `test_surprise_without_criteria_stays_expected` 必须改名并改断言，不得再固化 Expected。
+- [x] C39 两类 Unevaluated 文案分流，且都不出现 Show me — 程序: `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx src/components/__tests__/AgentRail.test.tsx` — 预期: ① `status=Unevaluated` + `unevaluated_reason=no_criteria`：展示「尚未判定：尚未设置可检验的预期。」；`data-status=Unevaluated`；不得出现绿色/肯定性 Expected 文案；AgentRail 无 Show me。② `status=Unevaluated` 且不是 no_criteria（有 unresolved criterion）：展示「尚未判定：所需证据还没有产生」；无 Show me。③ Inconclusive 既有文案保持，无 Show me。不能只在前端把 Expected 隐藏成别的字；后端 payload 本身必须是 Unevaluated。
+- [x] C40 写入→运行→读取→展示的集成路径 — 程序: `PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m pytest -q --tb=short -p no:cacheprovider --basetemp=$(mktemp -d /tmp/ep-backend-XXXXXX) backend/tests/test_card_spec_run.py -k "empty_criteria_write_run_read or without_criteria_api"` 与 C39 的前端测试 — 预期: 经现有 `PUT /research/expectation`（`criteria=[]`，自由文本保留）→ freeze → specification-space run → `GET /research`：`expectation.text` 原样、`expectation.criteria==[]`、不自动生成 criterion、`surprise.status=="Unevaluated"` 且 `!= "Expected"`、`unevaluated_reason=="no_criteria"`。对照：未清空判据的 Card 种子路径仍为 Unexpected（OLS 0.0747 / IV 0.1315 量级），不得退化成 Unevaluated。读模型若遇到已存储的空判据 + `status=Expected` 陈旧 payload，也不得把 Expected 交给界面（允许在 `public_research` / GET 对空判据做 fail-closed 校正，调用现有 `evaluate_surprise`，不是新引擎）。
+- [x] C41 Surprise 读模型含稳定原因码，API drift 同步 — 程序: `make gen-api && make check-api-drift` — 预期: `SurpriseResponse` 含可选 `unevaluated_reason`（`no_criteria` / `unresolved_metrics` 或等价稳定字面；空判据必须是 `no_criteria`）。`openapi.json`、`docs/api/openapi.json`、`frontend/src/types/api.ts` 同步。不把后端英文句子当作协议枚举。
+- [x] C42 既有 Card 判据与质量门不退化 — 程序: C29–C33、C35–C36 原程序复跑；`make test`；`cd frontend && npx tsc --noEmit && npm run lint && npm run build` — 预期: 全部 0 退出；无新增 skip；M0/M2/M3/M4 源文件与统计结果未改；PR 描述更新（旧测试数不得再当最新结果）；push 原 PR #31，不 merge、不改 main。本修复不证明所有产品能力可上线。
 
 ### M2 — Run specifications 完整状态转换
 
@@ -124,6 +141,16 @@ validator 报告：`generic-research-spine-hardening-m1-p0-r2-validator.md`（Ve
 - C36：revealed 后改 text 200 且 operator 仍为 lt、spec_id 保留；改 criteria → 409 `expectation_criterion_locked`；Surprise `expectation_version=2` + `criterion_ids` 不被污染。UI select disabled +「结果已经揭晓；本轮意外判定已锁定，不能事后改写。」（r2-criterion-locked.png）。
 - C37：validator `check-api-drift` 3/3；agent 819 passed / 1 skip；backend 445 passed / 8 skip；frontend 393 passed；`tsc --noEmit` 0；lint 0 error（5 既有 warning）；`npm run build` 0。push PR #31，不 merge。
 - 浏览器 Card：自然语言「我觉得 IV 应该会更小一些，但并不确定。」判据仍为 exact `iv_region_dummies` < `ols_region_dummies`（r2-expectation-zh-criterion.png）。Run 后 Unexpected · Observed `IV estimate 0.1315 > OLS estimate 0.0747`，Show me 出现（r2-evidence-unexpected.png）。linear preview 不漂移。揭晓后 text 可改、criterion 锁定。
+
+### M1 P0 r3 Evidence（空判据分支）
+
+validator 报告：`generic-research-spine-hardening-m1-p0-r3-validator.md`（Verdict ACCEPT）。implementer 摘要：`generic-research-spine-hardening-m1-p0-r3-implementer.md`。Status 保持 `ready for external review`，不 closed、不 merge。下列数字来自独立 validator 复跑，不是 PR 正文里的历史测试数。
+
+- C38：validator `8 passed, 23 deselected`。`criteria=[]` / 缺 `criteria` 键 / 全部无 `id` → `Unevaluated` + `unevaluated_reason=no_criteria`，`status != Expected`。合法 criterion 全 unresolved → `Unevaluated` + `unresolved_metrics`。部分解析无 violation → `Inconclusive`。全部满足 → `Expected`。任意 violated → `Unexpected`（OLS 0.0747 / IV 0.1315）。无完成运行 → `None`。旧名 `test_surprise_without_criteria_stays_expected` 已改名为 `test_surprise_without_criteria_is_unevaluated`。
+- C39：validator `EvidenceLab` + `AgentRail` **25 passed**。`no_criteria` 文案「尚未判定：尚未设置可检验的预期。」；unresolved Unevaluated 仍为「尚未判定：所需证据还没有产生」；二者与 Inconclusive 均无 Show me，均不出现 Expected。
+- C40：validator `3 passed, 28 deselected`。PUT `criteria=[]` + 自由文本 → freeze → spec-space run → GET：`text` 原样、`criteria==[]`、`surprise.status=Unevaluated`、`unevaluated_reason=no_criteria`。Card 种子对照仍 Unexpected，observed 含 0.0747 / 0.1315。空判据 + 陈旧 stored `status=Expected` 经 GET 校正为 Unevaluated + `no_criteria`。
+- C41：validator `make check-api-drift` 3/3 ✅。`SurpriseResponse.unevaluated_reason` 为可选 `no_criteria | unresolved_metrics`。
+- C42：validator 复跑 C29–C33 / C35–C36 原程序 13 backend + 3 frontend 全过。`make test`：agent **819 passed / 1 skipped**；backend **451 passed / 8 skipped**；frontend **395 passed**；无新增 skip。`tsc --noEmit` 0；lint 0 error（5 既有 warning）；`npm run build` 0。未改 M0/M2/M3/M4 源文件，未改 OLS/IV 系数。不 merge、不改 main。本修复不证明所有产品能力可上线。
 
 ## Named relaxations
 

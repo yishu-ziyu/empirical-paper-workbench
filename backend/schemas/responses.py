@@ -321,6 +321,7 @@ class SurpriseResponse(BaseModel):
     evaluated_criterion_ids: List[str] = Field(default_factory=list)
     unresolved_criterion_ids: List[str] = Field(default_factory=list)
     criterion_outcomes: List[CriterionOutcomeResponse] = Field(default_factory=list)
+    unevaluated_reason: Optional[Literal["no_criteria", "unresolved_metrics"]] = None
 
     model_config = {"extra": "allow"}
 

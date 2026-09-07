@@ -12,6 +12,7 @@ from models.run import Run
 from run_repository import RunRepository
 from runner import process_one_run
 from services.research_lab import (
+    comparable_spec_ids,
     evaluate_surprise,
     formula_for_choices,
     temporary_spec,
@@ -626,12 +627,15 @@ def test_surprise_does_not_drift_after_real_ols_linear_preview(client):
     sid = _ready(client)
     lab = _run_space(client, sid)
     criterion = lab["expectation"]["criteria"][0]
-    assert criterion["left"]["spec_id"] == "iv_region_dummies"
-    assert criterion["right"]["spec_id"] == "ols_region_dummies"
+    ols_id, iv_id = comparable_spec_ids(lab["specification_space"]["definitions"])
+    assert criterion["left"]["spec_id"] == iv_id
+    assert criterion["right"]["spec_id"] == ols_id
+    ols_run = next(run for run in lab["specification_runs"] if run["spec_id"] == ols_id)
+    iv_run = next(run for run in lab["specification_runs"] if run["spec_id"] == iv_id)
     surprise = lab["surprise"]
     assert surprise["status"] == "Unexpected"
-    assert "0.1315" in surprise["observed"]
-    assert "0.0747" in surprise["observed"]
+    assert f"{iv_run['coef']:.4f}" in surprise["observed"]
+    assert f"{ols_run['coef']:.4f}" in surprise["observed"]
     observed_before = surprise["observed"]
     resp = client.post(
         f"/sessions/{sid}/research/specs/ols_linear_exper/run",

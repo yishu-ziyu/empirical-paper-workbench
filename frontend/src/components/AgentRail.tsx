@@ -227,11 +227,7 @@ export default function AgentRail({
         >
           <p className="text-[13px] font-medium text-wb-ink">{t('agent.showMeTitle')}</p>
           <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
-            {displaySurpriseObserved(
-              ws.research?.expectation?.criteria,
-              ws.research?.specification_runs,
-              t,
-            ) || t('agent.unexpectedObserved')}
+            {displaySurpriseObserved(ws.research?.surprise, t) || t('agent.unexpectedObserved')}
           </p>
           <button
             type="button"

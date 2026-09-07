@@ -3,6 +3,7 @@ import type { components } from '../types/api'
 import type { ResearchLab } from '../lib/workspace'
 import { useT } from '../lib/i18n'
 import {
+  criterionSpecIdentities,
   displayCriterionLabel,
   displayEstimand,
   displaySpecLabel,
@@ -326,17 +327,30 @@ export function ExpectationEditor({
         </p>
         {criteria.length > 0 ? (
           <ul className="mt-1.5 space-y-1">
-            {criteria.map((criterion) => (
-              <li
-                key={criterion.id}
-                data-testid="expectation-criterion"
-                data-source={criterion.source}
-                className="flex items-center gap-2 text-[13px] leading-5 text-wb-ink"
-              >
-                <span aria-hidden className="text-wb-primary">◇</span>
-                {displayCriterionLabel(criterion, t)}
-              </li>
-            ))}
+            {criteria.map((criterion) => {
+              const specIds = criterionSpecIdentities(criterion)
+              const identity = [specIds.left, specIds.right].filter(Boolean).join(' · ')
+              return (
+                <li
+                  key={criterion.id}
+                  data-testid="expectation-criterion"
+                  data-source={criterion.source}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-5 text-wb-ink"
+                >
+                  <span aria-hidden className="text-wb-primary">◇</span>
+                  {displayCriterionLabel(criterion, t)}
+                  {identity ? (
+                    <span
+                      data-testid="criterion-spec-ids"
+                      title={identity}
+                      className="rounded border border-wb-line bg-wb-subtle px-1.5 py-0.5 font-mono text-[10px] text-wb-muted"
+                    >
+                      {identity}
+                    </span>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <p className="mt-1.5 text-[12px] text-wb-muted">

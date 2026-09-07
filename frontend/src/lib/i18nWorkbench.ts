@@ -415,6 +415,10 @@ export const workbenchZh = {
   'presentation.claim.card.conditional':
     '在大学邻近工具变量假设下，IV 给出教育的局部因果回报。',
   'presentation.claim.card.unsupported': '不能把 IV 读成「多一年教育让所有人工资提高 13%」。',
+  'presentation.claim.card.insufficient': '证据不足：现有结果还不足以支持或否定教育与工资的关联。',
+  'presentation.claim.card.draft': '结论草稿：尚未经你批准，请先核对下方证据再定稿。',
+  'presentation.claim.card.approved': '结论已获批准，以批准时点的证据版本为准（依据见下方运行记录）。',
+  'presentation.claim.card.unknown': '结论状态暂无法识别：请以原始结论与下方证据记录为准。',
   'presentation.claim.viewOriginal': '查看原文',
   'presentation.assumption.exclusion': 'IV 排他限制',
   'presentation.assumption.monotonicity': '单调性',
@@ -898,6 +902,14 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
     'Under the college-proximity IV assumptions, IV estimates a local causal return to schooling.',
   'presentation.claim.card.unsupported':
     'Do not read the IV as “one more year of education raises everyone’s wage by 13%.”',
+  'presentation.claim.card.insufficient':
+    'Insufficient evidence: current results neither support nor refute an education–earnings link.',
+  'presentation.claim.card.draft':
+    'Draft conclusion: not yet approved; check the evidence below before finalizing.',
+  'presentation.claim.card.approved':
+    'Approved conclusion: it rests on the evidence version at approval time (see the run record below).',
+  'presentation.claim.card.unknown':
+    'Claim status unavailable: refer to the original claim and the evidence record below.',
   'presentation.claim.viewOriginal': 'View original',
   'presentation.assumption.exclusion': 'IV exclusion restriction',
   'presentation.assumption.monotonicity': 'Monotonicity',

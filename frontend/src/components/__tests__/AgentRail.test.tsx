@@ -206,21 +206,32 @@ describe('AgentRail linked evidence', () => {
         ws={ws({
           workbenchTab: 'evidence',
           research: {
-            surprise: { status: 'Unexpected', observed: 'IV estimate 0.13 > OLS estimate 0.08' },
-            expectation: {
-              criteria: [
+            surprise: {
+              status: 'Unexpected',
+              observed: 'IV estimate 0.13 > OLS estimate 0.08',
+              criterion_outcomes: [
                 {
+                  id: 'criterion.seed.iv-below-ols',
+                  outcome: 'violated',
                   kind: 'ordering',
                   operator: 'lt',
-                  left: { estimator: 'iv', spec_id: 'iv_region_dummies' },
-                  right: { estimator: 'ols', spec_id: 'ols_region_dummies' },
+                  left: {
+                    source: 'metric',
+                    estimator: 'iv',
+                    spec_id: 'iv_region_dummies',
+                    run_id: 'run-iv',
+                    value: 0.13,
+                  },
+                  right: {
+                    source: 'metric',
+                    estimator: 'ols',
+                    spec_id: 'ols_region_dummies',
+                    run_id: 'run-ols',
+                    value: 0.08,
+                  },
                 },
               ],
             },
-            specification_runs: [
-              { spec_id: 'ols_region_dummies', method: 'ols', coef: 0.08, status: 'ok' },
-              { spec_id: 'iv_region_dummies', method: 'iv', coef: 0.13, status: 'ok' },
-            ],
           },
         })}
         decision={{

@@ -22,6 +22,30 @@ const research = {
     kind: 'ordering_mismatch',
     expected: 'IV may be smaller than OLS',
     observed: 'IV > OLS',
+    criterion_outcomes: [
+      {
+        id: 'criterion.seed.iv-below-ols',
+        outcome: 'violated',
+        kind: 'ordering',
+        operator: 'lt',
+        left: {
+          source: 'metric',
+          metric: 'estimate.coef',
+          estimator: 'iv',
+          spec_id: 'iv_region_dummies',
+          run_id: 'run-iv',
+          value: 0.13,
+        },
+        right: {
+          source: 'metric',
+          metric: 'estimate.coef',
+          estimator: 'ols',
+          spec_id: 'ols_region_dummies',
+          run_id: 'run-ols',
+          value: 0.08,
+        },
+      },
+    ],
   },
   next_challenge: {
     id: 'challenge.instrument_strength',
@@ -592,5 +616,147 @@ describe('EvidenceLab', () => {
     expect(onPreparePaper).toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('claim-promote-supporting'))
     expect(onPromote).toHaveBeenCalledWith('run-iv')
+  })
+
+  test('C4 mismatch notice follows the interface language with a visible technical id (zh/en)', () => {
+    const approved = {
+      ...research.claim!,
+      approved_by_user: true,
+      stale: false,
+      provenance: { iv_spec_id: 'iv_region_dummies', iv_run_id: 'run-iv' },
+    }
+    const mismatched = {
+      ...research,
+      canonical_spec_id: 'ols_region_dummies',
+      claim: approved,
+      claims: [approved],
+    } as unknown as ResearchLab
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab research={mismatched} onPromote={vi.fn(async () => undefined)} />
+      </>,
+    )
+    expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
+      '当前结论依赖的设定，并不是现在的主分析。',
+    )
+    expect(screen.getByTestId('claim-promote-supporting')).toHaveTextContent(
+      '把支撑设定设为主分析',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
+      'This claim depends on a specification that is not the current primary analysis.',
+    )
+    expect(screen.getByTestId('claim-canonical-mismatch')).not.toHaveTextContent('当前结论')
+    expect(screen.getByTestId('claim-promote-supporting')).toHaveTextContent(
+      'Set the supporting specification as primary',
+    )
+  })
+
+  test('C1 claim explanation renders honest wording per backend status in the real Claim component (zh)', () => {
+    const cases: Array<{ status: string | undefined; expectRe: RegExp; forbidRe: RegExp }> = [
+      {
+        status: 'supported',
+        expectRe: /在当前证据下，教育与工资呈正向关联/,
+        forbidRe: /证据不足/,
+      },
+      {
+        status: 'insufficient',
+        expectRe: /证据不足/,
+        forbidRe: /在当前证据下，教育与工资呈正向关联|正向关联/,
+      },
+      { status: 'draft', expectRe: /草稿/, forbidRe: /正向关联|不能把 IV/ },
+      // Approval is a user action, not stronger evidence
+      { status: 'approved', expectRe: /已获批准/, forbidRe: /正向关联/ },
+      // Missing / unknown stay neutral: no affirmation, no denial
+      { status: undefined, expectRe: /暂无法识别/, forbidRe: /正向关联|13%|草稿/ },
+      { status: 'some_future_status', expectRe: /暂无法识别/, forbidRe: /正向关联|13%/ },
+    ]
+    for (const { status, expectRe, forbidRe } of cases) {
+      const { unmount } = renderLab(
+        <EvidenceLab
+          research={
+            {
+              ...research,
+              claim: { ...research.claim!, evidence_status: status },
+              claims: [{ ...research.claim!, evidence_status: status }],
+            } as unknown as ResearchLab
+          }
+        />,
+      )
+      fireEvent.click(screen.getByTestId('evidence-review-claim'))
+      const explanation = screen.getByTestId('claim-explanation')
+      expect(explanation).toHaveTextContent(expectRe)
+      expect(explanation).not.toHaveTextContent(forbidRe)
+      // Original claim text stays viewable next to the localized explanation
+      expect(screen.getByTestId('claim-original')).toHaveTextContent(
+        'Education is positively associated with earnings.',
+      )
+      unmount()
+    }
+  })
+
+  test('C1 claim explanation honest wording in English too', () => {
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab
+          research={
+            {
+              ...research,
+              claim: { ...research.claim!, evidence_status: 'insufficient' },
+              claims: [{ ...research.claim!, evidence_status: 'insufficient' }],
+            } as unknown as ResearchLab
+          }
+        />
+      </>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByTestId('evidence-review-claim'))
+    const explanation = screen.getByTestId('claim-explanation')
+    expect(explanation).toHaveTextContent(/Insufficient evidence/)
+    expect(explanation).not.toHaveTextContent(/positively associated/)
+    expect(screen.getByTestId('claim-original')).toHaveTextContent(
+      'Education is positively associated with earnings.',
+    )
+  })
+
+  test('C2 observed values render from backend outcomes only; unresolved stays unobserved', () => {
+    const withOutcomes = {
+      ...research,
+      surprise: {
+        status: 'Inconclusive',
+        criterion_outcomes: [
+          {
+            id: 'criterion.seed.iv-below-ols',
+            outcome: 'satisfied',
+            kind: 'ordering',
+            operator: 'lt',
+            left: {
+              source: 'metric',
+              estimator: 'iv',
+              spec_id: 'iv_region_dummies',
+              run_id: 'run-iv',
+              value: 0.09,
+            },
+            right: {
+              source: 'metric',
+              estimator: 'ols',
+              spec_id: 'ols_region_dummies',
+              run_id: 'run-ols',
+              value: 0.13,
+            },
+          },
+          { id: 'criterion.future-att', outcome: 'unresolved' },
+        ],
+      },
+    } as unknown as ResearchLab
+    renderLab(<EvidenceLab research={withOutcomes} />)
+    const card = screen.getByTestId('evidence-surprise')
+    expect(card).toHaveAttribute('data-status', 'Inconclusive')
+    // Only the backend-resolved comparison is shown; the unresolved ATT
+    // criterion contributes nothing even though IV/OLS coefs exist.
+    expect(card).toHaveTextContent('IV 估计 0.0900 < OLS 估计 0.1300')
+    expect(card).not.toHaveTextContent('ATT')
   })
 })

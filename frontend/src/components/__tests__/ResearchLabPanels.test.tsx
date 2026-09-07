@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ExpectationEditor, SpecificationSpacePanel } from '../ResearchLabPanels'
 import type { components } from '../../types/api'
 import type { ResearchLab } from '../../lib/workspace'
+import { I18nProvider } from '../../lib/i18n'
 
 type Expectation = NonNullable<ResearchLab['expectation']>
 type ExpectationCriterion = components['schemas']['ExpectationCriterion']
@@ -69,12 +70,14 @@ function renderEditor(
   specificationSpace?: SpecSpace,
 ) {
   return render(
-    <ExpectationEditor
-      expectation={expectation}
-      onSave={onSave}
-      criteriaLocked={criteriaLocked}
-      specificationSpace={specificationSpace}
-    />,
+    <I18nProvider>
+      <ExpectationEditor
+        expectation={expectation}
+        onSave={onSave}
+        criteriaLocked={criteriaLocked}
+        specificationSpace={specificationSpace}
+      />
+    </I18nProvider>,
   )
 }
 
@@ -82,9 +85,12 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
   test('renders the explicit surprise condition block below the textarea', () => {
     renderEditor()
     expect(screen.getByTestId('expectation-criteria-block')).toHaveTextContent(
-      'Surprise condition',
+      '意外判定',
     )
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
+      'IV 估计 < OLS 估计',
+    )
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent(
       'IV estimate < OLS estimate',
     )
     expect(screen.getByTestId('expectation-criterion')).toHaveAttribute('data-source', 'seed')
@@ -96,7 +102,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: '我觉得 IV 应该会更小一些，但并不确定。' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate < OLS estimate',
+      'IV 估计 < OLS 估计',
     )
     expect(screen.getByTestId('expectation-criterion-select')).toHaveValue('iv-lt-ols')
   })
@@ -108,9 +114,9 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: 'iv-gt-ols' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate > OLS estimate',
+      'IV 估计 > OLS 估计',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const payload = onSave.mock.calls[0]![0]
     expect(payload.criteria).toHaveLength(1)
@@ -125,7 +131,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-gt-ols' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const payload = onSave.mock.calls[0]![0]
     const next = payload.criteria![0]!
@@ -149,7 +155,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-lt-ols' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const next = onSave.mock.calls[0]![0].criteria![0]!
     expect(next.kind).toBe('ordering')
@@ -172,7 +178,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-lt-ols' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const next = onSave.mock.calls[0]![0].criteria![0]!
     expect(next.left.spec_id).toBe('iv_region_dummies')
@@ -197,7 +203,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-gt-ols' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const next = onSave.mock.calls[0]![0].criteria![0]!
     expect(next.left.spec_id).toBe('iv_nearc4_full')
@@ -214,7 +220,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
       target: { value: 'iv-gt-ols' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate < OLS estimate',
+      'IV 估计 < OLS 估计',
     )
   })
 
@@ -224,14 +230,14 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-approx-ols' },
     })
-    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV estimate ≈ OLS')
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 ≈ OLS 估计')
     fireEvent.change(screen.getByTestId('expectation-criterion-select'), {
       target: { value: 'iv-positive' },
     })
     expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
-      'IV estimate is positive',
+      'IV 估计 为正',
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
     const payload = onSave.mock.calls[0]![0]
     expect(payload.criteria![0]!.kind).toBe('sign')
@@ -250,7 +256,7 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     fireEvent.change(screen.getByRole('textbox'), {
       target: { value: '未保存的修改必须留下' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save expectation' }))
+    fireEvent.click(screen.getByTestId('expectation-save'))
     const error = await screen.findByTestId('expectation-save-error')
     expect(error).toBeInTheDocument()
     expect(screen.getByRole('textbox')).toHaveValue('未保存的修改必须留下')
@@ -259,6 +265,115 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('expectation-save-error')).not.toBeInTheDocument(),
     )
+  })
+
+  test('C3 approx criterion label carries the effective tolerance in the real component', () => {
+    const approx: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-approx-ols',
+          kind: 'distance',
+          operator: 'approx',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_region_dummies',
+            label: 'IV estimate',
+          },
+          right: {
+            metric: 'estimate.coef',
+            estimator: 'ols',
+            spec_id: 'ols_region_dummies',
+            label: 'OLS estimate',
+          },
+          tolerance: { rel: 0.05 },
+          label: 'IV ≈ OLS (±5%)',
+          source: 'user',
+        },
+      ],
+    }
+    renderEditor(async () => undefined, approx)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent(
+      'IV 估计 ≈ OLS 估计 ±5%',
+    )
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent('±25%')
+    // ±25% (and the both-empty backend default) must be distinguishable
+    const defaulted = {
+      ...approx,
+      criteria: [{ ...approx.criteria![0]!, tolerance: undefined }],
+    } as Expectation
+    renderEditor(async () => undefined, defaulted)
+    expect(screen.getAllByTestId('expectation-criterion')[1]).toHaveTextContent('±25%')
+  })
+
+  test('C3 ordering against a numeric constant shows the full string, not generic', () => {
+    const orderingConst: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-lt-const',
+          kind: 'ordering',
+          operator: 'lt',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_nearc4_full',
+            label: 'IV estimate',
+          },
+          right: 0.1,
+          label: 'IV estimate < 0.1',
+          source: 'user',
+        } as ExpectationCriterion,
+      ],
+    }
+    renderEditor(async () => undefined, orderingConst)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 < 0.1')
+    expect(screen.getByTestId('expectation-criterion')).not.toHaveTextContent('可检验判定')
+  })
+
+  test('C3 same-estimator different-spec refs expose their spec identity visibly', () => {
+    const twoIvSpecs: Expectation = {
+      ...seedExpectation,
+      criteria: [
+        {
+          id: 'criterion.user.iv-approx-ols',
+          kind: 'distance',
+          operator: 'approx',
+          left: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_nearc4_full',
+            label: 'IV estimate',
+          },
+          right: {
+            metric: 'estimate.coef',
+            estimator: 'iv',
+            spec_id: 'iv_region_dummies',
+            label: 'IV estimate (region dummies)',
+          },
+          tolerance: { rel: 0.25 },
+          label: 'IV ≈ IV (region)',
+          source: 'user',
+        },
+      ],
+    }
+    renderEditor(async () => undefined, twoIvSpecs)
+    const identity = screen.getByTestId('criterion-spec-ids')
+    expect(identity).toHaveTextContent('iv_nearc4_full')
+    expect(identity).toHaveTextContent('iv_region_dummies')
+    expect(identity).toBeVisible()
+  })
+
+  test('C3 criteria block stays display-only: no criterion mutation on render', async () => {
+    const onSave = vi.fn(async (_payload: SavePayload): Promise<void> => undefined)
+    renderEditor(onSave)
+    expect(screen.getByTestId('expectation-criterion')).toHaveTextContent('IV 估计 < OLS 估计')
+    // The stored snapshot (spec ids, label) is untouched until an explicit save
+    expect(screen.getByTestId('criterion-spec-ids')).toHaveTextContent(
+      'iv_region_dummies · ols_region_dummies',
+    )
+    expect(onSave).not.toHaveBeenCalled()
   })
 })
 
@@ -294,44 +409,50 @@ describe('SpecificationSpacePanel run state (M2)', () => {
 
   test('running state disables the button with counted progress from global state', () => {
     render(
-      <SpecificationSpacePanel
-        space={space}
-        onFreeze={vi.fn(async () => undefined)}
-        onRun={vi.fn(async () => undefined)}
-        running
-        progress={{ done: 3, total: 12 }}
-      />,
+      <I18nProvider>
+        <SpecificationSpacePanel
+          space={space}
+          onFreeze={vi.fn(async () => undefined)}
+          onRun={vi.fn(async () => undefined)}
+          running
+          progress={{ done: 3, total: 12 }}
+        />
+      </I18nProvider>,
     )
     const button = screen.getByTestId('spec-space-run')
-    expect(button).toHaveTextContent('Running 3/12')
+    expect(button).toHaveTextContent('正在运行 3/12')
     expect(button).toBeDisabled()
-    expect(screen.getByTestId('spec-space-run-status')).toHaveTextContent('正在运行规格 3/12')
+    expect(screen.getByTestId('spec-space-run-status')).toHaveTextContent('正在运行分析方案 3/12')
   })
 
   test('indeterminate progress shows non-fabricated label', () => {
     render(
-      <SpecificationSpacePanel
-        space={space}
-        onFreeze={vi.fn(async () => undefined)}
-        onRun={vi.fn(async () => undefined)}
-        running
-        progress={null}
-      />,
+      <I18nProvider>
+        <SpecificationSpacePanel
+          space={space}
+          onFreeze={vi.fn(async () => undefined)}
+          onRun={vi.fn(async () => undefined)}
+          running
+          progress={null}
+        />
+      </I18nProvider>,
     )
-    expect(screen.getByTestId('spec-space-run')).toHaveTextContent('Running specifications…')
-    expect(screen.getByTestId('spec-space-run-status')).toHaveTextContent('正在运行规格…')
+    expect(screen.getByTestId('spec-space-run')).toHaveTextContent('正在运行分析方案…')
+    expect(screen.getByTestId('spec-space-run-status')).toHaveTextContent('正在运行分析方案…')
   })
 
   test('terminal failure shows the stable category with a Retry that re-runs', async () => {
     const onRetryRun = vi.fn()
     render(
-      <SpecificationSpacePanel
-        space={space}
-        onFreeze={vi.fn(async () => undefined)}
-        onRun={vi.fn(async () => undefined)}
-        failure={{ category: 'spec_run_failed' }}
-        onRetryRun={onRetryRun}
-      />,
+      <I18nProvider>
+        <SpecificationSpacePanel
+          space={space}
+          onFreeze={vi.fn(async () => undefined)}
+          onRun={vi.fn(async () => undefined)}
+          failure={{ category: 'spec_run_failed' }}
+          onRetryRun={onRetryRun}
+        />
+      </I18nProvider>,
     )
     const error = screen.getByTestId('spec-space-run-error')
     expect(error).toHaveTextContent('spec_run_failed')

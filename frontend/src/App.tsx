@@ -27,20 +27,20 @@ import {
   useWorkspace,
 } from './lib/workspace'
 import { formatStatValue } from './lib/readoutTable'
+import { displaySurpriseObserved } from './lib/i18nPresentation'
 import WorkbenchArtifact from './components/WorkbenchArtifact'
 
-const VIEW_LABEL: Record<WorkbenchViewId, string> = {
-  overview: 'Overview',
-  question: 'Research Question',
-  data: 'Data',
-  design: 'Design · Specification',
-  evidence: 'Evidence',
-  literature: 'Literature',
-  paper: 'Paper',
-}
-
 function App() {
-  const { t } = useT()
+  const { t, lang } = useT()
+  const viewLabel: Record<WorkbenchViewId, string> = {
+    overview: t('nav.overview'),
+    question: t('nav.question'),
+    data: t('nav.data'),
+    design: t('nav.design'),
+    evidence: t('nav.evidence'),
+    literature: t('nav.literature'),
+    paper: t('nav.paper'),
+  }
   const { authed, setAuthed, sessionId, setSessionId } = useSession()
   const ws = useWorkspace({ sessionId, setSessionId, setAuthed, t })
 
@@ -88,16 +88,16 @@ function App() {
   } else if (isQuestionGroup) {
     if (ws.identFailed) {
       blockingDecision = {
-        title: '研究设计需要重开',
-        reason: ws.identReport || '识别未通过，先改研究设计再写正文。',
-        actionLabel: '修改研究设计',
+        title: t('decision.redesign'),
+        reason: ws.identReport || t('decision.redesignReason'),
+        actionLabel: t('decision.editDesign'),
         onAction: openDirection,
       }
     } else if (ws.runFailure) {
       blockingDecision = {
-        title: '上一次运行失败',
-        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
-        actionLabel: '重新运行',
+        title: t('decision.runFailed'),
+        reason: t('decision.runFailedReason', { error: ws.runFailure }),
+        actionLabel: t('decision.rerun'),
         onAction: openDirection,
       }
     } else if (
@@ -106,9 +106,9 @@ function App() {
       !ws.directionBusy
     ) {
       blockingDecision = {
-        title: '确认 Admissible Space',
-        reason: '先冻结合理规格空间，再看比较结果。比较结果不会在冻结前出现。',
-        actionLabel: '查看规格空间',
+        title: t('decision.confirmPlans'),
+        reason: t('decision.confirmPlansReason'),
+        actionLabel: t('decision.viewPlans'),
         onAction: () => ws.setWorkbenchTab('design'),
       }
     } else if (
@@ -118,20 +118,20 @@ function App() {
       !ws.directionDisabledReason
     ) {
       blockingDecision = {
-        title: ws.directionSummary ? '确认修改后的研究方向' : '确认研究方向',
+        title: ws.directionSummary ? t('decision.confirmDirectionEdit') : t('decision.confirmDirection'),
         reason: ws.directionSummary
-          ? '研究方向正在修改；提交这次修改后，系统才会按新设计继续。'
-          : '需要你确认研究问题、变量和方法；确认后系统才会运行估计。',
-        actionLabel: '打开研究方向',
+          ? t('decision.confirmDirectionEditReason')
+          : t('decision.confirmDirectionReason'),
+        actionLabel: t('decision.openDirection'),
         onAction: openDirection,
       }
     }
   } else if (isEvidenceTab) {
     if (ws.runFailure) {
       blockingDecision = {
-        title: '上一次运行失败',
-        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
-        actionLabel: '重新运行',
+        title: t('decision.runFailed'),
+        reason: t('decision.runFailedReason', { error: ws.runFailure }),
+        actionLabel: t('decision.rerun'),
         onAction: openDirection,
       }
     } else if (
@@ -141,9 +141,9 @@ function App() {
       !ws.activeRun
     ) {
       blockingDecision = {
-        title: 'Run specifications',
-        reason: 'Admissible space is frozen. Run the included specifications to see real estimates.',
-        actionLabel: 'Run specifications',
+        title: t('decision.runSpecs'),
+        reason: t('decision.runSpecsReason'),
+        actionLabel: t('decision.runSpecs'),
         onAction: () => {
           ws.setWorkbenchTab('evidence')
           void ws.handleRunSpecSpace()
@@ -151,32 +151,33 @@ function App() {
       }
     } else if (ws.research?.surprise?.status === 'Unexpected') {
       blockingDecision = {
-        title: 'Unexpected result',
+        title: t('decision.unexpected'),
         reason:
-          ws.research.surprise.observed ||
-          'Observed estimates do not match the recorded expectation.',
+          displaySurpriseObserved(ws.research?.surprise, t) || t('agent.unexpectedObserved'),
       }
     }
   } else if (isPaperTab) {
     if (ws.runFailure) {
       blockingDecision = {
-        title: '上一次运行失败',
-        reason: `${ws.runFailure}。检查数据与方向后可重新运行。`,
-        actionLabel: '重新运行',
+        title: t('decision.runFailed'),
+        reason: t('decision.runFailedReason', { error: ws.runFailure }),
+        actionLabel: t('decision.rerun'),
         onAction: openDirection,
       }
     } else if (ws.writeBlockers.length > 0) {
       blockingDecision = {
-        title: '写作暂时被阻塞',
+        title: t('decision.writeBlocked'),
         reason: ws.writeBlockers[0],
-        actionLabel: '查看论文工作区',
+        actionLabel: t('decision.viewPaper'),
         onAction: () => ws.setWorkbenchTab('paper'),
       }
     } else if (pendingChapter) {
       blockingDecision = {
-        title: '确认当前章节',
-        reason: `“${pendingChapter.title || pendingChapter.type}”已生成，等待你批准、修改或打回重写。`,
-        actionLabel: '查看章节',
+        title: t('decision.confirmChapter'),
+        reason: t('decision.confirmChapterReason', {
+          title: pendingChapter.title || pendingChapter.type,
+        }),
+        actionLabel: t('decision.viewChapter'),
         onAction: () => {
           const index = ws.outline.findIndex((chapter) => chapter.type === pendingChapter.type)
           if (index >= 0) ws.handleSelectChapter(index)
@@ -185,20 +186,20 @@ function App() {
       }
     } else if (ws.outline.length > 0 && !ws.outlineLocked && !ws.writeBusy && !ws.writtenChapter?.content) {
       blockingDecision = {
-        title: '确认论文大纲',
-        reason: '大纲已形成，等待你确认章节结构后开始写作。',
-        actionLabel: '查看大纲',
+        title: t('decision.confirmOutline'),
+        reason: t('decision.confirmOutlineReason'),
+        actionLabel: t('decision.viewOutline'),
         onAction: () => ws.setWorkbenchTab('paper'),
       }
     }
   }
 
   const waitingMessage = ws.directionBusy
-    ? '等待估计与识别结果；结果回来后再决定下一步。'
+    ? t('agent.waitingEstimate')
     : ws.writeBusy
-      ? '章节正在生成；完成后会停下来请你确认。'
+      ? t('agent.waitingWrite')
       : ws.directionSummary && !ws.hasReadout
-        ? '方向已提交，等待主结果返回。'
+        ? t('agent.waitingMain')
         : null
 
   const writtenTypes = new Set(
@@ -216,17 +217,17 @@ function App() {
   if (isPaperTab) {
     if (ws.hasReadout) {
       decisionSuggestions.push({
-        title: '查看证据解释',
-        detail: '识别说明、稳健性和运行摘要不会打断论文正文。',
-        actionLabel: '打开 Evidence',
+        title: t('decision.viewEvidence'),
+        detail: t('decision.viewEvidenceDetail'),
+        actionLabel: t('decision.openEvidence'),
         onAction: openEvidence,
       })
     }
     if (ws.degradations.length > 0) {
       decisionSuggestions.push({
-        title: '有降级记录可查看',
+        title: t('decision.degraded'),
         detail: `${ws.degradations[0].node}: ${ws.degradations[0].reason}`,
-        actionLabel: '查看运行记录',
+        actionLabel: t('decision.viewTrace'),
         onAction: openEvidence,
       })
     }
@@ -376,7 +377,7 @@ function App() {
     )
   }
 
-  const cardQuestion = researchQuestionPrompt(ws.research)
+  const cardQuestion = researchQuestionPrompt(ws.research, lang)
   const questionConfirmed = hasConfirmedResearchQuestion(
     ws.research,
     ws.directionSummary,
@@ -385,25 +386,25 @@ function App() {
     cardQuestion ||
     ws.directionSummary ||
     ws.shapedQuestion ||
-    (ws.research?.teaching_case ? 'Teaching case · Card 1995' : null) ||
+    (ws.research?.teaching_case ? `${t('workbench.teachingCase')} Card 1995` : null) ||
     ws.csvName ||
     t('app.hint')
 
   const sidebarItems: SidebarItem[] = [
     {
       id: 'overview',
-      label: 'Overview',
+      label: viewLabel.overview,
       hint: ws.directionSummary
-        ? '研究进行中'
+        ? t('nav.hint.inProgress')
         : sessionId
-          ? '统计与进度'
-          : '从上传数据开始',
+          ? t('nav.hint.stats')
+          : t('nav.hint.startUpload'),
       status: 'pending',
     },
     {
       id: 'question',
-      label: 'Research Question',
-      hint: questionConfirmed ? '已确认' : '待确认方向',
+      label: viewLabel.question,
+      hint: questionConfirmed ? t('nav.hint.questionDone') : t('nav.hint.questionPending'),
       status: questionConfirmed
         ? ws.directionOpen && !ws.research?.teaching_case
           ? 'active'
@@ -412,10 +413,10 @@ function App() {
     },
     {
       id: 'data',
-      label: 'Data',
+      label: viewLabel.data,
       hint: ws.csvName
-        ? `${ws.csvName}${ws.csvRows != null ? ` · ${ws.csvRows} 行` : ''}`
-        : '未上传',
+        ? `${ws.csvName}${ws.csvRows != null ? ` · ${t('nav.hint.rows', { n: ws.csvRows })}` : ''}`
+        : t('nav.hint.noUpload'),
       status:
         ws.uploadReadiness === 'FAILED' || ws.uploadReadiness === 'CANCELLED'
           ? 'blocked'
@@ -427,14 +428,14 @@ function App() {
     },
     {
       id: 'design',
-      label: 'Design · Specification',
+      label: viewLabel.design,
       hint: ws.directionSummary
-        ? ws.directionRecord?.method || '已设定'
+        ? ws.directionRecord?.method || t('nav.hint.designSet')
         : ws.research?.specification_space?.frozen_at
-          ? 'Admissible space frozen'
+          ? t('nav.hint.spaceFrozen')
           : ws.research?.teaching_case
-            ? '待冻结'
-            : '待方向',
+            ? t('nav.hint.designPending')
+            : t('nav.hint.designNeedDirection'),
       status: ws.identFailed
         ? 'blocked'
         : ws.directionSummary || ws.research?.specification_space?.frozen_at
@@ -443,27 +444,32 @@ function App() {
     },
     {
       id: 'evidence',
-      label: 'Evidence',
+      label: viewLabel.evidence,
       hint: hasSuccessfulEstimate
         ? `β ${formatStatValue(ws.estimateMeta?.coef, 'coef')}`
         : ws.directionBusy
-          ? '估计中'
-          : '暂无主结果',
+          ? t('nav.hint.estimating')
+          : t('nav.hint.noMainResult'),
       status: hasSuccessfulEstimate ? 'done' : ws.directionBusy ? 'active' : 'pending',
     },
     {
       id: 'literature',
-      label: 'Literature',
-      hint: ws.literatureSource ? `来源：${ws.literatureSource}` : '未检索',
+      label: viewLabel.literature,
+      hint: ws.literatureSource
+        ? t('nav.hint.litSource', { source: String(ws.literatureSource) })
+        : t('nav.hint.litNone'),
       status: ws.literatureSource ? 'done' : 'pending',
     },
     {
       id: 'paper',
-      label: 'Paper',
+      label: viewLabel.paper,
       hint:
         ws.outline.length > 0
-          ? `${writtenTypes.size}/${ws.outline.length} 章有正文`
-          : '待大纲',
+          ? t('nav.hint.chaptersWritten', {
+              done: writtenTypes.size,
+              total: ws.outline.length,
+            })
+          : t('nav.hint.outlinePending'),
       status:
         ws.canExport && incompleteChapterCount === 0 && pendingApprovalCount === 0
           ? 'done'
@@ -483,12 +489,12 @@ function App() {
   const headerSubtitle = ws.directionSummary
     ? ws.directionSummary
     : ws.research?.teaching_case
-      ? 'Teaching case · Card 1995 · 教育是否提高工资'
+      ? `${t('workbench.teachingCase')} Card 1995`
       : cardQuestion
         ? cardQuestion
         : sessionId
-          ? '尚未设定研究方向；先在 Research Question 提交方向。'
-          : '上传数据后开始研究。'
+          ? t('workbench.subtitleNeedDirection')
+          : t('workbench.subtitleUpload')
 
   return (
     <div
@@ -537,7 +543,7 @@ function App() {
                       onClick={ws.handleNewStudy}
                       className="wb-press w-full rounded-md border border-wb-line px-2.5 py-1.5 text-left text-[12px] text-wb-muted transition-colors hover:bg-wb-surface hover:text-wb-ink"
                     >
-                      New study · 回工作台
+                      {t('workbench.newStudy')}
                     </button>
                   </>
                 ) : (
@@ -565,10 +571,10 @@ function App() {
                 className="mx-6 mt-6 rounded-lg border border-wb-danger/40 bg-wb-danger-soft px-4 py-4"
               >
                 <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-danger">
-                  Boot failed · 启动失败
+                  {t('workbench.bootFailed')}
                 </p>
                 <p className="mt-1.5 text-[14px] font-medium text-wb-ink">
-                  数据处理失败，本次研究没有生成任何结果。
+                  {t('workbench.bootFailedBody')}
                 </p>
                 <p className="mt-1 font-mono text-[11px] text-wb-danger">
                   <span data-testid="boot-failure-category">{ws.bootFailure.category}</span>
@@ -583,7 +589,7 @@ function App() {
                       }}
                       className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
                     >
-                      Retry Card
+                      {t('workbench.retryCard')}
                     </button>
                   ) : (
                     <button
@@ -592,7 +598,7 @@ function App() {
                       onClick={() => ws.fileInputRef.current?.click()}
                       className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
                     >
-                      重新上传数据
+                      {t('workbench.reupload')}
                     </button>
                   )}
                   <button
@@ -601,7 +607,7 @@ function App() {
                     onClick={ws.handleNewStudy}
                     className="wb-press rounded-md border border-wb-line bg-wb-surface px-3 py-1.5 text-[12px] text-wb-ink"
                   >
-                    Back to desk
+                    {t('workbench.backToDesk')}
                   </button>
                 </div>
               </div>
@@ -614,10 +620,10 @@ function App() {
               <div className="flex min-h-[26px] flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 <nav
                   data-testid="workbench-breadcrumb"
-                  aria-label="面包屑"
+                  aria-label={t('nav.breadcrumb')}
                   className="flex min-w-0 items-center gap-1.5 text-[12px] text-wb-muted"
                 >
-                  <span>项目</span>
+                  <span>{t('nav.breadcrumb')}</span>
                   <span aria-hidden className="text-wb-faint">›</span>
                   <span
                     data-testid="project-name"
@@ -628,7 +634,7 @@ function App() {
                   </span>
                   <span aria-hidden className="text-wb-faint">›</span>
                   <span data-testid="breadcrumb-current" className="text-wb-ink">
-                    {VIEW_LABEL[ws.workbenchTab]}
+                    {viewLabel[ws.workbenchTab]}
                   </span>
                 </nav>
                 <div className="flex items-center gap-2.5">
@@ -703,7 +709,7 @@ function App() {
                     onClick={openDirection}
                     className="wb-press inline-flex items-center gap-1.5 rounded-md bg-wb-primary px-3.5 py-1.5 text-[12.5px] font-medium text-white transition-colors duration-150 hover:bg-wb-primary-strong"
                   >
-                    {ws.directionBusy ? t('app.directionWorking') : 'Run'}
+                    {ws.directionBusy ? t('app.directionWorking') : t('workbench.run')}
                   </button>
                   <button
                     data-testid="export-doc-btn"
@@ -767,18 +773,18 @@ function App() {
             }`}
           />
           {ws.uploading
-            ? '数据清理中…'
+            ? t('status.cleaning')
             : ws.directionBusy
-              ? '正在估计…'
+              ? t('status.estimating')
               : ws.activeRun
-                ? `后台 run ${ws.activeRun.run_id.slice(0, 8)} 进行中`
+                ? t('status.backgroundRun', { id: ws.activeRun.run_id.slice(0, 8) })
                 : ws.runFailure
-                  ? `上次运行失败：${ws.runFailure}`
-                  : '空闲'}
+                  ? t('status.lastFailed', { error: ws.runFailure })
+                  : t('status.idle')}
         </span>
         {ws.degraded ? (
           <span data-testid="run-degradations" className="text-wb-warning">
-            {ws.degradations.length} 条降级记录
+            {t('status.degradations', { n: ws.degradations.length })}
           </span>
         ) : null}
         {sessionId ? (
@@ -787,7 +793,7 @@ function App() {
             className="truncate"
             title={`/api/sessions/${sessionId}/trace`}
           >
-            运行记录与 trace 可查
+            {t('status.traceHint')}
           </span>
         ) : null}
       </footer>

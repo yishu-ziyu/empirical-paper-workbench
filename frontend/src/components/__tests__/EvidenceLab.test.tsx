@@ -1,7 +1,14 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { LangPills } from '../UnauthHeader'
+import type { ReactElement } from 'react'
 import EvidenceLab from '../EvidenceLab'
 import type { ResearchLab } from '../../lib/workspace'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderLab(ui: ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 function choice(dimension: string, value: string) {
   return { dimension, value }
@@ -15,6 +22,30 @@ const research = {
     kind: 'ordering_mismatch',
     expected: 'IV may be smaller than OLS',
     observed: 'IV > OLS',
+    criterion_outcomes: [
+      {
+        id: 'criterion.seed.iv-below-ols',
+        outcome: 'violated',
+        kind: 'ordering',
+        operator: 'lt',
+        left: {
+          source: 'metric',
+          metric: 'estimate.coef',
+          estimator: 'iv',
+          spec_id: 'iv_region_dummies',
+          run_id: 'run-iv',
+          value: 0.13,
+        },
+        right: {
+          source: 'metric',
+          metric: 'estimate.coef',
+          estimator: 'ols',
+          spec_id: 'ols_region_dummies',
+          run_id: 'run-ols',
+          value: 0.08,
+        },
+      },
+    ],
   },
   next_challenge: {
     id: 'challenge.instrument_strength',
@@ -23,6 +54,23 @@ const research = {
     rationale_zh:
       '工具变量强度值得检查。Effective F = 14.14。强度诊断本身不能证明工具变量有效。',
     status: 'proposed',
+  },
+  expectation: {
+    text: 'OLS positive; IV may be smaller.',
+    confidence: 'medium',
+    version: 1,
+    history: [],
+    criteria: [
+      {
+        id: 'criterion.seed.iv-below-ols',
+        kind: 'ordering',
+        operator: 'lt',
+        left: { metric: 'estimate.coef', estimator: 'iv', spec_id: 'iv_region_dummies' },
+        right: { metric: 'estimate.coef', estimator: 'ols', spec_id: 'ols_region_dummies' },
+        label: 'IV estimate < OLS estimate',
+        source: 'seed',
+      },
+    ],
   },
   specification_space: {
     status: 'frozen',
@@ -110,6 +158,10 @@ const research = {
 } as unknown as ResearchLab
 
 describe('EvidenceLab', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   test('renders results space, matrix and compare from research payload', async () => {
     const onCompare = vi.fn(async () => ({
       coef_a: 0.08,
@@ -125,7 +177,7 @@ describe('EvidenceLab', () => {
       ],
       why_moved: 'Identification strategy changed',
     }))
-    render(
+    renderLab(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
@@ -140,9 +192,10 @@ describe('EvidenceLab', () => {
     expect(screen.getByTestId('evidence-spec-iv')).toBeInTheDocument()
     expect(screen.getByTestId('evidence-choice-matrix')).toBeInTheDocument()
     expect(screen.getByTestId('evidence-matrix-ols_region_dummies')).toBeInTheDocument()
-    expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Unexpected')
-    expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Expected')
-    expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('Observed')
+    expect(screen.getByTestId('evidence-surprise')).toHaveAttribute('data-status', 'Unexpected')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('与预期不符')
+    expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('预期')
+    expect(screen.getByTestId('evidence-surprise')).toHaveTextContent('观察到')
     expect(screen.getByTestId('evidence-challenge')).toHaveTextContent('Instrument strength deserves inspection')
     expect(screen.getByTestId('evidence-challenge')).toHaveTextContent('Effective F = 14.14')
     expect(screen.getByTestId('evidence-challenge')).not.toHaveTextContent('may be a weak instrument')
@@ -150,15 +203,47 @@ describe('EvidenceLab', () => {
     fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
     fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
     expect(await screen.findByTestId('evidence-compare-intent')).toHaveTextContent(
-      'Identification strategy changed',
+      '识别策略改变了',
     )
     expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('βA → βB')
     expect(screen.getByTestId('evidence-compare-delta')).toHaveTextContent('Δ')
     expect(onCompare).toHaveBeenCalled()
+    expect(screen.getByTestId('evidence-compare')).toHaveTextContent('方法')
+    expect(screen.getByTestId('evidence-compare')).not.toHaveTextContent('Method')
+  })
+
+  test('English chrome localizes compare dimensions and surprise', async () => {
+    const onCompare = vi.fn(async () => ({
+      coef_a: 0.08,
+      coef_b: 0.13,
+      changed: [{ dimension: 'estimator', a: 'ols', b: 'iv' }],
+      unchanged: [{ dimension: 'experience', a: 'quadratic', b: 'quadratic' }],
+    }))
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab
+          research={research}
+          onPromote={vi.fn(async () => undefined)}
+          onRevert={vi.fn(async () => undefined)}
+          onAcceptChallenge={vi.fn(async () => undefined)}
+          onCompare={onCompare}
+        />
+      </>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByTestId('evidence-matrix-ols_region_dummies'))
+    fireEvent.click(screen.getByTestId('evidence-matrix-iv_region_dummies'))
+    expect(await screen.findByTestId('evidence-compare-intent')).toHaveTextContent(
+      'Identification strategy changed',
+    )
+    expect(screen.getByTestId('evidence-compare')).toHaveTextContent('Method')
+    expect(screen.getByTestId('evidence-compare')).not.toHaveTextContent('方法')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unexpected')
   })
 
   test('Unevaluated does not masquerade as Expected', () => {
-    render(
+    renderLab(
       <EvidenceLab
         research={
           {
@@ -180,7 +265,7 @@ describe('EvidenceLab', () => {
     )
     const card = screen.getByTestId('evidence-surprise')
     expect(card).toHaveAttribute('data-status', 'Unevaluated')
-    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('尚未判定')
     expect(screen.getByTestId('evidence-surprise-unevaluated')).toHaveTextContent(
       '尚未判定：所需证据还没有产生',
     )
@@ -189,7 +274,7 @@ describe('EvidenceLab', () => {
   })
 
   test('no_criteria Unevaluated explains missing expectation, not missing evidence', () => {
-    render(
+    renderLab(
       <EvidenceLab
         research={
           {
@@ -211,7 +296,7 @@ describe('EvidenceLab', () => {
     )
     const card = screen.getByTestId('evidence-surprise')
     expect(card).toHaveAttribute('data-status', 'Unevaluated')
-    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('Unevaluated')
+    expect(screen.getByTestId('evidence-surprise-status')).toHaveTextContent('尚未判定')
     expect(screen.getByTestId('evidence-surprise-no-criteria')).toHaveTextContent(
       '尚未判定：尚未设置可检验的预期。',
     )
@@ -221,7 +306,7 @@ describe('EvidenceLab', () => {
   })
 
   test('Inconclusive does not masquerade as Expected', () => {
-    render(
+    renderLab(
       <EvidenceLab
         research={
           {
@@ -250,7 +335,7 @@ describe('EvidenceLab', () => {
   test('renders claim ledger and approve control after reviewing claim', async () => {
     const onApproveClaim = vi.fn(async () => undefined)
     const onDraftClaim = vi.fn(async () => undefined)
-    render(
+    renderLab(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
@@ -263,7 +348,7 @@ describe('EvidenceLab', () => {
     // Before review: lightweight card shown, full claim ledger folded
     expect(screen.getByTestId('evidence-claim-ledger')).toBeInTheDocument()
     expect(screen.getByTestId('evidence-review-claim')).toBeInTheDocument()
-    expect(screen.getByText(/Draft claim ready · 已可以整理结论/)).toBeInTheDocument()
+    expect(screen.getByText('已可以整理结论')).toBeInTheDocument()
     expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
 
     // Clicking review claim expands full claim ledger
@@ -293,7 +378,7 @@ describe('EvidenceLab', () => {
         stale: false,
       },
     }
-    render(
+    renderLab(
       <EvidenceLab
         research={nonStaleResearch as unknown as ResearchLab}
         onPromote={vi.fn(async () => undefined)}
@@ -326,7 +411,7 @@ describe('EvidenceLab', () => {
         approved_by_user: true, // expanded so Review new evidence is directly accessible
       },
     }
-    render(
+    renderLab(
       <EvidenceLab
         research={staleResearch as unknown as ResearchLab}
         onPromote={vi.fn(async () => undefined)}
@@ -345,7 +430,7 @@ describe('EvidenceLab', () => {
     const onAcceptChallenge = vi.fn(async () => {
       throw new Error('Network failure')
     })
-    render(
+    renderLab(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
@@ -355,7 +440,7 @@ describe('EvidenceLab', () => {
     )
     const acceptBtn = screen.getByTestId('evidence-challenge-accept')
     expect(acceptBtn).toBeInTheDocument()
-    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('evidence-challenge-accepted')).not.toBeInTheDocument()
     expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
 
     // Click accept which fails
@@ -367,13 +452,13 @@ describe('EvidenceLab', () => {
 
     // Accept button remains visible, no "Accepted" text, Claim does NOT expand
     expect(screen.getByTestId('evidence-challenge-accept')).toBeInTheDocument()
-    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('evidence-challenge-accepted')).not.toBeInTheDocument()
     expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
   })
 
   test('Challenge accept success: onAcceptChallenge succeeds, snapshot rerender with status=accepted expands Claim and displays Accepted', async () => {
     const onAcceptChallenge = vi.fn(async () => undefined)
-    const { rerender } = render(
+    const { rerender } = renderLab(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
@@ -383,7 +468,7 @@ describe('EvidenceLab', () => {
     )
     const acceptBtn = screen.getByTestId('evidence-challenge-accept')
     expect(acceptBtn).toBeInTheDocument()
-    expect(screen.queryByText('Accepted')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('evidence-challenge-accepted')).not.toBeInTheDocument()
     expect(screen.queryByTestId('claim-ledger')).not.toBeInTheDocument()
 
     // Click accept which succeeds
@@ -410,12 +495,12 @@ describe('EvidenceLab', () => {
 
     // Accept button is now replaced with Accepted text, and Claim Ledger expands
     expect(screen.queryByTestId('evidence-challenge-accept')).not.toBeInTheDocument()
-    expect(screen.getByText('Accepted')).toBeInTheDocument()
+    expect(screen.getByTestId('evidence-challenge-accepted')).toBeInTheDocument()
     expect(screen.getByTestId('claim-ledger')).toBeInTheDocument()
   })
 
   test('C1 Visual order: Results space and Compare precede Claim Ledger; Compare expands claim', () => {
-    render(
+    renderLab(
       <EvidenceLab
         research={research}
         onPromote={vi.fn(async () => undefined)}
@@ -474,7 +559,7 @@ describe('EvidenceLab', () => {
       ],
     } as unknown as ResearchLab
 
-    render(
+    renderLab(
       <EvidenceLab
         research={multiRunResearch}
         onPromote={vi.fn(async () => undefined)}
@@ -490,8 +575,7 @@ describe('EvidenceLab', () => {
     // History button shows 2 runs
     const historyBtn = screen.getByTestId('evidence-history-ols_region_dummies')
     expect(historyBtn).toBeInTheDocument()
-    expect(historyBtn).toHaveTextContent(/2 runs/i)
-    expect(historyBtn).toHaveTextContent(/History 2/i)
+    expect(historyBtn).toHaveTextContent('历史 2 次运行')
 
     // Default displayed is latest run (run-ols-2: 0.0800)
     expect(rows[0]).toHaveTextContent('0.0800')
@@ -511,7 +595,7 @@ describe('EvidenceLab', () => {
       stale: false,
       provenance: { iv_spec_id: 'iv_region_dummies', iv_run_id: 'run-iv' },
     }
-    render(
+    renderLab(
       <EvidenceLab
         research={{
           ...research,
@@ -524,7 +608,7 @@ describe('EvidenceLab', () => {
       />,
     )
     expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
-      '当前 Claim 依赖 IV specification，但正式主规格不是该 IV。',
+      '当前结论依赖的设定，并不是现在的主分析。',
     )
     expect(screen.getByTestId('claim-promote-supporting')).toBeInTheDocument()
     expect(screen.getByTestId('claim-write-results')).toBeInTheDocument()
@@ -532,5 +616,147 @@ describe('EvidenceLab', () => {
     expect(onPreparePaper).toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('claim-promote-supporting'))
     expect(onPromote).toHaveBeenCalledWith('run-iv')
+  })
+
+  test('C4 mismatch notice follows the interface language with a visible technical id (zh/en)', () => {
+    const approved = {
+      ...research.claim!,
+      approved_by_user: true,
+      stale: false,
+      provenance: { iv_spec_id: 'iv_region_dummies', iv_run_id: 'run-iv' },
+    }
+    const mismatched = {
+      ...research,
+      canonical_spec_id: 'ols_region_dummies',
+      claim: approved,
+      claims: [approved],
+    } as unknown as ResearchLab
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab research={mismatched} onPromote={vi.fn(async () => undefined)} />
+      </>,
+    )
+    expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
+      '当前结论依赖的设定，并不是现在的主分析。',
+    )
+    expect(screen.getByTestId('claim-promote-supporting')).toHaveTextContent(
+      '把支撑设定设为主分析',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(screen.getByTestId('claim-canonical-mismatch')).toHaveTextContent(
+      'This claim depends on a specification that is not the current primary analysis.',
+    )
+    expect(screen.getByTestId('claim-canonical-mismatch')).not.toHaveTextContent('当前结论')
+    expect(screen.getByTestId('claim-promote-supporting')).toHaveTextContent(
+      'Set the supporting specification as primary',
+    )
+  })
+
+  test('C1 claim explanation renders honest wording per backend status in the real Claim component (zh)', () => {
+    const cases: Array<{ status: string | undefined; expectRe: RegExp; forbidRe: RegExp }> = [
+      {
+        status: 'supported',
+        expectRe: /在当前证据下，教育与工资呈正向关联/,
+        forbidRe: /证据不足/,
+      },
+      {
+        status: 'insufficient',
+        expectRe: /证据不足/,
+        forbidRe: /在当前证据下，教育与工资呈正向关联|正向关联/,
+      },
+      { status: 'draft', expectRe: /草稿/, forbidRe: /正向关联|不能把 IV/ },
+      // Approval is a user action, not stronger evidence
+      { status: 'approved', expectRe: /已获批准/, forbidRe: /正向关联/ },
+      // Missing / unknown stay neutral: no affirmation, no denial
+      { status: undefined, expectRe: /暂无法识别/, forbidRe: /正向关联|13%|草稿/ },
+      { status: 'some_future_status', expectRe: /暂无法识别/, forbidRe: /正向关联|13%/ },
+    ]
+    for (const { status, expectRe, forbidRe } of cases) {
+      const { unmount } = renderLab(
+        <EvidenceLab
+          research={
+            {
+              ...research,
+              claim: { ...research.claim!, evidence_status: status },
+              claims: [{ ...research.claim!, evidence_status: status }],
+            } as unknown as ResearchLab
+          }
+        />,
+      )
+      fireEvent.click(screen.getByTestId('evidence-review-claim'))
+      const explanation = screen.getByTestId('claim-explanation')
+      expect(explanation).toHaveTextContent(expectRe)
+      expect(explanation).not.toHaveTextContent(forbidRe)
+      // Original claim text stays viewable next to the localized explanation
+      expect(screen.getByTestId('claim-original')).toHaveTextContent(
+        'Education is positively associated with earnings.',
+      )
+      unmount()
+    }
+  })
+
+  test('C1 claim explanation honest wording in English too', () => {
+    renderLab(
+      <>
+        <LangPills />
+        <EvidenceLab
+          research={
+            {
+              ...research,
+              claim: { ...research.claim!, evidence_status: 'insufficient' },
+              claims: [{ ...research.claim!, evidence_status: 'insufficient' }],
+            } as unknown as ResearchLab
+          }
+        />
+      </>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    fireEvent.click(screen.getByTestId('evidence-review-claim'))
+    const explanation = screen.getByTestId('claim-explanation')
+    expect(explanation).toHaveTextContent(/Insufficient evidence/)
+    expect(explanation).not.toHaveTextContent(/positively associated/)
+    expect(screen.getByTestId('claim-original')).toHaveTextContent(
+      'Education is positively associated with earnings.',
+    )
+  })
+
+  test('C2 observed values render from backend outcomes only; unresolved stays unobserved', () => {
+    const withOutcomes = {
+      ...research,
+      surprise: {
+        status: 'Inconclusive',
+        criterion_outcomes: [
+          {
+            id: 'criterion.seed.iv-below-ols',
+            outcome: 'satisfied',
+            kind: 'ordering',
+            operator: 'lt',
+            left: {
+              source: 'metric',
+              estimator: 'iv',
+              spec_id: 'iv_region_dummies',
+              run_id: 'run-iv',
+              value: 0.09,
+            },
+            right: {
+              source: 'metric',
+              estimator: 'ols',
+              spec_id: 'ols_region_dummies',
+              run_id: 'run-ols',
+              value: 0.13,
+            },
+          },
+          { id: 'criterion.future-att', outcome: 'unresolved' },
+        ],
+      },
+    } as unknown as ResearchLab
+    renderLab(<EvidenceLab research={withOutcomes} />)
+    const card = screen.getByTestId('evidence-surprise')
+    expect(card).toHaveAttribute('data-status', 'Inconclusive')
+    // Only the backend-resolved comparison is shown; the unresolved ATT
+    // criterion contributes nothing even though IV/OLS coefs exist.
+    expect(card).toHaveTextContent('IV 估计 0.0900 < OLS 估计 0.1300')
+    expect(card).not.toHaveTextContent('ATT')
   })
 })

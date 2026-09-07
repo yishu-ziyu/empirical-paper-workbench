@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '../lib/i18n'
+import { LangSwitch } from '../components/UnauthHeader'
 import { discussDesk, speakDesk, transcribeDesk } from '../lib/deskDiscuss'
 import type { DeskCard, DeskTurn } from '../lib/deskDiscuss'
 import { nextPrompt, shapeQuestion } from '../lib/shapeQuestion'
@@ -329,16 +330,16 @@ export default function DeskPage({
         <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-[#4e5969] text-[12px] leading-none">
           +
         </span>
-        新论文
+        {t('desk.newPaper')}
       </button>
-      <p className="px-2 pb-1 pt-2 text-[12px] text-[#86909c]">论文</p>
+      <p className="px-2 pb-1 pt-2 text-[12px] text-[#86909c]">{t('desk.papers')}</p>
       <div className="min-h-0 flex-1 overflow-y-auto text-[13.5px]">
         <div className="rounded-lg bg-[#f2f3f5] px-2.5 py-1.5 font-medium">
           {title || t('desk.heading')}
         </div>
-        <div className="px-2.5 py-1.5 text-[#4e5969]">课设样例：年龄与收入</div>
+        <div className="px-2.5 py-1.5 text-[#4e5969]">{t('desk.samplePaper')}</div>
       </div>
-      <p className="px-2 pb-1 pt-3 text-[12px] text-[#86909c]">数据</p>
+      <p className="px-2 pb-1 pt-3 text-[12px] text-[#86909c]">{t('desk.data')}</p>
       <button
         type="button"
         onClick={onPickData}
@@ -390,6 +391,7 @@ export default function DeskPage({
               {t('app.signUp')}
             </button>
           )}
+          <LangSwitch />
         </div>
       </header>
 
@@ -399,9 +401,9 @@ export default function DeskPage({
 
           {!text && (
             <section className="my-auto pb-16" data-testid="desk-empty-state">
-              <p className="font-serif text-[30px] leading-tight text-ink">先说一句你想研究什么。</p>
+              <p className="font-serif text-[30px] leading-tight text-ink">{t('desk.emptyTitle')}</p>
               <p className="mt-3 max-w-[34rem] text-[14px] leading-7 text-muted">
-                我会保留你的原话，一次只追问一个决定；数据入口和研究进度始终留在两侧。
+                {t('desk.emptyLead')}
               </p>
               <div className="mt-7 flex flex-wrap gap-2">
                 {(['desk.starter1', 'desk.starter2', 'desk.starter3'] as const).map((key) => (
@@ -423,11 +425,11 @@ export default function DeskPage({
                   disabled={uploading}
                   className="rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
-                  Try a real study · Card
+                  {t('desk.tryCard')}
                 </button>
+                <p className="mt-2 text-[13px] text-muted">{t('desk.tryCardHint')}</p>
               </div>
               <p className="mt-5 text-[13px] text-muted">
-                {t('desk.haveDataQ')}{' '}
                 <button
                   type="button"
                   data-testid="desk-upload-inline"
@@ -435,8 +437,11 @@ export default function DeskPage({
                   disabled={uploading}
                   className="text-ink underline underline-offset-4 hover:opacity-80 disabled:opacity-50"
                 >
-                  {uploading ? t('app.uploading') : t('desk.uploadCta')}
+                  {uploading ? t('app.uploading') : t('desk.ownData')}
                 </button>
+                <span className="mt-1 block max-w-[36rem] text-[12px] leading-5 text-[#8a8a8a]">
+                  {t('desk.ownDataScope')}
+                </span>
               </p>
             </section>
           )}

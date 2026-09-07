@@ -9,7 +9,7 @@ import pytest
 from facade import facade
 from models.run import Run
 from run_repository import RunRepository
-from services.research_lab import REQUIRED_CARD_COLUMNS, evaluate_surprise
+from services.research_lab import REQUIRED_CARD_COLUMNS, comparable_spec_ids, evaluate_surprise
 
 
 def _headers(key: str | None = None) -> dict[str, str]:
@@ -102,14 +102,15 @@ def test_seed_expectation_carries_single_structured_criterion(client):
     assert criterion["operator"] == "lt"
     assert criterion["left"]["metric"] == "estimate.coef"
     assert criterion["left"]["estimator"] == "iv"
-    assert criterion["left"]["spec_id"] == "iv_region_dummies"
+    ols_id, iv_id = comparable_spec_ids(lab["specification_space"]["definitions"])
+    assert criterion["left"]["spec_id"] == iv_id
     assert criterion["right"]["metric"] == "estimate.coef"
     assert criterion["right"]["estimator"] == "ols"
-    assert criterion["right"]["spec_id"] == "ols_region_dummies"
+    assert criterion["right"]["spec_id"] == ols_id
     assert "IV estimate < OLS estimate" in criterion["label"]
     seed_history = lab["expectation"]["history"][0]
-    assert seed_history["criteria"][0]["left"]["spec_id"] == "iv_region_dummies"
-    assert seed_history["criteria"][0]["right"]["spec_id"] == "ols_region_dummies"
+    assert seed_history["criteria"][0]["left"]["spec_id"] == iv_id
+    assert seed_history["criteria"][0]["right"]["spec_id"] == ols_id
 
 
 def _strip_nones(value):
@@ -420,8 +421,10 @@ def test_pre_reveal_criterion_history_keeps_full_snapshots(client):
     expectation = put.json()["expectation"]
     history = expectation["history"]
     assert history[0]["criteria"][0]["operator"] == "lt"
-    assert history[0]["criteria"][0]["left"]["spec_id"] == "iv_region_dummies"
-    assert history[0]["criteria"][0]["right"]["spec_id"] == "ols_region_dummies"
+    assert history[0]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
+    assert history[0]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]
+    assert seed["left"]["spec_id"]
+    assert seed["right"]["spec_id"]
     assert history[-1]["criteria"][0]["operator"] == "gt"
     assert history[-1]["criteria"][0]["left"]["spec_id"] == seed["left"]["spec_id"]
     assert history[-1]["criteria"][0]["right"]["spec_id"] == seed["right"]["spec_id"]

@@ -301,8 +301,8 @@ describe('ExpectationEditor surprise criteria (M1)', () => {
     // ±25% (and the both-empty backend default) must be distinguishable
     const defaulted = {
       ...approx,
-      criteria: [{ ...approx.criteria[0]!, tolerance: undefined }],
-    }
+      criteria: [{ ...approx.criteria![0]!, tolerance: undefined }],
+    } as Expectation
     renderEditor(async () => undefined, defaulted)
     expect(screen.getAllByTestId('expectation-criterion')[1]).toHaveTextContent('±25%')
   })

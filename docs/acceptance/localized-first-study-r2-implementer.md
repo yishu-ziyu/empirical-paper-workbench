@@ -3,7 +3,7 @@
 Date: 2026-09-07  
 Branch: `review/localized-first-study`  
 Round 2 start HEAD: `c9d36387ea6e2f554376fa046527b802a825387c`  
-This HEAD: `d47a19c` (`fix(i18n): keep language switch display-only on the Card path`).  
+This HEAD: `26dc6f8102e6a5778be7c36c3704b2807e025695` (`fix(i18n): keep language switch display-only on the Card path`). The SHA in the first draft of this paragraph was the pre-amend local commit; after amend+push the branch tip is `26dc6f8`.  
 Contract: `docs/acceptance/localized-first-study.md` (Status **open**; C1–C7 not weakened; C8–C12 are the new bar).  
 Did not merge. Did not enter Phase C. Did not implement issue #30, DiD, or Research Continuity.  
 Did not rewrite `docs/acceptance/localized-first-study-validator.md`.  

@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import OverviewView from '../OverviewView'
+import { I18nProvider } from '../../lib/i18n'
 import type { WorkspaceApi } from '../../lib/workspace'
 
 function overviewWs(overrides: Partial<WorkspaceApi> = {}): WorkspaceApi {
@@ -48,14 +49,16 @@ function overviewWs(overrides: Partial<WorkspaceApi> = {}): WorkspaceApi {
 describe('OverviewView table_rows', () => {
   test('renders Key Results rows from array-shaped table_rows', () => {
     render(
-      <OverviewView
-        ws={overviewWs()}
-        sessionId="sess-1"
-        hasSuccessfulEstimate
-        onSelectView={vi.fn()}
-        onOpenEvidence={vi.fn()}
-        onOpenDirection={vi.fn()}
-      />,
+      <I18nProvider>
+        <OverviewView
+          ws={overviewWs()}
+          sessionId="sess-1"
+          hasSuccessfulEstimate
+          onSelectView={vi.fn()}
+          onOpenEvidence={vi.fn()}
+          onOpenDirection={vi.fn()}
+        />
+      </I18nProvider>,
     )
     const table = screen.getByTestId('overview-results-table')
     expect(table).toHaveTextContent('age')

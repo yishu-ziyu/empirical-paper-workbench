@@ -80,7 +80,7 @@ describe('ChapterWriter 章节写作器', () => {
         }}
       />,
     )
-    expect(screen.getByTestId('chapter-stale')).toHaveTextContent('needs regeneration')
+    expect(screen.getByTestId('chapter-stale')).toHaveTextContent('证据已更新，请重新生成这一章')
     await userEvent.click(screen.getByTestId('paper-claim-link'))
     expect(onJumpToClaim).toHaveBeenCalled()
   })

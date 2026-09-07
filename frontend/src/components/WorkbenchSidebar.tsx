@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useT } from '../lib/i18n'
 
 export type WorkbenchViewId =
   | 'overview'
@@ -67,10 +68,11 @@ export default function WorkbenchSidebar({
   onSelect,
   children,
 }: WorkbenchSidebarProps) {
+  const { t } = useT()
   return (
     <nav
       data-testid="workbench-sidebar"
-      aria-label="项目导航"
+      aria-label={t('nav.myStudy')}
       className="flex h-full min-h-0 flex-col"
     >
       <div className="flex items-center gap-2 px-4 pb-3 pt-4">
@@ -86,7 +88,7 @@ export default function WorkbenchSidebar({
       </div>
 
       <p className="px-4 pb-1.5 pt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-        我的研究
+        {t('nav.myStudy')}
       </p>
       <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2">
         {items.map((item) => {
@@ -123,7 +125,7 @@ export default function WorkbenchSidebar({
       {children}
 
       <p className="border-t border-wb-line px-4 py-3 font-serif text-[12px] italic leading-5 text-wb-faint">
-        先做事，不打扰，人决定下一步。
+        {t('nav.sidebarMotto')}
       </p>
     </nav>
   )

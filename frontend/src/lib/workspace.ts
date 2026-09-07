@@ -419,11 +419,14 @@ export function snapshotHasDesk(data: WorkspaceSnapshot): boolean {
  */
 export function researchQuestionPrompt(
   research: ResearchLab | null | undefined,
+  lang?: 'zh' | 'en',
 ): string | null {
   const q = research?.question
   if (!q || typeof q !== 'object') return null
   const en = typeof q.prompt_en === 'string' ? q.prompt_en.trim() : ''
   const zh = typeof q.prompt_zh === 'string' ? q.prompt_zh.trim() : ''
+  if (lang === 'zh') return zh || en || null
+  if (lang === 'en') return en || zh || null
   return en || zh || null
 }
 

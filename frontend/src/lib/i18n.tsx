@@ -1,8 +1,9 @@
 // ── i18n 双语支持 ──
 
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { workbenchEn, workbenchZh } from './i18nWorkbench'
 
-type Lang = 'zh' | 'en'
+export type Lang = 'zh' | 'en'
 const LS_LANG_KEY = 'econpaper_lang'
 
 // ── 翻译字典 ──
@@ -132,6 +133,7 @@ const zh = {
   'deskSteps.iterations': '轮迭代',
   'deskSteps.failed': '失败',
   'deskSteps.approved': '已批准',
+  'deskSteps.kicker': '步骤卡 · 每步可追溯',
   'deskSteps.direction': '方向凝练',
   'deskSteps.directionWaiting': '提交研究方向后在此出现',
   'deskSteps.cleaning': '清洗八步',
@@ -564,18 +566,6 @@ const zh = {
   'journey.step8.desc': 'tex / pdf / docx',
   'journey.intervene': '可介入',
 
-  // Card Canonical concepts
-  'canonical.researchQuestion': 'Research Question（研究问题）',
-  'canonical.expectation': 'Expectation（预期）',
-  'canonical.admissibleSpace': 'Admissible Space（合理规格空间）',
-  'canonical.evidenceLab': 'Evidence Lab（证据实验室）',
-  'canonical.surprise': 'Surprise（意外）',
-  'canonical.compare': 'Compare（比较）',
-  'canonical.nextBestChallenge': 'Next-best Challenge（下一步最有价值的检验）',
-  'canonical.claimLedger': 'Claim Ledger（结论账本）',
-  'canonical.supported': 'Supported（当前证据支持）',
-  'canonical.conditionallySupported': 'Conditionally supported（有条件支持）',
-  'canonical.unsupported': 'Unsupported（当前证据不支持）',
 }
 
 const en: typeof zh = {
@@ -699,6 +689,7 @@ const en: typeof zh = {
   'deskSteps.iterations': 'iterations',
   'deskSteps.failed': 'Failed',
   'deskSteps.approved': 'Approved',
+  'deskSteps.kicker': 'Steps · traceable',
   'deskSteps.direction': 'Refine direction',
   'deskSteps.directionWaiting': 'Appears here after you submit a direction',
   'deskSteps.cleaning': 'Clean 8 steps',
@@ -1103,31 +1094,31 @@ const en: typeof zh = {
   'journey.step8.desc': 'tex / pdf / docx',
   'journey.intervene': 'Intervene',
 
-  // Card Canonical concepts
-  'canonical.researchQuestion': 'Research Question',
-  'canonical.expectation': 'Expectation',
-  'canonical.admissibleSpace': 'Admissible Space',
-  'canonical.evidenceLab': 'Evidence Lab',
-  'canonical.surprise': 'Surprise',
-  'canonical.compare': 'Compare',
-  'canonical.nextBestChallenge': 'Next-best Challenge',
-  'canonical.claimLedger': 'Claim Ledger',
-  'canonical.supported': 'Supported',
-  'canonical.conditionallySupported': 'Conditionally supported',
-  'canonical.unsupported': 'Unsupported',
 }
 
 // ── Context ──
 
+export type TranslateVars = Record<string, string | number>
+export type Translate = (key: string, vars?: TranslateVars) => string
+
 interface I18nContextValue {
   lang: Lang
   setLang: (lang: Lang) => void
-  t: (key: string) => string
+  t: Translate
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 export { I18nContext }
+
+export function htmlLangAttr(lang: Lang): 'zh-CN' | 'en' {
+  return lang === 'zh' ? 'zh-CN' : 'en'
+}
+
+function applyDocumentLang(lang: Lang) {
+  if (typeof document === 'undefined') return
+  document.documentElement.lang = htmlLangAttr(lang)
+}
 
 function getInitialLang(): Lang {
   try {
@@ -1139,13 +1130,26 @@ function getInitialLang(): Lang {
   return 'zh'
 }
 
-const dict: Record<Lang, Record<string, string>> = { zh, en }
+const dict: Record<Lang, Record<string, string>> = {
+  zh: { ...zh, ...workbenchZh },
+  en: { ...en, ...workbenchEn },
+}
+
+export const I18N_MESSAGES = dict
+
+function interpolate(template: string, vars?: TranslateVars): string {
+  if (!vars) return template
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
+  )
+}
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(getInitialLang)
 
   const setLang = (next: Lang) => {
     setLangState(next)
+    applyDocumentLang(next)
     try {
       localStorage.setItem(LS_LANG_KEY, next)
     } catch {
@@ -1153,7 +1157,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const t = (key: string): string => dict[lang][key] ?? key
+  useEffect(() => {
+    applyDocumentLang(lang)
+  }, [lang])
+
+  const t: Translate = (key, vars) => interpolate(dict[lang][key] ?? key, vars)
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t }}>

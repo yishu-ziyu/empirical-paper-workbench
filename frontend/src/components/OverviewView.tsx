@@ -1,5 +1,6 @@
 import type { WorkspaceApi } from '../lib/workspace'
 import type { WorkbenchViewId } from './WorkbenchSidebar'
+import { useT } from '../lib/i18n'
 import {
   formatStatValue,
   normalizeEstimateTableSource,
@@ -38,6 +39,7 @@ export default function OverviewView({
   onOpenEvidence,
   onOpenDirection,
 }: OverviewViewProps) {
+  const { t } = useT()
   const cleanedCount = Array.isArray(ws.cleaningReport?.steps)
     ? (ws.cleaningReport.steps as Array<{ status?: string }>).filter(
         (step) => step?.status === 'success',
@@ -54,7 +56,7 @@ export default function OverviewView({
   const stations: Station[] = [
     {
       id: 'data',
-      label: '数据清洗',
+      label: t('overview.clean'),
       view: 'data',
       status: uploadFailed
         ? 'blocked'
@@ -64,16 +66,16 @@ export default function OverviewView({
             ? 'done'
             : 'pending',
       hint: uploadFailed
-        ? '清理未完成'
+        ? t('overview.cleanIncomplete')
         : cleanedCount > 0
-          ? `${cleanedCount} 步完成`
+          ? t('overview.stepsDone', { n: cleanedCount })
           : ws.dataset
-            ? '数据已就位'
-            : '待上传',
+            ? t('overview.dataReady')
+            : t('overview.awaitUpload'),
     },
     {
       id: 'design',
-      label: '设计设定',
+      label: t('overview.design'),
       view: 'design',
       status: ws.identFailed
         ? 'blocked'
@@ -83,18 +85,18 @@ export default function OverviewView({
             ? 'active'
             : 'pending',
       hint: ws.identFailed
-        ? '识别未通过'
+        ? t('overview.identFailed')
         : ws.directionSummary
-          ? ws.directionRecord?.method || '已提交'
+          ? ws.directionRecord?.method || t('overview.submitted')
           : ws.research?.specification_space?.frozen_at
-            ? 'Admissible space frozen'
+            ? t('overview.plansConfirmed')
             : ws.research?.teaching_case
-              ? '待冻结'
-              : '待方向',
+              ? t('overview.awaitFreeze')
+              : t('overview.awaitDirection'),
     },
     {
       id: 'estimate',
-      label: '主结果',
+      label: t('overview.mainResult'),
       view: 'evidence',
       status:
         ws.estimateMeta?.status === 'error' || (ws.identFailed && Boolean(ws.directionSummary))
@@ -107,14 +109,14 @@ export default function OverviewView({
       hint: hasSuccessfulEstimate
         ? `β ${formatStatValue(ws.estimateMeta?.coef, 'coef')}`
         : ws.estimateMeta?.status === 'error'
-          ? '估计失败'
+          ? t('overview.estimateFailed')
           : ws.directionBusy
-            ? '估计中'
-            : '待估计',
+            ? t('overview.estimating')
+            : t('overview.awaitEstimate'),
     },
     {
       id: 'robustness',
-      label: '稳健性',
+      label: t('overview.robustness'),
       view: 'evidence',
       status:
         ws.robustnessStatus === 'ran' || ws.robustnessStatus === 'degraded'
@@ -124,23 +126,23 @@ export default function OverviewView({
             : 'pending',
       hint:
         ws.robustnessStatus === 'degraded'
-          ? '已跑（降级）'
+          ? t('overview.ranDegraded')
           : ws.robustnessStatus === 'ran'
-            ? '已跑'
+            ? t('overview.ran')
             : ws.robustnessStatus
               ? String(ws.robustnessStatus)
-              : '未运行',
+              : t('overview.notRun'),
     },
     {
       id: 'literature',
-      label: '文献',
+      label: t('overview.literature'),
       view: 'literature',
       status: ws.literatureSource ? 'done' : 'pending',
-      hint: ws.literatureSource ? String(ws.literatureSource) : '未检索',
+      hint: ws.literatureSource ? String(ws.literatureSource) : t('overview.notSearched'),
     },
     {
       id: 'paper',
-      label: '论文',
+      label: t('overview.paper'),
       view: 'paper',
       status:
         writtenCount > 0
@@ -152,8 +154,8 @@ export default function OverviewView({
             : 'pending',
       hint:
         ws.outline.length > 0
-          ? `${writtenCount}/${ws.outline.length} 章有正文`
-          : '待大纲',
+          ? t('overview.chaptersWritten', { done: writtenCount, total: ws.outline.length })
+          : t('overview.awaitOutline'),
     },
   ]
 
@@ -166,18 +168,20 @@ export default function OverviewView({
   )
 
   const lastRunText = ws.activeRun
-    ? `运行中 · ${ws.activeRun.kind === 'upload_pipeline' ? '数据管道' : '研究流程'}`
+    ? ws.activeRun.kind === 'upload_pipeline'
+      ? t('overview.runUpload')
+      : t('overview.runResearch')
     : ws.uploading
-      ? '数据管道运行中'
+      ? t('overview.pipelineRunning')
       : ws.directionBusy
-        ? '估计运行中'
+        ? t('overview.estimateRunning')
         : ws.runFailure
-          ? '上次运行失败'
+          ? t('overview.lastFailed')
           : hasSuccessfulEstimate
-            ? '主结果已生成'
+            ? t('overview.mainReady')
             : cleanedCount > 0
-              ? '数据清理完成'
-              : '暂无运行'
+              ? t('overview.cleanDone')
+              : t('overview.noRun')
 
   return (
     <div data-testid="overview-view" className="wb-pane-enter mx-auto max-w-[52rem] px-6 py-8 sm:px-8">
@@ -189,7 +193,7 @@ export default function OverviewView({
         >
           <p className="text-[11px] font-medium text-wb-muted">数据集</p>
           <p className="mt-1 truncate text-[15px] font-semibold text-wb-ink" title={ws.csvName ?? undefined}>
-            {ws.csvName || '未上传'}
+            {ws.csvName || t('overview.notUploaded')}
           </p>
           <p className="mt-0.5 text-[11px] text-wb-faint">
             {ws.dataset ? `${ws.dataset.columns?.length ?? 0} 列` : '—'}
@@ -203,7 +207,7 @@ export default function OverviewView({
           <p className="mt-1 font-mono text-[15px] font-semibold tabular-nums text-wb-ink">
             {ws.csvRows != null ? `N ${formatStatValue(ws.csvRows, 'n')}` : '—'}
           </p>
-          <p className="mt-0.5 text-[11px] text-wb-faint">{ws.csvRows != null ? '行' : '待上传'}</p>
+          <p className="mt-0.5 text-[11px] text-wb-faint">{ws.csvRows != null ? t('overview.rows') : t('overview.awaitUpload')}</p>
         </div>
         <div
           data-testid="overview-stat-method"
@@ -214,7 +218,7 @@ export default function OverviewView({
             {ws.directionRecord?.method || (ws.estimateMeta?.method as string | undefined) || '—'}
           </p>
           <p className="mt-0.5 text-[11px] text-wb-faint">
-            {ws.directionSummary ? '来自研究设定' : '未设定'}
+            {ws.directionSummary ? t('overview.fromDesign') : t('overview.notSet')}
           </p>
         </div>
         <div
@@ -352,8 +356,8 @@ export default function OverviewView({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed border-wb-line-strong px-3 py-4">
             <p className="text-[12.5px] text-wb-muted">
               {ws.estimateMeta?.status === 'error'
-                ? '上次估计失败，尚无可引用的主结果。'
-                : '还没有主结果。提交研究方向后系统会真实估计。'}
+                ? t('overview.noMainFailed')
+                : t('overview.noMain')}
             </p>
             <button
               type="button"
@@ -361,7 +365,7 @@ export default function OverviewView({
               onClick={onOpenDirection}
               className="wb-press rounded-md bg-wb-primary px-3 py-1.5 text-[12px] font-medium text-white hover:bg-wb-primary-strong"
             >
-              {ws.directionBusy ? '估计中…' : 'Run'}
+              {ws.directionBusy ? t('overview.estimatingEllipsis') : t('workbench.run')}
             </button>
           </div>
         )}

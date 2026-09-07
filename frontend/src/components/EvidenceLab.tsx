@@ -3,6 +3,8 @@ import type { ResearchLab } from '../lib/workspace'
 import { useAgentCursor } from '../lib/agentCursor/context'
 import { useSemanticTarget, useSemanticTargets } from '../lib/agentCursor/useSemanticTarget'
 import { TARGET } from '../lib/agentCursor/scripts'
+import { useT } from '../lib/i18n'
+import { MethodHelp, TaskHelp } from './TaskHelp'
 
 type SpecRun = NonNullable<ResearchLab['specification_runs']>[number]
 
@@ -194,6 +196,7 @@ function ClaimLedgerSection({
   onPromoteSupporting?: () => Promise<void>
   onReviewEvidence?: () => Promise<void>
 }) {
+  const { t } = useT()
   const stale = Boolean(claim.stale)
   return (
     <section
@@ -202,16 +205,23 @@ function ClaimLedgerSection({
       className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
     >
       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-        Claim Ledger（结论账本）
+        {t('canonical.claimLedger')}
       </p>
       {stale ? (
-        <p data-testid="claim-stale" className="mt-2 text-[13px] leading-6 text-wb-ink">
-          New evidence available · 结论需要重新审视
-        </p>
+        <div className="mt-2">
+          <p data-testid="claim-stale" className="text-[13px] leading-6 text-wb-ink">
+            {t('claim.stale')}
+          </p>
+          <TaskHelp
+            testId="help-stale"
+            summary={t('claim.helpStale')}
+            details={t('claim.helpStaleMore')}
+          />
+        </div>
       ) : null}
       {mismatch && !stale ? (
         <p data-testid="claim-canonical-mismatch" className="mt-2 text-[13px] leading-6 text-wb-ink">
-          当前 Claim 依赖 IV specification，但正式主规格不是该 IV。
+          {t('claim.mismatch')}
         </p>
       ) : null}
       <p data-testid="claim-text" className="mt-2 font-serif text-[1.15rem] leading-7 text-wb-ink">
@@ -220,7 +230,7 @@ function ClaimLedgerSection({
       <dl className="mt-3 space-y-2 text-[13px] leading-6">
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Supported（当前证据支持）
+            {t('claim.supported')}
           </dt>
           <dd data-testid="claim-supported" className="text-wb-ink">
             {claim.supported_wording}
@@ -228,7 +238,7 @@ function ClaimLedgerSection({
         </div>
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Conditionally supported（有条件支持）
+            {t('claim.conditional')}
           </dt>
           <dd data-testid="claim-conditional" className="text-wb-muted">
             {claim.conditionally_supported_wording}
@@ -236,7 +246,7 @@ function ClaimLedgerSection({
         </div>
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
-            Unsupported（当前证据不支持）
+            {t('claim.unsupported')}
           </dt>
           <dd data-testid="claim-unsupported" className="text-wb-faint">
             {claim.unsupported_wording}
@@ -245,7 +255,7 @@ function ClaimLedgerSection({
       </dl>
       {claim.unresolved_assumptions && claim.unresolved_assumptions.length > 0 ? (
         <p className="mt-3 text-[12px] leading-5 text-wb-muted">
-          Unresolved: {claim.unresolved_assumptions.join(' · ')}
+          {t('claim.unresolved')}: {claim.unresolved_assumptions.join(' · ')}
         </p>
       ) : null}
       {stale ? (
@@ -258,12 +268,12 @@ function ClaimLedgerSection({
           }}
           className="wb-press mt-3 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
         >
-          Review new evidence
+          {t('claim.reviewEvidence')}
         </button>
       ) : claim.approved_by_user ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p data-testid="claim-approved" className="text-[12px] text-wb-muted">
-            Approved
+            {t('claim.approved')}
           </p>
           {mismatch && onPromoteSupporting ? (
             <button
@@ -275,7 +285,7 @@ function ClaimLedgerSection({
               }}
               className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
-              Promote supporting specification
+              {t('claim.promoteSupporting')}
             </button>
           ) : null}
           {onPreparePaper ? (
@@ -288,7 +298,7 @@ function ClaimLedgerSection({
               }}
               className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
-              Write Results
+              {t('claim.writeResults')}
             </button>
           ) : null}
         </div>
@@ -303,7 +313,7 @@ function ClaimLedgerSection({
           }}
           className="wb-press mt-3 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
         >
-          Approve claim
+          {t('claim.approve')}
         </button>
       )}
     </section>
@@ -329,6 +339,7 @@ export default function EvidenceLab({
   onCompare?: (a: string, b: string) => Promise<CompareModel | null>
   onDraftClaim?: () => Promise<void>
 }) {
+  const { t, lang } = useT()
   const runs = (research.specification_runs ?? []).filter((run) => run.status !== 'error')
   const [specRunOverrides, setSpecRunOverrides] = useState<Record<string, string>>({})
   const [reviewClaimRequested, setReviewClaimRequested] = useState(false)
@@ -520,11 +531,15 @@ export default function EvidenceLab({
       {/* 1. Header */}
       <header>
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Evidence Lab（证据实验室）
+          {t('evidence.kicker')}
         </p>
         <h2 className="mt-1 font-serif text-[1.35rem] text-wb-ink">
-          {isClaimExpanded ? 'Claim Ledger' : 'Results space'}
+          {isClaimExpanded ? t('evidence.claims') : t('evidence.resultsSpace')}
         </h2>
+        <div className="mt-2 space-y-1">
+          <MethodHelp method="OLS" />
+          <MethodHelp method="IV" />
+        </div>
       </header>
 
       {/* 2. Surprise */}
@@ -535,33 +550,42 @@ export default function EvidenceLab({
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-2.5"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-            Surprise（意外）
+            {t('evidence.surprise')}
           </p>
           <p className="mt-1 text-[14px] text-wb-ink" data-testid="evidence-surprise-status">
-            {surprise.status}
+            {(() => {
+              const status = surprise.status || ''
+              const key = `evidence.status.${status}`
+              const label = t(key)
+              return label === key ? status : label
+            })()}
           </p>
           {surprise.status === 'Unevaluated' && surprise.unevaluated_reason === 'no_criteria' ? (
             <p data-testid="evidence-surprise-no-criteria" className="mt-1 text-[12px] text-wb-muted">
-              尚未判定：尚未设置可检验的预期。
+              {t('evidence.unevaluatedNoCriteria')}
             </p>
           ) : null}
           {surprise.status === 'Unevaluated' && surprise.unevaluated_reason !== 'no_criteria' ? (
             <p data-testid="evidence-surprise-unevaluated" className="mt-1 text-[12px] text-wb-muted">
-              尚未判定：所需证据还没有产生
+              {t('evidence.unevaluatedUnresolved')}
             </p>
           ) : null}
           {surprise.status === 'Inconclusive' ? (
             <p data-testid="evidence-surprise-inconclusive" className="mt-1 text-[12px] text-wb-muted">
-              部分判定：有的所需证据还没有产生
+              {t('evidence.inconclusive')}
             </p>
           ) : null}
           {surprise.status !== 'Unevaluated' &&
           surprise.status !== 'Inconclusive' &&
           surprise.expected ? (
-            <p className="mt-1 text-[12px] text-wb-muted">Expected: {surprise.expected}</p>
+            <p className="mt-1 text-[12px] text-wb-muted">
+              {t('evidence.expected')}: {surprise.expected}
+            </p>
           ) : null}
           {surprise.observed ? (
-            <p className="text-[12px] text-wb-muted">Observed: {surprise.observed}</p>
+            <p className="text-[12px] text-wb-muted">
+              {t('evidence.observed')}: {surprise.observed}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -572,7 +596,7 @@ export default function EvidenceLab({
         viewBox={`0 0 ${points.width} ${points.height}`}
         className="w-full rounded-md border border-wb-line bg-wb-surface"
         role="img"
-        aria-label="Specification coefficients"
+        aria-label={t('evidence.ariaPlot')}
       >
         {points.lanes.map((lane) => (
           <text
@@ -633,14 +657,18 @@ export default function EvidenceLab({
 
       {/* 3. Results Space: Choice Matrix */}
       <section data-testid="evidence-choice-matrix">
-        <h3 className="mb-2 font-serif text-[1.1rem] text-wb-ink">Choice matrix</h3>
+        <h3 className="mb-2 font-serif text-[1.1rem] text-wb-ink">{t('evidence.matrix')}</h3>
         <div className="overflow-x-auto rounded-md border border-wb-line">
           <table className="w-full text-left text-[12px]">
             <thead className="bg-wb-subtle font-mono text-[10px] uppercase tracking-[0.12em] text-wb-faint">
               <tr>
-                <th className="px-3 py-2">Spec</th>
+                <th className="px-3 py-2">{t('evidence.spec')}</th>
                 {DIMS.map((dim) => (
-                  <ChoiceHeader key={dim.key} dimKey={dim.key} label={dim.label} />
+                  <ChoiceHeader
+                    key={dim.key}
+                    dimKey={dim.key}
+                    label={t(`evidence.dim.${dim.key}`)}
+                  />
                 ))}
                 <th className="px-3 py-2">β</th>
               </tr>
@@ -684,7 +712,7 @@ export default function EvidenceLab({
                             className="rounded border border-wb-line bg-wb-subtle px-1.5 py-0.5 font-mono text-[10px] text-wb-muted hover:text-wb-ink"
                             title={`Switch run (${groupRuns.findIndex((r) => r.id === run.id) + 1}/${groupRuns.length})`}
                           >
-                            History {groupRuns.length} (Preview · {groupRuns.length} runs)
+                            {t('evidence.historyRuns', { n: groupRuns.length })}
                           </button>
                         ) : null}
                       </div>
@@ -718,7 +746,7 @@ export default function EvidenceLab({
         data-testid="evidence-compare"
         className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
       >
-        <h3 className="font-serif text-[1.1rem] text-wb-ink">Compare（比较）</h3>
+        <h3 className="font-serif text-[1.1rem] text-wb-ink">{t('evidence.compare')}</h3>
         {comparison && selectedRuns.length === 2 ? (
           <div className="mt-2 space-y-1 text-[13px] leading-6 text-wb-ink">
             <p data-testid="evidence-compare-delta">
@@ -730,14 +758,14 @@ export default function EvidenceLab({
               {comparison.why || '…'}
             </p>
             <p className="text-[12px] text-wb-muted">
-              Changed: {comparison.changed.map((item) => item.dimension).join(', ') || 'none'}
+              {t('evidence.changed')}: {comparison.changed.map((item) => item.dimension).join(', ') || t('evidence.none')}
             </p>
             <p className="text-[12px] text-wb-muted">
-              Unchanged: {comparison.unchanged.map((item) => item.dimension).join(', ') || 'none'}
+              {t('evidence.unchanged')}: {comparison.unchanged.map((item) => item.dimension).join(', ') || t('evidence.none')}
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-[13px] text-wb-muted">Select two specifications to compare.</p>
+          <p className="mt-2 text-[13px] text-wb-muted">{t('evidence.selectTwo')}</p>
         )}
 
         {selectedRuns[0] ? (
@@ -753,7 +781,7 @@ export default function EvidenceLab({
               }}
               className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
-              Promote to canonical
+              {t('evidence.setPrimary')}
             </button>
             <button
               type="button"
@@ -766,8 +794,13 @@ export default function EvidenceLab({
               }}
               className="wb-press rounded-md border border-wb-line px-3 py-1.5 text-[12px] text-wb-ink disabled:opacity-50"
             >
-              Revert canonical
+              {t('evidence.revertPrimary')}
             </button>
+            <TaskHelp
+              testId="help-promote"
+              summary={t('evidence.helpPromote')}
+              details={t('evidence.helpPromoteMore')}
+            />
           </div>
         ) : null}
       </section>
@@ -778,10 +811,10 @@ export default function EvidenceLab({
           className="rounded-md border border-dashed border-wb-line bg-wb-subtle px-3 py-3"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-            Preview proposal
+            {t('evidence.previewProposal')}
           </p>
           <p className="mt-1 text-[13px] leading-6 text-wb-ink">
-            Experience: quadratic → linear. Canonical estimate is unchanged until you promote.
+            {t('evidence.previewBody')}
           </p>
         </section>
       ) : null}
@@ -795,10 +828,10 @@ export default function EvidenceLab({
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-            Experience form
+            {t('evidence.experienceForm')}
           </p>
           <p className="mt-1 text-[13px] leading-6 text-wb-ink">
-            Experience may enter linearly or as a quadratic.
+            {t('evidence.experienceBody')}
           </p>
           <button
             type="button"
@@ -807,7 +840,7 @@ export default function EvidenceLab({
             onClick={cursor.playChallengeExperience}
             className="wb-press mt-2 rounded-md border border-wb-line px-3 py-1.5 text-[12px] text-wb-ink"
           >
-            Show preview
+            {t('evidence.showPreview')}
           </button>
         </section>
       ) : null}
@@ -819,16 +852,26 @@ export default function EvidenceLab({
           className="rounded-md border border-wb-line bg-wb-surface px-3 py-3"
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-            Next-best Challenge（下一步最有价值的检验）
+            {t('evidence.challenge')}
           </p>
           <p className="mt-1 text-[13px] leading-6 text-wb-ink">
-            {challenge.rationale}
-            {challenge.rationale_zh ? (
-              <span className="mt-1 block text-[12px] text-wb-muted">
-                {challenge.rationale_zh}
-              </span>
-            ) : null}
+            {lang === 'zh'
+              ? challenge.rationale_zh || challenge.rationale
+              : challenge.rationale || challenge.rationale_zh}
           </p>
+          {challenge.rationale && challenge.rationale_zh ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-[12px] text-wb-muted">
+                {t('question.original')}
+              </summary>
+              <p
+                lang={lang === 'zh' ? 'en' : 'zh-CN'}
+                className="mt-1 text-[12px] text-wb-muted"
+              >
+                {lang === 'zh' ? challenge.rationale : challenge.rationale_zh}
+              </p>
+            </details>
+          ) : null}
           {challenge.status !== 'accepted' ? (
             <button
               type="button"
@@ -847,10 +890,12 @@ export default function EvidenceLab({
               }}
               className="wb-press mt-2 rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
-              Accept challenge
+              {t('evidence.acceptChallenge')}
             </button>
           ) : (
-            <p className="mt-1 text-[12px] text-wb-muted">Accepted</p>
+            <p data-testid="evidence-challenge-accepted" className="mt-1 text-[12px] text-wb-muted">
+              {t('evidence.accepted')}
+            </p>
           )}
         </section>
       ) : null}
@@ -863,10 +908,10 @@ export default function EvidenceLab({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-                    Claim Ledger（结论账本）
+                    {t('canonical.claimLedger')}
                   </p>
                   <p className="mt-1 text-[13px] font-medium text-wb-ink">
-                    Draft claim ready · 已可以整理结论
+                    {t('evidence.claimReady')}
                   </p>
                 </div>
                 <button
@@ -880,7 +925,7 @@ export default function EvidenceLab({
                   }}
                   className="wb-press rounded-md bg-wb-ink px-3 py-1.5 text-[12px] font-medium text-white"
                 >
-                  Review claim · 整理结论
+                  {t('evidence.reviewClaim')}
                 </button>
               </div>
             </section>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useT } from '../lib/i18n'
 import { fetchSessionEvidence, type EvidenceModel } from '../lib/workspace'
 import {
   claimLabel,
@@ -38,6 +39,7 @@ export default function EvidenceView({
   direction,
   onOpenCode,
 }: EvidenceViewProps) {
+  const { t } = useT()
   const [evidence, setEvidence] = useState<EvidenceModel | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -135,7 +137,7 @@ export default function EvidenceView({
   const layers: ProvenanceLayer[] = [
     {
       id: 'result',
-      title: 'Result · 结果数字',
+      title: t('legacy.result'),
       detail: (
         <span className="font-mono tabular-nums">
           β {formatStatValue(estimate?.coef, 'coef')}
@@ -146,13 +148,13 @@ export default function EvidenceView({
     },
     {
       id: 'specification',
-      title: 'Specification · 研究设定',
+      title: t('legacy.specification'),
       detail: <span>{specLabel ?? '暂无'}</span>,
       present: Boolean(specLabel),
     },
     {
       id: 'estimator',
-      title: 'Estimator · 估计量',
+      title: t('legacy.estimator'),
       detail: (
         <span>
           {estimate?.estimator ? String(estimate.estimator) : '暂无'}
@@ -163,7 +165,7 @@ export default function EvidenceView({
     },
     {
       id: 'run',
-      title: 'Run · 运行',
+      title: t('legacy.run'),
       detail: (
         <span>
           {provenance?.run_id ? (
@@ -189,7 +191,7 @@ export default function EvidenceView({
     },
     {
       id: 'dataset',
-      title: 'Dataset · 数据集',
+      title: t('legacy.dataset'),
       detail: (
         <span>
           {dataset
@@ -203,7 +205,7 @@ export default function EvidenceView({
     },
     {
       id: 'code',
-      title: 'Code · 代码',
+      title: t('legacy.code'),
       detail: (
         <span>
           {hasCodeArtifact ? (
@@ -231,7 +233,7 @@ export default function EvidenceView({
     <div data-testid="evidence-view" className="wb-pane-enter mx-auto max-w-[52rem] px-6 py-8 sm:px-8">
       <header className="mb-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-          Evidence · 结论与来源
+          {t('legacy.evidenceKicker')}
         </p>
         {evidence?.claim || fallbackEstimate != null ? (
           <h2 data-testid="evidence-claim" className="mt-1.5 font-serif text-[1.3rem] leading-snug text-wb-ink">

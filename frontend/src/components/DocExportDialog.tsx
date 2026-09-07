@@ -17,16 +17,16 @@ export interface DocExportDialogProps {
 }
 
 const TEMPLATES = [
-  { value: 'cn_journal', label: '中文核心期刊' },
-  { value: 'undergraduate', label: '本科论文' },
-  { value: 'master_thesis', label: '硕士学位论文' },
-  { value: 'english_submission', label: '英文投稿' },
+  { value: 'cn_journal', labelKey: 'docExport.tpl.cn_journal' },
+  { value: 'undergraduate', labelKey: 'docExport.tpl.undergraduate' },
+  { value: 'master_thesis', labelKey: 'docExport.tpl.master_thesis' },
+  { value: 'english_submission', labelKey: 'docExport.tpl.english_submission' },
 ]
 
-const FORMATS: { format: ExportFormat; label: string }[] = [
-  { format: 'tex', label: '.tex 源码' },
-  { format: 'pdf', label: '.pdf' },
-  { format: 'docx', label: '.docx' },
+const FORMATS: { format: ExportFormat; labelKey: string }[] = [
+  { format: 'tex', labelKey: 'docExport.fmt.tex' },
+  { format: 'pdf', labelKey: 'docExport.fmt.pdf' },
+  { format: 'docx', labelKey: 'docExport.fmt.docx' },
 ]
 
 export default function DocExportDialog({
@@ -61,22 +61,22 @@ export default function DocExportDialog({
             {t('docExport.selectTemplate')}
           </span>
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-          {TEMPLATES.map((t) => (
+          {TEMPLATES.map((item) => (
             <label
-              key={t.value}
+              key={item.value}
               className="flex cursor-pointer items-center gap-2 rounded border border-border px-2 py-1 font-serif text-xs text-ink transition-colors hover:bg-panel"
             >
               <input
                 type="radio"
                 name="template"
-                value={t.value}
+                value={item.value}
                 data-testid="template-option"
-                checked={template === t.value}
-                onChange={() => setTemplate(t.value)}
+                checked={template === item.value}
+                onChange={() => setTemplate(item.value)}
                 className="accent-accent"
               />
-              <span className="font-semibold">{t.value}</span>
-              <span className="text-muted">— {t.label}</span>
+              <span className="font-semibold">{item.value}</span>
+              <span className="text-muted">— {t(item.labelKey)}</span>
             </label>
           ))}
         </div>
@@ -96,7 +96,7 @@ export default function DocExportDialog({
               onClick={() => onExport(f.format, template)}
               className="rounded border border-accent bg-accent/5 px-4 py-2 font-serif text-xs font-semibold text-accent transition-colors hover:bg-accent hover:text-paper"
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>

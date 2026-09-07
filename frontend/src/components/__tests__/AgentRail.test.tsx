@@ -2,6 +2,11 @@ import { describe, expect, test, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import AgentRail from '../AgentRail'
 import type { WorkspaceApi } from '../../lib/workspace'
+import { I18nProvider } from '../../lib/i18n'
+
+function renderRail(ui: React.ReactElement) {
+  return render(ui, { wrapper: I18nProvider })
+}
 
 function ws(overrides: Record<string, unknown> = {}): WorkspaceApi {
   return {
@@ -41,7 +46,7 @@ function ws(overrides: Record<string, unknown> = {}): WorkspaceApi {
 
 describe('AgentRail linked evidence', () => {
   test('results grounded badge requires approved claim', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws()}
         decision={null}
@@ -56,7 +61,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('missing based_on_evidence_revision is not grounded when lab has revision', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           research: {
@@ -87,7 +92,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('stale claim is not marked grounded', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           research: {
@@ -120,7 +125,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('unsupported wording is not marked grounded', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           writtenChapters: [
@@ -144,7 +149,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('C2 Question tab does not leak Evidence "Show me" or "IV > OLS"', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'question',
@@ -167,7 +172,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('C2 Paper tab shows Linked Evidence and never leaks Show me or Unexpected result', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'paper',
@@ -196,7 +201,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('C2 Evidence tab displays Unexpected result prompt and Show me', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'evidence',
@@ -223,7 +228,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('Unevaluated does not show Show me', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'evidence',
@@ -243,7 +248,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('no_criteria Unevaluated does not show Show me', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'evidence',
@@ -269,7 +274,7 @@ describe('AgentRail linked evidence', () => {
   })
 
   test('Inconclusive does not show Show me', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           workbenchTab: 'evidence',
@@ -291,7 +296,7 @@ describe('AgentRail linked evidence', () => {
 
 describe('AgentRail spec_run progress (M2)', () => {
   test('shows real per-spec progress while a spec_run is active', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           activeRun: { run_id: 'run-spec-1', kind: 'spec_run', status: 'RUNNING' },
@@ -307,13 +312,13 @@ describe('AgentRail spec_run progress (M2)', () => {
     )
     const task = screen.getByTestId('agent-current-task')
     expect(task).toHaveAttribute('data-busy', 'true')
-    expect(task).toHaveTextContent('正在运行规格 3/12')
+    expect(task).toHaveTextContent('正在运行分析方案 3/12')
     expect(task).not.toHaveTextContent('空闲')
     expect(task).not.toHaveTextContent('后台运行监控中')
   })
 
   test('indeterminate wording when the progress denominator is unknown', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({
           activeRun: { run_id: 'run-spec-2', kind: 'spec_run', status: 'RUNNING' },
@@ -327,11 +332,11 @@ describe('AgentRail spec_run progress (M2)', () => {
         onOpenEvidence={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('agent-current-task')).toHaveTextContent('正在运行规格…')
+    expect(screen.getByTestId('agent-current-task')).toHaveTextContent('正在运行分析方案…')
   })
 
   test('terminal spec_run clears the background-run claim (no stale monitoring)', () => {
-    render(
+    renderRail(
       <AgentRail
         ws={ws({ activeRun: null, specRunProgress: null })}
         decision={null}

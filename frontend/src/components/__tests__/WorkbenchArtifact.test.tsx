@@ -97,10 +97,10 @@ describe('WorkbenchArtifact research lab', () => {
       </I18nProvider>,
     )
     expect(screen.getByTestId('teaching-case-badge')).toBeInTheDocument()
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('Log wage')
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('Years of education')
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('Ability and family background')
-    expect(screen.getByTestId('research-question-card')).toHaveTextContent('College proximity')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('对数工资')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('受教育年限')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('能力与家庭背景')
+    expect(screen.getByTestId('research-question-card')).toHaveTextContent('大学邻近')
     expect(screen.getByTestId('research-question-card')).toHaveTextContent('OLS association')
     expect(screen.getByTestId('expectation-editor')).toBeInTheDocument()
 
@@ -118,7 +118,7 @@ describe('WorkbenchArtifact research lab', () => {
       </I18nProvider>,
     )
     expect(screen.getByTestId('spec-space')).toBeInTheDocument()
-    expect(screen.getByTestId('spec-space-freeze')).toHaveTextContent('Freeze admissible space')
+    expect(screen.getByTestId('spec-space-freeze')).toHaveTextContent('确认分析方案')
     expect(screen.queryByText(/βA → βB|compare/i)).not.toBeInTheDocument()
   })
 
@@ -185,13 +185,13 @@ describe('WorkbenchArtifact research lab', () => {
 
     // ChapterWriter is rendered
     expect(screen.getByTestId('chapter-writer')).toBeInTheDocument()
-    expect(screen.getByTestId('paper-grounded-badge')).toHaveTextContent('基于证据')
+    expect(screen.getByTestId('paper-grounded-badge')).toHaveTextContent('已关联当前证据')
     expect(screen.getByTestId('paper-claim-link')).toBeInTheDocument()
 
     // Research trace is a collapsed details element below ChapterWriter
     const researchTrace = screen.getByTestId('research-trace')
     expect(researchTrace.tagName.toLowerCase()).toBe('details')
-    expect(researchTrace).toHaveTextContent(/Research trace · 研究记录/)
+    expect(researchTrace).toHaveTextContent('研究记录')
 
     // ChapterWriter appears before research-trace in DOM
     const chapterWriter = screen.getByTestId('chapter-writer')

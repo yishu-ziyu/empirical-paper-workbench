@@ -1,6 +1,7 @@
 import { describe, expect, test, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import EvidenceView from '../EvidenceView'
+import { I18nProvider } from '../../lib/i18n'
 import { fetchSessionEvidence } from '../../lib/workspace'
 
 vi.mock('../../lib/workspace', async () => {
@@ -66,7 +67,7 @@ describe('EvidenceView provenance layers', () => {
 
   test('canExport-equivalent chapters without code artifact stay 5/6', async () => {
     fetchEvidence.mockResolvedValue(sixLayerEvidence() as never)
-    render(<EvidenceView sessionId="sess-1" />)
+    render(<I18nProvider><EvidenceView sessionId="sess-1" /></I18nProvider>)
     await waitFor(() => {
       expect(screen.getByTestId('evidence-traceability')).toHaveAttribute(
         'data-fully-traceable',
@@ -93,7 +94,7 @@ describe('EvidenceView provenance layers', () => {
         },
       }) as never,
     )
-    render(<EvidenceView sessionId="sess-1" />)
+    render(<I18nProvider><EvidenceView sessionId="sess-1" /></I18nProvider>)
     await waitFor(() => {
       expect(screen.getByTestId('evidence-traceability')).toHaveAttribute(
         'data-fully-traceable',

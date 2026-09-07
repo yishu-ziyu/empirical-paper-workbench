@@ -35,10 +35,10 @@ export interface WorkbenchArtifactProps {
 
 type PaperTab = 'writing' | 'preview' | 'history'
 
-const PAPER_TABS: Array<{ id: PaperTab; label: string }> = [
-  { id: 'writing', label: 'Writing' },
-  { id: 'preview', label: 'Preview' },
-  { id: 'history', label: 'History' },
+const PAPER_TAB_KEYS: Array<{ id: PaperTab; labelKey: string }> = [
+  { id: 'writing', labelKey: 'paper.writing' },
+  { id: 'preview', labelKey: 'paper.preview' },
+  { id: 'history', labelKey: 'paper.history' },
 ]
 
 /**
@@ -103,10 +103,10 @@ export default function WorkbenchArtifact({
 
   const nowHintText = ws.research?.teaching_case && !ws.hasReadout
     ? ws.research.specification_runs && ws.research.specification_runs.length
-      ? '规格已运行。到 Evidence 看结果空间与 Surprise。'
+      ? t('paper.nowSpecsRun')
       : ws.research.specification_space?.frozen_at
-      ? 'Admissible space 已冻结。比较结果会在真实运行后出现。'
-      : '确认研究问题与预期，然后在 Design 冻结 Admissible Space。'
+      ? t('paper.nowFrozen')
+      : t('paper.nowConfirm')
     : !ws.hasReadout
     ? t('guide.nowDirection')
     : !ws.writtenChapter?.content && !ws.writeBusy
@@ -144,7 +144,7 @@ export default function WorkbenchArtifact({
   return (
     <div
       data-testid="paper-surface"
-      aria-label="当前研究工件"
+      aria-label={t('workbench.artifact')}
       className="min-w-0"
     >
       {ws.research?.teaching_case && ws.workbenchTab === 'overview' ? (
@@ -195,7 +195,7 @@ export default function WorkbenchArtifact({
             {ws.research?.teaching_case ? (
               <details>
                 <summary className="cursor-pointer font-mono text-xs text-muted">
-                  Technical details
+                  {t('design.techDetails')}
                 </summary>
                 <div className="mt-4">
                   <h2 className="mb-3 font-serif text-[1.15rem] text-ink">
@@ -271,8 +271,12 @@ export default function WorkbenchArtifact({
             </h2>
             <p data-testid="dataset-summary" className="mb-4 font-mono text-xs text-muted">
               {ws.csvName
-                ? `${ws.csvName} · ${ws.csvRows ?? '?'} 行 · ${ws.csvCols ?? ws.dataColumns.length} 列`
-                : '尚未上传数据'}
+                ? t('design.datasetRows', {
+                    name: ws.csvName,
+                    rows: ws.csvRows ?? '?',
+                    cols: ws.csvCols ?? ws.dataColumns.length,
+                  })
+                : t('design.noDataset')}
             </p>
             <CsvDropZone
               uploading={ws.uploading}
@@ -301,9 +305,9 @@ export default function WorkbenchArtifact({
             <TeachingCaseBadge teachingCase={ws.research?.teaching_case} />
             <header>
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-                Design · 研究设定
+                {t('design.kicker')}
               </p>
-              <h2 className="mt-1 font-serif text-[1.35rem] text-ink">识别与设定</h2>
+              <h2 className="mt-1 font-serif text-[1.35rem] text-ink">{t('design.title')}</h2>
             </header>
             {ws.research?.specification_space ? (
               <SpecificationSpacePanel
@@ -324,17 +328,17 @@ export default function WorkbenchArtifact({
             {ws.directionRecord ? (
               <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
                 <div>
-                  <dt className="text-muted">方法</dt>
+                  <dt className="text-muted">{t('design.method')}</dt>
                   <dd data-testid="design-method" className="mt-1 text-ink">
                     {ws.directionRecord.method || '—'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted">因变量</dt>
+                  <dt className="text-muted">{t('design.dv')}</dt>
                   <dd className="mt-1 text-ink">{ws.directionRecord.dv || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted">自变量</dt>
+                  <dt className="text-muted">{t('design.iv')}</dt>
                   <dd className="mt-1 text-ink">{ws.directionRecord.iv || '—'}</dd>
                 </div>
               </dl>
@@ -342,7 +346,7 @@ export default function WorkbenchArtifact({
             {ws.identReport ? (
               <details className="rounded border border-border bg-paper px-3 py-2">
                 <summary className="cursor-pointer font-mono text-xs text-muted">
-                  识别说明
+                  {t('design.identNotes')}
                 </summary>
                 <pre data-testid="ident-report" className="mt-2 whitespace-pre-wrap text-xs">
                   {ws.identReport}
@@ -376,7 +380,7 @@ export default function WorkbenchArtifact({
             />
           ) : (
             <div className="px-6 py-8">
-              <p className="text-sm text-muted">建立研究会话后，这里显示主结果证据。</p>
+              <p className="text-sm text-muted">{t('design.noEvidenceYet')}</p>
             </div>
           )}
         </>
@@ -387,9 +391,9 @@ export default function WorkbenchArtifact({
           <section data-testid="literature-view" className="space-y-4">
             <header>
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-wb-faint">
-                Literature · 文献
+                {t('nav.literature')}
               </p>
-              <h2 className="mt-1 font-serif text-[1.35rem] text-ink">文献来源</h2>
+              <h2 className="mt-1 font-serif text-[1.35rem] text-ink">{t('paper.literatureTitle')}</h2>
             </header>
             {ws.literatureSource ? (
               <p data-testid="literature-source" className="text-sm text-ink">
@@ -430,7 +434,7 @@ export default function WorkbenchArtifact({
             aria-label="论文工作区"
             className="mb-5 inline-flex gap-1 rounded-lg border border-wb-line bg-wb-subtle p-1"
           >
-            {PAPER_TABS.map(({ id, label }) => paperTabButton(id, label))}
+            {PAPER_TAB_KEYS.map(({ id, labelKey }) => paperTabButton(id, t(labelKey)))}
           </div>
 
           {paperTab === 'writing' && (
@@ -491,7 +495,7 @@ export default function WorkbenchArtifact({
                 className="rounded-lg border border-wb-line bg-wb-surface"
               >
                 <summary className="cursor-pointer px-4 py-3 font-serif text-[14px] text-wb-ink">
-                  Research trace · 研究记录
+                  {t('paper.researchTrace')}
                 </summary>
                 <div className="space-y-5 border-t border-wb-line p-4">
                   <SubmissionStatus
@@ -549,7 +553,7 @@ export default function WorkbenchArtifact({
                   {ws.identReport && (
                     <details className="rounded border border-border bg-paper px-3 py-2">
                       <summary className="cursor-pointer font-mono text-xs text-muted">
-                        识别说明
+                        {t('design.identNotes')}
                       </summary>
                       <pre
                         data-testid="ident-report"

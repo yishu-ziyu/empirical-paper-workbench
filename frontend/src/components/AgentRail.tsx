@@ -3,6 +3,7 @@ import { formatStatValue } from '../lib/readoutTable'
 import { useAgentCursor } from '../lib/agentCursor/context'
 import type { WorkspaceDecision, WorkspaceSuggestion } from './WorkspaceDecisionRail'
 import WorkspaceDecisionRail from './WorkspaceDecisionRail'
+import { useT, type Translate } from '../lib/i18n'
 
 /**
  * Workbench v2 右侧 Agent 栏（契约 C5）：上半当前任务（只在真的有事
@@ -16,17 +17,17 @@ interface CurrentTask {
   why: string
 }
 
-function deriveCurrentTask(ws: WorkspaceApi): CurrentTask | null {
+function deriveCurrentTask(ws: WorkspaceApi, t: Translate): CurrentTask | null {
   if (ws.uploading) {
-    return { label: '正在接收并清洗数据', why: '数据就绪后才能设定研究方向。' }
+    return { label: t('agent.receiving'), why: t('agent.receivingWhy') }
   }
   if (ws.directionBusy) {
-    return { label: '正在估计主结果', why: '估计与识别完成后会停下来给你看结果。' }
+    return { label: t('agent.estimating'), why: t('agent.estimatingWhy') }
   }
   if (ws.writeBusy) {
     return {
-      label: `正在写「${ws.writingType || '章节'}」`,
-      why: '完成后会停下请你确认，不会自动写下一篇。',
+      label: t('agent.writing', { title: ws.writingType || t('agent.chapterFallback') }),
+      why: t('agent.writingWhy'),
     }
   }
   if (ws.activeRun?.kind === 'spec_run') {
@@ -34,18 +35,18 @@ function deriveCurrentTask(ws: WorkspaceApi): CurrentTask | null {
     const progress = ws.specRunProgress
     return progress
       ? {
-          label: `正在运行规格 ${progress.done}/${progress.total}`,
-          why: '逐个规格估计中；完成后自动进入 Evidence。',
+          label: t('agent.specRunning', { done: progress.done, total: progress.total }),
+          why: t('agent.specRunningWhy'),
         }
       : {
-          label: '正在运行规格…',
-          why: '逐个规格估计中；完成后自动进入 Evidence。',
+          label: t('agent.specRunningIndeterminate'),
+          why: t('agent.specRunningWhy'),
         }
   }
   if (ws.activeRun) {
     return {
-      label: '后台运行监控中',
-      why: `run ${ws.activeRun.run_id.slice(0, 8)} 仍在进行，恢复后从这里接上。`,
+      label: t('agent.background'),
+      why: t('agent.backgroundWhy', { id: ws.activeRun.run_id.slice(0, 8) }),
     }
   }
   return null
@@ -60,6 +61,7 @@ function LinkedEvidenceCard({
   hasSuccessfulEstimate: boolean
   onOpenEvidence: () => void
 }) {
+  const { t } = useT()
   const claim = ws.research?.claim ?? ws.research?.claims?.[0]
   const claimsExist = Boolean(claim?.id) || (ws.research?.claims?.length ?? 0) > 0
   const resultsChapter = ws.writtenChapters.find((chapter) => chapter.type === 'results')
@@ -87,7 +89,7 @@ function LinkedEvidenceCard({
       className="rounded-lg border border-wb-line bg-wb-surface px-3.5 py-3.5"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-wb-ink">Linked Evidence</h3>
+        <h3 className="text-[13px] font-semibold text-wb-ink">{t('agent.linkedEvidence')}</h3>
         <span
           data-testid="evidence-grounded-badge"
           data-grounded={grounded}
@@ -97,17 +99,17 @@ function LinkedEvidenceCard({
               : 'bg-wb-warning-soft text-wb-warning'
           }`}
         >
-          {grounded ? '基于证据' : '未 grounded'}
+          {grounded ? t('agent.grounded') : t('agent.notGrounded')}
         </span>
       </div>
       <p className="mt-0.5 text-[11px] leading-4 text-wb-faint">
-        本节正文由下列证据支撑；证据变了正文要跟着重写。
+        {t('agent.linkedHint')}
       </p>
 
       {hasSuccessfulEstimate ? (
         <dl className="mt-2.5 space-y-1 font-mono text-[12px] tabular-nums text-wb-ink">
           <div className="flex justify-between gap-2">
-            <dt className="text-wb-muted">β 系数</dt>
+            <dt className="text-wb-muted">β {t('agent.coef')}</dt>
             <dd>{formatStatValue(ws.estimateMeta?.coef, 'coef')}</dd>
           </div>
           <div className="flex justify-between gap-2">
@@ -125,7 +127,7 @@ function LinkedEvidenceCard({
         </dl>
       ) : (
         <p className="mt-2.5 rounded-md border border-dashed border-wb-line-strong px-2.5 py-2 text-[11.5px] leading-4 text-wb-muted">
-          {ws.identFailed ? '识别未通过，暂无可靠主结果。' : '还没有主结果；先完成估计再写结果章。'}
+          {ws.identFailed ? t('agent.identFailed') : t('agent.noMain')}
         </p>
       )}
 
@@ -143,7 +145,7 @@ function LinkedEvidenceCard({
         onClick={onOpenEvidence}
         className="wb-press mt-3 w-full rounded-md border border-wb-line px-2.5 py-1.5 text-[12px] text-wb-ink hover:bg-wb-subtle"
       >
-        查看完整证据 →
+        {t('agent.openEvidence')} →
       </button>
     </section>
   )
@@ -168,7 +170,8 @@ export default function AgentRail({
   hasSuccessfulEstimate,
   onOpenEvidence,
 }: AgentRailProps) {
-  const task = deriveCurrentTask(ws)
+  const { t } = useT()
+  const task = deriveCurrentTask(ws, t)
   const cursor = useAgentCursor()
   const isEvidence = ws.workbenchTab === 'evidence'
   const unexpected = ws.research?.surprise?.status === 'Unexpected'
@@ -198,7 +201,7 @@ export default function AgentRail({
       {/* 当前任务：只在有事发生时出现（C5 空闲不空转） */}
       <section data-testid="agent-current-task" data-busy={Boolean(task)}>
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-wb-faint">
-          当前任务
+          {t('agent.currentTask')}
         </p>
         {task ? (
           <div className="mt-1.5 rounded-lg border border-wb-line bg-wb-surface px-3 py-2.5">
@@ -212,7 +215,7 @@ export default function AgentRail({
             <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">{task.why}</p>
           </div>
         ) : (
-          <p className="mt-1.5 text-[12px] leading-5 text-wb-faint">空闲。系统会在需要你时停下。</p>
+          <p className="mt-1.5 text-[12px] leading-5 text-wb-faint">{t('agent.idle')}</p>
         )}
       </section>
 
@@ -221,7 +224,7 @@ export default function AgentRail({
           data-testid="agent-cursor-prompt"
           className="rounded-lg border border-wb-line bg-wb-surface px-3 py-2.5"
         >
-          <p className="text-[13px] font-medium text-wb-ink">这个变化值得检查</p>
+          <p className="text-[13px] font-medium text-wb-ink">{t('agent.showMeTitle')}</p>
           <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
             {ws.research?.surprise?.observed || 'OLS and IV do not match the recorded expectation.'}
           </p>
@@ -232,7 +235,7 @@ export default function AgentRail({
             onClick={cursor.playShowMe}
             className="wb-press mt-2.5 rounded-md border border-wb-line bg-wb-subtle px-2.5 py-1 text-[12px] text-wb-ink"
           >
-            Show me
+            {t('agent.showMe')}
           </button>
         </section>
       ) : null}
@@ -240,9 +243,9 @@ export default function AgentRail({
       {cursor.presentation.status === 'awaiting-confirm' &&
       cursor.presentation.awaiting === 'runPreview' ? (
         <section className="rounded-lg border border-wb-line bg-wb-surface px-3 py-2.5">
-          <p className="text-[13px] font-medium text-wb-ink">Run this preview?</p>
+          <p className="text-[13px] font-medium text-wb-ink">{t('agent.runPreviewQ')}</p>
           <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
-            Executes a real specification run. Canonical estimate stays put.
+            {t('agent.runPreviewHint')}
           </p>
           <button
             type="button"
@@ -251,7 +254,7 @@ export default function AgentRail({
             onClick={cursor.confirmRunPreview}
             className="wb-press mt-2.5 rounded-md bg-wb-ink px-2.5 py-1 text-[12px] font-medium text-white"
           >
-            Run Preview
+            {t('agent.runPreview')}
           </button>
         </section>
       ) : null}
@@ -265,7 +268,7 @@ export default function AgentRail({
             onClick={cursor.cancel}
             className="wb-press rounded-md border border-wb-line px-2.5 py-1 text-[12px] text-wb-ink"
           >
-            Cancel
+            {t('agent.cancel')}
           </button>
           <button
             type="button"
@@ -274,14 +277,14 @@ export default function AgentRail({
             onClick={cursor.replay}
             className="wb-press rounded-md border border-wb-line px-2.5 py-1 text-[12px] text-wb-ink"
           >
-            Replay
+            {t('agent.replay')}
           </button>
         </div>
       ) : null}
 
       {cursor.presentation.status === 'paused' ? (
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[12px] text-wb-muted">已暂停——继续或取消。</p>
+          <p className="text-[12px] text-wb-muted">{t('agent.paused')}</p>
           <button
             type="button"
             data-testid="agent-cursor-resume"
@@ -289,7 +292,7 @@ export default function AgentRail({
             onClick={cursor.resume}
             className="wb-press rounded-md border border-wb-line bg-wb-subtle px-2.5 py-1 text-[12px] text-wb-ink"
           >
-            继续播放
+            {t('agent.resume')}
           </button>
         </div>
       ) : null}

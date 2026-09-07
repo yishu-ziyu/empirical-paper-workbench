@@ -29,6 +29,18 @@ function boxesFor(ids: string[]): HighlightBox[] {
   return boxes
 }
 
+function targetPoint(el: Element): { x: number; y: number } {
+  const rect = el.getBoundingClientRect()
+  return {
+    x: rect.left + rect.width / 2 - 6,
+    // y<56 会钻进 sticky header；贴近视口下沿时上移，保证 label 不出视口。
+    y: Math.min(
+      Math.max(56, rect.top + rect.height / 2 - 6),
+      Math.max(56, window.innerHeight - 48),
+    ),
+  }
+}
+
 function moveCursorTo(
   x: ReturnType<typeof useMotionValue<number>>,
   y: ReturnType<typeof useMotionValue<number>>,
@@ -39,20 +51,23 @@ function moveCursorTo(
   if (typeof el.scrollIntoView === 'function') {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }
-  const rect = el.getBoundingClientRect()
-  const targetX = rect.left + rect.width / 2 - 6
-  const targetY = Math.max(56, rect.top + rect.height / 2 - 6)
-  const duration = travelDurationMs(reduced) / 1000
+  const { x: targetX, y: targetY } = targetPoint(el)
+  const travel = travelDurationMs(reduced)
+  const duration = travel / 1000
   opacity.set(1)
   if (reduced || duration <= 0) {
     x.set(targetX)
     y.set(targetY)
     return Promise.resolve()
   }
-  return Promise.all([
-    animate(x, targetX, { duration, ease: [0.23, 1, 0.32, 1] }),
-    animate(y, targetY, { duration, ease: [0.23, 1, 0.32, 1] }),
-  ]).then(() => undefined)
+  // "motion" 的 animate 作用在 motion/react 的 MotionValue 上时，其
+  // thenable 不会 settle（视觉在动、promise 挂死）。改为 fire-and-forget
+  // + 以 travel 时长定时 resolve，保证 point/compare 必然返回（M3 根因）。
+  animate(x, targetX, { duration, ease: [0.23, 1, 0.32, 1] })
+  animate(y, targetY, { duration, ease: [0.23, 1, 0.32, 1] })
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, travel)
+  })
 }
 
 function AgentCursorOverlay() {
@@ -92,19 +107,22 @@ function AgentCursorOverlay() {
       className="pointer-events-none fixed inset-0 z-[60]"
       aria-hidden={!visible}
     >
-      {boxes.map((box) => (
-        <div
-          key={box.id}
-          data-testid={`agent-cursor-highlight-${box.id}`}
-          className="pointer-events-none absolute rounded-sm border border-wb-ink/35 bg-transparent"
-          style={{
-            left: box.left,
-            top: box.top,
-            width: box.width,
-            height: box.height,
-          }}
-        />
-      ))}
+      {/* Cancel / abort 后必须无残留：非可见态不渲染任何方框（C16）。 */}
+      {visible
+        ? boxes.map((box) => (
+            <div
+              key={box.id}
+              data-testid={`agent-cursor-highlight-${box.id}`}
+              className="pointer-events-none absolute rounded-sm border border-wb-ink/35 bg-transparent"
+              style={{
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: box.height,
+              }}
+            />
+          ))
+        : null}
     </div>
   )
 }
@@ -192,9 +210,7 @@ export default function AgentCursorRoot({
     const handleScrollOrResize = () => {
       const el = activeTargetRef.current
       if (!el || !document.body.contains(el)) return
-      const rect = el.getBoundingClientRect()
-      const targetX = rect.left + rect.width / 2 - 6
-      const targetY = Math.max(56, rect.top + rect.height / 2 - 6)
+      const { x: targetX, y: targetY } = targetPoint(el)
       x.set(targetX)
       y.set(targetY)
     }

@@ -184,6 +184,8 @@ export default function WorkbenchArtifact({
             <ExpectationEditor
               expectation={ws.research.expectation}
               onSave={ws.handleSaveExpectation}
+              criteriaLocked={Boolean(ws.research.specification_space?.revealed)}
+              specificationSpace={ws.research.specification_space}
             />
           ) : null}
           <section
@@ -308,6 +310,12 @@ export default function WorkbenchArtifact({
                 space={ws.research.specification_space}
                 onFreeze={ws.handleFreezeSpecSpace}
                 onRun={ws.handleRunSpecSpace}
+                running={ws.activeRun?.kind === 'spec_run'}
+                progress={ws.specRunProgress}
+                failure={ws.specRunFailure}
+                onRetryRun={() => {
+                  void ws.handleRunSpecSpace()
+                }}
               />
             ) : null}
             <p data-testid="direction-summary" className="text-sm text-ink">

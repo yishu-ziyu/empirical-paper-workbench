@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "date": "2026-09-07",
+    "viewport": "1280x720 (IAB)",
+    "session": "clean first-user Card journey, final acceptance run",
+    "method": "page-side sampler at 120ms; cursor transform = getComputedStyle([data-testid=agent-cursor]).transform; highlight boxes = [data-testid^=agent-cursor-highlight-] bounding rects; machine check: cursor visual center (x+6,y+8) vs target rect, margin 24px",
+    "budget": "Show me <= 6000ms (non-reduced motion, no user-confirm waits)"
+  },
+  "show_me_key_frames": [
+    { "t_ms": 122, "targets": ["evidence.spec.ols"], "cursor": { "x": 302.973, "y": 357.607 }, "label": null, "note": "travel to OLS point in flight" },
+    { "t_ms": 962, "targets": ["evidence.spec.iv"], "cursor": { "x": 426.482, "y": 462.055 }, "label": null, "note": "IV point reached" },
+    { "t_ms": 1922, "targets": ["evidence.spec.ols", "evidence.spec.iv"], "cursor": { "x": 460.451, "y": 482.935 }, "label": "Identification strategy changed", "note": "compare step: cursor moves A->B, compare card auto-populates" },
+    { "t_ms": 2761, "targets": ["evidence.choice.estimator"], "cursor": { "x": 522.938, "y": 580.349 }, "label": "Identification strategy changed", "note": "fadeUnchanged applied; estimator point" },
+    { "t_ms": 4803, "targets": ["evidence.choice.estimator"], "cursor": { "x": 522.25, "y": 635.578 }, "label": "This is the main change.", "note": "final point step" }
+  ],
+  "total_duration_ms": 5820,
+  "total_duration_verdict": "<= 6000ms PASS",
+  "proximity_samples": [
+    { "step": "point ols", "target_rect": { "left": 381, "top": 441, "width": 32, "height": 12 }, "cursor_center": { "x": 397, "y": 448 }, "delta_px": 1, "within_24px": true },
+    { "step": "point iv", "target_rect": { "left": 279, "top": 523, "width": 502, "height": 12 }, "cursor_center": { "x": 529, "y": 529 }, "delta_px": 1, "within_24px": true },
+    { "step": "point estimator", "target_rect": { "left": 495, "top": 626, "width": 67, "height": 32 }, "cursor_center": { "x": 528, "y": 643 }, "delta_px": 2, "within_24px": true },
+    { "step": "point estimator after scroll", "target_rect": { "left": 495, "top": 518, "width": 67, "height": 32 }, "cursor_center": { "x": 528, "y": 536 }, "delta_px": 2, "within_24px": true, "note": "cursor followed target after window scroll (re-position handler)" }
+  ],
+  "yield_resume": {
+    "pointerdown_injected_at_ms": 1200,
+    "paused_ui": ["已暂停 text visible", "resume button (data-testid=agent-cursor-resume) present"],
+    "still_paused_after_ms": 1500,
+    "resume_result": "script continued from current step to final step (label 'This is the main change.'), not a replay"
+  },
+  "cancel_cleanup": { "highlight_boxes_in_dom": 0, "cursor_opacity": "0" },
+  "reduced_motion": { "data_reduced_motion": "true", "full_script_done_ms": 420, "positions_set_instantly": true },
+  "compare_after_show_me": { "delta_text": "βA → βB 0.0747 → 0.1315 · Δ 0.0568 · 76.1%", "intent": "Identification strategy changed", "changed": "estimator, identification", "unchanged": "experience, demographics, region (matrix cells opacity-40, non-selected scatter points opacity 0.28)" },
+  "console": { "uncaught_errors": 0, "unhandledrejections": 0 }
+}

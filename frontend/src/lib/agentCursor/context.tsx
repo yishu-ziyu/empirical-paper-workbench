@@ -28,6 +28,7 @@ export type AgentCursorApi = {
   playChallengeExperience: () => void
   cancel: () => void
   pause: () => void
+  resume: () => void
   replay: () => void
   confirmRunPreview: () => void
   reportDelta: (delta: { deltaAbs: number | null; deltaPct: number | null } | null) => void
@@ -39,6 +40,7 @@ const noopApi: AgentCursorApi = {
   playChallengeExperience: () => undefined,
   cancel: () => undefined,
   pause: () => undefined,
+  resume: () => undefined,
   replay: () => undefined,
   confirmRunPreview: () => undefined,
   reportDelta: () => undefined,
@@ -121,6 +123,10 @@ export function AgentCursorProvider({
     playerRef.current?.pause()
   }, [])
 
+  const resume = useCallback(() => {
+    playerRef.current?.resume()
+  }, [])
+
   const replay = useCallback(() => {
     void playerRef.current?.replay()
   }, [])
@@ -185,6 +191,7 @@ export function AgentCursorProvider({
       playChallengeExperience,
       cancel,
       pause,
+      resume,
       replay,
       confirmRunPreview,
       reportDelta,
@@ -195,6 +202,7 @@ export function AgentCursorProvider({
       playChallengeExperience,
       cancel,
       pause,
+      resume,
       replay,
       confirmRunPreview,
       reportDelta,

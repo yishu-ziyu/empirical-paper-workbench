@@ -52,7 +52,31 @@ implementer 子代理实现 + 逐条跑程序留证据；validator 子代理独�
 
 ## Evidence
 
-<implementer 填：每条检查的真实输出摘录 / 证据文件路径；validator 报告结论。>
+实现分支 `fix/runner-logging-lifecycle`（implementer 填写，validator 复核）。
+证据目录：`docs/acceptance/assets/runner-logging-lifecycle/`
+（harness：`harness/repro_runner_broken_pipe.py` + `harness/sitecustomize.py`；
+证据：`evidence/<case>/`）。复跑命令示例：
+
+```bash
+backend/.venv/bin/python \
+  docs/acceptance/assets/runner-logging-lifecycle/harness/repro_runner_broken_pipe.py \
+  --phase pre --condition dead-pipe \
+  --evidence-dir docs/acceptance/assets/runner-logging-lifecycle/evidence/c1-prefix-dead-pipe \
+  --port 8002 --timeout 300
+# --phase post --condition dead-pipe|healthy-stderr 同理（隔离端口 8002、独立 ECONPAPER_LOCAL_STATE_ROOT、自启进程）
+```
+
+- **C1 PASS（修复前复现）** — `evidence/c1-prefix-dead-pipe/`：runner 子进程 fd1+fd2 指向同一条读端已关闭的 PIPE（`runner-lsof.txt`：fd1/fd2 同一 `PIPE 0xae7c…` 设备号），真实 `POST /demos/card` → run 终态 **FAILED**，error=`BrokenPipeError: upload_pipeline execution failed`（summary.json `run_api.status/error`）；业务已实际提交：uploads 目录存在 332282 字节的 `<session>.csv`、DB session state `has_uploaded_datasets=true`（summary.json `uploads_listing`/`db.session_state_excerpt`）。实际异常产生位置 traceback 留档（`runner-logging-evidence.log`，sitecustomize 只读包装 `handleError`/std stream 抓栈，不吞不改）：
+  `prewrite_supervisor.py:460 execute_upload_supervised → :321 _execute_supervised → multiprocessing/popen_spawn_posix.py:32 → popen_fork.py:16 → multiprocessing/util.py:438 _flush_std_streams → sys.stdout.flush()` 抛 BrokenPipeError 穿透进业务执行，被 `_stable_failure` 误标。日志 emit 失败本身（`logging.handleError called` ×144）被 CPython 3.12 handleError 吸收，真正的杀手是 spawn 起子进程时的无保护 std 流 flush。
+- **C2 PASS（修复后两条件均 SUCCEEDED）** — `evidence/c2-postfix-dead-pipe/` 与 `evidence/c2-postfix-healthy-stderr/`（与提交代码一致的最终复跑）：两条件 run 终态均 **SUCCEEDED**、`error=None`、`upload_readiness=READY`、`run_events` 7 条（含 4 条 `run.progress` worker 事件）、attempts 产物（`03_outliers_0.csv`/`clean.do` 等）落盘、run 记录唯一终态唯一（summary.json）。死管道条件下：控制台 handler 降级（`runner-file.log` 首部恰好 1 条 `WARNING runner log channel stderr is unavailable (BrokenPipeError…) ; remaining channels: file(…/runner.log)`），文件日志 242 行持续可用；健康条件下：`runner-console.log` 与 `runner-file.log` 均有 SQL/INFO 记录、降级记录 0 条。
+- **C3 PASS（业务失败仍 FAILED 且可诊断）** — `backend/tests/test_runner_logging_lifecycle.py::test_business_failures_still_fail_the_run_with_stable_error`（spawn 子进程内业务执行器真实抛 `BrokenPipeError` → FAILED，error=`BrokenPipeError: upload_pipeline executor failed`，稳定且含异常类型；`RuntimeError` 业务错误同样 FAILED 且不泄敏感文本）；`test_stable_failure_classification_is_unchanged` 钉死 `_stable_failure` 分类。源码核实：`git diff main..HEAD -- backend/` 仅 `runner.py(+5)`、`prewrite_supervisor.py(+7)`、`runner_logging.py(新增)`；services/、facade/、agent/、routers/ 零改动，无任何按类名吞 BrokenPipeError 的新逻辑。
+- **C4 PASS（降级四不）** — (a) `test_dead_console_degrades_once_and_file_survives`：死控制台连续 300 条日志，恰 1 条降级留痕、进程存活、文件通道继续收 `record 299`；`test_multiprocessing_spawn_flush_cannot_escape` 直接钉死 spawn flush 逃逸路径已闭合；(b) `test_successful_upload_run_leaves_single_records_and_result`：run 记录唯一、attempt=1、`run.claimed`/`run.succeeded` 各 1 条；C2 两场景 summary.json 同源核实；(c) 同测试断言产物唯一（`cleaned*.csv` 仅 1 个）；(d) `test_configure_is_idempotent_across_reentry_and_reload`：重复调用 + `importlib.reload` 重入后 handler 数量恒定（marker 属性而非 isinstance，重导入下不失效），`test_child_configuration_installs_no_file_handler` 覆盖 child 形态。
+- **C5 PASS（正常可用 + 降级留痕 + 全渠道不可用）** — 正常：`test_healthy_channels_log_to_file_and_console` + C2 健康场景证据（控制台与文件均有记录）；降级留痕：C2 死管道 `runner-file.log` 恰 1 条（含失效通道 stderr 与剩余通道 file 路径）；全渠道不可用：`test_all_channels_unavailable_process_and_business_survive`（文件路径不可创建 + 控制台死流：进程存活、业务函数完成、记录丢弃不抛错）。`docs/local-runner.md` 已更新：不再强依赖重定向（仍推荐）、默认位置 `<ECONPAPER_LOCAL_STATE_ROOT>/log/runner.log` 与 `ECONPAPER_RUNNER_LOG_FILE` 覆盖、降级行为、spawn 子进程取舍、"所有输出渠道都不可用时日志可能丢弃，业务不受影响"。
+- **C6 PASS（红线）** — `git diff main..HEAD --stat -- backend/` = 上述 3 个文件；研究节点/统计/Claim 门禁/evidence_revision/任务队列零改动；契约文件除 Evidence 节外未改动，Status 保持 open。
+- **C7 PASS（全量 gates）** — `make test`（agent+backend+frontend 三套）全绿；backend 单独复跑 `467 passed, 8 skipped, 0 failed`；`frontend npx tsc --noEmit` exit 0、`npm run lint` 0 errors（6 条既有 warning）、`npm run build` 成功；`git grep -n '\.skip\|skipIf' -- frontend/src backend/tests` 与 main `452a895` 基线一致（5 处：test_outline×2、test_postgres_upload_recovery、test_prewrite_supervisor、test_s3），无新增 skip。注意：backend `test_prewrite_supervisor` 的两个取消延迟断言（<1.0s 预算）在与其他 gate 并行抢 CPU 时会翻flaky（本机实测），静默串行运行稳定全绿——复核时请勿并行压测。
+- **C8（交付物）** — 证据均为仓库内路径（`docs/acceptance/assets/runner-logging-lifecycle/`），无 /tmp-only 依赖；PR 由 orchestrator 开出，描述请引用本节与上述证据目录。
+
+实施备注（给 validator）：修复形态为 `backend/runner_logging.py`（`raiseExceptions=False` 兜底 + root logger 挂 RotatingFileHandler（默认 `_state_path("ECONPAPER_RUNNER_LOG_FILE","log","runner.log")`，目录创建失败降级为仅控制台不炸启动）+ 自禁用 stderr 控制台 handler + 进程级一次性降级留痕 + `sys.stdout/stderr` 容错包装（关闭 spawn flush 逃逸路径，业务 socket/pipes 不经过该包装））；接入点仅 `runner.main()` 开头与 `prewrite_supervisor._child_main`（ready 握手之后，保 spawn 启动延迟与 main 持平；子进程不挂文件 handler，避免多进程同文件轮转竞争）。复现 harness 是只读留证（sitecustomize 包装 handleError/std 流仅记录后原样重抛），未改动任何业务代码。
 
 ## Named relaxations
 

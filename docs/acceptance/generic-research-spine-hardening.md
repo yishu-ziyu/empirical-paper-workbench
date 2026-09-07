@@ -1,10 +1,13 @@
 # 验收契约：Generic Research Spine 加固（Expectation → Run → Surprise → Explanation → Recovery）
 
-Status: closed（2026-09-07 validator 独立复核 ACCEPT，28/28；报告要点与本 Evidence 节一致。C13 时间线已补独立归档 `assets/generic-spine-hardening-2026-09-07/m3-showme-timeline.json`；C6 检查程序修正大小写笔误，断言未变）
+Status: external-review changes requested（2026-09-07 PR #31 外部独立验收 REQUEST CHANGES。M0 / M2 / M3 / M4 认可，本轮不得继续修改那些实现。只修 M1 ExpectationCriterion 的最后研究语义。C1–C28 既有证据保留；本轮只增 C29–C37，不弱化既有检查。）
 
 基线：`main @ ac62d4a0457c80e480aa335a362040acc650b3af`，分支 `review/generic-research-spine-hardening`。
 事实来源：`card-canonical-research-experience-validator.md` 追加的 J–Q first-user audit（2026-09-06，verdict B）。
 本契约实现 M1–M4；Infra follow-up（BrokenPipe）只判定与记录，不在本分支修。
+外部复核范围：ExpectationCriterion 必须绑定确切 Evidence，schema/evaluator fail-closed，Expected / Unexpected / Unevaluated / Inconclusive 分开，揭晓后判据锁定。
+
+部分已解析、部分 unresolved、且无 violation 的聚合状态稳定名为 **Inconclusive**。
 
 ## Change
 
@@ -34,6 +37,20 @@ Status: closed（2026-09-07 validator 独立复核 ACCEPT，28/28；报告要点
 - [ ] C5 命名通用 + API drift 门 — 程序: `grep -rn "CardExpectation" backend/ frontend/src/ | wc -l` 为 0；类型名 `ExpectationCriterion` / `EvidenceMetricRef`（或等价通用名）；`make check-api-drift` 绿 — 预期: openapi.json、docs/api/openapi.json、frontend/types/api.ts 同步包含 criteria 模型。
 - [ ] C6 UI 显式判定块 — 程序: `cd frontend && npx vitest run src/components/__tests__ -t "Expectation" -q`（含新增断言）+ 浏览器抽查 — 预期: Expectation 编辑器在 textarea 下方渲染 `Surprise condition · 意外判定` 块，显示当前判据（如 "IV estimate < OLS estimate"）；改 textarea 文本不改变该块；提供显式控件修改判据（改后保存即生效），无任何"从文本重猜"路径。
 - [ ] C7 真实数据验收 — 程序: 浏览器走 Card 真实会话：把预期原文改成 `我觉得 IV 应该会更小一些，但并不确定。`，判据块仍显式为 IV<OLS；Freeze→Run→查看后端 `GET /research` — 预期: `surprise.status="Unexpected"`、`observed` 表达 IV > OLS（真实系数 0.0747/0.1315 量级）。证据归档。
+
+### M1 P0 — ExpectationCriterion 最后研究语义（2026-09-07 外部复核）
+
+M0 / M2 / M3 / M4 已认可：Run specifications 进度与自动转场、Agent Cursor choreography、Expectation 保存失败 UX、Card boot failure UX、New study 导航、BrokenPipe issue #30。那些实现本轮不得改。下列检查只增不弱化。
+
+- [ ] C29 seed criterion 绑定确切可比 spec_id — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "seed_expectation or nine_col_path" -q` — 预期: `seed_card_lab` 先建立 specification definitions，再用 `comparable_spec_ids(definitions)` 写入 seed criterion 的 `left.spec_id` / `right.spec_id`。34 列 wooldridge：`iv_region_dummies` / `ols_region_dummies`。9 列 fallback：`iv_nearc4_full` / `ols_full_controls`。`estimator` 可作为展示 metadata 保留，但不得再作为该 seed criterion 的权威选择器。
+- [ ] C30 显式 spec_id 禁止 fallback，后来的同 estimator preview 不得漂移 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "surprise_binds_exact_spec or surprise_missing_spec_id or surprise_does_not_drift" -q` — 预期: ① 初始 comparable OLS=0.0747、IV=0.1315 → Unexpected。② 追加 `ols_linear_exper` preview（或 coef=0.2000 的同 estimator run）后重新 evaluate，仍使用 0.0747 / 0.1315，不得改用 0.2000；Surprise 的 observed 与 status 不因无关 preview 漂移。③ criterion 指定不存在的 spec_id、同时存在其他 OLS/IV run → unresolved / Unevaluated，不得 fallback 到同 estimator 的另一条 run。
+- [ ] C31 UI 改判定方向必须保留已有 metric refs — 程序: `cd frontend && npx vitest run src/components/__tests__/ResearchLabPanels.test.tsx -t "preserves exact spec_id" -q` — 预期: 修改判定方向只改变 `kind` / `operator` / `tolerance` / `label` / `source`；已有 `left`/`right` 及 `spec_id` 原样保留；不得用前端 `IV_METRIC` / `OLS_METRIC` 常量覆盖精确引用。
+- [ ] C32 criterion schema fail-closed，非法组合 422 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "invalid_criterion or empty_selector or negative_tolerance" -q` — 预期: 合法组合只有 (A) sign：operator 为 positive|negative，right 必须为空，tolerance 必须为空；(B) ordering：operator 为 lt|gt，right 必须存在；(C) distance：operator 为 approx，right 必须存在，tolerance.abs / tolerance.rel 若存在必须 >= 0。EvidenceMetricRef 至少要有 spec_id 或 estimator 之一；空 selector 无效。非法组合由 API 返回 422，不得写入 state。
+- [ ] C33 严格数学边界 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "equality or zero_boundary" -q` — 预期: lt 只有 left < right 才满足，left >= right 都算违反；gt 只有 left > right 才满足，left <= right 都算违反；positive 只有 value > 0 才满足，value <= 0 都算违反；negative 只有 value < 0 才满足，value >= 0 都算违反。含 equality 与 zero 测试。
+- [ ] C34 Expected / Unexpected / Unevaluated / Inconclusive 必须分开 — 程序: `python -m pytest backend/tests/test_card_spec_run.py -k "surprise_unresolvable or surprise_inconclusive or surprise_without_criteria" -q` 与 `cd frontend && npx vitest run src/components/__tests__/EvidenceLab.test.tsx src/components/__tests__/AgentRail.test.tsx -t "Unevaluated or Inconclusive" -q` — 预期: 每条 criterion 产生 satisfied / violated / unresolved。聚合：任意已解析 criterion violated → Unexpected；全部已解析且全部 satisfied → Expected；0 条可解析 → Unevaluated；部分已解析、部分 unresolved、且无 violation → Inconclusive。无判据纯文本仍为 Expected。Surprise read model 至少含 `evaluated_criterion_ids`、`unresolved_criterion_ids`、`expectation_version`。`test_surprise_unresolvable_metric_stays_silent` 不得再断言 status == Expected。UI：Unevaluated 不得显示绿色/肯定性的 Expected，须显示「尚未判定：所需证据还没有产生」，不出现 Show me；Inconclusive 同样不得伪装成 Expected，也不出现 Show me。
+- [ ] C35 揭晓前 criterion 决策可审计 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "pre_reveal_criterion_history" -q` — 预期: 结果尚未 revealed 时，criterion 可从 IV<OLS 改为 IV>OLS；`ExpectationHistoryItem` 保存当时完整 criteria snapshot；`expectation_set` decision event 至少记录 `expectation_version`、criterion ids、kind/operator、left/right refs、`phase: pre_reveal`。不得只记录 criteria 数量。
+- [ ] C36 揭晓后 criterion 锁定 — 程序: `python -m pytest backend/tests/test_card_research_lab.py -k "post_reveal_criterion" -q` 与 `cd frontend && npx vitest run src/components/__tests__/ResearchLabPanels.test.tsx -t "locked" -q` — 预期: `specification_space.revealed == true` 后，同一 research revision 内不得静默修改 Surprise criteria。PUT 只改 text/confidence 且 criteria 与当前完全相同 → 允许。PUT 尝试改变 criteria → HTTP 409，`code = expectation_criterion_locked`。text 可修改且 criterion 原样保持；history / Surprise 不被污染。Surprise payload 能证明依据的是哪一版 expectation（`expectation_version` + criterion ids）。UI 禁用 criterion select，并说明「结果已经揭晓；本轮意外判定已锁定，不能事后改写。」本轮不实现 fork/new hypothesis。
+- [ ] C37 既有 M2/M3/M4 旅程不退化，质量门复跑 — 程序: `make test`；`cd frontend && npx tsc --noEmit && npm run lint && npm run build` — 预期: 全部 0 退出；无新增 skip；M2/M3/M4 既有测试保持原断言。push 原 PR #31，不 merge。
 
 ### M2 — Run specifications 完整状态转换
 

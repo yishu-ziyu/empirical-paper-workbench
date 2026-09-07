@@ -4,6 +4,7 @@ import { useAgentCursor } from '../lib/agentCursor/context'
 import type { WorkspaceDecision, WorkspaceSuggestion } from './WorkspaceDecisionRail'
 import WorkspaceDecisionRail from './WorkspaceDecisionRail'
 import { useT, type Translate } from '../lib/i18n'
+import { displaySurpriseObserved } from '../lib/i18nPresentation'
 
 /**
  * Workbench v2 右侧 Agent 栏（契约 C5）：上半当前任务（只在真的有事
@@ -226,7 +227,11 @@ export default function AgentRail({
         >
           <p className="text-[13px] font-medium text-wb-ink">{t('agent.showMeTitle')}</p>
           <p className="mt-1 text-[11.5px] leading-4 text-wb-muted">
-            {ws.research?.surprise?.observed || 'OLS and IV do not match the recorded expectation.'}
+            {displaySurpriseObserved(
+              ws.research?.expectation?.criteria,
+              ws.research?.specification_runs,
+              t,
+            ) || t('agent.unexpectedObserved')}
           </p>
           <button
             type="button"

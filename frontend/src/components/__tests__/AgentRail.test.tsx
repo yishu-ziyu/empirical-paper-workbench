@@ -206,12 +206,26 @@ describe('AgentRail linked evidence', () => {
         ws={ws({
           workbenchTab: 'evidence',
           research: {
-            surprise: { status: 'Unexpected', observed: 'IV > OLS' },
+            surprise: { status: 'Unexpected', observed: 'IV estimate 0.13 > OLS estimate 0.08' },
+            expectation: {
+              criteria: [
+                {
+                  kind: 'ordering',
+                  operator: 'lt',
+                  left: { estimator: 'iv', spec_id: 'iv_region_dummies' },
+                  right: { estimator: 'ols', spec_id: 'ols_region_dummies' },
+                },
+              ],
+            },
+            specification_runs: [
+              { spec_id: 'ols_region_dummies', method: 'ols', coef: 0.08, status: 'ok' },
+              { spec_id: 'iv_region_dummies', method: 'iv', coef: 0.13, status: 'ok' },
+            ],
           },
         })}
         decision={{
-          title: 'Unexpected result',
-          reason: 'IV > OLS',
+          title: '结果与预期不符',
+          reason: 'IV 估计 0.1300 > OLS 估计 0.0800',
         }}
         waiting={null}
         suggestions={[]}
@@ -223,7 +237,8 @@ describe('AgentRail linked evidence', () => {
     expect(screen.getByTestId('agent-cursor-prompt')).toBeInTheDocument()
     expect(screen.getByTestId('agent-cursor-show-me')).toBeInTheDocument()
     expect(screen.getByText(/这个变化值得检查/)).toBeInTheDocument()
-    expect(screen.getByTestId('agent-cursor-prompt')).toHaveTextContent('IV > OLS')
+    expect(screen.getByTestId('agent-cursor-prompt')).toHaveTextContent('IV 估计 0.1300 > OLS 估计 0.0800')
+    expect(screen.getByTestId('agent-cursor-prompt')).not.toHaveTextContent('IV estimate')
     expect(screen.getAllByTestId('decision-blocker')).toHaveLength(1)
   })
 

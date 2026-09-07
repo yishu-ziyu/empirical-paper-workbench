@@ -124,9 +124,9 @@ Included in `make test` above; 0.
 
 ## Residual
 
-- AgentRail still dumps backend English surprise observed (`IV estimate 0.1315 > OLS estimate 0.0747`) on the zh path. Not in C9 listed surfaces; not changed.
 - Isolated Card paper chapter was not written (`canonical_mismatch`). Paper chrome is single-language; results chapter body is empty.
 - After Card spec runs, Results & evidence is EvidenceLab, not EvidenceView’s provenance timeline.
+- Compare-open language-switch screenshots were taken before AgentRail observed-copy used `displaySurpriseObserved`. Source now localizes that sentence; those two files remain C8 evidence (tab / run ids / Compare). See `STALE.md`.
 
 ## Next
 

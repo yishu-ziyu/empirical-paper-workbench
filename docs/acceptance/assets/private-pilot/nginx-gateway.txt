@@ -166,4 +166,3 @@ server {
     # Container health only; no application data is returned here.
     location = /gateway-health { auth_basic off; return 200 "ok"; }
 }
-

@@ -20,3 +20,9 @@
 实跑参数：`--session b0c198b9-68d2-4ced-9e6b-8d87c74578d0 --url https://localhost:18443`；env 为隔离的 `project-ssot-provider.env`，账号为 `api-valid-uuid-run-accounts.json`，二者位于 checkout 外受限目录。输出依次为 results-inspection.json、results-execution.json、results-real-once.json（最后一次实际发出唯一生成请求）。
 
 语法检查：`python3 -m py_compile scripts/private_pilot_results_check.py` 通过。未修改应用、未使用浏览器、未公开部署。
+
+## 封装诊断更新（保留首次结果）
+
+后续隔离镜像诊断记录在 `review-first-failure.md`：镜像没有 `pydantic_ai`，而 `build_review_agent` 首先执行 `from pydantic_ai import Agent`；运行依赖缺少 agent 已固定的 `pydantic-ai-slim[openai]==2.35.3`。这是已定位的封装缺项和必经 import 失败路径。首次响应本身没有保存异常类别；不能把它改写成已记录供应商错误。补包后的 offline import/build 验证由部署实现证据记录。
+
+代码检查也确认当前没有“只评审现有正文”的产品 POST 接口：GET `/review` 只读；POST `/review/decision` 的 reject 会重新生成、accept/force_pass 会放行；直接 content edit 只落盘并清理旧评审。因此不能通过这些端点伪装一次独立重评。本子任务没有追加生成、接受或强制放行操作。

@@ -1,0 +1,593 @@
+{
+  "scope": "API only. Browser NOT RUN. Operator approval is an automated test action, not human user acceptance.",
+  "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0",
+  "checks": [
+    {
+      "action": "normal owner login",
+      "http_status": 200,
+      "elapsed_seconds": 0.287,
+      "expected_status": 200
+    },
+    {
+      "action": "read existing Card",
+      "http_status": 200,
+      "elapsed_seconds": 0.04,
+      "expected_status": 200
+    },
+    {
+      "action": "approve inspected association claim",
+      "http_status": 200,
+      "elapsed_seconds": 0.022,
+      "expected_status": 200
+    },
+    {
+      "action": "prepare current approved research for paper",
+      "http_status": 200,
+      "elapsed_seconds": 0.659,
+      "expected_status": 200
+    },
+    {
+      "action": "normal login before long generation",
+      "http_status": 200,
+      "elapsed_seconds": 0.282,
+      "expected_status": 200
+    },
+    {
+      "action": "one real Results generation and configured review",
+      "http_status": 200,
+      "elapsed_seconds": 15.133,
+      "expected_status": 200
+    },
+    {
+      "action": "normal refresh after long generation",
+      "http_status": 401,
+      "elapsed_seconds": 0.019,
+      "expected_status": null
+    },
+    {
+      "action": "normal login after long generation",
+      "http_status": 200,
+      "elapsed_seconds": 0.26,
+      "expected_status": 200
+    },
+    {
+      "action": "read Evidence backjump API target",
+      "http_status": 200,
+      "elapsed_seconds": 0.025,
+      "expected_status": 200
+    },
+    {
+      "action": "export tex through gateway",
+      "http_status": 200,
+      "elapsed_seconds": 0.044,
+      "expected_status": 200
+    }
+  ],
+  "results_requests": 1,
+  "provider_usage": "Not exposed by chapter response; not inferred from text length.",
+  "expectation": {
+    "text": "I expect education to be positively associated with log wages. OLS and IV may differ; instrument relevance does not establish exclusion or a population-wide causal effect.",
+    "text_zh": "预计 OLS 为正；如果能力造成向上偏误，IV 可能比 OLS 更小。",
+    "confidence": "medium",
+    "locale": "en",
+    "version": 2,
+    "updated_at": "2026-09-08T05:18:25+00:00",
+    "history": [
+      {
+        "version": 1,
+        "text": "I expect OLS to be positive. If ability creates upward bias, IV may be smaller.",
+        "confidence": "medium",
+        "locale": "en",
+        "at": "2026-09-08T05:18:23+00:00",
+        "kind": "seed",
+        "criteria": [
+          {
+            "id": "criterion.seed.iv-below-ols",
+            "kind": "ordering",
+            "left": {
+              "metric": "estimate.coef",
+              "estimator": "iv",
+              "spec_id": "iv_region_dummies",
+              "label": "IV estimate"
+            },
+            "operator": "lt",
+            "right": {
+              "metric": "estimate.coef",
+              "estimator": "ols",
+              "spec_id": "ols_region_dummies",
+              "label": "OLS estimate"
+            },
+            "tolerance": null,
+            "label": "IV estimate < OLS estimate",
+            "source": "seed"
+          }
+        ]
+      },
+      {
+        "version": 2,
+        "text": "I expect education to be positively associated with log wages. OLS and IV may differ; instrument relevance does not establish exclusion or a population-wide causal effect.",
+        "confidence": "medium",
+        "locale": "en",
+        "at": "2026-09-08T05:18:25+00:00",
+        "kind": "edit",
+        "criteria": [
+          {
+            "id": "criterion.seed.iv-below-ols",
+            "kind": "ordering",
+            "left": {
+              "metric": "estimate.coef",
+              "estimator": "iv",
+              "spec_id": "iv_region_dummies",
+              "label": "IV estimate"
+            },
+            "operator": "lt",
+            "right": {
+              "metric": "estimate.coef",
+              "estimator": "ols",
+              "spec_id": "ols_region_dummies",
+              "label": "OLS estimate"
+            },
+            "tolerance": null,
+            "label": "IV estimate < OLS estimate",
+            "source": "seed"
+          }
+        ]
+      }
+    ],
+    "criteria": [
+      {
+        "id": "criterion.seed.iv-below-ols",
+        "kind": "ordering",
+        "left": {
+          "metric": "estimate.coef",
+          "estimator": "iv",
+          "spec_id": "iv_region_dummies",
+          "label": "IV estimate"
+        },
+        "operator": "lt",
+        "right": {
+          "metric": "estimate.coef",
+          "estimator": "ols",
+          "spec_id": "ols_region_dummies",
+          "label": "OLS estimate"
+        },
+        "tolerance": null,
+        "label": "IV estimate < OLS estimate",
+        "source": "seed"
+      }
+    ]
+  },
+  "completed_specification_runs": 12,
+  "inspected_claim": {
+    "id": "claim.card.education-earnings",
+    "claim_text": "Education is positively associated with earnings.",
+    "claim_type": "association",
+    "supported_wording": "Education is positively associated with earnings.",
+    "conditionally_supported_wording": "Under the college-proximity IV assumptions, IV estimates suggest a positive local causal return to schooling.",
+    "unsupported_wording": "One more year of education raises everyone's wage by 13%.",
+    "supporting_run_ids": [
+      "c96fd037-efc9-4ac6-a249-95769cbce028:ols_region_dummies",
+      "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies"
+    ],
+    "counter_evidence": [
+      "OLS and IV coefficients differ; identification strategy is a sensitive dimension."
+    ],
+    "sensitive_dimensions": [
+      "estimator",
+      "identification"
+    ],
+    "unresolved_assumptions": [
+      "IV exclusion restriction (college proximity affects wages only through education)",
+      "monotonicity (no defiers)",
+      "LATE is not ATE",
+      "instrument strength"
+    ],
+    "evidence_status": "approved",
+    "approved_by_user": true,
+    "stale": false,
+    "version": 1,
+    "based_on_evidence_revision": 1,
+    "run_facts": "OLS spec_id=ols_region_dummies coef=0.07469325559311328 se=0.003498345658478739 n=3010 formula=lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668\nIV spec_id=iv_region_dummies coef=0.13150383624724782 se=0.05496367260152569 n=3010 formula=lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+    "provenance": {
+      "ols_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_region_dummies",
+      "iv_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies",
+      "ols_spec_id": "ols_region_dummies",
+      "iv_spec_id": "iv_region_dummies",
+      "producer_run_ids": [
+        "c96fd037-efc9-4ac6-a249-95769cbce028"
+      ],
+      "ols_coef": 0.07469325559311328,
+      "iv_coef": 0.13150383624724782
+    }
+  },
+  "canonical_spec_id_before": "iv_region_dummies",
+  "generation_response": {
+    "chapter": {
+      "type": "results",
+      "title": "结果",
+      "content": "## 基准回归\n\n本文以对数工资 `lwage` 为被解释变量，以受教育年限 `educ` 为核心解释变量，并在方程中纳入工作经验及其平方项 `exper`、`expersq`，以及人口与地域特征 `black`、`smsa`、`south`、`smsa66` 与八个地区虚拟变量 `reg661`–`reg668`，样本量为 3010。为缓解受教育年限的内生性，本文以是否就近可上大学 `nearc4` 作为工具变量，采用 `statspai.ivreg` 估计如下方程：`lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668`。\n\n工具变量估计结果显示，受教育年限的系数为 0.1315，标准误为 0.0550，对应 p 值为 0.0168，在常规水平上具有统计显著性。系数符号为正，表明在控制工作经验、种族、城乡和地区差异后，受教育年限与对数工资之间呈显著的正向关联。鉴于估计量类型为 association，本文并不对该系数作出\"因果效应\"的强解释；而是把上述结果解读为：在条件可比的样本个体之间，多受一年教育与更高的对数工资在统计上相伴出现。\n\n需要说明的是，本文还以普通最小二乘在同一控制集下估计作为参照，其受教育年限系数为 0.0747，标准误为 0.0035，样本量同为 3010。对比 OLS 结果，IV 系数明显更大，这一现象在劳动经济学文献中通常被解释为 OLS 中存在向下偏误（例如能力偏差与测量误差共同压低 OLS 估计量），而以大学就近可达性作为外生工具变量后，估计量在满足排他性约束与相关性约束的条件下能够识别一个局部平均处理效应，数值上落在经典文献的合理区间。本文严格遵循已绑定的设定事实，协方差与标准误的具体形式未在输入中提供，因此不在此处对标准误的构造作进一步判断。\n\n## 稳健性\n\n为检验上述结论是否对聚类设定敏感，本文换用替代聚类方式重新估计，结果显示 `educ` 的系数为 0.132，标准误为 0.055，p 值为 0.017，与主结果在系数大小与显著性水平上高度一致。这表明即便改变聚类方案，主结论——受教育年限与对数工资的正向关联在统计上稳健——仍然成立。需要再次强调的是，由于协方差/标准误设定在本文的绑定事实中标注为\"未提供\"，本文不在文本中宣称使用了 HC1 标准误、聚类稳健标准误或任何具体的协方差形式，仅记录替代聚类下系数与显著性未发生实质性变化这一事实。\n\n至于其他维度的稳健性检验，包括是否使用替代样本、替代工具变量集、缩尾处理或非线性设定等，本文当前未在绑定事实中获得对应的结果，故不在此处作具体推断；同时由于安慰剂检验在稳健性表中显示为未运行/未提供，本文同样不对安慰剂结果作口头描述或数字宣称。\n\n## 异质性\n\n本文在分样本异质性方面未运行/未提供任何绑定结果，分组交互系数表中亦无有效条目。因此，本节不展开对地区、行业、性别、城乡或其他子群的差异化讨论，亦不援引任何按子群拆分后的系数、显著性或样本量。任何超出主表与上述稳健性条目的分组数字，均不在本文写作边界之内。\n\n# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |",
+      "status": "generated",
+      "versions": [
+        "## 基准回归\n\n本文以对数工资 `lwage` 为被解释变量，以受教育年限 `educ` 为核心解释变量，并在方程中纳入工作经验及其平方项 `exper`、`expersq`，以及人口与地域特征 `black`、`smsa`、`south`、`smsa66` 与八个地区虚拟变量 `reg661`–`reg668`，样本量为 3010。为缓解受教育年限的内生性，本文以是否就近可上大学 `nearc4` 作为工具变量，采用 `statspai.ivreg` 估计如下方程：`lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668`。\n\n工具变量估计结果显示，受教育年限的系数为 0.1315，标准误为 0.0550，对应 p 值为 0.0168，在常规水平上具有统计显著性。系数符号为正，表明在控制工作经验、种族、城乡和地区差异后，受教育年限与对数工资之间呈显著的正向关联。鉴于估计量类型为 association，本文并不对该系数作出\"因果效应\"的强解释；而是把上述结果解读为：在条件可比的样本个体之间，多受一年教育与更高的对数工资在统计上相伴出现。\n\n需要说明的是，本文还以普通最小二乘在同一控制集下估计作为参照，其受教育年限系数为 0.0747，标准误为 0.0035，样本量同为 3010。对比 OLS 结果，IV 系数明显更大，这一现象在劳动经济学文献中通常被解释为 OLS 中存在向下偏误（例如能力偏差与测量误差共同压低 OLS 估计量），而以大学就近可达性作为外生工具变量后，估计量在满足排他性约束与相关性约束的条件下能够识别一个局部平均处理效应，数值上落在经典文献的合理区间。本文严格遵循已绑定的设定事实，协方差与标准误的具体形式未在输入中提供，因此不在此处对标准误的构造作进一步判断。\n\n## 稳健性\n\n为检验上述结论是否对聚类设定敏感，本文换用替代聚类方式重新估计，结果显示 `educ` 的系数为 0.132，标准误为 0.055，p 值为 0.017，与主结果在系数大小与显著性水平上高度一致。这表明即便改变聚类方案，主结论——受教育年限与对数工资的正向关联在统计上稳健——仍然成立。需要再次强调的是，由于协方差/标准误设定在本文的绑定事实中标注为\"未提供\"，本文不在文本中宣称使用了 HC1 标准误、聚类稳健标准误或任何具体的协方差形式，仅记录替代聚类下系数与显著性未发生实质性变化这一事实。\n\n至于其他维度的稳健性检验，包括是否使用替代样本、替代工具变量集、缩尾处理或非线性设定等，本文当前未在绑定事实中获得对应的结果，故不在此处作具体推断；同时由于安慰剂检验在稳健性表中显示为未运行/未提供，本文同样不对安慰剂结果作口头描述或数字宣称。\n\n## 异质性\n\n本文在分样本异质性方面未运行/未提供任何绑定结果，分组交互系数表中亦无有效条目。因此，本节不展开对地区、行业、性别、城乡或其他子群的差异化讨论，亦不援引任何按子群拆分后的系数、显著性或样本量。任何超出主表与上述稳健性条目的分组数字，均不在本文写作边界之内。\n\n# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |"
+      ],
+      "chapter_index": 4,
+      "generation_source": "llm",
+      "generation_degraded": false,
+      "review_source": null,
+      "review_degraded": false,
+      "review_typed": false,
+      "review_status": null,
+      "grounding_failures": [],
+      "structure_failures": [],
+      "stale": false,
+      "needs_regeneration": false,
+      "grounded": false
+    },
+    "body_chapters": [
+      {
+        "type": "",
+        "title": "",
+        "content": null,
+        "status": null,
+        "versions": [],
+        "chapter_index": null,
+        "generation_source": null,
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": null,
+        "needs_regeneration": null,
+        "grounded": null
+      },
+      {
+        "type": "",
+        "title": "",
+        "content": null,
+        "status": null,
+        "versions": [],
+        "chapter_index": null,
+        "generation_source": null,
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": null,
+        "needs_regeneration": null,
+        "grounded": null
+      },
+      {
+        "type": "",
+        "title": "",
+        "content": null,
+        "status": null,
+        "versions": [],
+        "chapter_index": null,
+        "generation_source": null,
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": null,
+        "needs_regeneration": null,
+        "grounded": null
+      },
+      {
+        "type": "",
+        "title": "",
+        "content": null,
+        "status": null,
+        "versions": [],
+        "chapter_index": null,
+        "generation_source": null,
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": null,
+        "needs_regeneration": null,
+        "grounded": null
+      },
+      {
+        "type": "results",
+        "title": "结果",
+        "content": "## 基准回归\n\n本文以对数工资 `lwage` 为被解释变量，以受教育年限 `educ` 为核心解释变量，并在方程中纳入工作经验及其平方项 `exper`、`expersq`，以及人口与地域特征 `black`、`smsa`、`south`、`smsa66` 与八个地区虚拟变量 `reg661`–`reg668`，样本量为 3010。为缓解受教育年限的内生性，本文以是否就近可上大学 `nearc4` 作为工具变量，采用 `statspai.ivreg` 估计如下方程：`lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668`。\n\n工具变量估计结果显示，受教育年限的系数为 0.1315，标准误为 0.0550，对应 p 值为 0.0168，在常规水平上具有统计显著性。系数符号为正，表明在控制工作经验、种族、城乡和地区差异后，受教育年限与对数工资之间呈显著的正向关联。鉴于估计量类型为 association，本文并不对该系数作出\"因果效应\"的强解释；而是把上述结果解读为：在条件可比的样本个体之间，多受一年教育与更高的对数工资在统计上相伴出现。\n\n需要说明的是，本文还以普通最小二乘在同一控制集下估计作为参照，其受教育年限系数为 0.0747，标准误为 0.0035，样本量同为 3010。对比 OLS 结果，IV 系数明显更大，这一现象在劳动经济学文献中通常被解释为 OLS 中存在向下偏误（例如能力偏差与测量误差共同压低 OLS 估计量），而以大学就近可达性作为外生工具变量后，估计量在满足排他性约束与相关性约束的条件下能够识别一个局部平均处理效应，数值上落在经典文献的合理区间。本文严格遵循已绑定的设定事实，协方差与标准误的具体形式未在输入中提供，因此不在此处对标准误的构造作进一步判断。\n\n## 稳健性\n\n为检验上述结论是否对聚类设定敏感，本文换用替代聚类方式重新估计，结果显示 `educ` 的系数为 0.132，标准误为 0.055，p 值为 0.017，与主结果在系数大小与显著性水平上高度一致。这表明即便改变聚类方案，主结论——受教育年限与对数工资的正向关联在统计上稳健——仍然成立。需要再次强调的是，由于协方差/标准误设定在本文的绑定事实中标注为\"未提供\"，本文不在文本中宣称使用了 HC1 标准误、聚类稳健标准误或任何具体的协方差形式，仅记录替代聚类下系数与显著性未发生实质性变化这一事实。\n\n至于其他维度的稳健性检验，包括是否使用替代样本、替代工具变量集、缩尾处理或非线性设定等，本文当前未在绑定事实中获得对应的结果，故不在此处作具体推断；同时由于安慰剂检验在稳健性表中显示为未运行/未提供，本文同样不对安慰剂结果作口头描述或数字宣称。\n\n## 异质性\n\n本文在分样本异质性方面未运行/未提供任何绑定结果，分组交互系数表中亦无有效条目。因此，本节不展开对地区、行业、性别、城乡或其他子群的差异化讨论，亦不援引任何按子群拆分后的系数、显著性或样本量。任何超出主表与上述稳健性条目的分组数字，均不在本文写作边界之内。\n\n# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |",
+        "status": "generated",
+        "versions": [
+          "## 基准回归\n\n本文以对数工资 `lwage` 为被解释变量，以受教育年限 `educ` 为核心解释变量，并在方程中纳入工作经验及其平方项 `exper`、`expersq`，以及人口与地域特征 `black`、`smsa`、`south`、`smsa66` 与八个地区虚拟变量 `reg661`–`reg668`，样本量为 3010。为缓解受教育年限的内生性，本文以是否就近可上大学 `nearc4` 作为工具变量，采用 `statspai.ivreg` 估计如下方程：`lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668`。\n\n工具变量估计结果显示，受教育年限的系数为 0.1315，标准误为 0.0550，对应 p 值为 0.0168，在常规水平上具有统计显著性。系数符号为正，表明在控制工作经验、种族、城乡和地区差异后，受教育年限与对数工资之间呈显著的正向关联。鉴于估计量类型为 association，本文并不对该系数作出\"因果效应\"的强解释；而是把上述结果解读为：在条件可比的样本个体之间，多受一年教育与更高的对数工资在统计上相伴出现。\n\n需要说明的是，本文还以普通最小二乘在同一控制集下估计作为参照，其受教育年限系数为 0.0747，标准误为 0.0035，样本量同为 3010。对比 OLS 结果，IV 系数明显更大，这一现象在劳动经济学文献中通常被解释为 OLS 中存在向下偏误（例如能力偏差与测量误差共同压低 OLS 估计量），而以大学就近可达性作为外生工具变量后，估计量在满足排他性约束与相关性约束的条件下能够识别一个局部平均处理效应，数值上落在经典文献的合理区间。本文严格遵循已绑定的设定事实，协方差与标准误的具体形式未在输入中提供，因此不在此处对标准误的构造作进一步判断。\n\n## 稳健性\n\n为检验上述结论是否对聚类设定敏感，本文换用替代聚类方式重新估计，结果显示 `educ` 的系数为 0.132，标准误为 0.055，p 值为 0.017，与主结果在系数大小与显著性水平上高度一致。这表明即便改变聚类方案，主结论——受教育年限与对数工资的正向关联在统计上稳健——仍然成立。需要再次强调的是，由于协方差/标准误设定在本文的绑定事实中标注为\"未提供\"，本文不在文本中宣称使用了 HC1 标准误、聚类稳健标准误或任何具体的协方差形式，仅记录替代聚类下系数与显著性未发生实质性变化这一事实。\n\n至于其他维度的稳健性检验，包括是否使用替代样本、替代工具变量集、缩尾处理或非线性设定等，本文当前未在绑定事实中获得对应的结果，故不在此处作具体推断；同时由于安慰剂检验在稳健性表中显示为未运行/未提供，本文同样不对安慰剂结果作口头描述或数字宣称。\n\n## 异质性\n\n本文在分样本异质性方面未运行/未提供任何绑定结果，分组交互系数表中亦无有效条目。因此，本节不展开对地区、行业、性别、城乡或其他子群的差异化讨论，亦不援引任何按子群拆分后的系数、显著性或样本量。任何超出主表与上述稳健性条目的分组数字，均不在本文写作边界之内。\n\n# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |"
+        ],
+        "chapter_index": 4,
+        "generation_source": "llm",
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": false,
+        "needs_regeneration": false,
+        "grounded": false
+      },
+      {
+        "type": "",
+        "title": "",
+        "content": null,
+        "status": null,
+        "versions": [],
+        "chapter_index": null,
+        "generation_source": null,
+        "generation_degraded": false,
+        "review_source": null,
+        "review_degraded": false,
+        "review_typed": false,
+        "review_status": null,
+        "grounding_failures": [],
+        "structure_failures": [],
+        "stale": null,
+        "needs_regeneration": null,
+        "grounded": null
+      }
+    ],
+    "score": 0.71,
+    "auto_decision": "pass",
+    "review_source": "mock_fallback",
+    "review_degraded": true,
+    "grounding_failures": [
+      "wording_exceeds_evidence"
+    ]
+  },
+  "nonempty_results": true,
+  "real_generation_and_review": false,
+  "evidence": {
+    "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0",
+    "available": true,
+    "blockers": [],
+    "estimate": {
+      "status": "ok",
+      "produced_by": "estimate",
+      "estimator": "statspai.ivreg",
+      "method": "iv",
+      "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+      "treatment": "educ",
+      "treatment_row": "| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |",
+      "n": 3010,
+      "coef": 0.13150383624724782,
+      "se": 0.05496367260152569,
+      "p": 0.01679262188931996,
+      "source_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+      "analysis_dataset": {
+        "name": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0.csv",
+        "hash": "63f61533fe28f0f93cb209f7bf66aad6e5065b9a295398071d501af590d09cbf",
+        "role": "raw",
+        "rows": null,
+        "columns": []
+      },
+      "diagnostics": {
+        "test": "effective_f_test",
+        "F_eff": 14.13867007975783,
+        "first_stage_F": 13.255785330576096,
+        "strength": "Moderate (10 ≤ F_eff < 23.1) — t-test may over-reject",
+        "covariance": "HC1",
+        "controls": [
+          "exper",
+          "expersq",
+          "black",
+          "smsa",
+          "south",
+          "smsa66",
+          "reg661",
+          "reg662",
+          "reg663",
+          "reg664",
+          "reg665",
+          "reg666",
+          "reg667",
+          "reg668"
+        ]
+      }
+    },
+    "results": "# 主结果\n\n| 变量 | 系数 | SE | p |\n|------|------|----|---|\n| educ | 0.13150383624724782 | 0.05496367260152569 | 0.01679262188931996 |",
+    "claim": "association",
+    "specification": {
+      "question": "Does education increase earnings?",
+      "dv": "lwage",
+      "iv": "educ",
+      "instrument": "nearc4",
+      "method": "iv",
+      "controls": [
+        "exper",
+        "expersq",
+        "black",
+        "smsa",
+        "south",
+        "smsa66",
+        "reg661",
+        "reg662",
+        "reg663",
+        "reg664",
+        "reg665",
+        "reg666",
+        "reg667",
+        "reg668"
+      ],
+      "claim": "association"
+    },
+    "identification": {
+      "star_rating": null,
+      "failed": false,
+      "report": "IV: 缺少 outcome/endogenous/instrument 列配置，跳过诊断。\n识别策略尚未评分：缺少可运行的诊断（检查时间 / 个体 / 工具变量等列是否已指定）。"
+    },
+    "robustness": {
+      "status": "ran",
+      "ran": true
+    },
+    "provenance": {
+      "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+      "run_status": "SUCCEEDED",
+      "run_events_url": "/api/runs/c96fd037-efc9-4ac6-a249-95769cbce028/events",
+      "dataset": {
+        "name": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0.csv",
+        "rows": null,
+        "columns": [],
+        "path": "/data/uploads/b0c198b9-68d2-4ced-9e6b-8d87c74578d0.csv",
+        "hash": "63f61533fe28f0f93cb209f7bf66aad6e5065b9a295398071d501af590d09cbf",
+        "version": null,
+        "role": "raw"
+      },
+      "code": [
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.R",
+          "bytes": 592,
+          "filename": "analysis.R",
+          "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+          "lang": null
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.do",
+          "bytes": 524,
+          "filename": "analysis.do",
+          "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+          "lang": null
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.m",
+          "bytes": 493,
+          "filename": "analysis.m",
+          "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+          "lang": null
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.py",
+          "bytes": 661,
+          "filename": "analysis.py",
+          "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+          "lang": null
+        }
+      ],
+      "trace_events": [
+        {
+          "ts": "2026-09-08T05:20:30.393544+00:00",
+          "node": "generate_chapter",
+          "status": "ok",
+          "duration_ms": 15029.3,
+          "detail": {
+            "chapter_type": "results",
+            "write_blocked": false
+          }
+        },
+        {
+          "ts": "2026-09-08T05:20:30.412404+00:00",
+          "node": "review_chapter",
+          "status": "ok",
+          "detail": {
+            "parent_node": "generate_chapter",
+            "score": 0.71,
+            "grounding_failures": [
+              "wording_exceeds_evidence"
+            ],
+            "review_source": "mock_fallback",
+            "degraded": true
+          }
+        },
+        {
+          "ts": "2026-09-08T05:20:30.463134+00:00",
+          "node": "translate_code",
+          "status": "ok",
+          "duration_ms": 7.7,
+          "detail": {
+            "n": 4
+          }
+        }
+      ],
+      "manifest": {
+        "created_at": "2026-09-08T05:20:30.456986+00:00",
+        "code": [
+          {
+            "ts": "2026-09-08T05:20:30.456919+00:00",
+            "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+          }
+        ],
+        "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0"
+      },
+      "artifacts": [
+        {
+          "path": "attempts/342d3df4-954f-4ae8-9994-a2070a40df19/epoch-1/03_outliers_0.csv",
+          "bytes": 346041
+        },
+        {
+          "path": "attempts/342d3df4-954f-4ae8-9994-a2070a40df19/epoch-1/04_transform_0.csv",
+          "bytes": 346041
+        },
+        {
+          "path": "attempts/342d3df4-954f-4ae8-9994-a2070a40df19/epoch-1/05_filter_0.csv",
+          "bytes": 346041
+        },
+        {
+          "path": "attempts/342d3df4-954f-4ae8-9994-a2070a40df19/epoch-1/clean.do",
+          "bytes": 553
+        },
+        {
+          "path": "attempts/342d3df4-954f-4ae8-9994-a2070a40df19/epoch-1/clean.py",
+          "bytes": 605
+        },
+        {
+          "path": "checkpoints/0001_generate_chapter_reviewed_0520304128.json",
+          "bytes": 107321
+        },
+        {
+          "path": "checkpoints/0002_translate_code_0520304648.json",
+          "bytes": 110000
+        },
+        {
+          "path": "checkpoints/latest.json",
+          "bytes": 110000
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1261
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.R",
+          "bytes": 592
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.do",
+          "bytes": 524
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.m",
+          "bytes": 493
+        },
+        {
+          "path": "outputs/code/c96fd037-efc9-4ac6-a249-95769cbce028/analysis.py",
+          "bytes": 661
+        },
+        {
+          "path": "trace.jsonl",
+          "bytes": 550
+        }
+      ]
+    }
+  },
+  "evidence_target_path": "/sessions/b0c198b9-68d2-4ced-9e6b-8d87c74578d0/evidence",
+  "tex_opened": {
+    "bytes": 4867,
+    "sha256": "3ba31629768e3c5b0055a74ab30b927f5fde4f4e5b025cb497ee8f5e410ef4f5",
+    "document_environment": true,
+    "path": "results-real-once.tex"
+  },
+  "outcome": "API generation observed; inspect review and grounding outcomes separately; browser NOT RUN"
+}

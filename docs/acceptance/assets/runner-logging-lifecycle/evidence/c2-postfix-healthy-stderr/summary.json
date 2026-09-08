@@ -1,0 +1,187 @@
+{
+  "phase": "post",
+  "condition": "healthy-stderr",
+  "port": 8002,
+  "state_root": "/tmp/econpaper-runner-logging-post-healthy-stderr/state",
+  "backend_pid": 79790,
+  "runner_pid": 79809,
+  "idempotency_key": "c5b100a6-270d-4b53-8210-7a3ec6c6bd7a",
+  "run_id": "105239c5-a0ef-4374-9a12-e1dc02d41045",
+  "session_id": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e",
+  "run_api": {
+    "run_id": "105239c5-a0ef-4374-9a12-e1dc02d41045",
+    "session_id": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e",
+    "kind": "upload_pipeline",
+    "status": "SUCCEEDED",
+    "attempt": 1,
+    "lease_epoch": 1,
+    "result": {
+      "cleaning_report": {
+        "steps": [
+          {
+            "name": "profiling",
+            "status": "success",
+            "duration": 0.009972
+          },
+          {
+            "name": "merge",
+            "status": "success",
+            "duration": 8e-06
+          },
+          {
+            "name": "missing",
+            "status": "success",
+            "duration": 0.003893
+          },
+          {
+            "name": "outliers",
+            "status": "success",
+            "duration": 0.053104
+          },
+          {
+            "name": "transform",
+            "status": "success",
+            "duration": 0.022546
+          },
+          {
+            "name": "filter",
+            "status": "success",
+            "duration": 0.022654
+          },
+          {
+            "name": "balance",
+            "status": "success",
+            "duration": 6e-06
+          },
+          {
+            "name": "audit",
+            "status": "success",
+            "duration": 0.00033
+          }
+        ]
+      },
+      "upload_readiness": "READY"
+    },
+    "error": null
+  },
+  "session_api": {
+    "session_id": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e",
+    "upload_readiness": "READY",
+    "keys": [
+      "active_run",
+      "body_chapters",
+      "claim",
+      "cleaning_report",
+      "dataset",
+      "degradations",
+      "estimate",
+      "exists",
+      "has_dataset",
+      "identification_failed",
+      "identification_report",
+      "literature_source",
+      "outline",
+      "research",
+      "research_direction",
+      "results",
+      "robustness_status",
+      "session_id",
+      "star_rating",
+      "upload_readiness",
+      "write_blockers"
+    ],
+    "dataset_count": 0,
+    "has_research_lab": true,
+    "active_run": null,
+    "degradations": []
+  },
+  "db": {
+    "run": {
+      "run_id": "105239c5-a0ef-4374-9a12-e1dc02d41045",
+      "session_id": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e",
+      "kind": "upload_pipeline",
+      "status": "SUCCEEDED",
+      "error": null,
+      "attempt": 1,
+      "lease_owner": null,
+      "created_at": "2026-09-07 18:21:34.710311",
+      "updated_at": "2026-09-07 18:21:36.062747"
+    },
+    "run_events": [
+      {
+        "seq": 1,
+        "event_type": "run.accepted",
+        "created_at": "2026-09-07 18:21:34.711740"
+      },
+      {
+        "seq": 2,
+        "event_type": "run.claimed",
+        "created_at": "2026-09-07 18:21:34.733175"
+      },
+      {
+        "seq": 3,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:35.783815"
+      },
+      {
+        "seq": 4,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:35.801047"
+      },
+      {
+        "seq": 5,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:35.808422"
+      },
+      {
+        "seq": 6,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:35.924299"
+      },
+      {
+        "seq": 7,
+        "event_type": "run.succeeded",
+        "created_at": "2026-09-07 18:21:36.065100"
+      }
+    ],
+    "run_event_count": 7,
+    "session_state_excerpt": {
+      "upload_readiness": "READY",
+      "has_uploaded_datasets": true,
+      "dataset_meta_keys": null,
+      "csv_path_present": true
+    }
+  },
+  "uploads_listing": [
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e.csv",
+      "bytes": 332282
+    }
+  ],
+  "runs_listing": [
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e/attempts/105239c5-a0ef-4374-9a12-e1dc02d41045/epoch-1/03_outliers_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e/attempts/105239c5-a0ef-4374-9a12-e1dc02d41045/epoch-1/04_transform_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e/attempts/105239c5-a0ef-4374-9a12-e1dc02d41045/epoch-1/05_filter_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e/attempts/105239c5-a0ef-4374-9a12-e1dc02d41045/epoch-1/clean.do",
+      "bytes": 611
+    },
+    {
+      "path": "91c7a5d8-24e7-4cbc-86b4-92ee4961fc2e/attempts/105239c5-a0ef-4374-9a12-e1dc02d41045/epoch-1/clean.py",
+      "bytes": 663
+    }
+  ],
+  "logging_evidence_lines": 0,
+  "backend.log_lines": 307,
+  "runner-console.log_lines": 684,
+  "runner_file_log_lines": 341
+}

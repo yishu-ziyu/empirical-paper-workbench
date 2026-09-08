@@ -1,0 +1,186 @@
+{
+  "phase": "post",
+  "condition": "dead-pipe",
+  "port": 8002,
+  "state_root": "/tmp/econpaper-runner-logging-post-dead-pipe/state",
+  "backend_pid": 79687,
+  "runner_pid": 79737,
+  "idempotency_key": "eb952ba1-4a44-4297-863d-0c50f2749653",
+  "run_id": "808d550c-0f57-46d1-9db8-555e7768081d",
+  "session_id": "2c49d425-408a-4bda-91ca-7126b55b564b",
+  "run_api": {
+    "run_id": "808d550c-0f57-46d1-9db8-555e7768081d",
+    "session_id": "2c49d425-408a-4bda-91ca-7126b55b564b",
+    "kind": "upload_pipeline",
+    "status": "SUCCEEDED",
+    "attempt": 1,
+    "lease_epoch": 1,
+    "result": {
+      "cleaning_report": {
+        "steps": [
+          {
+            "name": "profiling",
+            "status": "success",
+            "duration": 0.006941
+          },
+          {
+            "name": "merge",
+            "status": "success",
+            "duration": 5e-06
+          },
+          {
+            "name": "missing",
+            "status": "success",
+            "duration": 0.003519
+          },
+          {
+            "name": "outliers",
+            "status": "success",
+            "duration": 0.061159
+          },
+          {
+            "name": "transform",
+            "status": "success",
+            "duration": 0.022526
+          },
+          {
+            "name": "filter",
+            "status": "success",
+            "duration": 0.023787
+          },
+          {
+            "name": "balance",
+            "status": "success",
+            "duration": 6e-06
+          },
+          {
+            "name": "audit",
+            "status": "success",
+            "duration": 0.000312
+          }
+        ]
+      },
+      "upload_readiness": "READY"
+    },
+    "error": null
+  },
+  "session_api": {
+    "session_id": "2c49d425-408a-4bda-91ca-7126b55b564b",
+    "upload_readiness": "READY",
+    "keys": [
+      "active_run",
+      "body_chapters",
+      "claim",
+      "cleaning_report",
+      "dataset",
+      "degradations",
+      "estimate",
+      "exists",
+      "has_dataset",
+      "identification_failed",
+      "identification_report",
+      "literature_source",
+      "outline",
+      "research",
+      "research_direction",
+      "results",
+      "robustness_status",
+      "session_id",
+      "star_rating",
+      "upload_readiness",
+      "write_blockers"
+    ],
+    "dataset_count": 0,
+    "has_research_lab": true,
+    "active_run": null,
+    "degradations": []
+  },
+  "db": {
+    "run": {
+      "run_id": "808d550c-0f57-46d1-9db8-555e7768081d",
+      "session_id": "2c49d425-408a-4bda-91ca-7126b55b564b",
+      "kind": "upload_pipeline",
+      "status": "SUCCEEDED",
+      "error": null,
+      "attempt": 1,
+      "lease_owner": null,
+      "created_at": "2026-09-07 18:21:26.797808",
+      "updated_at": "2026-09-07 18:21:28.047048"
+    },
+    "run_events": [
+      {
+        "seq": 1,
+        "event_type": "run.accepted",
+        "created_at": "2026-09-07 18:21:26.799385"
+      },
+      {
+        "seq": 2,
+        "event_type": "run.claimed",
+        "created_at": "2026-09-07 18:21:26.934727"
+      },
+      {
+        "seq": 3,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:27.690917"
+      },
+      {
+        "seq": 4,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:27.697436"
+      },
+      {
+        "seq": 5,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:27.707843"
+      },
+      {
+        "seq": 6,
+        "event_type": "run.progress",
+        "created_at": "2026-09-07 18:21:27.832959"
+      },
+      {
+        "seq": 7,
+        "event_type": "run.succeeded",
+        "created_at": "2026-09-07 18:21:28.051104"
+      }
+    ],
+    "run_event_count": 7,
+    "session_state_excerpt": {
+      "upload_readiness": "READY",
+      "has_uploaded_datasets": true,
+      "dataset_meta_keys": null,
+      "csv_path_present": true
+    }
+  },
+  "uploads_listing": [
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b.csv",
+      "bytes": 332282
+    }
+  ],
+  "runs_listing": [
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b/attempts/808d550c-0f57-46d1-9db8-555e7768081d/epoch-1/03_outliers_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b/attempts/808d550c-0f57-46d1-9db8-555e7768081d/epoch-1/04_transform_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b/attempts/808d550c-0f57-46d1-9db8-555e7768081d/epoch-1/05_filter_0.csv",
+      "bytes": 346117
+    },
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b/attempts/808d550c-0f57-46d1-9db8-555e7768081d/epoch-1/clean.do",
+      "bytes": 606
+    },
+    {
+      "path": "2c49d425-408a-4bda-91ca-7126b55b564b/attempts/808d550c-0f57-46d1-9db8-555e7768081d/epoch-1/clean.py",
+      "bytes": 658
+    }
+  ],
+  "logging_evidence_lines": 19041,
+  "backend.log_lines": 307,
+  "runner_file_log_lines": 292
+}

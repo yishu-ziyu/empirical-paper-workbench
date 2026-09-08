@@ -18,6 +18,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 
 
@@ -37,7 +38,7 @@ def main():
     gateway_password = (args.env_file.parent / 'gateway-password').read_text().strip()
     basic = 'Basic ' + base64.b64encode(f'{username}:{gateway_password}'.encode()).decode()
     context = ssl.create_default_context(cafile=str(root / 'tls.crt'))
-    report = {'scope': 'API only; browser NOT RUN; real LLM NOT configured',
+    report = {'scope': 'API only; browser NOT RUN; LLM generation NOT exercised by this script',
               'url': args.url, 'started_at_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
               'checks': [], 'limitations': ['Cookie policy is Python CookieJar, not browser evidence.',
               'No access-expiry renewal success or real chapter generation claimed.']}
@@ -57,9 +58,9 @@ def main():
                 entry['outcome'] = 'known_reproduced_failure'
                 continue
             expected = [200]
-            if 'gateway denial' in label or 'after logout' in label or 'anonymous session creation' in label or 'anonymous upload denied' in label:
+            if 'gateway denial' in label or 'after logout' in label or 'anonymous session creation' in label or 'anonymous upload denied' in label or 'readiness anonymous me' in label:
                 expected = [401]
-            elif 'forbidden' in label or 'capability isolation' in label:
+            elif ('forbidden' in label and not label.startswith('owner')) or 'capability isolation' in label:
                 expected = [401, 403, 404]
             elif label.endswith('register'):
                 expected = [201]
@@ -105,7 +106,7 @@ def main():
         except (ValueError, UnicodeDecodeError):
             result = {}
         safe_detail = result.get('detail') if isinstance(result, dict) else None
-        allowed_details = {'Missing refresh token', 'Not authenticated', 'Upload not found',
+        allowed_details = {'invalid_idempotency_key', 'Missing refresh token', 'Not authenticated', 'Upload not found',
                            'Session not found', 'Forbidden', 'File exceeds 50MB upload limit'}
         entry = {'check': label, 'method': method, 'path': path, 'http_status': status,
                  'elapsed_seconds': round(time.monotonic() - started, 3),
@@ -123,6 +124,11 @@ def main():
     a, b, anon = client(), client(), client()
     for path in ('/', '/api/auth/me', '/api/sessions'):
         request(anon, 'gateway denial ' + path, path, gateway=False)
+    status, _ = request(anon, 'gateway application readiness anonymous me', '/api/auth/me')
+    if status != 401:
+        report['stopped'] = 'Application proxy readiness failed; no registration submitted.'
+        save()
+        return 1
     request(anon, 'anonymous session creation denied', '/api/sessions', 'POST')
     accounts = []
     for label, c in [('a', a), ('b', b)]:
@@ -148,8 +154,8 @@ def main():
     probe = urllib.request.Request(args.url + '/api/auth/refresh')
     a[1].add_cookie_header(probe)
     report['refresh_cookie_policy'] = {
-        'jar_refresh_paths': [x.path for x in a[1] if x.name == 'ep_refresh'],
-        'refresh_sent_to_api_auth_refresh': 'ep_refresh=' in (probe.get_header('Cookie') or '')}
+        'jar_refresh_paths': [x.path for x in a[1] if x.name == 'ep_access_refresh'],
+        'refresh_sent_to_api_auth_refresh': 'ep_access_refresh=' in (probe.get_header('Cookie') or '')}
     request(a, 'first refresh through actual proxy', '/api/auth/refresh', 'POST')
 
     def ensure_login(c, account, label):
@@ -191,16 +197,18 @@ def main():
         return run.get('status') == 'SUCCEEDED'
 
     status, card = request(a, 'Card admission', '/api/demos/card', 'POST',
-                           headers={'Idempotency-Key': secrets.token_hex(20)})
+                           headers={'Idempotency-Key': str(uuid.uuid4())})
     if status == 202:
         sid, rid = card['session_id'], card['run_id']
         report['card_resources'] = {'session_id': sid, 'upload_run_id': rid}
         if observe_stream(rid, 'Card bootstrap SSE'):
+            request(a, 'Card prior expectation', f'/api/sessions/{sid}/research/expectation', 'PUT',
+                    {'text': 'I expect education to be positively associated with log wages. OLS and IV may differ; instrument relevance does not establish exclusion or a population-wide causal effect.', 'confidence': 'medium', 'locale': 'en'})
             status, _ = request(a, 'Card freeze', f'/api/sessions/{sid}/research/specification-space/freeze', 'POST')
             if status == 200:
                 status, run = request(a, 'Card specification execution admission',
                     f'/api/sessions/{sid}/research/specification-space/run', 'POST',
-                    headers={'Idempotency-Key': secrets.token_hex(20)})
+                    headers={'Idempotency-Key': str(uuid.uuid4())})
                 if status == 202:
                     report['card_resources']['spec_run_id'] = run['run_id']
                     observe_stream(run['run_id'], 'Card specification SSE')
@@ -220,7 +228,7 @@ def main():
     def multipart(content):
         return (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="synthetic.csv"\r\nContent-Type: text/csv\r\n\r\n'.encode()
                 + content + f'\r\n--{boundary}--\r\n'.encode())
-    upload_key = secrets.token_hex(20)
+    upload_key = str(uuid.uuid4())
     headers = {'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Idempotency-Key': upload_key}
     report['synthetic_csv'] = {'bytes': len(csv), 'rows': 200000, 'columns': ['x', 'y', 'z'],
                              'sha256': hashlib.sha256(csv).hexdigest()}
@@ -242,8 +250,8 @@ def main():
         report['run_observation'] = {k: run.get(k) for k in ('status', 'attempt')}
         report['run_observation']['error_present'] = bool(run.get('error'))
         report['run_observation']['result_present'] = run.get('result') is not None
-    request(anon, 'anonymous upload denied', '/api/upload', 'POST', headers={**headers, 'Idempotency-Key': secrets.token_hex(20)}, raw=multipart(b'x,y\n1,2\n'))
-    request(a, 'upload over product and gateway limits', '/api/upload', 'POST', headers={**headers, 'Idempotency-Key': secrets.token_hex(20)}, raw=multipart(b'x\n' + b'1\n' * (26 * 1024 * 1024)))
+    request(anon, 'anonymous upload denied', '/api/upload', 'POST', headers={**headers, 'Idempotency-Key': str(uuid.uuid4())}, raw=multipart(b'x,y\n1,2\n'))
+    request(a, 'upload over product and gateway limits', '/api/upload', 'POST', headers={**headers, 'Idempotency-Key': str(uuid.uuid4())}, raw=multipart(b'x\n' + b'1\n' * (26 * 1024 * 1024)))
     # Separate Content-Length rejection probe: do not resend a failed write.
     parsed = urllib.parse.urlsplit(args.url)
     connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, context=context, timeout=10)

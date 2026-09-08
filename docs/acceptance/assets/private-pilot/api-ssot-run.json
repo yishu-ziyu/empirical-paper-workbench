@@ -1,0 +1,284 @@
+{
+  "scope": "API only; browser NOT RUN; LLM generation NOT exercised by this script",
+  "url": "https://localhost:18443",
+  "started_at_utc": "2026-09-08T05:17:11Z",
+  "checks": [
+    {
+      "check": "gateway denial /",
+      "method": "GET",
+      "path": "/",
+      "http_status": 401,
+      "elapsed_seconds": 0.059,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/auth/me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.022,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/sessions",
+      "method": "GET",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.026,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway application readiness anonymous me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.08,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous session creation denied",
+      "method": "POST",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.022,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "a register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "http_status": 201,
+      "elapsed_seconds": 0.409,
+      "response_bytes": 198,
+      "expectation": "HTTP 201",
+      "outcome": "pass"
+    },
+    {
+      "check": "a login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "http_status": 200,
+      "elapsed_seconds": 0.415,
+      "response_bytes": 51,
+      "access_token_body_empty": true,
+      "cookie_attributes": [
+        {
+          "name": "ep_access",
+          "path": "/",
+          "secure": true,
+          "http_only": true
+        },
+        {
+          "name": "ep_access_refresh",
+          "path": "/auth",
+          "secure": true,
+          "http_only": true
+        }
+      ],
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "a authenticated me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.021,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "b register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "http_status": 201,
+      "elapsed_seconds": 0.445,
+      "response_bytes": 198,
+      "expectation": "HTTP 201",
+      "outcome": "pass"
+    },
+    {
+      "check": "b login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "http_status": 200,
+      "elapsed_seconds": 0.428,
+      "response_bytes": 51,
+      "access_token_body_empty": true,
+      "cookie_attributes": [
+        {
+          "name": "ep_access",
+          "path": "/",
+          "secure": true,
+          "http_only": true
+        },
+        {
+          "name": "ep_access_refresh",
+          "path": "/auth",
+          "secure": true,
+          "http_only": true
+        }
+      ],
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "b authenticated me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.081,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "first refresh through actual proxy",
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "http_status": 401,
+      "elapsed_seconds": 0.068,
+      "response_bytes": 94,
+      "detail": "Missing refresh token",
+      "expectation": "Refresh should return 200 for normal renewal",
+      "outcome": "known_reproduced_failure"
+    },
+    {
+      "check": "Card admission",
+      "method": "POST",
+      "path": "/api/demos/card",
+      "http_status": 422,
+      "elapsed_seconds": 0.048,
+      "response_bytes": 98,
+      "expectation": "HTTP 202",
+      "outcome": "fail"
+    },
+    {
+      "check": "before isolation a check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.019,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "before isolation b check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.016,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "upload greater than 1 MiB",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 422,
+      "elapsed_seconds": 0.063,
+      "response_bytes": 98,
+      "expectation": "HTTP 202",
+      "outcome": "fail"
+    },
+    {
+      "check": "anonymous upload denied",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 422,
+      "elapsed_seconds": 0.01,
+      "response_bytes": 98,
+      "expectation": "HTTP 401",
+      "outcome": "fail"
+    },
+    {
+      "check": "upload over product and gateway limits",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 413,
+      "elapsed_seconds": 1.69,
+      "response_bytes": 43,
+      "detail": "File exceeds 50MB upload limit",
+      "expectation": "HTTP 413",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway rejects over-limit Content-Length before body",
+      "http_status": 413,
+      "declared_bytes": 54525952,
+      "body_sent_bytes": 0,
+      "expectation": "HTTP 413",
+      "outcome": "pass"
+    },
+    {
+      "check": "before logout check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.151,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "logout",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "http_status": 200,
+      "elapsed_seconds": 0.102,
+      "response_bytes": 11,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "after logout protected me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.053,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    }
+  ],
+  "limitations": [
+    "Cookie policy is Python CookieJar, not browser evidence.",
+    "No access-expiry renewal success or real chapter generation claimed."
+  ],
+  "refresh_cookie_policy": {
+    "jar_refresh_paths": [],
+    "refresh_sent_to_api_auth_refresh": false
+  },
+  "synthetic_csv": {
+    "bytes": 1200006,
+    "rows": 200000,
+    "columns": [
+      "x",
+      "y",
+      "z"
+    ],
+    "sha256": "0cd397c10d78c84fe6e7e64fff01321b8a4060301528fb144d6b17f5d0558811"
+  },
+  "completed_at_utc": "2026-09-08T05:17:16Z",
+  "card_evaluation": {
+    "expectation": "At least two completed specification runs with actual coefficient, SE and n",
+    "outcome": "fail"
+  },
+  "overall": "incomplete: browser, normal renewal and real LLM journey not accepted"
+}

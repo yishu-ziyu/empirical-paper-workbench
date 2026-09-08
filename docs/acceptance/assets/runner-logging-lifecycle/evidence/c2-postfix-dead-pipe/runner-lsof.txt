@@ -1,0 +1,6 @@
+# condition=dead-pipe phase=post runner_pid=79737
+COMMAND   PID      USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  79737 mahaoxuan    0r   CHR                3,2      0t0  336 /dev/null
+Python  79737 mahaoxuan    1   PIPE 0x89b2f9c24d3220e4    16384      
+Python  79737 mahaoxuan    2   PIPE 0x89b2f9c24d3220e4    16384      
+

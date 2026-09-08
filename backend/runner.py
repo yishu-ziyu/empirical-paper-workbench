@@ -17,6 +17,7 @@ import run_store
 from config import ensure_private_directory
 from database import create_tables
 from run_repository import LeaseLost, RunRepository, UploadResultInvalid
+from runner_logging import configure_runner_logging
 from services.research_lab import reattach_research_lab
 from services.spec_run import execute_spec_run
 from agent.engine.cancellation import ExecutionCancelled
@@ -362,6 +363,10 @@ async def run_forever(
 
 
 def main() -> None:
+    # Output-channel lifecycle first: a dead console pipe must never turn a
+    # healthy run into FAILED (issue #30). Business failure semantics below
+    # are unchanged.
+    configure_runner_logging()
     parser = argparse.ArgumentParser(description="econpaper durable run worker")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=1.0)

@@ -112,6 +112,17 @@ def fail_upload_with_sensitive_text(
     raise RuntimeError("secret-token at /private/upload/source.csv")
 
 
+def fail_upload_with_broken_pipe(
+    _session_id: str,
+    _initial_state: dict,
+    *,
+    progress_callback=None,
+    cancellation_check=None,
+) -> dict:
+    """Simulate a business BrokenPipeError (e.g. LLM socket or helper pipe)."""
+    raise BrokenPipeError(32, "Broken pipe")
+
+
 def blocking_upload_with_descendant(
     _session_id: str,
     initial_state: dict,

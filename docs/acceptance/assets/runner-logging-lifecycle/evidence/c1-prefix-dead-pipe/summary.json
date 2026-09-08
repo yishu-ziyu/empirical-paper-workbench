@@ -1,0 +1,98 @@
+{
+  "phase": "pre",
+  "condition": "dead-pipe",
+  "port": 8002,
+  "state_root": "/tmp/econpaper-runner-logging-pre-dead-pipe/state",
+  "backend_pid": 51965,
+  "runner_pid": 51984,
+  "idempotency_key": "fe8e879a-bef9-4404-8d76-5c88cc12abbe",
+  "run_id": "15cd0c8c-96b5-491c-80d7-63e652fe9276",
+  "session_id": "56522bd5-02b2-49d2-8ce0-11c85d9896a2",
+  "run_api": {
+    "run_id": "15cd0c8c-96b5-491c-80d7-63e652fe9276",
+    "session_id": "56522bd5-02b2-49d2-8ce0-11c85d9896a2",
+    "kind": "upload_pipeline",
+    "status": "FAILED",
+    "attempt": 1,
+    "lease_epoch": 1,
+    "result": null,
+    "error": "BrokenPipeError: upload_pipeline execution failed"
+  },
+  "session_api": {
+    "session_id": "56522bd5-02b2-49d2-8ce0-11c85d9896a2",
+    "upload_readiness": "FAILED",
+    "keys": [
+      "active_run",
+      "body_chapters",
+      "claim",
+      "cleaning_report",
+      "dataset",
+      "degradations",
+      "estimate",
+      "exists",
+      "has_dataset",
+      "identification_failed",
+      "identification_report",
+      "literature_source",
+      "outline",
+      "research",
+      "research_direction",
+      "results",
+      "robustness_status",
+      "session_id",
+      "star_rating",
+      "upload_readiness",
+      "write_blockers"
+    ],
+    "dataset_count": 0,
+    "has_research_lab": true,
+    "active_run": null,
+    "degradations": []
+  },
+  "db": {
+    "run": {
+      "run_id": "15cd0c8c-96b5-491c-80d7-63e652fe9276",
+      "session_id": "56522bd5-02b2-49d2-8ce0-11c85d9896a2",
+      "kind": "upload_pipeline",
+      "status": "FAILED",
+      "error": "BrokenPipeError: upload_pipeline execution failed",
+      "attempt": 1,
+      "lease_owner": null,
+      "created_at": "2026-09-07 17:55:24.117469",
+      "updated_at": "2026-09-07 17:55:24.232792"
+    },
+    "run_events": [
+      {
+        "seq": 1,
+        "event_type": "run.accepted",
+        "created_at": "2026-09-07 17:55:24.119106"
+      },
+      {
+        "seq": 2,
+        "event_type": "run.claimed",
+        "created_at": "2026-09-07 17:55:24.215067"
+      },
+      {
+        "seq": 3,
+        "event_type": "run.failed",
+        "created_at": "2026-09-07 17:55:24.236440"
+      }
+    ],
+    "run_event_count": 3,
+    "session_state_excerpt": {
+      "upload_readiness": "FAILED",
+      "has_uploaded_datasets": true,
+      "dataset_meta_keys": null,
+      "csv_path_present": true
+    }
+  },
+  "uploads_listing": [
+    {
+      "path": "56522bd5-02b2-49d2-8ce0-11c85d9896a2.csv",
+      "bytes": 332282
+    }
+  ],
+  "runs_listing": [],
+  "logging_evidence_lines": 21737,
+  "backend.log_lines": 288
+}

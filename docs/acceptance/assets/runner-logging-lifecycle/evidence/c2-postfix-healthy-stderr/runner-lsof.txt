@@ -1,0 +1,6 @@
+# condition=healthy-stderr phase=post runner_pid=79809
+COMMAND   PID      USER   FD   TYPE DEVICE SIZE/OFF      NODE NAME
+Python  79809 mahaoxuan    0r   CHR    3,2      0t0       336 /dev/null
+Python  79809 mahaoxuan    1w   REG   1,15     9467 230571821 /private/tmp/econpaper-runner-logging-post-healthy-stderr/runner-console.log
+Python  79809 mahaoxuan    2w   REG   1,15     9467 230571821 /private/tmp/econpaper-runner-logging-post-healthy-stderr/runner-console.log
+

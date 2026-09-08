@@ -50,3 +50,13 @@ PILOT_ENV_FILE=/private/pilot.env deploy/private-pilot/ops.sh stop
 - 浏览器先复现 Cookie 路径问题的授权尚未恢复，所以 `/auth` → `/api/auth` 修复未实施。正常续期、完整浏览器旅程、真人理解与远端发布未完成。API 请求与容器检查不能替代。
 
 相关去敏工件位于 `docs/acceptance/assets/private-pilot/`；当前契约保持 open。请阅读每份工件的失败/未运行状态，不以运行镜像或健康状态视为试用验收通过。
+
+最终容器运行源码：`5d6fd9889edaf006c09eda16b1983fb29ddcf4bb`；精确镜像标识见 `images-final.json`。后续提交为证据/诊断运维脚本，未把这些提交冒称已进入镜像。镜像仅在本机构建，未推送镜像仓库。两个测试 project 均已 stop，独立卷和私有备份保留；`https://localhost:18443`/`:18444` 是本次已停止测试入口，非可交付试用地址。
+
+恢复验证使用 `snapshot.py` 正常登录后读取 `/sessions/{id}` 与 `/research`；前后完整 JSON 精确相等。实际读取并比较 16 个 CSV/代码文件和 2 个 MinIO 对象；恢复环境重新导出的 `.tex` 打开后字节与原件一致。命令维护方示例：
+
+```sh
+python3 deploy/private-pilot/snapshot.py --private-dir /private/pilot --accounts /private/pilot/accounts.json --origin https://localhost:18444 --session <public-test-session-id> --output /private/pilot/restored.json
+```
+
+结果保存的是原始降级评审状态；新镜像完成一次只读 typed review 组件诊断，不写回正文、不批准越界结论，不等于产品评审旅程通过。协方差标签与实际调用参数的既有疑点详见 `covariance-observation.md`，独立于 #34，未修改研究引擎。

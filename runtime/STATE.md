@@ -4,7 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
-| 20260908-private-pilot | `runtime/tasks/20260908-private-pilot.md` | active | `deploy/private-pilot` | 2026-09-08 | 固定部署依赖及隔离验证；不开放公网 |
+| 20260908-private-pilot | `runtime/tasks/20260908-private-pilot.md` | blocked | `deploy/private-pilot` / Draft PR #36 | 2026-09-08 | 镜像/API/备份证据齐；待browser授权和外部验收，contract open |
 | 20260907-localized-first-study | `runtime/tasks/20260907-localized-first-study.md` | active | `review/localized-first-study` / PR #32 | 2026-09-07 | r2 implementer 已交；待 r2 validator；不 merge |
 | 20260907-m1-empty-criteria-unevaluated | `runtime/tasks/20260907-m1-empty-criteria-unevaluated.md` | complete | PR #31 squash `87c5e5b` (reviewed `0192c74`) | 2026-09-07 | 外部 ACCEPT 已 merge |
 | 20260907-m1-expectation-criterion-p0 | `runtime/tasks/20260907-m1-expectation-criterion-p0.md` | complete | `review/generic-research-spine-hardening` / PR #31 | 2026-09-07 | r2 validator ACCEPT；push PR #31；不 merge |

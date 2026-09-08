@@ -1,0 +1,61 @@
+{
+  "runtime_source_sha": "5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+  "source_relationship": "Later commits contain evidence and diagnostic/operational scripts; image runtime source is recorded explicitly rather than claiming recursive evidence commits are in the image.",
+  "clean_source": "git archive 5d6fd9889edaf006c09eda16b1983fb29ddcf4bb extracted outside checkout; no development mounts",
+  "services": {
+    "backend": {
+      "configured_image": "econpaper-backend:5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+      "image_id": "sha256:4f24af8cb7f38e753623747be0a8fd3f7b4f389944912af24d0e9969d1d0e3c7",
+      "health": "healthy",
+      "published_ports": {
+        "8000/tcp": null
+      }
+    },
+    "runner": {
+      "configured_image": "econpaper-backend:5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+      "image_id": "sha256:4f24af8cb7f38e753623747be0a8fd3f7b4f389944912af24d0e9969d1d0e3c7",
+      "health": "healthy",
+      "published_ports": {
+        "8000/tcp": null
+      }
+    },
+    "frontend": {
+      "configured_image": "econpaper-frontend:5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+      "image_id": "sha256:4b41de748aa0d99fb8f0c24b39f6bcd364889c99c7fd06efb033fbf8a44e9141",
+      "health": "healthy",
+      "published_ports": {
+        "80/tcp": null
+      }
+    },
+    "gateway": {
+      "configured_image": "nginx:1.27-alpine",
+      "image_id": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "health": null,
+      "published_ports": {
+        "443/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18443"
+          }
+        ]
+      }
+    }
+  },
+  "images": {
+    "backend": {
+      "tag": "econpaper-backend:5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+      "id": "sha256:4f24af8cb7f38e753623747be0a8fd3f7b4f389944912af24d0e9969d1d0e3c7",
+      "repo_digests": [
+        "econpaper-backend@sha256:4f24af8cb7f38e753623747be0a8fd3f7b4f389944912af24d0e9969d1d0e3c7"
+      ]
+    },
+    "frontend": {
+      "tag": "econpaper-frontend:5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+      "id": "sha256:4b41de748aa0d99fb8f0c24b39f6bcd364889c99c7fd06efb033fbf8a44e9141",
+      "repo_digests": [
+        "econpaper-frontend@sha256:4b41de748aa0d99fb8f0c24b39f6bcd364889c99c7fd06efb033fbf8a44e9141"
+      ]
+    }
+  },
+  "image_secret_env_absent": true
+}

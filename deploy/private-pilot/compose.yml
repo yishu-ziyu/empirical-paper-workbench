@@ -1,0 +1,12 @@
+# Overlay the existing stack; never exposes its API or stores secrets in the image.
+services:
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      frontend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PILOT_TLS_PORT:-18443}:443"
+    volumes:
+      - ./deploy/private-pilot/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${PILOT_SECRETS_DIR:?set PILOT_SECRETS_DIR}:/run/pilot:ro

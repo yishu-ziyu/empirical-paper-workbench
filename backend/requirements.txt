@@ -28,11 +28,10 @@ psycopg[binary]==3.2.3
 statsmodels==0.14.6
 langgraph-checkpoint-postgres==3.1.2
 langgraph-checkpoint-sqlite==3.1.1  # isolated durable Agent spike
-# Optional extra (not required): pip install statspai
-# Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
-# Sibling checkout (same as agent venv):
-# From econpaper/: python -m pip install -e ../dependencies/StatsPAI
-# A missing install must not 500 POST /direction; nodes degrade.
+pyfixest==0.60.0  # existing Card OLS uses statspai.feols
+linearmodels==7.0  # existing Card IV estimator
+# Verified upstream source; normal wheel installation (never editable).
+StatsPAI @ https://codeload.github.com/brycewang-stanford/StatsPAI/tar.gz/a98b6743cc797ddd9cc33de1772c3ea3e3f0c394#sha256=a5882d80b31b472de9e7d952c012193aada389cbb8090f6fd2886a6987f199d6
 
 # --- S3 / 对象存储 ---
 boto3>=1.35.0

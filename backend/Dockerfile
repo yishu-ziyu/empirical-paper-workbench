@@ -19,6 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ------------------------------------------------------------------
 # 复制源码
 # ------------------------------------------------------------------
+# Fetch the public pinned extract once at build time; runtime is offline.
+COPY deploy/dependencies-card.json /app/deploy/dependencies-card.json
+COPY scripts/check_card_package.py /app/scripts/check_card_package.py
+ENV ECONPAPER_CARD_CSV=/opt/econpaper/card/data_card1995.csv
+RUN python /app/scripts/check_card_package.py --fetch --data-only
 COPY backend/ ./backend/
 COPY agent/    ./agent/
 

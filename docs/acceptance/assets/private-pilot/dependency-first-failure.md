@@ -27,3 +27,7 @@ No retry was run before changing the build prerequisite. The corrected clean
 build, container compiler-absence check, installed package inventory and real
 Card check remain separate subsequent evidence; this note does not claim they
 passed.
+
+## Second build: transport failure
+
+Source cae4aeb; apt trixie-updates InRelease over HTTP returned 502. The signature error was a consequence of the failed fetch. Changed the official Debian source transport to HTTPS, preserving signature verification; no package bypass or automatic retry loop. Raw local log: `/tmp/econpaper-private-pilot-build-cae4aeb.log`. This infrastructure fetch failure is unrelated to Card issue #34.

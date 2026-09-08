@@ -17,7 +17,8 @@ WORKDIR /app
 # Keep the compiler and headers in an unshipped build stage.
 FROM base AS dependencies
 COPY backend/requirements.txt .
-RUN apt-get update \
+RUN sed -i "s|http://deb.debian.org|https://deb.debian.org|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && pip install --no-cache-dir --prefix=/install -r requirements.txt
 

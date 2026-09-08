@@ -26,3 +26,9 @@
 后续隔离镜像诊断记录在 `review-first-failure.md`：镜像没有 `pydantic_ai`，而 `build_review_agent` 首先执行 `from pydantic_ai import Agent`；运行依赖缺少 agent 已固定的 `pydantic-ai-slim[openai]==2.35.3`。这是已定位的封装缺项和必经 import 失败路径。首次响应本身没有保存异常类别；不能把它改写成已记录供应商错误。补包后的 offline import/build 验证由部署实现证据记录。
 
 代码检查也确认当前没有“只评审现有正文”的产品 POST 接口：GET `/review` 只读；POST `/review/decision` 的 reject 会重新生成、accept/force_pass 会放行；直接 content edit 只落盘并清理旧评审。因此不能通过这些端点伪装一次独立重评。本子任务没有追加生成、接受或强制放行操作。
+
+## 补包后的单次组件诊断
+
+在源码 `5d6fd98` 构建的 backend 容器内，对同一正文调用一次 `invoke_review_llm(..., structured_retries=0)`，35.733 秒返回 `review_source=llm / review_typed=true / review_degraded=false`。见 `results-component-after-package-fix.json` 与 `results-component-check.py`。正文 SHA256 为 `3b6bdbf4fcde08b0ee7c1a59fa387d71c751c3467930c8f2979cc928ba3528b2`，输入来自首次公开 Card 生成证据。
+
+这只证明补齐依赖后真实 typed 评审通道可运行；没有调用产品写接口、没有保存评审、没有重新生成或批准。研究中的原章节仍保留首次 mock_fallback 及 wording_exceeds_evidence。模型反馈本身不是统计审稿结论：其中关于能力偏误、替代聚类与工具变量有效性的表述仍需研究者核查，不能据 rubric 数字宣布正文合格。此诊断不补足产品 API/浏览器完整旅程，也不补足真人理解验收。

@@ -58,7 +58,9 @@ the Wooldridge/Rdatasets Card extract. The [Card data documentation](https://vin
 credits David Card and lists 3,010 observations/34 variables. The
 [wooldridge package metadata](https://raw.githubusercontent.com/cran/wooldridge/master/DESCRIPTION)
 declares GPL-3 (checked 2026-09-08). Software MIT licensing does not relabel these
-data. This pilot uses the public upstream extract inside the protected runtime,
+data. No separate license for this CSV was found in the checked source; the
+package declaration is not a claim that every underlying dataset is GPL-3.
+This pilot uses the public upstream extract inside the protected runtime,
 retains provenance, and publishes neither a second CSV mirror nor the image.
 Any later image/data redistribution requires retaining the upstream notices and
 reviewing those distribution obligations before publication.

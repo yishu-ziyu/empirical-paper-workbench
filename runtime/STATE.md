@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| 20260908-first-value-entry-design | `runtime/tasks/20260908-first-value-entry-design.md` | complete | `review/first-value-entry` | 2026-09-08 | 设计交付 validator ACCEPT；等待用户确认，不实施 |
 | 20260907-localized-first-study | `runtime/tasks/20260907-localized-first-study.md` | active | `review/localized-first-study` / PR #32 | 2026-09-07 | r2 implementer 已交；待 r2 validator；不 merge |
 | 20260907-m1-empty-criteria-unevaluated | `runtime/tasks/20260907-m1-empty-criteria-unevaluated.md` | complete | PR #31 squash `87c5e5b` (reviewed `0192c74`) | 2026-09-07 | 外部 ACCEPT 已 merge |
 | 20260907-m1-expectation-criterion-p0 | `runtime/tasks/20260907-m1-expectation-criterion-p0.md` | complete | `review/generic-research-spine-hardening` / PR #31 | 2026-09-07 | r2 validator ACCEPT；push PR #31；不 merge |

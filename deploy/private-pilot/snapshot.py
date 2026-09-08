@@ -20,5 +20,6 @@ def request(path,payload=None):
 request('/auth/login',{'email':account['email'],'password':account['password']})
 sid=args.session
 snapshot={p:request(p) for p in ('/sessions/'+sid,'/sessions/'+sid+'/research')}
-Path(target).write_text(json.dumps(snapshot,ensure_ascii=False,sort_keys=True,indent=2));Path(target).chmod(0o600)
+Path(target).touch(mode=0o600,exist_ok=True);Path(target).chmod(0o600)
+Path(target).write_text(json.dumps(snapshot,ensure_ascii=False,sort_keys=True,indent=2))
 print(json.dumps({'normal_login':True,'session_id':sid,'endpoint_keys':{p:list(v) for p,v in snapshot.items()},'snapshot_sha256':hashlib.sha256(json.dumps(snapshot,ensure_ascii=False,sort_keys=True).encode()).hexdigest()}))

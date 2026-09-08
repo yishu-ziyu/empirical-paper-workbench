@@ -36,3 +36,7 @@ PILOT_ENV_FILE=/private/pilot.env deploy/private-pilot/ops.sh stop
 回滚：保存本次与前次源码SHA/镜像ID；先停止写入并备份，确认数据库/会话格式向后兼容后，将安全配置 `ECONPAPER_IMAGE` 指回前一镜像，执行 `up`，不重建或删除卷。未知兼容性时不回滚数据库、不覆盖现有研究。首个 pilot 尚无前一已验收版本。
 
 `.tex` 导出需实际下载并打开验证；镜像未提供 latexmk/pandoc，不承诺 PDF/Word。
+
+兼容边界：新增 `refresh_revocations` 表保存 refresh 单次消费；部署前旧进程内存撤销无法迁移。首次干净试用无旧账号迁移；已有部署升级需轮换 JWT 密钥或等待旧 refresh 自然过期，不能承诺旧撤销记录恢复。退出后已复制的短期 access 仍到期前有效，此处未引入 access 黑名单。
+
+验证工具：本机 Docker Compose 5.0.2 接受 `ports: !reset []`，pilot overlay 移除 backend/frontend 发布端口，只发布 TLS gateway。MinIO 固定镜像不含 tar；备份维护容器复用应用镜像、无网络，仅临时访问独立对象卷。

@@ -1,5 +1,16 @@
 # Overlay the existing stack; never exposes its API or stores secrets in the image.
 services:
+  backend:
+    ports: !reset []
+  frontend:
+    ports: !reset []
+  archive:
+    image: ${ECONPAPER_IMAGE:-econpaper-backend:local}
+    profiles: [maintenance]
+    network_mode: none
+    entrypoint: [tar]
+    volumes:
+      - minio_data:/objects
   gateway:
     image: nginx:1.27-alpine
     depends_on:

@@ -6,12 +6,11 @@ Token transport (F10-hardening): access + refresh tokens are issued as
 ``httpOnly`` cookies so XSS cannot read them. The ``Authorization: Bearer``
 header is still accepted for legacy clients during the compat window, but
 new clients must rely on cookies. Refresh tokens are single-use (rotated on
-every /auth/refresh) and revocable via an in-process jti denylist.
+every /auth/refresh) and revocable via a database-backed, uniquely keyed jti ledger.
 """
 
 from __future__ import annotations
 
-import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -21,11 +20,13 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 import bcrypt
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from database import get_db
 from models.user import User
+from models.refresh_revocation import RefreshRevocation
 
 ACCESS_COOKIE = "ep_access"
 REFRESH_COOKIE = "ep_access_refresh"
@@ -109,22 +110,19 @@ def _create_token(data: dict, expires_delta: timedelta, typ: str) -> str:
 # Refresh-token denylist (logout / rotation revocation)
 # ---------------------------------------------------------------------------
 
-_revoked_lock = threading.Lock()
-_revoked_jtis: dict[str, float] = {}  # jti -> epoch exp
+async def revoke_jti(db: AsyncSession, jti: str, exp: float) -> bool:
+    """Atomically claim a refresh token; only the first consumer wins.
 
-
-def revoke_jti(jti: str, exp: float) -> None:
-    """Add a token id to the denylist until its natural expiry."""
-    with _revoked_lock:
-        _revoked_jtis[jti] = exp
-        # prune anything already past its expiry
-        now = datetime.now(timezone.utc).timestamp()
-        for k in [k for k, v in _revoked_jtis.items() if v < now]:
-            _revoked_jtis.pop(k, None)
-
-
-def is_jti_revoked(jti: str) -> bool:
-    return jti in _revoked_jtis
+    A unique primary key arbitrates across processes. The caller commits before
+    issuing new cookies. Only token IDs and expiry are persisted, never JWTs.
+    """
+    try:
+        async with db.begin_nested():
+            db.add(RefreshRevocation(jti=jti, expires_at=exp))
+            await db.flush()
+    except IntegrityError:
+        return False
+    return True
 
 
 def decode_access_token(token: str) -> dict:
@@ -132,7 +130,7 @@ def decode_access_token(token: str) -> dict:
 
     Raises ``HTTPException(401)`` if the token is invalid or expired.
     """
-    return _decode(token, expected_typ=None)
+    return _decode(token, expected_typ="access")
 
 
 def _decode(token: str, expected_typ: Optional[str]) -> dict:
@@ -154,11 +152,6 @@ def _decode(token: str, expected_typ: Optional[str]) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
-    if payload.get("jti") and is_jti_revoked(payload["jti"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
-        )
     return payload
 
 
@@ -175,8 +168,8 @@ async def get_current_user(
     """FastAPI dependency: resolve the current user.
 
     Token source order: ``Authorization: Bearer`` header (legacy compat),
-    then the ``ep_access`` httpOnly cookie. Cookie tokens must be
-    ``typ=access`` strictly; header tokens may omit ``typ`` (legacy).
+    then the ``ep_access`` httpOnly cookie. Refresh tokens are rejected;
+    legacy tokens may omit ``typ`` during the compatibility window.
 
     Raises 401 when no valid token. Use ``get_optional_user`` for endpoints
     that work both authenticated and anonymously.
@@ -210,10 +203,8 @@ async def _resolve_user(
 ) -> Optional[User]:
     """Shared logic for resolving a user from header or cookie token."""
     token = header_token
-    from_cookie = False
     if not token and request is not None:
         token = request.cookies.get(ACCESS_COOKIE)
-        from_cookie = True
     if not token:
         if required:
             raise HTTPException(
@@ -223,7 +214,7 @@ async def _resolve_user(
             )
         return None
 
-    payload = _decode(token, expected_typ="access" if from_cookie else None)
+    payload = _decode(token, expected_typ="access")
     user_id = payload.get("sub")
     if not user_id:
         if required:

@@ -117,6 +117,7 @@ services:
       retries: 3
 
   frontend:
+    image: ${ECONPAPER_FRONTEND_IMAGE:-econpaper-frontend:local}
     build: ./frontend
     depends_on:
       backend:

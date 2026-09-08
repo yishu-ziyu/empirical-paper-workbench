@@ -40,3 +40,13 @@ PILOT_ENV_FILE=/private/pilot.env deploy/private-pilot/ops.sh stop
 兼容边界：新增 `refresh_revocations` 表保存 refresh 单次消费；部署前旧进程内存撤销无法迁移。首次干净试用无旧账号迁移；已有部署升级需轮换 JWT 密钥或等待旧 refresh 自然过期，不能承诺旧撤销记录恢复。退出后已复制的短期 access 仍到期前有效，此处未引入 access 黑名单。
 
 验证工具：本机 Docker Compose 5.0.2 接受 `ports: !reset []`，pilot overlay 移除 backend/frontend 发布端口，只发布 TLS gateway。MinIO 固定镜像不含 tar；备份维护容器复用应用镜像、无网络，仅临时访问独立对象卷。
+
+## 本轮实证与未完成项
+
+- Docker 29.2.0 / Compose 5.0.2；`git archive` 导出源树后构建，未包含开发环境。构建首次因缺 gcc、第二次因 Debian HTTP 502 失败，分别修复为独立编译阶段及 HTTPS，原失败保留。
+- 容器无网络执行公开 Card 依赖烟测成功：3,010 行、34 数据列，固定 checksum。其 OLS 显式 HC1 SE 与历史设计材料不同；这是直接 StatsPAI 封装烟测，不是历史工作台结果复刻，不能归因平台浮点。当前应用 run 数字另存 API 证据。
+- 初始 `.env.docker` 的生成/评审配置各一次 401；项目原生 SSOT 的两 role 各一次 200，各 173 tokens。未输出凭据，未回退 mock；费用金额未知。详见 `provider-first-attempt.json` 与 `provider-project-ssot.json`。
+- 正常真实 PostgreSQL 注册暴露 naive/aware datetime 错配；保留 schema、明确 naive UTC 默认后验证。前端 IPv6 localhost 健康探针和重建后代理旧地址问题均保留首证据，分别修为真实 IPv4 探针和联合重建代理。
+- 浏览器先复现 Cookie 路径问题的授权尚未恢复，所以 `/auth` → `/api/auth` 修复未实施。正常续期、完整浏览器旅程、真人理解与远端发布未完成。API 请求与容器检查不能替代。
+
+相关去敏工件位于 `docs/acceptance/assets/private-pilot/`；当前契约保持 open。请阅读每份工件的失败/未运行状态，不以运行镜像或健康状态视为试用验收通过。

@@ -16,7 +16,7 @@ compose() { docker compose --env-file "$PILOT_ENV_FILE" -p "${PILOT_PROJECT:-eco
 case "${1:-}" in
   check) compose config --quiet ;;
   build) test -z "$(git status --porcelain)" || { echo 'Build requires a clean checkout' >&2; exit 2; }; compose build ;;
-  up) compose up -d --wait --wait-timeout 180 ;;
+  up) compose up -d --wait --wait-timeout 180 --force-recreate backend runner frontend gateway ;;
   stop) compose stop ;;
   rebuild) compose up -d --wait --wait-timeout 180 --force-recreate --no-build backend runner frontend gateway ;;
   check-data) compose exec -T backend python scripts/check_card_package.py ;;
@@ -30,7 +30,7 @@ case "${1:-}" in
     compose exec -T postgres pg_dump -U econpaper -d econpaper -Fc > "$PILOT_BACKUP_DIR/database.dump"
     compose run --rm --no-deps -T --entrypoint sh backend -c 'tar -C /data -cf - uploads runs sessions' > "$PILOT_BACKUP_DIR/files.tar"
     compose run --rm --no-deps -T archive -C /objects -cf - . > "$PILOT_BACKUP_DIR/objects.tar"
-    git rev-parse HEAD > "$PILOT_BACKUP_DIR/source-sha.txt"
+    git rev-parse HEAD > "$PILOT_BACKUP_DIR/checkout-source-sha.txt"
     compose images --format json > "$PILOT_BACKUP_DIR/images.json"
     echo 'Backup written; services remain stopped. Resume with ops.sh up.'
     ;;

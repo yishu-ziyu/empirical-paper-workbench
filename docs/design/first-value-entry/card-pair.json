@@ -1,0 +1,148 @@
+{
+  "source_archive": "/tmp/econpaper-r3/journey-log-final.json",
+  "archive_sha256": "f9126e6ab33e175383211520ecda5ec60cc602138013e47e6c5d18e68aaae10c",
+  "json_pointer": "/calls/10/response",
+  "session_id": "5b4c3539-abf6-423e-9186-8fc950bc2983",
+  "provenance": {
+    "source": "statspai:papers/data_card1995.csv",
+    "citation": "Card, D. (1995). Using Geographic Variation in College Proximity to Estimate the Return to Schooling.",
+    "checksum": "eda514228a77327ab9aa20df72b89256cdec579482fa9dbbe4e3d757748c9bf2",
+    "redistribution": "runtime load from StatsPAI dependency, no second public copy",
+    "extract_kind": "wooldridge_card_34"
+  },
+  "runs": [
+    {
+      "id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58:ols_region_dummies",
+      "spec_id": "ols_region_dummies",
+      "spec_version": 1,
+      "label": "OLS · 1966 region dummies",
+      "choices": [
+        {
+          "dimension": "estimator",
+          "value": "ols"
+        },
+        {
+          "dimension": "identification",
+          "value": "none"
+        },
+        {
+          "dimension": "experience",
+          "value": "quadratic"
+        },
+        {
+          "dimension": "demographics",
+          "value": "black"
+        },
+        {
+          "dimension": "region",
+          "value": "reg66"
+        }
+      ],
+      "estimator": "statspai.feols",
+      "method": "ols",
+      "formula": "lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+      "covariance": "HC1",
+      "analysis_dataset": {
+        "name": "5b4c3539-abf6-423e-9186-8fc950bc2983.csv",
+        "hash": "f1833bfc3ad60bac52577b6e0cdba08c40567e9515d303045be152ebc6d40d27",
+        "role": "raw",
+        "rows": null,
+        "columns": []
+      },
+      "producer_run_id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58",
+      "coef": 0.07469325559311334,
+      "se": 0.0034983456584787432,
+      "p": 0.0,
+      "n": 3010,
+      "diagnostics": null,
+      "status": "ok",
+      "provenance": {
+        "produced_by": "estimate",
+        "producer_run_id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58",
+        "formula": "lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668"
+      },
+      "created_at": "2026-09-07T16:16:38+00:00",
+      "relation": "exploratory"
+    },
+    {
+      "id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58:iv_region_dummies",
+      "spec_id": "iv_region_dummies",
+      "spec_version": 1,
+      "label": "IV · nearc4 with 1966 region dummies",
+      "choices": [
+        {
+          "dimension": "estimator",
+          "value": "iv"
+        },
+        {
+          "dimension": "identification",
+          "value": "nearc4"
+        },
+        {
+          "dimension": "experience",
+          "value": "quadratic"
+        },
+        {
+          "dimension": "demographics",
+          "value": "black"
+        },
+        {
+          "dimension": "region",
+          "value": "reg66"
+        }
+      ],
+      "estimator": "statspai.ivreg",
+      "method": "iv",
+      "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+      "covariance": "nonrobust",
+      "analysis_dataset": {
+        "name": "5b4c3539-abf6-423e-9186-8fc950bc2983.csv",
+        "hash": "f1833bfc3ad60bac52577b6e0cdba08c40567e9515d303045be152ebc6d40d27",
+        "role": "raw",
+        "rows": null,
+        "columns": []
+      },
+      "producer_run_id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58",
+      "coef": 0.13150383625543327,
+      "se": 0.05496367260228859,
+      "p": 0.016792621884035075,
+      "n": 3010,
+      "diagnostics": {
+        "test": "effective_f_test",
+        "F_eff": 14.138670079757798,
+        "first_stage_F": 13.255785330576094,
+        "strength": "Moderate (10 ≤ F_eff < 23.1) — t-test may over-reject",
+        "covariance": "HC1",
+        "controls": [
+          "exper",
+          "expersq",
+          "black",
+          "smsa",
+          "south",
+          "smsa66",
+          "reg661",
+          "reg662",
+          "reg663",
+          "reg664",
+          "reg665",
+          "reg666",
+          "reg667",
+          "reg668"
+        ]
+      },
+      "status": "ok",
+      "provenance": {
+        "produced_by": "estimate",
+        "producer_run_id": "3d4c6546-cadb-4b3a-a7b6-0bb101492f58",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668"
+      },
+      "created_at": "2026-09-07T16:16:38+00:00",
+      "relation": "exploratory"
+    }
+  ],
+  "reproduction_status": "复现待核 / Reproduction pending verification",
+  "chapter_generation": {
+    "source": "mock",
+    "degraded": true
+  }
+}

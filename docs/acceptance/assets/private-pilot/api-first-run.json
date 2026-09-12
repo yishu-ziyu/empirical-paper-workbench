@@ -1,0 +1,63 @@
+{
+  "scope": "API only; browser NOT RUN; real LLM NOT configured",
+  "url": "https://localhost:18443",
+  "started_at_utc": "2026-09-08T05:09:07Z",
+  "checks": [
+    {
+      "check": "gateway denial /",
+      "method": "GET",
+      "path": "/",
+      "http_status": 401,
+      "elapsed_seconds": 0.028,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/auth/me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/sessions",
+      "method": "GET",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.02,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous session creation denied",
+      "method": "POST",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "a register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "http_status": 500,
+      "elapsed_seconds": 0.29,
+      "response_bytes": 141,
+      "expectation": "HTTP 201",
+      "outcome": "fail"
+    }
+  ],
+  "limitations": [
+    "Cookie policy is Python CookieJar, not browser evidence.",
+    "No access-expiry renewal success or real chapter generation claimed."
+  ],
+  "stopped": "Registration failed; no login retries."
+}

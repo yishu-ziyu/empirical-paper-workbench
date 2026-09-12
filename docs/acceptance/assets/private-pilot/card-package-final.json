@@ -1,0 +1,25 @@
+{
+  "card_sha256": "eda514228a77327ab9aa20df72b89256cdec579482fa9dbbe4e3d757748c9bf2",
+  "rows": 3010,
+  "data_columns": 34,
+  "statspai_version": "1.22.0",
+  "statspai_revision": "a98b6743cc797ddd9cc33de1772c3ea3e3f0c394",
+  "estimates": [
+    {
+      "spec_id": "ols_region_dummies",
+      "formula": "lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+      "coef": 0.07469325559311328,
+      "se": 0.003646247706203475,
+      "n": 3010,
+      "status": "ok"
+    },
+    {
+      "spec_id": "iv_region_dummies",
+      "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+      "coef": 0.13150383624724782,
+      "se": 0.05496367260152569,
+      "n": 3010,
+      "status": "ok"
+    }
+  ]
+}

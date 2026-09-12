@@ -1,0 +1,20 @@
+{
+  "scope": "API-only; browser persistence NOT RUN",
+  "runtime_source_sha": "5d6fd9889edaf006c09eda16b1983fb29ddcf4bb",
+  "backup_previous_runtime_source_sha": "8a994f7d101064d25f7482c38c64f2f59eb5573b",
+  "isolated_restore_project": "econpaper-private-pilot-restore-01",
+  "normal_login_after_rebuild_and_restore": true,
+  "exact_session_and_research_equal": true,
+  "snapshot_sha256": "ef7c744226f8d50c0d19411f6d38bba14a02d040b0b21fbd87e1e2118dfde571",
+  "object_count": 2,
+  "all_object_bytes_equal": true,
+  "object_manifest_sha256": "9e71ac86e91e3427d694bcd827679f93a23182f38e2834b02b94a52b2f4a5c21",
+  "persisted_results_state": "original real-generation / degraded review remains unchanged; no approval bypass",
+  "csv_and_code_file_count": 16,
+  "all_csv_and_code_bytes_equal": true,
+  "card_raw_hash_matches_original_evidence": true,
+  "artifact_manifest_sha256": "5612d4c28eda8ae8895dd9c9acbc1eaaaf8bdc527b9a9e8b9d60487c131dbc7a",
+  "restored_tex_export_opened": true,
+  "restored_tex_equals_original_bytes": true,
+  "tex_sha256": "3ba31629768e3c5b0055a74ab30b927f5fde4f4e5b025cb497ee8f5e410ef4f5"
+}

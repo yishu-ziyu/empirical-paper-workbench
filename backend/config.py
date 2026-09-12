@@ -166,45 +166,40 @@ def _is_insecure_jwt(secret: str) -> bool:
 
 
 def _validate_llm_providers() -> None:
-    """P1-8 fail-closed：生产拒绝 mock 生成/评审，拒绝"无 key 必落 mock"的部署。
+    """Validate the configuration the router will actually use, without calling it.
 
-    agent/llm/router.py 的兜底链最后一级是 mock；健康检查看不出它，
-    服务绿灯但论文是占位内容。这里在启动期把这类部署直接判死。
+    This is a startup configuration check, not proof of provider reachability.
+    Runtime generation/review failures retain the existing router policy.
     """
-    if os.getenv("ECONPAPER_LLM", "").strip().lower() == "mock":
-        print(
-            "FATAL: ECONPAPER_LLM=mock is not allowed when DEBUG=false. "
-            "Configure a real provider instead.",
-            file=sys.stderr,
-        )
+    from agent.llm.router import LLMConfig
+
+    def reject(prefix: str, reason: str) -> None:
+        # Never interpolate configuration values: keys/URLs may contain secrets.
+        print(f"FATAL: {prefix} LLM configuration: {reason}", file=sys.stderr)
         sys.exit(1)
 
+    if os.getenv("ECONPAPER_LLM", "").strip().lower() == "mock":
+        reject("GENERATE/REVIEW", "mock is not allowed when DEBUG=false.")
+
     for prefix in ("GENERATE", "REVIEW"):
-        provider = (os.getenv(f"{prefix}_LLM_PROVIDER") or "").strip().lower()
-        if provider == "mock":
-            print(
-                f"FATAL: {prefix}_LLM_PROVIDER=mock is not allowed when DEBUG=false. "
-                "Set it to a real provider (e.g. minimax / openai).",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        has_key = any(
+        config = LLMConfig.from_env(prefix)
+        if config.provider not in {"minimax", "openai"}:
+            reject(prefix, "select a supported real provider (minimax or openai).")
+        if not config.api_key or not config.api_key.strip():
+            reject(prefix, "the selected provider has no API key.")
+        if not config.model or config.model.strip() in {"", "default"}:
+            reject(prefix, "the selected provider has no model.")
+        if config.provider == "minimax" and not any(
             (os.getenv(name) or "").strip()
-            for name in (
-                f"{prefix}_LLM_API_KEY",
-                "MINIMAX_API_KEY",
-                "MINIMAX_TOKEN_PLAN_KEY",
-                "OPENAI_API_KEY",
-            )
-        )
-        if not has_key:
-            print(
-                f"FATAL: no API key for the {prefix} LLM. Set {prefix}_LLM_API_KEY, "
-                "MINIMAX_API_KEY, or OPENAI_API_KEY. Without a key the router "
-                "silently falls back to mock generation/review.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+            for name in (f"{prefix}_LLM_API_KEY", "MINIMAX_API_KEY", "MINIMAX_TOKEN_PLAN_KEY")
+        ):
+            reject(prefix, "MiniMax requires its own key or an explicit role API key.")
+        if config.provider == "openai" and (
+            not (os.getenv(f"{prefix}_LLM_MODEL") or "").strip()
+            or os.getenv(f"{prefix}_LLM_MODEL", "").strip() == "default"
+        ):
+            # The router's model fallback is MiniMax-specific, even for openai.
+            reject(prefix, "set an explicit role model for the OpenAI-compatible provider.")
 
 
 def validate_runtime_secrets() -> None:

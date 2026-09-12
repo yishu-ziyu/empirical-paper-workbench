@@ -1,0 +1,223 @@
+{
+  "source": "api-valid-uuid-run.json",
+  "source_sha256": "d98e0acfed4764fe17d3bd728c1d980f2f21544912e03c55e7ad3d6c35dddd4a",
+  "checks": [
+    {
+      "check": "gateway denial /",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/auth/me",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/sessions",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway application readiness anonymous me",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous session creation denied",
+      "outcome": "pass"
+    },
+    {
+      "check": "a register",
+      "outcome": "pass"
+    },
+    {
+      "check": "a login",
+      "outcome": "pass"
+    },
+    {
+      "check": "a authenticated me",
+      "outcome": "pass"
+    },
+    {
+      "check": "b register",
+      "outcome": "pass"
+    },
+    {
+      "check": "b login",
+      "outcome": "pass"
+    },
+    {
+      "check": "b authenticated me",
+      "outcome": "pass"
+    },
+    {
+      "check": "first refresh through actual proxy",
+      "outcome": "known_reproduced_failure"
+    },
+    {
+      "check": "Card admission",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card bootstrap SSE",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card bootstrap SSE after stream check identity",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card bootstrap SSE terminal read",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card prior expectation",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card freeze",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification execution admission",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification SSE",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification SSE after stream check identity",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification SSE terminal read",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card research result",
+      "outcome": "pass"
+    },
+    {
+      "check": "before isolation a check identity",
+      "outcome": "pass"
+    },
+    {
+      "check": "before isolation b check identity",
+      "outcome": "pass"
+    },
+    {
+      "check": "upload greater than 1 MiB",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden mutation",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden delete",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous upload capability isolation",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden mutation",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden delete",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account upload capability isolation",
+      "outcome": "pass"
+    },
+    {
+      "check": "owner session after forbidden deletes",
+      "outcome": "pass",
+      "expectation": "HTTP 200; owner still reads same resource after rejected cross-account delete",
+      "observed_http": 200,
+      "correction": "Collector matched word forbidden inside owner-read label and assigned nonowner rejection expectation. Endpoint correctly returned 200. No business rerun."
+    },
+    {
+      "check": "owner upload resolution",
+      "outcome": "pass"
+    },
+    {
+      "check": "owner current run",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous upload denied",
+      "outcome": "pass"
+    },
+    {
+      "check": "upload over product and gateway limits",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway rejects over-limit Content-Length before body",
+      "outcome": "pass"
+    },
+    {
+      "check": "before logout check identity",
+      "outcome": "pass"
+    },
+    {
+      "check": "logout",
+      "outcome": "pass"
+    },
+    {
+      "check": "after logout protected me",
+      "outcome": "pass"
+    }
+  ],
+  "counts": {
+    "pass": 50,
+    "fail": 0,
+    "known_reproduced_failure": 1
+  },
+  "card_evaluation": {
+    "expectation": "At least two completed specification runs with actual coefficient, SE and n",
+    "outcome": "pass"
+  },
+  "overall": "INCOMPLETE: normal renewal failed; browser acceptance not run; this script did not generate Results"
+}

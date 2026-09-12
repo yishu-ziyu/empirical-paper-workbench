@@ -1,0 +1,34 @@
+{
+  "scope": "consistent stopped-writer backup; restore validation pending",
+  "writers_stopped": [
+    "gateway",
+    "frontend",
+    "runner",
+    "backend",
+    "minio"
+  ],
+  "database_tool": "pg_dump -Fc",
+  "files": {
+    "objects.tar": {
+      "bytes": 1607680,
+      "sha256": "b72358a872febc03ad86b6501d1a6ffd6ad7e520d93a1c9c91f8aba85b0937f6"
+    },
+    "database.dump": {
+      "bytes": 39441,
+      "sha256": "0f0b3ec250c9274ddd97f91bc26c696c5bf70cf6289ba34ba8fd7863880739cd"
+    },
+    "checkout-source-sha.txt": {
+      "bytes": 41,
+      "sha256": "ee23dbb9fa9ac2dc1cbeb1bdb2284f6a35f79d0a8b0d90aa16dd011a6c666b7e"
+    },
+    "images.json": {
+      "bytes": 2304,
+      "sha256": "47c2f22f0a04b9e2188a7d8ff2e6380e885a5b1c1a8584408db4eaf339e59083"
+    },
+    "files.tar": {
+      "bytes": 6696960,
+      "sha256": "3936fbed66ba68686f2340bcfd7df8bf3168857d491f68d9a5c69c8d2e01d08c"
+    }
+  },
+  "note": "Backup contents remain private outside Git; no online database tar used."
+}

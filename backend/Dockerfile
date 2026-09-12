@@ -13,12 +13,27 @@ WORKDIR /app
 # ------------------------------------------------------------------
 # 先装依赖层（利用 Docker layer caching）
 # ------------------------------------------------------------------
+# ARM64 multimark (via pyfixest/maketables) builds a C extension.
+# Keep the compiler and headers in an unshipped build stage.
+FROM base AS dependencies
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN sed -i "s|http://deb.debian.org|https://deb.debian.org|g" /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+FROM base AS runtime
+COPY --from=dependencies /install /usr/local
+COPY backend/requirements.txt /app/requirements.txt
 
 # ------------------------------------------------------------------
 # 复制源码
 # ------------------------------------------------------------------
+# Fetch the public pinned extract once at build time; runtime is offline.
+COPY deploy/dependencies-card.json /app/deploy/dependencies-card.json
+COPY scripts/check_card_package.py /app/scripts/check_card_package.py
+ENV ECONPAPER_CARD_CSV=/opt/econpaper/card/data_card1995.csv
+RUN python /app/scripts/check_card_package.py --fetch --data-only
 COPY backend/ ./backend/
 COPY agent/    ./agent/
 
@@ -26,7 +41,7 @@ COPY agent/    ./agent/
 # - /app          使 `import agent`（/app/agent 包）/ `import backend`（命名空间包）唯一解析
 # - /app/backend  使 backend 各模块底部 `from config import settings` 唯一命中 /app/backend/config.py
 # 均无需进程级 sys.path 拼接，依赖 import 路径而非顺序。
-ENV PYTHONPATH="/app:/app/backend:${PYTHONPATH}"
+ENV PYTHONPATH="/app:/app/backend"
 
 # ------------------------------------------------------------------
 # 运行时

@@ -355,6 +355,7 @@ async def create_session(
 
     If the user is authenticated, the session is owned by that user.
     """
+    require_auth_unless_debug(current_user)
     user_id = current_user.id if current_user else None
     session_id = await run_in_threadpool(facade.create_session, user_id=user_id)
     return CreateSessionResponse(session_id=session_id)

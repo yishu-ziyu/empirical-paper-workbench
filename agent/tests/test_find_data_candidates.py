@@ -5,8 +5,14 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from agent.find_data import is_real_candidate, search_dataverse, suggest_data_candidates
+from agent.find_data import (
+    is_real_candidate,
+    search_dataverse,
+    suggest_data_candidates,
+    suggest_find_data,
+)
 from agent.find_data import candidates as fd
+from agent.find_data.honesty import TEACHING_SHELF_LABEL
 
 
 def _confirmed(**overrides) -> dict:
@@ -49,13 +55,6 @@ def _confirmed(**overrides) -> dict:
     return design
 
 
-def _write_found_scale_csv(path: Path, header: str = "employment,treated,period") -> None:
-    lines = [header]
-    for i in range(200):
-        lines.append(f"{i % 17},1,{i % 2}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
 def _silent_dataverse(_query: str) -> list:
     return []
 
@@ -76,6 +75,11 @@ def _assert_real(items: list) -> None:
     assert items, "expected ≥1 real candidate"
     for item in items:
         assert is_real_candidate(item), item
+        assert item["source_kind"] in {
+            "discovered",
+            "external_link",
+            "fetched",
+        }
         assert item["url_or_fixture"].strip()
         assert item["url_or_fixture"] not in {
             "ck1994",
@@ -111,25 +115,6 @@ def test_unconfirmed_design_returns_no_candidates(tmp_path: Path):
         assert items == [], design
 
 
-def test_captain_local_real_is_first_class_acquire_not_found(tmp_path: Path):
-    items = suggest_data_candidates(
-        _confirmed(),
-        dataverse_search=_silent_dataverse,
-        catalog_dir=tmp_path,
-    )
-    _assert_real(items)
-    assert items[0]["source_id"] == "captain-local-real"
-    local = items[0]
-    assert local["acquire"] is True
-    assert local["found"] is False
-    assert local["teaching_fixture"] is False
-    assert local["url_or_fixture"] == "/upload"
-    assert local["license"] == "user-owned"
-    assert "Desktop/经济学论文" in local["design_fit"]["notes"]
-    assert "source=captain-local-real" in local["design_fit"]["notes"]
-    assert "teaching toys" in local["design_fit"]["notes"]
-
-
 def test_minwage_without_fixture_still_has_card_zip_and_dataverse(tmp_path: Path):
     items = suggest_data_candidates(
         _confirmed(),
@@ -146,7 +131,7 @@ def test_minwage_without_fixture_still_has_card_zip_and_dataverse(tmp_path: Path
     assert card["license"] == "author-posted"
 
 
-def test_minwage_tiny_fixture_is_not_found(tmp_path: Path):
+def test_minwage_fixture_may_appear_but_is_not_the_only_candidate(tmp_path: Path):
     (tmp_path / "ck1994_long.csv").write_text("employment,treated,period\n1,1,0\n")
     (tmp_path / "catalog.json").write_text(
         json.dumps(
@@ -162,50 +147,33 @@ def test_minwage_tiny_fixture_is_not_found(tmp_path: Path):
         ),
         encoding="utf-8",
     )
-    items = suggest_data_candidates(
+    payload = suggest_find_data(
         _confirmed(),
         dataverse_search=_hit_dataverse,
         catalog_dir=tmp_path,
     )
+    items = payload["candidates"]
     _assert_real(items)
     ids = [c["source_id"] for c in items]
     assert "classic-5:ck1994_long" not in ids
-    assert "card-zip:njmin" in ids
-
-
-def test_minwage_fixture_may_appear_but_is_not_the_only_candidate(tmp_path: Path):
-    _write_found_scale_csv(tmp_path / "ck1994_long.csv")
-    (tmp_path / "catalog.json").write_text(
-        json.dumps(
-            {
-                "catalog_id": "classic-5",
-                "entries": [
-                    {
-                        "id": "ck1994_long",
-                        "title": "Card and Krueger minimum wage",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    items = suggest_data_candidates(
-        _confirmed(),
-        dataverse_search=_hit_dataverse,
-        catalog_dir=tmp_path,
-    )
-    _assert_real(items)
-    ids = [c["source_id"] for c in items]
-    assert "classic-5:ck1994_long" in ids
+    assert all(c["source_kind"] != "teaching_fixture" for c in items)
     assert "card-zip:njmin" in ids
     assert "dataverse:doi:10.7910/DVN/TEST01" in ids
-    fixture = next(c for c in items if c["source_id"] == "classic-5:ck1994_long")
+    assert next(c for c in items if c["source_id"] == "card-zip:njmin")["source_kind"] == "external_link"
+    assert next(
+        c for c in items if c["source_id"] == "dataverse:doi:10.7910/DVN/TEST01"
+    )["source_kind"] == "discovered"
+    shelf = payload["teaching_shelf"]
+    assert shelf is not None
+    assert shelf["label"] == TEACHING_SHELF_LABEL
+    fixture = next(c for c in shelf["candidates"] if c["source_id"] == "classic-5:ck1994_long")
+    assert fixture["source_kind"] == "teaching_fixture"
     assert fixture["url_or_fixture"].endswith("ck1994_long.csv")
     assert fixture["license"] == "public-reproduction"
-    assert fixture["found"] is True
-    assert fixture["n_rows"] >= 200
     assert "employment" in fixture["suggested_cols"]
-    assert "candidate only" in fixture["design_fit"]["notes"]
+    assert "找到了" not in fixture["design_fit"]["notes"]
+    assert "discovered" not in fixture["design_fit"]["notes"].lower()
+    assert "teaching-known" in fixture["honesty_label"]
 
 
 def test_catalog_id_without_file_is_not_a_candidate(tmp_path: Path):
@@ -252,25 +220,19 @@ def test_growth_route_lists_wdi_and_optional_barro(tmp_path: Path):
     assert any(sid.startswith("dataverse:") for sid in ids)
     assert "classic-5:barro1991_growth" not in ids
 
-    (tmp_path / "barro1991_growth.csv").write_text("growth,enrollment\n0.01,0.1\n")
-    with_barro = suggest_data_candidates(
+    (tmp_path / "barro1991_growth.csv").write_text("growth,enrollment\n")
+    with_barro = suggest_find_data(
         design,
         dataverse_search=_hit_dataverse,
         catalog_dir=tmp_path,
     )
-    barro_ids = [c["source_id"] for c in with_barro]
+    barro_ids = [c["source_id"] for c in with_barro["candidates"]]
     assert "classic-5:barro1991_growth" not in barro_ids
     assert "wdi:NY.GDP.PCAP.KD.ZG" in barro_ids
-
-    _write_found_scale_csv(tmp_path / "barro1991_growth.csv", "growth,enrollment")
-    found_barro = suggest_data_candidates(
-        design,
-        dataverse_search=_hit_dataverse,
-        catalog_dir=tmp_path,
-    )
-    found_ids = [c["source_id"] for c in found_barro]
-    assert "classic-5:barro1991_growth" in found_ids
-    assert "wdi:NY.GDP.PCAP.KD.ZG" in found_ids
+    assert any(sid.startswith("dataverse:") for sid in barro_ids)
+    shelf_ids = [c["source_id"] for c in with_barro["teaching_shelf"]["candidates"]]
+    assert "classic-5:barro1991_growth" in shelf_ids
+    assert with_barro["teaching_shelf"]["candidates"][0]["source_kind"] == "teaching_fixture"
 
 
 def test_educ_wage_route_lists_ipums(tmp_path: Path):
@@ -284,12 +246,13 @@ def test_educ_wage_route_lists_ipums(tmp_path: Path):
         interactions=[],
         source={"title": "教育对工资的影响", "question": ""},
     )
-    (tmp_path / "wage1.csv").write_text("wage,educ\n1,12\n")
-    items = suggest_data_candidates(
+    (tmp_path / "wage1.csv").write_text("wage,educ\n")
+    payload = suggest_find_data(
         design,
         dataverse_search=_silent_dataverse,
         catalog_dir=tmp_path,
     )
+    items = payload["candidates"]
     _assert_real(items)
     ids = [c["source_id"] for c in items]
     assert "ipums:cps" in ids
@@ -297,6 +260,9 @@ def test_educ_wage_route_lists_ipums(tmp_path: Path):
     assert any(sid.startswith("dataverse:") for sid in ids)
     ipums = next(c for c in items if c["source_id"] == "ipums:cps")
     assert ipums["license"] == "registration-required"
+    assert ipums["source_kind"] == "external_link"
+    shelf_ids = [c["source_id"] for c in payload["teaching_shelf"]["candidates"]]
+    assert "wage1" in shelf_ids
 
 
 def test_macro_route_lists_fred(tmp_path: Path):
@@ -366,6 +332,7 @@ def test_is_real_candidate_rejects_id_only():
     assert not is_real_candidate(
         {
             "source_id": "classic-5:ck1994_long",
+            "source_kind": "teaching_fixture",
             "title": "Card and Krueger minimum wage",
             "url_or_fixture": "",
             "license": "public-reproduction",
@@ -376,9 +343,20 @@ def test_is_real_candidate_rejects_id_only():
     assert not is_real_candidate(
         {
             "source_id": "ck1994_long",
+            "source_kind": "discovered",
             "title": "Card and Krueger minimum wage",
             "url_or_fixture": "ck1994_long",
             "license": "public-reproduction",
+            "suggested_cols": [],
+            "design_fit": {"method": "did"},
+        }
+    )
+    assert not is_real_candidate(
+        {
+            "source_id": "dataverse:doi:10.7910/DVN/TEST01",
+            "title": "Replication",
+            "url_or_fixture": "https://doi.org/10.7910/DVN/TEST01",
+            "license": "CC0",
             "suggested_cols": [],
             "design_fit": {"method": "did"},
         }

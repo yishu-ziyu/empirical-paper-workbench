@@ -2,8 +2,10 @@
 
 Reads only a confirmed ``session.design``. Emits ``session.find_data`` with
 a where/how plan and ``route_family``. Does not attach data, does not set
-``dataAttached`` / ``allow_did``, and does not treat fixtures as an answer
-key. Candidates are left empty for FD-BE-candidates.
+``dataAttached`` / ``allow_did``, and does not treat fixtures as found data.
+Honesty recut: real fetch / external venues first; teaching extracts only
+as an optional labeled shelf. Candidates stay empty unless a prior suggest
+already labeled them.
 """
 
 from __future__ import annotations
@@ -13,23 +15,25 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agent.data_honesty import CAPTAIN_LOCAL_REAL
+from agent.find_data.honesty import project_honest_find_data
 
 ROUTE_FAMILIES = ("educ_wage", "minwage", "growth", "macro", "else")
 
-# Venues the user is sent to first (contract §2.2 / §4).
+# Real-fetch / external venues first (DECIDE-10). Teaching extracts are not
+# the primary venue and are not find success.
 PRIMARY_VENUE = {
     "educ_wage": "IPUMS",
-    "minwage": "ck fixture + Card zip",
+    "minwage": "Card zip",
     "growth": "WDI",
     "macro": "FRED",
     "else": "Dataverse",
 }
 
 # Named landing paths. Dataverse is the always-on backup except when it is
-# already the primary venue.
+# already the primary venue. Fixture names stay off this list.
 _VENUES = {
     "educ_wage": ("IPUMS", "Dataverse"),
-    "minwage": ("ck fixture", "Card zip", "Dataverse"),
+    "minwage": ("Card zip", "Dataverse"),
     "growth": ("WDI", "Dataverse"),
     "macro": ("FRED", "Dataverse"),
     "else": ("Dataverse",),
@@ -215,25 +219,26 @@ def _how(family: str, facets: dict[str, Any]) -> str:
     treatment = facets["treatment"] or "confirmed treatment"
     method = facets["method"] or "confirmed method"
     terms = ", ".join(facets["query_terms"]) or f"{outcome} {treatment} {method}"
+    shelf = (
+        "Optional teaching-known extract may appear on the teaching shelf "
+        "— not a find result."
+    )
     if family == "educ_wage":
         body = (
             f"Open the IPUMS CPS/USA extract landing and request columns bound "
             f"to confirmed outcome '{outcome}' and treatment '{treatment}'. "
-            f"Do not treat wage1 or other teaching extracts as found data. "
-            f"Search Dataverse as backup using: {terms}."
+            f"Search Dataverse as backup using: {terms}. {shelf}"
         )
     elif family == "minwage":
         body = (
-            f"List the real-scale ck fixture as a candidate (never an answer "
-            f"key) when n≥200. Follow the Card zip at the author-published "
-            f"NJ–PA page. Search Dataverse for confirmed outcome '{outcome}' "
-            f"and treatment '{treatment}' (method {method})."
+            f"Follow the Card zip at the author-published NJ–PA page. "
+            f"Search Dataverse for confirmed outcome '{outcome}' and "
+            f"treatment '{treatment}' (method {method}). {shelf}"
         )
     elif family == "growth":
         body = (
             f"Use World Bank WDI for confirmed growth outcome '{outcome}'. "
-            f"Barro teaching extracts are not found data. Search Dataverse "
-            f"as backup using: {terms}."
+            f"Search Dataverse as backup using: {terms}. {shelf}"
         )
     elif family == "macro":
         body = (
@@ -253,7 +258,7 @@ def _where(family: str) -> str:
     if family == "educ_wage":
         return "IPUMS extract landing"
     if family == "minwage":
-        return "ck fixture + Card zip"
+        return "Card zip"
     if family == "growth":
         return "WDI"
     if family == "macro":
@@ -269,6 +274,7 @@ def _empty_find_data() -> dict[str, Any]:
         "primary_venue": None,
         "plan": None,
         "candidates": [],
+        "teaching_shelf": None,
     }
 
 
@@ -276,12 +282,13 @@ def build_find_data_plan(
     design: Any,
     *,
     now: str | None = None,
+    prior: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build ``session.find_data`` from a confirmed design.
 
     Raises ``DesignUnconfirmed`` when design is missing or still draft.
-    Candidates are an empty stub (FD-BE-candidates owns the real list).
-    This slice never prefills a fixture as the user's study.
+    Candidates stay empty unless *prior* already has honesty-labeled rows.
+    This slice never prefills a fixture as found data.
     """
     if not is_confirmed_design(design):
         raise DesignUnconfirmed("design_unconfirmed")
@@ -290,7 +297,7 @@ def build_find_data_plan(
     facets = search_facets(design)
     where = _where(family)
     how = _how(family, facets)
-    return {
+    record = {
         "status": "planned",
         "planned_at": now or _utc_now(),
         "route_family": family,
@@ -302,7 +309,13 @@ def build_find_data_plan(
             "search_facets": facets,
         },
         "candidates": [],
+        "teaching_shelf": None,
     }
+    if isinstance(prior, dict):
+        projected = project_honest_find_data(prior)
+        record["candidates"] = list(projected.get("candidates") or [])
+        record["teaching_shelf"] = projected.get("teaching_shelf")
+    return record
 
 
 def read_find_data(state: dict[str, Any] | None) -> dict[str, Any]:
@@ -313,7 +326,7 @@ def read_find_data(state: dict[str, Any] | None) -> dict[str, Any]:
     stored = state.get("find_data")
     if not isinstance(stored, dict) or stored.get("status") != "planned":
         return _empty_find_data()
-    return stored
+    return project_honest_find_data(stored)
 
 
 __all__ = [

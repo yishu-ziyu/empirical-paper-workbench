@@ -75,6 +75,7 @@ def test_unconfirmed_design_is_409(client):
     assert body["status"] == "missing"
     assert body["plan"] is None
     assert body["candidates"] == []
+    assert body.get("teaching_shelf") is None
 
 
 def test_confirmed_minwage_returns_where_how_plan_stub(client):
@@ -85,9 +86,10 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     data = resp.json()
     assert data["status"] == "planned"
     assert data["route_family"] == "minwage"
-    assert data["primary_venue"] == "ck fixture + Card zip"
-    assert "ck fixture" in data["plan"]["where"]
+    assert data["primary_venue"] == "Card zip"
+    assert "ck fixture" not in data["plan"]["where"]
     assert "Card zip" in data["plan"]["where"]
+    assert "teaching-known" in data["plan"]["how"]
     assert "Dataverse" in data["plan"]["how"]
     assert data["plan"]["venues"][0] == "captain-local-real"
     assert "captain-local-real" in data["plan"]["how"]
@@ -96,23 +98,7 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     assert data["plan"]["search_facets"]["treatment"] == "min_wage"
     assert data["plan"]["search_facets"]["method"] == "did"
     assert "treated:period" in data["plan"]["search_facets"]["interactions"]
-    ids = [item["source_id"] for item in data["candidates"]]
-    assert ids[0] == "captain-local-real"
-    local = next(item for item in data["candidates"] if item["source_id"] == "captain-local-real")
-    assert local["acquire"] is True
-    assert local["found"] is False
-    assert local["url_or_fixture"] == "/upload"
-    assert "card-zip:njmin" in ids
-    assert "classic-5:ck1994_long" in ids
-    assert all(
-        item.get("found") is not False
-        for item in data["candidates"]
-        if item["source_id"] != "captain-local-real"
-    )
-    assert all(not item.get("teaching_fixture") for item in data["candidates"])
-    ck = next(item for item in data["candidates"] if item["source_id"] == "classic-5:ck1994_long")
-    assert ck["n_rows"] >= 200
-    assert "wage1" not in ids
+    assert data["candidates"] == []
 
     state = facade.get_state(sid)
     assert state["find_data"]["status"] == "planned"
@@ -126,9 +112,7 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     stored = client.get(f"/sessions/{sid}/find-data")
     assert stored.status_code == 200
     assert stored.json()["route_family"] == "minwage"
-    stored_ids = [item["source_id"] for item in stored.json()["candidates"]]
-    assert "card-zip:njmin" in stored_ids
-    assert "classic-5:ck1994_long" in stored_ids
+    assert stored.json()["candidates"] == []
 
 
 def test_educ_wage_and_growth_routes(client):
@@ -154,6 +138,7 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.json()["route_family"] == "educ_wage"
     assert resp.json()["primary_venue"] == "IPUMS"
     assert "wage1" not in resp.json()["plan"]["where"]
+    assert "teaching-known" in resp.json()["plan"]["how"]
 
     facade.seed_state(
         sid,
@@ -176,6 +161,9 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.json()["route_family"] == "growth"
     assert resp.json()["primary_venue"] == "WDI"
     assert "barro" not in resp.json()["plan"]["where"]
+    assert "teaching-known" in resp.json()["plan"]["how"]
+    assert resp.json()["candidates"] == []
+    assert resp.json().get("teaching_shelf") is None
 
 
 def test_plan_does_not_clear_or_set_data_attached(client):
@@ -187,7 +175,7 @@ def test_plan_does_not_clear_or_set_data_attached(client):
         state = facade.get_state(sid)
         assert state["dataAttached"] is True
         assert state["find_data"]["status"] == "planned"
-        assert state["find_data"]["candidates"]
+        assert state["find_data"]["candidates"] == []
         assert "table1Confirmed" not in state
         assert "specConfirmed" not in state
     finally:
@@ -219,10 +207,6 @@ def test_plan_is_not_catalog_prefill(client):
     dumped = str(data)
     assert "ck1994" not in dumped
     assert "schooling-wages" not in dumped
-    ids = [item["source_id"] for item in data["candidates"]]
-    assert ids[0] == "captain-local-real"
-    assert "ipums:cps" in ids
-    assert "wage1" not in ids
-    assert any(sid.startswith("dataverse:") for sid in ids)
+    assert data["candidates"] == []
     state = facade.get_state(sid)
     assert state["design"]["catalog_entry_id"] is None

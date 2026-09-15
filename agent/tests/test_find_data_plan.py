@@ -63,10 +63,12 @@ def test_minwage_plan_names_where_and_how():
     assert record["route_family"] == "minwage"
     assert record["primary_venue"] == PRIMARY_VENUE["minwage"]
     plan = record["plan"]
-    assert "ck fixture" in plan["where"]
+    assert "ck fixture" not in plan["where"]
     assert "Card zip" in plan["where"]
-    assert "ck fixture" in plan["how"]
+    assert "ck fixture" not in plan["how"]
     assert "Card zip" in plan["how"]
+    assert "teaching-known" in plan["how"]
+    assert "teaching shelf" in plan["how"]
     assert "Dataverse" in plan["how"]
     assert plan["venues"][0] == "captain-local-real"
     assert "captain-local-real" in plan["how"]
@@ -102,7 +104,8 @@ def test_educ_wage_from_schooling_wages_slots():
     assert "IPUMS" in record["plan"]["where"]
     assert "wage1" not in record["plan"]["where"]
     assert "IPUMS" in record["plan"]["how"]
-    assert "teaching" in record["plan"]["how"]
+    assert "teaching-known" in record["plan"]["how"]
+    assert "teaching shelf" in record["plan"]["how"]
     assert record["plan"]["venues"][0] == "captain-local-real"
     assert record["candidates"] == []
 
@@ -125,6 +128,7 @@ def test_growth_from_barro_title():
     assert "WDI" in record["plan"]["where"]
     assert "barro" not in record["plan"]["where"]
     assert "WDI" in record["plan"]["how"]
+    assert "teaching-known" in record["plan"]["how"]
     assert record["candidates"] == []
 
 
@@ -164,7 +168,6 @@ def test_else_is_dataverse():
     assert record["primary_venue"] == "Dataverse"
     assert record["plan"]["where"] == "Dataverse"
     assert "Dataverse" in record["plan"]["how"]
-    assert record["plan"]["venues"][0] == "captain-local-real"
     assert "out_of_pocket" in record["plan"]["search_facets"]["query_terms"]
     assert "insurance_merge" in record["plan"]["search_facets"]["query_terms"]
 
@@ -206,6 +209,7 @@ def test_catalog_id_does_not_choose_the_route():
 def test_plan_stub_has_zero_candidates():
     record = build_find_data_plan(_confirmed())
     assert record["candidates"] == []
+    assert record["teaching_shelf"] is None
     assert record["status"] == "planned"
 
 
@@ -214,6 +218,7 @@ def test_read_find_data_empty_without_confirm_or_plan():
     assert empty["status"] == "missing"
     assert empty["plan"] is None
     assert empty["candidates"] == []
+    assert empty["teaching_shelf"] is None
 
     draft_state = {"design": _confirmed(status="draft", confirmed=False)}
     assert read_find_data(draft_state)["status"] == "missing"

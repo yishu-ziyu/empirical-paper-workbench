@@ -61,7 +61,7 @@ describe('readoutTable', () => {
 
   test('OLS method labels the engine OLS, not feols', () => {
     expect(displayEstimateEngineLabel('ols', 'statspai.feols')).toBe('OLS')
-    expect(displayEstimateEngineLabel('OLS', 'statsmodels.ols')).toBe('OLS')
+    expect(displayEstimateEngineLabel('OLS', 'statsmodels.ols')).toBe('statsmodels.ols')
     expect(displayEstimateEngineLabel('ols', 'estimate_agent')).toBe('estimate_agent')
     expect(displayEstimateEngineLabel('did', 'statspai.feols')).toBe('statspai.feols')
     expect(displayEstimateEngineLabel('iv', 'statspai.ivreg')).toBe('statspai.ivreg')

@@ -42,16 +42,14 @@ def norm_method(method: Any) -> str | None:
 def display_estimate_engine_label(method: Any, estimator: Any) -> str:
     """User-facing engine label. OLS lock: do not present pooled OLS as feols.
 
-    The stored ``estimator`` may still be the engine that ran (``statspai.feols``
-    without FE, or ``statsmodels.ols``). Display for ``method=ols`` is ``OLS``.
-    ``estimate_agent`` stays as itself so the agent path remains visible.
+    The stored ``estimator`` still records the engine that ran. Only the
+    ``statspai.feols`` (and other *feols*) string is rewritten to ``OLS``
+    when ``method`` is OLS. DiD/TWFE keeps ``statspai.feols``.
     """
     raw = "" if estimator is None else str(estimator).strip()
     if not raw:
         return ""
-    if raw == "estimate_agent":
-        return raw
-    if norm_method(method) == "ols":
+    if norm_method(method) == "ols" and "feols" in raw.lower():
         return "OLS"
     return raw
 

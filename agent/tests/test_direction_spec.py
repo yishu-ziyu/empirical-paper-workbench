@@ -248,7 +248,7 @@ def test_set_direction_guesses_exact_year_id_columns(tmp_path):
 def test_ols_engine_label_is_ols_not_feols():
     assert display_estimate_engine_label("ols", "statspai.feols") == "OLS"
     assert display_estimate_engine_label("OLS", "statspai.feols") == "OLS"
-    assert display_estimate_engine_label("ols", "statsmodels.ols") == "OLS"
+    assert display_estimate_engine_label("ols", "statsmodels.ols") == "statsmodels.ols"
     assert display_estimate_engine_label("ols", "estimate_agent") == "estimate_agent"
     assert display_estimate_engine_label("did", "statspai.feols") == "statspai.feols"
     assert display_estimate_engine_label("iv", "statspai.ivreg") == "statspai.ivreg"

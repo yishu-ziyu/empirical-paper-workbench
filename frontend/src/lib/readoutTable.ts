@@ -83,9 +83,8 @@ export function displayEstimateEngineLabel(
 ): string {
   const engine = String(estimator ?? '').trim()
   if (!engine) return ''
-  if (engine === 'estimate_agent') return engine
   const key = String(method ?? '').trim().toLowerCase()
-  if (key === 'ols') return 'OLS'
+  if (key === 'ols' && /feols/i.test(engine)) return 'OLS'
   return engine
 }
 

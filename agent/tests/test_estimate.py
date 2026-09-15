@@ -113,8 +113,11 @@ def test_ols_results_label_is_ols_not_feols(tmp_path):
     payload = out["estimate"]
     assert payload["method"] == "ols"
     assert payload["estimator"] in {"statspai.feols", "statsmodels.ols"}
-    assert "估计器：`OLS`" in out["results"]
-    assert "feols" not in out["results"].lower()
+    if "feols" in str(payload["estimator"]).lower():
+        assert "估计器：`OLS`" in out["results"]
+        assert "feols" not in out["results"].lower()
+    else:
+        assert payload["estimator"] in out["results"]
 
 
 def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):

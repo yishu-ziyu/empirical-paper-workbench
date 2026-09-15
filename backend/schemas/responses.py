@@ -439,6 +439,14 @@ class SessionInfoResponse(BaseModel):
         default=False,
         description="Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
     )
+    allow_did: bool = Field(
+        default=False,
+        description=(
+            "Narrow DiD exception gate (DID-BE-gate). True only after the "
+            "title/catalog matcher accepts a Card–Krueger / minwage TITLE/TOPIC "
+            "or catalog identity. Form method=did is not the setter. Missing is false."
+        ),
+    )
     upload_readiness: Optional[
         Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
     ] = None

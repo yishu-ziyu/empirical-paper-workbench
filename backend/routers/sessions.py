@@ -26,6 +26,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import PlainTextResponse, RedirectResponse
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from auth import (
@@ -52,6 +53,12 @@ from schemas.responses import (
     SnapshotActiveRunResponse,
     SnapshotDatasetResponse,
     UploadResponse,
+)
+from services.allow_did import (
+    catalog_identity_payload,
+    gate_updates,
+    normalize_entry_id,
+    session_allow_did,
 )
 from services.research_lab import lab_from_state, public_research
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
@@ -381,8 +388,50 @@ async def list_sessions(
     ]
 
 
+class TitleTopicRequest(BaseModel):
+    """POST /sessions/{id}/title-topic — TITLE/TOPIC + optional catalog identity."""
+
+    title: str = ""
+    topic: str = ""
+    entry_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
+
+
+@router.post(
+    "/sessions/{session_id}/title-topic",
+    response_model=SessionInfoResponse,
+)
+async def pin_title_topic(
+    session_id: str,
+    body: TitleTopicRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> SessionInfoResponse:
+    """Pin formal TITLE/TOPIC and optional classic-5 identity. Sets allow_did.
+
+    Does not attach data, does not set dataAttached, and ignores method.
+    """
+    await run_in_threadpool(require_session_ownership, session_id, current_user)
+    require_auth_unless_debug(current_user)
+    title = (body.title or "").strip()
+    topic = (body.topic or "").strip()
+    entry_id = normalize_entry_id(body.entry_id) if body.entry_id else ""
+    if body.entry_id and not entry_id:
+        raise HTTPException(status_code=400, detail="invalid_classic5_entry")
+    if not title and not topic and not entry_id:
+        raise HTTPException(status_code=400, detail="title or topic is required")
+    state = await run_in_threadpool(facade.get_state, session_id)
+    updates: dict = {"title_topic": {"title": title, "topic": topic}}
+    if entry_id:
+        updates["catalog_identity"] = catalog_identity_payload(entry_id)
+    await run_in_threadpool(
+        facade.update_state,
+        session_id,
+        **gate_updates(state, **updates),
+    )
+    return await build_session_info(session_id)
+
+
 async def build_session_info(session_id: str) -> SessionInfoResponse:
-    """Project the Project Snapshot, including the dataAttached confirm-attach gate."""
+    """Project the Project Snapshot, including dataAttached and allow_did."""
     has_dataset = False
     extra: dict = {}
     try:
@@ -400,6 +449,7 @@ async def build_session_info(session_id: str) -> SessionInfoResponse:
             await run_in_threadpool(facade.get_degradations, session_id)
         )
         extra["dataAttached"] = state.get("data_attached") is True
+        extra["allow_did"] = session_allow_did(state)
         if lab_from_state(state) is not None:
             extra["research"] = public_research(state)
     except Exception:
@@ -407,6 +457,7 @@ async def build_session_info(session_id: str) -> SessionInfoResponse:
     extra["dataset"] = await _snapshot_dataset(session_id)
     extra["active_run"] = await _snapshot_active_run(session_id)
     extra.setdefault("dataAttached", False)
+    extra.setdefault("allow_did", False)
     return SessionInfoResponse(
         session_id=session_id,
         exists=True,

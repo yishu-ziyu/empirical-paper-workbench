@@ -1,0 +1,30 @@
+# econpaper Codex Task State
+
+- Task ID: 20260915-fm-e-build-did-narrow-1-did-be-gate
+- Status: active
+- Git context（分支可选）: `cursor/did-be-gate-8102` off `feat/fm-e-build-did-narrow-1` @ `45c18dedbdecfd7fa965007e4646ad5a91b9ec0d`
+- Goal: DID-BE-gate — title/catalog path sets `allow_did` (default false). Only classic Card–Krueger / minwage TITLE/TOPIC or catalog identity may set true.
+- Hard bar: Form method=did is not the setter. No fixtures CSV / catalog inventory edits. No treated×period. No WORD-FIX / HET-CODE-EXPORT / PREWRITE-PAUSE. Push branch only; author yishu-ziyu; no PR.
+- Session / run ID:
+- Current research stage:
+- Current review / approval gate:
+- Verified facts:
+  - Contract: `docs/did-narrow-exception-contract.md` §1
+  - Existing catalog token: `minimum-wage-employment` in `fixtures/classic-5/catalog.json` (read only)
+  - Known tokens also include `ck1994`
+- Current hypothesis:
+- Changed files:
+  - `backend/services/allow_did.py` (matcher)
+  - `backend/routers/sessions.py` (snapshot + POST /sessions/{id}/title-topic)
+  - `backend/services/data_attach.py` (catalog identity on attach)
+  - `backend/schemas/responses.py` (`allow_did` on snapshot)
+  - `backend/tests/test_allow_did.py`
+- Failed paths:
+- Data / output evidence locations:
+- Test evidence:
+  - `backend/tests/test_allow_did.py` + `test_classic5_suggest.py`: 45 passed
+  - `backend/tests/test_data_attach.py`: 17 passed
+  - OpenAPI drift check: frontend/openapi.json, docs/api/openapi.json, types/api.ts match live app
+- Pending external state: CLASSIC-FIXTURES still owns CSV bytes; no PR (HARD STOP)
+- Next action: push `cursor/did-be-gate-8102` only
+- Updated at: 2026-09-15

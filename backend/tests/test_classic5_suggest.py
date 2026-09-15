@@ -55,6 +55,7 @@ def test_suggest_payload_never_attaches():
     assert payload["attached"] is False
     assert "dataAttached" not in payload
     assert "data_attached" not in payload
+    assert "allow_did" not in payload
     assert payload["own_file"] == {"action": "upload_own_file", "catalog": False}
     assert payload["candidates"][0]["entry_id"] == "trade-local-labor"
     for item in payload["candidates"]:
@@ -122,9 +123,11 @@ def test_suggest_does_not_create_or_mutate_session(client):
     # Snapshot always projects the confirm-attach gate after DC-BE-attach.
     # Suggest must not flip it or write state; false is the unattached default.
     assert body_after["dataAttached"] is False
+    assert body_after["allow_did"] is False
     assert "data_attached" not in body_after
     assert facade.get_state(sid).get("dataAttached") is None
     assert facade.get_state(sid).get("data_attached") is not True
+    assert facade.get_state(sid).get("allow_did") is not True
 
 
 def test_suggest_env_catalog_override(client, tmp_path, monkeypatch):
@@ -171,6 +174,7 @@ def test_suggest_modules_have_no_attach_imports():
         "facade",
         "RunRepository",
         "dataAttached",
+        "allow_did",
         "table1Confirmed",
         "specConfirmed",
     }

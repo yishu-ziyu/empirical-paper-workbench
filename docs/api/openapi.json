@@ -567,6 +567,61 @@
         ]
       }
     },
+    "/sessions/{session_id}/title-topic": {
+      "post": {
+        "summary": "Pin Title Topic",
+        "description": "Pin formal TITLE/TOPIC and optional classic-5 identity. Sets allow_did.\n\nDoes not attach data, does not set dataAttached, and ignores method.",
+        "operationId": "pin_title_topic_sessions__session_id__title_topic_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleTopicRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}": {
       "get": {
         "summary": "Get Session Info",
@@ -7315,6 +7370,12 @@
             "description": "Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
             "default": false
           },
+          "allow_did": {
+            "type": "boolean",
+            "title": "Allow Did",
+            "description": "Narrow DiD exception gate (DID-BE-gate). True only after the title/catalog matcher accepts a Card–Krueger / minwage TITLE/TOPIC or catalog identity. Form method=did is not the setter. Missing is false.",
+            "default": false
+          },
           "upload_readiness": {
             "anyOf": [
               {
@@ -8148,6 +8209,36 @@
         "additionalProperties": true,
         "type": "object",
         "title": "SurpriseResponse"
+      },
+      "TitleTopicRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          }
+        },
+        "type": "object",
+        "title": "TitleTopicRequest",
+        "description": "POST /sessions/{id}/title-topic — TITLE/TOPIC + optional catalog identity."
       },
       "TokenResponse": {
         "properties": {

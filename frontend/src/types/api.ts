@@ -304,6 +304,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/title-topic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin Title Topic
+         * @description Pin formal TITLE/TOPIC and optional classic-5 identity. Sets allow_did.
+         *
+         *     Does not attach data, does not set dataAttached, and ignores method.
+         */
+        post: operations["pin_title_topic_sessions__session_id__title_topic_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}": {
         parameters: {
             query?: never;
@@ -3188,6 +3210,12 @@ export interface components {
              * @default false
              */
             dataAttached: boolean;
+            /**
+             * Allow Did
+             * @description Narrow DiD exception gate (DID-BE-gate). True only after the title/catalog matcher accepts a Card–Krueger / minwage TITLE/TOPIC or catalog identity. Form method=did is not the setter. Missing is false.
+             * @default false
+             */
+            allow_did: boolean;
             /** Upload Readiness */
             upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
             /** Claim */
@@ -3470,6 +3498,24 @@ export interface components {
             unevaluated_reason?: ("no_criteria" | "unresolved_metrics") | null;
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * TitleTopicRequest
+         * @description POST /sessions/{id}/title-topic — TITLE/TOPIC + optional catalog identity.
+         */
+        TitleTopicRequest: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /** Entry Id */
+            entry_id?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -4064,6 +4110,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreateSessionResponse"];
+                };
+            };
+        };
+    };
+    pin_title_topic_sessions__session_id__title_topic_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TitleTopicRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

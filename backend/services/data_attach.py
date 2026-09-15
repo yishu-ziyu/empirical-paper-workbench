@@ -24,6 +24,7 @@ from run_repository import (
     finalize_upload_fingerprint,
 )
 from schemas.responses import DatasetMetaResponse
+from services.allow_did import catalog_identity_payload, gate_updates, session_allow_did
 from services.classic5 import classic5_candidate, resolve_classic5_entry
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
 
@@ -105,8 +106,11 @@ async def stamp_user_file_candidate(session_id: str) -> dict[str, Any]:
     updated = await run_in_threadpool(
         facade.update_state,
         session_id,
-        data_attached=False,
-        attach_candidate=user_file_candidate(),
+        **gate_updates(
+            state,
+            data_attached=False,
+            attach_candidate=user_file_candidate(),
+        ),
     )
     return updated
 
@@ -131,15 +135,25 @@ async def admit_bound_bytes(
             session_id=session_id,
             upload_dir=Path(settings.UPLOAD_DIR),
         )
+        try:
+            current = await run_in_threadpool(facade.get_state, session_id)
+        except Exception:
+            current = {}
+        extra_state = {
+            "attach_candidate": candidate,
+            "data_attached": False,
+        }
+        if candidate.get("source") == "classic-5":
+            extra_state["catalog_identity"] = catalog_identity_payload(
+                candidate.get("entry_id")
+            )
+        extra_state["allow_did"] = session_allow_did({**current, **extra_state})
         admission = await RunRepository().admit_session_upload(
             session_id=session_id,
             user_id=user_id,
             csv_path=str(csv_path),
             dataset_meta=dataset_meta.model_dump(),
-            extra_state={
-                "attach_candidate": candidate,
-                "data_attached": False,
-            },
+            extra_state=extra_state,
             idempotency_key=idempotency_key,
             input_fingerprint=fingerprint,
         )

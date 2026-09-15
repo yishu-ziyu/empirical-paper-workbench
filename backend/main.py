@@ -178,6 +178,7 @@ from routers.code_export import router as code_export_router  # noqa: E402
 from routers.doc_export import router as doc_export_router  # noqa: E402
 from routers.eda import router as eda_router  # noqa: E402
 from routers.evidence import router as evidence_router  # noqa: E402
+from routers.find_data import router as find_data_router  # noqa: E402
 from routers.labels import router as labels_router  # noqa: E402
 from routers.outline import router as outline_router  # noqa: E402
 from routers.paper_draft import router as paper_draft_router  # noqa: E402
@@ -195,6 +196,7 @@ app.include_router(agent_spike_router)
 app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(evidence_router)
+app.include_router(find_data_router)
 app.include_router(sessions_router)
 app.include_router(classic5_router)
 app.include_router(research_router)

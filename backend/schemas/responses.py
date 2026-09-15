@@ -1027,3 +1027,53 @@ class OutlierStepReportResponse(BaseModel):
     after: List[Dict[str, DistStatsResponse]] = Field(default_factory=list)
     iqr_outliers: List[Dict[str, int]] = Field(default_factory=list)
     winsorized: List[bool] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# find_data.py (FD-BE-plan)
+# ---------------------------------------------------------------------------
+
+
+class FindDataSearchFacetsResponse(BaseModel):
+    """Confirmed Y/X/method/interactions used to search (not a confirm substitute)."""
+
+    method: str = ""
+    outcome: str = ""
+    treatment: str = ""
+    controls: List[str] = Field(default_factory=list)
+    interactions: List[str] = Field(default_factory=list)
+    qType: str = ""
+    title: str = ""
+    question: str = ""
+    query_terms: List[str] = Field(default_factory=list)
+
+
+class FindDataPlanBodyResponse(BaseModel):
+    """Where / how to look. A family label without a venue is not a plan."""
+
+    where: str
+    how: str
+    venues: List[str] = Field(default_factory=list)
+    search_facets: FindDataSearchFacetsResponse
+
+
+class FindDataCandidateResponse(BaseModel):
+    """Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."""
+
+    source_id: str
+    title: str
+    url_or_fixture: str
+    license: str
+    suggested_cols: List[str] = Field(default_factory=list)
+    design_fit: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SessionFindDataResponse(BaseModel):
+    """GET/POST find-data: plan after confirmed design. Not attach, not gold prefill."""
+
+    status: Literal["missing", "planned"]
+    planned_at: Optional[str] = None
+    route_family: Optional[Literal["educ_wage", "minwage", "growth", "macro", "else"]] = None
+    primary_venue: Optional[str] = None
+    plan: Optional[FindDataPlanBodyResponse] = None
+    candidates: List[FindDataCandidateResponse] = Field(default_factory=list)

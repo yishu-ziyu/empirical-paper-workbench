@@ -3,11 +3,13 @@ from __future__ import annotations
 
 from agent.find_lit import (
     MIN_CARDS,
+    V1_SOURCES,
     build_query,
     check_cards,
     dedupe_hits,
     design_is_confirmed,
     export_checked,
+    fetch_papers,
     literature_write_allowed,
     literature_write_blockers,
     mailto,
@@ -254,6 +256,46 @@ def test_chapter_write_requires_confirmed_five_cards_and_checks():
     assert literature_write_blockers(state) == []
 
     assert literature_write_allowed({"research_direction": "x"}) is True
+
+
+def test_fetch_papers_wrap_keeps_checkbox_bib_on_find_lit():
+    assert V1_SOURCES == ("openalex", "crossref", "semantic_scholar")
+    fetched = fetch_papers(
+        "did employment min_wage",
+        searchers=[("openalex", lambda q: _five_hits())],
+    )
+    assert "export" not in fetched
+    assert "checked_ids" not in fetched
+    rec = search_find_lit(
+        {"design": _confirmed_design()},
+        searchers=[("openalex", lambda q: _five_hits())],
+    )
+    assert rec["checked_ids"] == []
+    assert rec["export"]["refs_bib"] == ""
+    chosen = [rec["cards"][0]["id"]]
+    checked = check_cards(rec, chosen)
+    assert checked["checked_ids"] == chosen
+    assert "Paper 1" in checked["export"]["refs_bib"]
+    assert checked["chapter_written"] is False
+    state = {"design": _confirmed_design(), "find_lit": rec}
+    assert literature_write_allowed(state) is False
+    assert literature_write_allowed({"design": _confirmed_design(), "find_lit": checked}) is True
+
+
+def test_search_find_lit_does_not_show_synthetic_as_found():
+    rec = search_find_lit(
+        {"design": _confirmed_design()},
+        searchers=[
+            (
+                "openalex",
+                lambda q: _five_hits() + [_hit(99, source="synthetic")],
+            )
+        ],
+    )
+    assert all("synthetic" not in (h.get("sources") or [h.get("source")]) for h in rec["hits"])
+    assert "Paper 99" not in [c["title"] for c in rec["cards"]]
+    assert rec["shown_count"] >= MIN_CARDS
+    assert rec["chapter_written"] is False
 
 
 def test_mailto_polite_pool_stub_and_env(monkeypatch):

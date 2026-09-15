@@ -4,17 +4,21 @@ from .cards import MIN_CARDS, has_min_cards, hits_to_cards, is_verifiable
 from .chapter_gate import literature_write_allowed, literature_write_blockers
 from .dedupe import dedupe_hits, normalize_doi
 from .export import export_checked
+from .fetch_papers import V1_SOURCES, default_searchers, fetch_papers
 from .polite_pool import mailto, polite_pool_note, user_agent
 from .query import build_query, design_is_confirmed, session_design
 from .search import check_cards, search_find_lit
 
 __all__ = [
     "MIN_CARDS",
+    "V1_SOURCES",
     "build_query",
     "check_cards",
     "dedupe_hits",
+    "default_searchers",
     "design_is_confirmed",
     "export_checked",
+    "fetch_papers",
     "has_min_cards",
     "hits_to_cards",
     "is_verifiable",

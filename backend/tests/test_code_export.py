@@ -474,6 +474,72 @@ def test_ols_six_chapter_paper_exports_regress_not_xtreg(client):
         facade.drop_session(sid)
 
 
+def test_ols_interaction_code_export_includes_educ_region(client):
+    """GET do|R for OLS + educ:region must emit the interaction, still regress/lm."""
+    import uuid
+
+    sid = f"test-ols-het-export-{uuid.uuid4()}"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/wage.csv",
+            "research_direction": {
+                "question": "Does the return to educ × region vary?",
+                "dv": "lwage",
+                "iv": "educ",
+                "controls": ["exper", "region"],
+                "method": "OLS",
+                "heterogeneity_groups": ["region"],
+            },
+            "main_specification": {
+                "method": "ols",
+                "outcome": "lwage",
+                "treatment": "educ",
+                "controls": ["exper", "region"],
+                "heterogeneity_groups": ["region"],
+                "formula": "lwage ~ educ + exper + region + educ:region",
+            },
+            "estimate": {
+                "method": "ols",
+                "estimator": "OLS",
+                "formula": "lwage ~ educ + exper + region + educ:region",
+                "status": "ok",
+            },
+            "body_chapters": [
+                {
+                    "type": "methods",
+                    "content": (
+                        "本文报告 OLS。\n\n"
+                        "```python\n"
+                        "import statspai\n"
+                        "model = statspai.feols('lwage ~ educ + exper + region + educ:region')\n"
+                        "```\n"
+                    ),
+                }
+            ],
+        },
+    )
+    try:
+        do = client.get(f"/sessions/{sid}/code-export", params={"format": "do"})
+        assert do.status_code == 200, do.text
+        assert "regress lwage educ exper region c.educ#c.region" in do.text
+        assert "educ:region" in do.text
+        assert "xtreg" not in do.text
+        assert "reghdfe" not in do.text
+        assert "feols" not in do.text
+        assert "analysis.do" in do.headers.get("content-disposition", "")
+
+        r_resp = client.get(f"/sessions/{sid}/code-export", params={"format": "R"})
+        assert r_resp.status_code == 200, r_resp.text
+        assert "lm(lwage ~ educ + exper + region + educ:region" in r_resp.text
+        assert "feols" not in r_resp.text
+        assert "felm" not in r_resp.text
+        assert "library(fixest)" not in r_resp.text
+        assert "analysis.R" in r_resp.headers.get("content-disposition", "")
+    finally:
+        facade.drop_session(sid)
+
+
 def test_ols_chapter_feols_python_exports_regress_not_xtreg(client):
     """OLS direction + chapter Python quoting feols still downloads regress/lm."""
     import uuid

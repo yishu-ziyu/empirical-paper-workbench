@@ -22,7 +22,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..design.spec import norm_method
+from ..design.spec import (
+    apply_heterogeneity_to_formula,
+    build_heterogeneity_ols_formula,
+    norm_method,
+)
 from ..protocols import TranslateCodeOutput
 from ..state import EconPaperState
 
@@ -425,6 +429,49 @@ def _pooled_ols_formula(text: str) -> str | None:
     return formula
 
 
+def _patsy_term_to_stata(term: str) -> str:
+    """Map Patsy ``a:b`` / ``a*b`` to Stata ``c.a#c.b`` / ``c.a##c.b``.
+
+    Main effects already listed on the RHS stay as-is; ``#`` is the product
+    so we do not emit ``##`` for a ``:`` term (that would duplicate mains).
+    """
+    raw = term.strip()
+    if not raw or raw == "1":
+        return ""
+    if ":" in raw and "*" not in raw:
+        parts = [part.strip() for part in raw.split(":") if part.strip()]
+        if len(parts) >= 2 and all(re.fullmatch(r"[A-Za-z_]\w*", part) for part in parts):
+            return "#".join(f"c.{part}" for part in parts)
+    if "*" in raw and ":" not in raw:
+        parts = [part.strip() for part in raw.split("*") if part.strip()]
+        if len(parts) >= 2 and all(re.fullmatch(r"[A-Za-z_]\w*", part) for part in parts):
+            return "##".join(f"c.{part}" for part in parts)
+    return raw
+
+
+def _ols_formula_parts(
+    formula: str, fallback_y: str, fallback_plus: str
+) -> tuple[str, str]:
+    """Outcome + Patsy RHS from an estimate formula; strip ``| FE`` bars."""
+    src = (formula or "").strip()
+    if src and "~" in src:
+        y, rhs = src.split("~", 1)
+        y = y.strip()
+        rhs = rhs.split("|", 1)[0].strip()
+        if y and rhs:
+            return y, rhs
+    return fallback_y, fallback_plus
+
+
+def _stata_regress_rhs(patsy_rhs: str) -> str:
+    terms = [
+        _patsy_term_to_stata(part)
+        for part in patsy_rhs.split("+")
+        if part.strip() and part.strip() != "1"
+    ]
+    return " ".join(term for term in terms if term)
+
+
 def _pooled_ols_command(line: str, *, lang: str) -> str | None:
     """Map pooled OLS Python (smf.ols / feols without FE) to regress / lm."""
     formula = _pooled_ols_formula(line)
@@ -432,11 +479,11 @@ def _pooled_ols_command(line: str, *, lang: str) -> str | None:
         return None
     y, rhs = formula.split("~", 1)
     y = y.strip()
-    rhs_vars = [part.strip() for part in rhs.split("+") if part.strip() and part.strip() != "1"]
+    rhs = rhs.split("|", 1)[0].strip()
     if lang == "stata":
-        return f"regress {y} {' '.join(rhs_vars)}".rstrip()
+        return f"regress {y} {_stata_regress_rhs(rhs)}".rstrip()
     if lang == "r":
-        return f"model <- lm({formula}, data=df)"
+        return f"model <- lm({y} ~ {rhs}, data=df)"
     return None
 
 
@@ -478,7 +525,21 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
     controls = [col for col in controls if col not in skip]
     estimate = state.get("estimate")
     estimate = estimate if isinstance(estimate, dict) else {}
+    groups = (
+        _as_controls(spec.get("heterogeneity_groups"))
+        or _as_controls(rd.get("heterogeneity_groups"))
+        or _as_controls(estimate.get("heterogeneity_groups"))
+    )
     formula = str(estimate.get("formula") or spec.get("formula") or "").strip()
+    if groups:
+        if formula:
+            formula = apply_heterogeneity_to_formula(
+                formula, treatment=treatment, groups=groups
+            )
+        else:
+            formula = build_heterogeneity_ols_formula(
+                outcome, treatment, controls, groups
+            )
     method = _first_text(spec, rd, keys=("method",))
     panel = _method_is_panel(method)
     return {
@@ -505,6 +566,7 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     controls = model["controls"]
     rhs_space = " ".join([treat, *controls])
     rhs_plus = " + ".join([treat, *controls])
+    eviews_rhs = rhs_space
     csv = model["csv"]
     if model["panel"]:
         note = (
@@ -533,7 +595,16 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
             f"({y} ~ {rhs_plus} | {i} + {t}) used in Python/Stata/R."
         )
     else:
-        fitted = model.get("formula") or f"{y} ~ {rhs_plus}"
+        y, rhs_plus = _ols_formula_parts(
+            str(model.get("formula") or ""), y, rhs_plus
+        )
+        rhs_space = _stata_regress_rhs(rhs_plus)
+        eviews_rhs = " ".join(
+            part.strip().replace(":", "*")
+            for part in rhs_plus.split("+")
+            if part.strip() and part.strip() != "1"
+        )
+        fitted = f"{y} ~ {rhs_plus}"
         spec_note = f"Common spec: pooled OLS {fitted}."
         py_formula = fitted
         py_fit = f'model = smf.ols("{py_formula}", data=df).fit()'
@@ -601,7 +672,7 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
         f"' {note}",
         f"' {eviews_note}",
         f"import {csv}",
-        f"ls {y} c {rhs_space}",
+        f"ls {y} c {eviews_rhs}",
     ]
     return {
         "py": py,

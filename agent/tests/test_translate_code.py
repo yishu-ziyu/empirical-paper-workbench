@@ -466,6 +466,171 @@ def test_translate_code_ols_feols_python_still_emits_regress():
     assert 'smf.ols("income ~ age"' in by_lang["py"]
 
 
+def _ols_interaction_state(**overrides) -> dict:
+    """OLS lock + educ×region estimate formula (the HET-INTERACTION payload)."""
+    state = make_state(
+        csv_path="/tmp/wage.csv",
+        research_direction={
+            "question": "Does the return to educ × region vary?",
+            "dv": "lwage",
+            "iv": "educ",
+            "controls": ["exper", "region"],
+            "method": "OLS",
+            "heterogeneity_groups": ["region"],
+        },
+        main_specification={
+            "method": "ols",
+            "outcome": "lwage",
+            "treatment": "educ",
+            "controls": ["exper", "region"],
+            "heterogeneity_groups": ["region"],
+            "formula": "lwage ~ educ + exper + region + educ:region",
+        },
+        estimate={
+            "method": "ols",
+            "estimator": "OLS",
+            "formula": "lwage ~ educ + exper + region + educ:region",
+            "status": "ok",
+        },
+        body_chapters=[
+            {
+                "type": "methods",
+                "content": (
+                    "本文使用 OLS。\n\n"
+                    "```python\n"
+                    "import pandas as pd\n"
+                    "import statspai\n"
+                    "df = pd.read_csv('wage.csv')\n"
+                    "model = statspai.feols('lwage ~ educ + exper + region + educ:region', data=df)\n"
+                    "```\n"
+                ),
+            }
+        ],
+    )
+    state.update(overrides)
+    return state
+
+
+def _assert_ols_lock(by_lang: dict[str, str]) -> None:
+    stata = by_lang["stata"]
+    r_code = by_lang["r"]
+    assert "regress " in stata
+    assert "xtreg" not in stata
+    assert "reghdfe" not in stata
+    assert "feols" not in stata
+    assert "lm(" in r_code
+    assert "feols" not in r_code
+    assert "felm" not in r_code
+    assert "library(fixest)" not in r_code
+
+
+def test_translate_code_ols_interaction_emits_educ_region():
+    """Estimate educ:region must appear in regress / lm, not an additive dummy."""
+    result = translate_code(_ols_interaction_state())
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    _assert_ols_lock(by_lang)
+    stata = by_lang["stata"]
+    r_code = by_lang["r"]
+    assert "educ:region" in by_lang["py"]
+    assert "educ:region" in r_code
+    assert "lm(lwage ~ educ + exper + region + educ:region" in r_code
+    # Stata product is c.educ#c.region; comment still quotes the Patsy term.
+    assert "c.educ#c.region" in stata
+    assert "educ:region" in stata
+    assert "regress lwage educ exper region c.educ#c.region" in stata
+    assert 'smf.ols("lwage ~ educ + exper + region + educ:region"' in by_lang["py"]
+
+
+def test_translate_code_ols_additive_formula_plus_groups_emits_interaction():
+    """Additive spec + heterogeneity_groups is rewritten before export."""
+    result = translate_code(
+        make_state(
+            csv_path="/tmp/wage.csv",
+            research_direction={
+                "dv": "lwage",
+                "iv": "educ",
+                "controls": ["exper", "region"],
+                "method": "ols",
+                "heterogeneity_groups": ["region"],
+            },
+            main_specification={
+                "method": "ols",
+                "outcome": "lwage",
+                "treatment": "educ",
+                "controls": ["exper", "region"],
+                "heterogeneity_groups": ["region"],
+                "formula": "lwage ~ educ + exper + region",
+            },
+            estimate={
+                "method": "ols",
+                "formula": "lwage ~ educ + exper + region",
+                "status": "ok",
+            },
+        )
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    _assert_ols_lock(by_lang)
+    assert "educ:region" in by_lang["r"]
+    assert "c.educ#c.region" in by_lang["stata"]
+    assert "educ:region" in by_lang["py"]
+
+
+def test_translate_code_ols_south_interaction_emits_educ_south():
+    """educ:south heterogeneity uses the same OLS regress / lm lock."""
+    result = translate_code(
+        make_state(
+            csv_path="/tmp/wage.csv",
+            research_direction={
+                "dv": "lwage",
+                "iv": "educ",
+                "controls": ["exper", "south"],
+                "method": "OLS",
+                "heterogeneity_groups": ["south"],
+            },
+            estimate={
+                "method": "ols",
+                "estimator": "OLS",
+                "formula": "lwage ~ educ + exper + south + educ:south",
+                "status": "ok",
+            },
+        )
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    _assert_ols_lock(by_lang)
+    assert "educ:south" in by_lang["r"]
+    assert "lm(lwage ~ educ + exper + south + educ:south" in by_lang["r"]
+    assert "c.educ#c.south" in by_lang["stata"]
+    assert "regress lwage educ exper south c.educ#c.south" in by_lang["stata"]
+    assert "educ:south" in by_lang["py"]
+
+
+def test_translate_to_stata_smf_ols_interaction_becomes_regress_product():
+    """Chapter smf.ols with educ:region translates to Stata #, not a comment."""
+    state = make_state(
+        body_chapters=[
+            {
+                "type": "results",
+                "title": "结果",
+                "content": (
+                    "```python\n"
+                    "import pandas as pd\n"
+                    "import statsmodels.formula.api as smf\n"
+                    "df = pd.read_csv('wage.csv')\n"
+                    "model = smf.ols('lwage ~ educ + region + educ:region', data=df).fit()\n"
+                    "print(model.summary())\n"
+                    "```\n"
+                ),
+            }
+        ]
+    )
+    result = translate_code(state)
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "regress lwage educ region c.educ#c.region" in by_lang["stata"]
+    assert "lm(lwage ~ educ + region + educ:region" in by_lang["r"]
+    assert "xtreg" not in by_lang["stata"]
+    assert "feols" not in by_lang["r"]
+
+
 def test_translate_code_ols_guessed_id_year_emits_regress_not_xtreg(tmp_path):
     """OLS stays pooled OLS when set_direction guessed CSV id+year."""
     cleaning_report, csv_path = _upload_cleaning_report(tmp_path)

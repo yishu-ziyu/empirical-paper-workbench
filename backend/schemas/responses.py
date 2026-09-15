@@ -440,6 +440,46 @@ class SessionInfoResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# classic-5 suggest (DC-BE-suggest; rank only, never attach)
+# ---------------------------------------------------------------------------
+
+
+class Classic5OwnFileActionResponse(BaseModel):
+    """Non-catalog action returned with every suggest response."""
+
+    action: Literal["upload_own_file"] = "upload_own_file"
+    catalog: bool = False
+
+
+class Classic5CandidateResponse(BaseModel):
+    """One ranked classic-5 catalog entry. Suggest never sets attached."""
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    entry_id: str
+    source: Literal["classic-5"] = "classic-5"
+    title: str
+    topic: str = ""
+    tags: List[str] = Field(default_factory=list)
+    score: float
+    attached: Literal[False] = False
+
+
+class Classic5SuggestResponse(BaseModel):
+    """POST /classic-5/suggest 返回体。
+
+    Ranked classic-5 candidates plus a non-catalog own-file action.
+    ``attached`` is always false: this path must not hang data.
+    """
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    title: str = ""
+    topic: str = ""
+    candidates: List[Classic5CandidateResponse] = Field(default_factory=list)
+    own_file: Classic5OwnFileActionResponse
+    attached: Literal[False] = False
+
+
+# ---------------------------------------------------------------------------
 # evidence.py (main-estimate read model, C2)
 # ---------------------------------------------------------------------------
 

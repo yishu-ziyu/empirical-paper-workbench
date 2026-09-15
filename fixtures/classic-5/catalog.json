@@ -1,0 +1,79 @@
+{
+  "catalog_id": "classic-5",
+  "entries": [
+    {
+      "id": "schooling-wages",
+      "title": "Education and wages",
+      "topic": "Returns to schooling and earnings",
+      "tags": [
+        "education",
+        "schooling",
+        "wages",
+        "earnings",
+        "mincer",
+        "教育",
+        "工资",
+        "教育回报",
+        "学历"
+      ]
+    },
+    {
+      "id": "minimum-wage-employment",
+      "title": "Minimum wage and employment",
+      "topic": "Labor-market effects of a wage floor",
+      "tags": [
+        "minimum",
+        "wage",
+        "employment",
+        "labor",
+        "最低工资",
+        "就业",
+        "劳动"
+      ]
+    },
+    {
+      "id": "trade-local-labor",
+      "title": "Trade and local labor markets",
+      "topic": "Import competition and manufacturing employment",
+      "tags": [
+        "trade",
+        "import",
+        "manufacturing",
+        "employment",
+        "贸易",
+        "进口",
+        "制造业",
+        "冲击"
+      ]
+    },
+    {
+      "id": "fiscal-output",
+      "title": "Government spending and output",
+      "topic": "Fiscal policy and local economic activity",
+      "tags": [
+        "fiscal",
+        "government",
+        "spending",
+        "multiplier",
+        "output",
+        "财政",
+        "政府支出",
+        "乘数"
+      ]
+    },
+    {
+      "id": "health-labor-supply",
+      "title": "Health and labor supply",
+      "topic": "Health status and hours of work",
+      "tags": [
+        "health",
+        "labor",
+        "supply",
+        "hours",
+        "健康",
+        "劳动供给",
+        "工时"
+      ]
+    }
+  ]
+}

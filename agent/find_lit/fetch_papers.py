@@ -43,6 +43,15 @@ def is_found_hit(hit: dict[str, Any]) -> bool:
     return not any(name in _NOT_FOUND_SOURCES for name in _source_names(hit))
 
 
+def _prepare_hit(hit: Any) -> dict[str, Any] | None:
+    if not isinstance(hit, dict) or not is_found_hit(hit):
+        return None
+    out = dict(hit)
+    doi = normalize_doi(out.get("doi"))
+    out["doi"] = doi or None
+    return out
+
+
 def _as_hit(entry: dict[str, Any], source: str) -> dict[str, Any] | None:
     if not isinstance(entry, dict):
         return None
@@ -125,9 +134,7 @@ def _run_searchers(
             batch = fn(query) or []
             status[name] = "ok"
             hits.extend(
-                item
-                for item in batch
-                if isinstance(item, dict) and is_found_hit(item)
+                item for item in (_prepare_hit(h) for h in batch) if item
             )
         except Exception as exc:
             status[name] = f"degraded:{type(exc).__name__}"

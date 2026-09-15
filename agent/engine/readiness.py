@@ -42,6 +42,10 @@ def paper_ready_to_write(state: dict, chapter_type: str) -> tuple[bool, list[str
     missing: list[str] = []
     if state.get("star_rating") == 0:
         return False, ["star_0"]
+    from .did_spec import DID_MISSING_INTERACTION, did_spec_block_reason
+
+    if did_spec_block_reason(state) and chapter_type == "results":
+        missing.append(DID_MISSING_INTERACTION)
     need = SLOT_REQUIREMENTS.get(chapter_type, ("identification",))
     if "identification" in need and not state.get("identification_diag"):
         missing.append("no_identification")
@@ -150,6 +154,10 @@ def results_is_grounded(state: dict, chapter: dict | None = None) -> bool:
 
 
 def estimate_ran(state: dict) -> bool:
+    from .did_spec import did_spec_block_reason
+
+    if did_spec_block_reason(state):
+        return False
     est = state.get("estimate") or {}
     return (
         isinstance(est, dict)

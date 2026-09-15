@@ -1,0 +1,33 @@
+# econpaper Codex Task State
+
+- Task ID: 20260915-fm-e-build-did-narrow-1-did-be-spec
+- Status: complete
+- Git context（分支可选）: `cursor/did-be-gate-8102`
+- Goal: DID-BE-spec — when allow_did, force treated×period (or equivalent 2×2 DiD main term). Missing → hard block (no estimate / no write-as-estimated).
+- Hard bar: Do not change the allow_did setter. No fixtures CSV / catalog inventory. No general TWFE unlock / OLS-lock rewrite. Push branch only; author yishu-ziyu; no PR.
+- Session / run ID:
+- Current research stage:
+- Current review / approval gate:
+- Verified facts:
+  - Contract: `docs/did-narrow-exception-contract.md` §2
+  - Gate already on tip: `allow_did` from title/catalog only
+  - Counts: `treat:post` / `treat * post` / `treat_post` / `did` dummy
+  - Does not count: treat alone, `| id + year`, method=did, first_treat_col
+- Current hypothesis:
+- Changed files:
+  - `agent/engine/did_spec.py` (detect / force / block)
+  - `agent/nodes/set_direction.py` (force onto main_specification)
+  - `agent/nodes/estimate.py` (hard block; 2×2 OLS, not TWFE)
+  - `agent/engine/readiness.py` (no write-as-estimated)
+  - `backend/routers/outline.py` (POST /direction refuse)
+  - `backend/facade/__init__.py` (project allow_did onto prewrite)
+  - `agent/tests/test_did_spec.py`
+  - `backend/tests/test_did_spec.py`
+- Failed paths:
+- Data / output evidence locations:
+- Test evidence:
+  - `agent/tests/test_did_spec.py`: 13 passed
+  - `backend/tests/test_did_spec.py` + allow_did + outline + chapter: 78 passed
+- Pending external state: no PR (HARD STOP)
+- Next action: none (branch pushed; no PR)
+- Updated at: 2026-09-15

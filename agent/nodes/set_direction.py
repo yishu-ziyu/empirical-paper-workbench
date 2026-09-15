@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..design.spec import DirectionSpec
+from ..engine.did_spec import allow_did_active, columns_from_state, force_did_main_term
 from ..protocols import SetDirectionOutput
 from ..state import EconPaperState
 
@@ -143,6 +144,17 @@ def set_direction(state: EconPaperState) -> SetDirectionOutput:
     enriched = spec.enrich_direction(projected)
     out: SetDirectionOutput = {"research_direction": enriched}
     main_spec = spec.to_main_specification()
+    if allow_did_active(state) and main_spec:
+        forced = force_did_main_term(
+            main_spec,
+            columns=columns_from_state(state),
+            direction=enriched,
+        )
+        if forced is not None:
+            main_spec = forced
+        else:
+            # Do not emit | entity + time as a DiD substitute.
+            main_spec.pop("feols_formula", None)
     if main_spec:
         out["main_specification"] = main_spec
     if degradations:

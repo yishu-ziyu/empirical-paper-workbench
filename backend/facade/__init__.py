@@ -371,11 +371,14 @@ class AgentFacade:
 
     def prepare_prewrite_state(self, session_id: str) -> dict:
         """Build the immutable state snapshot persisted with a pre-write run."""
+        from services.allow_did import session_allow_did
+
         state = dict(self.get_state(session_id))
         if not state.get("csv_path"):
             csv_path = self.get_session_entry(session_id).get("csv_path")
             if csv_path:
                 state["csv_path"] = csv_path
+        state["allow_did"] = session_allow_did(state) is True
         return state
 
     def execute_prewrite(
@@ -401,6 +404,9 @@ class AgentFacade:
                 detail=f"prewrite unavailable: {exc}",
             ) from exc
         state = {**initial_state, "research_direction": research_direction}
+        from services.allow_did import session_allow_did
+
+        state["allow_did"] = session_allow_did(state) is True
         # A durable run must never recreate disk artifacts after its Session is
         # deleted. Prewrite does not require a workspace; legacy synchronous
         # callers keep the existing create-on-demand behavior.

@@ -397,6 +397,96 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data": {
+      "get": {
+        "summary": "Get Find Data Endpoint",
+        "description": "Read stored find-data plan. Empty unless design is confirmed.",
+        "operationId": "get_find_data_endpoint_sessions__session_id__find_data_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/plan": {
+      "post": {
+        "summary": "Plan Find Data Endpoint",
+        "description": "Emit where/how plan from confirmed design facets + R-sources.",
+        "operationId": "plan_find_data_endpoint_sessions__session_id__find_data_plan_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -5235,6 +5325,135 @@
         "title": "FilterResultResponse",
         "description": "POST /sessions/{id}/filter 返回体。"
       },
+      "FindDataCandidateResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url_or_fixture": {
+            "type": "string",
+            "title": "Url Or Fixture"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "suggested_cols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Cols"
+          },
+          "design_fit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Design Fit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "title",
+          "url_or_fixture",
+          "license"
+        ],
+        "title": "FindDataCandidateResponse",
+        "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
+      },
+      "FindDataPlanBodyResponse": {
+        "properties": {
+          "where": {
+            "type": "string",
+            "title": "Where"
+          },
+          "how": {
+            "type": "string",
+            "title": "How"
+          },
+          "venues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Venues"
+          },
+          "search_facets": {
+            "$ref": "#/components/schemas/FindDataSearchFacetsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "where",
+          "how",
+          "search_facets"
+        ],
+        "title": "FindDataPlanBodyResponse",
+        "description": "Where / how to look. A family label without a venue is not a plan."
+      },
+      "FindDataSearchFacetsResponse": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Controls"
+          },
+          "interactions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "qType": {
+            "type": "string",
+            "title": "Qtype",
+            "default": ""
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          },
+          "query_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Query Terms"
+          }
+        },
+        "type": "object",
+        "title": "FindDataSearchFacetsResponse",
+        "description": "Confirmed Y/X/method/interactions used to search (not a confirm substitute)."
+      },
       "GenerateChapterRequest": {
         "properties": {
           "chapter": {
@@ -6914,6 +7133,81 @@
           "detail"
         ],
         "title": "SessionBusyResponse"
+      },
+      "SessionFindDataResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "planned"
+            ],
+            "title": "Status"
+          },
+          "planned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned At"
+          },
+          "route_family": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "educ_wage",
+                  "minwage",
+                  "growth",
+                  "macro",
+                  "else"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Family"
+          },
+          "primary_venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Venue"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataPlanBodyResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FindDataCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SessionFindDataResponse",
+        "description": "GET/POST find-data: plan after confirmed design. Not attach, not gold prefill."
       },
       "SessionInfoResponse": {
         "properties": {

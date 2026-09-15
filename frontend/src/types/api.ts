@@ -238,6 +238,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Find Data Endpoint
+         * @description Read stored find-data plan. Empty unless design is confirmed.
+         */
+        get: operations["get_find_data_endpoint_sessions__session_id__find_data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan Find Data Endpoint
+         * @description Emit where/how plan from confirmed design facets + R-sources.
+         */
+        post: operations["plan_find_data_endpoint_sessions__session_id__find_data_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -2301,6 +2341,81 @@ export interface components {
             conditions?: unknown[];
         };
         /**
+         * FindDataCandidateResponse
+         * @description Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty.
+         */
+        FindDataCandidateResponse: {
+            /** Source Id */
+            source_id: string;
+            /** Title */
+            title: string;
+            /** Url Or Fixture */
+            url_or_fixture: string;
+            /** License */
+            license: string;
+            /** Suggested Cols */
+            suggested_cols?: string[];
+            /** Design Fit */
+            design_fit?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * FindDataPlanBodyResponse
+         * @description Where / how to look. A family label without a venue is not a plan.
+         */
+        FindDataPlanBodyResponse: {
+            /** Where */
+            where: string;
+            /** How */
+            how: string;
+            /** Venues */
+            venues?: string[];
+            search_facets: components["schemas"]["FindDataSearchFacetsResponse"];
+        };
+        /**
+         * FindDataSearchFacetsResponse
+         * @description Confirmed Y/X/method/interactions used to search (not a confirm substitute).
+         */
+        FindDataSearchFacetsResponse: {
+            /**
+             * Method
+             * @default
+             */
+            method: string;
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Controls */
+            controls?: string[];
+            /** Interactions */
+            interactions?: string[];
+            /**
+             * Qtype
+             * @default
+             */
+            qType: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+            /** Query Terms */
+            query_terms?: string[];
+        };
+        /**
          * GenerateChapterRequest
          * @description POST /sessions/{id}/generate-chapter 请求体。
          */
@@ -2972,6 +3087,26 @@ export interface components {
              * @constant
              */
             degraded: false;
+        };
+        /**
+         * SessionFindDataResponse
+         * @description GET/POST find-data: plan after confirmed design. Not attach, not gold prefill.
+         */
+        SessionFindDataResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "missing" | "planned";
+            /** Planned At */
+            planned_at?: string | null;
+            /** Route Family */
+            route_family?: ("educ_wage" | "minwage" | "growth" | "macro" | "else") | null;
+            /** Primary Venue */
+            primary_venue?: string | null;
+            plan?: components["schemas"]["FindDataPlanBodyResponse"] | null;
+            /** Candidates */
+            candidates?: components["schemas"]["FindDataCandidateResponse"][];
         };
         /**
          * SessionInfoResponse
@@ -3718,6 +3853,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_find_data_endpoint_sessions__session_id__find_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_find_data_endpoint_sessions__session_id__find_data_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
                 };
             };
             /** @description Validation Error */

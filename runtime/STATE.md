@@ -4,7 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
-| FM-E-BUILD-RIGOR-ATTACH-MERGE-1 | `runtime/tasks/20260915-fm-e-build-rigor-attach-merge-1.md` | active | `fix/fm-e-build-rigor-attach-merge-1` from rigor `4546e4de` + attach `769beed7` | 2026-09-15 | merge; push; `make test`; no PR |
+| FM-E-BUILD-RIGOR-ATTACH-MERGE-1 | `runtime/tasks/20260915-fm-e-build-rigor-attach-merge-1.md` | complete | `fix/fm-e-build-rigor-attach-merge-1` @ `539a18ae` | 2026-09-15 | pushed; `make test` green; no PR; Run on full SHA |
 | FM-E-DATA-RIGOR-1 | `runtime/tasks/20260915-fm-e-data-rigor-1.md` | complete | `fix/fm-e-build-data-rigor-1` @ `810dfa7` | 2026-09-15 | pushed; captain-local-real encoded; no PR |
 | FM-E-BUILD-ATTACH-FIXTURE-MERGE-1 | `runtime/tasks/20260915-fm-e-build-attach-fixture-merge-1.md` | complete | `fix/fm-e-build-attach-fixture-merge-1` @ `a8a8665` | 2026-09-15 | merge tip pushed; no PR; Run re-smoke on full SHA |
 | FM-E-BUILD-DID-BE-SPEC re-cut | `runtime/tasks/20260915-fm-e-build-did-spec-recut.md` | complete | `feat/fm-e-build-did-spec-recut-1` from `9f154dda` | 2026-09-15 | confirmed did missing treat×period hard-blocks; no PR |

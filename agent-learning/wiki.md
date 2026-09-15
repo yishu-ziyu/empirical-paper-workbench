@@ -11,6 +11,7 @@
 | DID-spec-confirmed-not-catalog | Parked DID-BE-spec forced/blocked on catalog `allow_did` | DECIDE-6 withdrew catalog as DiD SoT | Trigger = `confirmed_did_method`; missing term 409 + estimate/write block; force `y ~ treat * post` without `| FE` | `agent-learning/raw/2026-09-15_did-be-spec-recut.md` |
 | DC-attach-routes-on-recut-stack | CK-WRITE-1 attach / confirm-attach 404; `/upload` used as hang workaround | Recut stack had suggest + infer-design but not DC-BE-attach | Restore `/sessions/{id}/attach` + `/confirm-attach`; only confirm-attach sets `dataAttached` | `agent-learning/raw/2026-09-15_fm-e-build-attach-404.md` |
 | DC-attach-plus-classic-fixture | Attach routes and `ck1994_long.csv` lived on sibling tips | Catalog already listed CK; CSV/SOURCE restored on a different branch | Merge attach first, then fixture blobs; do not invent CSV | `agent-learning/raw/2026-09-15_fm-e-build-attach-fixture-merge-1.md` |
+| DATA-RIGOR-plus-attach | DATA-RIGOR honesty and attach/confirm-attach lived on sibling tips | Rigor recovered found CK + teaching flags; attach restored DC-BE routes on the recut stack | Merge attach onto rigor; keep `teaching_fixture`/`found` and real CK bytes; do not invent CSV | `agent-learning/raw/2026-09-15_fm-e-build-rigor-attach-merge-1.md` |
 
 ## Skill impact
 

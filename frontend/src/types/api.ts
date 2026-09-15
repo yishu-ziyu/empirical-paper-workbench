@@ -1725,6 +1725,9 @@ export interface components {
         /**
          * Classic5CandidateResponse
          * @description One classic-5 catalog candidate. Suggest never attaches or prefills spec.
+         *
+         *     ``candidates`` are found-scale only. Teaching stubs / n<200 extracts use
+         *     ``teaching_fixture=true`` and ``found=false`` on the teaching shelf.
          */
         Classic5CandidateResponse: {
             /**
@@ -1773,6 +1776,20 @@ export interface components {
              * @constant
              */
             attached: false;
+            /**
+             * Found
+             * @default false
+             */
+            found: boolean;
+            /**
+             * Teaching Fixture
+             * @default false
+             */
+            teaching_fixture: boolean;
+            /** N Rows */
+            n_rows?: number | null;
+            /** Honesty Warning */
+            honesty_warning?: string | null;
         };
         /**
          * Classic5OwnFileActionResponse
@@ -1815,6 +1832,7 @@ export interface components {
          *
          *     After a confirmed ``session.design``, ranked classic-5 candidates plus a
          *     non-catalog own-file action. Without confirm, candidates stay empty.
+         *     ``candidates`` never include teaching toys as found data.
          *     ``attached`` is always false: this path must not hang data or lock spec.
          */
         Classic5SuggestResponse: {
@@ -1841,6 +1859,8 @@ export interface components {
             design_confirmed: boolean;
             /** Candidates */
             candidates?: components["schemas"]["Classic5CandidateResponse"][];
+            /** Teaching */
+            teaching?: components["schemas"]["Classic5CandidateResponse"][];
             own_file: components["schemas"]["Classic5OwnFileActionResponse"];
             /**
              * Attached
@@ -1914,6 +1934,13 @@ export interface components {
             session_id?: string | null;
             /** Status */
             status?: string | null;
+            /**
+             * Demo Success
+             * @default false
+             */
+            demo_success: boolean;
+            /** Honesty Warning */
+            honesty_warning?: string | null;
         };
         /** DatasetProvenanceResponse */
         DatasetProvenanceResponse: {
@@ -2577,6 +2604,20 @@ export interface components {
             design_fit?: {
                 [key: string]: unknown;
             };
+            /**
+             * Found
+             * @default true
+             */
+            found: boolean;
+            /**
+             * Teaching Fixture
+             * @default false
+             */
+            teaching_fixture: boolean;
+            /** N Rows */
+            n_rows?: number | null;
+            /** Honesty Warning */
+            honesty_warning?: string | null;
         };
         /**
          * FindDataPlanBodyResponse

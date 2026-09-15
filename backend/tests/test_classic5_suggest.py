@@ -76,9 +76,18 @@ def _assert_candidates_only(payload: dict) -> None:
     assert payload["own_file"] == {"action": "upload_own_file", "catalog": False}
     for key in _FORBIDDEN_SUCCESS_KEYS:
         assert key not in payload
+    assert "teaching" in payload
     for item in payload["candidates"]:
         assert item["source"] == "classic-5"
         assert item["catalog_id"] == "classic-5"
+        assert item["attached"] is False
+        assert item["found"] is True
+        assert item["teaching_fixture"] is False
+        for key in _FORBIDDEN_SUCCESS_KEYS:
+            assert key not in item
+    for item in payload["teaching"]:
+        assert item["found"] is False
+        assert item["teaching_fixture"] is True
         assert item["attached"] is False
         for key in _FORBIDDEN_SUCCESS_KEYS:
             assert key not in item
@@ -90,6 +99,9 @@ def test_default_catalog_has_ranking_stubs_with_matching_facets():
     by_id = {item.entry_id: item for item in entries}
     assert by_id["ck1994_long"].method == "did"
     assert by_id["barro1991_growth"].method == "ols"
+    assert by_id["ck1994_long"].found is True
+    assert by_id["barro1991_growth"].teaching_fixture is True
+    assert by_id["schooling-wages"].teaching_fixture is True
     assert by_id["ck1994_long"].outcome
     assert by_id["barro1991_growth"].treatment
     assert all(item.title for item in entries)
@@ -104,6 +116,7 @@ def test_unconfirmed_design_is_not_a_catalog_success():
     _assert_candidates_only(payload)
     assert payload["design_confirmed"] is False
     assert payload["candidates"] == []
+    assert payload["teaching"] == []
 
 
 def test_title_only_does_not_rank_classic_as_success():
@@ -111,6 +124,7 @@ def test_title_only_does_not_rank_classic_as_success():
     _assert_candidates_only(payload)
     assert payload["design_confirmed"] is False
     assert payload["candidates"] == []
+    assert payload["teaching"] == []
     ids = [item["entry_id"] for item in payload["candidates"]]
     assert "ck1994_long" not in ids
 
@@ -136,9 +150,13 @@ def test_confirmed_did_minwage_lists_ck1994_as_candidate():
     assert payload["design_confirmed"] is True
     ids = [item["entry_id"] for item in payload["candidates"]]
     assert ids[0] == "ck1994_long"
+    assert payload["candidates"][0]["found"] is True
+    assert payload["candidates"][0]["n_rows"] >= 200
     assert "barro1991_growth" not in ids
     assert payload["candidates"][0]["method"] == "did"
     assert payload["candidates"][0]["score"] > 0
+    teaching_ids = [item["entry_id"] for item in payload["teaching"]]
+    assert "barro1991_growth" not in teaching_ids
 
 
 def test_confirmed_ols_growth_lists_barro_as_candidate():
@@ -151,8 +169,14 @@ def test_confirmed_ols_growth_lists_barro_as_candidate():
     payload = suggest_candidates(design=design)
     _assert_candidates_only(payload)
     ids = [item["entry_id"] for item in payload["candidates"]]
-    assert ids[0] == "barro1991_growth"
     assert "ck1994_long" not in ids
+    assert "barro1991_growth" not in ids
+    teaching_ids = [item["entry_id"] for item in payload["teaching"]]
+    assert teaching_ids[0] == "barro1991_growth"
+    assert payload["teaching"][0]["teaching_fixture"] is True
+    assert payload["teaching"][0]["found"] is False
+    assert payload["teaching"][0]["n_rows"] == 110
+    assert payload["teaching"][0]["honesty_warning"]
 
 
 def test_confirmed_ols_schooling_does_not_open_did_fixture():
@@ -167,7 +191,11 @@ def test_confirmed_ols_schooling_does_not_open_did_fixture():
     assert ids[0] == "schooling-wages"
     assert "ck1994_long" not in ids
     payload = suggest_candidates(design=design)
-    assert all(item["method"] != "did" for item in payload["candidates"])
+    _assert_candidates_only(payload)
+    assert payload["candidates"] == []
+    assert all(item["method"] != "did" for item in payload["teaching"])
+    assert payload["teaching"][0]["entry_id"] == "schooling-wages"
+    assert payload["teaching"][0]["teaching_fixture"] is True
 
 
 def test_catalog_id_alone_does_not_lock_spec_or_did():
@@ -187,7 +215,9 @@ def test_suggest_payload_never_attaches_or_prefills():
         )
     )
     _assert_candidates_only(payload)
-    assert payload["candidates"][0]["entry_id"] == "trade-local-labor"
+    assert payload["candidates"] == []
+    assert payload["teaching"][0]["entry_id"] == "trade-local-labor"
+    assert payload["teaching"][0]["teaching_fixture"] is True
 
 
 def test_suggest_endpoint_without_confirm_returns_empty_candidates(client):
@@ -200,6 +230,7 @@ def test_suggest_endpoint_without_confirm_returns_empty_candidates(client):
     _assert_candidates_only(data)
     assert data["design_confirmed"] is False
     assert data["candidates"] == []
+    assert data["teaching"] == []
 
 
 def test_suggest_endpoint_after_confirm_matches_design(client):
@@ -221,6 +252,7 @@ def test_suggest_endpoint_after_confirm_matches_design(client):
     _assert_candidates_only(data)
     assert data["design_confirmed"] is True
     assert data["candidates"][0]["entry_id"] == "ck1994_long"
+    assert data["candidates"][0]["found"] is True
     assert data["title"] == "最低工资对就业的影响"
 
     snap_after = client.get(f"/sessions/{sid}").json()
@@ -250,6 +282,7 @@ def test_suggest_endpoint_draft_design_is_not_success(client):
     data = resp.json()
     assert data["design_confirmed"] is False
     assert data["candidates"] == []
+    assert data["teaching"] == []
     assert data["own_file"]["action"] == "upload_own_file"
 
 
@@ -330,10 +363,12 @@ def test_suggest_env_catalog_override_uses_confirmed_design(client, tmp_path, mo
     )
     resp = client.post("/classic-5/suggest", json={"session_id": sid})
     assert resp.status_code == 200, resp.text
-    ids = [item["entry_id"] for item in resp.json()["candidates"]]
+    ids = [item["entry_id"] for item in resp.json()["teaching"]]
     assert ids[0] == "alpha-trade"
     assert ids == ["alpha-trade", "beta-health"]
-    assert resp.json()["candidates"][0]["score"] > resp.json()["candidates"][1]["score"]
+    assert resp.json()["candidates"] == []
+    assert resp.json()["teaching"][0]["score"] > resp.json()["teaching"][1]["score"]
+    assert resp.json()["teaching"][0]["teaching_fixture"] is True
 
 
 def test_suggest_empty_catalog_still_returns_own_file(client, tmp_path, monkeypatch):
@@ -346,6 +381,7 @@ def test_suggest_empty_catalog_still_returns_own_file(client, tmp_path, monkeypa
     data = resp.json()
     assert data["design_confirmed"] is True
     assert data["candidates"] == []
+    assert data["teaching"] == []
     assert data["own_file"]["action"] == "upload_own_file"
     assert data["attached"] is False
 

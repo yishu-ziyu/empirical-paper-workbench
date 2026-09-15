@@ -30,6 +30,8 @@ class DatasetMetaResponse(BaseModel):
     missing_count: Optional[int] = None
     session_id: Optional[str] = None
     status: Optional[str] = None
+    demo_success: bool = False
+    honesty_warning: Optional[str] = None
 
 
 class ChapterResponse(BaseModel):
@@ -507,7 +509,11 @@ class Classic5OwnFileActionResponse(BaseModel):
 
 
 class Classic5CandidateResponse(BaseModel):
-    """One classic-5 catalog candidate. Suggest never attaches or prefills spec."""
+    """One classic-5 catalog candidate. Suggest never attaches or prefills spec.
+
+    ``candidates`` are found-scale only. Teaching stubs / n<200 extracts use
+    ``teaching_fixture=true`` and ``found=false`` on the teaching shelf.
+    """
 
     catalog_id: Literal["classic-5"] = "classic-5"
     entry_id: str
@@ -520,6 +526,10 @@ class Classic5CandidateResponse(BaseModel):
     treatment: str = ""
     score: float
     attached: Literal[False] = False
+    found: bool = False
+    teaching_fixture: bool = False
+    n_rows: Optional[int] = None
+    honesty_warning: Optional[str] = None
 
 
 class Classic5SuggestResponse(BaseModel):
@@ -527,6 +537,7 @@ class Classic5SuggestResponse(BaseModel):
 
     After a confirmed ``session.design``, ranked classic-5 candidates plus a
     non-catalog own-file action. Without confirm, candidates stay empty.
+    ``candidates`` never include teaching toys as found data.
     ``attached`` is always false: this path must not hang data or lock spec.
     """
 
@@ -535,6 +546,7 @@ class Classic5SuggestResponse(BaseModel):
     topic: str = ""
     design_confirmed: bool = False
     candidates: List[Classic5CandidateResponse] = Field(default_factory=list)
+    teaching: List[Classic5CandidateResponse] = Field(default_factory=list)
     own_file: Classic5OwnFileActionResponse
     attached: Literal[False] = False
 
@@ -1066,6 +1078,10 @@ class FindDataCandidateResponse(BaseModel):
     license: str
     suggested_cols: List[str] = Field(default_factory=list)
     design_fit: Dict[str, Any] = Field(default_factory=dict)
+    found: bool = True
+    teaching_fixture: bool = False
+    n_rows: Optional[int] = None
+    honesty_warning: Optional[str] = None
 
 
 class SessionFindDataResponse(BaseModel):

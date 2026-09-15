@@ -34,6 +34,7 @@ from auth import (
     require_auth_unless_debug,
     require_session_ownership,
 )
+from agent.data_honesty import honesty_for_n
 from config import settings
 from facade import facade
 from models.user import User
@@ -141,12 +142,15 @@ def _validated_upload_key(raw: str | None) -> str:
 
 
 def _dataset_meta(df: pd.DataFrame, name: str | None = None) -> DatasetMetaResponse:
+    honesty = honesty_for_n(int(len(df)), name=name)
     return DatasetMetaResponse(
         name=name,
         columns=[str(column) for column in df.columns],
         rows=int(len(df)),
         dtypes={str(column): str(dtype) for column, dtype in df.dtypes.items()},
         missing_count=int(df.isna().sum().sum()),
+        demo_success=bool(honesty["demo_success"]),
+        honesty_warning=honesty.get("honesty_warning"),
     )
 
 
@@ -170,6 +174,12 @@ def _upload_response(admission) -> UploadResponse:
             rows=metadata.get("rows"),
             dtypes=dict(metadata.get("dtypes") or {}),
             missing_count=metadata.get("missing_count"),
+            demo_success=bool(metadata.get("demo_success")),
+            honesty_warning=(
+                str(metadata["honesty_warning"])
+                if metadata.get("honesty_warning")
+                else None
+            ),
         ),
     )
 

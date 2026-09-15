@@ -20,6 +20,12 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from agent.data_honesty import (
+    count_csv_data_rows,
+    honesty_for_n,
+    is_found_scale,
+    is_toy_filename,
+)
 from agent.design.spec import norm_method
 from agent.find_data.plan import is_confirmed_design
 
@@ -278,15 +284,25 @@ def _candidate(
     suggested_cols: Sequence[str],
     design: Mapping[str, Any],
     notes: str,
+    found: bool = True,
+    teaching_fixture: bool = False,
+    n_rows: int | None = None,
+    honesty_warning: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    item = {
         "source_id": source_id,
         "title": title,
         "url_or_fixture": url_or_fixture,
         "license": license,
         "suggested_cols": list(suggested_cols),
         "design_fit": _design_fit(design, notes=notes),
+        "found": found,
+        "teaching_fixture": teaching_fixture,
+        "n_rows": n_rows,
     }
+    if honesty_warning:
+        item["honesty_warning"] = honesty_warning
+    return item
 
 
 def _route_externals(
@@ -503,6 +519,12 @@ def _fixture_candidates(
         path = _find_fixture_file(root, entry_id)
         if path is None:
             continue
+        if is_toy_filename(path):
+            continue
+        n_rows = count_csv_data_rows(path)
+        honesty = honesty_for_n(n_rows, name=path.name)
+        if not honesty["found"] or not is_found_scale(n_rows):
+            continue
         meta_title, license_text = _FIXTURE_META.get(
             entry_id, (entry_id, "unknown")
         )
@@ -520,6 +542,9 @@ def _fixture_candidates(
                 suggested_cols=_suggested_from_design(design, extras),
                 design=design,
                 notes=f"matches confirmed {family}; candidate only",
+                found=True,
+                teaching_fixture=False,
+                n_rows=n_rows,
             )
         )
     return found

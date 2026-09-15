@@ -26,9 +26,9 @@ PRIMARY_VENUE = {
 # Named landing paths. Dataverse is the always-on backup except when it is
 # already the primary venue.
 _VENUES = {
-    "educ_wage": ("IPUMS", "wage1", "Dataverse"),
+    "educ_wage": ("IPUMS", "Dataverse"),
     "minwage": ("ck fixture", "Card zip", "Dataverse"),
-    "growth": ("WDI", "barro", "Dataverse"),
+    "growth": ("WDI", "Dataverse"),
     "macro": ("FRED", "Dataverse"),
     "else": ("Dataverse",),
 }
@@ -211,21 +211,21 @@ def _how(family: str, facets: dict[str, Any]) -> str:
         return (
             f"Open the IPUMS CPS/USA extract landing and request columns bound "
             f"to confirmed outcome '{outcome}' and treatment '{treatment}'. "
-            f"Also list the wage1 teaching extract as a candidate, not an "
-            f"answer key. Search Dataverse as backup using: {terms}."
+            f"Do not treat wage1 or other teaching extracts as found data. "
+            f"Search Dataverse as backup using: {terms}."
         )
     if family == "minwage":
         return (
-            f"List the ck fixture as a candidate (never an answer key). "
-            f"Follow the Card zip at the author-published NJ–PA page. "
-            f"Search Dataverse for confirmed outcome '{outcome}' and "
-            f"treatment '{treatment}' (method {method})."
+            f"List the real-scale ck fixture as a candidate (never an answer "
+            f"key) when n≥200. Follow the Card zip at the author-published "
+            f"NJ–PA page. Search Dataverse for confirmed outcome '{outcome}' "
+            f"and treatment '{treatment}' (method {method})."
         )
     if family == "growth":
         return (
             f"Use World Bank WDI for confirmed growth outcome '{outcome}'. "
-            f"Also list the barro teaching extract as a candidate, not an "
-            f"answer key. Search Dataverse as backup using: {terms}."
+            f"Barro teaching extracts are not found data. Search Dataverse "
+            f"as backup using: {terms}."
         )
     if family == "macro":
         return (
@@ -241,11 +241,11 @@ def _how(family: str, facets: dict[str, Any]) -> str:
 
 def _where(family: str) -> str:
     if family == "educ_wage":
-        return "IPUMS extract landing + wage1"
+        return "IPUMS extract landing"
     if family == "minwage":
         return "ck fixture + Card zip"
     if family == "growth":
-        return "WDI + barro"
+        return "WDI"
     if family == "macro":
         return "FRED"
     return "Dataverse"

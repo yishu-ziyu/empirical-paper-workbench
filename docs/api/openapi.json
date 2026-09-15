@@ -3977,6 +3977,38 @@
             "const": false,
             "title": "Attached",
             "default": false
+          },
+          "found": {
+            "type": "boolean",
+            "title": "Found",
+            "default": false
+          },
+          "teaching_fixture": {
+            "type": "boolean",
+            "title": "Teaching Fixture",
+            "default": false
+          },
+          "n_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Rows"
+          },
+          "honesty_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Honesty Warning"
           }
         },
         "type": "object",
@@ -3986,7 +4018,7 @@
           "score"
         ],
         "title": "Classic5CandidateResponse",
-        "description": "One classic-5 catalog candidate. Suggest never attaches or prefills spec."
+        "description": "One classic-5 catalog candidate. Suggest never attaches or prefills spec.\n\n``candidates`` are found-scale only. Teaching stubs / n<200 extracts use\n``teaching_fixture=true`` and ``found=false`` on the teaching shelf."
       },
       "Classic5OwnFileActionResponse": {
         "properties": {
@@ -4064,6 +4096,13 @@
             "type": "array",
             "title": "Candidates"
           },
+          "teaching": {
+            "items": {
+              "$ref": "#/components/schemas/Classic5CandidateResponse"
+            },
+            "type": "array",
+            "title": "Teaching"
+          },
           "own_file": {
             "$ref": "#/components/schemas/Classic5OwnFileActionResponse"
           },
@@ -4079,7 +4118,7 @@
           "own_file"
         ],
         "title": "Classic5SuggestResponse",
-        "description": "POST /classic-5/suggest 返回体.\n\nAfter a confirmed ``session.design``, ranked classic-5 candidates plus a\nnon-catalog own-file action. Without confirm, candidates stay empty.\n``attached`` is always false: this path must not hang data or lock spec."
+        "description": "POST /classic-5/suggest 返回体.\n\nAfter a confirmed ``session.design``, ranked classic-5 candidates plus a\nnon-catalog own-file action. Without confirm, candidates stay empty.\n``candidates`` never include teaching toys as found data.\n``attached`` is always false: this path must not hang data or lock spec."
       },
       "CreateSessionResponse": {
         "properties": {
@@ -4210,6 +4249,22 @@
               }
             ],
             "title": "Status"
+          },
+          "demo_success": {
+            "type": "boolean",
+            "title": "Demo Success",
+            "default": false
+          },
+          "honesty_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Honesty Warning"
           }
         },
         "type": "object",
@@ -5708,6 +5763,38 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Design Fit"
+          },
+          "found": {
+            "type": "boolean",
+            "title": "Found",
+            "default": true
+          },
+          "teaching_fixture": {
+            "type": "boolean",
+            "title": "Teaching Fixture",
+            "default": false
+          },
+          "n_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Rows"
+          },
+          "honesty_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Honesty Warning"
           }
         },
         "type": "object",

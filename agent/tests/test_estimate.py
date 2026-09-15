@@ -85,6 +85,8 @@ def test_estimate_writes_treatment_row(tmp_path):
     assert "| x |" in out["results"]
     assert out["estimate"]["status"] == "ok"
     assert out["estimate"]["n"] == 6
+    assert out["estimate"]["demo_success"] is False
+    assert "below 200" in (out["estimate"].get("honesty_warning") or "")
     assert out["estimate"]["coef"] is not None
     assert out["estimate"]["table_rows"]
     assert any(row.startswith("| x |") for row in out["estimate"]["table_rows"])
@@ -96,7 +98,7 @@ def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[2]
-    df = pd.read_csv(repo_root / "frontend/public/samples/course-panel.csv")
+    df = pd.read_csv(repo_root / "tests/fixtures/course-panel.synthetic.csv")
     csv_path = tmp_path / "course.csv"
     df.to_csv(csv_path, index=False)
     out = estimate(
@@ -122,6 +124,8 @@ def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
         assert cells[2] == "—"
     else:
         float(cells[1])
+    assert out["estimate"]["demo_success"] is False
+    assert out["estimate"].get("honesty_warning")
 
 
 def test_estimate_omitted_control_not_in_data(tmp_path):

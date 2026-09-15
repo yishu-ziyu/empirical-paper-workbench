@@ -4,6 +4,10 @@ Read-only. Does not attach, does not set ``dataAttached``, does not lock
 spec / gold bodies, and does not load catalog bytes (that loader is
 DC-BE-attach). Catalog entries are candidates only, never an answer key.
 
+Found candidates require a real-scale fixture file (n ≥ 200). Metadata
+stubs and small teaching extracts go on the teaching shelf with
+``teaching_fixture=true`` / ``found=false``.
+
 Without a confirmed ``session.design``, ranking is not a success path.
 """
 from __future__ import annotations
@@ -15,6 +19,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from agent.data_honesty import (
+    count_csv_data_rows,
+    honesty_for_n,
+    is_found_scale,
+    is_toy_filename,
+)
 from agent.design.spec import norm_method
 from config import PRODUCT_ROOT
 from services.session_design import is_confirmed_object
@@ -24,6 +34,7 @@ OWN_FILE_ACTION = "upload_own_file"
 CATALOG_ENV_FILE = "ECONPAPER_CLASSIC5_CATALOG"
 CATALOG_ENV_DIR = "ECONPAPER_CLASSIC5_DIR"
 _DEFAULT_CATALOG = PRODUCT_ROOT / "fixtures" / "classic-5" / "catalog.json"
+_FIXTURE_EXTS = (".csv", ".dta", ".xlsx", ".xls")
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 _CJK_RUN_RE = re.compile(r"[\u4e00-\u9fff]+")
@@ -72,6 +83,8 @@ class Classic5Entry:
     method: str = ""
     outcome: str = ""
     treatment: str = ""
+    teaching_fixture: bool = False
+    found: bool = False
 
 
 def catalog_path() -> Path:
@@ -83,6 +96,19 @@ def catalog_path() -> Path:
     if env_dir:
         return Path(env_dir).expanduser() / "catalog.json"
     return _DEFAULT_CATALOG
+
+
+def catalog_dir(path: Path | None = None) -> Path:
+    return (path if path is not None else catalog_path()).parent
+
+
+def find_fixture_file(entry_id: str, directory: Path | None = None) -> Path | None:
+    root = directory if directory is not None else catalog_dir()
+    for ext in _FIXTURE_EXTS:
+        candidate = root / f"{entry_id}{ext}"
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def read_catalog(path: Path | None = None) -> list[Classic5Entry]:
@@ -154,29 +180,55 @@ def suggest_candidates(
         ranked = rank_entries_for_design(read_catalog(), design_dict, title, topic)
     else:
         ranked = []
+    found: list[dict] = []
+    teaching: list[dict] = []
+    root = catalog_dir()
+    for entry, score in ranked:
+        item = _candidate_payload(entry, score, root)
+        if item["found"]:
+            found.append(item)
+        else:
+            teaching.append(item)
     return {
         "catalog_id": CATALOG_ID,
         "title": title,
         "topic": topic,
         "design_confirmed": confirmed,
-        "candidates": [
-            {
-                "catalog_id": CATALOG_ID,
-                "entry_id": entry.entry_id,
-                "source": CATALOG_ID,
-                "title": entry.title,
-                "topic": entry.topic,
-                "tags": list(entry.tags),
-                "method": entry.method,
-                "outcome": entry.outcome,
-                "treatment": entry.treatment,
-                "score": score,
-                "attached": False,
-            }
-            for entry, score in ranked
-        ],
+        "candidates": found,
+        "teaching": teaching,
         "own_file": {"action": OWN_FILE_ACTION, "catalog": False},
         "attached": False,
+    }
+
+
+def _candidate_payload(entry: Classic5Entry, score: float, root: Path) -> dict:
+    path = find_fixture_file(entry.entry_id, root)
+    n_rows = count_csv_data_rows(path) if path is not None else None
+    honesty = honesty_for_n(n_rows, name=path.name if path is not None else entry.entry_id)
+    found = bool(
+        path is not None
+        and honesty["found"]
+        and is_found_scale(n_rows)
+        and not is_toy_filename(path)
+        and not entry.teaching_fixture
+    )
+    warning = honesty["honesty_warning"] if not found else None
+    return {
+        "catalog_id": CATALOG_ID,
+        "entry_id": entry.entry_id,
+        "source": CATALOG_ID,
+        "title": entry.title,
+        "topic": entry.topic,
+        "tags": list(entry.tags),
+        "method": entry.method,
+        "outcome": entry.outcome,
+        "treatment": entry.treatment,
+        "score": score,
+        "attached": False,
+        "found": found,
+        "teaching_fixture": not found,
+        "n_rows": n_rows,
+        "honesty_warning": warning,
     }
 
 
@@ -193,6 +245,10 @@ def _parse_entry(item: object) -> Classic5Entry | None:
         if str(tag).strip()
     )
     method = norm_method(item.get("method")) or ""
+    teaching = bool(item.get("teaching_fixture"))
+    found_flag = item.get("found")
+    if found_flag is None:
+        found_flag = not teaching
     return Classic5Entry(
         entry_id=entry_id,
         title=title,
@@ -201,6 +257,8 @@ def _parse_entry(item: object) -> Classic5Entry | None:
         method=method,
         outcome=str(item.get("outcome") or "").strip(),
         treatment=str(item.get("treatment") or "").strip(),
+        teaching_fixture=teaching,
+        found=bool(found_flag) and not teaching,
     )
 
 

@@ -93,7 +93,14 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     assert data["plan"]["search_facets"]["treatment"] == "min_wage"
     assert data["plan"]["search_facets"]["method"] == "did"
     assert "treated:period" in data["plan"]["search_facets"]["interactions"]
-    assert data["candidates"] == []
+    ids = [item["source_id"] for item in data["candidates"]]
+    assert "card-zip:njmin" in ids
+    assert "classic-5:ck1994_long" in ids
+    assert all(item.get("found") is not False for item in data["candidates"])
+    assert all(not item.get("teaching_fixture") for item in data["candidates"])
+    ck = next(item for item in data["candidates"] if item["source_id"] == "classic-5:ck1994_long")
+    assert ck["n_rows"] >= 200
+    assert "wage1" not in ids
 
     state = facade.get_state(sid)
     assert state["find_data"]["status"] == "planned"
@@ -107,7 +114,9 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     stored = client.get(f"/sessions/{sid}/find-data")
     assert stored.status_code == 200
     assert stored.json()["route_family"] == "minwage"
-    assert stored.json()["candidates"] == []
+    stored_ids = [item["source_id"] for item in stored.json()["candidates"]]
+    assert "card-zip:njmin" in stored_ids
+    assert "classic-5:ck1994_long" in stored_ids
 
 
 def test_educ_wage_and_growth_routes(client):
@@ -132,7 +141,7 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.status_code == 200, resp.text
     assert resp.json()["route_family"] == "educ_wage"
     assert resp.json()["primary_venue"] == "IPUMS"
-    assert "wage1" in resp.json()["plan"]["where"]
+    assert "wage1" not in resp.json()["plan"]["where"]
 
     facade.seed_state(
         sid,
@@ -154,8 +163,7 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.status_code == 200, resp.text
     assert resp.json()["route_family"] == "growth"
     assert resp.json()["primary_venue"] == "WDI"
-    assert "barro" in resp.json()["plan"]["where"]
-    assert resp.json()["candidates"] == []
+    assert "barro" not in resp.json()["plan"]["where"]
 
 
 def test_plan_does_not_clear_or_set_data_attached(client):
@@ -167,7 +175,7 @@ def test_plan_does_not_clear_or_set_data_attached(client):
         state = facade.get_state(sid)
         assert state["dataAttached"] is True
         assert state["find_data"]["status"] == "planned"
-        assert state["find_data"]["candidates"] == []
+        assert state["find_data"]["candidates"]
         assert "table1Confirmed" not in state
         assert "specConfirmed" not in state
     finally:
@@ -199,6 +207,9 @@ def test_plan_is_not_catalog_prefill(client):
     dumped = str(data)
     assert "ck1994" not in dumped
     assert "schooling-wages" not in dumped
-    assert data["candidates"] == []
+    ids = [item["source_id"] for item in data["candidates"]]
+    assert "ipums:cps" in ids
+    assert "wage1" not in ids
+    assert any(sid.startswith("dataverse:") for sid in ids)
     state = facade.get_state(sid)
     assert state["design"]["catalog_entry_id"] is None

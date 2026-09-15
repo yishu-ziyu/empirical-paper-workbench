@@ -8,6 +8,8 @@
       "method": "ols",
       "outcome": "wages",
       "treatment": "schooling",
+      "teaching_fixture": true,
+      "found": false,
       "tags": [
         "education",
         "schooling",
@@ -27,6 +29,8 @@
       "method": "did",
       "outcome": "employment",
       "treatment": "min_wage",
+      "teaching_fixture": false,
+      "found": true,
       "tags": [
         "min wage",
         "minimum wage",
@@ -49,6 +53,8 @@
       "method": "ols",
       "outcome": "employment",
       "treatment": "import",
+      "teaching_fixture": true,
+      "found": false,
       "tags": [
         "trade",
         "import",
@@ -67,6 +73,8 @@
       "method": "ols",
       "outcome": "output",
       "treatment": "spending",
+      "teaching_fixture": true,
+      "found": false,
       "tags": [
         "fiscal",
         "government",
@@ -85,6 +93,8 @@
       "method": "ols",
       "outcome": "hours",
       "treatment": "health",
+      "teaching_fixture": true,
+      "found": false,
       "tags": [
         "health",
         "labor",
@@ -102,6 +112,8 @@
       "method": "ols",
       "outcome": "growth",
       "treatment": "sec_enroll",
+      "teaching_fixture": true,
+      "found": false,
       "tags": [
         "growth",
         "barro",

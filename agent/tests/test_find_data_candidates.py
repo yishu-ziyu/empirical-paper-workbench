@@ -49,6 +49,13 @@ def _confirmed(**overrides) -> dict:
     return design
 
 
+def _write_found_scale_csv(path: Path, header: str = "employment,treated,period") -> None:
+    lines = [header]
+    for i in range(200):
+        lines.append(f"{i % 17},1,{i % 2}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _silent_dataverse(_query: str) -> list:
     return []
 
@@ -120,8 +127,35 @@ def test_minwage_without_fixture_still_has_card_zip_and_dataverse(tmp_path: Path
     assert card["license"] == "author-posted"
 
 
-def test_minwage_fixture_may_appear_but_is_not_the_only_candidate(tmp_path: Path):
+def test_minwage_tiny_fixture_is_not_found(tmp_path: Path):
     (tmp_path / "ck1994_long.csv").write_text("employment,treated,period\n1,1,0\n")
+    (tmp_path / "catalog.json").write_text(
+        json.dumps(
+            {
+                "catalog_id": "classic-5",
+                "entries": [
+                    {
+                        "id": "ck1994_long",
+                        "title": "Card and Krueger minimum wage",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    items = suggest_data_candidates(
+        _confirmed(),
+        dataverse_search=_hit_dataverse,
+        catalog_dir=tmp_path,
+    )
+    _assert_real(items)
+    ids = [c["source_id"] for c in items]
+    assert "classic-5:ck1994_long" not in ids
+    assert "card-zip:njmin" in ids
+
+
+def test_minwage_fixture_may_appear_but_is_not_the_only_candidate(tmp_path: Path):
+    _write_found_scale_csv(tmp_path / "ck1994_long.csv")
     (tmp_path / "catalog.json").write_text(
         json.dumps(
             {
@@ -149,6 +183,8 @@ def test_minwage_fixture_may_appear_but_is_not_the_only_candidate(tmp_path: Path
     fixture = next(c for c in items if c["source_id"] == "classic-5:ck1994_long")
     assert fixture["url_or_fixture"].endswith("ck1994_long.csv")
     assert fixture["license"] == "public-reproduction"
+    assert fixture["found"] is True
+    assert fixture["n_rows"] >= 200
     assert "employment" in fixture["suggested_cols"]
     assert "candidate only" in fixture["design_fit"]["notes"]
 
@@ -197,16 +233,25 @@ def test_growth_route_lists_wdi_and_optional_barro(tmp_path: Path):
     assert any(sid.startswith("dataverse:") for sid in ids)
     assert "classic-5:barro1991_growth" not in ids
 
-    (tmp_path / "barro1991_growth.csv").write_text("growth,enrollment\n")
+    (tmp_path / "barro1991_growth.csv").write_text("growth,enrollment\n0.01,0.1\n")
     with_barro = suggest_data_candidates(
         design,
         dataverse_search=_hit_dataverse,
         catalog_dir=tmp_path,
     )
     barro_ids = [c["source_id"] for c in with_barro]
-    assert "classic-5:barro1991_growth" in barro_ids
+    assert "classic-5:barro1991_growth" not in barro_ids
     assert "wdi:NY.GDP.PCAP.KD.ZG" in barro_ids
-    assert any(sid.startswith("dataverse:") for sid in barro_ids)
+
+    _write_found_scale_csv(tmp_path / "barro1991_growth.csv", "growth,enrollment")
+    found_barro = suggest_data_candidates(
+        design,
+        dataverse_search=_hit_dataverse,
+        catalog_dir=tmp_path,
+    )
+    found_ids = [c["source_id"] for c in found_barro]
+    assert "classic-5:barro1991_growth" in found_ids
+    assert "wdi:NY.GDP.PCAP.KD.ZG" in found_ids
 
 
 def test_educ_wage_route_lists_ipums(tmp_path: Path):
@@ -220,7 +265,7 @@ def test_educ_wage_route_lists_ipums(tmp_path: Path):
         interactions=[],
         source={"title": "教育对工资的影响", "question": ""},
     )
-    (tmp_path / "wage1.csv").write_text("wage,educ\n")
+    (tmp_path / "wage1.csv").write_text("wage,educ\n1,12\n")
     items = suggest_data_candidates(
         design,
         dataverse_search=_silent_dataverse,
@@ -229,7 +274,7 @@ def test_educ_wage_route_lists_ipums(tmp_path: Path):
     _assert_real(items)
     ids = [c["source_id"] for c in items]
     assert "ipums:cps" in ids
-    assert "wage1" in ids
+    assert "wage1" not in ids
     assert any(sid.startswith("dataverse:") for sid in ids)
     ipums = next(c for c in items if c["source_id"] == "ipums:cps")
     assert ipums["license"] == "registration-required"

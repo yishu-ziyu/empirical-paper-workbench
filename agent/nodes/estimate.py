@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..data_honesty import honesty_for_n
 from ..design.spec import norm_method
 from ..engine.did_spec import (
     DID_MISSING_INTERACTION,
@@ -111,7 +112,33 @@ def _stamp_estimate_lineage(state: EconPaperState, out: EstimateOutput) -> Estim
     identity = analysis_dataset_identity(state, state.get("csv_path"))
     if identity is not None:
         payload["analysis_dataset"] = identity
+    _stamp_estimate_honesty(state, payload, identity)
     return out
+
+
+def _stamp_estimate_honesty(
+    state: EconPaperState,
+    payload: Dict[str, Any],
+    identity: Optional[Dict[str, Any]],
+) -> None:
+    n = payload.get("n")
+    if not isinstance(n, int) and isinstance(identity, dict):
+        rows = identity.get("rows")
+        n = rows if isinstance(rows, int) else n
+    name = None
+    if isinstance(identity, dict) and identity.get("name"):
+        name = identity.get("name")
+    if not name:
+        csv_path = state.get("csv_path")
+        if csv_path:
+            name = Path(str(csv_path)).name
+    honesty = honesty_for_n(n if isinstance(n, int) else None, name=name)
+    payload["demo_success"] = bool(honesty["demo_success"])
+    warning = honesty.get("honesty_warning")
+    if warning:
+        payload["honesty_warning"] = warning
+    else:
+        payload.pop("honesty_warning", None)
 
 
 def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float], Optional[float]]:

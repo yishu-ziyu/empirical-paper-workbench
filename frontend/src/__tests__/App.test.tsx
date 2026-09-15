@@ -1176,56 +1176,68 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('desk-upload-inline')).toBeDisabled()
   })
 
-  test('课设样例预填方向并显示列名', async () => {
+  test('Guide 教学案例走 /demos/card 而不是课设 course-panel', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       const href = String(url)
-      if (href.includes('/samples/course-panel.csv')) {
-        return Promise.resolve({
-          ok: true,
-          blob: () =>
-            Promise.resolve(
-              new Blob(['id,year,income,treat,age\n1,2011,8.2,0,52'], { type: 'text/csv' }),
-            ),
-        })
+      if (href.endsWith('/demos/card')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              session_id: 'sess-card-guide',
+              run_id: 'run-card-guide',
+              status: 'PENDING',
+              events_url: '/api/runs/run-card-guide/events',
+              dataset_meta: {
+                name: 'card_1995.csv',
+                columns: ['lwage', 'educ', 'nearc4'],
+                rows: 3010,
+                demo_success: true,
+              },
+            }),
+            { status: 202, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
       }
-      if (href.includes('/upload')) {
+      if (href.endsWith('/sessions/sess-card-guide')) {
         return Promise.resolve({
           ok: true,
+          status: 200,
           json: () =>
             Promise.resolve({
-              session_id: 'sess-sample',
-              dataset_meta: {
-                columns: ['id', 'year', 'income', 'treat', 'age'],
-                rows: 1,
-                dtypes: {},
-                missing_count: 0,
+              exists: true,
+              has_dataset: true,
+              session_id: 'sess-card-guide',
+              dataset: { name: 'card_1995.csv', rows: 3010, columns: ['lwage', 'educ'] },
+              research: {
+                teaching_case: 'card_1995',
+                question: {
+                  prompt_en: 'Does education increase earnings?',
+                  outcome: { name: 'lwage', label: 'Log wage', gloss: '对数工资' },
+                  treatment: { name: 'educ', label: 'Years of education' },
+                  causal_threat: { label: 'Ability and family background' },
+                  identification: { instrument: 'nearc4', label: 'College proximity (nearc4)' },
+                  estimand: { ols: 'OLS association', iv: 'IV local causal return' },
+                },
+                expectation: { text: 'OLS positive', confidence: 'medium', version: 1, history: [] },
+                specification_space: { status: 'proposed', frozen_at: null, definitions: [] },
               },
             }),
         })
       }
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ exists: true, currentStage: 0, stages: [] }),
-      })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ exists: true }) })
     })
     vi.stubGlobal('fetch', mockFetch)
     renderWithI18n(<App />)
     fireEvent.click(screen.getByTestId('desk-open-guide'))
     fireEvent.click(screen.getByTestId('guide-sample-btn'))
     await waitFor(() => {
-      expect(screen.getByTestId('direction-form')).toBeInTheDocument()
+      const demoCalls = mockFetch.mock.calls.filter((call) => String(call[0]).includes('/demos/card'))
+      expect(demoCalls.length).toBeGreaterThan(0)
     })
-    expect(screen.getByLabelText(/因变量/i)).toHaveValue('income')
-    expect(screen.getByLabelText(/自变量/i)).toHaveValue('age')
-    expect(screen.getByTestId('method-selector')).toHaveValue('OLS')
-    expect(screen.getByLabelText(/模板/i)).toHaveValue('undergrad')
-    expect(screen.getByTestId('data-columns')).toHaveTextContent('income')
-    expect(screen.getByLabelText(/研究问题/i)).toHaveValue('这份课设样例里，年龄和收入是否相关？')
-    const sampleCsvCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/samples/course-panel.csv'))
-    const sampleUpload = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/upload'))
-    expect(String(sampleCsvCall![0])).toBe('/samples/course-panel.csv')
-    expect(String(sampleUpload![0])).toBe(`${API_BASE}/upload`)
-    expect(String(sampleUpload![0])).not.toMatch(/localhost:8000|127\.0\.0\.1:8000/)
+    expect(mockFetch.mock.calls.some((call) => String(call[0]).includes('/samples/course-panel.csv'))).toBe(false)
+    expect(mockFetch.mock.calls.some((call) => String(call[0]).includes('/upload'))).toBe(false)
+    expect(await screen.findByTestId('teaching-case-badge')).toBeInTheDocument()
   })
 
   test('刷新后仍保留课设样例预填，列名来自后端 snapshot', async () => {

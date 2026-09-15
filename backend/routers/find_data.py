@@ -13,6 +13,7 @@ from facade import facade
 from models.user import User
 from schemas.responses import SessionFindDataResponse
 
+from agent.find_data.candidates import suggest_data_candidates
 from agent.find_data.plan import DesignUnconfirmed, build_find_data_plan, read_find_data
 
 router = APIRouter()
@@ -47,5 +48,6 @@ async def plan_find_data_endpoint(
         record = build_find_data_plan(state.get("design"))
     except DesignUnconfirmed as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    record["candidates"] = suggest_data_candidates(state.get("design"))
     facade.update_state(session_id, find_data=record)
     return SessionFindDataResponse.model_validate(record)

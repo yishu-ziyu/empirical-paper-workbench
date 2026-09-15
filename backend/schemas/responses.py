@@ -486,6 +486,51 @@ class SessionInfoResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# classic-5 suggest (DC-BE-suggest; rank candidates after confirmed design)
+# ---------------------------------------------------------------------------
+
+
+class Classic5OwnFileActionResponse(BaseModel):
+    """Non-catalog action returned with every suggest response."""
+
+    action: Literal["upload_own_file"] = "upload_own_file"
+    catalog: bool = False
+
+
+class Classic5CandidateResponse(BaseModel):
+    """One classic-5 catalog candidate. Suggest never attaches or prefills spec."""
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    entry_id: str
+    source: Literal["classic-5"] = "classic-5"
+    title: str
+    topic: str = ""
+    tags: List[str] = Field(default_factory=list)
+    method: str = ""
+    outcome: str = ""
+    treatment: str = ""
+    score: float
+    attached: Literal[False] = False
+
+
+class Classic5SuggestResponse(BaseModel):
+    """POST /classic-5/suggest 返回体.
+
+    After a confirmed ``session.design``, ranked classic-5 candidates plus a
+    non-catalog own-file action. Without confirm, candidates stay empty.
+    ``attached`` is always false: this path must not hang data or lock spec.
+    """
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    title: str = ""
+    topic: str = ""
+    design_confirmed: bool = False
+    candidates: List[Classic5CandidateResponse] = Field(default_factory=list)
+    own_file: Classic5OwnFileActionResponse
+    attached: Literal[False] = False
+
+
+# ---------------------------------------------------------------------------
 # evidence.py (main-estimate read model, C2)
 # ---------------------------------------------------------------------------
 

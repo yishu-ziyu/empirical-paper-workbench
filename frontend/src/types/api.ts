@@ -377,6 +377,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classic-5/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rank classic-5 candidates from a confirmed design
+         * @description Rank built-in classic-5 catalog entries for a confirmed design.
+         *
+         *     Returns ranked candidates plus a non-catalog own-file action.
+         *     Without a confirmed design, candidates are empty (not a catalog success).
+         *     Does not attach, admit an upload, write ``dataAttached``, or lock spec.
+         */
+        post: operations["suggest_classic5_classic_5_suggest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demos/card": {
         parameters: {
             query?: never;
@@ -1637,6 +1661,133 @@ export interface components {
             };
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * Classic5CandidateResponse
+         * @description One classic-5 catalog candidate. Suggest never attaches or prefills spec.
+         */
+        Classic5CandidateResponse: {
+            /**
+             * Catalog Id
+             * @default classic-5
+             * @constant
+             */
+            catalog_id: "classic-5";
+            /** Entry Id */
+            entry_id: string;
+            /**
+             * Source
+             * @default classic-5
+             * @constant
+             */
+            source: "classic-5";
+            /** Title */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /** Tags */
+            tags?: string[];
+            /**
+             * Method
+             * @default
+             */
+            method: string;
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Score */
+            score: number;
+            /**
+             * Attached
+             * @default false
+             * @constant
+             */
+            attached: false;
+        };
+        /**
+         * Classic5OwnFileActionResponse
+         * @description Non-catalog action returned with every suggest response.
+         */
+        Classic5OwnFileActionResponse: {
+            /**
+             * Action
+             * @default upload_own_file
+             * @constant
+             */
+            action: "upload_own_file";
+            /**
+             * Catalog
+             * @default false
+             */
+            catalog: boolean;
+        };
+        /**
+         * Classic5SuggestRequest
+         * @description POST /classic-5/suggest 请求体：session + optional TITLE/TOPIC 文本。
+         */
+        Classic5SuggestRequest: {
+            /** Session Id */
+            session_id?: string | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+        };
+        /**
+         * Classic5SuggestResponse
+         * @description POST /classic-5/suggest 返回体.
+         *
+         *     After a confirmed ``session.design``, ranked classic-5 candidates plus a
+         *     non-catalog own-file action. Without confirm, candidates stay empty.
+         *     ``attached`` is always false: this path must not hang data or lock spec.
+         */
+        Classic5SuggestResponse: {
+            /**
+             * Catalog Id
+             * @default classic-5
+             * @constant
+             */
+            catalog_id: "classic-5";
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /**
+             * Design Confirmed
+             * @default false
+             */
+            design_confirmed: boolean;
+            /** Candidates */
+            candidates?: components["schemas"]["Classic5CandidateResponse"][];
+            own_file: components["schemas"]["Classic5OwnFileActionResponse"];
+            /**
+             * Attached
+             * @default false
+             * @constant
+             */
+            attached: false;
         };
         /**
          * CreateSessionResponse
@@ -4118,6 +4269,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_classic5_classic_5_suggest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Classic5SuggestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Classic5SuggestResponse"];
                 };
             };
             /** @description Validation Error */

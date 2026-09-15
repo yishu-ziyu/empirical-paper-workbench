@@ -6,6 +6,7 @@
 
 | ID | 问题 | 根因 | 已验证处理 | Run records |
 |---|---|---|---|---|
+| FD-plan-confirm-gate | FIND-DATA plan must not rank as a confirmed-design match before confirm | Unconfirmed `session.design` is missing/draft | POST plan returns 409; GET is `status=missing`; R-sources table is plan-only | `agent-learning/raw/2026-09-15_fd-be-plan.md` |
 
 ## Skill impact
 

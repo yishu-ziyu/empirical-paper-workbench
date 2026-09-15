@@ -54,6 +54,7 @@ from schemas.responses import (
     UploadResponse,
 )
 from services.research_lab import lab_from_state, public_research
+from services.session_design import public_design
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
 
 router = APIRouter()
@@ -410,6 +411,7 @@ async def get_session_info(
         )
         if lab_from_state(state) is not None:
             extra["research"] = public_research(state)
+        extra["design"] = public_design(state)
     except Exception:
         extra = {}
     extra["dataset"] = await _snapshot_dataset(session_id)

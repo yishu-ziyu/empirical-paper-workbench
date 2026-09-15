@@ -411,6 +411,51 @@ class ResearchLabResponse(BaseModel):
     claim: Optional[ClaimLedgerResponse] = None
 
 
+class DesignSourceResponse(BaseModel):
+    title: str
+    question: str = ""
+
+
+class DesignInteractionResponse(BaseModel):
+    kind: Literal["did", "het"]
+    left: str
+    right: str
+    term: str
+
+
+class SessionDesignResponse(BaseModel):
+    """Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."""
+
+    status: Literal["draft", "confirmed"]
+    confirmed: bool
+    proposed_at: str
+    confirmed_at: Optional[str] = None
+    source: DesignSourceResponse
+    method: Literal["ols", "did", "iv", "rd", "scm"]
+    outcome: str = ""
+    treatment: str = ""
+    controls: List[str] = Field(default_factory=list)
+    group: str = ""
+    treated: str = ""
+    period: str = ""
+    time_col: str = ""
+    id_col: str = ""
+    first_treat_col: str = ""
+    interactions: List[DesignInteractionResponse] = Field(default_factory=list)
+    qType: Literal["average", "heterogeneity", "causal"] = "average"
+    heterogeneity_groups: List[str] = Field(default_factory=list)
+    catalog_entry_id: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class SessionDesignConfirmResponse(BaseModel):
+    """POST /sessions/{id}/design/confirm 返回体。"""
+
+    ok: bool
+    design: SessionDesignResponse
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
@@ -437,6 +482,7 @@ class SessionInfoResponse(BaseModel):
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
     research: Optional[ResearchLabResponse] = None
+    design: Optional[SessionDesignResponse] = None
 
 
 # ---------------------------------------------------------------------------
@@ -927,44 +973,3 @@ class OutlierStepReportResponse(BaseModel):
     after: List[Dict[str, DistStatsResponse]] = Field(default_factory=list)
     iqr_outliers: List[Dict[str, int]] = Field(default_factory=list)
     winsorized: List[bool] = Field(default_factory=list)
-
-
-# ---------------------------------------------------------------------------
-# design.py (INF-BE-propose)
-# ---------------------------------------------------------------------------
-
-
-class DesignSourceResponse(BaseModel):
-    title: str
-    question: str = ""
-
-
-class DesignInteractionResponse(BaseModel):
-    kind: Literal["did", "het"]
-    left: str
-    right: str
-    term: str
-
-
-class SessionDesignResponse(BaseModel):
-    """POST /sessions/{id}/design/propose 返回的 session.design 草稿。"""
-
-    status: Literal["draft", "confirmed"]
-    confirmed: bool
-    proposed_at: str
-    confirmed_at: Optional[str] = None
-    source: DesignSourceResponse
-    method: Literal["ols", "did", "iv", "rd", "scm"]
-    outcome: str = ""
-    treatment: str = ""
-    controls: List[str] = Field(default_factory=list)
-    group: str = ""
-    treated: str = ""
-    period: str = ""
-    time_col: str = ""
-    id_col: str = ""
-    first_treat_col: str = ""
-    interactions: List[DesignInteractionResponse] = Field(default_factory=list)
-    qType: Literal["average", "heterogeneity", "causal"] = "average"
-    heterogeneity_groups: List[str] = Field(default_factory=list)
-    catalog_entry_id: Optional[str] = None

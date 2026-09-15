@@ -1,6 +1,9 @@
-"""INF-BE-propose: title/question → ``session.design`` draft.
+"""Infer-design: title/question → draft, then human confirm locks it.
 
-Does not confirm, attach data, or project onto ``research_direction``.
+POST /sessions/{id}/design/propose writes ``status=draft``.
+POST /sessions/{id}/design/confirm is the only transition that sets
+``status=confirmed``. Neither attaches data, suggests catalog rows, or
+writes chapters.
 """
 from __future__ import annotations
 
@@ -8,11 +11,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
-from schemas.responses import SessionDesignResponse
+from schemas.responses import SessionDesignConfirmResponse, SessionDesignResponse
 
 from agent.design.propose import propose_design
 
@@ -47,3 +51,17 @@ async def propose_design_endpoint(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     facade.update_state(session_id, design=draft)
     return SessionDesignResponse.model_validate(draft)
+
+
+@router.post(
+    "/sessions/{session_id}/design/confirm",
+    response_model=SessionDesignConfirmResponse,
+)
+async def confirm_design_endpoint(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> SessionDesignConfirmResponse:
+    """Lock the current session.design draft. Fail closed if none exists."""
+    await run_in_threadpool(require_session_ownership, session_id, current_user)
+    design = await run_in_threadpool(facade.confirm_design, session_id)
+    return SessionDesignConfirmResponse(ok=True, design=design)

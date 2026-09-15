@@ -1133,6 +1133,26 @@ class FindDataTeachingShelfResponse(BaseModel):
     candidates: List[FindDataCandidateResponse] = Field(default_factory=list)
 
 
+class FindDataFetchProjectionResponse(FindDataFetchResponse):
+    """Alias for WDI fetch projection; same shape as FindDataFetchResponse."""
+
+
+class WdiFetchResponse(BaseModel):
+    """FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.
+
+    Dedicated to this venue. Does not attach, does not use the Barro fixture.
+    """
+
+    source_id: str
+    source_kind: Literal["fetched", "external_link"]
+    title: str
+    url_or_fixture: str
+    license: str
+    suggested_cols: List[str] = Field(default_factory=list)
+    design_fit: Dict[str, Any] = Field(default_factory=dict)
+    fetch: FindDataFetchProjectionResponse
+
+
 class SessionFindDataResponse(BaseModel):
     """GET/POST find-data: plan after confirmed design. Not attach, not gold prefill."""
 

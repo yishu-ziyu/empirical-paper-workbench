@@ -1,4 +1,4 @@
-"""FD-BE-plan / honesty / Card zip / Dataverse: confirmed design → find_data.
+"""FD-BE-plan / honesty / Card / Dataverse / WDI: confirmed design → find_data.
 
 Does not attach data, confirm a design, or search literature.
 """
@@ -14,7 +14,7 @@ from starlette.concurrency import run_in_threadpool
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
-from schemas.responses import SessionFindDataResponse
+from schemas.responses import SessionFindDataResponse, WdiFetchResponse
 
 from agent.find_data.candidates import apply_find_data_suggest
 from agent.find_data.card_zip import (
@@ -23,6 +23,7 @@ from agent.find_data.card_zip import (
     merge_card_zip_candidate,
 )
 from agent.find_data.dataverse import apply_dataverse_fetch
+from agent.find_data.fetch_wdi import WdiFetchNotApplicable, fetch_wdi
 from agent.find_data.honesty import project_honest_find_data
 from agent.find_data.plan import (
     DesignUnconfirmed,
@@ -156,3 +157,33 @@ def _fetch_dataverse(session_id: str, payload: DataverseFetchRequest) -> dict:
     record = project_honest_find_data(record)
     facade.update_state(session_id, find_data=record)
     return record
+
+
+@router.post(
+    "/sessions/{session_id}/find-data/fetch-wdi",
+    response_model=WdiFetchResponse,
+)
+async def fetch_wdi_endpoint(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> WdiFetchResponse:
+    """Download WDI into the session workspace, or return the WDI link.
+
+    Confirm-design required. Growth family only. Never copies the Barro
+    fixture. Does not set dataAttached.
+    """
+    require_session_ownership(session_id, current_user)
+    state = facade.get_state(session_id)
+    workspace = Path(facade._workspace_dir(session_id))
+    try:
+        row = fetch_wdi(state.get("design"), workspace=workspace)
+    except DesignUnconfirmed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except WdiFetchNotApplicable as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    stored = state.get("find_data")
+    updated = dict(stored) if isinstance(stored, dict) else {}
+    updated["wdi_fetch"] = row
+    facade.update_state(session_id, find_data=updated)
+    return WdiFetchResponse.model_validate(row)

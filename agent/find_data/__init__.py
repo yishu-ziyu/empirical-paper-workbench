@@ -15,6 +15,7 @@ from .card_zip import (
     merge_card_zip_candidate,
 )
 from .dataverse import apply_dataverse_fetch, search_and_fetch_dataverse
+from .fetch_wdi import WdiFetchNotApplicable, fetch_wdi, wdi_page_url
 from .honesty import (
     captain_local_real_candidate,
     demo_claim_allowed,
@@ -34,6 +35,7 @@ __all__ = [
     "CARD_ZIP_POSTED_URL",
     "CardZipNotApplicable",
     "DesignUnconfirmed",
+    "WdiFetchNotApplicable",
     "apply_dataverse_fetch",
     "apply_find_data_suggest",
     "build_find_data_plan",
@@ -41,6 +43,7 @@ __all__ = [
     "classify_route_family",
     "demo_claim_allowed",
     "fetch_card_zip",
+    "fetch_wdi",
     "is_banned_toy",
     "is_confirmed_design",
     "is_find_success_candidate",
@@ -51,4 +54,5 @@ __all__ = [
     "search_dataverse",
     "suggest_data_candidates",
     "suggest_find_data",
+    "wdi_page_url",
 ]

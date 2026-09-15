@@ -171,6 +171,7 @@ from routers.agent_spike import router as agent_spike_router  # noqa: E402
 from routers.auth import router as auth_router  # noqa: E402
 from routers.charls import router as charls_router  # noqa: E402
 from routers.chapter import router as chapter_router  # noqa: E402
+from routers.classic5 import router as classic5_router  # noqa: E402
 from routers.desk import router as desk_router  # noqa: E402
 from routers.code_export import router as code_export_router  # noqa: E402
 from routers.doc_export import router as doc_export_router  # noqa: E402
@@ -194,6 +195,7 @@ app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(evidence_router)
 app.include_router(sessions_router)
+app.include_router(classic5_router)
 app.include_router(research_router)
 app.include_router(ws_router)
 app.include_router(labels_router)

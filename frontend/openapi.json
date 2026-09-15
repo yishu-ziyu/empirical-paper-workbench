@@ -487,6 +487,51 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data/fetch-card": {
+      "post": {
+        "summary": "Fetch Card Zip Endpoint",
+        "description": "Download author-posted Card zip into session, or keep link + upload.",
+        "operationId": "fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -5708,6 +5753,35 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Design Fit"
+          },
+          "source_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "discovered",
+                  "teaching_fixture",
+                  "external_link",
+                  "fetched",
+                  "captain_local_real",
+                  "user_upload"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Kind"
+          },
+          "fetch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataFetchResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5719,6 +5793,41 @@
         ],
         "title": "FindDataCandidateResponse",
         "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
+      },
+      "FindDataFetchResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchResponse",
+        "description": "Session download vs honest link (docs/real-fetch-contract.md §2.1)."
       },
       "FindDataPlanBodyResponse": {
         "properties": {

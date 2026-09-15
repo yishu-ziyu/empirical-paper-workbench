@@ -278,6 +278,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data/fetch-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Card Zip Endpoint
+         * @description Download author-posted Card zip into session, or keep link + upload.
+         */
+        post: operations["fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -2577,6 +2597,27 @@ export interface components {
             design_fit?: {
                 [key: string]: unknown;
             };
+            /** Source Kind */
+            source_kind?: ("discovered" | "teaching_fixture" | "external_link" | "fetched" | "captain_local_real" | "user_upload") | null;
+            fetch?: components["schemas"]["FindDataFetchResponse"] | null;
+        };
+        /**
+         * FindDataFetchResponse
+         * @description Session download vs honest link (docs/real-fetch-contract.md §2.1).
+         */
+        FindDataFetchResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /**
          * FindDataPlanBodyResponse
@@ -4224,6 +4265,37 @@ export interface operations {
         };
     };
     plan_find_data_endpoint_sessions__session_id__find_data_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post: {
         parameters: {
             query?: never;
             header?: never;

@@ -1057,6 +1057,14 @@ class FindDataPlanBodyResponse(BaseModel):
     search_facets: FindDataSearchFacetsResponse
 
 
+class FindDataFetchResponse(BaseModel):
+    """Session download vs honest link (docs/real-fetch-contract.md §2.1)."""
+
+    status: Literal["into_session", "link_only", "not_applicable"]
+    session_path: Optional[str] = None
+    reason: str = ""
+
+
 class FindDataCandidateResponse(BaseModel):
     """Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."""
 
@@ -1066,6 +1074,17 @@ class FindDataCandidateResponse(BaseModel):
     license: str
     suggested_cols: List[str] = Field(default_factory=list)
     design_fit: Dict[str, Any] = Field(default_factory=dict)
+    source_kind: Optional[
+        Literal[
+            "discovered",
+            "teaching_fixture",
+            "external_link",
+            "fetched",
+            "captain_local_real",
+            "user_upload",
+        ]
+    ] = None
+    fetch: Optional[FindDataFetchResponse] = None
 
 
 class SessionFindDataResponse(BaseModel):

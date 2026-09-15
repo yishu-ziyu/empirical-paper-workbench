@@ -1,0 +1,769 @@
+store_id,state,treated,period,fte,wage,chain
+46,PA,0,0,40.5,,Burger King
+46,PA,0,1,24,4.3,Burger King
+49,PA,0,0,13.75,,KFC
+49,PA,0,1,11.5,4.45,KFC
+506,PA,0,0,8.5,,KFC
+506,PA,0,1,10.5,5,KFC
+56,PA,0,0,34,5,Wendy's
+56,PA,0,1,20,5.25,Wendy's
+61,PA,0,0,24,5.5,Wendy's
+61,PA,0,1,35.5,4.75,Wendy's
+445,PA,0,0,70.5,5,Burger King
+445,PA,0,1,29,4.75,Burger King
+451,PA,0,0,23.5,5,Burger King
+451,PA,0,1,36.5,5,Burger King
+455,PA,0,0,11,5.25,KFC
+455,PA,0,1,11,5,KFC
+458,PA,0,0,9,5,KFC
+458,PA,0,1,8.5,5,KFC
+462,PA,0,0,15.5,5,Roy Rogers
+462,PA,0,1,17.5,4.75,Roy Rogers
+468,PA,0,0,58,5,Burger King
+468,PA,0,1,29,5,Burger King
+469,PA,0,0,26.5,5,Burger King
+469,PA,0,1,30.5,4.5,Burger King
+470,PA,0,0,28.5,5.5,Burger King
+470,PA,0,1,26,4.75,Burger King
+474,PA,0,0,13.5,5,Burger King
+474,PA,0,1,18,4.5,Burger King
+481,PA,0,0,16.75,5.25,KFC
+481,PA,0,1,20,5,KFC
+483,PA,0,0,9.5,5,KFC
+483,PA,0,1,13.5,4.75,KFC
+487,PA,0,0,15,5,Roy Rogers
+487,PA,0,1,19,4.75,Roy Rogers
+488,PA,0,0,29.5,5,Roy Rogers
+488,PA,0,1,15.5,4.75,Roy Rogers
+489,PA,0,0,18.5,5,Roy Rogers
+489,PA,0,1,14.5,4.25,Roy Rogers
+490,PA,0,0,20.25,5,Roy Rogers
+490,PA,0,1,14,5,Roy Rogers
+493,PA,0,0,36,5,Roy Rogers
+493,PA,0,1,19,4.9,Roy Rogers
+495,PA,0,0,21,5,Roy Rogers
+495,PA,0,1,21,5,Roy Rogers
+496,PA,0,0,20.5,5,Roy Rogers
+496,PA,0,1,18,4.75,Roy Rogers
+499,PA,0,0,19,5,Wendy's
+499,PA,0,1,20.5,5,Wendy's
+509,PA,0,0,14,5,Roy Rogers
+509,PA,0,1,13.5,4.25,Roy Rogers
+515,PA,0,0,19,5,Roy Rogers
+515,PA,0,1,17.5,4.75,Roy Rogers
+37,PA,0,0,32.5,4.25,Burger King
+37,PA,0,1,25.5,4.25,Burger King
+39,PA,0,0,19,4.25,Burger King
+39,PA,0,1,15.5,,Burger King
+40,PA,0,0,27,4.25,Burger King
+40,PA,0,1,25.5,4.25,Burger King
+41,PA,0,0,19.5,4.25,Burger King
+41,PA,0,1,27,4.25,Burger King
+42,PA,0,0,24,4.5,Burger King
+42,PA,0,1,16,4.25,Burger King
+45,PA,0,0,18,4.25,Burger King
+45,PA,0,1,19,4.25,Burger King
+48,PA,0,0,19,4.25,Burger King
+48,PA,0,1,25,4.38,Burger King
+50,PA,0,0,14,4.5,KFC
+50,PA,0,1,17,4.75,KFC
+51,PA,0,0,10.5,4.25,KFC
+51,PA,0,1,16.5,4.25,KFC
+57,PA,0,0,38,4.67,Wendy's
+57,PA,0,1,20,4.5,Wendy's
+58,PA,0,0,23.5,4.75,Wendy's
+58,PA,0,1,18,4.5,Wendy's
+59,PA,0,0,10.5,4.25,Wendy's
+59,PA,0,1,12,4.25,Wendy's
+60,PA,0,0,25,4.25,Wendy's
+60,PA,0,1,25,4.25,Wendy's
+407,PA,0,0,11,5.75,KFC
+407,PA,0,1,11,5.5,KFC
+430,PA,0,0,36.5,4.25,Burger King
+430,PA,0,1,27,4.25,Burger King
+432,PA,0,0,52.5,4.5,Burger King
+432,PA,0,1,34,5.05,Burger King
+433,PA,0,0,29,4.25,Burger King
+433,PA,0,1,25,,Burger King
+434,PA,0,0,45,4.25,Burger King
+434,PA,0,1,37.5,4.25,Burger King
+435,PA,0,0,22.75,4.25,Burger King
+435,PA,0,1,21,4.25,Burger King
+438,PA,0,0,7.5,4.25,KFC
+438,PA,0,1,9.5,4.25,KFC
+440,PA,0,0,15.5,4.25,Wendy's
+440,PA,0,1,18,,Wendy's
+441,PA,0,0,38,4.25,Wendy's
+441,PA,0,1,18,4.25,Wendy's
+443,PA,0,0,17.5,4.25,Wendy's
+443,PA,0,1,19,4.35,Wendy's
+444,PA,0,0,25,4.25,Wendy's
+444,PA,0,1,31.5,4.5,Wendy's
+448,PA,0,0,21,4.75,Burger King
+448,PA,0,1,24.5,4.5,Burger King
+449,PA,0,0,15.5,4.87,Burger King
+449,PA,0,1,27.5,5,Burger King
+450,PA,0,0,15.5,4.75,Burger King
+450,PA,0,1,34.5,4.75,Burger King
+454,PA,0,0,8.5,4.5,KFC
+454,PA,0,1,14,5,KFC
+459,PA,0,0,18,4.25,Roy Rogers
+459,PA,0,1,15,4.35,Roy Rogers
+466,PA,0,0,20.75,4.75,Wendy's
+466,PA,0,1,23,,Wendy's
+471,PA,0,0,39,4.25,Burger King
+471,PA,0,1,26.5,4.25,Burger King
+472,PA,0,0,41.5,4.25,Burger King
+472,PA,0,1,23.5,4.9,Burger King
+473,PA,0,0,22.5,4.75,Burger King
+473,PA,0,1,35.5,4.5,Burger King
+475,PA,0,0,32,4.5,Burger King
+475,PA,0,1,21,4.5,Burger King
+476,PA,0,0,24,4.25,Burger King
+476,PA,0,1,23,4.75,Burger King
+477,PA,0,0,26,4.25,Burger King
+477,PA,0,1,20,6.25,Burger King
+478,PA,0,0,48.5,4.5,Burger King
+478,PA,0,1,27,4.35,Burger King
+485,PA,0,0,8.5,4.5,KFC
+485,PA,0,1,13,4.5,KFC
+491,PA,0,0,18.5,4.5,Roy Rogers
+491,PA,0,1,0,,Roy Rogers
+492,PA,0,0,13,4.5,Roy Rogers
+492,PA,0,1,13.5,4.5,Roy Rogers
+498,PA,0,0,28,4.75,Wendy's
+498,PA,0,1,26.75,5,Wendy's
+501,PA,0,0,24.5,4.25,Burger King
+501,PA,0,1,43.5,4.75,Burger King
+503,PA,0,0,18.5,4.75,Burger King
+503,PA,0,1,41.25,4.5,Burger King
+510,PA,0,0,23.5,4.25,Roy Rogers
+510,PA,0,1,14.25,,Roy Rogers
+511,PA,0,0,15,4.75,Roy Rogers
+511,PA,0,1,12.5,4.75,Roy Rogers
+514,PA,0,0,18,4.5,Roy Rogers
+514,PA,0,1,34,4.25,Roy Rogers
+516,PA,0,0,20.25,4.75,Roy Rogers
+516,PA,0,1,10,4.91,Roy Rogers
+521,PA,0,0,15.5,4.25,Burger King
+521,PA,0,1,14,4.4,Burger King
+522,PA,0,0,21,4.35,Burger King
+522,PA,0,1,17.5,4.25,Burger King
+113,NJ,1,0,15,,Burger King
+113,NJ,1,1,27,5.05,Burger King
+123,NJ,1,0,15,,Burger King
+123,NJ,1,1,21.5,5.05,Burger King
+135,NJ,1,0,24,,Roy Rogers
+135,NJ,1,1,23,5.05,Roy Rogers
+138,NJ,1,0,19.25,,Roy Rogers
+138,NJ,1,1,21.5,5.05,Roy Rogers
+153,NJ,1,0,21.5,,Burger King
+153,NJ,1,1,34.5,5.05,Burger King
+181,NJ,1,0,9.5,,KFC
+181,NJ,1,1,10.5,5.05,KFC
+191,NJ,1,0,44,,Wendy's
+191,NJ,1,1,16.5,5.05,Wendy's
+236,NJ,1,0,21,,Burger King
+236,NJ,1,1,38,5.05,Burger King
+254,NJ,1,0,28,,Wendy's
+254,NJ,1,1,36,5.25,Wendy's
+255,NJ,1,0,10,,Wendy's
+255,NJ,1,1,16,,Wendy's
+294,NJ,1,0,20.5,,Burger King
+294,NJ,1,1,20.5,5.05,Burger King
+306,NJ,1,0,25.5,,Roy Rogers
+306,NJ,1,1,19,5.05,Roy Rogers
+311,NJ,1,0,19,,Wendy's
+311,NJ,1,1,53,5.05,Wendy's
+315,NJ,1,0,16.5,,Burger King
+315,NJ,1,1,16.5,5.05,Burger King
+335,NJ,1,0,17,,Burger King
+335,NJ,1,1,16.5,5.05,Burger King
+372,NJ,1,0,27.5,,Burger King
+372,NJ,1,1,45,5.05,Burger King
+6,NJ,1,0,5,5,Roy Rogers
+6,NJ,1,1,8,5.05,Roy Rogers
+14,NJ,1,0,16,5.12,KFC
+14,NJ,1,1,15.5,5.05,KFC
+26,NJ,1,0,41.5,5.56,Burger King
+26,NJ,1,1,24,5.05,Burger King
+27,NJ,1,0,13,5,KFC
+27,NJ,1,1,7.5,5.05,KFC
+30,NJ,1,0,10,5,KFC
+30,NJ,1,1,7.5,5.05,KFC
+31,NJ,1,0,15,5.25,KFC
+31,NJ,1,1,18.5,5.05,KFC
+33,NJ,1,0,26,5,Roy Rogers
+33,NJ,1,1,16.5,5.05,Roy Rogers
+36,NJ,1,0,18,5.5,Wendy's
+36,NJ,1,1,33.5,5.05,Wendy's
+77,NJ,1,0,35,5,Roy Rogers
+77,NJ,1,1,37,5.05,Roy Rogers
+78,NJ,1,0,21,5,Roy Rogers
+78,NJ,1,1,18,5.05,Roy Rogers
+81,NJ,1,0,34.5,5,Wendy's
+81,NJ,1,1,26.5,5.05,Wendy's
+82,NJ,1,0,18.25,5,Wendy's
+82,NJ,1,1,33,5.05,Wendy's
+85,NJ,1,0,20,5.5,Burger King
+85,NJ,1,1,20.5,5.05,Burger King
+89,NJ,1,0,16,5,Burger King
+89,NJ,1,1,24.5,5.5,Burger King
+94,NJ,1,0,17.5,5,KFC
+94,NJ,1,1,16,5.05,KFC
+112,NJ,1,0,20,5,Wendy's
+112,NJ,1,1,23.5,5.05,Wendy's
+128,NJ,1,0,12.25,5,KFC
+128,NJ,1,1,13,5.05,KFC
+129,NJ,1,0,33,5.25,Roy Rogers
+129,NJ,1,1,20,5.05,Roy Rogers
+131,NJ,1,0,31.5,5.5,Roy Rogers
+131,NJ,1,1,22,5.05,Roy Rogers
+144,NJ,1,0,28,5.05,Wendy's
+144,NJ,1,1,25.5,5.05,Wendy's
+145,NJ,1,0,16.5,5,Burger King
+145,NJ,1,1,18,5.28,Burger King
+147,NJ,1,0,14.75,5.12,Burger King
+147,NJ,1,1,9,5.25,Burger King
+148,NJ,1,0,23.5,5.25,Burger King
+148,NJ,1,1,26.5,5.05,Burger King
+151,NJ,1,0,10,5,Burger King
+151,NJ,1,1,0,,Burger King
+152,NJ,1,0,46.5,5.12,Burger King
+152,NJ,1,1,23.75,5.05,Burger King
+157,NJ,1,0,15.5,5,KFC
+157,NJ,1,1,18,5.5,KFC
+161,NJ,1,0,24.5,5,Roy Rogers
+161,NJ,1,1,36,5.05,Roy Rogers
+163,NJ,1,0,24,5,Roy Rogers
+163,NJ,1,1,21,5.05,Roy Rogers
+164,NJ,1,0,23,5,Roy Rogers
+164,NJ,1,1,15.5,5.05,Roy Rogers
+165,NJ,1,0,28,5,Wendy's
+165,NJ,1,1,22.5,5.05,Wendy's
+169,NJ,1,0,32.5,5,Burger King
+169,NJ,1,1,27,5.05,Burger King
+170,NJ,1,0,23,5,Burger King
+170,NJ,1,1,34,5.05,Burger King
+187,NJ,1,0,17,5.62,Roy Rogers
+187,NJ,1,1,16.75,5.05,Roy Rogers
+190,NJ,1,0,30,5,Roy Rogers
+190,NJ,1,1,26,5.05,Roy Rogers
+196,NJ,1,0,21.5,5,Wendy's
+196,NJ,1,1,18,5.05,Wendy's
+197,NJ,1,0,32,5,Burger King
+197,NJ,1,1,20.5,5.05,Burger King
+234,NJ,1,0,8,5,Burger King
+234,NJ,1,1,15,5.05,Burger King
+240,NJ,1,0,35.5,5.1,Roy Rogers
+240,NJ,1,1,25.5,5.05,Roy Rogers
+242,NJ,1,0,33,5.25,Roy Rogers
+242,NJ,1,1,20,5.05,Roy Rogers
+245,NJ,1,0,22,5.5,Roy Rogers
+245,NJ,1,1,18,5.05,Roy Rogers
+259,NJ,1,0,23,5,Burger King
+259,NJ,1,1,26.5,5.05,Burger King
+268,NJ,1,0,23,5,Burger King
+268,NJ,1,1,23.25,5.05,Burger King
+271,NJ,1,0,8.5,5,KFC
+271,NJ,1,1,10.5,5.05,KFC
+272,NJ,1,0,12.5,5.05,KFC
+272,NJ,1,1,12,5.25,KFC
+274,NJ,1,0,9.5,5.5,KFC
+274,NJ,1,1,9.5,5.05,KFC
+276,NJ,1,0,13,5,KFC
+276,NJ,1,1,15.5,5.05,KFC
+296,NJ,1,0,17,5.3,Burger King
+296,NJ,1,1,14.5,5.05,Burger King
+299,NJ,1,0,9,5,KFC
+299,NJ,1,1,14,5.05,KFC
+301,NJ,1,0,19,5,KFC
+301,NJ,1,1,6.5,5.05,KFC
+320,NJ,1,0,11.5,5,KFC
+320,NJ,1,1,10,5.05,KFC
+321,NJ,1,0,13,5,KFC
+321,NJ,1,1,11.5,5.05,KFC
+324,NJ,1,0,48,5.25,Roy Rogers
+324,NJ,1,1,46.5,5.05,Roy Rogers
+326,NJ,1,0,45.5,5.15,Roy Rogers
+326,NJ,1,1,26.5,5.05,Roy Rogers
+330,NJ,1,0,15,5.42,Wendy's
+330,NJ,1,1,16,5.67,Wendy's
+334,NJ,1,0,18,5,Burger King
+334,NJ,1,1,13,5.05,Burger King
+349,NJ,1,0,21,5,Roy Rogers
+349,NJ,1,1,14,5.05,Roy Rogers
+354,NJ,1,0,20.5,5.06,Wendy's
+354,NJ,1,1,15.5,5.05,Wendy's
+356,NJ,1,0,20.5,5.05,Wendy's
+356,NJ,1,1,18,5.05,Wendy's
+357,NJ,1,0,17.5,5,Wendy's
+357,NJ,1,1,27,5.25,Wendy's
+371,NJ,1,0,27.5,5,Burger King
+371,NJ,1,1,27,5.25,Burger King
+373,NJ,1,0,24,5,Burger King
+373,NJ,1,1,29.5,5.05,Burger King
+375,NJ,1,0,34,5.25,Burger King
+375,NJ,1,1,16.5,5.5,Burger King
+378,NJ,1,0,18,5,Burger King
+378,NJ,1,1,31.5,5.05,Burger King
+381,NJ,1,0,24,5,Burger King
+381,NJ,1,1,27.5,5.05,Burger King
+406,NJ,1,0,33.5,5,Wendy's
+406,NJ,1,1,32,5.5,Wendy's
+407,NJ,1,0,12,5.75,Wendy's
+407,NJ,1,1,14.5,5.5,Wendy's
+409,NJ,1,0,35,5,Burger King
+409,NJ,1,1,10.5,5.05,Burger King
+1,NJ,1,0,35,4.5,Burger King
+1,NJ,1,1,44,5.05,Burger King
+2,NJ,1,0,16,4.75,Burger King
+2,NJ,1,1,15.5,5.25,Burger King
+3,NJ,1,0,15.5,4.25,KFC
+3,NJ,1,1,10.5,5.05,KFC
+4,NJ,1,0,19,4.75,Roy Rogers
+4,NJ,1,1,24,5.05,Roy Rogers
+5,NJ,1,0,24,4.5,Roy Rogers
+5,NJ,1,1,29,5.15,Roy Rogers
+9,NJ,1,0,36,4.37,Burger King
+9,NJ,1,1,20,5.05,Burger King
+10,NJ,1,0,29,4.25,Burger King
+10,NJ,1,1,26.5,5.05,Burger King
+11,NJ,1,0,29,4.25,Burger King
+11,NJ,1,1,27,5.05,Burger King
+12,NJ,1,0,21.25,4.37,Burger King
+12,NJ,1,1,26.5,5.05,Burger King
+13,NJ,1,0,15.5,4.5,KFC
+13,NJ,1,1,10.5,5,KFC
+15,NJ,1,0,19.5,4.6,Roy Rogers
+15,NJ,1,1,18,5.05,Roy Rogers
+16,NJ,1,0,21,4.5,Roy Rogers
+16,NJ,1,1,18.5,5.05,Roy Rogers
+17,NJ,1,0,14,4.37,Roy Rogers
+17,NJ,1,1,25.5,5.05,Roy Rogers
+18,NJ,1,0,30.5,4.25,Roy Rogers
+18,NJ,1,1,32,5.05,Roy Rogers
+19,NJ,1,0,23.5,4.25,Burger King
+19,NJ,1,1,33,5.05,Burger King
+21,NJ,1,0,14,4.45,KFC
+21,NJ,1,1,7.5,5.05,KFC
+22,NJ,1,0,14.5,4.35,Roy Rogers
+22,NJ,1,1,12.5,5.05,Roy Rogers
+23,NJ,1,0,15.5,4.5,Burger King
+23,NJ,1,1,24,5.05,Burger King
+24,NJ,1,0,26.5,4.75,Burger King
+24,NJ,1,1,29,5.05,Burger King
+28,NJ,1,0,8,4.5,KFC
+28,NJ,1,1,10,,KFC
+29,NJ,1,0,5.5,4.5,KFC
+29,NJ,1,1,9.5,5.05,KFC
+32,NJ,1,0,23.25,4.5,Roy Rogers
+32,NJ,1,1,17.5,5.05,Roy Rogers
+34,NJ,1,0,15.5,4.95,Roy Rogers
+34,NJ,1,1,17.5,5.05,Roy Rogers
+35,NJ,1,0,32.25,4.5,Wendy's
+35,NJ,1,1,25,5.05,Wendy's
+38,NJ,1,0,30,4.25,Burger King
+38,NJ,1,1,26,5.05,Burger King
+64,NJ,1,0,30.5,4.5,Burger King
+64,NJ,1,1,22.5,5.05,Burger King
+66,NJ,1,0,27,4.25,Burger King
+66,NJ,1,1,35,5.05,Burger King
+67,NJ,1,0,18.5,4.5,Burger King
+67,NJ,1,1,17.75,5.05,Burger King
+68,NJ,1,0,38,4.25,Burger King
+68,NJ,1,1,24.5,5.05,Burger King
+69,NJ,1,0,16.5,4.25,Burger King
+69,NJ,1,1,16.5,5.05,Burger King
+70,NJ,1,0,50,4.5,Burger King
+70,NJ,1,1,30,5.05,Burger King
+71,NJ,1,0,20.5,4.75,Burger King
+71,NJ,1,1,39,5.05,Burger King
+73,NJ,1,0,6.5,4.25,KFC
+73,NJ,1,1,17,5.05,KFC
+75,NJ,1,0,13.5,4.25,KFC
+75,NJ,1,1,12.5,5.05,KFC
+76,NJ,1,0,28,4.25,Roy Rogers
+76,NJ,1,1,38.5,5.05,Roy Rogers
+79,NJ,1,0,21.5,4.5,Roy Rogers
+79,NJ,1,1,20,5.05,Roy Rogers
+84,NJ,1,0,24,4.5,Burger King
+84,NJ,1,1,32,5.05,Burger King
+86,NJ,1,0,20.5,4.25,Burger King
+86,NJ,1,1,19,5.05,Burger King
+88,NJ,1,0,23.5,4.25,Burger King
+88,NJ,1,1,26.5,5.05,Burger King
+91,NJ,1,0,23,4.25,Burger King
+91,NJ,1,1,19,5.05,Burger King
+92,NJ,1,0,17,4.25,Burger King
+92,NJ,1,1,20,5.05,Burger King
+93,NJ,1,0,20.5,4.25,Burger King
+93,NJ,1,1,22.5,5.05,Burger King
+95,NJ,1,0,23.5,4.25,KFC
+95,NJ,1,1,10,5.05,KFC
+96,NJ,1,0,9.5,4.25,KFC
+96,NJ,1,1,12.5,5.05,KFC
+97,NJ,1,0,10,4.25,KFC
+97,NJ,1,1,11,5.05,KFC
+98,NJ,1,0,14,4.25,KFC
+98,NJ,1,1,12.5,5.05,KFC
+99,NJ,1,0,85,4.75,Roy Rogers
+99,NJ,1,1,59,5.05,Roy Rogers
+101,NJ,1,0,15,4.75,Roy Rogers
+101,NJ,1,1,19,5.05,Roy Rogers
+102,NJ,1,0,21.5,4.4,Roy Rogers
+102,NJ,1,1,15.5,5.05,Roy Rogers
+104,NJ,1,0,53,4.62,Wendy's
+104,NJ,1,1,19,5.05,Wendy's
+105,NJ,1,0,24,4.25,Burger King
+105,NJ,1,1,26.5,5.05,Burger King
+106,NJ,1,0,20.5,4.25,Burger King
+106,NJ,1,1,17.5,5.05,Burger King
+107,NJ,1,0,14.5,4.25,Burger King
+107,NJ,1,1,20.5,5.05,Burger King
+108,NJ,1,0,25,4.25,Burger King
+108,NJ,1,1,28,5.05,Burger King
+111,NJ,1,0,27,4.25,Roy Rogers
+111,NJ,1,1,30.25,5.05,Roy Rogers
+114,NJ,1,0,22.5,4.75,Burger King
+114,NJ,1,1,44,5.25,Burger King
+115,NJ,1,0,36.5,4.75,Burger King
+115,NJ,1,1,17.5,5.05,Burger King
+116,NJ,1,0,17.25,4.25,Burger King
+116,NJ,1,1,31,5.05,Burger King
+118,NJ,1,0,21.5,4.25,Burger King
+118,NJ,1,1,31,5.05,Burger King
+119,NJ,1,0,24.5,4.75,Burger King
+119,NJ,1,1,28.5,5.05,Burger King
+120,NJ,1,0,19,4.5,Burger King
+120,NJ,1,1,19,5.05,Burger King
+122,NJ,1,0,25,4.25,Burger King
+122,NJ,1,1,41,5.05,Burger King
+124,NJ,1,0,16,4.25,Burger King
+124,NJ,1,1,28,5.05,Burger King
+125,NJ,1,0,19,4.5,KFC
+125,NJ,1,1,9.5,5.05,KFC
+130,NJ,1,0,22.75,4.5,Roy Rogers
+130,NJ,1,1,25,5.05,Roy Rogers
+132,NJ,1,0,35,4.5,Roy Rogers
+132,NJ,1,1,28,5.5,Roy Rogers
+133,NJ,1,0,16,4.75,Roy Rogers
+133,NJ,1,1,16,5.05,Roy Rogers
+134,NJ,1,0,21,4.62,Roy Rogers
+134,NJ,1,1,22.75,5.05,Roy Rogers
+137,NJ,1,0,30.5,4.25,Roy Rogers
+137,NJ,1,1,32,5.05,Roy Rogers
+140,NJ,1,0,23,4.5,Wendy's
+140,NJ,1,1,27.5,5.67,Wendy's
+141,NJ,1,0,21.5,4.75,Wendy's
+141,NJ,1,1,25.5,5.05,Wendy's
+142,NJ,1,0,36.5,4.25,Wendy's
+142,NJ,1,1,60.5,5.05,Wendy's
+146,NJ,1,0,23,4.8,Burger King
+146,NJ,1,1,20.5,5.05,Burger King
+149,NJ,1,0,14,4.5,Burger King
+149,NJ,1,1,16,5.05,Burger King
+150,NJ,1,0,17.25,4.67,Burger King
+150,NJ,1,1,25,5.75,Burger King
+156,NJ,1,0,18.5,4.87,Burger King
+156,NJ,1,1,13,5.05,Burger King
+158,NJ,1,0,8.5,4.5,KFC
+158,NJ,1,1,9,5.05,KFC
+159,NJ,1,0,14,4.5,KFC
+159,NJ,1,1,16.5,5.25,KFC
+162,NJ,1,0,23,4.75,Roy Rogers
+162,NJ,1,1,21,5.05,Roy Rogers
+166,NJ,1,0,29,4.75,Wendy's
+166,NJ,1,1,21.5,5.05,Wendy's
+168,NJ,1,0,19,4.25,Burger King
+168,NJ,1,1,20,5.25,Burger King
+171,NJ,1,0,21,4.25,Burger King
+171,NJ,1,1,21.25,5.05,Burger King
+172,NJ,1,0,17,4.75,Burger King
+172,NJ,1,1,21.5,5.05,Burger King
+173,NJ,1,0,36,4.85,Burger King
+173,NJ,1,1,31,5.05,Burger King
+174,NJ,1,0,25,4.75,Burger King
+174,NJ,1,1,33,5.05,Burger King
+176,NJ,1,0,29.5,4.62,Burger King
+176,NJ,1,1,37.75,5.05,Burger King
+178,NJ,1,0,22,4.25,KFC
+178,NJ,1,1,9,5.05,KFC
+179,NJ,1,0,11,4.25,KFC
+179,NJ,1,1,11,5.05,KFC
+180,NJ,1,0,13.5,4.5,KFC
+180,NJ,1,1,12.75,5.05,KFC
+182,NJ,1,0,13.5,4.5,KFC
+182,NJ,1,1,10.5,5.05,KFC
+183,NJ,1,0,18,4.62,KFC
+183,NJ,1,1,22,5.05,KFC
+185,NJ,1,0,9.5,4.5,KFC
+185,NJ,1,1,8,5.05,KFC
+186,NJ,1,0,24,4.75,Roy Rogers
+186,NJ,1,1,25,5.05,Roy Rogers
+189,NJ,1,0,14.5,4.75,Roy Rogers
+189,NJ,1,1,12.5,5.05,Roy Rogers
+192,NJ,1,0,29,4.87,Wendy's
+192,NJ,1,1,22.5,5.25,Wendy's
+193,NJ,1,0,10.5,4.5,Wendy's
+193,NJ,1,1,11.5,5.05,Wendy's
+195,NJ,1,0,18,4.25,Wendy's
+195,NJ,1,1,23.5,5.05,Wendy's
+199,NJ,1,0,9,4.35,KFC
+199,NJ,1,1,16.5,5.05,KFC
+200,NJ,1,0,33,4.25,Burger King
+200,NJ,1,1,29,5.05,Burger King
+201,NJ,1,0,19.5,4.5,Burger King
+201,NJ,1,1,30,5.05,Burger King
+202,NJ,1,0,41,4.25,Burger King
+202,NJ,1,1,22.5,5.05,Burger King
+203,NJ,1,0,17,4.25,Burger King
+203,NJ,1,1,24,5.05,Burger King
+204,NJ,1,0,18.25,4.25,Burger King
+204,NJ,1,1,21.75,5.05,Burger King
+207,NJ,1,0,17,4.75,KFC
+207,NJ,1,1,13.5,5.2,KFC
+208,NJ,1,0,32,4.62,Roy Rogers
+208,NJ,1,1,24,5.05,Roy Rogers
+209,NJ,1,0,26,4.25,Roy Rogers
+209,NJ,1,1,28.5,5.05,Roy Rogers
+210,NJ,1,0,11.5,4.5,Wendy's
+210,NJ,1,1,10,5.05,Wendy's
+211,NJ,1,0,21,4.5,Burger King
+211,NJ,1,1,23.5,5.05,Burger King
+212,NJ,1,0,22.75,4.5,Burger King
+212,NJ,1,1,30.5,5.05,Burger King
+213,NJ,1,0,18.5,4.55,Burger King
+213,NJ,1,1,24.75,5.05,Burger King
+214,NJ,1,0,20,4.62,Burger King
+214,NJ,1,1,22.5,5.05,Burger King
+215,NJ,1,0,18,4.5,Burger King
+215,NJ,1,1,28,5.05,Burger King
+216,NJ,1,0,10.5,4.25,KFC
+216,NJ,1,1,14,5.05,KFC
+217,NJ,1,0,10.5,4.25,KFC
+217,NJ,1,1,9,5.05,KFC
+218,NJ,1,0,11,4.35,KFC
+218,NJ,1,1,9.5,5.05,KFC
+219,NJ,1,0,10.5,4.25,KFC
+219,NJ,1,1,15.5,5.05,KFC
+220,NJ,1,0,12.5,4.25,KFC
+220,NJ,1,1,12,5.05,KFC
+221,NJ,1,0,18,4.6,KFC
+221,NJ,1,1,11.5,5.05,KFC
+222,NJ,1,0,17,4.25,Roy Rogers
+222,NJ,1,1,12.5,5.05,Roy Rogers
+223,NJ,1,0,15,4.75,Roy Rogers
+223,NJ,1,1,16,5.05,Roy Rogers
+225,NJ,1,0,19.5,4.75,Roy Rogers
+225,NJ,1,1,28.5,5.05,Roy Rogers
+226,NJ,1,0,13,4.25,Wendy's
+226,NJ,1,1,15,5.3,Wendy's
+228,NJ,1,0,20.25,4.5,Wendy's
+228,NJ,1,1,23.5,5.05,Wendy's
+229,NJ,1,0,26,4.5,Burger King
+229,NJ,1,1,30.5,5.5,Burger King
+230,NJ,1,0,15.5,4.25,Burger King
+230,NJ,1,1,26.5,5.05,Burger King
+232,NJ,1,0,24,4.75,Burger King
+232,NJ,1,1,27,5.05,Burger King
+233,NJ,1,0,25.5,4.65,Burger King
+233,NJ,1,1,21.5,5.05,Burger King
+237,NJ,1,0,21.5,4.25,Burger King
+237,NJ,1,1,21.5,5.05,Burger King
+238,NJ,1,0,14,4.75,KFC
+238,NJ,1,1,37.5,5.05,KFC
+239,NJ,1,0,20,4.25,KFC
+239,NJ,1,1,11.5,5.05,KFC
+243,NJ,1,0,22.5,4.5,Roy Rogers
+243,NJ,1,1,21,5.05,Roy Rogers
+244,NJ,1,0,30,4.25,Roy Rogers
+244,NJ,1,1,28,5.05,Roy Rogers
+247,NJ,1,0,24,4.5,Wendy's
+247,NJ,1,1,24,5.05,Wendy's
+248,NJ,1,0,22,4.75,Wendy's
+248,NJ,1,1,23,5.05,Wendy's
+249,NJ,1,0,13,4.37,Burger King
+249,NJ,1,1,19,5.05,Burger King
+250,NJ,1,0,5,4.5,KFC
+250,NJ,1,1,7,5.05,KFC
+253,NJ,1,0,13.5,4.87,Roy Rogers
+253,NJ,1,1,14,5.05,Roy Rogers
+258,NJ,1,0,18,4.25,Burger King
+258,NJ,1,1,32,5.05,Burger King
+260,NJ,1,0,24,4.25,Burger King
+260,NJ,1,1,22,5.05,Burger King
+262,NJ,1,0,16.5,4.25,Burger King
+262,NJ,1,1,14.25,5.05,Burger King
+264,NJ,1,0,7,4.25,Burger King
+264,NJ,1,1,16.5,5.05,Burger King
+265,NJ,1,0,11,4.25,Burger King
+265,NJ,1,1,0,,Burger King
+267,NJ,1,0,19.5,4.25,Burger King
+267,NJ,1,1,47.5,5.05,Burger King
+269,NJ,1,0,10,4.45,KFC
+269,NJ,1,1,15.5,5.05,KFC
+273,NJ,1,0,13,4.62,KFC
+273,NJ,1,1,10.5,5.05,KFC
+275,NJ,1,0,10,4.25,KFC
+275,NJ,1,1,7,5.05,KFC
+277,NJ,1,0,12.5,4.25,KFC
+277,NJ,1,1,11,5.05,KFC
+278,NJ,1,0,8,4.25,KFC
+278,NJ,1,1,8.5,5.05,KFC
+282,NJ,1,0,12,4.25,Roy Rogers
+282,NJ,1,1,0,,Roy Rogers
+284,NJ,1,0,20.5,4.5,Roy Rogers
+284,NJ,1,1,15,5.05,Roy Rogers
+285,NJ,1,0,18.5,4.75,Roy Rogers
+285,NJ,1,1,13.5,5.05,Roy Rogers
+286,NJ,1,0,11.5,4.75,Roy Rogers
+286,NJ,1,1,12.5,5.05,Roy Rogers
+287,NJ,1,0,15,4.5,Roy Rogers
+287,NJ,1,1,12.5,5.05,Roy Rogers
+288,NJ,1,0,13,4.75,Roy Rogers
+288,NJ,1,1,12.5,5.05,Roy Rogers
+289,NJ,1,0,10,4.25,Roy Rogers
+289,NJ,1,1,10,5.05,Roy Rogers
+290,NJ,1,0,17,4.75,Wendy's
+290,NJ,1,1,13.5,5.05,Wendy's
+291,NJ,1,0,17,4.55,Wendy's
+291,NJ,1,1,16,5.1,Wendy's
+292,NJ,1,0,20.5,4.8,Wendy's
+292,NJ,1,1,23.5,5.05,Wendy's
+297,NJ,1,0,19.5,4.25,Burger King
+297,NJ,1,1,34,5.05,Burger King
+303,NJ,1,0,30.5,4.35,Roy Rogers
+303,NJ,1,1,32.5,5.05,Roy Rogers
+304,NJ,1,0,23,4.5,Roy Rogers
+304,NJ,1,1,21.5,5.05,Roy Rogers
+305,NJ,1,0,13,4.39,Roy Rogers
+305,NJ,1,1,20,5.05,Roy Rogers
+307,NJ,1,0,30.25,4.25,Roy Rogers
+307,NJ,1,1,43.5,5.2,Roy Rogers
+310,NJ,1,0,18,4.25,Wendy's
+310,NJ,1,1,17.5,5.05,Wendy's
+312,NJ,1,0,10,4.25,Burger King
+312,NJ,1,1,7,5.05,Burger King
+314,NJ,1,0,17,4.62,Burger King
+314,NJ,1,1,22,5.25,Burger King
+316,NJ,1,0,25.5,4.62,Burger King
+316,NJ,1,1,22,5.05,Burger King
+317,NJ,1,0,6,4.25,Burger King
+317,NJ,1,1,7,5.05,Burger King
+318,NJ,1,0,11.5,4.75,KFC
+318,NJ,1,1,14,5.05,KFC
+319,NJ,1,0,8.5,4.62,KFC
+319,NJ,1,1,27,5.05,KFC
+322,NJ,1,0,18.5,4.75,Roy Rogers
+322,NJ,1,1,18.5,5.05,Roy Rogers
+325,NJ,1,0,15.5,4.5,Roy Rogers
+325,NJ,1,1,11.5,5.05,Roy Rogers
+333,NJ,1,0,14.25,4.25,Burger King
+333,NJ,1,1,16,5.05,Burger King
+336,NJ,1,0,38,4.5,Burger King
+336,NJ,1,1,25,5.05,Burger King
+337,NJ,1,0,24.75,4.87,Burger King
+337,NJ,1,1,30.5,5.05,Burger King
+339,NJ,1,0,23,4.25,Burger King
+339,NJ,1,1,11.5,5.05,Burger King
+340,NJ,1,0,24,4.25,Burger King
+340,NJ,1,1,25.5,5.05,Burger King
+341,NJ,1,0,7.5,4.62,KFC
+341,NJ,1,1,9.5,5.05,KFC
+343,NJ,1,0,15,4.75,KFC
+343,NJ,1,1,11.5,5.05,KFC
+346,NJ,1,0,9.25,4.25,KFC
+346,NJ,1,1,12,,KFC
+348,NJ,1,0,11.25,4.25,Roy Rogers
+348,NJ,1,1,0,,Roy Rogers
+350,NJ,1,0,16.5,4.75,Roy Rogers
+350,NJ,1,1,17,5.05,Roy Rogers
+351,NJ,1,0,18.75,4.25,Roy Rogers
+351,NJ,1,1,24,5.05,Roy Rogers
+355,NJ,1,0,13.5,4.87,Wendy's
+355,NJ,1,1,13.5,,Wendy's
+359,NJ,1,0,15,4.25,Burger King
+359,NJ,1,1,17,5.05,Burger King
+360,NJ,1,0,17.5,4.25,Burger King
+360,NJ,1,1,28,5.05,Burger King
+361,NJ,1,0,17.5,4.25,Burger King
+361,NJ,1,1,21.5,5.05,Burger King
+363,NJ,1,0,15.5,4.25,KFC
+363,NJ,1,1,19.5,5.2,KFC
+364,NJ,1,0,16.5,4.25,KFC
+364,NJ,1,1,20,5.05,KFC
+366,NJ,1,0,13.5,4.5,Roy Rogers
+366,NJ,1,1,14.5,5.05,Roy Rogers
+368,NJ,1,0,13,4.25,Wendy's
+368,NJ,1,1,14.5,5.05,Wendy's
+369,NJ,1,0,11.5,4.35,Burger King
+369,NJ,1,1,0,,Burger King
+370,NJ,1,0,29.05,4.85,Burger King
+370,NJ,1,1,31.5,5.05,Burger King
+376,NJ,1,0,13,4.5,Burger King
+376,NJ,1,1,11.5,5.05,Burger King
+377,NJ,1,0,18,4.25,Burger King
+377,NJ,1,1,20,5.05,Burger King
+379,NJ,1,0,30,4.62,Burger King
+379,NJ,1,1,34,5.05,Burger King
+380,NJ,1,0,20.5,4.5,Burger King
+380,NJ,1,1,25,5.05,Burger King
+383,NJ,1,0,10,4.5,Burger King
+383,NJ,1,1,10,5.05,Burger King
+385,NJ,1,0,26,4.25,Burger King
+385,NJ,1,1,25,5.05,Burger King
+386,NJ,1,0,12.5,4.25,Burger King
+386,NJ,1,1,23,5.05,Burger King
+391,NJ,1,0,19.5,4.25,KFC
+391,NJ,1,1,17.5,5.05,KFC
+393,NJ,1,0,12,4.62,KFC
+393,NJ,1,1,23,5.25,KFC
+396,NJ,1,0,36,4.87,Roy Rogers
+396,NJ,1,1,26,5.4,Roy Rogers
+397,NJ,1,0,21,4.25,Roy Rogers
+397,NJ,1,1,16.5,5.05,Roy Rogers
+398,NJ,1,0,24.5,4.75,Roy Rogers
+398,NJ,1,1,35.5,5.05,Roy Rogers
+399,NJ,1,0,20,4.87,Roy Rogers
+399,NJ,1,1,31,5.05,Roy Rogers
+400,NJ,1,0,26.5,4.5,Roy Rogers
+400,NJ,1,1,23,5.05,Roy Rogers
+401,NJ,1,0,15,4.25,Roy Rogers
+401,NJ,1,1,22.5,5.05,Roy Rogers
+402,NJ,1,0,19,4.75,Roy Rogers
+402,NJ,1,1,21.5,5.05,Roy Rogers
+405,NJ,1,0,17.5,4.32,Roy Rogers
+405,NJ,1,1,12,5.05,Roy Rogers
+410,NJ,1,0,20.5,4.25,Burger King
+410,NJ,1,1,20.5,5.05,Burger King
+411,NJ,1,0,21,4.5,Burger King
+411,NJ,1,1,25,5.05,Burger King
+412,NJ,1,0,10.5,4.5,KFC
+412,NJ,1,1,8.5,5.05,KFC
+413,NJ,1,0,23,4.25,Burger King
+413,NJ,1,1,13,5.05,Burger King
+414,NJ,1,0,23,4.25,Burger King
+414,NJ,1,1,21.5,5.05,Burger King
+415,NJ,1,0,29,4.25,Burger King
+415,NJ,1,1,23,5.05,Burger King
+417,NJ,1,0,21,4.25,Burger King
+417,NJ,1,1,25.5,5.05,Burger King
+418,NJ,1,0,41.5,4.25,Burger King
+418,NJ,1,1,21.5,5.05,Burger King
+419,NJ,1,0,12,4.25,KFC
+419,NJ,1,1,9.5,5.05,KFC
+421,NJ,1,0,33,4.62,KFC
+421,NJ,1,1,36.5,5.05,KFC
+422,NJ,1,0,6.5,4.75,KFC
+422,NJ,1,1,16,5.05,KFC
+423,NJ,1,0,9,4.95,KFC
+423,NJ,1,1,23.75,5.25,KFC
+424,NJ,1,0,9.75,4.75,KFC
+424,NJ,1,1,17.5,5.25,KFC
+426,NJ,1,0,24.5,4.25,Roy Rogers
+426,NJ,1,1,20.5,5.05,Roy Rogers
+427,NJ,1,0,14,4.75,Wendy's
+427,NJ,1,1,20.5,5.05,Wendy's
+428,NJ,1,0,19.5,4.62,Wendy's
+428,NJ,1,1,25,5.14,Wendy's

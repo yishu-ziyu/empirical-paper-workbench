@@ -1,0 +1,62 @@
+classic-5 fixture provenance
+============================
+
+ck1994_long.csv
+---------------
+Paper: Card, David, and Alan B. Krueger. 1994. "Minimum Wages and Employment:
+A Case Study of the Fast-Food Industry in New Jersey and Pennsylvania."
+American Economic Review 84(4): 772–793.
+
+Preferred public extract:
+  https://github.com/Zhn-Rui/minwage-did
+  data/clean/ck1994_long.csv  (balanced 384-store × 2-wave FTE panel)
+  data/clean/ck1994_wide.csv  (same stores; starting wage by wave)
+
+The published long file does not include starting wage. This fixture keeps
+that long panel and joins wage from the same repo's wide file
+(wage_st before the New Jersey increase, wage_st2 after). Empty wage cells
+are missing in the public extract (coded NA there).
+
+Upstream public-use microdata (also used by that extract):
+  David Card, njmin.zip → public.dat
+  https://davidcard.berkeley.edu/data_sets/njmin.zip
+
+Column mapping:
+  store_id  ← sheet
+  state     ← state_label (PA / NJ)
+  treated   ← treated (1 = NJ, 0 = PA)
+  period    ← post (0 = before, 1 = after)
+  fte       ← fte (full-time + managers + 0.5 × part-time)
+  wage      ← wage_st / wage_st2
+  chain     ← chain_label
+
+
+barro1991_growth.csv
+--------------------
+Paper: Barro, Robert J. 1991. "Economic Growth in a Cross Section of
+Countries." Quarterly Journal of Economics 106(2): 407–443.
+
+Constructed from the NBER Barro–Lee 1994 country panel (the same source
+shipped as GrowthData in R package hdm). Country names are not in hdm's
+complete-case matrix, so this file is a 1960 cross-section cut from the
+NBER extract assembled by ECLR:
+
+  https://github.com/datasquad/ECLR/blob/gh-pages/data/BARLEE/GrowthData_complete.csv
+  https://www.nber.org/research/data/barro-lee-dataset
+  Barro, Robert J., and Jong-Wha Lee. 1994. "Data Set for a Panel of 138
+  Countries." NBER.
+
+Rows with any missing required field are dropped (110 countries).
+
+Column mapping (1960 / 1960–85):
+  country          ← COUNTRY.NAME
+  gdp_pc_initial   ← gdpsh460  (real GDP per capita, SH v4.0, 1960)
+  growth           ← log(gdpsh485 / gdpsh460) / 25  (annualized 1960–85)
+  sec_enroll       ← s60   (secondary enrollment ratio, 1960)
+  prim_enroll      ← p60   (primary enrollment ratio, 1960)
+  inv_share        ← invsh41
+  gov_share        ← govsh41
+  pop_growth       ← gpop1
+
+These files are built-in catalog data, not a user's study. They are not the
+Card 1995 teaching case (`POST /demos/card`).

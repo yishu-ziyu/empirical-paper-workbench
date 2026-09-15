@@ -207,6 +207,13 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('desk-columns')).toBeInTheDocument()
     expect(screen.getByTestId('direction-section')).toBeInTheDocument()
     expect(screen.getByLabelText(/研究问题/)).toHaveValue(shapedTitle)
+    expect(screen.getByTestId('attach-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('attach-confirm-btn')).toBeDisabled()
+    expect(screen.queryByTestId('eda-sidebar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('dataset-summary')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('table1-pause')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('desk-try-card')).not.toBeInTheDocument()
   })
 
   test('GuidePage 发送研究想法后进入空桌对话，并保留用户原文', async () => {

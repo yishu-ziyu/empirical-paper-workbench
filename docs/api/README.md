@@ -151,17 +151,25 @@ estimate → robustness → outline。继续估计见
 方向预览确认后，从 `run_estimate` 接到大纲。契约与 payload 见
 [prewrite-confirm.md](./prewrite-confirm.md)。
 
-**请求体**：
+**请求体**（两段确认后才能跑估计）：
 
 ```json
 {
-  "action": "continue_estimate"
+  "action": "continue_estimate",
+  "table1Confirmed": true,
+  "specConfirmed": true,
+  "qType": "heterogeneity",
+  "specMode": "interaction"
 }
 ```
 
+`action=record_confirms` 只落盘旗标（200）。`qType === heterogeneity` 且设定无
+交互时 `blockingDecision.isBlock=true`，估计 409。详见
+[prewrite-confirm.md](./prewrite-confirm.md)。
+
 **请求头**：`Idempotency-Key`（必填）。
 
-**响应 202**：与 `POST /direction` 相同的 `RunAcceptedResponse`。
+**响应 202**：与 `POST /direction` 相同的 `RunAcceptedResponse`（仅 `continue_estimate`）。
 
 ---
 

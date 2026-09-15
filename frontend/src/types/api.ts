@@ -649,7 +649,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm Prewrite Endpoint
-         * @description Confirm the direction preview and enqueue estimate → robustness → outline.
+         * @description Record FE confirm flags, or continue estimate after both CTAs.
          */
         post: operations["confirm_prewrite_endpoint_sessions__session_id__prewrite_confirm_post"];
         delete?: never;
@@ -1424,6 +1424,35 @@ export interface components {
              */
             attrition_rate: number;
         };
+        /**
+         * BlockingDecisionResponse
+         * @description Hard-block readout for the estimate-prep rail (FE ``is-block``).
+         */
+        BlockingDecisionResponse: {
+            /**
+             * Blocked
+             * @default false
+             */
+            blocked: boolean;
+            /**
+             * Isblock
+             * @default false
+             */
+            isBlock: boolean;
+            /** Code */
+            code?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
+            /**
+             * Hasinteraction
+             * @default false
+             */
+            hasInteraction: boolean;
+        };
         /** Body_transcribe_desk_desk_transcribe_post */
         Body_transcribe_desk_desk_transcribe_post: {
             /**
@@ -1936,6 +1965,10 @@ export interface components {
             cluster_levels?: string[];
             /** Heterogeneity Groups */
             heterogeneity_groups?: string[];
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
         } & {
             [key: string]: unknown;
         };
@@ -1981,6 +2014,21 @@ export interface components {
             specification_equation?: string | null;
             /** Prewrite Gate */
             prewrite_gate?: string | null;
+            /**
+             * Table1Confirmed
+             * @default false
+             */
+            table1Confirmed: boolean;
+            /**
+             * Specconfirmed
+             * @default false
+             */
+            specConfirmed: boolean;
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
+            blockingDecision?: components["schemas"]["BlockingDecisionResponse"] | null;
         };
         /**
          * EdaRequest
@@ -2639,16 +2687,68 @@ export interface components {
          * PrewriteConfirmRequest
          * @description POST /sessions/{id}/prewrite/confirm 请求体。
          *
-         *     方向阶段停在 Table 1 + 主设定方程之后。客户端显式确认后才继续
-         *     estimate → robustness → outline。空 body 等价于 continue_estimate。
+         *     估计前必须两段确认：``table1Confirmed``（Table 1 CTA）与
+         *     ``specConfirmed``（方程 + 题型→设定 CTA）。``action=record_confirms``
+         *     只落盘确认态；``continue_estimate`` 在两段都为 true 且未被硬挡时才
+         *     入队 estimate。硬挡：``qType === heterogeneity`` 且设定无交互。
          */
         PrewriteConfirmRequest: {
             /**
              * Action
              * @default continue_estimate
-             * @constant
+             * @enum {string}
              */
-            action: "continue_estimate";
+            action: "record_confirms" | "continue_estimate";
+            /**
+             * Table1Confirmed
+             * @default false
+             */
+            table1Confirmed: boolean;
+            /**
+             * Specconfirmed
+             * @default false
+             */
+            specConfirmed: boolean;
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
+            /** Hasinteraction */
+            hasInteraction?: boolean | null;
+        };
+        /**
+         * PrewriteGateResponse
+         * @description ``action=record_confirms`` 的 200 返回：确认旗标 + blockingDecision。
+         */
+        PrewriteGateResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Prewrite Gate */
+            prewrite_gate?: string | null;
+            /**
+             * Table1Confirmed
+             * @default false
+             */
+            table1Confirmed: boolean;
+            /**
+             * Specconfirmed
+             * @default false
+             */
+            specConfirmed: boolean;
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
+            blockingDecision?: components["schemas"]["BlockingDecisionResponse"] | null;
+            /** Table1 */
+            table1?: unknown;
+            /** Specification Equation */
+            specification_equation?: string | null;
+            /** Main Specification */
+            main_specification?: unknown;
         };
         /**
          * ProgressChapterSummary
@@ -3069,6 +3169,21 @@ export interface components {
             specification_equation?: string | null;
             /** Prewrite Gate */
             prewrite_gate?: string | null;
+            /**
+             * Table1Confirmed
+             * @default false
+             */
+            table1Confirmed: boolean;
+            /**
+             * Specconfirmed
+             * @default false
+             */
+            specConfirmed: boolean;
+            /** Qtype */
+            qType?: string | null;
+            /** Specmode */
+            specMode?: string | null;
+            blockingDecision?: components["schemas"]["BlockingDecisionResponse"] | null;
             dataset?: components["schemas"]["SnapshotDatasetResponse"] | null;
             active_run?: components["schemas"]["SnapshotActiveRunResponse"] | null;
             /** Degradations */
@@ -4597,7 +4712,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful Response */
+            /** @description Table 1 / spec confirms recorded; estimate not started. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrewriteGateResponse"];
+                };
+            };
+            /** @description Both confirms accepted; estimate run enqueued. */
             202: {
                 headers: {
                     [name: string]: unknown;
@@ -4606,7 +4730,7 @@ export interface operations {
                     "application/json": components["schemas"]["RunAcceptedResponse"];
                 };
             };
-            /** @description Session busy, identification blocked, or prewrite not ready. */
+            /** @description Session busy, confirms incomplete, identification blocked, or hetero hard-block. */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -342,7 +342,10 @@ def test_confirm_prewrite_and_estimate_resumes_from_estimate(monkeypatch):
     assert paused.get("prewrite_gate") == "awaiting_estimate"
     calls.clear()
 
-    result = facade.confirm_prewrite_and_estimate(sid)
+    result = facade.confirm_prewrite_and_estimate(
+        sid,
+        {"table1Confirmed": True, "specConfirmed": True},
+    )
     assert calls == [
         "estimate",
         "robustness_check",

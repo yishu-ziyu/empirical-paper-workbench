@@ -18,7 +18,11 @@ from runner import process_one_run
 def _confirm_and_finish(client, session_id: str) -> dict:
     accepted = client.post(
         f"/sessions/{session_id}/prewrite/confirm",
-        json={"action": "continue_estimate"},
+        json={
+            "action": "continue_estimate",
+            "table1Confirmed": True,
+            "specConfirmed": True,
+        },
         headers={"Idempotency-Key": f"confirm-{session_id}"},
     )
     assert accepted.status_code == 202, accepted.text
@@ -352,6 +356,180 @@ def test_get_session_exposes_table1_after_direction_pause(client, tmp_path):
         assert data["specification_equation"].startswith("income =")
         assert data["table1"]["produced_by"] == "prewrite_preview"
         assert data["main_specification"]["formula"] == "income ~ age"
+        assert data["table1Confirmed"] is False
+        assert data["specConfirmed"] is False
+        assert data["blockingDecision"]["blocked"] is False
+        assert data["blockingDecision"]["isBlock"] is False
+    finally:
+        facade.drop_session(sid)
+
+
+def test_confirm_prewrite_requires_both_fe_flags(client):
+    sid = "test-confirm-incomplete"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/input.csv",
+            "research_direction": {"question": "q", "dv": "y", "iv": "x"},
+            "identification_diag": {"report": "ok"},
+            "star_rating": 3,
+            "prewrite_gate": "awaiting_estimate",
+        },
+    )
+    try:
+        resp = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "continue_estimate", "table1Confirmed": True},
+            headers={"Idempotency-Key": "confirm-incomplete"},
+        )
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert detail["code"] == "confirms_incomplete"
+        assert detail["table1Confirmed"] is True
+        assert detail["specConfirmed"] is False
+    finally:
+        facade.drop_session(sid)
+
+
+def test_record_confirms_then_continue_estimate(client, tmp_path, monkeypatch):
+    csv = tmp_path / "gate.csv"
+    csv.write_text("y,x\n1,2\n3,4\n", encoding="utf-8")
+    sid = "test-record-then-continue"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": str(csv),
+            "research_direction": {"question": "q", "dv": "y", "iv": "x"},
+            "identification_diag": {"report": "ok"},
+            "star_rating": 3,
+            "prewrite_gate": "awaiting_estimate",
+            "main_specification": {
+                "method": "ols",
+                "formula": "y ~ x",
+                "outcome": "y",
+                "treatment": "x",
+            },
+        },
+    )
+    monkeypatch.setattr("runner.execute_prewrite_supervised", facade.execute_prewrite)
+    try:
+        table1 = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "record_confirms", "table1Confirmed": True},
+            headers={"Idempotency-Key": "record-t1"},
+        )
+        assert table1.status_code == 200, table1.text
+        body = table1.json()
+        assert body["table1Confirmed"] is True
+        assert body["specConfirmed"] is False
+        assert body["blockingDecision"]["isBlock"] is False
+
+        spec = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "record_confirms", "specConfirmed": True},
+            headers={"Idempotency-Key": "record-spec"},
+        )
+        assert spec.status_code == 200, spec.text
+        assert spec.json()["specConfirmed"] is True
+
+        accepted = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "continue_estimate"},
+            headers={"Idempotency-Key": "continue-after-record"},
+        )
+        assert accepted.status_code == 202, accepted.text
+    finally:
+        facade.drop_session(sid)
+
+
+def test_heterogeneity_without_interaction_blocks_estimate(client):
+    sid = "test-hetero-block"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/input.csv",
+            "research_direction": {
+                "question": "教育回报是否因地区而异？",
+                "dv": "ln_wage",
+                "iv": "educ",
+                "qType": "heterogeneity",
+            },
+            "identification_diag": {"report": "ok"},
+            "star_rating": 3,
+            "prewrite_gate": "awaiting_estimate",
+            "main_specification": {
+                "method": "ols",
+                "formula": "ln_wage ~ educ + region",
+                "outcome": "ln_wage",
+                "treatment": "educ",
+                "controls": ["region"],
+            },
+            "qType": "heterogeneity",
+            "specMode": "level",
+        },
+    )
+    try:
+        snap = client.get(f"/sessions/{sid}").json()
+        assert snap["blockingDecision"]["blocked"] is True
+        assert snap["blockingDecision"]["isBlock"] is True
+        assert snap["blockingDecision"]["code"] == "heterogeneity_missing_interaction"
+        assert "heterogeneity_missing_interaction" in snap["write_blockers"]
+
+        blocked = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={
+                "action": "continue_estimate",
+                "table1Confirmed": True,
+                "specConfirmed": True,
+                "qType": "heterogeneity",
+                "specMode": "level",
+            },
+            headers={"Idempotency-Key": "hetero-block"},
+        )
+        assert blocked.status_code == 409, blocked.text
+        detail = blocked.json()["detail"]
+        assert detail["code"] == "estimate_blocked"
+        assert detail["blockingDecision"]["isBlock"] is True
+        assert "educ×region" in detail["blockingDecision"]["reason"]
+    finally:
+        facade.drop_session(sid)
+
+
+def test_heterogeneity_with_interaction_allows_continue(client):
+    sid = "test-hetero-ok"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/input.csv",
+            "research_direction": {
+                "question": "教育回报是否因地区而异？",
+                "dv": "ln_wage",
+                "iv": "educ",
+                "qType": "heterogeneity",
+            },
+            "identification_diag": {"report": "ok"},
+            "star_rating": 3,
+            "prewrite_gate": "awaiting_estimate",
+            "main_specification": {
+                "method": "ols",
+                "formula": "ln_wage ~ educ + educ:region + exper",
+                "outcome": "ln_wage",
+                "treatment": "educ",
+            },
+        },
+    )
+    try:
+        accepted = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={
+                "action": "continue_estimate",
+                "table1Confirmed": True,
+                "specConfirmed": True,
+                "qType": "heterogeneity",
+            },
+            headers={"Idempotency-Key": "hetero-ok"},
+        )
+        assert accepted.status_code == 202, accepted.text
     finally:
         facade.drop_session(sid)
 

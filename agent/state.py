@@ -126,6 +126,15 @@ class EconPaperState(TypedDict, total=False):
     specification_equation: Optional[str]  # main-spec equation text
     prewrite_gate: Optional[str]  # awaiting_estimate | estimate_complete
     prewrite_phase: Optional[str]  # direction | estimate (durable-run control)
+    table1_confirmed: Optional[bool]
+    spec_confirmed: Optional[bool]
+    table1Confirmed: Optional[bool]
+    specConfirmed: Optional[bool]
+    q_type: Optional[str]  # average | heterogeneity | causal
+    qType: Optional[str]
+    spec_mode: Optional[str]  # interaction | level
+    specMode: Optional[str]
+    blocking_decision: Optional[dict]
     # 稳健性检验（robustness_check 节点写入）
     robustness_results: Optional[dict]  # {robustness: list[dict], heterogeneity: list[dict], placebos: list[dict], summary_table: str}
     # 主估计（estimate 节点写入）。results 是结果章 prompt 的 {results}。

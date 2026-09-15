@@ -26,6 +26,11 @@ PREWRITE_DOWNSTREAM_KEYS = (
     "literature_produced_by",
     "citation_graph",
     "citation_indices",
+    "table1_confirmed",
+    "spec_confirmed",
+    "table1Confirmed",
+    "specConfirmed",
+    "blocking_decision",
 )
 
 _SPEC_COLUMN_KEYS = (
@@ -254,15 +259,31 @@ def _column_roles(spec: dict[str, Any] | None) -> dict[str, str]:
 
 def build_prewrite_preview(state: dict[str, Any]) -> dict[str, Any]:
     """Attach Table 1 + equation and mark the estimate confirm gate."""
+    from .prewrite_gates import persist_gate_fields
+
     spec = state.get("main_specification")
     if not isinstance(spec, dict):
         spec = {}
     table1 = compute_table1(state.get("csv_path"), spec)
     equation = specification_equation_text(spec)
+    preview = persist_gate_fields(
+        {**state, "specification_equation": equation},
+        table1_confirmed=False,
+        spec_confirmed=False,
+    )
     return {
         "table1": table1,
         "specification_equation": equation,
         "prewrite_gate": PREWRITE_GATE_AWAITING_ESTIMATE,
+        "table1_confirmed": False,
+        "spec_confirmed": False,
+        "table1Confirmed": False,
+        "specConfirmed": False,
+        "q_type": preview.get("q_type"),
+        "qType": preview.get("qType"),
+        "spec_mode": preview.get("spec_mode"),
+        "specMode": preview.get("specMode"),
+        "blocking_decision": preview.get("blocking_decision"),
     }
 
 

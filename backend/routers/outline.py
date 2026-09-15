@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_session_ownership
@@ -24,6 +25,7 @@ from models.user import User
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
     PrewriteConfirmRequest,
+    PrewriteGateResponse,
     QueueFullResponse,
     ResumeResponse,
     RunAcceptedResponse,
@@ -63,6 +65,8 @@ class DirectionRequest(BaseModel):
     cluster: Optional[str] = None
     cluster_levels: List[str] = Field(default_factory=list)
     heterogeneity_groups: List[str] = Field(default_factory=list)
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
     model_config = {"extra": "allow"}
 
 
@@ -153,12 +157,19 @@ async def set_direction_endpoint(
 
 @router.post(
     "/sessions/{session_id}/prewrite/confirm",
-    response_model=RunAcceptedResponse,
-    status_code=202,
+    response_model=RunAcceptedResponse | PrewriteGateResponse,
     responses={
+        200: {
+            "model": PrewriteGateResponse,
+            "description": "Table 1 / spec confirms recorded; estimate not started.",
+        },
+        202: {
+            "model": RunAcceptedResponse,
+            "description": "Both confirms accepted; estimate run enqueued.",
+        },
         409: {
             "model": SessionBusyResponse,
-            "description": "Session busy, identification blocked, or prewrite not ready.",
+            "description": "Session busy, confirms incomplete, identification blocked, or hetero hard-block.",
         },
         429: {
             "model": QueueFullResponse,
@@ -182,12 +193,21 @@ async def confirm_prewrite_endpoint(
         max_length=200,
     ),
     current_user: Optional[User] = Depends(get_optional_user),
-) -> RunAcceptedResponse:
-    """Confirm the direction preview and enqueue estimate → robustness → outline."""
+):
+    """Record FE confirm flags, or continue estimate after both CTAs."""
     require_session_ownership(session_id, current_user)
+    confirms = payload.model_dump(exclude_none=True)
+    if payload.action == "record_confirms":
+        recorded = facade.record_prewrite_confirms(session_id, confirms)
+        return JSONResponse(
+            status_code=200,
+            content=PrewriteGateResponse(**recorded).model_dump(mode="json"),
+        )
     if payload.action != "continue_estimate":
         raise HTTPException(status_code=422, detail="unsupported confirm action")
-    research_direction, initial_state = facade.prepare_prewrite_confirm(session_id)
+    research_direction, initial_state = facade.prepare_prewrite_confirm(
+        session_id, confirms
+    )
     try:
         run = await RunRepository().enqueue(
             session_id=session_id,
@@ -212,11 +232,14 @@ async def confirm_prewrite_endpoint(
             detail="run queue is full",
             headers={"Retry-After": "5"},
         ) from exc
-    return RunAcceptedResponse(
-        run_id=run.run_id,
-        session_id=run.session_id,
-        status="PENDING",
-        events_url=f"/api/runs/{run.run_id}/events",
+    return JSONResponse(
+        status_code=202,
+        content=RunAcceptedResponse(
+            run_id=run.run_id,
+            session_id=run.session_id,
+            status="PENDING",
+            events_url=f"/api/runs/{run.run_id}/events",
+        ).model_dump(mode="json"),
     )
 
 

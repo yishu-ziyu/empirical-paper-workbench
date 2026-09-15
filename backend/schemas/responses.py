@@ -411,6 +411,18 @@ class ResearchLabResponse(BaseModel):
     claim: Optional[ClaimLedgerResponse] = None
 
 
+class BlockingDecisionResponse(BaseModel):
+    """Hard-block readout for the estimate-prep rail (FE ``is-block``)."""
+
+    blocked: bool = False
+    isBlock: bool = False
+    code: Optional[str] = None
+    reason: Optional[str] = None
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
+    hasInteraction: bool = False
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
@@ -437,6 +449,11 @@ class SessionInfoResponse(BaseModel):
     table1: Any = None
     specification_equation: Optional[str] = None
     prewrite_gate: Optional[str] = None
+    table1Confirmed: bool = False
+    specConfirmed: bool = False
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
+    blockingDecision: Optional[BlockingDecisionResponse] = None
     dataset: Optional[SnapshotDatasetResponse] = None
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
@@ -540,16 +557,43 @@ class DirectionResponse(BaseModel):
     table1: Any = None
     specification_equation: Optional[str] = None
     prewrite_gate: Optional[str] = None
+    table1Confirmed: bool = False
+    specConfirmed: bool = False
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
+    blockingDecision: Optional[BlockingDecisionResponse] = None
 
 
 class PrewriteConfirmRequest(BaseModel):
     """POST /sessions/{id}/prewrite/confirm 请求体。
 
-    方向阶段停在 Table 1 + 主设定方程之后。客户端显式确认后才继续
-    estimate → robustness → outline。空 body 等价于 continue_estimate。
+    估计前必须两段确认：``table1Confirmed``（Table 1 CTA）与
+    ``specConfirmed``（方程 + 题型→设定 CTA）。``action=record_confirms``
+    只落盘确认态；``continue_estimate`` 在两段都为 true 且未被硬挡时才
+    入队 estimate。硬挡：``qType === heterogeneity`` 且设定无交互。
     """
 
-    action: Literal["continue_estimate"] = "continue_estimate"
+    action: Literal["record_confirms", "continue_estimate"] = "continue_estimate"
+    table1Confirmed: bool = False
+    specConfirmed: bool = False
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
+    hasInteraction: Optional[bool] = None
+
+
+class PrewriteGateResponse(BaseModel):
+    """``action=record_confirms`` 的 200 返回：确认旗标 + blockingDecision。"""
+
+    ok: bool = True
+    prewrite_gate: Optional[str] = None
+    table1Confirmed: bool = False
+    specConfirmed: bool = False
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
+    blockingDecision: Optional[BlockingDecisionResponse] = None
+    table1: Any = None
+    specification_equation: Optional[str] = None
+    main_specification: Any = None
 
 
 class RunAcceptedResponse(BaseModel):

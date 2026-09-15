@@ -1,10 +1,10 @@
 # econpaper Codex Task State
 
 - Task ID: FM-E-DATA-RIGOR-1
-- Status: complete
-- Git context（分支可选）: `fix/fm-e-build-data-rigor-1` @ `7db607f` from `feat/fm-e-build-did-spec-recut-1` @ `bf695715`
-- Goal: Audit and remove synthetic/tiny CSVs from product found-data paths; honesty fail-closed for n<200 demo claims.
-- Hard bar: no toys as found in suggest/find; teaching_fixture labeled; recover ck1994_long/barro from `24e79c46`; no CGSS pkl; no PR
+- Status: active
+- Git context（分支可选）: `fix/fm-e-build-data-rigor-1` from `feat/fm-e-build-did-spec-recut-1` @ `bf695715`
+- Goal: Audit and remove synthetic/tiny CSVs from product found-data paths; honesty fail-closed for n<200 demo claims; encode captain-local-real as first-class acquire.
+- Hard bar: no toys as found in suggest/find; teaching_fixture labeled; recover ck1994_long/barro from `24e79c46`; captain-local real panel upload is first-class acquire (`source=captain-local-real`); never toys; no CGSS pkl; no PR
 - Session / run ID:
 - Current research stage:
 - Current review / approval gate:

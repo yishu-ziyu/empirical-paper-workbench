@@ -12,6 +12,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from agent.data_honesty import CAPTAIN_LOCAL_REAL
+
 ROUTE_FAMILIES = ("educ_wage", "minwage", "growth", "macro", "else")
 
 # Venues the user is sent to first (contract §2.2 / §4).
@@ -32,6 +34,12 @@ _VENUES = {
     "macro": ("FRED", "Dataverse"),
     "else": ("Dataverse",),
 }
+
+CAPTAIN_LOCAL_HOW = (
+    " First-class acquire (source=captain-local-real): upload a real local "
+    "panel (CSV or Stata .dta); interim OK for real Desktop/经济学论文 files. "
+    "Never teaching toys."
+)
 
 _MINWAGE = re.compile(
     r"最低工资|minimum[\s\-]?wages?|min[\s_]?wage|"
@@ -208,35 +216,37 @@ def _how(family: str, facets: dict[str, Any]) -> str:
     method = facets["method"] or "confirmed method"
     terms = ", ".join(facets["query_terms"]) or f"{outcome} {treatment} {method}"
     if family == "educ_wage":
-        return (
+        body = (
             f"Open the IPUMS CPS/USA extract landing and request columns bound "
             f"to confirmed outcome '{outcome}' and treatment '{treatment}'. "
             f"Do not treat wage1 or other teaching extracts as found data. "
             f"Search Dataverse as backup using: {terms}."
         )
-    if family == "minwage":
-        return (
+    elif family == "minwage":
+        body = (
             f"List the real-scale ck fixture as a candidate (never an answer "
             f"key) when n≥200. Follow the Card zip at the author-published "
             f"NJ–PA page. Search Dataverse for confirmed outcome '{outcome}' "
             f"and treatment '{treatment}' (method {method})."
         )
-    if family == "growth":
-        return (
+    elif family == "growth":
+        body = (
             f"Use World Bank WDI for confirmed growth outcome '{outcome}'. "
             f"Barro teaching extracts are not found data. Search Dataverse "
             f"as backup using: {terms}."
         )
-    if family == "macro":
-        return (
+    elif family == "macro":
+        body = (
             f"Search FRED for series matching confirmed outcome '{outcome}' "
             f"and treatment '{treatment}'. Search Dataverse as backup using: "
             f"{terms}."
         )
-    return (
-        f"Search Dataverse for confirmed outcome '{outcome}', treatment "
-        f"'{treatment}', and method '{method}'. Query terms: {terms}."
-    )
+    else:
+        body = (
+            f"Search Dataverse for confirmed outcome '{outcome}', treatment "
+            f"'{treatment}', and method '{method}'. Query terms: {terms}."
+        )
+    return body + CAPTAIN_LOCAL_HOW
 
 
 def _where(family: str) -> str:
@@ -288,7 +298,7 @@ def build_find_data_plan(
         "plan": {
             "where": where,
             "how": how,
-            "venues": list(_VENUES[family]),
+            "venues": [CAPTAIN_LOCAL_REAL, *list(_VENUES[family])],
             "search_facets": facets,
         },
         "candidates": [],
@@ -307,6 +317,7 @@ def read_find_data(state: dict[str, Any] | None) -> dict[str, Any]:
 
 
 __all__ = [
+    "CAPTAIN_LOCAL_HOW",
     "DesignUnconfirmed",
     "PRIMARY_VENUE",
     "ROUTE_FAMILIES",

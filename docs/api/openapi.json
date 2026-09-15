@@ -4032,11 +4032,17 @@
             "type": "boolean",
             "title": "Catalog",
             "default": false
+          },
+          "source": {
+            "type": "string",
+            "const": "captain-local-real",
+            "title": "Source",
+            "default": "captain-local-real"
           }
         },
         "type": "object",
         "title": "Classic5OwnFileActionResponse",
-        "description": "Non-catalog action returned with every suggest response."
+        "description": "Non-catalog first-class acquire: captain-local real panel upload."
       },
       "Classic5SuggestRequest": {
         "properties": {
@@ -4265,6 +4271,17 @@
               }
             ],
             "title": "Honesty Warning"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -5795,6 +5812,11 @@
               }
             ],
             "title": "Honesty Warning"
+          },
+          "acquire": {
+            "type": "boolean",
+            "title": "Acquire",
+            "default": false
           }
         },
         "type": "object",

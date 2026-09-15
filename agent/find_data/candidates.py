@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from agent.data_honesty import (
+    CAPTAIN_LOCAL_REAL,
     count_csv_data_rows,
     honesty_for_n,
     is_found_scale,
@@ -97,6 +98,7 @@ CARD_ZIP_URL = "https://davidcard.berkeley.edu/data_sets.html"
 IPUMS_URL = "https://cps.ipums.org/cps/"
 WDI_URL = "https://data.worldbank.org/indicator/NY.GDP.PCAP.KD.ZG"
 FRED_URL = "https://fred.stlouisfed.org/series/UNRATE"
+CAPTAIN_LOCAL_UPLOAD = "/upload"
 
 
 def is_real_candidate(obj: Any) -> bool:
@@ -166,6 +168,9 @@ def suggest_data_candidates(
     if not any(str(c["source_id"]).startswith("dataverse:") for c in found):
         _add(_dataverse_landing(design, query))
 
+    _add(_captain_local_candidate(design))
+    # First-class acquire stays first even when public hits exist.
+    found.sort(key=lambda item: 0 if item.get("source_id") == CAPTAIN_LOCAL_REAL else 1)
     return found
 
 
@@ -288,6 +293,7 @@ def _candidate(
     teaching_fixture: bool = False,
     n_rows: int | None = None,
     honesty_warning: str | None = None,
+    acquire: bool = False,
 ) -> dict[str, Any]:
     item = {
         "source_id": source_id,
@@ -299,6 +305,7 @@ def _candidate(
         "found": found,
         "teaching_fixture": teaching_fixture,
         "n_rows": n_rows,
+        "acquire": acquire,
     }
     if honesty_warning:
         item["honesty_warning"] = honesty_warning
@@ -358,6 +365,25 @@ def _route_externals(
             )
         ]
     return []
+
+
+def _captain_local_candidate(design: Mapping[str, Any]) -> dict[str, Any]:
+    """Always-on first-class acquire. Not found data; never a toy fixture."""
+    return _candidate(
+        source_id=CAPTAIN_LOCAL_REAL,
+        title="Captain-local real panel (CSV or Stata .dta)",
+        url_or_fixture=CAPTAIN_LOCAL_UPLOAD,
+        license="user-owned",
+        suggested_cols=_suggested_from_design(design),
+        design=design,
+        notes=(
+            "first-class acquire source=captain-local-real; interim OK for "
+            "real Desktop/经济学论文 .dta/CSV; never teaching toys"
+        ),
+        found=False,
+        teaching_fixture=False,
+        acquire=True,
+    )
 
 
 def _dataverse_landing(

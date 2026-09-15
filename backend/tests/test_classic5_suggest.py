@@ -73,7 +73,11 @@ def _confirmed_design(**fields) -> dict:
 def _assert_candidates_only(payload: dict) -> None:
     assert payload["catalog_id"] == "classic-5"
     assert payload["attached"] is False
-    assert payload["own_file"] == {"action": "upload_own_file", "catalog": False}
+    assert payload["own_file"] == {
+        "action": "upload_own_file",
+        "catalog": False,
+        "source": "captain-local-real",
+    }
     for key in _FORBIDDEN_SUCCESS_KEYS:
         assert key not in payload
     assert "teaching" in payload
@@ -284,6 +288,7 @@ def test_suggest_endpoint_draft_design_is_not_success(client):
     assert data["candidates"] == []
     assert data["teaching"] == []
     assert data["own_file"]["action"] == "upload_own_file"
+    assert data["own_file"]["source"] == "captain-local-real"
 
 
 def test_suggest_rejects_empty_request(client):
@@ -383,6 +388,7 @@ def test_suggest_empty_catalog_still_returns_own_file(client, tmp_path, monkeypa
     assert data["candidates"] == []
     assert data["teaching"] == []
     assert data["own_file"]["action"] == "upload_own_file"
+    assert data["own_file"]["source"] == "captain-local-real"
     assert data["attached"] is False
 
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Iterable
 
 from agent.data_honesty import (
+    CAPTAIN_LOCAL_REAL,
     count_csv_data_rows,
     honesty_for_n,
     is_found_scale,
@@ -196,7 +197,11 @@ def suggest_candidates(
         "design_confirmed": confirmed,
         "candidates": found,
         "teaching": teaching,
-        "own_file": {"action": OWN_FILE_ACTION, "catalog": False},
+        "own_file": {
+            "action": OWN_FILE_ACTION,
+            "catalog": False,
+            "source": CAPTAIN_LOCAL_REAL,
+        },
         "attached": False,
     }
 

@@ -67,6 +67,7 @@ def test_upload_returns_session_id_and_meta(client, sample_csv_path):
         assert key in meta, f"dataset_meta missing key: {key}"
     assert meta["demo_success"] is False
     assert meta.get("honesty_warning")
+    assert meta.get("source") == "captain-local-real"
 
 
 def test_upload_returns_before_graph_or_cleaning(client, tmp_path, monkeypatch):
@@ -359,6 +360,24 @@ def test_upload_course_panel_returns_202_without_checkpoint_db(client, monkeypat
     assert meta["rows"] == 24
     assert meta["demo_success"] is False
     assert meta.get("honesty_warning")
+    assert meta.get("source") not in {"captain-local-real", "captain_local_real"}
+
+
+def test_upload_real_scale_panel_stamps_captain_local_real(client):
+    """n≥200 non-toy CSV is first-class captain-local-real acquire."""
+    header = "id,year,y,treat\n"
+    rows = "".join(f"{i},2010,{i % 9},1\n" for i in range(3010))
+    resp = client.post(
+        "/upload",
+        files={"file": ("经济学论文/cfps_panel.csv", BytesIO((header + rows).encode("utf-8")), "text/csv")},
+        headers=_upload_headers(),
+    )
+    assert resp.status_code == 202, resp.text
+    meta = resp.json()["dataset_meta"]
+    assert meta["rows"] == 3010
+    assert meta["source"] == "captain-local-real"
+    assert meta["demo_success"] is True
+    assert not meta.get("honesty_warning")
 
 
 def test_upload_detects_missing_values(client, sample_csv_path):

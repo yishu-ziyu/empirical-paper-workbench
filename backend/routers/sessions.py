@@ -34,7 +34,7 @@ from auth import (
     require_auth_unless_debug,
     require_session_ownership,
 )
-from agent.data_honesty import honesty_for_n
+from agent.data_honesty import acquire_source_for_upload, honesty_for_n
 from config import settings
 from facade import facade
 from models.user import User
@@ -141,8 +141,14 @@ def _validated_upload_key(raw: str | None) -> str:
     return str(parsed)
 
 
-def _dataset_meta(df: pd.DataFrame, name: str | None = None) -> DatasetMetaResponse:
+def _dataset_meta(
+    df: pd.DataFrame,
+    name: str | None = None,
+    *,
+    captain_local: bool = False,
+) -> DatasetMetaResponse:
     honesty = honesty_for_n(int(len(df)), name=name)
+    source = acquire_source_for_upload(name) if captain_local else None
     return DatasetMetaResponse(
         name=name,
         columns=[str(column) for column in df.columns],
@@ -151,14 +157,20 @@ def _dataset_meta(df: pd.DataFrame, name: str | None = None) -> DatasetMetaRespo
         missing_count=int(df.isna().sum().sum()),
         demo_success=bool(honesty["demo_success"]),
         honesty_warning=honesty.get("honesty_warning"),
+        source=source,
     )
 
 
 def _normalize_dataframe(
-    df: pd.DataFrame, name: str | None = None
+    df: pd.DataFrame,
+    name: str | None = None,
+    *,
+    captain_local: bool = False,
 ) -> tuple[bytes, DatasetMetaResponse]:
     """Serialize and profile a parsed table away from the API event loop."""
-    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(df, name)
+    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(
+        df, name, captain_local=captain_local
+    )
 
 
 def _upload_response(admission) -> UploadResponse:
@@ -178,6 +190,11 @@ def _upload_response(admission) -> UploadResponse:
             honesty_warning=(
                 str(metadata["honesty_warning"])
                 if metadata.get("honesty_warning")
+                else None
+            ),
+            source=(
+                str(metadata["source"])
+                if isinstance(metadata.get("source"), str) and metadata.get("source")
                 else None
             ),
         ),
@@ -270,7 +287,10 @@ async def upload(
     #     The original file name is recorded server-side so the Project
     #     Snapshot can restore the workspace without client-side copies.
     csv_bytes, dataset_meta = await run_in_threadpool(
-        _normalize_dataframe, df, file.filename or ""
+        _normalize_dataframe,
+        df,
+        file.filename or "",
+        captain_local=True,
     )
     session_id = str(uuid.uuid4())
     user_id = current_user.id if current_user else None

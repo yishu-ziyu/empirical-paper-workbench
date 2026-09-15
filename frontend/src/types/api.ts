@@ -1793,7 +1793,7 @@ export interface components {
         };
         /**
          * Classic5OwnFileActionResponse
-         * @description Non-catalog action returned with every suggest response.
+         * @description Non-catalog first-class acquire: captain-local real panel upload.
          */
         Classic5OwnFileActionResponse: {
             /**
@@ -1807,6 +1807,12 @@ export interface components {
              * @default false
              */
             catalog: boolean;
+            /**
+             * Source
+             * @default captain-local-real
+             * @constant
+             */
+            source: "captain-local-real";
         };
         /**
          * Classic5SuggestRequest
@@ -1941,6 +1947,8 @@ export interface components {
             demo_success: boolean;
             /** Honesty Warning */
             honesty_warning?: string | null;
+            /** Source */
+            source?: string | null;
         };
         /** DatasetProvenanceResponse */
         DatasetProvenanceResponse: {
@@ -2618,6 +2626,11 @@ export interface components {
             n_rows?: number | null;
             /** Honesty Warning */
             honesty_warning?: string | null;
+            /**
+             * Acquire
+             * @default false
+             */
+            acquire: boolean;
         };
         /**
          * FindDataPlanBodyResponse

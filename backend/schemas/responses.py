@@ -32,6 +32,7 @@ class DatasetMetaResponse(BaseModel):
     status: Optional[str] = None
     demo_success: bool = False
     honesty_warning: Optional[str] = None
+    source: Optional[str] = None
 
 
 class ChapterResponse(BaseModel):
@@ -502,10 +503,11 @@ class SessionInfoResponse(BaseModel):
 
 
 class Classic5OwnFileActionResponse(BaseModel):
-    """Non-catalog action returned with every suggest response."""
+    """Non-catalog first-class acquire: captain-local real panel upload."""
 
     action: Literal["upload_own_file"] = "upload_own_file"
     catalog: bool = False
+    source: Literal["captain-local-real"] = "captain-local-real"
 
 
 class Classic5CandidateResponse(BaseModel):
@@ -1082,6 +1084,7 @@ class FindDataCandidateResponse(BaseModel):
     teaching_fixture: bool = False
     n_rows: Optional[int] = None
     honesty_warning: Optional[str] = None
+    acquire: bool = False
 
 
 class SessionFindDataResponse(BaseModel):

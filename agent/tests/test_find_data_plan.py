@@ -68,6 +68,9 @@ def test_minwage_plan_names_where_and_how():
     assert "ck fixture" in plan["how"]
     assert "Card zip" in plan["how"]
     assert "Dataverse" in plan["how"]
+    assert plan["venues"][0] == "captain-local-real"
+    assert "captain-local-real" in plan["how"]
+    assert "teaching toys" in plan["how"]
     assert "employment" in plan["how"]
     assert "min_wage" in plan["how"]
     facets = plan["search_facets"]
@@ -100,6 +103,7 @@ def test_educ_wage_from_schooling_wages_slots():
     assert "wage1" not in record["plan"]["where"]
     assert "IPUMS" in record["plan"]["how"]
     assert "teaching" in record["plan"]["how"]
+    assert record["plan"]["venues"][0] == "captain-local-real"
     assert record["candidates"] == []
 
 
@@ -160,6 +164,7 @@ def test_else_is_dataverse():
     assert record["primary_venue"] == "Dataverse"
     assert record["plan"]["where"] == "Dataverse"
     assert "Dataverse" in record["plan"]["how"]
+    assert record["plan"]["venues"][0] == "captain-local-real"
     assert "out_of_pocket" in record["plan"]["search_facets"]["query_terms"]
     assert "insurance_merge" in record["plan"]["search_facets"]["query_terms"]
 

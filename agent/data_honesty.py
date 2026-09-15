@@ -1,6 +1,7 @@
 """Honesty gates for found-data vs teaching toys (FM-E-DATA-RIGOR-1).
 
 Product suggest/find paths must not present teaching toys as found data.
+Captain-local real panel upload is first-class acquire (`source=captain-local-real`).
 Attach/estimate may still run on a small real upload, but n < 200 cannot
 be claimed as a demo or found-data success.
 """
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 DEMO_MIN_ROWS = 200
+CAPTAIN_LOCAL_REAL = "captain-local-real"
 
 TOY_FILENAMES = frozenset(
     {
@@ -39,6 +41,17 @@ def filename_of(name: str | Path | None) -> str:
 
 def is_toy_filename(name: str | Path | None) -> bool:
     return filename_of(name) in TOY_FILENAMES
+
+
+def acquire_source_for_upload(name: str | Path | None) -> str | None:
+    """POST /upload of a non-toy file is first-class captain-local-real acquire.
+
+    Interim OK for real Desktop/经济学论文 CSV / Stata .dta. Teaching toys
+    never receive this source. n<200 still cannot claim demo/found success.
+    """
+    if not filename_of(name) or is_toy_filename(name):
+        return None
+    return CAPTAIN_LOCAL_REAL
 
 
 def count_csv_data_rows(path: Path | str) -> int | None:
@@ -109,10 +122,12 @@ def stamp_mapping(payload: Mapping[str, Any], honesty: Mapping[str, Any]) -> dic
 
 
 __all__ = [
+    "CAPTAIN_LOCAL_REAL",
     "DEMO_MIN_ROWS",
     "HONESTY_TEACHING",
     "HONESTY_TOO_SMALL",
     "TOY_FILENAMES",
+    "acquire_source_for_upload",
     "count_csv_data_rows",
     "filename_of",
     "honesty_for_n",

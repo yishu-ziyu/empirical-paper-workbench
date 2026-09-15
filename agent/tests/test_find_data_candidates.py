@@ -111,6 +111,25 @@ def test_unconfirmed_design_returns_no_candidates(tmp_path: Path):
         assert items == [], design
 
 
+def test_captain_local_real_is_first_class_acquire_not_found(tmp_path: Path):
+    items = suggest_data_candidates(
+        _confirmed(),
+        dataverse_search=_silent_dataverse,
+        catalog_dir=tmp_path,
+    )
+    _assert_real(items)
+    assert items[0]["source_id"] == "captain-local-real"
+    local = items[0]
+    assert local["acquire"] is True
+    assert local["found"] is False
+    assert local["teaching_fixture"] is False
+    assert local["url_or_fixture"] == "/upload"
+    assert local["license"] == "user-owned"
+    assert "Desktop/经济学论文" in local["design_fit"]["notes"]
+    assert "source=captain-local-real" in local["design_fit"]["notes"]
+    assert "teaching toys" in local["design_fit"]["notes"]
+
+
 def test_minwage_without_fixture_still_has_card_zip_and_dataverse(tmp_path: Path):
     items = suggest_data_candidates(
         _confirmed(),

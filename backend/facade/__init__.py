@@ -196,6 +196,10 @@ class AgentFacade:
             "outline": outline,
             "body_chapters": body_chapters,
             "research_direction": state.get("research_direction"),
+            "main_specification": state.get("main_specification"),
+            "table1": state.get("table1"),
+            "specification_equation": state.get("specification_equation"),
+            "prewrite_gate": state.get("prewrite_gate"),
         }
 
     def get_state(self, session_id: str) -> dict:
@@ -356,8 +360,12 @@ class AgentFacade:
         session_id: str,
         research_direction: dict,
     ) -> dict:
-        """Run the shared pre-write path: identify → estimate → robustness → literature → outline."""
+        """Accept a direction: identify, then pause with Table 1 + equation.
+
+        Estimate → robustness → outline wait for ``confirm_prewrite_and_estimate``.
+        """
         initial_state = self.prepare_prewrite_state(session_id)
+        initial_state["prewrite_phase"] = "direction"
         state = {**initial_state, "research_direction": research_direction}
         try:
             state = self.execute_prewrite(
@@ -407,11 +415,18 @@ class AgentFacade:
         if not state.get("workspace") and cancellation_check is None:
             state["workspace"] = self._workspace_dir(session_id)
 
+        phase = str(state.get("prewrite_phase") or "direction").strip().lower()
+        if phase == "estimate":
+            prewrite_kwargs: dict[str, Any] = {"resume_from": "run_estimate"}
+        else:
+            prewrite_kwargs = {"until": "identification_verify"}
+
         def run() -> dict:
             return run_prewrite(
                 state,
                 progress=progress_callback,
                 should_cancel=cancellation_check,
+                **prewrite_kwargs,
             )
 
         # Durable workers publish RunEvent rows. Avoid the legacy disk trace
@@ -426,6 +441,47 @@ class AgentFacade:
                 claim=state.get("claim"),
             )
         return state
+
+    def prepare_prewrite_confirm(self, session_id: str) -> tuple[dict, dict]:
+        """Validate the estimate gate and build the durable confirm snapshot."""
+        state = self.get_state(session_id)
+        rd = state.get("research_direction")
+        if not isinstance(rd, dict) or not (rd.get("question") or rd.get("dv")):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "prewrite_not_ready", "reason": "no_direction"},
+            )
+        if state.get("star_rating") == 0 or state.get("identification_failed"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "identification_blocked",
+                    "star_rating": state.get("star_rating"),
+                    "identification_failed": True,
+                },
+            )
+        if not state.get("identification_diag"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "prewrite_not_ready", "reason": "no_identification"},
+            )
+        initial_state = self.prepare_prewrite_state(session_id)
+        initial_state["prewrite_phase"] = "estimate"
+        return dict(rd), initial_state
+
+    def confirm_prewrite_and_estimate(self, session_id: str) -> dict:
+        """Continue a paused prewrite from estimate through outline."""
+        research_direction, initial_state = self.prepare_prewrite_confirm(session_id)
+        state = {**initial_state, "research_direction": research_direction}
+        try:
+            state = self.execute_prewrite(
+                session_id,
+                research_direction,
+                initial_state,
+            )
+            return state
+        finally:
+            self.save_state(session_id, state)
 
     def run_identification_verify(self, session_id: str) -> dict:
         """Run identification verification after method selection.

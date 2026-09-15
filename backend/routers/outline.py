@@ -2,7 +2,8 @@
 
 - POST /sessions/{id}/direction: 接受 {question, dv, iv, controls, method, template}
   → 写入 state.research_direction → set_direction → 识别验真
-  → 非 0 星再 generate_outline → 返回 outline + 识别报告
+  → 非 0 星写入 Table 1 + 主设定方程并停下，不自动跑 estimate
+- POST /sessions/{id}/prewrite/confirm: 客户端确认后继续 estimate → robustness → outline
 - POST /sessions/{id}/resume: 接受用户调整后的 outline → 写入 state.user_adjusted_outline
   → 重跑 generate_outline (采用调整版) → 返回 {ok, outline}
 
@@ -22,6 +23,7 @@ from facade import facade
 from models.user import User
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
+    PrewriteConfirmRequest,
     QueueFullResponse,
     ResumeResponse,
     RunAcceptedResponse,
@@ -120,7 +122,80 @@ async def set_direction_endpoint(
             kind="prewrite",
             payload={
                 "research_direction": rd,
-                "initial_state": facade.prepare_prewrite_state(session_id),
+                "initial_state": {
+                    **facade.prepare_prewrite_state(session_id),
+                    "prewrite_phase": "direction",
+                },
+                "phase": "direction",
+            },
+            idempotency_key=idempotency_key,
+        )
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    except SessionBusy as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "session_busy", "run_id": exc.run_id},
+        ) from exc
+    except QueueFull as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="run queue is full",
+            headers={"Retry-After": "5"},
+        ) from exc
+    return RunAcceptedResponse(
+        run_id=run.run_id,
+        session_id=run.session_id,
+        status="PENDING",
+        events_url=f"/api/runs/{run.run_id}/events",
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/prewrite/confirm",
+    response_model=RunAcceptedResponse,
+    status_code=202,
+    responses={
+        409: {
+            "model": SessionBusyResponse,
+            "description": "Session busy, identification blocked, or prewrite not ready.",
+        },
+        429: {
+            "model": QueueFullResponse,
+            "description": "The durable run queue is full.",
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds before retrying admission.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
+)
+async def confirm_prewrite_endpoint(
+    session_id: str,
+    payload: PrewriteConfirmRequest = PrewriteConfirmRequest(),
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+    ),
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> RunAcceptedResponse:
+    """Confirm the direction preview and enqueue estimate → robustness → outline."""
+    require_session_ownership(session_id, current_user)
+    if payload.action != "continue_estimate":
+        raise HTTPException(status_code=422, detail="unsupported confirm action")
+    research_direction, initial_state = facade.prepare_prewrite_confirm(session_id)
+    try:
+        run = await RunRepository().enqueue(
+            session_id=session_id,
+            kind="prewrite",
+            payload={
+                "research_direction": research_direction,
+                "initial_state": initial_state,
+                "phase": "estimate",
             },
             idempotency_key=idempotency_key,
         )

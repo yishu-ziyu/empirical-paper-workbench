@@ -433,6 +433,10 @@ class SessionInfoResponse(BaseModel):
     outline: List[OutlineChapterResponse] = Field(default_factory=list)
     body_chapters: List[ChapterResponse] = Field(default_factory=list)
     research_direction: Any = None
+    main_specification: Any = None
+    table1: Any = None
+    specification_equation: Optional[str] = None
+    prewrite_gate: Optional[str] = None
     dataset: Optional[SnapshotDatasetResponse] = None
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
@@ -532,6 +536,20 @@ class DirectionResponse(BaseModel):
     degradations: List[Any] = Field(default_factory=list)
     write_blockers: List[str] = Field(default_factory=list)
     robustness_status: Optional[str] = None
+    main_specification: Any = None
+    table1: Any = None
+    specification_equation: Optional[str] = None
+    prewrite_gate: Optional[str] = None
+
+
+class PrewriteConfirmRequest(BaseModel):
+    """POST /sessions/{id}/prewrite/confirm 请求体。
+
+    方向阶段停在 Table 1 + 主设定方程之后。客户端显式确认后才继续
+    estimate → robustness → outline。空 body 等价于 continue_estimate。
+    """
+
+    action: Literal["continue_estimate"] = "continue_estimate"
 
 
 class RunAcceptedResponse(BaseModel):

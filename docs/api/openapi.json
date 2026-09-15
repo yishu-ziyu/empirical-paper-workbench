@@ -1623,6 +1623,102 @@
         }
       }
     },
+    "/sessions/{session_id}/prewrite/confirm": {
+      "post": {
+        "summary": "Confirm Prewrite Endpoint",
+        "description": "Confirm the direction preview and enqueue estimate → robustness → outline.",
+        "operationId": "confirm_prewrite_endpoint_sessions__session_id__prewrite_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrewriteConfirmRequest",
+                "default": {
+                  "action": "continue_estimate"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Session busy, identification blocked, or prewrite not ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBusyResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The durable run queue is full.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying admission.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueFullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/resume": {
       "post": {
         "summary": "Resume Endpoint",
@@ -4420,6 +4516,34 @@
               }
             ],
             "title": "Robustness Status"
+          },
+          "main_specification": {
+            "title": "Main Specification"
+          },
+          "table1": {
+            "title": "Table1"
+          },
+          "specification_equation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification Equation"
+          },
+          "prewrite_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Gate"
           }
         },
         "type": "object",
@@ -6017,6 +6141,19 @@
         "title": "PaperSourceEvidenceResponse",
         "description": "Resolver-verified source metadata; no fabricated full-text excerpt."
       },
+      "PrewriteConfirmRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "continue_estimate",
+            "title": "Action",
+            "default": "continue_estimate"
+          }
+        },
+        "type": "object",
+        "title": "PrewriteConfirmRequest",
+        "description": "POST /sessions/{id}/prewrite/confirm 请求体。\n\n方向阶段停在 Table 1 + 主设定方程之后。客户端显式确认后才继续\nestimate → robustness → outline。空 body 等价于 continue_estimate。"
+      },
       "ProgressChapterSummary": {
         "properties": {
           "type": {
@@ -7047,6 +7184,34 @@
           },
           "research_direction": {
             "title": "Research Direction"
+          },
+          "main_specification": {
+            "title": "Main Specification"
+          },
+          "table1": {
+            "title": "Table1"
+          },
+          "specification_equation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification Equation"
+          },
+          "prewrite_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Gate"
           },
           "dataset": {
             "anyOf": [

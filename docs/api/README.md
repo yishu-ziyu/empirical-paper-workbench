@@ -23,7 +23,8 @@ open http://localhost:8000/redoc
 | sessions | `/sessions` | POST | 创建空 session（不上传文件） |
 | sessions | `/sessions/{id}` | GET | 查询 session 状态（用于 localStorage 恢复校验） |
 | sessions | `/sessions/{id}/export` | GET | 导出论文源码（format=tex 当前仅支持 LaTeX） |
-| outline | `/sessions/{id}/direction` | POST | 设置研究方向，生成大纲 |
+| outline | `/sessions/{id}/direction` | POST | 设置研究方向；识别通过后写 Table 1 + 方程并停下 |
+| outline | `/sessions/{id}/prewrite/confirm` | POST | 确认方向预览后继续 estimate → outline |
 | outline | `/sessions/{id}/resume` | POST | 用户调整大纲后重跑 generate_outline |
 | chapter | `/sessions/{id}/generate-chapter` | POST | 生成指定章节（写入 current_chapter → 跑节点 → 返回章节） |
 | chapter | `/sessions/{id}/approve-chapter` | POST | 审批章节，标记 status="approved" |
@@ -113,7 +114,10 @@ open http://localhost:8000/redoc
 
 #### POST /sessions/{session_id}/direction
 
-设置研究方向，运行 set_direction + generate_outline 节点，返回 6 章大纲。
+设置研究方向，运行 set_direction + identification_verify。识别通过后写入
+Table 1 描述统计与主设定方程（`prewrite_gate=awaiting_estimate`），**不**自动跑
+estimate → robustness → outline。继续估计见
+[prewrite-confirm.md](./prewrite-confirm.md)。
 
 **请求体**：
 
@@ -137,18 +141,27 @@ open http://localhost:8000/redoc
 | method | string | 是 | — | 计量方法 |
 | template | string | 否 | "cn_journal" | 模板（cn_journal / undergraduate / master_thesis / english_submission） |
 
-**响应 200**：
+**响应 202**：durable run（`run_id` / `events_url`）。成功后 snapshot 含
+`table1`、`specification_equation`、`prewrite_gate`，**没有**新的 `estimate` / `outline`。
+
+---
+
+#### POST /sessions/{session_id}/prewrite/confirm
+
+方向预览确认后，从 `run_estimate` 接到大纲。契约与 payload 见
+[prewrite-confirm.md](./prewrite-confirm.md)。
+
+**请求体**：
 
 ```json
 {
-  "outline": [
-    {"type": "intro", "title": "引言", "research_question": "..."},
-    {"type": "lit_review", "title": "文献综述", "research_question": null},
-    ...
-  ],
-  "research_direction": {...}
+  "action": "continue_estimate"
 }
 ```
+
+**请求头**：`Idempotency-Key`（必填）。
+
+**响应 202**：与 `POST /direction` 相同的 `RunAcceptedResponse`。
 
 ---
 

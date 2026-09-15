@@ -638,6 +638,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/prewrite/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Prewrite Endpoint
+         * @description Confirm the direction preview and enqueue estimate → robustness → outline.
+         */
+        post: operations["confirm_prewrite_endpoint_sessions__session_id__prewrite_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/resume": {
         parameters: {
             query?: never;
@@ -1953,6 +1973,14 @@ export interface components {
             write_blockers?: string[];
             /** Robustness Status */
             robustness_status?: string | null;
+            /** Main Specification */
+            main_specification?: unknown;
+            /** Table1 */
+            table1?: unknown;
+            /** Specification Equation */
+            specification_equation?: string | null;
+            /** Prewrite Gate */
+            prewrite_gate?: string | null;
         };
         /**
          * EdaRequest
@@ -2608,6 +2636,21 @@ export interface components {
             excerpt_status: "available" | "unavailable";
         };
         /**
+         * PrewriteConfirmRequest
+         * @description POST /sessions/{id}/prewrite/confirm 请求体。
+         *
+         *     方向阶段停在 Table 1 + 主设定方程之后。客户端显式确认后才继续
+         *     estimate → robustness → outline。空 body 等价于 continue_estimate。
+         */
+        PrewriteConfirmRequest: {
+            /**
+             * Action
+             * @default continue_estimate
+             * @constant
+             */
+            action: "continue_estimate";
+        };
+        /**
          * ProgressChapterSummary
          * @description progress 端点返回的章节概要。
          */
@@ -3018,6 +3061,14 @@ export interface components {
             body_chapters?: components["schemas"]["ChapterResponse"][];
             /** Research Direction */
             research_direction?: unknown;
+            /** Main Specification */
+            main_specification?: unknown;
+            /** Table1 */
+            table1?: unknown;
+            /** Specification Equation */
+            specification_equation?: string | null;
+            /** Prewrite Gate */
+            prewrite_gate?: string | null;
             dataset?: components["schemas"]["SnapshotDatasetResponse"] | null;
             active_run?: components["schemas"]["SnapshotActiveRunResponse"] | null;
             /** Degradations */
@@ -4499,6 +4550,63 @@ export interface operations {
                 };
             };
             /** @description The session already has an active run; attach to it. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBusyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The durable run queue is full. */
+            429: {
+                headers: {
+                    /** @description Seconds before retrying admission. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueFullResponse"];
+                };
+            };
+        };
+    };
+    confirm_prewrite_endpoint_sessions__session_id__prewrite_confirm_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PrewriteConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAcceptedResponse"];
+                };
+            };
+            /** @description Session busy, identification blocked, or prewrite not ready. */
             409: {
                 headers: {
                     [name: string]: unknown;

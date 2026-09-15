@@ -15,6 +15,26 @@ from facade import facade
 from runner import process_one_run
 
 
+def _confirm_and_finish(client, session_id: str) -> dict:
+    accepted = client.post(
+        f"/sessions/{session_id}/prewrite/confirm",
+        json={"action": "continue_estimate"},
+        headers={"Idempotency-Key": f"confirm-{session_id}"},
+    )
+    assert accepted.status_code == 202, accepted.text
+    run_id = accepted.json()["run_id"]
+    assert asyncio.run(
+        process_one_run(
+            owner="outline-confirm-test",
+            run_id=run_id,
+        )
+    ) is True
+    terminal = client.get(f"/runs/{run_id}")
+    assert terminal.status_code == 200, terminal.text
+    assert terminal.json()["status"] == "SUCCEEDED", terminal.text
+    return terminal.json()["result"]
+
+
 def _post_and_finish(
     client,
     session_id: str,
@@ -137,12 +157,17 @@ def test_post_direction_did_missing_statspai_returns_outline(client, tmp_path, m
             },
         )
         assert data["identification_failed"] is False
-        assert len(data["outline"]) == 6
+        assert data.get("prewrite_gate") == "awaiting_estimate"
+        assert data.get("specification_equation")
+        assert not (data.get("estimate") or {}).get("produced_by")
+        assert not (data.get("outline") or [])
+        continued = _confirm_and_finish(client, sid)
+        assert len(continued["outline"]) == 6
         assert any(
             item.get("reason") == "statspai_unavailable"
-            for item in (data.get("degradations") or [])
+            for item in (continued.get("degradations") or [])
         )
-        assert data.get("estimate", {}).get("produced_by") == "estimate"
+        assert continued.get("estimate", {}).get("produced_by") == "estimate"
     finally:
         facade.drop_session(sid)
 
@@ -167,11 +192,16 @@ def test_post_direction_runs_identification_without_blocking_ols(client):
         assert data["identification_failed"] is False
         assert data.get("identification_report")
         assert "识别诊断套餐" in data["identification_report"]
-        assert len(data["outline"]) == 6
-        assert data.get("results")
-        assert isinstance(data.get("estimate"), dict)
-        assert data["estimate"].get("produced_by") == "estimate"
-        assert data.get("claim") == "association"
+        assert data.get("prewrite_gate") == "awaiting_estimate"
+        assert data.get("specification_equation")
+        assert not (data.get("outline") or [])
+        assert not (data.get("estimate") or {}).get("produced_by")
+        continued = _confirm_and_finish(client, sid)
+        assert len(continued["outline"]) == 6
+        assert continued.get("results")
+        assert isinstance(continued.get("estimate"), dict)
+        assert continued["estimate"].get("produced_by") == "estimate"
+        assert continued.get("claim") == "association"
     finally:
         facade.drop_session(sid)
 
@@ -192,22 +222,27 @@ def test_post_direction_endpoint(uploaded_session, client):
             "template": "cn_journal",
         },
     )
-    assert "outline" in data
-    outline = data["outline"]
-    assert len(outline) == 6
-    types = [ch["type"] for ch in outline]
-    assert "intro" in types
-    assert "conclusion" in types
+    assert data.get("prewrite_gate") == "awaiting_estimate"
+    assert data.get("table1")
+    assert data.get("specification_equation")
+    assert not (data.get("outline") or [])
+    assert not (data.get("estimate") or {}).get("produced_by")
     # research_direction 也应回显
     assert data["research_direction"]["method"] == "OLS"
     # OLS 无识别套餐：不截断，带识别报告
     assert data["identification_failed"] is False
     assert data.get("identification_report")
-    assert data.get("results")
-    assert data.get("estimate", {}).get("produced_by") == "estimate"
-    assert data["estimate"].get("status") == "ok"
     assert data.get("claim") == "association"
-    assert data.get("literature_source")
+    continued = _confirm_and_finish(client, uploaded_session)
+    outline = continued["outline"]
+    assert len(outline) == 6
+    types = [ch["type"] for ch in outline]
+    assert "intro" in types
+    assert "conclusion" in types
+    assert continued.get("results")
+    assert continued.get("estimate", {}).get("produced_by") == "estimate"
+    assert continued["estimate"].get("status") == "ok"
+    assert continued.get("literature_source")
 
 
 def test_get_session_hydrates_instrument_after_direction(client):
@@ -239,6 +274,84 @@ def test_get_session_hydrates_instrument_after_direction(client):
         assert data["estimate"]["treatment_row"].startswith("| age")
         assert data["robustness_status"] == "ran"
         assert data["outline"][0]["type"] == "intro"
+    finally:
+        facade.drop_session(sid)
+
+
+def test_confirm_prewrite_rejects_session_without_direction(client):
+    sid = "test-confirm-no-direction"
+    facade.seed_state(sid, {"csv_path": "/tmp/input.csv"})
+    try:
+        resp = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "continue_estimate"},
+            headers={"Idempotency-Key": "confirm-empty"},
+        )
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "prewrite_not_ready"
+    finally:
+        facade.drop_session(sid)
+
+
+def test_confirm_prewrite_rejects_zero_star(client):
+    sid = "test-confirm-zero-star"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": "/tmp/input.csv",
+            "research_direction": {"question": "q", "dv": "y", "iv": "x"},
+            "identification_diag": {"report": "blocked"},
+            "identification_failed": True,
+            "star_rating": 0,
+        },
+    )
+    try:
+        resp = client.post(
+            f"/sessions/{sid}/prewrite/confirm",
+            json={"action": "continue_estimate"},
+            headers={"Idempotency-Key": "confirm-zero"},
+        )
+        assert resp.status_code == 409, resp.text
+        assert resp.json()["detail"]["code"] == "identification_blocked"
+    finally:
+        facade.drop_session(sid)
+
+
+def test_get_session_exposes_table1_after_direction_pause(client, tmp_path):
+    csv = tmp_path / "desk.csv"
+    csv.write_text("income,age\n1,20\n2,30\n", encoding="utf-8")
+    sid = "test-desk-table1"
+    facade.seed_state(
+        sid,
+        {
+            "csv_path": str(csv),
+            "claim": "association",
+            "star_rating": 3,
+            "identification_diag": {"report": "ok"},
+            "research_direction": {"question": "q", "dv": "income", "iv": "age"},
+            "main_specification": {
+                "method": "ols",
+                "formula": "income ~ age",
+                "outcome": "income",
+                "treatment": "age",
+            },
+            "table1": {
+                "produced_by": "prewrite_preview",
+                "columns": ["variable", "count"],
+                "rows": [{"variable": "income", "count": 2}],
+            },
+            "specification_equation": "income = β₀ + β₁ age + ε",
+            "prewrite_gate": "awaiting_estimate",
+        },
+    )
+    try:
+        resp = client.get(f"/sessions/{sid}")
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["prewrite_gate"] == "awaiting_estimate"
+        assert data["specification_equation"].startswith("income =")
+        assert data["table1"]["produced_by"] == "prewrite_preview"
+        assert data["main_specification"]["formula"] == "income ~ age"
     finally:
         facade.drop_session(sid)
 

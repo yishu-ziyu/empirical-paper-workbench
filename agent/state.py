@@ -121,6 +121,11 @@ class EconPaperState(TypedDict, total=False):
     star_rating: Optional[int]  # 0-3 星：0=完全不可信（0星截断），1-2=继续但标注，3=最佳
     # HITL_pause：0星截断后等待用户调整研究方向的图内中断点
     hitl_pause_reason: Optional[str]  # "identification_0star" 等
+    # Direction-phase preview + human gate before estimate
+    table1: Optional[dict]  # descriptives for spec columns (Table 1)
+    specification_equation: Optional[str]  # main-spec equation text
+    prewrite_gate: Optional[str]  # awaiting_estimate | estimate_complete
+    prewrite_phase: Optional[str]  # direction | estimate (durable-run control)
     # 稳健性检验（robustness_check 节点写入）
     robustness_results: Optional[dict]  # {robustness: list[dict], heterogeneity: list[dict], placebos: list[dict], summary_table: str}
     # 主估计（estimate 节点写入）。results 是结果章 prompt 的 {results}。

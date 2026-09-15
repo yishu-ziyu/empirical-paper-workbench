@@ -119,9 +119,12 @@ def test_suggest_does_not_create_or_mutate_session(client):
     assert body_after == body_before
     assert body_after["has_dataset"] is False
     assert body_after.get("upload_readiness") in {None, "FAILED", "CANCELLED"}
-    assert "dataAttached" not in body_after
+    # Snapshot always projects the confirm-attach gate after DC-BE-attach.
+    # Suggest must not flip it or write state; false is the unattached default.
+    assert body_after["dataAttached"] is False
     assert "data_attached" not in body_after
     assert facade.get_state(sid).get("dataAttached") is None
+    assert facade.get_state(sid).get("data_attached") is not True
 
 
 def test_suggest_env_catalog_override(client, tmp_path, monkeypatch):

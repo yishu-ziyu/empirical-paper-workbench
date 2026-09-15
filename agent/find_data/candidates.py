@@ -27,6 +27,7 @@ from agent.find_data.honesty import (
     honesty_label,
     is_banned_toy,
     is_find_success_candidate,
+    is_real_candidate,
     project_honest_find_data,
     teaching_shelf_payload,
 )

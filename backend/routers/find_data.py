@@ -1,4 +1,4 @@
-"""FD-BE-plan / honesty / Card zip: confirmed session.design → session.find_data.
+"""FD-BE-plan / honesty / Card zip / Dataverse: confirmed design → find_data.
 
 Does not attach data, confirm a design, or search literature.
 """
@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from auth import get_optional_user, require_session_ownership
@@ -21,6 +22,7 @@ from agent.find_data.card_zip import (
     fetch_card_zip,
     merge_card_zip_candidate,
 )
+from agent.find_data.dataverse import apply_dataverse_fetch
 from agent.find_data.honesty import project_honest_find_data
 from agent.find_data.plan import (
     DesignUnconfirmed,
@@ -31,6 +33,13 @@ from agent.find_data.plan import (
 )
 
 router = APIRouter()
+
+
+class DataverseFetchRequest(BaseModel):
+    """Optional chosen Dataverse dataset / file. Empty body searches then fetches."""
+
+    source_id: Optional[str] = None
+    file_id: Optional[str] = None
 
 
 @router.get(
@@ -115,3 +124,35 @@ async def fetch_card_zip_endpoint(
     record = project_honest_find_data(merge_card_zip_candidate(record, candidate))
     facade.update_state(session_id, find_data=record)
     return SessionFindDataResponse.model_validate(record)
+
+
+@router.post(
+    "/sessions/{session_id}/find-data/fetch-dataverse",
+    response_model=SessionFindDataResponse,
+)
+async def fetch_dataverse_endpoint(
+    session_id: str,
+    payload: DataverseFetchRequest = DataverseFetchRequest(),
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> SessionFindDataResponse:
+    """Search Dataverse and download a public file, else keep the URL."""
+    require_session_ownership(session_id, current_user)
+    record = await run_in_threadpool(_fetch_dataverse, session_id, payload)
+    return SessionFindDataResponse.model_validate(record)
+
+
+def _fetch_dataverse(session_id: str, payload: DataverseFetchRequest) -> dict:
+    state = facade.get_state(session_id)
+    workspace = Path(facade._workspace_dir(session_id))
+    try:
+        record = apply_dataverse_fetch(
+            state,
+            workspace=workspace,
+            source_id=payload.source_id,
+            file_id=payload.file_id,
+        )
+    except DesignUnconfirmed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    record = project_honest_find_data(record)
+    facade.update_state(session_id, find_data=record)
+    return record

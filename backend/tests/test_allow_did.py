@@ -39,6 +39,9 @@ def _design(
     payload = {
         "status": status,
         "confirmed": confirmed,
+        "proposed_at": "2026-09-15T12:00:00Z",
+        "confirmed_at": "2026-09-15T13:00:00Z" if status == "confirmed" and confirmed else None,
+        "source": {"title": "最低工资对就业的影响", "question": ""},
         "method": method,
         "outcome": "employment",
         "treatment": "min_wage",

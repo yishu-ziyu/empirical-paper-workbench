@@ -1929,7 +1929,10 @@ export interface components {
         };
         /** DesignSourceResponse */
         DesignSourceResponse: {
-            /** Title */
+            /**
+             * Title
+             * @default
+             */
             title: string;
             /**
              * Question
@@ -3223,10 +3226,10 @@ export interface components {
             /** Confirmed */
             confirmed: boolean;
             /** Proposed At */
-            proposed_at: string;
+            proposed_at?: string | null;
             /** Confirmed At */
             confirmed_at?: string | null;
-            source: components["schemas"]["DesignSourceResponse"];
+            source?: components["schemas"]["DesignSourceResponse"];
             /**
              * Method
              * @enum {string}

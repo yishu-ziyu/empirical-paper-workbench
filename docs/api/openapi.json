@@ -4227,7 +4227,8 @@
         "properties": {
           "title": {
             "type": "string",
-            "title": "Title"
+            "title": "Title",
+            "default": ""
           },
           "question": {
             "type": "string",
@@ -4236,9 +4237,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "title"
-        ],
         "title": "DesignSourceResponse"
       },
       "DeskChatTurn": {
@@ -7323,7 +7321,14 @@
             "title": "Confirmed"
           },
           "proposed_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Proposed At"
           },
           "confirmed_at": {
@@ -7439,8 +7444,6 @@
         "required": [
           "status",
           "confirmed",
-          "proposed_at",
-          "source",
           "method"
         ],
         "title": "SessionDesignResponse",

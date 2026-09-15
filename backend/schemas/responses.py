@@ -412,7 +412,7 @@ class ResearchLabResponse(BaseModel):
 
 
 class DesignSourceResponse(BaseModel):
-    title: str
+    title: str = ""
     question: str = ""
 
 
@@ -428,9 +428,9 @@ class SessionDesignResponse(BaseModel):
 
     status: Literal["draft", "confirmed"]
     confirmed: bool
-    proposed_at: str
+    proposed_at: Optional[str] = None
     confirmed_at: Optional[str] = None
-    source: DesignSourceResponse
+    source: DesignSourceResponse = Field(default_factory=DesignSourceResponse)
     method: Literal["ols", "did", "iv", "rd", "scm"]
     outcome: str = ""
     treatment: str = ""

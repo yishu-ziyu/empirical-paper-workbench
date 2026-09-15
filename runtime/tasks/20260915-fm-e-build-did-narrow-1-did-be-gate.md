@@ -11,7 +11,8 @@
 - Verified facts:
   - Contract: `docs/did-narrow-exception-contract.md` §1
   - Existing catalog token: `minimum-wage-employment` in `fixtures/classic-5/catalog.json` (read only)
-  - Known tokens also include `ck1994`
+  - CLASSIC-FIXTURES landed separately: `feat/fm-e-build-classic-fixtures-1` @ `24e79c46` renamed minwage ranking id to `ck1994_long` and added `barro1991_growth`
+  - This branch does not rewrite fixture CSVs; gate keys `minimum-wage-employment` / `ck1994` / `ck1994_long` + minwage title keywords
 - Current hypothesis:
 - Changed files:
   - `backend/services/allow_did.py` (matcher)
@@ -22,9 +23,9 @@
 - Failed paths:
 - Data / output evidence locations:
 - Test evidence:
-  - `backend/tests/test_allow_did.py` + `test_classic5_suggest.py`: 45 passed
+  - `backend/tests/test_allow_did.py` + `test_classic5_suggest.py`: 52 passed after ck1994_long / barro alignment
   - `backend/tests/test_data_attach.py`: 17 passed
   - OpenAPI drift check: frontend/openapi.json, docs/api/openapi.json, types/api.ts match live app
-- Pending external state: CLASSIC-FIXTURES still owns CSV bytes; no PR (HARD STOP)
+- Pending external state: no PR (HARD STOP); this branch does not carry fixture CSV bytes
 - Next action: none (branch pushed; no PR)
 - Updated at: 2026-09-15

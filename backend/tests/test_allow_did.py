@@ -6,6 +6,7 @@ Card–Krueger / minwage TITLE/TOPIC or catalog identity may set true.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 
 import pytest
@@ -15,6 +16,7 @@ from runner import process_one_run
 from services.allow_did import (
     MINWAGE_ENTRY_IDS,
     allow_did_for,
+    catalog_identity_allows,
     session_allow_did,
     title_topic_allows,
 )
@@ -68,10 +70,19 @@ def test_known_catalog_tokens_allow(entry_id):
 
 @pytest.mark.parametrize(
     "entry_id",
-    ["schooling-wages", "trade-local-labor", "fiscal-output", "min-wage", ""],
+    [
+        "schooling-wages",
+        "trade-local-labor",
+        "fiscal-output",
+        "health-labor-supply",
+        "barro1991_growth",
+        "min-wage",
+        "",
+    ],
 )
 def test_other_catalog_tokens_deny(entry_id):
     assert allow_did_for(title="crime and policing", entry_id=entry_id, method="did") is False
+    assert catalog_identity_allows(entry_id) is False
 
 
 def test_method_is_never_the_setter():
@@ -135,6 +146,24 @@ def test_ck1994_token_sets_allow_did(client):
     resp = client.post(f"/sessions/{sid}/title-topic", json={"entry_id": "ck1994"})
     assert resp.status_code == 200, resp.text
     assert resp.json()["allow_did"] is True
+
+
+def test_landed_ck1994_long_identity_sets_allow_did(client):
+    sid = _create_session(client)
+    resp = client.post(f"/sessions/{sid}/title-topic", json={"entry_id": "ck1994_long"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["allow_did"] is True
+    assert resp.json()["dataAttached"] is False
+
+
+def test_barro1991_growth_identity_stays_false(client):
+    sid = _create_session(client)
+    resp = client.post(
+        f"/sessions/{sid}/title-topic",
+        json={"title": "Barro cross-country growth", "entry_id": "barro1991_growth"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["allow_did"] is False
 
 
 def test_schooling_catalog_identity_stays_false(client):
@@ -280,3 +309,62 @@ def test_title_topic_rejects_invalid_entry_id(client):
     )
     assert resp.status_code == 400
     assert resp.json()["detail"] == "invalid_classic5_entry"
+
+
+def test_soft_read_expected_tokens_only(tmp_path, monkeypatch):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text(
+        json.dumps(
+            {
+                "catalog_id": "classic-5",
+                "entries": [
+                    {
+                        "id": "ck1994_long",
+                        "title": "Card and Krueger minimum wage",
+                        "topic": "Min wage and employment",
+                    },
+                    {
+                        "id": "barro1991_growth",
+                        "title": "Barro cross-country growth",
+                        "topic": "Growth and schooling",
+                        "allow_did": True,
+                    },
+                    {
+                        "id": "minimum-wage-employment",
+                        "title": "Minimum wage and employment",
+                        "allow_did": False,
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ECONPAPER_CLASSIC5_CATALOG", str(catalog))
+    assert catalog_identity_allows("ck1994_long") is True
+    assert catalog_identity_allows("minimum-wage-employment") is False
+    assert catalog_identity_allows("barro1991_growth") is False
+    assert allow_did_for(entry_id="barro1991_growth", method="did") is False
+
+
+def test_landed_ck1994_long_attach_sets_allow_did(client, tmp_path, monkeypatch):
+    root = tmp_path / "classic-5"
+    _write_entry(root, "ck1994_long")
+    _write_entry(root, "barro1991_growth")
+    monkeypatch.setenv("ECONPAPER_CLASSIC5_ROOT", str(root))
+    sid = _create_session(client)
+    accepted = client.post(
+        f"/sessions/{sid}/attach",
+        json={"source": "classic-5", "entry_id": "ck1994_long"},
+        headers=_key(),
+    )
+    assert accepted.status_code == 202, accepted.text
+    assert client.get(f"/sessions/{sid}").json()["allow_did"] is True
+    _finish_upload_run(accepted.json()["run_id"])
+    rebound = client.post(
+        f"/sessions/{sid}/attach",
+        json={"source": "classic-5", "entry_id": "barro1991_growth"},
+        headers=_key(),
+    )
+    assert rebound.status_code == 202, rebound.text
+    assert client.get(f"/sessions/{sid}").json()["allow_did"] is False

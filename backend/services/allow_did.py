@@ -3,19 +3,26 @@
 ``allow_did`` defaults false. Only classic Card–Krueger / minwage TITLE/TOPIC
 or catalog identity may set true. Form ``method=did`` is not a setter.
 
-Does not load catalog bytes, does not force treated×period, and does not
-rewrite the OLS lock. Missing / null / absent is false.
+Does not load catalog bytes, does not rewrite fixture CSVs, does not force
+treated×period, and does not rewrite the OLS lock. Missing / null / absent
+is false.
+
+CLASSIC-FIXTURES maps the minwage ranking token to ``ck1994_long``. This
+gate keys on ``minimum-wage-employment`` and that landed alias, plus minwage
+title keywords. ``barro1991_growth`` is not the exception.
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Mapping
 
-# Catalog identity tokens. Do not invent inventory rows; match known ids only.
+# Product + landed catalog identities. Soft-read catalog for these names only.
 MINWAGE_ENTRY_IDS = frozenset(
     {
         "minimum-wage-employment",
         "ck1994",
+        "ck1994_long",
     }
 )
 
@@ -41,7 +48,11 @@ def normalize_entry_id(entry_id: object) -> str:
 
 
 def catalog_identity_allows(entry_id: object) -> bool:
-    return normalize_entry_id(entry_id) in MINWAGE_ENTRY_IDS
+    token = normalize_entry_id(entry_id)
+    if token not in MINWAGE_ENTRY_IDS:
+        return False
+    denied = _soft_read_denied_tokens()
+    return token not in denied
 
 
 def title_topic_allows(title: str = "", topic: str = "") -> bool:
@@ -120,6 +131,28 @@ def gate_updates(state: Mapping[str, Any], **fields: Any) -> dict[str, Any]:
     """Merge writes and stamp the derived ``allow_did`` flag."""
     merged = {**dict(state), **fields}
     return {**fields, "allow_did": session_allow_did(merged)}
+
+
+def _soft_read_denied_tokens() -> frozenset[str]:
+    """Read catalog ids only. Honor ``allow_did: false`` on expected tokens."""
+    try:
+        from services.classic5_catalog import catalog_path
+
+        raw = json.loads(catalog_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeError, ImportError):
+        return frozenset()
+    if not isinstance(raw, dict) or raw.get("catalog_id") != _CLASSIC5:
+        return frozenset()
+    denied: set[str] = set()
+    for item in raw.get("entries") or []:
+        if not isinstance(item, dict):
+            continue
+        token = normalize_entry_id(item.get("id"))
+        if token not in MINWAGE_ENTRY_IDS:
+            continue
+        if item.get("allow_did") is False:
+            denied.add(token)
+    return frozenset(denied)
 
 
 def _is_card_teaching(state: Mapping[str, Any]) -> bool:

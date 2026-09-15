@@ -2,7 +2,7 @@
 
 - Date: 2026-09-15
 - Task ID / state file: FM-E-BUILD-REAL-FETCH-1 / FD-BE-honesty · `runtime/tasks/20260915-fd-be-honesty.md`
-- Commit / Git context: `feat/fm-e-build-fd-be-honesty-1` (see HEAD after this record lands)
+- Commit / Git context: `feat/fm-e-build-fd-be-honesty-1` @ `5263e3a` (implementation); runtime/learning follow-up on same branch
 - Model and tool environment: Cursor cloud agent
 - Dataset class / research method（不含原始数据）: none (honesty labels; no attach, no fetch download)
 - Task: FIND-DATA plan/suggest never present fixtures/toys as discovered/found; teaching shelf explicit; `source_kind` required

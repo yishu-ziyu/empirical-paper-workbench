@@ -15,6 +15,7 @@
 | DC-attach-routes-on-recut-stack | CK-WRITE-1 attach / confirm-attach 404; `/upload` used as hang workaround | Recut stack had suggest + infer-design but not DC-BE-attach | Restore `/sessions/{id}/attach` + `/confirm-attach`; only confirm-attach sets `dataAttached` | `agent-learning/raw/2026-09-15_fm-e-build-attach-404.md` |
 | DC-attach-plus-classic-fixture | Attach routes and `ck1994_long.csv` lived on sibling tips | Catalog already listed CK; CSV/SOURCE restored on a different branch | Merge attach first, then fixture blobs; do not invent CSV | `agent-learning/raw/2026-09-15_fm-e-build-attach-fixture-merge-1.md` |
 | DATA-RIGOR-plus-attach | DATA-RIGOR honesty and attach/confirm-attach lived on sibling tips | Rigor recovered found CK + teaching flags; attach restored DC-BE routes on the recut stack | Merge attach onto rigor; keep `teaching_fixture`/`found` and real CK bytes; do not invent CSV | `agent-learning/raw/2026-09-15_fm-e-build-rigor-attach-merge-1.md` |
+| BRYCE-fold-on-rigor-attach | FL/CL/NORMS/OLS lived on DATA-RIGOR siblings, not the live attach tip | Product write-sets disjoint; STATE/wiki overlap | Serial-merge onto live PASS rigor+attach; union STATE/wiki; keep found CK; do not fold EVAL-top5 | `agent-learning/raw/2026-09-15_fm-e-build-bryce-fold-1.md` |
 
 ## Skill impact
 

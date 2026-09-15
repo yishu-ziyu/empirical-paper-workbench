@@ -1,7 +1,7 @@
 """estimate node -- 主结果估计。
 
 按 ``main_specification.method`` 分派到 StatsPAI：
-OLS ``feols`` / DiD ``feols`` 或 ``callaway_santanna`` / IV ``ivreg`` /
+OLS ``statsmodels``（标签 OLS / regress / lm） / DiD ``feols`` 或 ``callaway_santanna`` / IV ``ivreg`` /
 RD ``rdrobust`` / SCM ``synth``。
 
 IV 主表必须是 ``statspai.ivreg``，禁止用 ``iv_diag`` 当主表。
@@ -24,6 +24,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..design.spec import norm_method
+from ..engine.ols_lock import (
+    OLS_ESTIMATOR_LABEL,
+    ols_lock_active,
+    pooled_ols_formula,
+)
 from ..protocols import EstimateOutput
 from ..state import EconPaperState
 
@@ -565,20 +570,30 @@ def _bacon_forbidden_over(state: EconPaperState) -> bool:
     return False
 
 
-def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
+def _estimate_ols(
+    df: Any, spec: Dict[str, Any], formula: str, *, lock: bool = False
+) -> EstimateOutput:
     treatment = spec.get("treatment") or spec.get("treatment_col") or "treat"
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
     requested = str(formula)
-    fitted, estimator, fit_formula = _fit(requested, df, cluster)
+    if lock:
+        requested = pooled_ols_formula(requested)
+        fitted, _raw_estimator, fit_formula = _fit_statsmodels(requested, df, cluster)
+        estimator = OLS_ESTIMATOR_LABEL
+        dropped_fe = False
+    else:
+        fitted, estimator, fit_formula = _fit(requested, df, cluster)
+        dropped_fe = (
+            _wanted_fixed_effects(spec, requested) and estimator == "statsmodels.ols"
+        )
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
-    table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
+    table_rows = _table_rows_from_fit(fitted, spec, requested, str(treatment))
     treatment_row, table_rows = _prefer_treatment_row(
         str(treatment), coef, se, p, table_rows
     )
-    dropped_fe = _wanted_fixed_effects(spec, requested) and estimator == "statsmodels.ols"
     payload = {
         "status": "degraded" if dropped_fe else "ok",
         "produced_by": "estimate",
@@ -864,7 +879,9 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
         elif method == "did":
             result = _estimate_did(df, spec, state)
         else:
-            result = _estimate_ols(df, spec, str(formula))
+            result = _estimate_ols(
+                df, spec, str(formula), lock=ols_lock_active(state)
+            )
     except Exception as exc:
         return _error(
             f"主估计失败：{exc}",

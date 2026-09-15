@@ -186,7 +186,7 @@ def test_evidence_projects_main_estimate_and_provenance(client):
         assert est["se"] == 0.0456
         assert est["p"] == 0.0078
         assert est["n"] == 5
-        assert est["estimator"] == "statspai.feols"
+        assert est["estimator"] == "OLS"
         assert est["method"] == "ols"
         assert est["formula"] == "income ~ age"
         assert "age" in est["treatment_row"]

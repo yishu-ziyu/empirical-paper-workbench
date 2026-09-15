@@ -487,6 +487,61 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+      "post": {
+        "summary": "Fetch Dataverse Endpoint",
+        "description": "Search Dataverse and download a public file, else keep the URL.",
+        "operationId": "fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataverseFetchRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -4253,6 +4308,35 @@
         "type": "object",
         "title": "DatasetProvenanceResponse"
       },
+      "DataverseFetchRequest": {
+        "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          }
+        },
+        "type": "object",
+        "title": "DataverseFetchRequest",
+        "description": "Optional chosen Dataverse dataset / file. Empty body searches then fetches."
+      },
       "DecisionEventResponse": {
         "properties": {
           "id": {
@@ -5708,6 +5792,27 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Design Fit"
+          },
+          "source_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Kind"
+          },
+          "fetch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataFetchProjectionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5719,6 +5824,41 @@
         ],
         "title": "FindDataCandidateResponse",
         "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
+      },
+      "FindDataFetchProjectionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchProjectionResponse",
+        "description": "Session download vs honest link. Fetch is not attach."
       },
       "FindDataPlanBodyResponse": {
         "properties": {

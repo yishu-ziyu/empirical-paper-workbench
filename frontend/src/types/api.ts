@@ -278,6 +278,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Dataverse Endpoint
+         * @description Search Dataverse and download a public file, else keep the URL.
+         */
+        post: operations["fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -1940,6 +1960,16 @@ export interface components {
             /** Extract Kind */
             extract_kind?: string | null;
         };
+        /**
+         * DataverseFetchRequest
+         * @description Optional chosen Dataverse dataset / file. Empty body searches then fetches.
+         */
+        DataverseFetchRequest: {
+            /** Source Id */
+            source_id?: string | null;
+            /** File Id */
+            file_id?: string | null;
+        };
         /** DecisionEventResponse */
         DecisionEventResponse: {
             /** Id */
@@ -2577,6 +2607,27 @@ export interface components {
             design_fit?: {
                 [key: string]: unknown;
             };
+            /** Source Kind */
+            source_kind?: string | null;
+            fetch?: components["schemas"]["FindDataFetchProjectionResponse"] | null;
+        };
+        /**
+         * FindDataFetchProjectionResponse
+         * @description Session download vs honest link. Fetch is not attach.
+         */
+        FindDataFetchProjectionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /**
          * FindDataPlanBodyResponse
@@ -4233,6 +4284,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DataverseFetchRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

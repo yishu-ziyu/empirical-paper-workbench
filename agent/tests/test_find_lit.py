@@ -79,6 +79,7 @@ def test_unconfirmed_design_does_not_search():
     assert rec["chapter_written"] is False
     assert called == []
     assert design_is_confirmed({"design": {"status": "draft"}}) is False
+    assert design_is_confirmed({"design": {"status": "confirmed"}}) is False
 
 
 def test_search_merges_three_sources_and_doi_dedupes():

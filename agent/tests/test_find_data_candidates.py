@@ -93,6 +93,7 @@ def test_unconfirmed_design_returns_no_candidates(tmp_path: Path):
         {},
         {"status": "missing"},
         {"status": "draft", "confirmed": False, "source": {"title": "最低工资对就业的影响"}},
+        {"status": "confirmed"},
         _confirmed(status="draft", confirmed=False, confirmed_at=None),
     ):
         items = suggest_data_candidates(

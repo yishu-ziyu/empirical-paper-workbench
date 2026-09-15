@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from agent.design.spec import norm_method
+from agent.find_data.plan import is_confirmed_design
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CLASSIC5 = REPO_ROOT / "fixtures" / "classic-5"
@@ -127,7 +128,7 @@ def suggest_data_candidates(
     catalog_dir: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """Return §5 candidates for a confirmed design. Unconfirmed → []."""
-    if not _is_confirmed(design):
+    if not is_confirmed_design(design):
         return []
     assert design is not None
     family = _route_family(design)
@@ -204,16 +205,6 @@ def search_dataverse(
         if len(hits) >= max_results:
             break
     return hits
-
-
-def _is_confirmed(design: Mapping[str, Any] | None) -> bool:
-    if not isinstance(design, Mapping):
-        return False
-    status = str(design.get("status") or "").strip().lower()
-    confirmed_flag = design.get("confirmed")
-    if status == "confirmed":
-        return confirmed_flag is not False
-    return False
 
 
 def _facet_blob(design: Mapping[str, Any]) -> str:

@@ -77,15 +77,10 @@ def _as_text(value: Any) -> str:
 
 
 def is_confirmed_design(design: Any) -> bool:
-    """True iff ``session.design.status === "confirmed"`` (fail closed)."""
+    """True iff the infer-design lock is set (status=confirmed and confirmed=true)."""
     if not isinstance(design, dict):
         return False
-    if design.get("status") != "confirmed":
-        return False
-    confirmed = design.get("confirmed")
-    if confirmed is False:
-        return False
-    return True
+    return design.get("status") == "confirmed" and design.get("confirmed") is True
 
 
 def _source(design: dict[str, Any]) -> dict[str, Any]:

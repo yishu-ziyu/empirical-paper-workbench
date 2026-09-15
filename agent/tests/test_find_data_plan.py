@@ -54,6 +54,7 @@ def test_unconfirmed_design_raises():
     with pytest.raises(DesignUnconfirmed):
         build_find_data_plan(_confirmed(status="draft", confirmed=False, confirmed_at=None))
     assert is_confirmed_design(_confirmed(status="draft", confirmed=True)) is False
+    assert is_confirmed_design({"status": "confirmed"}) is False
 
 
 def test_minwage_plan_names_where_and_how():

@@ -22,7 +22,7 @@ def design_is_confirmed(state_or_design: Any) -> bool:
         design = session_design(state_or_design)
     if not isinstance(design, dict):
         return False
-    return str(design.get("status") or "").strip().lower() == "confirmed"
+    return design.get("status") == "confirmed" and design.get("confirmed") is True
 
 
 def build_query(design: dict[str, Any] | None) -> str:

@@ -411,6 +411,44 @@ class ResearchLabResponse(BaseModel):
     claim: Optional[ClaimLedgerResponse] = None
 
 
+class DesignSourceResponse(BaseModel):
+    title: str = ""
+    question: str = ""
+
+
+class SessionDesignResponse(BaseModel):
+    """Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."""
+
+    status: Literal["draft", "confirmed"]
+    confirmed: bool
+    proposed_at: Optional[str] = None
+    confirmed_at: Optional[str] = None
+    source: DesignSourceResponse = Field(default_factory=DesignSourceResponse)
+    method: str = ""
+    outcome: str = ""
+    treatment: str = ""
+    controls: List[str] = Field(default_factory=list)
+    group: str = ""
+    treated: str = ""
+    period: str = ""
+    time_col: str = ""
+    id_col: str = ""
+    first_treat_col: str = ""
+    interactions: List[Dict[str, Any]] = Field(default_factory=list)
+    qType: Optional[str] = None
+    heterogeneity_groups: List[str] = Field(default_factory=list)
+    catalog_entry_id: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class SessionDesignConfirmResponse(BaseModel):
+    """POST /sessions/{id}/design/confirm 返回体。"""
+
+    ok: bool
+    design: SessionDesignResponse
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
@@ -437,6 +475,7 @@ class SessionInfoResponse(BaseModel):
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
     research: Optional[ResearchLabResponse] = None
+    design: Optional[SessionDesignResponse] = None
 
 
 # ---------------------------------------------------------------------------

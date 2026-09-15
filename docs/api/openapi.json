@@ -2279,6 +2279,51 @@
         ]
       }
     },
+    "/sessions/{session_id}/design/confirm": {
+      "post": {
+        "summary": "Confirm Design Endpoint",
+        "description": "Lock the current session.design draft. Fail closed if none exists.",
+        "operationId": "confirm_design_endpoint_sessions__session_id__design_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDesignConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/transform": {
       "post": {
         "summary": "Run Transform",
@@ -3884,6 +3929,22 @@
           "at"
         ],
         "title": "DecisionEventResponse"
+      },
+      "DesignSourceResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DesignSourceResponse"
       },
       "DeskChatTurn": {
         "properties": {
@@ -6915,6 +6976,162 @@
         ],
         "title": "SessionBusyResponse"
       },
+      "SessionDesignConfirmResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "design": {
+            "$ref": "#/components/schemas/SessionDesignResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "design"
+        ],
+        "title": "SessionDesignConfirmResponse",
+        "description": "POST /sessions/{id}/design/confirm 返回体。"
+      },
+      "SessionDesignResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "confirmed"
+            ],
+            "title": "Status"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "proposed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DesignSourceResponse"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Controls"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group",
+            "default": ""
+          },
+          "treated": {
+            "type": "string",
+            "title": "Treated",
+            "default": ""
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": ""
+          },
+          "time_col": {
+            "type": "string",
+            "title": "Time Col",
+            "default": ""
+          },
+          "id_col": {
+            "type": "string",
+            "title": "Id Col",
+            "default": ""
+          },
+          "first_treat_col": {
+            "type": "string",
+            "title": "First Treat Col",
+            "default": ""
+          },
+          "interactions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "heterogeneity_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Heterogeneity Groups"
+          },
+          "catalog_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Entry Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status",
+          "confirmed"
+        ],
+        "title": "SessionDesignResponse",
+        "description": "Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."
+      },
       "SessionInfoResponse": {
         "properties": {
           "session_id": {
@@ -7080,6 +7297,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ResearchLabResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "design": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionDesignResponse"
               },
               {
                 "type": "null"

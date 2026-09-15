@@ -928,6 +928,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/design/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Design Endpoint
+         * @description Lock the current session.design draft. Fail closed if none exists.
+         */
+        post: operations["confirm_design_endpoint_sessions__session_id__design_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/transform": {
         parameters: {
             query?: never;
@@ -1721,6 +1741,19 @@ export interface components {
             payload?: {
                 [key: string]: unknown;
             };
+        };
+        /** DesignSourceResponse */
+        DesignSourceResponse: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
         };
         /** DeskChatTurn */
         DeskChatTurn: {
@@ -2974,6 +3007,92 @@ export interface components {
             degraded: false;
         };
         /**
+         * SessionDesignConfirmResponse
+         * @description POST /sessions/{id}/design/confirm 返回体。
+         */
+        SessionDesignConfirmResponse: {
+            /** Ok */
+            ok: boolean;
+            design: components["schemas"]["SessionDesignResponse"];
+        };
+        /**
+         * SessionDesignResponse
+         * @description Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed.
+         */
+        SessionDesignResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /** Confirmed */
+            confirmed: boolean;
+            /** Proposed At */
+            proposed_at?: string | null;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            source?: components["schemas"]["DesignSourceResponse"];
+            /**
+             * Method
+             * @default
+             */
+            method: string;
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Controls */
+            controls?: string[];
+            /**
+             * Group
+             * @default
+             */
+            group: string;
+            /**
+             * Treated
+             * @default
+             */
+            treated: string;
+            /**
+             * Period
+             * @default
+             */
+            period: string;
+            /**
+             * Time Col
+             * @default
+             */
+            time_col: string;
+            /**
+             * Id Col
+             * @default
+             */
+            id_col: string;
+            /**
+             * First Treat Col
+             * @default
+             */
+            first_treat_col: string;
+            /** Interactions */
+            interactions?: {
+                [key: string]: unknown;
+            }[];
+            /** Qtype */
+            qType?: string | null;
+            /** Heterogeneity Groups */
+            heterogeneity_groups?: string[];
+            /** Catalog Entry Id */
+            catalog_entry_id?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
          * SessionInfoResponse
          * @description GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。
          */
@@ -3025,6 +3144,7 @@ export interface components {
                 [key: string]: unknown;
             }[];
             research?: components["schemas"]["ResearchLabResponse"] | null;
+            design?: components["schemas"]["SessionDesignResponse"] | null;
         };
         /**
          * SnapshotActiveRunResponse
@@ -4955,6 +5075,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_design_endpoint_sessions__session_id__design_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDesignConfirmResponse"];
                 };
             };
             /** @description Validation Error */

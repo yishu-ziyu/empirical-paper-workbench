@@ -908,6 +908,25 @@ class AgentFacade:
         self.save_state(session_id, state)
         return charls_config
 
+    def confirm_design(self, session_id: str) -> dict:
+        """Lock session.design (draft → confirmed). Fail closed without a draft.
+
+        Does not attach data, suggest catalog rows, set allow_did, or write
+        chapters / PREWRITE-PAUSE flags. Re-confirm of an already locked
+        design is idempotent.
+        """
+        from services.session_design import DesignNotProposed, lock_confirmed_design
+
+        state = self.get_state(session_id)
+        try:
+            locked = lock_confirmed_design(state.get("design"))
+        except DesignNotProposed as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": exc.code},
+            ) from exc
+        return self.update_state(session_id, design=locked)["design"]
+
     # ------------------------------------------------------------------
     # ADR-0007: HITL 人工评审
     # ------------------------------------------------------------------

@@ -4,7 +4,7 @@
 
 - Date: 2026-09-15
 - Task ID / state file: FM-E-BUILD-INFER-DESIGN-1 / INF-BE-confirm · `runtime/tasks/20260915-inf-be-confirm.md`
-- Commit / Git context: `feat/fm-e-build-inf-be-confirm-1` (from `feat/fm-e-build-infer-design-1` @ `2a663915`)
+- Commit / Git context: `feat/fm-e-build-inf-be-confirm-1` @ `0f214274ab00ec8ec71bb0457f17958505a5b345` (from `feat/fm-e-build-infer-design-1` @ `2a663915`)
 - Model and tool environment: Cursor cloud agent
 - Dataset class / research method（不含原始数据）: n/a
 - Task: Implement human confirm that locks `session.design` (draft → confirmed)

@@ -855,6 +855,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/design/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Design Endpoint
+         * @description Propose a research-design draft from the session title (+ optional RQ).
+         */
+        post: operations["propose_design_endpoint_sessions__session_id__design_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/desk/discuss": {
         parameters: {
             query?: never;
@@ -1721,6 +1741,30 @@ export interface components {
             payload?: {
                 [key: string]: unknown;
             };
+        };
+        /** DesignInteractionResponse */
+        DesignInteractionResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "did" | "het";
+            /** Left */
+            left: string;
+            /** Right */
+            right: string;
+            /** Term */
+            term: string;
+        };
+        /** DesignSourceResponse */
+        DesignSourceResponse: {
+            /** Title */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
         };
         /** DeskChatTurn */
         DeskChatTurn: {
@@ -2638,6 +2682,19 @@ export interface components {
             /** Run Id */
             run_id: string;
         };
+        /**
+         * ProposeDesignRequest
+         * @description POST /sessions/{id}/design/propose 请求体。
+         */
+        ProposeDesignRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+        };
         /** QueueFullResponse */
         QueueFullResponse: {
             /** Error */
@@ -2972,6 +3029,83 @@ export interface components {
              * @constant
              */
             degraded: false;
+        };
+        /**
+         * SessionDesignResponse
+         * @description POST /sessions/{id}/design/propose 返回的 session.design 草稿。
+         */
+        SessionDesignResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /** Confirmed */
+            confirmed: boolean;
+            /** Proposed At */
+            proposed_at: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            source: components["schemas"]["DesignSourceResponse"];
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "ols" | "did" | "iv" | "rd" | "scm";
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Controls */
+            controls?: string[];
+            /**
+             * Group
+             * @default
+             */
+            group: string;
+            /**
+             * Treated
+             * @default
+             */
+            treated: string;
+            /**
+             * Period
+             * @default
+             */
+            period: string;
+            /**
+             * Time Col
+             * @default
+             */
+            time_col: string;
+            /**
+             * Id Col
+             * @default
+             */
+            id_col: string;
+            /**
+             * First Treat Col
+             * @default
+             */
+            first_treat_col: string;
+            /** Interactions */
+            interactions?: components["schemas"]["DesignInteractionResponse"][];
+            /**
+             * Qtype
+             * @default average
+             * @enum {string}
+             */
+            qType: "average" | "heterogeneity" | "causal";
+            /** Heterogeneity Groups */
+            heterogeneity_groups?: string[];
+            /** Catalog Entry Id */
+            catalog_entry_id?: string | null;
         };
         /**
          * SessionInfoResponse
@@ -4821,6 +4955,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_design_endpoint_sessions__session_id__design_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeDesignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDesignResponse"];
                 };
             };
             /** @description Validation Error */

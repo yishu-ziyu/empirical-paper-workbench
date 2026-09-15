@@ -1,0 +1,30 @@
+# econpaper Codex Task State
+
+- Task ID: FM-E-BUILD-INFER-DESIGN-1 / INF-BE-propose
+- Status: active
+- Git context: `feat/fm-e-build-inf-be-propose-1` from `feat/fm-e-build-infer-design-1` @ `2a663915`
+- Goal: Title (+ optional RQ) → `session.design` draft (Y/X/interactions/method). No confirm, attach, gold body, catalog→spec.
+- Hard bar: DECIDE-6 accept bullets 1–3 on propose side; write-set is propose backend + tests only; no PR.
+- Session / run ID:
+- Current research stage: implement propose
+- Current review / approval gate: none
+- Verified facts:
+  - Contract `docs/infer-design-contract.md` frozen at start SHA `2a663915`.
+  - New path: `POST /sessions/{id}/design/propose`.
+  - CK title `最低工资对就业的影响` → `method=did` + `treated:period` before attach.
+  - Catalog id `ck1994_long` / `minimum-wage-employment` → OLS, no DiD.
+  - Level OLS titles (schooling–wages, Barro growth) → `method=ols`.
+- Current hypothesis:
+- Changed files:
+  - `agent/design/propose.py` (new)
+  - `backend/routers/design.py` (new)
+  - `agent/tests/test_propose_design.py` (new)
+  - `backend/tests/test_design_propose.py` (new)
+  - `backend/schemas/responses.py`, `backend/main.py`, `agent/design/__init__.py`, `agent/state.py`
+  - OpenAPI regen: `docs/api/openapi.json`, `frontend/openapi.json`, `frontend/src/types/api.ts`
+- Failed paths:
+- Data / output evidence locations:
+- Test evidence: agent `test_propose_design.py`; backend `test_design_propose.py`
+- Pending external state: push branch; do not open PR
+- Next action: commit, push, report SHA + test counts
+- Updated at: 2026-09-15

@@ -58,6 +58,7 @@ class EconPaperState(TypedDict, total=False):
     # 以下为占位字段，后续 ticket 逐步填充
     eda_results: List[Any]
     research_direction: Optional[dict]
+    design: Optional[dict]  # session.design draft|confirmed (infer-design)
     main_specification: Optional[dict]  # robustness_check / spec_curve 主设定
     spec_curve: Optional[dict]  # 探索臂设定表（全部规格留在桌上）
     outline: Optional[Any]

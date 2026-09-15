@@ -1,8 +1,8 @@
 # econpaper Codex Task State
 
 - Task ID: 20260915-fm-e-build-did-narrow-1-did-be-gate
-- Status: active
-- Git context（分支可选）: `cursor/did-be-gate-8102` off `feat/fm-e-build-did-narrow-1` @ `45c18dedbdecfd7fa965007e4646ad5a91b9ec0d`
+- Status: complete
+- Git context（分支可选）: `cursor/did-be-gate-8102` @ `9d439896eab7430c43cb190e1e4692c1aa6baf5f` (base `feat/fm-e-build-did-narrow-1` @ `45c18dedbdecfd7fa965007e4646ad5a91b9ec0d`)
 - Goal: DID-BE-gate — title/catalog path sets `allow_did` (default false). Only classic Card–Krueger / minwage TITLE/TOPIC or catalog identity may set true.
 - Hard bar: Form method=did is not the setter. No fixtures CSV / catalog inventory edits. No treated×period. No WORD-FIX / HET-CODE-EXPORT / PREWRITE-PAUSE. Push branch only; author yishu-ziyu; no PR.
 - Session / run ID:
@@ -26,5 +26,5 @@
   - `backend/tests/test_data_attach.py`: 17 passed
   - OpenAPI drift check: frontend/openapi.json, docs/api/openapi.json, types/api.ts match live app
 - Pending external state: CLASSIC-FIXTURES still owns CSV bytes; no PR (HARD STOP)
-- Next action: push `cursor/did-be-gate-8102` only
+- Next action: none (branch pushed; no PR)
 - Updated at: 2026-09-15

@@ -24,6 +24,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..design.spec import norm_method
+from ..engine.did_spec import (
+    DID_MISSING_INTERACTION,
+    apply_did_spec,
+    did_spec_applies,
+    did_spec_block_reason,
+)
 from ..protocols import EstimateOutput
 from ..state import EconPaperState
 
@@ -788,7 +794,22 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
     csv_path = state.get("csv_path")
     method = _method_of(state, spec)
 
-    if method == "iv":
+    if did_spec_applies(state):
+        if did_spec_block_reason(state):
+            return _error(
+                "主估计未跑：已确认 DiD 需要 treated×period（或等价 2×2 交互），未编造系数",
+                error=DID_MISSING_INTERACTION,
+                method=method,
+                formula=spec.get("formula") or None,
+            )
+        formula = spec.get("formula")
+        if not formula or not csv_path:
+            return _error(
+                "主估计未跑：已确认 DiD 需要 treated×period（或等价 2×2 交互），未编造系数",
+                error=DID_MISSING_INTERACTION,
+                method=method,
+            )
+    elif method == "iv":
         if not csv_path:
             return _error(
                 "主估计未跑：缺少公式或数据路径",
@@ -855,7 +876,15 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
         )
 
     try:
-        if method == "iv":
+        if did_spec_applies(state):
+            # Narrow 2×2 exception: estimate the interaction, never TWFE / CS.
+            fit_spec = dict(spec)
+            fit_spec["method"] = "ols"
+            result = _estimate_ols(df, fit_spec, str(formula))
+            est = result.get("estimate")
+            if isinstance(est, dict):
+                est["method"] = "did"
+        elif method == "iv":
             result = _estimate_iv(df, spec, str(formula))
         elif method == "rd":
             result = _estimate_rd(df, spec)
@@ -902,6 +931,21 @@ def estimate(state: EconPaperState) -> EstimateOutput:
     ``facade.record_degradation`` 的 {node, reason, fallback, visible,
     timestamp} 模式）。输出 state 键与固定分派完全一致。
     """
+    forced = apply_did_spec(state)
+    if forced:
+        state = {**state, **forced}
+    if did_spec_applies(state) and did_spec_block_reason(state):
+        spec = state.get("main_specification") or {}
+        formula = spec.get("formula") if isinstance(spec, dict) else None
+        return _stamp_estimate_lineage(
+            state,
+            _error(
+                "主估计未跑：已确认 DiD 需要 treated×period（或等价 2×2 交互），未编造系数",
+                error=DID_MISSING_INTERACTION,
+                method=_method_of(state, spec if isinstance(spec, dict) else {}),
+                formula=str(formula) if formula else None,
+            ),
+        )
     agent_error: Optional[str] = None
     if _estimate_agent_enabled():
         try:

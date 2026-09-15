@@ -10,6 +10,6 @@ DECIDE-5 A froze `allow_did` default false and allowed a title/catalog gate (Car
 
 Current gate (this recut): DiD is allowed only from **confirmed** `session.design.method=did` (or `norm_method` equivalent) **plus** treated×period presence on that design. TITLE/TOPIC propose stays INF-BE-propose; this gate only reads the confirmed object.
 
-Missing treated×period on a confirmed DiD design is a hard-block **hook** (`confirmed_did_method` / `did_interaction_missing`) for DID-BE-spec (force + 409). This file does not own that force.
+Missing treated×period on a confirmed DiD design is a hard-block **hook** (`confirmed_did_method` / `did_interaction_missing`). DID-BE-spec owns force + 409 from that hook. This file does not own the setter.
 
 Do not revive `catalog_identity_allows`, `MINWAGE_ENTRY_IDS`, or `entry.allow_did` as the setter.

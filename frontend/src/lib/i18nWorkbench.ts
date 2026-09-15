@@ -461,7 +461,7 @@ export const workbenchZh = {
   'findData.kind.captainLocalReal': '船长本地真实面板 — 不是检索结果',
   'findData.kind.userUpload': '上传你自己的文件',
   'findData.externalLink': '公开链接；请下载后上传',
-  'findData.externalLinkHint': '这不是检索到的数据集。请跟随公开页下载后上传。',
+  'findData.externalLinkHint': '请跟随公开页下载后上传。不是检索命中。',
   'findData.captainLocalReal': '船长本地真实面板（不是检索结果）',
   'findData.captainLocalRealHint': '本地真实面板进入会话。不是检索命中，也不是教学玩具。',
   'findData.teachingShelf': '教学已知样本（不是检索结果）',
@@ -985,7 +985,7 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
   'findData.kind.userUpload': 'Upload your own file',
   'findData.externalLink': 'Public link — download, then upload',
   'findData.externalLinkHint':
-    'This is not a found dataset. Follow the public page, then upload.',
+    'Follow the public page, then upload. Not a search hit.',
   'findData.captainLocalReal': 'Captain-local-real — not a find result',
   'findData.captainLocalRealHint':
     'A captain-local real panel entered the session. Not a search hit and not a teaching toy.',

@@ -41,11 +41,6 @@ def attach_gate_fields(attached: bool) -> dict[str, bool]:
     return {"dataAttached": attached, "data_attached": attached}
 
 
-def is_data_attached(state: dict[str, Any] | None) -> bool:
-    blob = state or {}
-    return blob.get("dataAttached") is True or blob.get("data_attached") is True
-
-
 def replace_normalized_upload(
     csv_bytes: bytes,
     *,

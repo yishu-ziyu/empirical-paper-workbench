@@ -12,7 +12,7 @@
 | FM-E-BUILD-INFER-DESIGN-1 / DID-BE-gate recut | `runtime/tasks/20260915-fm-e-build-did-gate-recut.md` | complete | `feat/fm-e-build-did-gate-recut-1` | 2026-09-15 | pushed; no PR |
 | 20260915-fd-be-plan | `runtime/tasks/20260915-fd-be-plan.md` | complete | `feat/fm-e-build-fd-be-plan-1` | 2026-09-15 | FD-BE-plan pushed; no PR |
 | 20260915-fl-be-search | `runtime/tasks/20260915-fl-be-search.md` | complete | `feat/fm-e-build-fl-be-search-1` | 2026-09-15 | FL-BE-search landed; no PR |
-| 20260915-fm-e-build-attach-404 | `runtime/tasks/20260915-fm-e-build-attach-404.md` | active | `fix/fm-e-build-attach-404-1` from `feat/fm-e-build-did-spec-recut-1` @ `bf695715` | 2026-09-15 | restore attach + confirm-attach; no PR |
+| 20260915-fm-e-build-attach-404 | `runtime/tasks/20260915-fm-e-build-attach-404.md` | complete | `fix/fm-e-build-attach-404-1` @ `1de9dfa` | 2026-09-15 | pushed; no PR |
 | 20260907-localized-first-study | `runtime/tasks/20260907-localized-first-study.md` | active | `review/localized-first-study` / PR #32 | 2026-09-07 | r2 implementer 已交；待 r2 validator；不 merge |
 | 20260907-m1-empty-criteria-unevaluated | `runtime/tasks/20260907-m1-empty-criteria-unevaluated.md` | complete | PR #31 squash `87c5e5b` (reviewed `0192c74`) | 2026-09-07 | 外部 ACCEPT 已 merge |
 | 20260907-m1-expectation-criterion-p0 | `runtime/tasks/20260907-m1-expectation-criterion-p0.md` | complete | `review/generic-research-spine-hardening` / PR #31 | 2026-09-07 | r2 validator ACCEPT；push PR #31；不 merge |

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   claimLabel,
+  displayEstimateEngineLabel,
   literatureLabel,
   normalizeEstimateTableSource,
   parseEstimateRows,
@@ -56,5 +57,13 @@ describe('readoutTable', () => {
     expect(starHumanLabel(null)).toBe('无因果评级')
     expect(literatureLabel('crossref')).toBe('Crossref')
     expect(literatureLabel('mock')).toBe('示例文献')
+  })
+
+  test('OLS method labels the engine OLS, not feols', () => {
+    expect(displayEstimateEngineLabel('ols', 'statspai.feols')).toBe('OLS')
+    expect(displayEstimateEngineLabel('OLS', 'statsmodels.ols')).toBe('OLS')
+    expect(displayEstimateEngineLabel('ols', 'estimate_agent')).toBe('estimate_agent')
+    expect(displayEstimateEngineLabel('did', 'statspai.feols')).toBe('statspai.feols')
+    expect(displayEstimateEngineLabel('iv', 'statspai.ivreg')).toBe('statspai.ivreg')
   })
 })

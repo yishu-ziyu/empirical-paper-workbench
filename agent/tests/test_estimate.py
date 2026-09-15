@@ -92,6 +92,31 @@ def test_estimate_writes_treatment_row(tmp_path):
     assert any(row.startswith("| x |") for row in out["estimate"]["table_rows"])
 
 
+def test_ols_results_label_is_ols_not_feols(tmp_path):
+    """method=ols user-facing engine is OLS; stored estimator stays the engine."""
+    import pandas as pd
+
+    df = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [0, 1, 0, 1]})
+    csv_path = tmp_path / "ols.csv"
+    df.to_csv(csv_path, index=False)
+    out = estimate(
+        {
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "formula": "y ~ x",
+                "treatment": "x",
+                "outcome": "y",
+                "method": "ols",
+            },
+        }
+    )
+    payload = out["estimate"]
+    assert payload["method"] == "ols"
+    assert payload["estimator"] in {"statspai.feols", "statsmodels.ols"}
+    assert "估计器：`OLS`" in out["results"]
+    assert "feols" not in out["results"].lower()
+
+
 def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
     """income ~ age + treat: treat gets a real row, never invented DiD."""
     import pandas as pd

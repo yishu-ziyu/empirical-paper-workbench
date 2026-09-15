@@ -59,6 +59,21 @@ describe('StepTimeline 空桌步骤卡', () => {
     expect(screen.getByText(/import statspai/)).toBeInTheDocument()
   })
 
+  test('OLS estimate card labels the engine OLS, not feols', () => {
+    renderTimeline({
+      estimate: {
+        status: 'ok',
+        method: 'ols',
+        estimator: 'statspai.feols',
+        iterations: 1,
+        treatment_row: '| educ | 0.07 | 0.01 | 0.001 |',
+      },
+    })
+    const card = screen.getByTestId('step-card-estimate')
+    expect(card.textContent).toContain('OLS')
+    expect(card.textContent).not.toContain('feols')
+  })
+
   test('清洗卡：8 步全成功显示 ✓，估计失败显示红字错误', () => {
     renderTimeline({
       cleaningReport: {

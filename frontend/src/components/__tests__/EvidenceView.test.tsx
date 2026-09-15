@@ -104,4 +104,23 @@ describe('EvidenceView provenance layers', () => {
     expect(screen.getByTestId('evidence-traceability')).toHaveTextContent('完全可溯源')
     expect(screen.getByTestId('evidence-traceability')).not.toHaveTextContent('Fully traceable')
   })
+
+  test('OLS method shows OLS engine label, not statspai.feols', async () => {
+    fetchEvidence.mockResolvedValue(
+      sixLayerEvidence({
+        estimate: {
+          ...sixLayerEvidence().estimate,
+          method: 'ols',
+          estimator: 'statspai.feols',
+        },
+      }) as never,
+    )
+    render(<I18nProvider><EvidenceView sessionId="sess-1" /></I18nProvider>)
+    await waitFor(() => {
+      expect(screen.getByTestId('evidence-provenance')).toBeInTheDocument()
+    })
+    const layer = screen.getByTestId('evidence-provenance').querySelector('[data-layer="estimator"]')
+    expect(layer).toHaveTextContent('OLS')
+    expect(layer).not.toHaveTextContent('feols')
+  })
 })

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..data_honesty import honesty_for_n
-from ..design.spec import norm_method
+from ..design.spec import display_estimate_engine_label, norm_method
 from ..engine.did_spec import (
     DID_MISSING_INTERACTION,
     apply_did_spec,
@@ -486,10 +486,13 @@ def _error(
 
 def _ok_table(payload: Dict[str, Any]) -> str:
     formula = payload.get("formula") or ""
+    engine = display_estimate_engine_label(
+        payload.get("method"), payload.get("estimator")
+    ) or payload["estimator"]
     lines = [
         "# 主结果",
         "",
-        f"估计器：`{payload['estimator']}`",
+        f"估计器：`{engine}`",
     ]
     if payload.get("status") == "degraded":
         lines.append(_FE_DROPPED_LINE)

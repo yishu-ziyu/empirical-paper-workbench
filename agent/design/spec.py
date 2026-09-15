@@ -39,6 +39,23 @@ def norm_method(method: Any) -> str | None:
     return _METHOD_ALIASES.get(key)
 
 
+def display_estimate_engine_label(method: Any, estimator: Any) -> str:
+    """User-facing engine label. OLS lock: do not present pooled OLS as feols.
+
+    The stored ``estimator`` may still be the engine that ran (``statspai.feols``
+    without FE, or ``statsmodels.ols``). Display for ``method=ols`` is ``OLS``.
+    ``estimate_agent`` stays as itself so the agent path remains visible.
+    """
+    raw = "" if estimator is None else str(estimator).strip()
+    if not raw:
+        return ""
+    if raw == "estimate_agent":
+        return raw
+    if norm_method(method) == "ols":
+        return "OLS"
+    return raw
+
+
 def slug_for_topic(topic: str) -> str:
     """Stable slug for a research question. Known pilots keep readable names."""
     known = {

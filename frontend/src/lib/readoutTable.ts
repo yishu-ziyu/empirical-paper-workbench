@@ -76,6 +76,19 @@ export function literatureLabel(source: string | null | undefined): string {
   return source
 }
 
+/** User-facing estimate engine. OLS lock: do not present pooled OLS as feols. */
+export function displayEstimateEngineLabel(
+  method?: string | null,
+  estimator?: string | null,
+): string {
+  const engine = String(estimator ?? '').trim()
+  if (!engine) return ''
+  if (engine === 'estimate_agent') return engine
+  const key = String(method ?? '').trim().toLowerCase()
+  if (key === 'ols') return 'OLS'
+  return engine
+}
+
 // Evidence 大数字的人读格式：显示层定长，精确值仍由接口与 title 保留。
 export function formatStatValue(
   value: unknown,

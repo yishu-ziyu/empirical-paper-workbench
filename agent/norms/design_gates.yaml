@@ -1,0 +1,20 @@
+# NORMS-BE distilled AER design gates (DECIDE-8).
+# Hook: infer-design propose. Draft stays unconfirmed until human confirm.
+# Not an AER-Skills dump. Not a Claude skill runner.
+version: 1
+hook: propose
+gates:
+  - id: draft_not_locked
+    blocker: design_treated_as_locked
+  - id: did_requires_treated_period
+    when:
+      method: did
+    blocker: did_missing_interaction
+  - id: het_requires_interaction
+    when:
+      qType: heterogeneity
+    blocker: het_missing_interaction
+  - id: catalog_not_design_lock
+    blocker: catalog_as_locked_spec
+  - id: no_skill_runner
+    blocker: skill_runner_not_allowed

@@ -87,9 +87,10 @@ class EconPaperState(TypedDict, total=False):
     # ADR-0004: 文献检索（search_literature 节点写入）
     literature_entries: List[Any]  # List[LiteratureEntry]，见 protocols.py
     literature_query: Optional[str]
-    literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled"
+    literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled" | "r_lit_bar"
     literature_produced_by: Optional[str]
     literature_actions: List[str]  # #11: keyword / method_anchor / threat / citation_hop
+    find_lit: Optional[Any]  # R-lit-bar: hits / checkbox cards / checked export
     write_blocked: bool
     write_blockers: List[str]
     claim: Optional[str]

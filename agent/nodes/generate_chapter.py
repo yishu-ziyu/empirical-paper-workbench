@@ -132,6 +132,16 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     if not ready:
         return {"write_blocked": True, "write_blockers": blockers}
 
+    if str(chapter_type) == "lit_review":
+        from ..find_lit.chapter_gate import literature_write_blockers
+
+        extra = literature_write_blockers(state)
+        if extra:
+            return {
+                "write_blocked": True,
+                "write_blockers": list(blockers) + extra,
+            }
+
     # 加载模板（未知 type 在此抛 ValueError）
     prompt_mod = get_prompt(chapter_type)
 

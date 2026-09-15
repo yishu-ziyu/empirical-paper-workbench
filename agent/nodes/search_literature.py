@@ -236,6 +236,20 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
             "literature_actions": [],
         }
 
+    from ..find_lit.query import design_is_confirmed
+    from ..find_lit.search import search_find_lit
+
+    if design_is_confirmed(state):
+        find_lit = search_find_lit(state)
+        return {
+            "literature_entries": [],
+            "literature_query": find_lit.get("query") or query,
+            "literature_source": "r_lit_bar",
+            "literature_produced_by": "search_literature",
+            "literature_actions": ["fl_search"],
+            "find_lit": find_lit,
+        }
+
     entries, effective_source = _dispatch_search(query, source)
 
     family = _method_family(research_direction)

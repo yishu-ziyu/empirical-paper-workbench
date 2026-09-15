@@ -1382,14 +1382,16 @@ describe('App 三栏布局', () => {
   test('I-decide paragraphs appear in generate-chapter render_kwargs', async () => {
     const user = userEvent.setup()
     localStorage.setItem('econpaper_session_id', 'test-sess')
-    const mockFetch = vi.fn().mockImplementation((url: string) => {
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       const href = String(url)
       if (href.includes('/generate-chapter')) {
+        const body = JSON.parse(String(init?.body || '{}')) as { chapter?: { type: string; title: string } }
+        const ch = body.chapter || { type: 'intro', title: '引言' }
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
-            chapter: { type: 'intro', title: '引言', content: '正文', status: 'generated' },
-            body_chapters: [{ type: 'intro', title: '引言', content: '正文', status: 'generated' }],
+            chapter: { type: ch.type, title: ch.title, content: `${ch.type}正文`, status: 'generated' },
+            body_chapters: [{ type: ch.type, title: ch.title, content: `${ch.type}正文`, status: 'generated' }],
           }),
         })
       }
@@ -1423,12 +1425,14 @@ describe('App 三栏布局', () => {
     fireEvent.change(screen.getByTestId('pause-paragraphs'), { target: { value: '5' } })
     await user.click(screen.getByTestId('pause-apply'))
     await waitFor(() => {
-      expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toBe(true)
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(2)
     })
-    const genCall = mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/generate-chapter'))!
-    const body = JSON.parse(String(genCall[1].body))
-    expect(body.render_kwargs.paragraphs).toBe(5)
-    expect(body.chapter).toEqual({ type: 'intro', title: '引言' })
+    const firstBodies = mockFetch.mock.calls
+      .filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))
+      .map((c) => JSON.parse(String(c[1].body)))
+    expect(firstBodies[0].render_kwargs.paragraphs).toBe(5)
+    expect(firstBodies[0].chapter).toEqual({ type: 'intro', title: '引言' })
+    expect(firstBodies[1].chapter).toEqual({ type: 'results', title: '结果' })
     expect(mockFetch.mock.calls.some((c: unknown[]) => String(c[0]).includes('/resume'))).toBe(false)
   })
 
@@ -1704,12 +1708,13 @@ describe('App 三栏布局', () => {
     })
     await user.click(screen.getByTestId('pause-apply'))
     await waitFor(() => {
-      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(1)
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(2)
     })
-    expect(JSON.parse(String(
-      mockFetch.mock.calls.find((c: unknown[]) => String(c[0]).includes('/generate-chapter'))![1].body,
-    )).chapter.type).toBe('intro')
-    expect(await screen.findByText('intro正文')).toBeInTheDocument()
+    const firstTypes = mockFetch.mock.calls
+      .filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))
+      .map((c) => JSON.parse(String(c[1].body)).chapter.type)
+    expect(firstTypes).toEqual(['intro', 'results'])
+    expect(await screen.findByText('results正文')).toBeInTheDocument()
     await user.click(screen.getByTestId('write-chapter-results'))
     await waitFor(() => {
       expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(2)
@@ -1726,6 +1731,69 @@ describe('App 三栏布局', () => {
     expect(lastBody.chapter).toEqual({ type: 'results', title: '结果' })
     expect(lastBody.render_kwargs).toEqual({ paragraphs: 5 })
     expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/resume'))).toHaveLength(1)
+  })
+
+  test('Apply generate writes every six-chapter outline body, not intro-only', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    const six = [
+      { type: 'intro', title: '引言' },
+      { type: 'lit_review', title: '文献综述' },
+      { type: 'data_desc', title: '数据描述' },
+      { type: 'methods', title: '方法' },
+      { type: 'results', title: '结果' },
+      { type: 'conclusion', title: '结论' },
+    ]
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.includes('/generate-chapter')) {
+        const body = JSON.parse(String(init?.body || '{}')) as { chapter?: { type: string; title: string } }
+        const ch = body.chapter || six[0]
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              chapter: { type: ch.type, title: ch.title, content: `${ch.type}正文`, status: 'generated' },
+              body_chapters: [{ type: ch.type, title: ch.title, content: `${ch.type}正文`, status: 'generated' }],
+            }),
+        })
+      }
+      if (href.includes('/direction')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              outline: six,
+              research_direction: { method: 'OLS', dv: 'income', iv: 'age' },
+              identification_failed: false,
+              identification_report: 'ok',
+              claim: 'association',
+              literature_source: 'mock',
+              robustness_status: 'ran',
+              estimate: { treatment_row: '| age | 0.1 |', produced_by: 'estimate' },
+              results: '| age | 0.1 |',
+            }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ exists: true }) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    renderWithI18n(<App />)
+    fireEvent.change(screen.getByLabelText(/研究问题/), { target: { value: '教育对收入的影响' } })
+    fireEvent.change(screen.getByLabelText(/因变量/), { target: { value: 'income' } })
+    fireEvent.change(screen.getByLabelText(/自变量/), { target: { value: 'age' } })
+    fireEvent.change(screen.getByLabelText(/方法/), { target: { value: 'OLS' } })
+    fireEvent.submit(screen.getByTestId('direction-form'))
+    const apply = await screen.findByTestId('pause-apply')
+    await user.click(apply)
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))).toHaveLength(6)
+    })
+    const types = mockFetch.mock.calls
+      .filter((c: unknown[]) => String(c[0]).includes('/generate-chapter'))
+      .map((c) => JSON.parse(String(c[1].body)).chapter.type)
+    expect(types).toEqual(six.map((ch) => ch.type))
+    expect(await screen.findByText('conclusion正文')).toBeInTheDocument()
   })
 
   test('refresh I-decide Apply on last written chapter does not regenerate intro', async () => {

@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| FM-E-FOLD-REAL-FETCH-1 | `runtime/tasks/20260915-fm-e-fold-real-fetch-1.md` | complete | `feat/fm-e-build-fold-real-fetch-1` | 2026-09-15 | pushed; `make test` green; no PR |
 | FM-E-BUILD-BRYCE-FOLD-1 | `runtime/tasks/20260915-fm-e-build-bryce-fold-1.md` | complete | `feat/fm-e-build-bryce-fold-1` @ `2e5701b` | 2026-09-15 | pushed; `make test` green; no PR; Run Card1995 attach→confirm→estimate on full SHA |
 | FM-E-BUILD-FIX-OLS-LABEL | `runtime/tasks/20260915-fm-e-build-ols-label.md` | complete | `fix/fm-e-build-ols-label-1` from `4546e4de` | 2026-09-15 | OLS label pushed; no PR |
 | FM-E-BUILD-BRYCE-1 / NORMS-BE | `runtime/tasks/20260915-fm-e-build-norms-be-1.md` | complete | `feat/fm-e-build-norms-be-1` from `4546e4de` | 2026-09-15 | pushed; `make test` green; no PR |

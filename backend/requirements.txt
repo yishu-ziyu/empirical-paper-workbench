@@ -28,6 +28,10 @@ psycopg[binary]==3.2.3
 statsmodels==0.14.6
 langgraph-checkpoint-postgres==3.1.2
 langgraph-checkpoint-sqlite==3.1.1  # isolated durable Agent spike
+# 评审门：Facade 调 agent review_chapter 的类型化评审通道（build_review_agent →
+# pydantic_ai.Agent）。缺失时 backend/runner 进程 import 失败，评审静默降级 mock，
+# 即便配了真 key 也永远走不到大模型。与 agent/requirements 对齐。
+pydantic-ai-slim[openai]==2.35.3
 # Optional extra (not required): pip install statspai
 # Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
 # Sibling checkout (same as agent venv):

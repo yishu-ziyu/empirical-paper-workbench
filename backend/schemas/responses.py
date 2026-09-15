@@ -1057,15 +1057,44 @@ class FindDataPlanBodyResponse(BaseModel):
     search_facets: FindDataSearchFacetsResponse
 
 
+class FindDataFetchResponse(BaseModel):
+    """Session download vs honest link vs teaching shelf. Not attach."""
+
+    status: Literal["into_session", "link_only", "not_applicable"]
+    session_path: Optional[str] = None
+    reason: str = ""
+
+
 class FindDataCandidateResponse(BaseModel):
-    """Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."""
+    """Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.
+
+    Missing ``source_kind`` fails closed. Fixtures are never discovered/found.
+    """
 
     source_id: str
+    source_kind: Literal[
+        "discovered",
+        "teaching_fixture",
+        "external_link",
+        "fetched",
+        "captain_local_real",
+        "user_upload",
+    ]
+    source: Optional[str] = None
     title: str
     url_or_fixture: str
     license: str
     suggested_cols: List[str] = Field(default_factory=list)
     design_fit: Dict[str, Any] = Field(default_factory=dict)
+    honesty_label: str = ""
+    fetch: Optional[FindDataFetchResponse] = None
+
+
+class FindDataTeachingShelfResponse(BaseModel):
+    """Optional teaching-known extracts. Explicitly not a find result."""
+
+    label: str
+    candidates: List[FindDataCandidateResponse] = Field(default_factory=list)
 
 
 class SessionFindDataResponse(BaseModel):
@@ -1077,3 +1106,4 @@ class SessionFindDataResponse(BaseModel):
     primary_venue: Optional[str] = None
     plan: Optional[FindDataPlanBodyResponse] = None
     candidates: List[FindDataCandidateResponse] = Field(default_factory=list)
+    teaching_shelf: Optional[FindDataTeachingShelfResponse] = None

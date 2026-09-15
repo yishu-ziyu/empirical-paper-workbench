@@ -487,6 +487,51 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data/suggest": {
+      "post": {
+        "summary": "Suggest Find Data Endpoint",
+        "description": "Label discovered / external_link candidates and optional teaching shelf.",
+        "operationId": "suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -5685,6 +5730,29 @@
             "type": "string",
             "title": "Source Id"
           },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "discovered",
+              "teaching_fixture",
+              "external_link",
+              "fetched",
+              "captain_local_real",
+              "user_upload"
+            ],
+            "title": "Source Kind"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -5708,17 +5776,68 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Design Fit"
+          },
+          "honesty_label": {
+            "type": "string",
+            "title": "Honesty Label",
+            "default": ""
+          },
+          "fetch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataFetchResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "source_id",
+          "source_kind",
           "title",
           "url_or_fixture",
           "license"
         ],
         "title": "FindDataCandidateResponse",
-        "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
+        "description": "Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.\n\nMissing ``source_kind`` fails closed. Fixtures are never discovered/found."
+      },
+      "FindDataFetchResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchResponse",
+        "description": "Session download vs honest link vs teaching shelf. Not attach."
       },
       "FindDataPlanBodyResponse": {
         "properties": {
@@ -5807,6 +5926,27 @@
         "type": "object",
         "title": "FindDataSearchFacetsResponse",
         "description": "Confirmed Y/X/method/interactions used to search (not a confirm substitute)."
+      },
+      "FindDataTeachingShelfResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FindDataCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "FindDataTeachingShelfResponse",
+        "description": "Optional teaching-known extracts. Explicitly not a find result."
       },
       "GenerateChapterRequest": {
         "properties": {
@@ -7734,6 +7874,16 @@
             },
             "type": "array",
             "title": "Candidates"
+          },
+          "teaching_shelf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataTeachingShelfResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

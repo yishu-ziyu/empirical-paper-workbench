@@ -278,6 +278,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest Find Data Endpoint
+         * @description Label discovered / external_link candidates and optional teaching shelf.
+         */
+        post: operations["suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -2560,11 +2580,20 @@ export interface components {
         };
         /**
          * FindDataCandidateResponse
-         * @description Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty.
+         * @description Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.
+         *
+         *     Missing ``source_kind`` fails closed. Fixtures are never discovered/found.
          */
         FindDataCandidateResponse: {
             /** Source Id */
             source_id: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "discovered" | "teaching_fixture" | "external_link" | "fetched" | "captain_local_real" | "user_upload";
+            /** Source */
+            source?: string | null;
             /** Title */
             title: string;
             /** Url Or Fixture */
@@ -2577,6 +2606,30 @@ export interface components {
             design_fit?: {
                 [key: string]: unknown;
             };
+            /**
+             * Honesty Label
+             * @default
+             */
+            honesty_label: string;
+            fetch?: components["schemas"]["FindDataFetchResponse"] | null;
+        };
+        /**
+         * FindDataFetchResponse
+         * @description Session download vs honest link vs teaching shelf. Not attach.
+         */
+        FindDataFetchResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
         };
         /**
          * FindDataPlanBodyResponse
@@ -2632,6 +2685,16 @@ export interface components {
             question: string;
             /** Query Terms */
             query_terms?: string[];
+        };
+        /**
+         * FindDataTeachingShelfResponse
+         * @description Optional teaching-known extracts. Explicitly not a find result.
+         */
+        FindDataTeachingShelfResponse: {
+            /** Label */
+            label: string;
+            /** Candidates */
+            candidates?: components["schemas"]["FindDataCandidateResponse"][];
         };
         /**
          * GenerateChapterRequest
@@ -3426,6 +3489,7 @@ export interface components {
             plan?: components["schemas"]["FindDataPlanBodyResponse"] | null;
             /** Candidates */
             candidates?: components["schemas"]["FindDataCandidateResponse"][];
+            teaching_shelf?: components["schemas"]["FindDataTeachingShelfResponse"] | null;
         };
         /**
          * SessionInfoResponse
@@ -4224,6 +4288,37 @@ export interface operations {
         };
     };
     plan_find_data_endpoint_sessions__session_id__find_data_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post: {
         parameters: {
             query?: never;
             header?: never;

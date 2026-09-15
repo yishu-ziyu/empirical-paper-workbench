@@ -1,12 +1,12 @@
 """Data candidates after confirmed ``session.design`` (FD-BE-suggest).
 
 Reads a confirmed design's facets, searches Dataverse, and may list a
-matching classic-5 / teaching fixture. Fixtures are candidates only —
-never an answer key, never an attach. Without a fixture id the R-sources
-external path (Card zip, IPUMS, WDI, FRED, Dataverse) still appears.
+matching classic-5 / teaching extract on the **teaching shelf**. Fixtures
+are never found data. Without a fixture id the R-sources external path
+(Card zip, IPUMS, WDI, FRED, Dataverse) still appears as ``external_link``.
 
 Does not propose or confirm a design, does not attach, does not set
-``dataAttached`` / ``allow_did``, and does not emit a find-data plan.
+``dataAttached`` / ``allow_did``, and does not download venue bytes.
 """
 
 from __future__ import annotations
@@ -21,7 +21,20 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from agent.design.spec import norm_method
-from agent.find_data.plan import is_confirmed_design
+from agent.find_data.honesty import (
+    TEACHING_SHELF_LABEL,
+    honest_candidate,
+    honesty_label,
+    is_banned_toy,
+    is_find_success_candidate,
+    project_honest_find_data,
+    teaching_shelf_payload,
+)
+from agent.find_data.plan import (
+    DesignUnconfirmed,
+    build_find_data_plan,
+    is_confirmed_design,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CLASSIC5 = REPO_ROOT / "fixtures" / "classic-5"
@@ -34,15 +47,6 @@ UA = "econpaper/1.0 (find-data; mailto:dev@local)"
 HTTP_TIMEOUT_SECONDS = 10
 MAX_DATAVERSE_HITS = 8
 _FIXTURE_EXTS = (".csv", ".dta", ".xlsx", ".xls")
-
-CANDIDATE_FIELDS = (
-    "source_id",
-    "title",
-    "url_or_fixture",
-    "license",
-    "suggested_cols",
-    "design_fit",
-)
 
 _MINWAGE = re.compile(
     r"最低工资|minimum[\s\-]?wages?|min[\s_]?wage|"
@@ -93,43 +97,31 @@ WDI_URL = "https://data.worldbank.org/indicator/NY.GDP.PCAP.KD.ZG"
 FRED_URL = "https://fred.stlouisfed.org/series/UNRATE"
 
 
-def is_real_candidate(obj: Any) -> bool:
-    """True iff *obj* is a §5 real candidate (not a classic-5 id string)."""
-    if not isinstance(obj, Mapping):
-        return False
-    for key in CANDIDATE_FIELDS:
-        if key not in obj:
-            return False
-    source_id = str(obj.get("source_id") or "").strip()
-    title = str(obj.get("title") or "").strip()
-    url = str(obj.get("url_or_fixture") or "").strip()
-    license_text = str(obj.get("license") or "").strip()
-    if not source_id or not title or not url or not license_text:
-        return False
-    if url == source_id or url in {
-        "ck1994",
-        "ck1994_long",
-        "minimum-wage-employment",
-        "barro1991_growth",
-        "schooling-wages",
-    }:
-        return False
-    cols = obj.get("suggested_cols")
-    fit = obj.get("design_fit")
-    if not isinstance(cols, list) or not isinstance(fit, Mapping):
-        return False
-    return True
-
-
 def suggest_data_candidates(
     design: Mapping[str, Any] | None,
     *,
     dataverse_search: Callable[[str], Sequence[Mapping[str, Any]]] | None = None,
     catalog_dir: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    """Return §5 candidates for a confirmed design. Unconfirmed → []."""
+    """Find-success list only (discovered / external_link). Unconfirmed → []."""
+    return list(
+        suggest_find_data(
+            design,
+            dataverse_search=dataverse_search,
+            catalog_dir=catalog_dir,
+        )["candidates"]
+    )
+
+
+def suggest_find_data(
+    design: Mapping[str, Any] | None,
+    *,
+    dataverse_search: Callable[[str], Sequence[Mapping[str, Any]]] | None = None,
+    catalog_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    """Honesty-labeled find list + optional teaching shelf. Unconfirmed → empty."""
     if not is_confirmed_design(design):
-        return []
+        return {"candidates": [], "teaching_shelf": None}
     assert design is not None
     family = _route_family(design)
     search = (
@@ -143,16 +135,15 @@ def suggest_data_candidates(
     seen: set[str] = set()
 
     def _add(item: Mapping[str, Any] | None) -> None:
-        if item is None or not is_real_candidate(item):
+        honest = honest_candidate(item) if item is not None else None
+        if honest is None or not is_find_success_candidate(honest):
             return
-        sid = str(item["source_id"])
+        sid = str(honest["source_id"])
         if sid in seen:
             return
         seen.add(sid)
-        found.append(dict(item))
+        found.append(honest)
 
-    for fixture in _fixture_candidates(design, family, catalog_dir):
-        _add(fixture)
     for external in _route_externals(design, family):
         _add(external)
     for hit in _dataverse_candidates(design, query, search):
@@ -160,7 +151,36 @@ def suggest_data_candidates(
     if not any(str(c["source_id"]).startswith("dataverse:") for c in found):
         _add(_dataverse_landing(design, query))
 
-    return found
+    shelf = teaching_shelf_payload(
+        _fixture_candidates(design, family, catalog_dir)
+    )
+    return {"candidates": found, "teaching_shelf": shelf}
+
+
+def apply_find_data_suggest(
+    state: Mapping[str, Any] | None,
+    *,
+    dataverse_search: Callable[[str], Sequence[Mapping[str, Any]]] | None = None,
+    catalog_dir: Path | str | None = None,
+) -> dict[str, Any]:
+    """Merge honesty-labeled suggest into session.find_data. Confirm required."""
+    state = state or {}
+    design = state.get("design")
+    if not is_confirmed_design(design):
+        raise DesignUnconfirmed("design_unconfirmed")
+    prior = state.get("find_data") if isinstance(state.get("find_data"), dict) else None
+    if isinstance(prior, dict) and prior.get("status") == "planned" and prior.get("plan"):
+        record = dict(prior)
+    else:
+        record = build_find_data_plan(design)
+    payload = suggest_find_data(
+        design,
+        dataverse_search=dataverse_search,
+        catalog_dir=catalog_dir,
+    )
+    record["candidates"] = list(payload["candidates"])
+    record["teaching_shelf"] = payload.get("teaching_shelf")
+    return project_honest_find_data(record)
 
 
 def search_dataverse(
@@ -272,82 +292,93 @@ def _suggested_from_design(design: Mapping[str, Any], extras: Iterable[str] = ()
 def _candidate(
     *,
     source_id: str,
+    source_kind: str,
     title: str,
     url_or_fixture: str,
     license: str,
     suggested_cols: Sequence[str],
     design: Mapping[str, Any],
     notes: str,
-) -> dict[str, Any]:
-    return {
+) -> dict[str, Any] | None:
+    item = {
         "source_id": source_id,
+        "source_kind": source_kind,
         "title": title,
         "url_or_fixture": url_or_fixture,
         "license": license,
         "suggested_cols": list(suggested_cols),
         "design_fit": _design_fit(design, notes=notes),
+        "honesty_label": honesty_label(source_kind),
     }
+    return honest_candidate(item)
 
 
 def _route_externals(
     design: Mapping[str, Any],
     family: str,
 ) -> list[dict[str, Any]]:
+    raw: list[dict[str, Any] | None]
     if family == "minwage":
-        return [
+        raw = [
             _candidate(
                 source_id="card-zip:njmin",
+                source_kind="external_link",
                 title="Card–Krueger NJ–PA fast-food data (author zip)",
                 url_or_fixture=CARD_ZIP_URL,
                 license="author-posted",
                 suggested_cols=[],
                 design=design,
-                notes="external path; Card zip; candidate only",
+                notes="公开链接；请下载后上传 / public link — not ingested",
             )
         ]
-    if family == "educ_wage":
-        return [
+    elif family == "educ_wage":
+        raw = [
             _candidate(
                 source_id="ipums:cps",
+                source_kind="external_link",
                 title="IPUMS CPS / USA extracts",
                 url_or_fixture=IPUMS_URL,
                 license="registration-required",
                 suggested_cols=[],
                 design=design,
-                notes="external path; IPUMS; candidate only",
+                notes="公开链接；请下载后上传 / registration-required; not ingested",
             )
         ]
-    if family == "growth":
-        return [
+    elif family == "growth":
+        raw = [
             _candidate(
                 source_id="wdi:NY.GDP.PCAP.KD.ZG",
+                source_kind="external_link",
                 title="World Bank World Development Indicators (GDP growth)",
                 url_or_fixture=WDI_URL,
                 license="cc-by-4.0",
                 suggested_cols=[],
                 design=design,
-                notes="external path; WDI; candidate only",
+                notes="公开链接；请下载后上传 / WDI page — not ingested",
             )
         ]
-    if family == "macro":
-        return [
+    elif family == "macro":
+        raw = [
             _candidate(
                 source_id="fred:UNRATE",
+                source_kind="external_link",
                 title="FRED unemployment rate (UNRATE)",
                 url_or_fixture=FRED_URL,
                 license="public",
                 suggested_cols=[],
                 design=design,
-                notes="external path; FRED; candidate only",
+                notes="公开链接；请下载后上传 / FRED series — not ingested",
             )
         ]
-    return []
+    else:
+        raw = []
+    return [item for item in raw if item is not None]
 
 
 def _dataverse_landing(
     design: Mapping[str, Any],
     query: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     if query:
         url = (
             "https://dataverse.harvard.edu/dataverse/harvard?"
@@ -357,12 +388,13 @@ def _dataverse_landing(
         url = DATAVERSE_HOME
     return _candidate(
         source_id="dataverse:search",
+        source_kind="external_link",
         title="Harvard Dataverse catalog search",
         url_or_fixture=url,
         license="unknown",
         suggested_cols=[],
         design=design,
-        notes="Dataverse backup; candidate only",
+        notes="公开链接；请下载后上传 / Dataverse path; not ingested",
     )
 
 
@@ -419,17 +451,18 @@ def _dataverse_candidates(
             mapped = _map_dataverse_item(hit) or {}
         if not mapped:
             continue
-        out.append(
-            _candidate(
-                source_id=str(mapped["source_id"]),
-                title=str(mapped["title"]),
-                url_or_fixture=str(mapped["url_or_fixture"]),
-                license=str(mapped.get("license") or "unknown"),
-                suggested_cols=list(mapped.get("suggested_cols") or []),
-                design=design,
-                notes="Dataverse search hit; candidate only",
-            )
+        mapped = _candidate(
+            source_id=str(mapped["source_id"]),
+            source_kind="discovered",
+            title=str(mapped["title"]),
+            url_or_fixture=str(mapped["url_or_fixture"]),
+            license=str(mapped.get("license") or "unknown"),
+            suggested_cols=list(mapped.get("suggested_cols") or []),
+            design=design,
+            notes="检索到 / Dataverse 命中; not a fixture",
         )
+        if mapped is not None:
+            out.append(mapped)
     return out
 
 
@@ -503,6 +536,9 @@ def _fixture_candidates(
         path = _find_fixture_file(root, entry_id)
         if path is None:
             continue
+        url = _fixture_url(path)
+        if is_banned_toy(url) or is_banned_toy(path.name) or is_banned_toy(entry_id):
+            continue
         meta_title, license_text = _FIXTURE_META.get(
             entry_id, (entry_id, "unknown")
         )
@@ -511,15 +547,16 @@ def _fixture_candidates(
         extras: tuple[str, ...] = ()
         if family == "minwage":
             extras = ("employment", "treated", "period")
-        found.append(
-            _candidate(
-                source_id=source_id,
-                title=title,
-                url_or_fixture=_fixture_url(path),
-                license=license_text,
-                suggested_cols=_suggested_from_design(design, extras),
-                design=design,
-                notes=f"matches confirmed {family}; candidate only",
-            )
+        item = _candidate(
+            source_id=source_id,
+            source_kind="teaching_fixture",
+            title=title,
+            url_or_fixture=url,
+            license=license_text,
+            suggested_cols=_suggested_from_design(design, extras),
+            design=design,
+            notes=TEACHING_SHELF_LABEL,
         )
+        if item is not None:
+            found.append(item)
     return found

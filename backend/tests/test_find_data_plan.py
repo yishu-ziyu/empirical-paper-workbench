@@ -75,6 +75,7 @@ def test_unconfirmed_design_is_409(client):
     assert body["status"] == "missing"
     assert body["plan"] is None
     assert body["candidates"] == []
+    assert body.get("teaching_shelf") is None
 
 
 def test_confirmed_minwage_returns_where_how_plan_stub(client):
@@ -85,9 +86,10 @@ def test_confirmed_minwage_returns_where_how_plan_stub(client):
     data = resp.json()
     assert data["status"] == "planned"
     assert data["route_family"] == "minwage"
-    assert data["primary_venue"] == "ck fixture + Card zip"
-    assert "ck fixture" in data["plan"]["where"]
+    assert data["primary_venue"] == "Card zip"
+    assert "ck fixture" not in data["plan"]["where"]
     assert "Card zip" in data["plan"]["where"]
+    assert "teaching-known" in data["plan"]["how"]
     assert "Dataverse" in data["plan"]["how"]
     assert data["plan"]["search_facets"]["outcome"] == "employment"
     assert data["plan"]["search_facets"]["treatment"] == "min_wage"
@@ -132,7 +134,8 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.status_code == 200, resp.text
     assert resp.json()["route_family"] == "educ_wage"
     assert resp.json()["primary_venue"] == "IPUMS"
-    assert "wage1" in resp.json()["plan"]["where"]
+    assert "wage1" not in resp.json()["plan"]["where"]
+    assert "teaching-known" in resp.json()["plan"]["how"]
 
     facade.seed_state(
         sid,
@@ -154,8 +157,10 @@ def test_educ_wage_and_growth_routes(client):
     assert resp.status_code == 200, resp.text
     assert resp.json()["route_family"] == "growth"
     assert resp.json()["primary_venue"] == "WDI"
-    assert "barro" in resp.json()["plan"]["where"]
+    assert "barro" not in resp.json()["plan"]["where"]
+    assert "teaching-known" in resp.json()["plan"]["how"]
     assert resp.json()["candidates"] == []
+    assert resp.json().get("teaching_shelf") is None
 
 
 def test_plan_does_not_clear_or_set_data_attached(client):

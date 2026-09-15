@@ -52,6 +52,10 @@ function App() {
     new URLSearchParams(window.location.search).get('spike') === '1'
 
   const openDirection = () => {
+    if (ws.formalAttachBlocked) {
+      ws.openAttachConfirm()
+      return
+    }
     ws.setWorkbenchTab('question')
     ws.setDirectionOpen(true)
   }
@@ -85,6 +89,14 @@ function App() {
   if (ws.bootFailure) {
     // C21：终态失败时只有 failure surface 一个真相，抑制一切推进文案。
     blockingDecision = null
+  } else if (ws.formalAttachBlocked) {
+    // DC-FE-gate: confirm-attach sits in front of Table 1 / spec / direction / estimate.
+    blockingDecision = {
+      title: t('decision.confirmAttach'),
+      reason: t('decision.confirmAttachReason'),
+      actionLabel: t('decision.openAttach'),
+      onAction: ws.openAttachConfirm,
+    }
   } else if (isQuestionGroup) {
     if (ws.identFailed) {
       blockingDecision = {

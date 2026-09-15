@@ -228,6 +228,9 @@ export const workbenchZh = {
   'decision.confirmPlans': '确认分析方案',
   'decision.confirmPlansReason': '先确认拟纳入的估计设定，再看比较结果。比较结果不会在确认前出现。',
   'decision.viewPlans': '查看分析方案',
+  'decision.confirmAttach': '确认挂接数据',
+  'decision.confirmAttachReason': '还没有确认挂接数据。Table 1、设定确认和估计都要等挂接完成。',
+  'decision.openAttach': '去挂接数据',
   'decision.confirmDirection': '确认研究方向',
   'decision.confirmDirectionEdit': '确认修改后的研究方向',
   'decision.confirmDirectionReason': '需要你确认研究问题、变量和方法；确认后系统才会运行估计。',
@@ -727,6 +730,10 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
   'decision.confirmPlansReason':
     'Confirm the specifications first. Comparison results do not appear before that.',
   'decision.viewPlans': 'View analysis plans',
+  'decision.confirmAttach': 'Confirm-attach the dataset',
+  'decision.confirmAttachReason':
+    'Data is not confirm-attached yet. Table 1, specification confirm, and estimate wait until it is.',
+  'decision.openAttach': 'Open attach',
   'decision.confirmDirection': 'Confirm the research direction',
   'decision.confirmDirectionEdit': 'Confirm the edited research direction',
   'decision.confirmDirectionReason':

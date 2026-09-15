@@ -279,4 +279,62 @@ describe('workspace run recovery ordering', () => {
     expect(directionGateForReadiness('FAILED').disabled).toBe(true)
     expect(directionGateForReadiness('CANCELLED').disabled).toBe(true)
   })
+
+  it('does not replay a pending direction when formal dataAttached is false', async () => {
+    localStorage.setItem(
+      `${LS_PENDING_RUN_KEY}:session-1`,
+      JSON.stringify({
+        idempotencyKey: 'blocked-direction',
+        direction: {
+          question: 'q',
+          dv: 'income',
+          iv: 'age',
+          controls: [],
+          method: 'OLS',
+          template: 'undergrad',
+        },
+      }),
+    )
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      recoverFromSnapshot(
+        'session-1',
+        snapshotWith({
+          upload_readiness: 'READY',
+          dataAttached: false,
+        } as Partial<WorkspaceSnapshot>),
+      ),
+    ).resolves.toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(localStorage.getItem(`${LS_PENDING_RUN_KEY}:session-1`)).not.toBeNull()
+  })
+
+  it('surfaces 409 upload_not_ready as an admission conflict', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: { code: 'upload_not_ready' } }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await expect(
+      acceptDirectionRun(
+        'session-1',
+        {
+          question: 'q',
+          dv: 'income',
+          iv: 'age',
+          controls: [],
+          method: 'OLS',
+          template: 'undergrad',
+        },
+        'key-1',
+      ),
+    ).rejects.toMatchObject({ status: 409, code: 'upload_not_ready' })
+  })
 })

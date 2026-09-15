@@ -634,7 +634,9 @@ describe('App 三栏布局', () => {
     await waitFor(() => {
       expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
     })
-    expect(screen.queryByTestId('direction-disabled-reason')).not.toBeInTheDocument()
+    // DC-FE-gate: READY ingest is not confirm-attach. Direction / estimate stay closed.
+    expect(screen.getByTestId('direction-disabled-reason')).toHaveTextContent('请先确认挂接数据')
+    expect(screen.getByTestId('decision-blocker-title')).toHaveTextContent('确认挂接数据')
     // 清理结果在 Overview stepper 的「数据清洗」站如实显示
     fireEvent.click(screen.getByTestId('rail-overview'))
     expect(screen.getByTestId('overview-step-data')).toHaveAttribute('data-status', 'done')

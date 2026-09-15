@@ -411,12 +411,34 @@ class ResearchLabResponse(BaseModel):
     claim: Optional[ClaimLedgerResponse] = None
 
 
+class AttachResponse(BaseModel):
+    """POST /sessions/{id}/attach — bind only; never sets dataAttached."""
+
+    session_id: str
+    dataAttached: bool = Field(
+        default=False,
+        description="Always false. Confirm-attach is the only transition that sets this gate.",
+    )
+    source: Literal["user_file", "classic-5"]
+    entry_id: Optional[str] = None
+    upload_readiness: Optional[
+        Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
+    ] = None
+    run_id: Optional[str] = None
+    events_url: Optional[str] = None
+    dataset_meta: Optional[DatasetMetaResponse] = None
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
     session_id: str
     exists: bool
     has_dataset: bool = False
+    dataAttached: bool = Field(
+        default=False,
+        description="Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
+    )
     upload_readiness: Optional[
         Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
     ] = None

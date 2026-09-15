@@ -278,6 +278,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data/fetch-wdi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Wdi Endpoint
+         * @description Download WDI into the session workspace, or return the WDI link.
+         *
+         *     Confirm-design required. Growth family only. Never copies the Barro
+         *     fixture. Does not set dataAttached.
+         */
+        post: operations["fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -2579,6 +2602,24 @@ export interface components {
             };
         };
         /**
+         * FindDataFetchProjectionResponse
+         * @description Session download vs honest link (docs/real-fetch-contract.md §2.1).
+         */
+        FindDataFetchProjectionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
          * FindDataPlanBodyResponse
          * @description Where / how to look. A family label without a venue is not a plan.
          */
@@ -3885,6 +3926,34 @@ export interface components {
             /** Versions */
             versions?: components["schemas"]["ChapterVersionItem"][];
         };
+        /**
+         * WdiFetchResponse
+         * @description FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.
+         *
+         *     Dedicated to this venue. Does not attach, does not use the Barro fixture.
+         */
+        WdiFetchResponse: {
+            /** Source Id */
+            source_id: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "fetched" | "external_link";
+            /** Title */
+            title: string;
+            /** Url Or Fixture */
+            url_or_fixture: string;
+            /** License */
+            license: string;
+            /** Suggested Cols */
+            suggested_cols?: string[];
+            /** Design Fit */
+            design_fit?: {
+                [key: string]: unknown;
+            };
+            fetch: components["schemas"]["FindDataFetchProjectionResponse"];
+        };
     };
     responses: never;
     parameters: never;
@@ -4241,6 +4310,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WdiFetchResponse"];
                 };
             };
             /** @description Validation Error */

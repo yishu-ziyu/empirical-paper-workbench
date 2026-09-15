@@ -487,6 +487,51 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data/fetch-wdi": {
+      "post": {
+        "summary": "Fetch Wdi Endpoint",
+        "description": "Download WDI into the session workspace, or return the WDI link.\n\nConfirm-design required. Growth family only. Never copies the Barro\nfixture. Does not set dataAttached.",
+        "operationId": "fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WdiFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -5720,6 +5765,41 @@
         "title": "FindDataCandidateResponse",
         "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
       },
+      "FindDataFetchProjectionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchProjectionResponse",
+        "description": "Session download vs honest link (docs/real-fetch-contract.md §2.1)."
+      },
       "FindDataPlanBodyResponse": {
         "properties": {
           "where": {
@@ -8903,6 +8983,60 @@
         ],
         "title": "VersionsResponse",
         "description": "GET /sessions/{id}/chapters/{chapter_index}/versions 返回体。"
+      },
+      "WdiFetchResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "fetched",
+              "external_link"
+            ],
+            "title": "Source Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url_or_fixture": {
+            "type": "string",
+            "title": "Url Or Fixture"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "suggested_cols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Cols"
+          },
+          "design_fit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Design Fit"
+          },
+          "fetch": {
+            "$ref": "#/components/schemas/FindDataFetchProjectionResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_kind",
+          "title",
+          "url_or_fixture",
+          "license",
+          "fetch"
+        ],
+        "title": "WdiFetchResponse",
+        "description": "FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.\n\nDedicated to this venue. Does not attach, does not use the Barro fixture."
       }
     },
     "securitySchemes": {

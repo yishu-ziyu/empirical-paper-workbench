@@ -18,6 +18,11 @@ Formal TITLE/TOPIC attach loads catalog bytes from this tree, or from
 
 Layout: `{entry_id}.csv` (also `.dta` / `.xlsx`). Entry ids are `[A-Za-z0-9._-]`.
 
+Vendored files (see `SOURCE.txt`):
+
+- `ck1994_long.csv` — Card and Krueger (1994) NJ–PA min-wage panel
+- `barro1991_growth.csv` — Barro (1991) / Barro–Lee 1960–85 growth cross-section
+
 Selecting or attaching a candidate leaves `dataAttached` false. Only
 confirm-attach sets the snapshot gate, and only when ingest is READY
 with a dataset.

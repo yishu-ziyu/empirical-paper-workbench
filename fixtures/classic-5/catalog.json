@@ -18,12 +18,17 @@
       ]
     },
     {
-      "id": "minimum-wage-employment",
-      "title": "Minimum wage and employment",
-      "topic": "Labor-market effects of a wage floor",
+      "id": "ck1994_long",
+      "title": "Card and Krueger minimum wage",
+      "topic": "Min wage and employment in the New Jersey–Pennsylvania fast-food study",
       "tags": [
+        "min wage",
+        "minimum wage",
         "minimum",
         "wage",
+        "card",
+        "krueger",
+        "card krueger",
         "employment",
         "labor",
         "最低工资",
@@ -73,6 +78,25 @@
         "健康",
         "劳动供给",
         "工时"
+      ]
+    },
+    {
+      "id": "barro1991_growth",
+      "title": "Barro cross-country growth",
+      "topic": "Growth, schooling, and investment in a Barro–Lee country panel",
+      "tags": [
+        "growth",
+        "barro",
+        "barro lee",
+        "economic growth",
+        "gdp",
+        "convergence",
+        "enrollment",
+        "investment",
+        "cross country",
+        "增长",
+        "经济增长",
+        "巴罗"
       ]
     }
   ]

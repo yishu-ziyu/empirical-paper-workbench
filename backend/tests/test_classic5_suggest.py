@@ -5,13 +5,17 @@ attach or write dataAttached; formal path only (not /demos/card).
 """
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
 import routers.classic5 as classic5_router
 import services.classic5_catalog as catalog
+from config import PRODUCT_ROOT
 from facade import facade
 from services.classic5_catalog import rank_entries, read_catalog, suggest_candidates
+
+_CLASSIC5_DIR = PRODUCT_ROOT / "fixtures" / "classic-5"
 
 
 def _write_catalog(path: Path, entries: list[dict]) -> Path:
@@ -22,15 +26,19 @@ def _write_catalog(path: Path, entries: list[dict]) -> Path:
     return path
 
 
-def test_default_catalog_has_five_ranking_stubs():
+_DEFAULT_ENTRY_IDS = [
+    "schooling-wages",
+    "ck1994_long",
+    "trade-local-labor",
+    "fiscal-output",
+    "health-labor-supply",
+    "barro1991_growth",
+]
+
+
+def test_default_catalog_includes_ck1994_and_barro_entries():
     entries = read_catalog()
-    assert [item.entry_id for item in entries] == [
-        "schooling-wages",
-        "minimum-wage-employment",
-        "trade-local-labor",
-        "fiscal-output",
-        "health-labor-supply",
-    ]
+    assert [item.entry_id for item in entries] == _DEFAULT_ENTRY_IDS
     assert all(item.title for item in entries)
 
 
@@ -45,8 +53,68 @@ def test_rank_schooling_query_beats_fiscal():
 
 def test_rank_chinese_minimum_wage_query():
     ranked = rank_entries(read_catalog(), "最低工资对就业的影响")
-    assert ranked[0][0].entry_id == "minimum-wage-employment"
+    assert ranked[0][0].entry_id == "ck1994_long"
     assert ranked[0][1] > 0
+
+
+def test_rank_min_wage_and_card_krueger_hit_ck1994():
+    for query in ("min wage", "Card Krueger"):
+        ranked = rank_entries(read_catalog(), query)
+        assert ranked[0][0].entry_id == "ck1994_long", query
+        assert ranked[0][1] > 0
+
+
+def test_rank_growth_and_barro_hit_barro1991():
+    for query in ("growth", "Barro"):
+        ranked = rank_entries(read_catalog(), query)
+        assert ranked[0][0].entry_id == "barro1991_growth", query
+        assert ranked[0][1] > 0
+
+
+def test_suggest_endpoint_hits_ck1994_and_barro_keywords(client):
+    cases = (
+        ({"title": "min wage"}, "ck1994_long"),
+        ({"title": "Card Krueger"}, "ck1994_long"),
+        ({"topic": "growth"}, "barro1991_growth"),
+        ({"title": "Barro"}, "barro1991_growth"),
+    )
+    for body, entry_id in cases:
+        resp = client.post("/classic-5/suggest", json=body)
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["candidates"][0]["entry_id"] == entry_id
+        assert data["attached"] is False
+
+
+def test_classic5_fixture_csvs_have_required_columns():
+    required = {
+        "ck1994_long.csv": [
+            "store_id",
+            "state",
+            "treated",
+            "period",
+            "fte",
+            "wage",
+            "chain",
+        ],
+        "barro1991_growth.csv": [
+            "country",
+            "gdp_pc_initial",
+            "growth",
+            "sec_enroll",
+            "prim_enroll",
+            "inv_share",
+            "gov_share",
+            "pop_growth",
+        ],
+    }
+    for name, columns in required.items():
+        path = _CLASSIC5_DIR / name
+        assert path.is_file(), name
+        with path.open(encoding="utf-8", newline="") as handle:
+            header = next(csv.reader(handle))
+        assert header == columns
+    assert (_CLASSIC5_DIR / "SOURCE.txt").is_file()
 
 
 def test_suggest_payload_never_attaches():
@@ -77,14 +145,9 @@ def test_suggest_endpoint_ranks_and_keeps_own_file(client):
     assert data["own_file"]["catalog"] is False
     assert data["candidates"][0]["entry_id"] == "health-labor-supply"
     ids = [item["entry_id"] for item in data["candidates"]]
-    assert len(ids) == 5
-    assert set(ids) == {
-        "schooling-wages",
-        "minimum-wage-employment",
-        "trade-local-labor",
-        "fiscal-output",
-        "health-labor-supply",
-    }
+    assert ids.count("ck1994_long") == 1
+    assert ids.count("barro1991_growth") == 1
+    assert set(ids) == set(_DEFAULT_ENTRY_IDS)
 
 
 def test_suggest_rejects_empty_title_and_topic(client):

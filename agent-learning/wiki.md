@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | FD-plan-confirm-gate | FIND-DATA plan must not rank as a confirmed-design match before confirm | Unconfirmed `session.design` is missing/draft | POST plan returns 409; GET is `status=missing`; R-sources table is plan-only | `agent-learning/raw/2026-09-15_fd-be-plan.md` |
 | FIND-merge-stack-on-infer | FIND G0/plan/suggest + FL search need one tip with INFER confirm lock | Sibling write-sets share G0 `2a663915`; OpenAPI/STATE overlap | Stack on INFER `0ad7e0ae`; union routers/schemas; regen OpenAPI; confirm=`status`+`confirmed is True` | `agent-learning/raw/2026-09-15_fm-e-build-find-merge-1.md` |
-| DID-spec-confirmed-not-catalog | Parked DID-BE-spec forced/blocked on catalog `allow_did` | DECIDE-6 withdrew catalog as DiD SoT | Trigger = `confirmed_did_method`; missing term 409 + estimate/write block; force `y ~ treat * post` without `| FE` | `agent-learning/raw/2026-09-15_did-be-spec-recut.md` |
+| EVAL-top5-not-catalog | V1 eval must not use classic-5 as gold or require a submodule | Catalog identity conflated with EVAL-top5 | Optional `eval/` harness + submodule stub; flag off product path; refuse catalog/farm ids | `agent-learning/raw/2026-09-15_eval-top5.md` |
 
 ## Skill impact
 

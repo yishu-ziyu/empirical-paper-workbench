@@ -129,18 +129,23 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     chapter_spec["chapter_index"] = idx
     chapter_type = chapter_spec.get("type", "intro")
     ready, blockers = paper_ready_to_write(state, str(chapter_type))
-    if not ready:
-        return {"write_blocked": True, "write_blockers": blockers}
-
+    extra: list[str] = []
     if str(chapter_type) == "lit_review":
         from ..find_lit.chapter_gate import literature_write_blockers
 
-        extra = literature_write_blockers(state)
-        if extra:
-            return {
-                "write_blocked": True,
-                "write_blockers": list(blockers) + extra,
-            }
+        extra.extend(literature_write_blockers(state))
+    from ..norms.loader import chapter_write_blockers
+
+    extra.extend(chapter_write_blockers(state, str(chapter_type)))
+    merged: list[str] = []
+    seen: set[str] = set()
+    for code in list(blockers) + extra:
+        if code in seen:
+            continue
+        merged.append(code)
+        seen.add(code)
+    if not ready or extra:
+        return {"write_blocked": True, "write_blockers": merged}
 
     # 加载模板（未知 type 在此抛 ValueError）
     prompt_mod = get_prompt(chapter_type)

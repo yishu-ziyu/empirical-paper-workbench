@@ -11,6 +11,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from ..norms.loader import assert_propose_gates
 from .spec import norm_method
 
 # Catalog identity tokens named in the infer-design contract. A title that
@@ -201,6 +202,7 @@ def propose_design(
         "heterogeneity_groups": [],
         "catalog_entry_id": None,
     }
+    assert_propose_gates(draft)
     return draft
 
 

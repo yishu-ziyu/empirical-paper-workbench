@@ -7,6 +7,7 @@
 | ID | 问题 | 根因 | 已验证处理 | Run records |
 |---|---|---|---|---|
 | FD-plan-confirm-gate | FIND-DATA plan must not rank as a confirmed-design match before confirm | Unconfirmed `session.design` is missing/draft | POST plan returns 409; GET is `status=missing`; R-sources table is plan-only | `agent-learning/raw/2026-09-15_fd-be-plan.md` |
+| FD-fetch-card-not-fixture | Card zip fetch must not treat classic-5 / proximity.zip as the NJ–PA archive | Same author page lists schooling proximity.zip; fixture CSV can be served as a fake download | Only `njmin.zip`; zip magic required; else landing + honest upload; no `dataAttached` | `agent-learning/raw/2026-09-15_fd-be-fetch-card.md` |
 | FIND-merge-stack-on-infer | FIND G0/plan/suggest + FL search need one tip with INFER confirm lock | Sibling write-sets share G0 `2a663915`; OpenAPI/STATE overlap | Stack on INFER `0ad7e0ae`; union routers/schemas; regen OpenAPI; confirm=`status`+`confirmed is True` | `agent-learning/raw/2026-09-15_fm-e-build-find-merge-1.md` |
 | DID-spec-confirmed-not-catalog | Parked DID-BE-spec forced/blocked on catalog `allow_did` | DECIDE-6 withdrew catalog as DiD SoT | Trigger = `confirmed_did_method`; missing term 409 + estimate/write block; force `y ~ treat * post` without `| FE` | `agent-learning/raw/2026-09-15_did-be-spec-recut.md` |
 

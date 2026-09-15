@@ -168,6 +168,7 @@ def health() -> dict[str, str]:
 
 from routers.analysis import router as analysis_router  # noqa: E402
 from routers.agent_spike import router as agent_spike_router  # noqa: E402
+from routers.attach import router as attach_router  # noqa: E402
 from routers.auth import router as auth_router  # noqa: E402
 from routers.charls import router as charls_router  # noqa: E402
 from routers.chapter import router as chapter_router  # noqa: E402
@@ -198,6 +199,7 @@ app.include_router(eda_router)
 app.include_router(evidence_router)
 app.include_router(find_data_router)
 app.include_router(sessions_router)
+app.include_router(attach_router)
 app.include_router(classic5_router)
 app.include_router(research_router)
 app.include_router(ws_router)

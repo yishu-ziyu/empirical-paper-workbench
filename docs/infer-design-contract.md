@@ -4,17 +4,29 @@ Status: frozen (G0 serial contract)
 Task: `FM-E-BUILD-INFER-DESIGN-1` · slice **INF-G0**  
 Product line: **formal econpaper only** (ADR-0010 web product; user study path)  
 Baseline: `main` @ `79c9c91508f9f1479dc5cd8c6d85b3342f7c913d`  
-Design input: **DECIDE-6** — title-first research-design inference; catalog is candidates only  
+Design input: **DECIDE-6** acceptance from Decide (via Firstmate) — title-first research-design inference; catalog is candidates only; **no gold body reads**  
 Sister contracts (cited, not merged): `docs/data-completion-contract.md` (`FM-E-BUILD-DATA-COMPLETE-1` G0), `docs/did-narrow-exception-contract.md` (`FM-E-BUILD-DID-NARROW-1` G0)  
-Authority: this file freezes **propose-from-title**, **`session.design` draft vs confirmed**, confirm-before-lock, DATA-COMPLETE suggest matching the **confirmed** design, and the DiD rewrite that **deprecates catalog-token `allow_did`**. Later slices implement against it. G0 adds **this markdown only**.
+Authority: this file freezes the DECIDE-6 **order**, **locks**, and **accept bullets** below, plus **`session.design` draft vs confirmed** and the DiD rewrite that **deprecates catalog-token `allow_did`**. Later slices implement against it. G0 adds **this markdown only**.
 
-This is not an ADR and not an acceptance checklist. It is the serial write-set freeze so INF-BE-\* / DID-BE-\* / DC-BE-suggest can run without colliding with DATA-COMPLETE attach, PREWRITE-PAUSE flags, or classic-5 CSV authorship.
+This is not an ADR. It is the serial write-set freeze so INF-BE-\* / DID-BE-\* / DC-BE-suggest can run without colliding with DATA-COMPLETE attach, PREWRITE-PAUSE flags, or classic-5 CSV authorship. Acceptance is the DECIDE-6 bullets in §8 — **not** gold-body reads.
 
 ---
 
 ## 0. Product-line lock — DECIDE-6
 
-**DECIDE-6 (frozen):** the engine proposes a research design from the **session title** (and any user-supplied research-question text) **first**. Classic fixtures / catalog entries are **candidates only**. The user must **confirm** a design before downstream gates treat it as locked (`session.design`). DiD is allowed only from that **confirmed** design (`method=did` or `norm_method` equivalent **and** the required treated×period interaction). Catalog id is never the DiD source of truth.
+**DECIDE-6 (frozen; Decide via Firstmate).** Encode the following **verbatim**:
+
+**Order:** title/question → design propose (Y/X/interactions/method) → human confirm → data candidates → attach → prewrite pauses.
+
+**Locks:**
+
+- Fixtures/catalog = candidates only, never answer key.
+- DiD only from confirmed `design.method=did` + treated×period; NO catalog-id `allow_did`.
+- OLS default elsewhere; het interaction hard-block still.
+
+Product-object name in this file is `session.design` (same object as `design` above). `Y` / `X` are outcome / treatment. Later slices must not evaluate by reading gold chapter bodies.
+
+The engine proposes a research design from the **session title** (and any user-supplied research-question text) **first**. Classic fixtures / catalog entries are **candidates only**, never an answer key. The user must **confirm** a design before downstream gates treat it as locked (`session.design`). DiD is allowed only from that **confirmed** design (`design.method=did` or `norm_method` equivalent **and** the required treated×period interaction). Catalog id is never the DiD source of truth. OLS is the default elsewhere; the heterogeneity interaction hard-block still holds.
 
 In scope: the formal econpaper paper path after TITLE/TOPIC — the same product line as `docs/data-completion-contract.md`.
 
@@ -49,7 +61,7 @@ Given a formal-path **session title** and optional research-question text, this 
 
 This contract does **not**:
 
-- Generate, fill, or lock six-chapter / gold chapter bodies
+- Generate, fill, lock, or **read** six-chapter / gold chapter bodies (acceptance is §8, not gold-body reads)
 - Treat catalog → locked spec as a win path
 - Treat catalog → `allow_did` as a win path
 - Auto-succeed, auto-select, or prefill a fixture as the user’s study
@@ -281,20 +293,26 @@ Without a confirmed design, those consumers fail closed or stay on candidates-on
 
 ### 5.1 Intended sequence (frozen)
 
+DECIDE-6 order (verbatim):
+
 ```
-TITLE/TOPIC (session title; optional RQ text)
-    → infer-design propose   ⇒  session.design status=draft
-    → infer-design confirm   ⇒  session.design status=confirmed (locked)
-    → DATA-COMPLETE suggest  (match confirmed design; fixtures = candidates)
-    → attach panel (找 / 选 / 传)
-    → confirm-attach         ⇒  dataAttached
-    → data preview (optional ingest view)
-    → PREWRITE-PAUSE table1Confirmed
-    → PREWRITE-PAUSE specConfirmed   (DID-BE-spec: method=did ⇒ interaction required)
-    → estimate / write / export
+title/question → design propose (Y/X/interactions/method) → human confirm → data candidates → attach → prewrite pauses
 ```
 
-Propose → confirm happens **before** DATA-COMPLETE and PREWRITE-PAUSE treat the design as authoritative.
+Mapped onto named gates already in this product line:
+
+```
+title/question
+    → design propose (Y/X/interactions/method)  ⇒  session.design status=draft
+    → human confirm                             ⇒  session.design status=confirmed (locked)
+    → data candidates                           (DC-BE-suggest; fixtures = candidates, never answer key)
+    → attach                                    ⇒  dataAttached
+    → prewrite pauses                           table1Confirmed then specConfirmed
+                                                (DID-BE-spec: method=did ⇒ interaction required;
+                                                 het interaction hard-block still)
+```
+
+Propose → confirm happens **before** DATA-COMPLETE and PREWRITE-PAUSE treat the design as authoritative. No gold body reads on this path.
 
 ### 5.2 Rules
 
@@ -322,7 +340,9 @@ What must not happen before confirm-design:
 
 ### 6.1 What catalog is after DECIDE-6
 
-`classic-5` remains the named built-in catalog for formal-path find/select (`docs/data-completion-contract.md` §3). Landed ranking tokens include `ck1994_long` (Card–Krueger minwage) and `barro1991_growth` (Barro growth), plus the other `fixtures/classic-5/catalog.json` ids.
+DECIDE-6 lock (verbatim): **Fixtures/catalog = candidates only, never answer key.**
+
+`classic-5` remains the named built-in catalog for formal-path find/select (`docs/data-completion-contract.md` §3). Landed ranking tokens include `ck1994_long` (Card–Krueger minwage) and `barro1991_growth` (Barro growth), plus the other `fixtures/classic-5/catalog.json` ids. They are never an answer key, never a gold-body source, and never a DiD key.
 
 After infer-design confirm, DC-BE-suggest **may list** those entries as **candidates matching the confirmed design** (method + topic / outcome / treatment slots, plus title/RQ text). Example: a confirmed DiD minwage design may list `ck1994_long`; a confirmed OLS growth design may list `barro1991_growth`.
 
@@ -365,7 +385,7 @@ Unchanged from DECIDE-5 A (still frozen):
 DiD is allowed iff **all** of:
 
 1. `session.design.status === "confirmed"`
-2. Confirmed `method` normalizes to `did` (or an existing `norm_method` equivalent)
+2. Confirmed `design.method=did` (or an existing `norm_method` equivalent)
 3. The confirmed design includes the required **treated×period** interaction (§2.4)
 
 Otherwise DiD is not allowed. Fail closed.
@@ -408,20 +428,27 @@ IV / RD / SCM stay on their existing non-OLS paths. This file does not reopen th
 
 ---
 
-## 8. Acceptance tests (behavioral; later slices)
+## 8. Acceptance criteria (DECIDE-6; verbatim)
 
-G0 does not add tests. Later INF / DID / DC slices must be able to show:
+G0 does not add tests. Later INF / DID / DC slices **must** implement and show these acceptance criteria. Text below is **verbatim** from Decide (via Firstmate). Do **not** evaluate by reading gold chapter bodies.
 
-| # | Behavior | Pass | Fail (unacceptable substitute) |
-|---|---|---|---|
-| A | Title proposing OLS vs DiD drafts | Schooling / Barro-style title → `method=ols` draft, `status=draft`. Minwage / Card–Krueger-style title → `method=did` draft with a treated×period **slot**. Optional RQ text is honored when present. | Catalog id selected; `status=confirmed`; `dataAttached`; chapter body filled; `allow_did` set from `ck1994`. |
-| B | Confirm locks | Confirm sets `status=confirmed`, `confirmed=true`, `confirmed_at` set. Downstream may read `session.design` as locked. Re-propose returns to draft until re-confirm. | Confirm attaches data; confirm writes gold body; confirm sets `table1Confirmed` / `specConfirmed`; confirm auto-picks a fixture. |
-| C | Suggest without confirmed design | Request fails closed **or** returns **candidates-only** (`attached=false`, no ranked-as-authoritative match, no `dataAttached`). | Suggest auto-selects `ck1994_long` / `barro1991_growth`; sets `dataAttached`; treats a candidate as locked spec. |
-| D | Suggest after confirm | Lists classic-5 entries that match the **confirmed** design (e.g. DiD minwage → may include `ck1994_long`; OLS growth → may include `barro1991_growth`). All remain candidates. | Auto-select; prefill as success; catalog → `allow_did`; catalog → confirmed design. |
-| E | DiD without interaction hard-blocks | Confirmed `method=did` and missing treated×period → DID-BE-spec refuses spec confirm and estimate (same surfaces as §7.3). | Silent OLS; silent TWFE; `specConfirmed=true`; estimate runs. |
-| F | Catalog id alone never unlocks DiD | Session with `ck1994` / `ck1994_long` / `minimum-wage-employment` and no confirmed `method=did` + interaction → DiD denied. `barro1991_growth` never unlocks DiD. | `catalog_identity_allows` / `allow_did_for(entry_id=…)` as the win path. |
+1. CK-class title only → engine proposes DiD with treated×period BEFORE any ck attach
+2. Rename/remove fixture → still can propose; catalog id alone cannot open DiD
+3. Level OLS title → proposes OLS; must not open DiD from catalog
+4. Unconfirmed design cannot jump to gold/classic prefilled spec
+5. After confirm → suggest matches design → attach → direction/pause continues
 
-Evaluator for later slices: session snapshot + gate refusals, not “catalog fixture reproduced.” Real outcome = user title → draft → confirm → (optional) candidate list → attach → Table 1 / spec / estimate under these rules.
+### 8.1 How later slices bind those bullets (not substitutes)
+
+| # | Gate reading | Fail (unacceptable substitute) |
+|---|---|---|
+| 1 | Title/question only. Propose writes `design.method=did` plus a treated×period slot **before** any `ck1994` / `ck1994_long` attach, suggest-select, or `dataAttached`. | Wait for ck attach; catalog → `allow_did`; gold-body read; auto-confirm. |
+| 2 | After the fixture is renamed or removed, title/question still proposes. Catalog id (`ck1994`, `ck1994_long`, `minimum-wage-employment`, …) alone cannot open DiD. | `catalog_identity_allows` / `allow_did_for(entry_id=…)` as the win path; propose requires the fixture file. |
+| 3 | Level OLS title (schooling–wages, Barro growth, …) proposes `method=ols`. Catalog must not open DiD. | Catalog token flips DiD; OLS title emits `method=did`. |
+| 4 | Missing or `status=draft` design cannot jump to gold / classic prefilled spec, gold chapter bodies, or locked `main_specification`. | Unconfirmed → gold-body read; classic prefill as success; `set_direction` from catalog. |
+| 5 | After human confirm: suggest matches the **confirmed** design (candidates only, never answer key) → attach (`dataAttached`) → direction / prewrite pauses continue. | Suggest without confirm as authoritative match; skip attach; skip pauses; gold-body read. |
+
+OLS remains the default when DiD is not allowed. Heterogeneity × no-interaction stays a hard block. Missing treated×period when `design.method=did` stays a DID-BE-spec hard block (§7.3).
 
 ---
 
@@ -466,7 +493,7 @@ Reuse, do not fork: `norm_method` / `DirectionSpec` field names, `dataAttached`,
 ## 11. G0 done rule
 
 - File present: `docs/infer-design-contract.md`
-- Folded: title-first propose → user confirm → locked `session.design`; catalog / fixtures are candidates only; DC suggest matches **confirmed** design; DiD permission = confirmed `method=did` (or equivalent) **and** treated×period; catalog-token `allow_did` deprecated; missing DiD interaction remains DID-BE-spec hard block
+- Folded: DECIDE-6 order / locks / five accept bullets (verbatim, §0 + §8); title-first propose (Y/X/interactions/method) → human confirm → data candidates → attach → prewrite pauses; fixtures/catalog = candidates only, never answer key; DiD only from confirmed `design.method=did` + treated×period; NO catalog-id `allow_did`; OLS default elsewhere; het interaction hard-block still; **no gold body reads**
 - No application code, API routes, frontend, fixtures, OpenAPI, or OLS-lock change in G0
 - No merge of old DATA-COMPLETE / DID-NARROW implementation branches
 - No pull request from this slice

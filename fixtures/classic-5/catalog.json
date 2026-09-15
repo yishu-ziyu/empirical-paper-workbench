@@ -1,0 +1,121 @@
+{
+  "catalog_id": "classic-5",
+  "entries": [
+    {
+      "id": "schooling-wages",
+      "title": "Education and wages",
+      "topic": "Returns to schooling and earnings",
+      "method": "ols",
+      "outcome": "wages",
+      "treatment": "schooling",
+      "tags": [
+        "education",
+        "schooling",
+        "wages",
+        "earnings",
+        "mincer",
+        "教育",
+        "工资",
+        "教育回报",
+        "学历"
+      ]
+    },
+    {
+      "id": "ck1994_long",
+      "title": "Card and Krueger minimum wage",
+      "topic": "Min wage and employment in the New Jersey–Pennsylvania fast-food study",
+      "method": "did",
+      "outcome": "employment",
+      "treatment": "min_wage",
+      "tags": [
+        "min wage",
+        "minimum wage",
+        "minimum",
+        "wage",
+        "card",
+        "krueger",
+        "card krueger",
+        "employment",
+        "labor",
+        "最低工资",
+        "就业",
+        "劳动"
+      ]
+    },
+    {
+      "id": "trade-local-labor",
+      "title": "Trade and local labor markets",
+      "topic": "Import competition and manufacturing employment",
+      "method": "ols",
+      "outcome": "employment",
+      "treatment": "import",
+      "tags": [
+        "trade",
+        "import",
+        "manufacturing",
+        "employment",
+        "贸易",
+        "进口",
+        "制造业",
+        "冲击"
+      ]
+    },
+    {
+      "id": "fiscal-output",
+      "title": "Government spending and output",
+      "topic": "Fiscal policy and local economic activity",
+      "method": "ols",
+      "outcome": "output",
+      "treatment": "spending",
+      "tags": [
+        "fiscal",
+        "government",
+        "spending",
+        "multiplier",
+        "output",
+        "财政",
+        "政府支出",
+        "乘数"
+      ]
+    },
+    {
+      "id": "health-labor-supply",
+      "title": "Health and labor supply",
+      "topic": "Health status and hours of work",
+      "method": "ols",
+      "outcome": "hours",
+      "treatment": "health",
+      "tags": [
+        "health",
+        "labor",
+        "supply",
+        "hours",
+        "健康",
+        "劳动供给",
+        "工时"
+      ]
+    },
+    {
+      "id": "barro1991_growth",
+      "title": "Barro cross-country growth",
+      "topic": "Growth, schooling, and investment in a Barro–Lee country panel",
+      "method": "ols",
+      "outcome": "growth",
+      "treatment": "sec_enroll",
+      "tags": [
+        "growth",
+        "barro",
+        "barro lee",
+        "economic growth",
+        "gdp",
+        "convergence",
+        "enrollment",
+        "investment",
+        "cross country",
+        "增长",
+        "经济增长",
+        "巴罗"
+      ]
+    }
+  ]
+}

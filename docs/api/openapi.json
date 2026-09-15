@@ -757,6 +757,50 @@
         }
       }
     },
+    "/classic-5/suggest": {
+      "post": {
+        "summary": "Rank classic-5 candidates from a confirmed design",
+        "description": "Rank built-in classic-5 catalog entries for a confirmed design.\n\nReturns ranked candidates plus a non-catalog own-file action.\nWithout a confirmed design, candidates are empty (not a catalog success).\nDoes not attach, admit an upload, write ``dataAttached``, or lock spec.",
+        "operationId": "suggest_classic5_classic_5_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Classic5SuggestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Classic5SuggestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/demos/card": {
       "post": {
         "summary": "Boot Card Demo",
@@ -3684,6 +3728,168 @@
         ],
         "title": "ClaimLedgerResponse",
         "description": "Deterministic Claim Ledger entry (not the paper-draft main-estimate claim)."
+      },
+      "Classic5CandidateResponse": {
+        "properties": {
+          "catalog_id": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Catalog Id",
+            "default": "classic-5"
+          },
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id"
+          },
+          "source": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Source",
+            "default": "classic-5"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "attached": {
+            "type": "boolean",
+            "const": false,
+            "title": "Attached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "title",
+          "score"
+        ],
+        "title": "Classic5CandidateResponse",
+        "description": "One classic-5 catalog candidate. Suggest never attaches or prefills spec."
+      },
+      "Classic5OwnFileActionResponse": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "upload_own_file",
+            "title": "Action",
+            "default": "upload_own_file"
+          },
+          "catalog": {
+            "type": "boolean",
+            "title": "Catalog",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Classic5OwnFileActionResponse",
+        "description": "Non-catalog action returned with every suggest response."
+      },
+      "Classic5SuggestRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "Classic5SuggestRequest",
+        "description": "POST /classic-5/suggest 请求体：session + optional TITLE/TOPIC 文本。"
+      },
+      "Classic5SuggestResponse": {
+        "properties": {
+          "catalog_id": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Catalog Id",
+            "default": "classic-5"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "design_confirmed": {
+            "type": "boolean",
+            "title": "Design Confirmed",
+            "default": false
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Classic5CandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "own_file": {
+            "$ref": "#/components/schemas/Classic5OwnFileActionResponse"
+          },
+          "attached": {
+            "type": "boolean",
+            "const": false,
+            "title": "Attached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "own_file"
+        ],
+        "title": "Classic5SuggestResponse",
+        "description": "POST /classic-5/suggest 返回体.\n\nAfter a confirmed ``session.design``, ranked classic-5 candidates plus a\nnon-catalog own-file action. Without confirm, candidates stay empty.\n``attached`` is always false: this path must not hang data or lock spec."
       },
       "CreateSessionResponse": {
         "properties": {

@@ -14,6 +14,7 @@
 | FM-E-BUILD-ATTACH-FIXTURE-MERGE-1 | `runtime/tasks/20260915-fm-e-build-attach-fixture-merge-1.md` | complete | `fix/fm-e-build-attach-fixture-merge-1` @ `a8a8665` | 2026-09-15 | merge tip pushed; no PR; Run re-smoke on full SHA |
 | FM-E-BUILD-REAL-FETCH-1 / FD-BE-honesty | `runtime/tasks/20260915-fd-be-honesty.md` | complete | `feat/fm-e-build-fd-be-honesty-1` from `8303340b` | 2026-09-15 | honesty landed; `make test` green; no PR |
 | FM-E-BUILD-REAL-FETCH-1 / FD-FE-honesty | `runtime/tasks/20260915-fd-fe-honesty.md` | complete | `feat/fm-e-build-fd-fe-honesty-1` | 2026-09-15 | pushed; frontend 445 passed; no PR |
+| FM-E-BUILD-REAL-FETCH-1 / FD-BE-fetch-card | `runtime/tasks/20260915-fd-be-fetch-card.md` | complete | `feat/fm-e-build-fd-be-fetch-card-1` from `8303340` | 2026-09-15 | `make test` green; no PR |
 | FM-E-BUILD-DID-BE-SPEC re-cut | `runtime/tasks/20260915-fm-e-build-did-spec-recut.md` | complete | `feat/fm-e-build-did-spec-recut-1` from `9f154dda` | 2026-09-15 | confirmed did missing treat×period hard-blocks; no PR |
 | FM-E-BUILD-FIND-MERGE-1 | `runtime/tasks/20260915-fm-e-build-find-merge-1.md` | complete | `feat/fm-e-build-find-merge-1` @ `552cf397` | 2026-09-15 | stacked on INFER; `make test` green; no PR |
 | FM-E-BUILD-INFER-MERGE-1 | `runtime/tasks/20260915-fm-e-build-infer-merge-1.md` | complete | `feat/fm-e-build-infer-merge-1` @ `759ce5d6` | 2026-09-15 | pushed; `make test` green; no PR |

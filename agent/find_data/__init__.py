@@ -6,6 +6,13 @@ from .candidates import (
     suggest_data_candidates,
     suggest_find_data,
 )
+from .card_zip import (
+    CARD_ZIP_LANDING_URL,
+    CARD_ZIP_POSTED_URL,
+    CardZipNotApplicable,
+    fetch_card_zip,
+    merge_card_zip_candidate,
+)
 from .honesty import (
     captain_local_real_candidate,
     demo_claim_allowed,
@@ -22,16 +29,21 @@ from .plan import (
 )
 
 __all__ = [
+    "CARD_ZIP_LANDING_URL",
+    "CARD_ZIP_POSTED_URL",
+    "CardZipNotApplicable",
     "DesignUnconfirmed",
     "apply_find_data_suggest",
     "build_find_data_plan",
     "captain_local_real_candidate",
     "classify_route_family",
     "demo_claim_allowed",
+    "fetch_card_zip",
     "is_banned_toy",
     "is_confirmed_design",
     "is_find_success_candidate",
     "is_real_candidate",
+    "merge_card_zip_candidate",
     "read_find_data",
     "search_dataverse",
     "suggest_data_candidates",

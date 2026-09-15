@@ -115,12 +115,13 @@ def test_title_only_does_not_rank_classic_as_success():
     assert "ck1994_long" not in ids
 
 
-def test_stub_confirmed_flag_without_status_is_confirmed():
+def test_confirmed_flag_without_status_fails_closed():
     design = {"confirmed": True, "method": "did", "outcome": "employment", "treatment": "min_wage"}
-    assert design_is_confirmed(design) is True
+    assert design_is_confirmed(design) is False
     payload = suggest_candidates(design=design)
-    assert payload["design_confirmed"] is True
-    assert payload["candidates"][0]["entry_id"] == "ck1994_long"
+    _assert_candidates_only(payload)
+    assert payload["design_confirmed"] is False
+    assert payload["candidates"] == []
 
 
 def test_confirmed_did_minwage_lists_ck1994_as_candidate():

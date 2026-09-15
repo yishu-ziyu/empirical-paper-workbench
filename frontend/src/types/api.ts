@@ -899,6 +899,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/design/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Design Endpoint
+         * @description Lock the current session.design draft. Fail closed if none exists.
+         */
+        post: operations["confirm_design_endpoint_sessions__session_id__design_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/desk/discuss": {
         parameters: {
             query?: never;
@@ -3182,8 +3202,17 @@ export interface components {
             degraded: false;
         };
         /**
+         * SessionDesignConfirmResponse
+         * @description POST /sessions/{id}/design/confirm 返回体。
+         */
+        SessionDesignConfirmResponse: {
+            /** Ok */
+            ok: boolean;
+            design: components["schemas"]["SessionDesignResponse"];
+        };
+        /**
          * SessionDesignResponse
-         * @description POST /sessions/{id}/design/propose 返回的 session.design 草稿。
+         * @description Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed.
          */
         SessionDesignResponse: {
             /**
@@ -3257,6 +3286,8 @@ export interface components {
             heterogeneity_groups?: string[];
             /** Catalog Entry Id */
             catalog_entry_id?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * SessionInfoResponse
@@ -3310,6 +3341,7 @@ export interface components {
                 [key: string]: unknown;
             }[];
             research?: components["schemas"]["ResearchLabResponse"] | null;
+            design?: components["schemas"]["SessionDesignResponse"] | null;
             /**
              * Allow Did
              * @description DiD permission (DID-BE-gate). True only from confirmed session.design.method=did plus treated×period on that design. Catalog id / TITLE/TOPIC / form method=did are not setters. Missing is false.
@@ -5180,6 +5212,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionDesignResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_design_endpoint_sessions__session_id__design_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDesignConfirmResponse"];
                 };
             };
             /** @description Validation Error */

@@ -2205,6 +2205,51 @@
         }
       }
     },
+    "/sessions/{session_id}/design/confirm": {
+      "post": {
+        "summary": "Confirm Design Endpoint",
+        "description": "Lock the current session.design draft. Fail closed if none exists.",
+        "operationId": "confirm_design_endpoint_sessions__session_id__design_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDesignConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/desk/discuss": {
       "post": {
         "summary": "Discuss Desk",
@@ -7245,6 +7290,24 @@
         ],
         "title": "SessionBusyResponse"
       },
+      "SessionDesignConfirmResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "design": {
+            "$ref": "#/components/schemas/SessionDesignResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "design"
+        ],
+        "title": "SessionDesignConfirmResponse",
+        "description": "POST /sessions/{id}/design/confirm 返回体。"
+      },
       "SessionDesignResponse": {
         "properties": {
           "status": {
@@ -7371,6 +7434,7 @@
             "title": "Catalog Entry Id"
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "required": [
           "status",
@@ -7380,7 +7444,7 @@
           "method"
         ],
         "title": "SessionDesignResponse",
-        "description": "POST /sessions/{id}/design/propose 返回的 session.design 草稿。"
+        "description": "Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."
       },
       "SessionInfoResponse": {
         "properties": {
@@ -7547,6 +7611,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ResearchLabResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "design": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionDesignResponse"
               },
               {
                 "type": "null"

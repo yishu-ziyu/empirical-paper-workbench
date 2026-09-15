@@ -17,6 +17,7 @@ from typing import Iterable
 
 from agent.design.spec import norm_method
 from config import PRODUCT_ROOT
+from services.session_design import is_confirmed_object
 
 CATALOG_ID = "classic-5"
 OWN_FILE_ACTION = "upload_own_file"
@@ -109,15 +110,8 @@ def read_catalog(path: Path | None = None) -> list[Classic5Entry]:
 
 
 def design_is_confirmed(design: object) -> bool:
-    """Stub-read ``session.design`` confirm. Missing / draft fails closed."""
-    if not isinstance(design, dict):
-        return False
-    status = str(design.get("status") or "").strip().lower()
-    if status == "confirmed":
-        return True
-    if status == "draft":
-        return False
-    return design.get("confirmed") is True
+    """True iff session.design is locked. Missing / draft / mismatch fails closed."""
+    return is_confirmed_object(design)
 
 
 def rank_entries_for_design(

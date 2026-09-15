@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 from typing import List, Optional
 
+from .polite_pool import user_agent
 from ...protocols import LiteratureEntry
 
 
@@ -63,7 +64,10 @@ def semantic_scholar_search(
     )
     url = f"{SEMANTIC_SCHOLAR_BASE}?{params}"
 
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": user_agent(),
+    }
     if api_key:
         headers["x-api-key"] = api_key
 
@@ -88,6 +92,8 @@ def semantic_scholar_search(
         ]
         external_ids = paper.get("externalIds") or {}
         doi = external_ids.get("DOI")
+        paper_id = str(paper.get("paperId") or "").strip()
+        url_out = f"https://www.semanticscholar.org/paper/{paper_id}" if paper_id else None
 
         entries.append(
             LiteratureEntry(
@@ -96,6 +102,7 @@ def semantic_scholar_search(
                 year=paper.get("year") or 0,
                 abstract=paper.get("abstract", "") or "",
                 doi=doi,
+                url=url_out,
                 source="semantic_scholar",
                 relevance_score=score,
             )
@@ -150,7 +157,10 @@ def semantic_scholar_references(
     )
     full_url = f"{url}?{params}"
 
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": user_agent(),
+    }
     if api_key:
         headers["x-api-key"] = api_key
 

@@ -13,16 +13,19 @@ import urllib.parse
 import urllib.request
 from typing import Any, List
 
+from .polite_pool import user_agent
 from ...protocols import LiteratureEntry
 
 CROSSREF = "https://api.crossref.org/works"
-UA = "econpaper/1.0 (literature-search; mailto:dev@local)"
 HTTP_TIMEOUT_SECONDS = 10
 MAX_RESULTS = 20
 
 
 def _http_get_json(url: str, timeout: float = HTTP_TIMEOUT_SECONDS) -> dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": user_agent(), "Accept": "application/json"},
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -101,6 +104,7 @@ def crossref_search(
         # Strip trivial JATS tags if Crossref returned markup.
         abstract = abstract.replace("<jats:p>", "").replace("</jats:p>", "").strip()
         score = max(0.3, 1.0 - i / n * 0.7)
+        url_out = str(msg.get("URL") or "").strip() or f"https://doi.org/{doi}"
         entries.append(
             {
                 "title": title,
@@ -108,6 +112,7 @@ def crossref_search(
                 "year": _year_from_message(msg),
                 "abstract": abstract,
                 "doi": doi,
+                "url": url_out,
                 "source": "crossref",
                 "relevance_score": score,
             }

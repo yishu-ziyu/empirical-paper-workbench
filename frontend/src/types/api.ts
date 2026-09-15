@@ -377,6 +377,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach Dataset
+         * @description Bind a user file or classic-5 entry. Does not set dataAttached.
+         */
+        post: operations["attach_dataset_sessions__session_id__attach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/confirm-attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Attach Dataset
+         * @description Confirm-attach is the only transition that sets dataAttached.
+         */
+        post: operations["confirm_attach_dataset_sessions__session_id__confirm_attach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demos/card": {
         parameters: {
             query?: never;
@@ -1356,6 +1396,34 @@ export interface components {
              * @default []
              */
             files: components["schemas"]["ArtifactFile"][];
+        };
+        /**
+         * AttachResponse
+         * @description POST /sessions/{id}/attach — bind only; never sets dataAttached.
+         */
+        AttachResponse: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Dataattached
+             * @description Always false. Confirm-attach is the only transition that sets this gate.
+             * @default false
+             */
+            dataAttached: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user_file" | "classic-5";
+            /** Entry Id */
+            entry_id?: string | null;
+            /** Upload Readiness */
+            upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Events Url */
+            events_url?: string | null;
+            dataset_meta?: components["schemas"]["DatasetMetaResponse"] | null;
         };
         /**
          * BalanceRequest
@@ -2987,6 +3055,12 @@ export interface components {
              * @default false
              */
             has_dataset: boolean;
+            /**
+             * Dataattached
+             * @description Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.
+             * @default false
+             */
+            dataAttached: boolean;
             /** Upload Readiness */
             upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
             /** Claim */
@@ -3985,6 +4059,91 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_dataset_sessions__session_id__attach_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachResponse"];
+                };
+            };
+            /** @description Session busy, ingest not ready, or no candidate */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The durable run queue is full */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_attach_dataset_sessions__session_id__confirm_attach_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfoResponse"];
+                };
+            };
+            /** @description Ingest not ready, no candidate, or session busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

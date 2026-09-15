@@ -185,6 +185,7 @@ from routers.review import router as review_router  # noqa: E402
 from routers.runs import router as runs_router  # noqa: E402
 from routers.run_execution import router as run_execution_router  # noqa: E402
 from routers.sample import router as sample_router  # noqa: E402
+from routers.attach import router as attach_router  # noqa: E402
 from routers.sessions import router as sessions_router  # noqa: E402
 from routers.ws import router as ws_router  # noqa: E402
 
@@ -194,6 +195,7 @@ app.include_router(analysis_router)
 app.include_router(eda_router)
 app.include_router(evidence_router)
 app.include_router(sessions_router)
+app.include_router(attach_router)
 app.include_router(research_router)
 app.include_router(ws_router)
 app.include_router(labels_router)

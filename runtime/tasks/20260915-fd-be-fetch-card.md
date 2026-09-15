@@ -2,7 +2,7 @@
 
 - Task ID: FM-E-BUILD-REAL-FETCH-1 / FD-BE-fetch-card
 - Status: complete
-- Git context（分支可选）: `feat/fm-e-build-fd-be-fetch-card-1` from `feat/fm-e-build-real-fetch-1` @ `8303340`
+- Git context（分支可选）: `feat/fm-e-build-fd-be-fetch-card-1` from `feat/fm-e-build-real-fetch-1` @ `8303340`; feat `a14afac726a35c7c5f3aa743d69b1ab9b6e8d2c2`
 - Goal: Real Card/minwage zip download (or honest link+upload) into session — not fixture-as-found
 - Hard bar: After confirmed minwage, download author-posted njmin.zip into session workspace when retrievable; else landing URL + honest upload. Must not use `/demos/card`, copy classic-5 CSV, set `dataAttached`, or call it a find of `ck1994`.
 - Session / run ID:

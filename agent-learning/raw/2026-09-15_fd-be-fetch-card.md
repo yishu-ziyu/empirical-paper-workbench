@@ -2,7 +2,7 @@
 
 - Date: 2026-09-15
 - Task ID / state file: FM-E-BUILD-REAL-FETCH-1 / FD-BE-fetch-card · `runtime/tasks/20260915-fd-be-fetch-card.md`
-- Commit / Git context: `feat/fm-e-build-fd-be-fetch-card-1` from `8303340`
+- Commit / Git context: `feat/fm-e-build-fd-be-fetch-card-1` from `8303340`; feat `a14afac726a35c7c5f3aa743d69b1ab9b6e8d2c2`
 - Model and tool environment: Cursor cloud agent
 - Dataset class / research method（不含原始数据）: Card–Krueger NJ–PA author zip (minwage)
 - Task: Real Card/minwage zip download into session, or honest link+upload — not fixture-as-found

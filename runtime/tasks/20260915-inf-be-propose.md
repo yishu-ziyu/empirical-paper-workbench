@@ -1,0 +1,23 @@
+# econpaper Codex Task State
+
+- Task ID: FM-E-BUILD-INFER-DESIGN-1 / INF-BE-propose
+- Status: complete
+- Git context: `feat/fm-e-build-inf-be-propose-1` @ `874ecb302b31196a0def342572ea9773007c5110` (from `2a663915`)
+- Goal: Title (+ optional RQ) → `session.design` draft (Y/X/interactions/method). No confirm, attach, gold body, catalog→spec.
+- Hard bar: DECIDE-6 accept bullets 1–3 on propose side; write-set is propose backend + tests only; no PR.
+- Session / run ID:
+- Current research stage: propose implemented
+- Current review / approval gate: none (no PR per slice)
+- Verified facts:
+  - `POST /sessions/{id}/design/propose` writes `state.design` draft only.
+  - CK title → `method=did` + `treated:period`; no `dataAttached` / `allow_did` / `research_direction`.
+  - Catalog id alone → OLS; level OLS titles → OLS.
+  - Agent propose tests: 9 passed. Backend propose tests: 10 passed.
+- Current hypothesis:
+- Changed files: `agent/design/propose.py`, `backend/routers/design.py`, propose tests, OpenAPI regen, `agent/state.py` `design` field
+- Failed paths:
+- Data / output evidence locations:
+- Test evidence: `agent/tests/test_propose_design.py` (9); `backend/tests/test_design_propose.py` (10)
+- Pending external state: none; branch pushed; no PR
+- Next action: later INF-BE-confirm owns lock; this slice stops at draft
+- Updated at: 2026-09-15

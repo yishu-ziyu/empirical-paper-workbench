@@ -2106,6 +2106,61 @@
         }
       }
     },
+    "/sessions/{session_id}/design/propose": {
+      "post": {
+        "summary": "Propose Design Endpoint",
+        "description": "Propose a research-design draft from the session title (+ optional RQ).",
+        "operationId": "propose_design_endpoint_sessions__session_id__design_propose_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeDesignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDesignResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/desk/discuss": {
       "post": {
         "summary": "Discuss Desk",
@@ -3884,6 +3939,56 @@
           "at"
         ],
         "title": "DecisionEventResponse"
+      },
+      "DesignInteractionResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "did",
+              "het"
+            ],
+            "title": "Kind"
+          },
+          "left": {
+            "type": "string",
+            "title": "Left"
+          },
+          "right": {
+            "type": "string",
+            "title": "Right"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "left",
+          "right",
+          "term"
+        ],
+        "title": "DesignInteractionResponse"
+      },
+      "DesignSourceResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "DesignSourceResponse"
       },
       "DeskChatTurn": {
         "properties": {
@@ -6111,6 +6216,25 @@
         ],
         "title": "PromoteRequest"
       },
+      "ProposeDesignRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ProposeDesignRequest",
+        "description": "POST /sessions/{id}/design/propose 请求体。"
+      },
       "QueueFullResponse": {
         "properties": {
           "error": {
@@ -6914,6 +7038,143 @@
           "detail"
         ],
         "title": "SessionBusyResponse"
+      },
+      "SessionDesignResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "confirmed"
+            ],
+            "title": "Status"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "proposed_at": {
+            "type": "string",
+            "title": "Proposed At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DesignSourceResponse"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "ols",
+              "did",
+              "iv",
+              "rd",
+              "scm"
+            ],
+            "title": "Method"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Controls"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group",
+            "default": ""
+          },
+          "treated": {
+            "type": "string",
+            "title": "Treated",
+            "default": ""
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": ""
+          },
+          "time_col": {
+            "type": "string",
+            "title": "Time Col",
+            "default": ""
+          },
+          "id_col": {
+            "type": "string",
+            "title": "Id Col",
+            "default": ""
+          },
+          "first_treat_col": {
+            "type": "string",
+            "title": "First Treat Col",
+            "default": ""
+          },
+          "interactions": {
+            "items": {
+              "$ref": "#/components/schemas/DesignInteractionResponse"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "qType": {
+            "type": "string",
+            "enum": [
+              "average",
+              "heterogeneity",
+              "causal"
+            ],
+            "title": "Qtype",
+            "default": "average"
+          },
+          "heterogeneity_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Heterogeneity Groups"
+          },
+          "catalog_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Entry Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "confirmed",
+          "proposed_at",
+          "source",
+          "method"
+        ],
+        "title": "SessionDesignResponse",
+        "description": "POST /sessions/{id}/design/propose 返回的 session.design 草稿。"
       },
       "SessionInfoResponse": {
         "properties": {

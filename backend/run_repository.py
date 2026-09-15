@@ -298,6 +298,115 @@ class RunRepository:
                     )
             raise
 
+    async def admit_session_upload(
+        self,
+        *,
+        session_id: str,
+        user_id: int | None,
+        csv_path: str,
+        dataset_meta: dict[str, Any],
+        extra_state: dict[str, Any],
+        idempotency_key: str,
+        input_fingerprint: str,
+    ) -> UploadAdmission:
+        """Admit upload_pipeline onto an existing session (classic-5 / re-bind).
+
+        Does not create a session. Clears ``dataAttached`` so confirm-attach
+        is the only transition that can set the product gate. Same readiness
+        and idempotency contract as ``admit_upload``.
+        """
+        if not idempotency_key:
+            raise ValueError("idempotency key is required")
+        if not input_fingerprint:
+            raise ValueError("input fingerprint is required")
+        try:
+            async with self._factory() as db:
+                async with _write_transaction(db):
+                    locked_session_id = await db.scalar(
+                        select(ResearchSession.session_id)
+                        .where(ResearchSession.session_id == session_id)
+                        .with_for_update()
+                    )
+                    if locked_session_id is None:
+                        raise SessionNotFound(
+                            f"session {session_id} no longer exists"
+                        )
+                    await self._lock_admission(db)
+                    existing = await self._upload_by_key(db, idempotency_key)
+                    if existing is not None:
+                        if existing.session_id != session_id:
+                            raise IdempotencyConflict()
+                        return await self._validate_upload_replay(
+                            db,
+                            existing,
+                            user_id=user_id,
+                            input_fingerprint=input_fingerprint,
+                        )
+
+                    active = await self._active_run(db, session_id)
+                    if active is not None:
+                        raise SessionBusy(active.run_id)
+
+                    pending = await db.scalar(
+                        select(func.count())
+                        .select_from(Run)
+                        .where(Run.status == "PENDING")
+                    )
+                    if int(pending or 0) >= self.queue_capacity:
+                        raise QueueFull("run queue is full")
+
+                    session = await db.get(ResearchSession, session_id)
+                    if session is None:
+                        raise SessionNotFound(
+                            f"session {session_id} no longer exists"
+                        )
+                    current = dict(session.state or {})
+                    state = {**current, **_json_safe(extra_state)}
+                    state["upload_readiness"] = "PROCESSING"
+                    state["data_attached"] = False
+                    state["dataAttached"] = False
+                    state["csv_path"] = csv_path
+                    state["uploaded_datasets"] = [
+                        {"path": csv_path, "format": "csv"}
+                    ]
+                    session.state = state
+                    session.csv_path = csv_path
+                    session.metadata_json = _json_safe(dataset_meta)
+                    run = Run(
+                        run_id=str(uuid.uuid4()),
+                        session_id=session_id,
+                        kind="upload_pipeline",
+                        status="PENDING",
+                        payload={
+                            "initial_state": {**state, "csv_path": csv_path},
+                            "dataset_meta": _json_safe(dataset_meta),
+                            "input_fingerprint": input_fingerprint,
+                        },
+                        idempotency_key=idempotency_key,
+                    )
+                    db.add(run)
+                    await db.flush()
+                    await self._append_locked(
+                        db,
+                        run,
+                        "run.accepted",
+                        {"status": "PENDING", "kind": "upload_pipeline"},
+                    )
+                return UploadAdmission(session=session, run=run, replayed=False)
+        except IntegrityError:
+            async with self._factory() as db:
+                existing = await self._upload_by_key(db, idempotency_key)
+                if existing is not None:
+                    if existing.session_id != session_id:
+                        raise IdempotencyConflict()
+                    return await self._validate_upload_replay(
+                        db,
+                        existing,
+                        user_id=user_id,
+                        input_fingerprint=input_fingerprint,
+                    )
+            raise
+
     @staticmethod
     async def _lock_admission(db: AsyncSession) -> None:
         if db.bind is not None and db.bind.dialect.name == "postgresql":

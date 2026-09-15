@@ -25,7 +25,13 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 
-from .ols_lock import OLS_PROMPT_LOCK, method_triggers_ols_lock, pooled_ols_formula
+from .ols_lock import (
+    OLS_ESTIMATOR_LABEL,
+    OLS_PROMPT_LOCK,
+    method_triggers_ols_lock,
+    pooled_ols_formula,
+)
+from ..design.spec import apply_heterogeneity_to_formula
 from .sandbox import SandboxResult, SandboxSession, SubprocessSession, open_session
 from ..llm.router import MINIMAX_BASE_URL, router
 from ..state import EconPaperState
@@ -413,8 +419,10 @@ def _method_of(state: EconPaperState, spec: dict) -> str:
 def _spec_formula(method: str, spec: dict) -> str:
     if method_triggers_ols_lock(method or spec.get("method")):
         raw = spec.get("formula") or spec.get("feols_formula") or ""
-        return pooled_ols_formula(str(raw))
-    return str(spec.get("feols_formula") or spec.get("formula") or "")
+        formula = pooled_ols_formula(str(raw))
+    else:
+        formula = str(spec.get("feols_formula") or spec.get("formula") or "")
+    return apply_heterogeneity_to_formula(formula, spec)
 
 
 def _user_prompt(method: str, spec: dict, csv_name: str) -> str:
@@ -479,8 +487,12 @@ def estimate_output_from_agent(
     treatment_row 留空、不写 coef/se/p —— 与"不编造假系数"红线一致。
     ``history_compact`` 为纯增量溯源键（六段结构化轮次摘要，供步骤卡展示）。
     """
-    estimator = "estimate_agent"
     method_label = method or str(spec.get("method") or "ols")
+    estimator = (
+        OLS_ESTIMATOR_LABEL
+        if method_triggers_ols_lock(method_label)
+        else "estimate_agent"
+    )
     if out.verdict == "pass":
         treatment = str(
             spec.get("endogenous")

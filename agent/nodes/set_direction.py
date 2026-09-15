@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..design.spec import DirectionSpec
+from ..design.spec import DirectionSpec, infer_heterogeneity_groups
 from ..protocols import SetDirectionOutput
 from ..state import EconPaperState
 
@@ -16,6 +16,14 @@ _CHARLS_ID_KEYS = {"pid", "id"}
 _CHARLS_TIME_KEYS = {"wave", "year"}
 _CSV_TIME_NAMES = ("year", "wave")
 _CSV_ID_NAMES = ("id", "pid", "state")
+
+
+def _as_controls(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
 def _filled(value: Any) -> bool:
@@ -55,16 +63,42 @@ def _charls_id_time(cfg: Any) -> tuple[str, str]:
     return id_col, time_col
 
 
-def _guess_columns_from_csv(csv_path: str) -> tuple[str, str]:
+def _csv_column_names(csv_path: str) -> list[str]:
     try:
         import pandas as pd
 
-        columns = {str(c) for c in pd.read_csv(csv_path, nrows=0).columns}
+        return [str(c) for c in pd.read_csv(csv_path, nrows=0).columns]
     except Exception:
+        return []
+
+
+def _guess_columns_from_csv(csv_path: str) -> tuple[str, str]:
+    columns = set(_csv_column_names(csv_path))
+    if not columns:
         return "", ""
     time_col = next((name for name in _CSV_TIME_NAMES if name in columns), "")
     id_col = next((name for name in _CSV_ID_NAMES if name in columns), "")
     return id_col, time_col
+
+
+def _dataset_columns(state: EconPaperState) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for key in ("cleaned_datasets", "uploaded_datasets"):
+        for item in state.get(key) or []:
+            if not isinstance(item, dict):
+                continue
+            for col in item.get("columns") or []:
+                name = str(col).strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    names.append(name)
+    if names:
+        return names
+    csv_path = state.get("csv_path")
+    if csv_path:
+        return _csv_column_names(str(csv_path))
+    return []
 
 
 def project_method_columns(
@@ -139,6 +173,23 @@ def set_direction(state: EconPaperState) -> SetDirectionOutput:
 
     rd_dict = dict(rd) if isinstance(rd, dict) else {"question": rd}
     projected, degradations = project_method_columns(state, rd_dict)
+    columns = _dataset_columns(state)
+    if columns and not projected.get("columns") and not projected.get("available_columns"):
+        projected["columns"] = columns
+    if not _filled(projected.get("heterogeneity_groups")):
+        inferred = infer_heterogeneity_groups(
+            str(projected.get("question") or projected.get("topic") or ""),
+            treatment=str(
+                projected.get("iv")
+                or projected.get("treatment")
+                or projected.get("treatment_col")
+                or ""
+            ),
+            controls=_as_controls(projected.get("controls")),
+            columns=columns,
+        )
+        if inferred:
+            projected["heterogeneity_groups"] = inferred
     spec = DirectionSpec.from_direction(projected) or spec
     enriched = spec.enrich_direction(projected)
     out: SetDirectionOutput = {"research_direction": enriched}

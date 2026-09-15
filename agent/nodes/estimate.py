@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..design.spec import norm_method
+from ..design.spec import apply_heterogeneity_to_formula, norm_method
 from ..engine.ols_lock import (
     OLS_ESTIMATOR_LABEL,
     ols_lock_active,
@@ -196,6 +196,7 @@ OMITTED_CELL = "未估计"
 
 _RHS_SKIP = {"", "1", "0"}
 _SIMPLE_VAR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_INTERACTION_VAR = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*:[A-Za-z_][A-Za-z0-9_]*$")
 _COEF_HEADER_MARKERS = (
     "系数",
     "coef",
@@ -222,7 +223,7 @@ def _as_name_list(raw: Any) -> List[str]:
 
 
 def _rhs_simple_names(formula: str) -> List[str]:
-    """Simple identifiers on the RHS. Skip I(), i.year, interactions."""
+    """Simple identifiers and treat:group terms on the RHS. Skip I(), i.year."""
     if "~" not in formula:
         return []
     rhs = formula.split("~", 1)[1]
@@ -230,9 +231,10 @@ def _rhs_simple_names(formula: str) -> List[str]:
     names: List[str] = []
     for tok in rhs.split("+"):
         name = tok.strip()
-        if name in _RHS_SKIP or not _SIMPLE_VAR.match(name):
+        if name in _RHS_SKIP:
             continue
-        names.append(name)
+        if _SIMPLE_VAR.match(name) or _INTERACTION_VAR.match(name):
+            names.append(name)
     return names
 
 
@@ -249,6 +251,14 @@ def table_var_names(spec: Dict[str, Any], formula: Optional[str] = None) -> List
     for name in _rhs_simple_names(str(src)):
         if name not in names:
             names.append(name)
+    treat = str(treatment) if treatment else ""
+    for group in _as_name_list(spec.get("heterogeneity_groups")):
+        if group and group not in names:
+            names.append(group)
+        if treat and group:
+            inter = f"{treat}:{group}"
+            if inter not in names:
+                names.append(inter)
     return names
 
 
@@ -577,7 +587,7 @@ def _estimate_ols(
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
-    requested = str(formula)
+    requested = apply_heterogeneity_to_formula(str(formula), spec, treatment=str(treatment))
     if lock:
         requested = pooled_ols_formula(requested)
         fitted, _raw_estimator, fit_formula = _fit_statsmodels(requested, df, cluster)
@@ -851,6 +861,8 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
         formula = spec.get("formula") if method != "did" else (
             spec.get("feols_formula") or spec.get("formula")
         )
+        if formula:
+            formula = apply_heterogeneity_to_formula(str(formula), spec)
         if not formula or not csv_path:
             return _error(
                 "主估计未跑：缺少公式或数据路径",

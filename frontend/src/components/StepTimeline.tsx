@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../lib/i18n'
 import { apiFetch } from '../lib/apiBase'
+import { displayEstimateEngineLabel } from '../lib/readoutTable'
 
 export interface StepTimelineProps {
   sessionId?: string | null
@@ -136,7 +137,7 @@ export default function StepTimeline({
   const estMeta = estimateBusy
     ? t('deskSteps.running')
     : estOk
-      ? `${estimate.estimator ?? ''} · ${estimate.iterations ?? 1} ${t('deskSteps.iterations')}`
+      ? `${displayEstimateEngineLabel(estimate.method, estimate.estimator) || estimate.estimator || ''} · ${estimate.iterations ?? 1} ${t('deskSteps.iterations')}`
       : estError
         ? t('deskSteps.failed')
         : undefined

@@ -39,6 +39,21 @@ def norm_method(method: Any) -> str | None:
     return _METHOD_ALIASES.get(key)
 
 
+def display_estimate_engine_label(method: Any, estimator: Any) -> str:
+    """User-facing engine label. OLS lock: do not present pooled OLS as feols.
+
+    The stored ``estimator`` still records the engine that ran. Only the
+    ``statspai.feols`` (and other *feols*) string is rewritten to ``OLS``
+    when ``method`` is OLS. DiD/TWFE keeps ``statspai.feols``.
+    """
+    raw = "" if estimator is None else str(estimator).strip()
+    if not raw:
+        return ""
+    if norm_method(method) == "ols" and "feols" in raw.lower():
+        return "OLS"
+    return raw
+
+
 def slug_for_topic(topic: str) -> str:
     """Stable slug for a research question. Known pilots keep readable names."""
     known = {

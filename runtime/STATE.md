@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| FM-E-BUILD-FIX-OLS-LABEL | `runtime/tasks/20260915-fm-e-build-ols-label.md` | complete | `fix/fm-e-build-ols-label-1` from `4546e4de` | 2026-09-15 | OLS label pushed; no PR |
 | FM-E-BUILD-BRYCE-1 / NORMS-BE | `runtime/tasks/20260915-fm-e-build-norms-be-1.md` | complete | `feat/fm-e-build-norms-be-1` from `4546e4de` | 2026-09-15 | pushed; `make test` green; no PR |
 | FM-E-BUILD-BRYCE-1 / CL-BE-winsor | `runtime/tasks/20260915-fm-e-build-cl-be-winsor.md` | complete | `feat/fm-e-build-cl-be-winsor-1` @ `a850719` | 2026-09-15 | pushed; no PR |
 | FM-E-BUILD-BRYCE-1 / FL-BE-reuse | `runtime/tasks/20260915-fl-be-reuse.md` | complete | `feat/fm-e-build-fl-be-reuse-1` from `4546e4de` | 2026-09-15 | pushed; fetch_papers thin wrap; no PR |

@@ -111,8 +111,51 @@ def _escape_tex_plain(text: str) -> str:
 
 
 _CITE_RE = re.compile(r"\\(cite|ref|eqref)\{[^}]*\}")
+# Multiline ``$$…$$`` must stay one chunk. Line-by-line ``[^$]+`` left the
+# interior of a display block (``\ln``, ``_{i}``) to ``_escape_tex_plain``.
 _MATH_BOLD_RE = re.compile(
-    r"(\$\$[^$]+\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*)"
+    r"(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\*\*[^*]+\*\*)"
+)
+_EQ_ENV_OPEN_RE = re.compile(r"^\\begin\{equation\*?\}")
+_EQ_ENV_CLOSE_RE = re.compile(r"\\end\{equation\*?\}$")
+_MATH_MACROS: Tuple[Tuple[str, str], ...] = (
+    ("varepsilon", "ε"),
+    ("rightarrow", "→"),
+    ("Rightarrow", "⇒"),
+    ("epsilon", "ε"),
+    ("partial", "∂"),
+    ("approx", "≈"),
+    ("infty", "∞"),
+    ("cdot", "·"),
+    ("times", "×"),
+    ("alpha", "α"),
+    ("beta", "β"),
+    ("gamma", "γ"),
+    ("delta", "δ"),
+    ("theta", "θ"),
+    ("lambda", "λ"),
+    ("sigma", "σ"),
+    ("omega", "ω"),
+    ("Delta", "Δ"),
+    ("Sigma", "Σ"),
+    ("Omega", "Ω"),
+    ("leq", "≤"),
+    ("geq", "≥"),
+    ("neq", "≠"),
+    ("mu", "μ"),
+    ("phi", "φ"),
+    ("psi", "ψ"),
+    ("pi", "π"),
+    ("tau", "τ"),
+    ("rho", "ρ"),
+    ("pm", "±"),
+    ("ln", "ln"),
+    ("log", "log"),
+    ("exp", "exp"),
+    ("max", "max"),
+    ("min", "min"),
+    ("sum", "∑"),
+    ("prod", "∏"),
 )
 
 
@@ -149,6 +192,34 @@ def _escape_tex_text(text: str) -> str:
     for i, original in enumerate(held):
         merged = merged.replace(f"\x00CITE{i}\x00", original)
     return merged
+
+
+def _is_display_math_open(stripped: str) -> bool:
+    return (
+        stripped == "$$"
+        or stripped.startswith("$$")
+        or stripped.startswith("\\[")
+        or bool(_EQ_ENV_OPEN_RE.match(stripped))
+    )
+
+
+def _is_display_math_one_line(stripped: str) -> bool:
+    if stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) > 2:
+        return True
+    if stripped.startswith("\\[") and stripped.endswith("\\]") and len(stripped) > 3:
+        return True
+    if _EQ_ENV_OPEN_RE.match(stripped) and _EQ_ENV_CLOSE_RE.search(stripped):
+        return True
+    return False
+
+
+def _is_display_math_close(stripped: str) -> bool:
+    return (
+        stripped == "$$"
+        or stripped.endswith("$$")
+        or stripped.endswith("\\]")
+        or bool(_EQ_ENV_CLOSE_RE.search(stripped))
+    )
 
 
 def _is_md_table_line(line: str) -> bool:
@@ -223,6 +294,21 @@ def markdown_to_latex(text: str, section_title: str = "") -> str:
             converted = _md_table_to_latex(block)
             if converted:
                 out.append(converted)
+            continue
+        stripped = raw.strip()
+        if _is_display_math_open(stripped):
+            # Keep the whole display block as TeX. Escaping each line turns
+            # ``\ln`` / ``_{i}`` into ``\textbackslash\{\}ln`` / ``\_\{i\}``.
+            block = [raw]
+            i += 1
+            if not _is_display_math_one_line(stripped):
+                while i < len(lines):
+                    block.append(lines[i])
+                    end = lines[i].strip()
+                    i += 1
+                    if _is_display_math_close(end):
+                        break
+            out.append("\n".join(block))
             continue
         if not raw.strip():
             out.append("")
@@ -453,9 +539,79 @@ def _xml_escape(text: str) -> str:
     )
 
 
+def _restore_overescaped_tex(text: str) -> str:
+    """Undo ``\\textbackslash{}`` + ``\\{\\}`` / ``\\_`` double-escaping."""
+    text = text.replace("\\textbackslash\\{\\}", "\\")
+    text = text.replace("\\textbackslash{}", "\\")
+    text = text.replace("\\{\\}", "\\")
+    text = text.replace("\\_", "_")
+    text = text.replace("\\{", "{")
+    text = text.replace("\\}", "}")
+    text = text.replace("\\$", "$")
+    text = text.replace("\\#", "#")
+    return text
+
+
+def _apply_math_macros(text: str, *, unwrap_braces: bool = False) -> str:
+    """Turn TeX math macros into readable unicode. Leaves ``\\textbf`` alone."""
+    text = re.sub(
+        r"\\(?:text|mathrm|operatorname|mathbf|mathit)\*?\{([^{}]*)\}",
+        r"\1",
+        text,
+    )
+    text = re.sub(r"\\(?:left|right)\s*", "", text)
+    text = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", text)
+    text = re.sub(r"\\hat\{([^{}]+)\}", lambda m: m.group(1) + "\u0302", text)
+    text = re.sub(r"\\bar\{([^{}]+)\}", lambda m: m.group(1) + "\u0304", text)
+    text = re.sub(r"\\tilde\{([^{}]+)\}", lambda m: m.group(1) + "\u0303", text)
+    text = (
+        text.replace("\\qquad", " ")
+        .replace("\\quad", " ")
+        .replace("\\,", " ")
+        .replace("\\;", " ")
+        .replace("\\:", " ")
+    )
+    for name, repl in sorted(_MATH_MACROS, key=lambda kv: -len(kv[0])):
+        text = re.sub(rf"\\{re.escape(name)}(?![a-zA-Z])", repl, text)
+    text = re.sub(r"_\{([^{}]+)\}", r"_\1", text)
+    text = re.sub(r"\^\{([^{}]+)\}", r"^\1", text)
+    if unwrap_braces:
+        text = re.sub(r"\{([^{}]+)\}", r"\1", text)
+        text = re.sub(r"[ \t]+", " ", text).strip()
+    return text
+
+
+def _render_tex_math(text: str) -> str:
+    """Unwrap ``$…$`` / ``$$…$$`` and render the interior as unicode."""
+
+    def _display(match: re.Match[str]) -> str:
+        return _apply_math_macros(match.group(1), unwrap_braces=True)
+
+    text = re.sub(r"\$\$(.+?)\$\$", _display, text, flags=re.S)
+    text = re.sub(r"\\\[(.+?)\\\]", _display, text, flags=re.S)
+    text = re.sub(
+        r"\\begin\{equation\*?\}(.+?)\\end\{equation\*?\}",
+        _display,
+        text,
+        flags=re.S,
+    )
+    text = re.sub(
+        r"\$([^$\n]+)\$",
+        lambda m: _apply_math_macros(m.group(1), unwrap_braces=True),
+        text,
+    )
+    return text
+
+
 def _strip_tex_markup(text: str) -> str:
-    """Drop TeX commands but keep brace prose (\\textbf{结果} → 结果)."""
+    """Drop TeX commands but keep brace prose (\\textbf{结果} → 结果).
+
+    Math is rendered to unicode (``\\ln(\\text{homicide}_{i})`` →
+    ``ln(homicide_i)``) so Word never shows ``\\{\\}ln`` / ``\\_``.
+    """
     text = re.sub(r"(?<!\\)%.*", "", text)
+    text = _restore_overescaped_tex(text)
+    text = _render_tex_math(text)
     text = re.sub(r"\\(?:begin|end)\{[^}]+\}", "", text)
     text = re.sub(r"\\(?:maketitle|tableofcontents)\b", "", text)
     text = re.sub(
@@ -463,13 +619,21 @@ def _strip_tex_markup(text: str) -> str:
         "",
         text,
     )
+    text = _apply_math_macros(text, unwrap_braces=False)
     keep_arg = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
     prev = None
     while prev != text:
         prev = text
         text = keep_arg.sub(r"\1", text)
     text = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", "", text)
-    return text.replace("\\%", "%").replace("\\&", "&").strip()
+    return (
+        text.replace("\\%", "%")
+        .replace("\\&", "&")
+        .replace("\\_", "_")
+        .replace("\\{", "{")
+        .replace("\\}", "}")
+        .strip()
+    )
 
 
 def _prelude_section(raw: str) -> Optional[dict]:
@@ -528,6 +692,27 @@ def _w_paragraph(text: str, *, heading: bool = False) -> str:
     )
 
 
+def _is_readable_equation_line(line: str) -> bool:
+    """Standalone regression line → Word OMML, not a BodyText dump."""
+    stripped = line.strip()
+    if not stripped or "=" not in stripped:
+        return False
+    if re.search(r"[\u4e00-\u9fff]", stripped):
+        return False
+    return bool(re.search(r"[α-ωΑ-Ωβ]|_|\bln\b|\blog\b|\bexp\b", stripped))
+
+
+def _w_omath_paragraph(text: str) -> str:
+    return (
+        "<w:p>"
+        "<w:pPr><w:jc w:val=\"center\"/></w:pPr>"
+        "<m:oMathPara><m:oMath><m:r>"
+        f"<m:t xml:space=\"preserve\">{_xml_escape(text.strip())}</m:t>"
+        "</m:r></m:oMath></m:oMathPara>"
+        "</w:p>"
+    )
+
+
 def _write_simple_docx(path: Path, title: str, sections: List[dict]) -> None:
     """Write a minimal OOXML docx. No pandoc / python-docx required."""
     paras = [_w_paragraph(title or "Untitled", heading=True)]
@@ -535,10 +720,14 @@ def _write_simple_docx(path: Path, title: str, sections: List[dict]) -> None:
         paras.append(_w_paragraph(str(section.get("title") or ""), heading=True))
         body = str(section.get("content") or "")
         for line in body.splitlines() or [""]:
-            paras.append(_w_paragraph(line))
+            if _is_readable_equation_line(line):
+                paras.append(_w_omath_paragraph(line))
+            else:
+                paras.append(_w_paragraph(line))
     document_xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        ' xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
         f"<w:body>{''.join(paras)}<w:sectPr/></w:body></w:document>"
     )
     content_types = (

@@ -78,7 +78,7 @@ class EconPaperState(TypedDict, total=False):
     docx_path: Optional[str]
     degraded: bool
     # ADR-0003: clean_data 高级配置
-    outliers_cuts: tuple  # (low, high) 百分位，默认 (5, 95)
+    outliers_cuts: tuple  # (low, high) 百分位，默认 (1, 99)；显式传入，不用 Stata winsor2 默认调用
     # ADR-0003: generate_chapter render kwargs（模板占位符，backend 或 EDA 写入）
     research_question: Optional[str]
     data_summary: Optional[str]

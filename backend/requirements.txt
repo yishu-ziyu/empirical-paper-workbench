@@ -10,6 +10,9 @@ httpx==0.27.0
 pandas==2.2.3
 openpyxl==3.1.5
 numpy==2.1.0
+# Cleaning: pywinsor2 (Bryce). clean_winsor always passes cuts=(1, 99) and
+# replace=True; it does not use Stata winsor2's implicit-default call.
+pywinsor2==0.4.3
 plotly==5.24.0
 
 # --- 数据库 ---

@@ -388,6 +388,30 @@ def test_extract_sections_skips_empty_untitled_pads():
     assert "\\subsection{研究背景}" in sections[0]["content"]
 
 
+def test_extract_sections_skips_heading_only_chapter():
+    """A heading without prose is an empty chapter body and must not export."""
+    sections = _extract_sections(
+        [
+            {"type": "intro", "title": "引言", "content": "## 引言\n\n"},
+            {"type": "methods", "title": "方法", "content": "OLS 相关设定。"},
+        ]
+    )
+    assert [s["title"] for s in sections] == ["方法"]
+    assert "引言" not in [s["title"] for s in sections]
+
+
+def test_extract_sections_follows_six_chapter_outline_order():
+    """Export walks the outline so later chapters are not dropped after intro."""
+    from conftest import make_six_chapter_outline, make_body_chapters
+
+    outline = make_six_chapter_outline()
+    chapters = make_body_chapters()
+    sections = _extract_sections(chapters, {"outline": outline})
+    assert [s["title"] for s in sections] == [ch["title"] for ch in chapters]
+    for section in sections:
+        assert section["content"].strip()
+
+
 def test_extract_sections_keeps_body_without_title_as_unnamed():
     """Body with no title/type is kept as 未命名, not dropped."""
     sections = _extract_sections(

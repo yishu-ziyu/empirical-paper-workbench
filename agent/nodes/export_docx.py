@@ -34,6 +34,7 @@ if os.path.isdir(_TEX_BIN) and _TEX_BIN not in os.environ.get("PATH", ""):
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
+from ..engine.outline_bodies import chapter_has_body
 from ..nodes.estimate import looks_like_coef_table, splice_missing_table_rows
 from ..protocols import ExportDocxOutput
 from ..state import EconPaperState
@@ -232,14 +233,48 @@ def markdown_to_latex(text: str, section_title: str = "") -> str:
     return "\n".join(out)
 
 
+def _ordered_body_chapters(
+    body_chapters: List[Any], state: Optional[dict] = None
+) -> List[dict]:
+    """Walk outline order when present so export is six-chapter, not intro-only."""
+    chapters = [ch for ch in (body_chapters or []) if isinstance(ch, dict)]
+    outline = (state or {}).get("outline") or [] if isinstance(state, dict) else []
+    types = [
+        str(entry.get("type") or "").strip()
+        for entry in outline
+        if isinstance(entry, dict) and str(entry.get("type") or "").strip()
+    ]
+    if not types:
+        return chapters
+    by_type: dict[str, dict] = {}
+    extras: List[dict] = []
+    for ch in chapters:
+        chapter_type = str(ch.get("type") or "").strip()
+        if chapter_type and chapter_type not in by_type:
+            by_type[chapter_type] = ch
+        elif not chapter_type:
+            extras.append(ch)
+    ordered = [by_type[chapter_type] for chapter_type in types if chapter_type in by_type]
+    seen = set(types)
+    ordered.extend(
+        ch
+        for ch in chapters
+        if str(ch.get("type") or "").strip()
+        and str(ch.get("type") or "").strip() not in seen
+    )
+    ordered.extend(extras)
+    return ordered
+
+
 def _extract_sections(
     body_chapters: List[Any], state: Optional[dict] = None
 ) -> List[dict]:
     """正文章节 → ``{title, content}``. Skip empty outline pads.
 
     Empty ``{}`` slots from generate_chapter's 6-way pad used to become
-    ``Untitled section`` Heading1s. Only chapters with body text are kept.
-    Content is markdown→LaTeX so leftover ``#`` / ``##`` do not survive.
+    ``Untitled section`` Heading1s. Heading-only drafts are also dropped.
+    Only chapters with body text are kept. Content is markdown→LaTeX so
+    leftover ``#`` / ``##`` do not survive.
     """
     state = state or {}
     spec = state.get("main_specification") if isinstance(state, dict) else {}
@@ -249,12 +284,10 @@ def _extract_sections(
     if not isinstance(estimate, dict):
         estimate = {}
     sections: List[dict] = []
-    for ch in body_chapters or []:
-        if not isinstance(ch, dict):
+    for ch in _ordered_body_chapters(body_chapters, state):
+        if not chapter_has_body(ch):
             continue
         content = ch.get("content") or ""
-        if not str(content).strip():
-            continue
         title = (ch.get("title") or "").strip()
         if not title:
             # Body with no title: keep the text. Prefer type, else 未命名.

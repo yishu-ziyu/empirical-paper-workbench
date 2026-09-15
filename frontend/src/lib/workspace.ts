@@ -340,6 +340,22 @@ export function chapterIndexForApply(
   return Math.min(Math.max(0, opts.currentIndex), accepted.length - 1)
 }
 
+export function chapterHasBody(
+  chapter: { content?: string | null } | undefined | null,
+): boolean {
+  return Boolean(String(chapter?.content || '').replace(/^#{1,6}\s+.*$/gm, '').trim())
+}
+
+export function chaptersMissingBodies<T extends { type: string; title: string }>(
+  outline: T[],
+  written: { type?: string; content?: string | null }[],
+): T[] {
+  return outline.filter((ch) => {
+    const writtenCh = written.find((item) => item.type === ch.type)
+    return !chapterHasBody(writtenCh)
+  })
+}
+
 export function createRestoreSnapshotGate() {
   let runApplied = false
   return {
@@ -1702,7 +1718,17 @@ export function useWorkspace(opts: WorkspaceOptions) {
         return
       }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      if (payload.chapter) {
+      if (Array.isArray(payload.body_chapters) && payload.body_chapters.length) {
+        setWrittenChapters((prev) => {
+          const byType = new Map(
+            prev.filter((ch) => ch.type).map((ch) => [ch.type, ch]),
+          )
+          for (const ch of payload.body_chapters as WrittenChapter[]) {
+            if (ch?.type && chapterHasBody(ch)) byType.set(ch.type, ch)
+          }
+          return Array.from(byType.values())
+        })
+      } else if (payload.chapter && chapterHasBody(payload.chapter)) {
         setWrittenChapters((prev) => {
           const next = prev.filter((ch) => ch.type !== payload.chapter.type)
           return [...next, payload.chapter]
@@ -1742,7 +1768,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       const ch = outline[index]
       if (!ch) return
       setCurrentChapterIndex(index)
-      const existing = writtenChapters.find((item) => item.type === ch.type && item.content)
+      const existing = writtenChapters.find((item) => item.type === ch.type && chapterHasBody(item))
       if (existing) return
       if (identFailed) {
         showGlobalError(t('app.identBlocked'))
@@ -1856,11 +1882,16 @@ export function useWorkspace(opts: WorkspaceOptions) {
           currentType: outline[currentChapterIndex]?.type,
           currentIndex: currentChapterIndex,
         })
-        const ch = accepted[useIdx]
-        if (!ch) return
-        setCurrentChapterIndex(useIdx)
-        setWritingType(ch.type)
-        await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+        const missing = chaptersMissingBodies(accepted, writtenChapters)
+        const targets = missing.length
+          ? missing
+          : [accepted[useIdx]].filter(Boolean)
+        for (const ch of targets) {
+          const idx = accepted.findIndex((item) => item.type === ch.type)
+          if (idx >= 0) setCurrentChapterIndex(idx)
+          setWritingType(ch.type)
+          await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+        }
       } catch (err) {
         showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
       } finally {
@@ -1872,6 +1903,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       outline,
       outlineLocked,
       currentChapterIndex,
+      writtenChapters,
       sessionId,
       postResumeOutline,
       runGenerateChapter,

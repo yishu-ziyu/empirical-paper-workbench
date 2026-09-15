@@ -769,6 +769,53 @@ class AgentFacade:
             self.save_state(session_id, state)
             return state
 
+    def ensure_outline_bodies(
+        self,
+        session_id: str,
+        render_kwargs: Optional[dict] = None,
+    ) -> dict:
+        """Generate every outline chapter that still lacks a body.
+
+        Right-pane generate and doc-export both use this so a six-chapter
+        outline cannot export as intro-only or as empty headings.
+        Write-blocked slots are skipped; other generate failures stop the fill.
+        """
+        try:
+            from agent.engine.outline_bodies import missing_outline_specs
+        except Exception:
+            return self.get_state(session_id)
+        state = self.get_state(session_id)
+        title = state.get("title_chapter")
+        need_title = (
+            not isinstance(title, dict)
+            or not str(title.get("title") or "").strip()
+        )
+        if need_title:
+            try:
+                from agent.nodes.generate_title import generate_title as generate_title_node
+                title_result = generate_title_node(state)
+                if isinstance(title_result, dict) and title_result.get("title_chapter"):
+                    state = {**state, **title_result}
+                    self.save_state(session_id, state)
+            except Exception:
+                pass
+        for spec in missing_outline_specs(state):
+            chapter = {
+                "type": spec.get("type"),
+                "title": spec.get("title") or "",
+            }
+            if spec.get("method"):
+                chapter["method"] = spec["method"]
+            try:
+                state = self.generate_chapter(session_id, chapter, render_kwargs)
+            except HTTPException as exc:
+                if exc.status_code in {400, 409}:
+                    continue
+                if exc.status_code == 503:
+                    break
+                raise
+        return self.get_state(session_id)
+
     def export_document(self, session_id: str, template: str) -> dict:
         """Run export_docx node and return the result dict."""
         if export_docx_node is None:
@@ -776,6 +823,7 @@ class AgentFacade:
                 status_code=503,
                 detail="export_docx node not available (agent module missing)",
             )
+        self.ensure_outline_bodies(session_id)
         state = self.get_state(session_id)
         if not state.get("workspace"):
             state["workspace"] = self._workspace_dir(session_id)

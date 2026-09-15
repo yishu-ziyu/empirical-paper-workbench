@@ -53,6 +53,7 @@ from schemas.responses import (
     SnapshotDatasetResponse,
     UploadResponse,
 )
+from services.allow_did import session_allow_did
 from services.research_lab import lab_from_state, public_research
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
 
@@ -408,12 +409,14 @@ async def get_session_info(
         extra["degradations"] = public_degradations(
             await run_in_threadpool(facade.get_degradations, session_id)
         )
+        extra["allow_did"] = session_allow_did(state)
         if lab_from_state(state) is not None:
             extra["research"] = public_research(state)
     except Exception:
         extra = {}
     extra["dataset"] = await _snapshot_dataset(session_id)
     extra["active_run"] = await _snapshot_active_run(session_id)
+    extra.setdefault("allow_did", False)
     return SessionInfoResponse(
         session_id=session_id,
         exists=True,

@@ -51,16 +51,14 @@ def csv_with_missing(tmp_path):
 
 @pytest.fixture
 def csv_with_outliers(tmp_path):
-    """21-row CSV with a single extreme outlier (income=1000), no missing.
+    """201-row CSV with a single extreme outlier (income=1000), no missing.
 
-    The 20 non-outlier incomes are all <= 90. After winsorize at (5, 95) the
-    95th percentile is 90, so the 1000 outlier is clipped to 90 and the
+    200 bulk incomes cycle 10..90. After winsorize at explicit (1, 99) the
+    99th percentile sits in that bulk, so the 1000 outlier is clipped and the
     post-winsor max of income is 90 (<= 100).
     """
-    incomes = [10, 20, 30, 40, 50, 60, 70, 80, 90,
-               10, 20, 30, 40, 50, 60, 70, 80, 90,
-               10, 20, 1000]
-    ages = list(range(21))
+    incomes = ([10, 20, 30, 40, 50, 60, 70, 80, 90, 10] * 20) + [1000]
+    ages = list(range(len(incomes)))
     rows = ["income,age,city"] + [
         f"{inc},{age},city{age}" for inc, age in zip(incomes, ages)
     ]

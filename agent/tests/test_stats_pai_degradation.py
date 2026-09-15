@@ -93,86 +93,54 @@ def test_balance_stats_pai_false_empty():
 
 
 # =========================================================================== #
-# Test B: outliers.py — StatsPAI degradation
+# Test B: outliers.py — pywinsor2 degradation (StatsPAI is not the winsor engine)
 # =========================================================================== #
 
-def test_outliers_fallback_when_statspai_raises(csv_with_numeric, tmp_path, caplog):
-    """When statspai.winsor raises, OutliersStep falls back to pandas.
-
-    Injects a mock statspai module into sys.modules so that the lazy import
-    ``from statspai import winsor as sp_winsor`` succeeds, but calling
-    ``sp_winsor()`` raises an exception.
-
-    Verifies:
-    - stats_pai_used is False in the report
-    - A warning log message is emitted
-    - The output file is still written (pandas fallback works)
-    """
-    mock_winsor = MagicMock(
-        side_effect=Exception("Simulated StatsPAI failure")
-    )
-    mock_statspai = MagicMock(winsor=mock_winsor)
+def test_outliers_fallback_when_pywinsor2_raises(csv_with_numeric, tmp_path, caplog):
+    """When pywinsor2.winsor2 raises, OutliersStep falls back to pandas."""
+    mock_mod = MagicMock()
+    mock_mod.winsor2.side_effect = Exception("Simulated pywinsor2 failure")
 
     ds = [{"path": str(csv_with_numeric)}]
-    config = {"workspace": str(tmp_path), "order": 3, "cuts": (5, 95)}
+    config = {"workspace": str(tmp_path), "order": 3, "cuts": (1, 99)}
 
     with (
-        patch.dict(sys.modules, {"statspai": mock_statspai}),
-        caplog.at_level(logging.WARNING, logger="agent.cleaning.outliers"),
+        patch.dict(sys.modules, {"pywinsor2": mock_mod}),
+        caplog.at_level(logging.WARNING, logger="agent.cleaning.winsor"),
     ):
         result_datasets, report = OutliersStep().run(ds, config)
 
-    # StatsPAI not used indicator
     assert report["stats_pai_used"] is False
-
-    # Warning logged
+    assert report["stata_default"] is False
+    assert report["engine"][0] == "pandas"
     assert any(
-        "StatsPAI winsor() failed" in record.message
+        "pywinsor2.winsor2 failed" in record.message
         for record in caplog.records
-    ), "Expected a warning about StatsPAI winsor() failure"
+    ), "Expected a warning about pywinsor2 failure"
 
-    # Sidecar file written (pandas fallback produced output)
     sidecar = result_datasets[0].get("step_paths", [])
     assert len(sidecar) > 0, "Expected sidecar path to be written"
     df_out = pd.read_csv(result_datasets[0]["path"])
     assert len(df_out) == 5, "Pandas fallback should preserve all rows"
 
 
-def test_outliers_fallback_when_statspai_not_importable(csv_with_numeric, tmp_path, caplog):
-    """When statspai cannot be imported, OutliersStep falls back to pandas.
-
-    Temporarily removes statspai from sys.modules so that the lazy import
-    ``from statspai import winsor`` fails with ImportError.
-
-    Verifies:
-    - stats_pai_used is False in the report
-    - A warning log message is emitted
-    """
+def test_outliers_fallback_when_pywinsor2_not_importable(csv_with_numeric, tmp_path, caplog):
+    """When pywinsor2 cannot be imported, OutliersStep falls back to pandas."""
     ds = [{"path": str(csv_with_numeric)}]
-    config = {"workspace": str(tmp_path), "order": 3, "cuts": (5, 95)}
+    config = {"workspace": str(tmp_path), "order": 3, "cuts": (1, 99)}
 
-    # Temporarily remove statspai from sys.modules to force ImportError
-    had_statspai = "statspai" in sys.modules
-    old_statspai = sys.modules.pop("statspai", None)
-
-    try:
-        with caplog.at_level(logging.WARNING, logger="agent.cleaning.outliers"):
-            result_datasets, report = OutliersStep().run(ds, config)
-    finally:
-        if had_statspai:
-            sys.modules["statspai"] = old_statspai
+    with (
+        patch.dict(sys.modules, {"pywinsor2": None}),
+        caplog.at_level(logging.WARNING, logger="agent.cleaning.winsor"),
+    ):
+        result_datasets, report = OutliersStep().run(ds, config)
 
     assert report["stats_pai_used"] is False
+    assert report["engine"][0] == "pandas"
+    assert any(
+        "pywinsor2 not available" in r.message for r in caplog.records
+    ), "Expected warning about pywinsor2 not available"
 
-    # Should log about StatsPAI not available
-    warnings = [
-        r.message
-        for r in caplog.records
-        if "StatsPAI not available" in r.message
-    ]
-    assert len(warnings) > 0, "Expected warning about StatsPAI not available"
-
-    # Pandas fallback output
     df_out = pd.read_csv(result_datasets[0]["path"])
     assert len(df_out) == 5
 
@@ -261,14 +229,16 @@ except ImportError:
     _HAS_STATSPAI = False
 
 
-@pytest.mark.skipif(not _HAS_STATSPAI, reason="StatsPAI not installed in this environment")
-def test_outliers_statspai_normal_path(csv_with_numeric, tmp_path):
-    """When StatsPAI is available, OutliersStep reports stats_pai_used: true."""
+def test_outliers_pywinsor2_normal_path(csv_with_numeric, tmp_path):
+    """When pywinsor2 is available, OutliersStep records engine=pywinsor2."""
     ds = [{"path": str(csv_with_numeric)}]
-    config = {"workspace": str(tmp_path), "order": 3, "cuts": (5, 95)}
+    config = {"workspace": str(tmp_path), "order": 3, "cuts": (1, 99)}
 
     result_datasets, report = OutliersStep().run(ds, config)
-    assert report["stats_pai_used"] is True
+    assert report["stats_pai_used"] is False
+    assert report["engine"][0] == "pywinsor2"
+    assert report["cuts"] == [1, 99]
+    assert report["stata_default"] is False
 
 
 @pytest.mark.skipif(not _HAS_STATSPAI, reason="StatsPAI not installed in this environment")

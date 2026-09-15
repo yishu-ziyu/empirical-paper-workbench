@@ -329,7 +329,8 @@ def test_estimate_node_agent_error_falls_back_with_degradation(tmp_path, force_a
     out = estimate(make_state(tmp_path))
     payload = out["estimate"]
     assert payload["status"] == "ok"                      # 固定分派照常出表
-    assert payload["estimator"] == "statspai.feols"       # 没有被 Agent 污染
+    assert payload["estimator"] == "OLS"
+    assert "feols" not in str(payload["estimator"]).lower()
     entries = payload["degradations"]
     assert len(entries) == 1
     entry = entries[0]
@@ -345,7 +346,7 @@ def test_estimate_node_agent_none_no_degradation(tmp_path, force_agent_enabled, 
     """provider 不可用（返回 None）：静默回退，不算 degradation。"""
     monkeypatch.setattr("agent.engine.estimate_agent.run_estimate_agent", lambda state: None)
     out = estimate(make_state(tmp_path))
-    assert out["estimate"]["estimator"] == "statspai.feols"
+    assert out["estimate"]["estimator"] == "OLS"
     assert "degradations" not in out["estimate"]
 
 
@@ -355,7 +356,7 @@ def test_estimate_node_disabled_by_default(tmp_path, monkeypatch):
     out = estimate(make_state(tmp_path))
     payload = out["estimate"]
     assert payload["status"] == "ok"
-    assert payload["estimator"] == "statspai.feols"
+    assert payload["estimator"] == "OLS"
     assert "degradations" not in payload
 
 

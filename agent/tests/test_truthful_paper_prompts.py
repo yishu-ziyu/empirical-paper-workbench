@@ -211,7 +211,7 @@ def test_methods_binds_actual_estimate_spec_and_unknown_covariance():
 
     assert "income ~ age + schooling" in prompt
     assert "schooling" in prompt
-    assert "statsmodels.ols" in prompt
+    assert "OLS" in prompt
     assert "N：88" in prompt
     assert state["estimate"]["treatment_row"] in prompt
     assert "协方差/标准误设定：未提供" in prompt

@@ -11,6 +11,7 @@ from numbers import Real
 from typing import Any, Iterable, Mapping
 
 from .data_eda import compute_csv_eda
+from .ols_lock import estimator_label, ols_lock_active, sanitize_ols_text
 from .readiness import claim_mode, current_research_claim
 
 
@@ -315,13 +316,18 @@ def format_estimate_facts(
     estimate = state.get("estimate") or {}
     if not isinstance(estimate, Mapping):
         estimate = {}
+    shown_estimator = _first_text(estimate, "estimator")
+    shown_formula = _first_text(estimate, "formula")
+    if ols_lock_active(state):
+        shown_estimator = estimator_label(shown_estimator)
+        shown_formula = sanitize_ols_text(shown_formula)
     return "\n".join(
         [
             f"主张类型：{effective_claim or claim_mode(dict(state))}",
             f"估计状态：{_first_text(estimate, 'status')}",
-            f"真实公式：{_first_text(estimate, 'formula')}",
+            f"真实公式：{shown_formula}",
             f"控制变量：{_controls_text(state)}",
-            f"估计器：{_first_text(estimate, 'estimator')}",
+            f"估计器：{shown_estimator}",
             f"协方差/标准误设定：{_covariance_text(estimate)}",
             f"N：{_first_text(estimate, 'n')}",
             f"主处理变量行：{_first_text(estimate, 'treatment_row')}",
@@ -568,11 +574,21 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
         state, claim_method, requested_claim
     )
     ledger = current_research_claim(dict(state)) or {}
+    results = state.get("results") or ""
+    robustness_table = rob.get("summary_table") or ""
+    estimate_facts = format_estimate_facts(
+        state, effective_claim=effective_claim
+    )
+    if ols_lock_active(state, requested_method):
+        results = sanitize_ols_text(str(results))
+        robustness_table = sanitize_ols_text(str(robustness_table))
+        estimate_facts = sanitize_ols_text(estimate_facts)
+        execution_notice = sanitize_ols_text(execution_notice)
     return {
         "research_question": rd.get("question") or state.get("research_question") or "",
         "method": requested_method,
-        "results": state.get("results") or "",
-        "robustness_table": rob.get("summary_table") or "",
+        "results": results,
+        "robustness_table": robustness_table,
         "key_references": format_entries(state.get("literature_entries") or []),
         "citation_indices": state.get("citation_indices") or {},
         "star_rating": state.get("star_rating"),
@@ -583,9 +599,7 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
         "eda_results": eda_results,
         "data_provenance": format_data_provenance(state),
         "variable_roles": format_variable_roles(state),
-        "estimate_facts": format_estimate_facts(
-            state, effective_claim=effective_claim
-        ),
+        "estimate_facts": estimate_facts,
         "method_execution_notice": execution_notice,
         "robustness_status": robustness_status(state),
         "heterogeneity_evidence": format_heterogeneity_evidence(state),

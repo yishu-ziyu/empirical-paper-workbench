@@ -128,7 +128,7 @@ def make_write_ready_state(**overrides) -> dict:
             "status": "ok",
             "produced_by": "estimate",
             "method": "ols",
-            "estimator": "statspai.feols",
+            "estimator": "OLS",
             "treatment": "age",
             "coef": 0.1234,
             "se": 0.0456,

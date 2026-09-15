@@ -1,14 +1,14 @@
-# Real-fetch contract (after design confirm; DECIDE-10)
+# Real-fetch contract (after design confirm; DECIDE-10 + DATA-RIGOR)
 
 Status: frozen (G0 serial contract)  
-Task: `FM-E-BUILD-REAL-FETCH-1` · slice **G0** (DECIDE-10)  
+Task: `FM-E-BUILD-REAL-FETCH-1` · slice **G0** (DECIDE-10) · recut **`FM-E-DATA-RIGOR-1`** (Captain hard lock)  
 Product line: **formal econpaper only** (ADR-0010 web product; user study path)  
 Baseline: `feat/fm-e-build-did-spec-recut-1` @ `bf6957150713d9d8ff3ae72379d4233e5bd9b253`  
-Design input: **DECIDE-10** acceptance from Decide (via Firstmate / Captain) — **real fetch first**; find-data must not present fixtures as discovered / found data; fixtures = **teaching-known only**, never find success; optional teaching shelf with explicit label; prefer actual download into session when the API allows  
+Design input: **DECIDE-10** (Decide via Firstmate / Captain) plus **FM-E-DATA-RIGOR-1** Captain hard lock — **real fetch first**; no synthetic / invented / toy sample data on the **product** path; find-data must not present fixtures or teaching toys as discovered / found data  
 Sister contracts (cited, not merged): `docs/find-data-lit-contract.md` (`FM-E-BUILD-FIND-DATA-LIT` FD-G0 / DECIDE-7), `docs/infer-design-contract.md` (`FM-E-BUILD-INFER-DESIGN-1` INF-G0 / DECIDE-6), `docs/data-completion-contract.md` (`FM-E-BUILD-DATA-COMPLETE-1` G0), `docs/did-narrow-exception-contract.md` (`FM-E-BUILD-DID-NARROW-1` G0)  
-Authority: this file freezes the DECIDE-10 **order**, **locks**, **`source_kind`**, and **slice accept bullets** below. Later slices implement against it. G0 adds **this markdown only**.
+Authority: this file freezes the DECIDE-10 **order**, **locks**, **`source_kind`**, the **DATA-RIGOR** toy ban / n<200 honesty gate, and **slice accept bullets** below. Later slices implement against it. G0 adds **this markdown only**.
 
-This is not an ADR. It is the serial write-set freeze so FD-BE-honesty / FD-BE-fetch-\* / FD-FE-honesty can run without colliding with infer-design confirm, FIND-DATA plan authorship, FIND-LIT / R-lit-bar, DATA-COMPLETE attach, PREWRITE-PAUSE flags, classic-5 CSV authorship, or gold chapter bodies. Acceptance is the DECIDE-10 bullets in §8 — **not** gold-body reads and **not** fixture-as-found.
+This is not an ADR. It is the serial write-set freeze so FD-BE-honesty / FD-BE-fetch-\* / FD-FE-honesty can run without colliding with infer-design confirm, FIND-DATA plan authorship, FIND-LIT / R-lit-bar, DATA-COMPLETE attach, PREWRITE-PAUSE flags, classic-5 CSV authorship, or gold chapter bodies. Acceptance is the DECIDE-10 bullets in §8 plus DATA-RIGOR in §8.2 — **not** gold-body reads, **not** fixture-as-found, and **not** 4–24-row toys as product demos.
 
 ---
 
@@ -25,7 +25,21 @@ This is not an ADR. It is the serial write-set freeze so FD-BE-honesty / FD-BE-f
 - Else: show link + honest upload path.
 - Align with infer-design + find-data-lit contracts; fixtures ≠ answer key.
 
-**Order after design confirm:** confirmed `session.design` → **real fetch / discovered candidates first** → optional teaching shelf (`teaching_fixture`, labeled) → attach → prewrite.
+**FM-E-DATA-RIGOR-1 (frozen; Captain hard lock).** Encode the following **verbatim**:
+
+**NO synthetic / invented / toy sample data on the product path.** Fake small CSVs that pass demos then die on real panels are forbidden.
+
+**BANNED as product "found data":** `minimum_wage.csv` (4 rows), `course-panel.csv` (24), CFPS `sanitized_sample.csv` (24, synthetic).
+
+**MUST:**
+
+1. Never present teaching toys as found data.
+2. Prefer live public fetch OR captain-local real files via upload.
+3. Tiny fixtures ONLY under `tests/`, labeled synthetic — never in suggest/find-data UI.
+4. Smoke/rehearsal/classic write-loops ≥ real Card1995 or real panels — not 4–24 row toys.
+5. On attach/estimate, rows < 200 → fail-closed for demo claims (honesty warning).
+
+**Order after design confirm:** confirmed `session.design` → **real fetch / discovered candidates first** → optional teaching shelf (`teaching_fixture`, labeled; **not** toys) → attach → prewrite.
 
 Product-object names in this file: `session.find_data.candidates[]` with required **`source_kind`**, plus optional **`session.find_data.teaching_shelf`**. They are **not** `session.design`, **not** `dataAttached`, and **not** chapter bodies. Later slices must not evaluate by reading gold chapter bodies or treating a classic-5 id as a find.
 
@@ -33,16 +47,18 @@ In scope: the formal econpaper paper path **after** infer-design confirm — the
 
 Out of product line for this contract (do not extend, re-label, or treat as FIND / fetch success):
 
-- Card teaching case (`POST /demos/card`, `research.teaching_case=card_1995`, ADR-0015)
-- Guide / legacy course sample (`frontend/public/samples/course-panel.csv`)
-- CHARLS wizard, CFPS fixture, spike CSVs, eval datasets (including `agent/eval/tasks/undergrad_did_01`)
+- Card teaching case **chrome** (`POST /demos/card`, `research.teaching_case=card_1995`, ADR-0015) as FIND success (real Card 1995 extract may still back **smoke / rehearsal** write-loops — §3.7)
+- Guide / legacy course sample (`frontend/public/samples/course-panel.csv`, 24 rows) — **DATA-RIGOR banned found-data**
+- Spike toy (`agent/spike/fixtures/minimum_wage.csv`, 4 rows) — **DATA-RIGOR banned found-data**
+- CFPS synthetic (`fixtures/cfps_association/sanitized_sample.csv`, 24 rows) — **DATA-RIGOR banned found-data**
+- CHARLS wizard, other spike CSVs, eval datasets (including `agent/eval/tasks/undergrad_did_01`) presented as found data
 - Agent spike (`/spike`), first-value marketing review, **flow-sketch / draft-product chrome as shipped UI**
 - Sketch-only sample names (`sample_wage.csv`, `sample_panel_mini.csv`, `wage_panel.csv`)
 - Catalog identity alone (`ck1994`, `ck1994_long`, `minimum-wage-employment`, `barro1991_growth`, `schooling-wages`, …) presented as **discovered / found**
 - Unconfirmed `session.design` (`missing` / `draft`)
 - Gold-body reads, six-chapter fill from catalog, generate-as-lit
 
-`session.design` (infer-design), `session.find_data` plan (FIND-DATA / DECIDE-7), `dataAttached` (data-completion), and `table1Confirmed` / `specConfirmed` (PREWRITE-PAUSE) are **different** gates. This contract does not propose or confirm a design, does not replace the where/how plan, does not skip confirm-attach, and does not replace those flags. It **does** freeze that fixtures are never “found data”, and that fetch prefers session download when the public API allows.
+`session.design` (infer-design), `session.find_data` plan (FIND-DATA / DECIDE-7), `dataAttached` (data-completion), and `table1Confirmed` / `specConfirmed` (PREWRITE-PAUSE) are **different** gates. This contract does not propose or confirm a design, does not replace the where/how plan, does not skip confirm-attach, and does not replace those flags. It **does** freeze that fixtures and teaching toys are never “found data”, that fetch prefers live public download **or** captain-local **real** files via upload, and that n<200 cannot carry a product demo claim.
 
 DiD permission stays in `docs/infer-design-contract.md` §7. FIND-LIT / R-lit-bar stay in `docs/find-data-lit-contract.md` §7–§8. This file must not reopen catalog-token `allow_did`, must not propose DiD from a fixture id, and must not contradict title-first CK propose.
 
@@ -58,7 +74,8 @@ Given a formal-path session whose **`session.design.status === "confirmed"`**, t
 2. **Never fixture-as-found** — In-repo classic-5 / teaching extracts must **not** be labeled, ordered, or copied as discovered / found / matched-your-study data.
 3. **Teaching-known only** — Those extracts may appear **only** as `source_kind = teaching_fixture`, on an **optional teaching shelf** with an **explicit** label. Their presence is **not** find success.
 4. **Download into session when the API allows** — For Dataverse, Card zip, WDI, and FRED/IPUMS per existing R-sources routes: if a public API or posted file can be retrieved, write bytes into the **session workspace** (staging). That is **fetch**, not attach.
-5. **Else honest path** — If download is not allowed, fails, or needs login / registration, show a followable **link** plus an **honest upload** path. Do not pad with a fixture.
+5. **Else honest path** — If download is not allowed, fails, or needs login / registration, show a followable **link** plus an **honest upload** of **captain-local real files**. Do not pad with a fixture or a toy CSV.
+6. **DATA-RIGOR** — Keep synthetic / invented / toy samples off the product path (§3.4–§3.7). Tiny fixtures live only under `tests/`, labeled synthetic.
 
 FIND-DATA still lists candidates; it never auto-selects, never confirm-attaches, never writes gold chapter bodies. Fetch-into-session does **not** set `dataAttached`.
 
@@ -75,6 +92,7 @@ This contract does **not**:
 - Run estimate, robustness, `generate_title` / `state.title_chapter`, or export docx
 - Vendor restricted microdata (IPUMS extracts, CHARLS, …) into the git repo
 - Scrape behind login, store user credentials, or treat a teaching shelf as a find
+- Present teaching **toys** (`minimum_wage.csv`, `course-panel.csv`, CFPS `sanitized_sample.csv`, or other n≈4–24 invented CSVs) as found data, suggest hits, or product demos
 - Ship Design FIND-1 / `econpaper-ui-temp/flow-sketch` as product chrome
 - Merge DATA-COMPLETE / DID / INF / FIND-LIT / FIND-DATA implementation branches
 - Implement application code, API routes, OpenAPI shapes, or frontend chrome (G0 is markdown only)
@@ -122,7 +140,7 @@ Allowed additional kinds later slices may add **only** if they stay outside find
 |---|---|---|
 | `user_upload` | Honest “upload your own file” action, not a catalog hit | No — it is the fallback path, not a find |
 
-**Must not** invent kinds that launder a fixture (`builtin_match`, `recommended`, `classic_found`, catalog id as `discovered`).
+**Must not** invent kinds that launder a fixture or a toy (`builtin_match`, `recommended`, `classic_found`, catalog id as `discovered`, `course-panel` / `minimum_wage` / `sanitized_sample` as `discovered` or `fetched`).
 
 ### 2.3 Example objects (role freeze, not byte hashes)
 
@@ -200,7 +218,7 @@ External link + honest upload (no public file API / login wall):
 
 ### 2.4 Must not live on these objects as a win path
 
-Catalog id alone, `allow_did`, `dataAttached`, chapter bodies, gold-body hashes, unconfirmed `session.design`, a fixture with `source_kind=discovered` or `source_kind=fetched`.
+Catalog id alone, `allow_did`, `dataAttached`, chapter bodies, gold-body hashes, unconfirmed `session.design`, a fixture or toy with `source_kind=discovered` or `source_kind=fetched`.
 
 ---
 
@@ -234,6 +252,8 @@ DECIDE-7 still allows a fixture to **appear** as a candidate. DECIDE-10 **narrow
 
 Rename or remove `ck1994_long` / `barro1991_growth` / wage1: the shelf may empty. Real fetch / external path **must** still show (same as DECIDE-7 bullet 2).
 
+**DATA-RIGOR recut of the shelf:** banned toys (§3.4) **must not** appear on the shelf, in suggest, or in find-data UI. A 4–24-row synthetic is not a `teaching_fixture` candidate. Real classic-5 **reproduction extracts** (not toys) may still sit on the shelf as teaching-known, never as found data.
+
 ### 3.3 Copy rules (FD-BE-honesty; frozen)
 
 | `source_kind` | Allowed copy family | Forbidden copy family |
@@ -244,6 +264,57 @@ Rename or remove `ck1994_long` / `barro1991_growth` / wage1: the shelf may empty
 | `user_upload` | “上传你自己的文件” | presented as a search hit |
 
 Chinese and English surfaces obey the same distinctions. A translation that calls a fixture 发现 / 检索结果 **fails** FD-BE-honesty.
+
+### 3.4 Teaching toys — banned on the product path (DATA-RIGOR; frozen)
+
+**NO synthetic / invented / toy sample data on the product path.** Fake small CSVs that pass demos then die on real panels are forbidden.
+
+**BANNED as product "found data"** (paths frozen; row counts are data rows, excluding header):
+
+| File | Path | Rows | Why banned |
+|---|---|---|---|
+| `minimum_wage.csv` | `agent/spike/fixtures/minimum_wage.csv` | 4 | Spike toy 2×2; not a panel |
+| `course-panel.csv` | `frontend/public/samples/course-panel.csv` | 24 | Guide / legacy course sample |
+| `sanitized_sample.csv` | `fixtures/cfps_association/sanitized_sample.csv` | 24 | CFPS-shaped **synthetic** (fixture README) |
+
+Same ban covers aliases, copies, and UI sample entries that load those bytes (`SAMPLE_CSV` / “了解产品” guide-sample, spike min-wage CSV, CFPS sanitized sample). Later slices must not add new n≈4–24 invented CSVs to `frontend/public/`, `fixtures/` (outside `tests/`), or suggest/find-data.
+
+**Never present teaching toys as found data.** Not as `discovered`, `fetched`, `external_link` padding, unlabeled shelf rows, or “we found your data”.
+
+### 3.5 Tiny fixtures — tests only (DATA-RIGOR; frozen)
+
+Tiny / synthetic fixtures **ONLY** under `tests/` (including `backend/tests/`, `agent/tests/`, `frontend/src/__tests__/`), and they **must be labeled synthetic** in the file or the test that owns them.
+
+They **never** appear in:
+
+- suggest / FIND-DATA / FIND UI
+- teaching shelf
+- product sample buttons
+- session fetch staging presented as a find
+
+pytest HTTP mocks remain test doubles. They are not found data and not a product demo.
+
+### 3.6 n<200 honesty gate (DATA-RIGOR; frozen)
+
+On **attach** or **estimate**, if attached / analysis `n` (row count) **< 200**:
+
+| Surface | Frozen |
+|---|---|
+| Demo / found-data / “product works” claim | **Fail closed.** Must not treat the run as a passing product demo, FIND success, or teaching-toy win. |
+| Honesty warning | **Required.** User-visible: this file is too small to stand in for a real panel; it is not a demo success. |
+| Attach itself | A user may still attach their own small file. Attach ≠ demo claim. |
+| Estimate itself | May run for the user’s own file. Estimate ≠ “the product was proven on real data”. |
+| Write-loops | Smoke / rehearsal / classic write-loops **must not** use n<200 toys as the proving path. |
+
+Threshold name (later slices may project; G0 does not add OpenAPI): **`N_DEMO_CLAIM_MIN = 200`**. Missing row count **fails closed** for demo claims (do not assume n≥200).
+
+### 3.7 Smoke / rehearsal / classic write-loops (DATA-RIGOR; frozen)
+
+Product-path smoke, rehearsal, and classic write-loops **must** use **≥ real Card 1995 extract** (wooldridge / StatsPAI `card_1995`, n≈3010 in-repo evidence) **or other real panels** (live public fetch, or captain-local real files via upload).
+
+**Not allowed** as that proving path: 4–24-row toys, CFPS `sanitized_sample.csv`, `course-panel.csv`, `minimum_wage.csv`, or any unlabeled synthetic under `fixtures/` / `frontend/public/`.
+
+`/demos/card` chrome stays out of FIND success. Real Card 1995 **bytes** may back a write-loop; the teaching-case UI is still not FIND-DATA.
 
 ---
 
@@ -274,7 +345,7 @@ If any of the following hold, **do not** invent a fixture find:
 - HTTP / parse / license refusal
 - Ambiguous HTML landing page with no resolvable file
 
-Then: `source_kind=external_link` (or keep `discovered` with `fetch.status=link_only` when the row is a live catalog hit), show the **URL**, and offer **upload your own file**. Copy must say the product did **not** ingest that file.
+Then: `source_kind=external_link` (or keep `discovered` with `fetch.status=link_only` when the row is a live catalog hit), show the **URL**, and offer **upload of captain-local real files**. Copy must say the product did **not** ingest that file. Upload of `course-panel.csv` / `minimum_wage.csv` / CFPS `sanitized_sample.csv` (or copies) is **not** a FIND win and **not** a demo claim (§3.4–§3.7).
 
 ### 4.3 Fetch must not (frozen)
 
@@ -283,6 +354,7 @@ Then: `source_kind=external_link` (or keep `discovered` with `fetch.status=link_
 | Set `dataAttached` | Fetch is pre-attach staging. |
 | Confirm-attach | User still confirms. |
 | Treat fixture bytes as a fetch | Copying `fixtures/classic-5/*.csv` into the session is **not** real fetch and **not** `source_kind=fetched`. |
+| Treat toy bytes as a fetch | Copying `minimum_wage.csv` / `course-panel.csv` / CFPS `sanitized_sample.csv` (or other n≈4–24 synthetics) into the session is **not** real fetch, **not** found data, and **not** a demo claim. |
 | Vendor restricted files into git | IPUMS / CHARLS / licensed microdata stay out of the repo. Session staging is per-session, not a catalog commit. |
 | Scrape behind login | No password, cookie, or token harvest. |
 | Skip confirm-design | No authoritative fetch against missing / draft design. |
@@ -322,8 +394,9 @@ FIND-LIT stays after confirm and before literature chapter write (`docs/find-dat
 3. **FIND / fetch does not attach.** `dataAttached` still first for data.
 4. **PREWRITE-PAUSE still owns** `table1Confirmed` and `specConfirmed`.
 5. **CK DiD propose stays on infer-design.** Title/question only → propose DiD + treated×period **before** any ck attach (`docs/infer-design-contract.md` §8 bullet 1). This file may fetch Card zip / Dataverse **after** that confirm. It must not propose DiD from a fixture or from a successful fetch.
-6. **Fixtures ≠ answer key** (DECIDE-6 / DECIDE-7, unchanged). DECIDE-10 adds: fixtures ≠ found data.
+6. **Fixtures ≠ answer key** (DECIDE-6 / DECIDE-7, unchanged). DECIDE-10 adds: fixtures ≠ found data. DATA-RIGOR adds: **toys ≠ found data** and **toys ≠ product demo**.
 7. **Independence.** A session fetch path does not confirm a design. Checking lit cards does not fetch data. A catalog highlight does neither.
+8. **Prefer live public fetch OR captain-local real files via upload.** Guide-sample / spike / CFPS synthetic buttons are not that upload path.
 
 ### 5.3 What may happen before confirm-design
 
@@ -333,7 +406,7 @@ FIND-LIT stays after confirm and before literature chapter write (`docs/find-dat
 What must not happen before confirm-design:
 
 - Authoritative fetch / “discovered” ranking
-- Fixture-as-found
+- Fixture-as-found or toy-as-found
 - Catalog → `allow_did` or catalog → locked spec
 - `table1Confirmed` / `specConfirmed` / estimate
 
@@ -360,7 +433,7 @@ Dataverse remains the **always-on backup** when a named venue cannot fetch.
 
 **Design FIND-1** at `econpaper-ui-temp/flow-sketch` may be **consulted as a draft sketch only** (label intent: discovered vs teaching-known vs upload). It is **not** product chrome, **not** a second product line, and **not** an accept path. Later FE must not import sketch sample names, Card 1995 teaching-case layout, or treat the sketch as the formal FIND UI.
 
-Absence of the FE chrome does **not** waive backend honesty (`source_kind` + never fixture-as-found).
+Absence of the FE chrome does **not** waive backend honesty (`source_kind` + never fixture-as-found + never toy-as-found). Teaching-toy sample buttons in sketch chrome must not land on the formal FIND UI.
 
 ---
 
@@ -368,7 +441,7 @@ Absence of the FE chrome does **not** waive backend honesty (`source_kind` + nev
 
 G0 does not add tests. Later slices **must** implement and show these acceptance criteria. Do **not** evaluate by reading gold chapter bodies. Do **not** treat a fixture as found data.
 
-**Locks (must remain true on every named slice):** real fetch first; fixtures = teaching-known only, never find success; optional teaching shelf with explicit label; prefer session download when the API allows (Dataverse, Card zip, WDI, FRED/IPUMS per existing routes); else link + honest upload; fixtures ≠ answer key; CK title→propose DiD deferred to infer-design.
+**Locks (must remain true on every named slice):** real fetch first; fixtures = teaching-known only, never find success; optional teaching shelf with explicit label (**not** toys); prefer session download when the API allows (Dataverse, Card zip, WDI, FRED/IPUMS per existing routes); else link + captain-local **real** upload; fixtures ≠ answer key; **no synthetic / toy data on the product path**; CK title→propose DiD deferred to infer-design.
 
 ### 8.1 Named slice accept bullets
 
@@ -378,7 +451,17 @@ G0 does not add tests. Later slices **must** implement and show these acceptance
 | **FD-BE-fetch-card** | Confirmed minwage design: attempt Card zip **download into session** when the posted archive is retrievable; else Card zip **link + honest upload**. Fixture is not the fetch. | `/demos/card`; copy `ck1994_long.csv` into session and call it the zip; skip confirm-design; set `dataAttached`; unlock DiD. |
 | **FD-BE-fetch-dataverse** | Confirmed design: Dataverse search from facets; download a public file into session when the API allows; else dataset / search URL + honest upload. Search miss → Dataverse path still shown, **not** a fixture find. | Fixture as the Dataverse hit; hide Dataverse because a catalog id existed; attach without confirm. |
 | **FD-BE-fetch-wdi** | Confirmed growth design: WDI download into session when the public API allows; else WDI link + honest upload. `barro1991_growth` stays teaching-known if shown. | Barro fixture as the WDI fetch; skip confirm; set `dataAttached`. |
-| **FD-FE-honesty** | UI labels separate discovered / fetched / external_link / teaching shelf / upload. Teaching shelf explicitly **not** a find result. May use Design FIND-1 (`econpaper-ui-temp/flow-sketch`) as **draft sketch only**. | Sketch shipped as the formal UI; fixture cards with “found” copy; mixing unlabeled fixtures into the discovered list. |
+| **FD-FE-honesty** | UI labels separate discovered / fetched / external_link / teaching shelf / upload. Teaching shelf explicitly **not** a find result. May use Design FIND-1 (`econpaper-ui-temp/flow-sketch`) as **draft sketch only**. | Sketch shipped as the formal UI; fixture cards with “found” copy; mixing unlabeled fixtures into the discovered list; toy sample as found. |
+
+### 8.2 DATA-RIGOR accept bullets (Captain; later slices)
+
+| # | Accept (gate reading) | Fail (unacceptable substitute) |
+|---|---|---|
+| 1 | Teaching toys never presented as found data (copy, `source_kind`, suggest, FIND UI). | `course-panel.csv` / `minimum_wage.csv` / CFPS `sanitized_sample.csv` as discovered / fetched / “找到了数据”. |
+| 2 | After confirm: live public fetch **or** captain-local **real** file upload. | Guide-sample / spike / CFPS synthetic as the preferred path; pad miss with a toy. |
+| 3 | Tiny fixtures only under `tests/`, labeled synthetic. Never in suggest / find-data UI. | New toy CSV in `frontend/public/` or `fixtures/` used as product data; test double shown as a find. |
+| 4 | Smoke / rehearsal / classic write-loops use real Card 1995 extract or real panels. | 4–24-row toys as the proving write-loop; `course-panel.csv` golden-path as product rigor. |
+| 5 | Attach or estimate with `n < 200`: honesty warning; **demo claims fail closed**. | Silent success; “demo passed” on 24 rows; missing n treated as large enough. |
 
 OLS remains the default when DiD is not allowed (**infer-design**). Heterogeneity × no-interaction stays a hard block. Missing treated×period when `design.method=did` stays a DID-BE-spec hard block. FIND-LIT / R-lit-bar stay as DECIDE-7. This file does not change those rules.
 
@@ -392,7 +475,7 @@ G0 owns **only** `docs/real-fetch-contract.md`.
 
 | Slice | Owns | Must not write |
 |---|---|---|
-| **FD-BE-honesty** | `source_kind` on candidates; never fixture-as-found; teaching-shelf projection; copy tokens | Attach / `dataAttached`, catalog auto-select, `allow_did`, chapter bodies, FE chrome ownership, fetch HTTP clients |
+| **FD-BE-honesty** | `source_kind` on candidates; never fixture-as-found; never toy-as-found; teaching-shelf projection; DATA-RIGOR copy tokens; n<200 demo-claim fail-closed (warning contract) | Attach implementation, catalog auto-select, `allow_did`, chapter bodies, FE chrome ownership, fetch HTTP clients, moving toys into `tests/` in G0 |
 | **FD-BE-fetch-card** | Card / minwage zip resolve + session download or link+upload | Classic-5 CSV bytes, `/demos/card`, confirm-attach, DiD permission, WDI/Dataverse clients |
 | **FD-BE-fetch-dataverse** | Dataverse file download into session when API allows; else URL | Fixture substitution, attach, teaching-shelf copy ownership |
 | **FD-BE-fetch-wdi** | WDI public download into session when API allows; else URL | Barro as fetch, attach, Card zip client |
@@ -402,7 +485,7 @@ Slices stay **write-set-disjoint**. Shared types go through existing OpenAPI cod
 
 FRED / IPUMS fetch, if later named, follow §4 and stay off this G0 write-set.
 
-**FD-FE-honesty alignment (frozen):** optional chrome. Absence of the labels UI does not waive backend `source_kind` / never fixture-as-found.
+**FD-FE-honesty alignment (frozen):** optional chrome. Absence of the labels UI does not waive backend `source_kind` / never fixture-as-found / never toy-as-found.
 
 Existing FD-BE-plan / FD-BE-candidates (DECIDE-7) keep plan + real-candidate shape. This contract **recuts** fixture presentation and adds fetch. **Do not merge** those implementation branches in G0.
 
@@ -426,14 +509,16 @@ Existing FD-BE-plan / FD-BE-candidates (DECIDE-7) keep plan + real-candidate sha
 
 Also do not reopen: generic spine, localized-first-study, upload-recovery, run-execution DESIGN.
 
-Reuse, do not fork: `session.design`, DECIDE-7 candidate fields, `dataAttached`, snapshot `dataset`, PREWRITE-PAUSE flag names, R-sources families. Add `source_kind` (and optional fetch projection) — do not replace `session.design` or `dataAttached`, and do not treat catalog id as discovered.
+Reuse, do not fork: `session.design`, DECIDE-7 candidate fields, `dataAttached`, snapshot `dataset`, PREWRITE-PAUSE flag names, R-sources families. Add `source_kind` (and optional fetch projection) — do not replace `session.design` or `dataAttached`, and do not treat catalog id or a toy CSV as discovered.
+
+G0 does **not** delete the banned toy files, move them under `tests/`, or change `/demos/card`. Later slices own those write-sets against this freeze.
 
 ---
 
 ## 11. G0 done rule
 
 - File present: `docs/real-fetch-contract.md`
-- Folded: DECIDE-10 **real fetch first**; find-data must not present fixtures as discovered/found data; fixtures = teaching-known only, never find success; optional teaching shelf with explicit label; prefer actual download into session when API allows (Dataverse, Card zip, WDI, and FRED/IPUMS per existing routes); else link + honest upload; align with infer-design + find-data-lit; fixtures ≠ answer key; `source_kind`: `discovered` \| `teaching_fixture` \| `external_link` \| `fetched` (plus optional `user_upload`); order after design confirm; slice accept bullets **FD-BE-honesty**, **FD-BE-fetch-card**, **FD-BE-fetch-dataverse**, **FD-BE-fetch-wdi**, **FD-FE-honesty** (Design FIND-1 / flow-sketch = draft sketch only); **no gold body reads**
+- Folded: DECIDE-10 **real fetch first**; find-data must not present fixtures as discovered/found data; fixtures = teaching-known only, never find success; optional teaching shelf with explicit label; prefer actual download into session when API allows (Dataverse, Card zip, WDI, and FRED/IPUMS per existing routes); else link + captain-local **real** upload; align with infer-design + find-data-lit; fixtures ≠ answer key; `source_kind`: `discovered` \| `teaching_fixture` \| `external_link` \| `fetched` (plus optional `user_upload`); order after design confirm; slice accept bullets **FD-BE-honesty**, **FD-BE-fetch-card**, **FD-BE-fetch-dataverse**, **FD-BE-fetch-wdi**, **FD-FE-honesty** (Design FIND-1 / flow-sketch = draft sketch only); **FM-E-DATA-RIGOR-1**: no synthetic / invented / toy sample data on the product path; banned found-data `minimum_wage.csv` (4), `course-panel.csv` (24), CFPS `sanitized_sample.csv` (24, synthetic); teaching toys never found data; tiny fixtures only under `tests/`, labeled synthetic, never suggest/find-data UI; smoke/rehearsal/classic write-loops ≥ real Card1995 or real panels; attach/estimate `n < 200` → demo claims fail closed (honesty warning); **no gold body reads**
 - No application code, API routes, frontend, fixtures, OpenAPI, or OLS-lock change in G0
 - No merge of DATA-COMPLETE / DID-NARROW / INF / FIND-DATA / FIND-LIT implementation branches
 - No pull request from this slice

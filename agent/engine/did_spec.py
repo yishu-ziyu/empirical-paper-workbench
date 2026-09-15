@@ -251,8 +251,6 @@ def _candidate_names(
             "outcome",
             "outcome_col",
             "dv",
-            "treated",
-            "period",
         ):
             raw = src.get(key)
             if raw is not None and str(raw).strip():

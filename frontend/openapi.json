@@ -487,6 +487,151 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data/suggest": {
+      "post": {
+        "summary": "Suggest Find Data Endpoint",
+        "description": "Label discovered / external_link candidates and optional teaching shelf.",
+        "operationId": "suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/fetch-card": {
+      "post": {
+        "summary": "Fetch Card Zip Endpoint",
+        "description": "Download author-posted Card zip into session, or keep link + upload.",
+        "operationId": "fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+      "post": {
+        "summary": "Fetch Dataverse Endpoint",
+        "description": "Search Dataverse and download a public file, else keep the URL.",
+        "operationId": "fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataverseFetchRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/find-data/fetch-wdi": {
       "post": {
         "summary": "Fetch Wdi Endpoint",
@@ -4574,6 +4719,35 @@
         "type": "object",
         "title": "DatasetProvenanceResponse"
       },
+      "DataverseFetchRequest": {
+        "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          }
+        },
+        "type": "object",
+        "title": "DataverseFetchRequest",
+        "description": "Optional chosen Dataverse dataset / file. Empty body searches then fetches."
+      },
       "DecisionEventResponse": {
         "properties": {
           "id": {
@@ -6006,6 +6180,29 @@
             "type": "string",
             "title": "Source Id"
           },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "discovered",
+              "teaching_fixture",
+              "external_link",
+              "fetched",
+              "captain_local_real",
+              "user_upload"
+            ],
+            "title": "Source Kind"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -6030,53 +6227,32 @@
             "type": "object",
             "title": "Design Fit"
           },
-          "found": {
-            "type": "boolean",
-            "title": "Found",
-            "default": true
+          "honesty_label": {
+            "type": "string",
+            "title": "Honesty Label",
+            "default": ""
           },
-          "teaching_fixture": {
-            "type": "boolean",
-            "title": "Teaching Fixture",
-            "default": false
-          },
-          "n_rows": {
+          "fetch": {
             "anyOf": [
               {
-                "type": "integer"
+                "$ref": "#/components/schemas/FindDataFetchResponse"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "N Rows"
-          },
-          "honesty_warning": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Honesty Warning"
-          },
-          "acquire": {
-            "type": "boolean",
-            "title": "Acquire",
-            "default": false
+            ]
           }
         },
         "type": "object",
         "required": [
           "source_id",
+          "source_kind",
           "title",
           "url_or_fixture",
           "license"
         ],
         "title": "FindDataCandidateResponse",
-        "description": "Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty."
+        "description": "Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.\n\nMissing ``source_kind`` fails closed. Fixtures are never discovered/found."
       },
       "FindDataFetchProjectionResponse": {
         "properties": {
@@ -6111,7 +6287,42 @@
           "status"
         ],
         "title": "FindDataFetchProjectionResponse",
-        "description": "Session download vs honest link (docs/real-fetch-contract.md §2.1)."
+        "description": "Alias for WDI fetch projection; same shape as FindDataFetchResponse."
+      },
+      "FindDataFetchResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchResponse",
+        "description": "Session download vs honest link vs teaching shelf. Not attach."
       },
       "FindDataPlanBodyResponse": {
         "properties": {
@@ -6200,6 +6411,27 @@
         "type": "object",
         "title": "FindDataSearchFacetsResponse",
         "description": "Confirmed Y/X/method/interactions used to search (not a confirm substitute)."
+      },
+      "FindDataTeachingShelfResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FindDataCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "FindDataTeachingShelfResponse",
+        "description": "Optional teaching-known extracts. Explicitly not a find result."
       },
       "GenerateChapterRequest": {
         "properties": {
@@ -8127,6 +8359,16 @@
             },
             "type": "array",
             "title": "Candidates"
+          },
+          "teaching_shelf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataTeachingShelfResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

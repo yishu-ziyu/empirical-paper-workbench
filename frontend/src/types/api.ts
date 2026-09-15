@@ -278,6 +278,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest Find Data Endpoint
+         * @description Label discovered / external_link candidates and optional teaching shelf.
+         */
+        post: operations["suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/fetch-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Card Zip Endpoint
+         * @description Download author-posted Card zip into session, or keep link + upload.
+         */
+        post: operations["fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Dataverse Endpoint
+         * @description Search Dataverse and download a public file, else keep the URL.
+         */
+        post: operations["fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/find-data/fetch-wdi": {
         parameters: {
             query?: never;
@@ -2066,6 +2126,16 @@ export interface components {
             /** Extract Kind */
             extract_kind?: string | null;
         };
+        /**
+         * DataverseFetchRequest
+         * @description Optional chosen Dataverse dataset / file. Empty body searches then fetches.
+         */
+        DataverseFetchRequest: {
+            /** Source Id */
+            source_id?: string | null;
+            /** File Id */
+            file_id?: string | null;
+        };
         /** DecisionEventResponse */
         DecisionEventResponse: {
             /** Id */
@@ -2686,11 +2756,20 @@ export interface components {
         };
         /**
          * FindDataCandidateResponse
-         * @description Real candidate shape (docs/find-data-lit-contract.md §5). Plan stub may be empty.
+         * @description Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.
+         *
+         *     Missing ``source_kind`` fails closed. Fixtures are never discovered/found.
          */
         FindDataCandidateResponse: {
             /** Source Id */
             source_id: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "discovered" | "teaching_fixture" | "external_link" | "fetched" | "captain_local_real" | "user_upload";
+            /** Source */
+            source?: string | null;
             /** Title */
             title: string;
             /** Url Or Fixture */
@@ -2704,30 +2783,35 @@ export interface components {
                 [key: string]: unknown;
             };
             /**
-             * Found
-             * @default true
+             * Honesty Label
+             * @default
              */
-            found: boolean;
-            /**
-             * Teaching Fixture
-             * @default false
-             */
-            teaching_fixture: boolean;
-            /** N Rows */
-            n_rows?: number | null;
-            /** Honesty Warning */
-            honesty_warning?: string | null;
-            /**
-             * Acquire
-             * @default false
-             */
-            acquire: boolean;
+            honesty_label: string;
+            fetch?: components["schemas"]["FindDataFetchResponse"] | null;
         };
         /**
          * FindDataFetchProjectionResponse
-         * @description Session download vs honest link (docs/real-fetch-contract.md §2.1).
+         * @description Alias for WDI fetch projection; same shape as FindDataFetchResponse.
          */
         FindDataFetchProjectionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
+         * FindDataFetchResponse
+         * @description Session download vs honest link vs teaching shelf. Not attach.
+         */
+        FindDataFetchResponse: {
             /**
              * Status
              * @enum {string}
@@ -2795,6 +2879,16 @@ export interface components {
             question: string;
             /** Query Terms */
             query_terms?: string[];
+        };
+        /**
+         * FindDataTeachingShelfResponse
+         * @description Optional teaching-known extracts. Explicitly not a find result.
+         */
+        FindDataTeachingShelfResponse: {
+            /** Label */
+            label: string;
+            /** Candidates */
+            candidates?: components["schemas"]["FindDataCandidateResponse"][];
         };
         /**
          * GenerateChapterRequest
@@ -3589,6 +3683,7 @@ export interface components {
             plan?: components["schemas"]["FindDataPlanBodyResponse"] | null;
             /** Candidates */
             candidates?: components["schemas"]["FindDataCandidateResponse"][];
+            teaching_shelf?: components["schemas"]["FindDataTeachingShelfResponse"] | null;
         };
         /**
          * SessionInfoResponse
@@ -4430,6 +4525,103 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DataverseFetchRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

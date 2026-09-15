@@ -3310,6 +3310,12 @@ export interface components {
                 [key: string]: unknown;
             }[];
             research?: components["schemas"]["ResearchLabResponse"] | null;
+            /**
+             * Allow Did
+             * @description DiD permission (DID-BE-gate). True only from confirmed session.design.method=did plus treated×period on that design. Catalog id / TITLE/TOPIC / form method=did are not setters. Missing is false.
+             * @default false
+             */
+            allow_did: boolean;
         };
         /**
          * SnapshotActiveRunResponse

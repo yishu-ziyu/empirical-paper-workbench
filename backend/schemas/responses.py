@@ -483,6 +483,15 @@ class SessionInfoResponse(BaseModel):
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
     research: Optional[ResearchLabResponse] = None
     design: Optional[SessionDesignResponse] = None
+    allow_did: bool = Field(
+        default=False,
+        description=(
+            "DiD permission (DID-BE-gate). True only from confirmed "
+            "session.design.method=did plus treated×period on that design. "
+            "Catalog id / TITLE/TOPIC / form method=did are not setters. "
+            "Missing is false."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

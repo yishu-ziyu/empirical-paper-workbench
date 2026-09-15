@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| FM-E-BUILD-FIND-MERGE-1 | `runtime/tasks/20260915-fm-e-build-find-merge-1.md` | complete | `feat/fm-e-build-find-merge-1` @ `552cf397` | 2026-09-15 | stacked on INFER; `make test` green; no PR |
 | FM-E-BUILD-INFER-MERGE-1 | `runtime/tasks/20260915-fm-e-build-infer-merge-1.md` | complete | `feat/fm-e-build-infer-merge-1` @ `759ce5d6` | 2026-09-15 | pushed; `make test` green; no PR |
 | 20260915-inf-be-propose | `runtime/tasks/20260915-inf-be-propose.md` | complete | `feat/fm-e-build-inf-be-propose-1` @ `874ecb3` | 2026-09-15 | slice done; no PR |
 | FM-E-BUILD-INFER-DESIGN-1 / INF-BE-confirm | `runtime/tasks/20260915-inf-be-confirm.md` | complete | `feat/fm-e-build-inf-be-confirm-1` from `2a663915` | 2026-09-15 | later slices call `locked_design()`; no PR |

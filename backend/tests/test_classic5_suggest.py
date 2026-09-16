@@ -6,11 +6,13 @@ not a success path and must not prefill spec or open DiD.
 """
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
 import routers.classic5 as classic5_router
 import services.classic5_catalog as catalog
+from config import PRODUCT_ROOT
 from facade import facade
 from services.classic5_catalog import (
     design_is_confirmed,
@@ -18,6 +20,10 @@ from services.classic5_catalog import (
     read_catalog,
     suggest_candidates,
 )
+
+# Fixture-integrity check carried over from feat/fm-e-build-classic-fixtures-1
+# (its CSV bytes match main's byte-for-byte; main had no column contract test).
+_CLASSIC5_DIR = PRODUCT_ROOT / "fixtures" / "classic-5"
 
 _FORBIDDEN_SUCCESS_KEYS = {
     "allow_did",
@@ -410,3 +416,35 @@ def test_suggest_modules_have_no_attach_or_did_lock():
     assert not hasattr(catalog, "load_entry_bytes")
     assert not hasattr(catalog, "admit_classic5")
     assert not hasattr(catalog, "allow_did")
+
+
+def test_classic5_fixture_csvs_have_required_columns():
+    """feat/fm-e-build-classic-fixtures-1: shipped CSV bytes keep their header."""
+    required = {
+        "ck1994_long.csv": [
+            "store_id",
+            "state",
+            "treated",
+            "period",
+            "fte",
+            "wage",
+            "chain",
+        ],
+        "barro1991_growth.csv": [
+            "country",
+            "gdp_pc_initial",
+            "growth",
+            "sec_enroll",
+            "prim_enroll",
+            "inv_share",
+            "gov_share",
+            "pop_growth",
+        ],
+    }
+    for name, columns in required.items():
+        path = _CLASSIC5_DIR / name
+        assert path.is_file(), name
+        with path.open(encoding="utf-8", newline="") as handle:
+            header = next(csv.reader(handle))
+        assert header == columns
+    assert (_CLASSIC5_DIR / "SOURCE.txt").is_file()

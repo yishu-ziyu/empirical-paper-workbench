@@ -1,0 +1,195 @@
+{
+  "scope": "API only. Browser NOT RUN. Operator approval is an automated test action, not human user acceptance.",
+  "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0",
+  "checks": [
+    {
+      "action": "normal owner login",
+      "http_status": 200,
+      "elapsed_seconds": 0.28,
+      "expected_status": 200
+    },
+    {
+      "action": "read existing Card",
+      "http_status": 200,
+      "elapsed_seconds": 0.021,
+      "expected_status": 200
+    },
+    {
+      "action": "approve inspected association claim",
+      "http_status": 200,
+      "elapsed_seconds": 0.022,
+      "expected_status": 200
+    },
+    {
+      "action": "main analysis mismatch gate",
+      "http_status": 409,
+      "elapsed_seconds": 0.018,
+      "expected_status": 409
+    },
+    {
+      "action": "explicitly promote required completed IV",
+      "http_status": 200,
+      "elapsed_seconds": 0.029,
+      "expected_status": 200
+    },
+    {
+      "action": "prepare current approved research for paper",
+      "http_status": 200,
+      "elapsed_seconds": 0.577,
+      "expected_status": 200
+    },
+    {
+      "action": "normal refresh before long generation",
+      "http_status": 401,
+      "elapsed_seconds": 0.017,
+      "expected_status": 200
+    }
+  ],
+  "results_requests": 0,
+  "provider_usage": "Not exposed by chapter response; not inferred from text length.",
+  "expectation": {
+    "text": "I expect education to be positively associated with log wages. OLS and IV may differ; instrument relevance does not establish exclusion or a population-wide causal effect.",
+    "text_zh": "预计 OLS 为正；如果能力造成向上偏误，IV 可能比 OLS 更小。",
+    "confidence": "medium",
+    "locale": "en",
+    "version": 2,
+    "updated_at": "2026-09-08T05:18:25+00:00",
+    "history": [
+      {
+        "version": 1,
+        "text": "I expect OLS to be positive. If ability creates upward bias, IV may be smaller.",
+        "confidence": "medium",
+        "locale": "en",
+        "at": "2026-09-08T05:18:23+00:00",
+        "kind": "seed",
+        "criteria": [
+          {
+            "id": "criterion.seed.iv-below-ols",
+            "kind": "ordering",
+            "left": {
+              "metric": "estimate.coef",
+              "estimator": "iv",
+              "spec_id": "iv_region_dummies",
+              "label": "IV estimate"
+            },
+            "operator": "lt",
+            "right": {
+              "metric": "estimate.coef",
+              "estimator": "ols",
+              "spec_id": "ols_region_dummies",
+              "label": "OLS estimate"
+            },
+            "tolerance": null,
+            "label": "IV estimate < OLS estimate",
+            "source": "seed"
+          }
+        ]
+      },
+      {
+        "version": 2,
+        "text": "I expect education to be positively associated with log wages. OLS and IV may differ; instrument relevance does not establish exclusion or a population-wide causal effect.",
+        "confidence": "medium",
+        "locale": "en",
+        "at": "2026-09-08T05:18:25+00:00",
+        "kind": "edit",
+        "criteria": [
+          {
+            "id": "criterion.seed.iv-below-ols",
+            "kind": "ordering",
+            "left": {
+              "metric": "estimate.coef",
+              "estimator": "iv",
+              "spec_id": "iv_region_dummies",
+              "label": "IV estimate"
+            },
+            "operator": "lt",
+            "right": {
+              "metric": "estimate.coef",
+              "estimator": "ols",
+              "spec_id": "ols_region_dummies",
+              "label": "OLS estimate"
+            },
+            "tolerance": null,
+            "label": "IV estimate < OLS estimate",
+            "source": "seed"
+          }
+        ]
+      }
+    ],
+    "criteria": [
+      {
+        "id": "criterion.seed.iv-below-ols",
+        "kind": "ordering",
+        "left": {
+          "metric": "estimate.coef",
+          "estimator": "iv",
+          "spec_id": "iv_region_dummies",
+          "label": "IV estimate"
+        },
+        "operator": "lt",
+        "right": {
+          "metric": "estimate.coef",
+          "estimator": "ols",
+          "spec_id": "ols_region_dummies",
+          "label": "OLS estimate"
+        },
+        "tolerance": null,
+        "label": "IV estimate < OLS estimate",
+        "source": "seed"
+      }
+    ]
+  },
+  "completed_specification_runs": 12,
+  "inspected_claim": {
+    "id": "claim.card.education-earnings",
+    "claim_text": "Education is positively associated with earnings.",
+    "claim_type": "association",
+    "supported_wording": "Education is positively associated with earnings.",
+    "conditionally_supported_wording": "Under the college-proximity IV assumptions, IV estimates suggest a positive local causal return to schooling.",
+    "unsupported_wording": "One more year of education raises everyone's wage by 13%.",
+    "supporting_run_ids": [
+      "c96fd037-efc9-4ac6-a249-95769cbce028:ols_region_dummies",
+      "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies"
+    ],
+    "counter_evidence": [
+      "OLS and IV coefficients differ; identification strategy is a sensitive dimension."
+    ],
+    "sensitive_dimensions": [
+      "estimator",
+      "identification"
+    ],
+    "unresolved_assumptions": [
+      "IV exclusion restriction (college proximity affects wages only through education)",
+      "monotonicity (no defiers)",
+      "LATE is not ATE",
+      "instrument strength"
+    ],
+    "evidence_status": "supported",
+    "approved_by_user": false,
+    "stale": false,
+    "version": 1,
+    "based_on_evidence_revision": 1,
+    "run_facts": "OLS spec_id=ols_region_dummies coef=0.07469325559311328 se=0.003498345658478739 n=3010 formula=lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668\nIV spec_id=iv_region_dummies coef=0.13150383624724782 se=0.05496367260152569 n=3010 formula=lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+    "provenance": {
+      "ols_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_region_dummies",
+      "iv_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies",
+      "ols_spec_id": "ols_region_dummies",
+      "iv_spec_id": "iv_region_dummies",
+      "producer_run_ids": [
+        "c96fd037-efc9-4ac6-a249-95769cbce028"
+      ],
+      "ols_coef": 0.07469325559311328,
+      "iv_coef": 0.13150383624724782
+    }
+  },
+  "canonical_spec_id_before": null,
+  "main_analysis_selection": {
+    "reason": "Use the completed comparable IV specification required by the inspected claim, retaining its identification limitations.",
+    "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies",
+    "spec_id": "iv_region_dummies"
+  },
+  "stopped": {
+    "type": "RuntimeError",
+    "message": "normal refresh before long generation: HTTP 401, expected 200"
+  }
+}

@@ -1,0 +1,3 @@
+# PostgreSQL registration first failure
+
+The first real HTTPS `POST /api/auth/register` returned 500 on source e4c1ab0. asyncpg rejected aware datetime defaults bound to the existing timezone-naive `users.created_at/updated_at` columns (`can't subtract offset-naive and offset-aware datetimes`). No write retry was made before diagnosis. Keep the existing schema and store naive UTC defaults explicitly; then verify the same registration path through the proxy. The raw local trace is not published because SQL parameters may contain password hashes. API first-run evidence is the public redacted record. This is separate from issue #34.

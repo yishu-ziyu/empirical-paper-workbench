@@ -1,0 +1,7 @@
+{
+  "path": "/api/auth/me",
+  "entry_auth": true,
+  "application_auth": false,
+  "status": 401,
+  "provider_config": "project-native SSOT; real role probes passed"
+}

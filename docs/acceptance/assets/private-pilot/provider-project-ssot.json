@@ -1,0 +1,40 @@
+[
+  {
+    "role": "generate",
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "key_present": true,
+    "requests": 1,
+    "http_status": 200,
+    "ok": true,
+    "content_length": 5,
+    "usage": {
+      "total_tokens": 173,
+      "total_characters": 0,
+      "prompt_tokens": 171,
+      "completion_tokens": 2,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      }
+    }
+  },
+  {
+    "role": "review",
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "key_present": true,
+    "requests": 1,
+    "http_status": 200,
+    "ok": true,
+    "content_length": 5,
+    "usage": {
+      "total_tokens": 173,
+      "total_characters": 0,
+      "prompt_tokens": 171,
+      "completion_tokens": 2,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      }
+    }
+  }
+]

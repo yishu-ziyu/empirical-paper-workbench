@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ..design.spec import norm_method
+from ..design.spec import apply_heterogeneity_to_formula, interaction_term, norm_method
+from ..engine.ols_lock import method_triggers_ols_lock
 from ..state import EconPaperState
 
 
@@ -145,6 +146,8 @@ def _run_heterogeneity(
     df: Any,
     main_spec: Dict[str, Any],
     diagnostics: List[Dict[str, Any]],
+    *,
+    method: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """异质性：对每个 heterogeneity_group 跑交互项。"""
     groups = main_spec.get("heterogeneity_groups") or []
@@ -158,42 +161,60 @@ def _run_heterogeneity(
     if "~" not in formula:
         return []
 
-    outcome, rhs = formula.split("~", 1)
+    outcome, _rhs = formula.split("~", 1)
     outcome = outcome.strip()
     treatment = main_spec.get("treatment") or "treat"
+    lock_ols = method_triggers_ols_lock(method or main_spec.get("method"))
 
     results: List[Dict[str, Any]] = []
     for group in groups:
-        # y ~ treat + group + treat:group
-        interaction_formula = f"{outcome} ~ {treatment} + {group} + {treatment}:{group}"
-        interaction_var = f"{treatment}:{group}"
-        try:
-            import statspai
-
-            res = statspai.feols(interaction_formula, data=df)
-        except Exception as exc:
-            # pyfixest 未安装时 feols 抛 ImportError，降级到 statsmodels 交互
-            # OLS，保证异质性交互项仍被估计（降级被如实记入 diagnostics）。
-            diagnostics.append({
-                "test": "feols_heterogeneity",
-                "group": group,
-                "status": "fallback",
-                "error": str(exc),
-            })
+        # y ~ treat + group + treat:group  (educ×group, not additive-only dummy)
+        interaction_formula = apply_heterogeneity_to_formula(
+            f"{outcome} ~ {treatment}",
+            treatment=str(treatment),
+            groups=[str(group)],
+        )
+        interaction_var = interaction_term(str(treatment), str(group))
+        if lock_ols:
             try:
                 res = _sm_ols(interaction_formula, data=df)
-            except Exception as exc2:
+            except Exception as exc:
                 diagnostics.append({
-                    "test": "statsmodels_heterogeneity",
+                    "test": "ols_heterogeneity",
                     "group": group,
                     "status": "error",
-                    "error": str(exc2),
+                    "error": str(exc),
                 })
                 continue
+        else:
+            try:
+                import statspai
+
+                res = statspai.feols(interaction_formula, data=df)
+            except Exception as exc:
+                # pyfixest 未安装时 feols 抛 ImportError，降级到 statsmodels 交互
+                # OLS，保证异质性交互项仍被估计（降级被如实记入 diagnostics）。
+                diagnostics.append({
+                    "test": "feols_heterogeneity",
+                    "group": group,
+                    "status": "fallback",
+                    "error": str(exc),
+                })
+                try:
+                    res = _sm_ols(interaction_formula, data=df)
+                except Exception as exc2:
+                    diagnostics.append({
+                        "test": "statsmodels_heterogeneity",
+                        "group": group,
+                        "status": "error",
+                        "error": str(exc2),
+                    })
+                    continue
         results.append({
             "group": group,
             "interaction_coef": _coef_of(res, interaction_var),
             "p": _p_of(res, interaction_var),
+            "formula": interaction_formula,
         })
     return results
 
@@ -612,7 +633,9 @@ def robustness_check(state: EconPaperState) -> Dict[str, Any]:
         placebos = _run_placebo(df, main_spec, "scm", diagnostics)
     else:
         robustness = _run_clustering(df, main_spec, diagnostics)
-        heterogeneity = _run_heterogeneity(df, main_spec, diagnostics)
+        heterogeneity = _run_heterogeneity(
+            df, main_spec, diagnostics, method=method
+        )
         placebos = _run_placebo(
             df,
             main_spec,

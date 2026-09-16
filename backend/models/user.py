@@ -10,6 +10,12 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from database import Base
 
 
+def _utc_naive() -> datetime:
+    # Existing user columns are TIMESTAMP WITHOUT TIME ZONE. asyncpg rejects
+    # aware values for that schema; store UTC consistently without a migration.
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class User(Base):
     """Registered user of the econpaper application."""
 
@@ -28,10 +34,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
+        default=_utc_naive,
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utc_naive,
+        onupdate=_utc_naive,
     )

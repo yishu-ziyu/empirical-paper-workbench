@@ -11,6 +11,7 @@ import pytest
 import agent.graph as graph_module
 from agent.engine.cancellation import ExecutionCancelled
 from agent.engine.prewrite import PRWRITE_NODES, PRWRITE_SEQUENCE, run_prewrite
+from agent.engine.prewrite_preview import PREWRITE_GATE_AWAITING_ESTIMATE
 from agent.nodes.route_after_review import _advance  # noqa: F401  (route 收敛锚点)
 
 
@@ -87,6 +88,35 @@ def test_run_prewrite_does_not_start_the_next_node_after_cancellation(monkeypatc
         run_prewrite({}, should_cancel=lambda: cancelled)
 
     assert calls == ["set_direction"]
+
+
+def test_run_prewrite_until_identification_does_not_estimate(tmp_path):
+    """Workbench direction phase: Table 1 + equation, no estimate/outline."""
+    csv = _panel_csv(tmp_path)
+    state = run_prewrite(
+        {"csv_path": str(csv), "research_direction": _direction()},
+        until="identification_verify",
+    )
+    assert state.get("star_rating") not in (0, None) or state.get("identification_diag")
+    assert state.get("prewrite_gate") == PREWRITE_GATE_AWAITING_ESTIMATE
+    assert state.get("specification_equation")
+    assert (state.get("table1") or {}).get("produced_by") == "prewrite_preview"
+    assert not (state.get("estimate") or {}).get("produced_by")
+    assert not state.get("outline")
+    assert not state.get("robustness_results")
+
+
+def test_run_prewrite_resume_from_estimate_continues(tmp_path):
+    csv = _panel_csv(tmp_path)
+    paused = run_prewrite(
+        {"csv_path": str(csv), "research_direction": _direction()},
+        until="identification_verify",
+    )
+    continued = run_prewrite(paused, resume_from="run_estimate")
+    assert (continued.get("estimate") or {}).get("produced_by") == "estimate"
+    outline = continued.get("outline") or []
+    assert len(outline) == 6
+    assert continued.get("prewrite_gate") == "estimate_complete"
 
 
 def test_id_node_reuse_in_nonzero_star():

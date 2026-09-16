@@ -204,9 +204,12 @@ def test_feols_runtime_error_stays_error_not_pooled_ols(tmp_path, monkeypatch):
         {
             "csv_path": str(csv_path),
             "main_specification": {
-                "method": "ols",
+                "method": "did",
                 "formula": "y ~ treat | id + year",
+                "feols_formula": "y ~ treat | id + year",
                 "treatment": "treat",
+                "id_col": "id",
+                "time_col": "year",
             },
         }
     )

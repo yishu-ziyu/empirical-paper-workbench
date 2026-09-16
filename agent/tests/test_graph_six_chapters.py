@@ -111,6 +111,15 @@ def test_graph_reaches_translate_code(recorder, six_chapter_outline):
     assert len(translations) == 4
     langs = {t["lang"] for t in translations}
     assert langs == {"py", "stata", "r", "eviews"}
+    by_lang = {t["lang"]: t["code"] for t in translations}
+    assert "regress " in by_lang["stata"]
+    assert "income" in by_lang["stata"]
+    assert "age" in by_lang["stata"]
+    assert "xtreg" not in by_lang["stata"]
+    assert "reghdfe" not in by_lang["stata"]
+    assert "lm(" in by_lang["r"]
+    assert "feols" not in by_lang["r"]
+    assert "felm" not in by_lang["r"]
 
 
 def test_graph_each_chapter_has_versions(recorder, six_chapter_outline):

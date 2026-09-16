@@ -23,6 +23,11 @@ from collections.abc import Callable
 from typing import Any
 
 from .cancellation import cancellation_scope, raise_if_cancelled
+from .prewrite_preview import (
+    PREWRITE_GATE_ESTIMATE_COMPLETE,
+    build_prewrite_preview,
+    clear_prewrite_downstream,
+)
 from .readiness import claim_mode
 
 # 预写流程单一真相：预写步骤的有序元数据（节点名 + 调用来源 + 前驱依赖）。
@@ -85,13 +90,27 @@ def run_prewrite(
     state: dict,
     progress: Callable[[str, str, dict[str, Any]], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
+    *,
+    until: str | None = None,
+    resume_from: str | None = None,
 ) -> dict:
     """按 ``PRWRITE_SEQUENCE`` 顺序串行执行预写段（Facade HITL 路径）。
 
     识别节点后有中断判定：0 星或识别失败则直接返回，不跑估计／文献／大纲。
+
+    Workbench 方向阶段传 ``until="identification_verify"``：识别通过后写入
+    Table 1 + 主设定方程并停下，不自动跑 estimate。确认后续传
+    ``resume_from="run_estimate"`` 从估计接到大纲。默认（两者皆空）仍跑完整
+    序列，留给 graph / 既有 agent 测试。
     """
+    started = resume_from is None
     with cancellation_scope(should_cancel):
         for node_id, _src, _deps in PRWRITE_SEQUENCE:
+            if not started:
+                if node_id == resume_from:
+                    started = True
+                else:
+                    continue
             raise_if_cancelled()
             if progress:
                 progress(node_id, "started", {})
@@ -109,6 +128,19 @@ def run_prewrite(
                             {"reason": "identification_failed"},
                         )
                     return state
+                if until == "identification_verify":
+                    if progress:
+                        progress("prewrite_preview", "started", {})
+                    state = {**clear_prewrite_downstream(state), **build_prewrite_preview(state)}
+                    if progress:
+                        progress(
+                            "prewrite_preview",
+                            "completed",
+                            {"gate": state.get("prewrite_gate")},
+                        )
+                    return state
+        if resume_from == "run_estimate":
+            state = {**state, "prewrite_gate": PREWRITE_GATE_ESTIMATE_COMPLETE}
     return state
 
 

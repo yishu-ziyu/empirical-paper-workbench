@@ -1,0 +1,22 @@
+{
+  "scope": "Read-only component diagnostic, NOT product API/browser journey. Saved chapter unchanged and unapproved.",
+  "calls": 1,
+  "structured_retries": 0,
+  "content_sha256": "3b6bdbf4fcde08b0ee7c1a59fa387d71c751c3467930c8f2979cc928ba3528b2",
+  "review_source": "llm",
+  "review_typed": true,
+  "review_degraded": false,
+  "result": {
+    "rubric": {
+      "endogeneity": 0.75,
+      "identification": 0.72,
+      "robustness": 0.65,
+      "contribution": 0.85,
+      "readability": 0.85
+    },
+    "feedback": "本文以 nearc4 作为 educ 的工具变量来回应受教育年限的内生性问题，并明确点名能力偏差与测量误差作为 OLS 向下偏误的来源，这一点处理得当。但行文存在一处内在张力：全文主张'association'框架，却在基准回归与稳健性章节中使用 IV 并讨论'局部平均处理效应（LATE）'。IV 在本质上属于因果识别策略（即便只是 LATE），与 association 表述不完全一致。需要在 association 与因果之间做一次明确取舍，否则读者会困惑于本文到底是描述条件相关还是在做因果推断。\n\n排他性约束的讨论偏单薄：仅一句'在满足排他性约束与相关性约束的条件下'带过，没有讨论 nearc4 可能违反排他性的具体威胁——如大学就近可达性可能通过本地房价、家庭背景、社区就业网络等渠道直接影响工资，而非仅通过受教育年限。如果坚持 association 框架，则无需展开此讨论；如果走 IV 路线，则此处需要补充。\n\nLATE 的解释不够具体：仅说'估计一个局部平均处理效应'，但未刻画'complier'——即因大学就近可达而多上大学的子群是谁、其规模与特征如何。这是 IV 解读中最容易出错的地方。\n\n稳健性方面只做了一项替代聚类检验，且系数变化极小（0.1315→0.132），信息量有限。论文对未运行的检验（替代样本、替代 IV、缩尾、安慰剂等）采取了诚实的'不描述'策略，这一点值得肯定，避免了凭空宣称。\n\n整体可读性良好：表格清楚，方程书写规范，限定语（'在条件可比的样本个体之间''统计上相伴出现'）使用得当，避免了把相关写成因果的主要风险——主结论部分确实没有滑向因果化表述。",
+    "suggestions": "1. 统一框架：建议在引言或方法部分明确声明——若以 association 为本文定位，则将 IV 结果作为'缓解内生性后的条件相关'来呈现，去掉 LATE 字眼；若保留 IV 因果识别，则需要在 association 与因果之间划清边界（例如只在主结果用 association 表述，在 IV 子段标注因果条件）。当前两者并存会给读者造成解读困扰。\n\n2. 补充排他性约束的讨论：即使最终走 association 路线，也建议用一段简短文字说明 nearc4 作为 IV 的合理性依据（Card 1995 的经典论证），并列出至少一条潜在威胁并说明为何在本文设定下影响有限。\n\n3. 明确 LATE 的 complier 群体：若保留 LATE 表述，补充'complier 主要为居住在大学附近、因就近入学而多受教育的个体'这一描述，使读者知道该效应是对谁而言的。\n\n4. 扩大稳健性边界：在课程作业允许范围内，至少再补一项稳健性检验——例如更换控制集（去掉地区虚拟变量或种族变量）、或报告 first-stage F 统计量以确认弱工具变量问题不严重。\n\n5. 报告 first-stage 结果：在 IV 表格中补充第一阶段回归（educ 对 nearc4 的回归系数与 F 值），这是判断 nearc4 是否为有效工具变量的最低要求。\n\n6. 措辞微调：将'估计量能够识别一个局部平均处理效应'改为更准确的'若排他性约束成立，估计量可被解释为对 complier 子群的局部平均因果效应'，避免暗示无条件成立。"
+  },
+  "elapsed_seconds": 35.733,
+  "usage": "invoke_review_llm returns typed output only; usage and provider request IDs not exposed"
+}

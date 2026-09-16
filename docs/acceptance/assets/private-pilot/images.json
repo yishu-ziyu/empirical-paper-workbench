@@ -1,0 +1,60 @@
+{
+  "source_sha": "8a994f7d101064d25f7482c38c64f2f59eb5573b",
+  "clean_source": "git archive HEAD extracted outside checkout; no development mounts",
+  "services": {
+    "backend": {
+      "configured_image": "econpaper-backend:8a994f7d101064d25f7482c38c64f2f59eb5573b",
+      "image_id": "sha256:f8dab27e1496d60ba606a2f017d9096de23980c4ffbae1344d2b7e32c83defd6",
+      "health": "healthy",
+      "published_ports": {
+        "8000/tcp": null
+      }
+    },
+    "runner": {
+      "configured_image": "econpaper-backend:8a994f7d101064d25f7482c38c64f2f59eb5573b",
+      "image_id": "sha256:f8dab27e1496d60ba606a2f017d9096de23980c4ffbae1344d2b7e32c83defd6",
+      "health": "healthy",
+      "published_ports": {
+        "8000/tcp": null
+      }
+    },
+    "frontend": {
+      "configured_image": "econpaper-frontend:8a994f7d101064d25f7482c38c64f2f59eb5573b",
+      "image_id": "sha256:22cdddd576386cb0f5efe2a4dbe8a46f41fd635c75773235ec74ef5a8c630d46",
+      "health": "healthy",
+      "published_ports": {
+        "80/tcp": null
+      }
+    },
+    "gateway": {
+      "configured_image": "nginx:1.27-alpine",
+      "image_id": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "health": null,
+      "published_ports": {
+        "443/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18443"
+          }
+        ]
+      }
+    }
+  },
+  "images": {
+    "backend": {
+      "tag": "econpaper-backend:8a994f7d101064d25f7482c38c64f2f59eb5573b",
+      "id": "sha256:f8dab27e1496d60ba606a2f017d9096de23980c4ffbae1344d2b7e32c83defd6",
+      "repo_digests": [
+        "econpaper-backend@sha256:f8dab27e1496d60ba606a2f017d9096de23980c4ffbae1344d2b7e32c83defd6"
+      ]
+    },
+    "frontend": {
+      "tag": "econpaper-frontend:8a994f7d101064d25f7482c38c64f2f59eb5573b",
+      "id": "sha256:22cdddd576386cb0f5efe2a4dbe8a46f41fd635c75773235ec74ef5a8c630d46",
+      "repo_digests": [
+        "econpaper-frontend@sha256:22cdddd576386cb0f5efe2a4dbe8a46f41fd635c75773235ec74ef5a8c630d46"
+      ]
+    }
+  },
+  "image_secret_env_absent": true
+}

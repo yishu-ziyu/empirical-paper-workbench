@@ -1,0 +1,6 @@
+{
+  "missing_env_rejected": true,
+  "in_checkout_config_rejected": true,
+  "compose_config_valid": true,
+  "shell_syntax_valid": true
+}

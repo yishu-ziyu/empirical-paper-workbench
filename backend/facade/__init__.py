@@ -56,6 +56,21 @@ from .session_store import SessionStore
 logger = logging.getLogger(__name__)
 
 
+def _public_prewrite_gates(state: dict) -> dict[str, Any]:
+    """CamelCase confirm flags + blockingDecision for the FE estimate-prep rail."""
+    try:
+        from agent.engine.prewrite_gates import public_prewrite_gates
+    except Exception:
+        return {
+            "table1Confirmed": bool(state.get("table1Confirmed") or state.get("table1_confirmed")),
+            "specConfirmed": bool(state.get("specConfirmed") or state.get("spec_confirmed")),
+            "qType": state.get("qType") or state.get("q_type"),
+            "specMode": state.get("specMode") or state.get("spec_mode"),
+            "blockingDecision": state.get("blocking_decision") or state.get("blockingDecision"),
+        }
+    return public_prewrite_gates(state)
+
+
 class AgentFacade:
     """组合 SessionStore / desk_client / graph 与各 agent 节点的薄门面。
 
@@ -148,6 +163,11 @@ class AgentFacade:
         blockers = [str(item) for item in (state.get("write_blockers") or []) if item]
         if state.get("star_rating") == 0 and "star_0" not in blockers:
             blockers = ["star_0", *blockers]
+        gate_fields = _public_prewrite_gates(state)
+        decision = gate_fields.get("blockingDecision") or {}
+        block_code = decision.get("code") if isinstance(decision, dict) else None
+        if decision.get("blocked") and block_code and block_code not in blockers:
+            blockers.append(str(block_code))
         rob = state.get("robustness_results")
         rob_status = None
         if isinstance(rob, dict) and rob:
@@ -196,6 +216,11 @@ class AgentFacade:
             "outline": outline,
             "body_chapters": body_chapters,
             "research_direction": state.get("research_direction"),
+            "main_specification": state.get("main_specification"),
+            "table1": state.get("table1"),
+            "specification_equation": state.get("specification_equation"),
+            "prewrite_gate": state.get("prewrite_gate"),
+            **_public_prewrite_gates(state),
         }
 
     def get_state(self, session_id: str) -> dict:
@@ -356,8 +381,12 @@ class AgentFacade:
         session_id: str,
         research_direction: dict,
     ) -> dict:
-        """Run the shared pre-write path: identify → estimate → robustness → literature → outline."""
+        """Accept a direction: identify, then pause with Table 1 + equation.
+
+        Estimate → robustness → outline wait for ``confirm_prewrite_and_estimate``.
+        """
         initial_state = self.prepare_prewrite_state(session_id)
+        initial_state["prewrite_phase"] = "direction"
         state = {**initial_state, "research_direction": research_direction}
         try:
             state = self.execute_prewrite(
@@ -371,11 +400,14 @@ class AgentFacade:
 
     def prepare_prewrite_state(self, session_id: str) -> dict:
         """Build the immutable state snapshot persisted with a pre-write run."""
+        from services.allow_did import session_allow_did
+
         state = dict(self.get_state(session_id))
         if not state.get("csv_path"):
             csv_path = self.get_session_entry(session_id).get("csv_path")
             if csv_path:
                 state["csv_path"] = csv_path
+        state["allow_did"] = session_allow_did(state) is True
         return state
 
     def execute_prewrite(
@@ -401,17 +433,27 @@ class AgentFacade:
                 detail=f"prewrite unavailable: {exc}",
             ) from exc
         state = {**initial_state, "research_direction": research_direction}
+        from services.allow_did import session_allow_did
+
+        state["allow_did"] = session_allow_did(state) is True
         # A durable run must never recreate disk artifacts after its Session is
         # deleted. Prewrite does not require a workspace; legacy synchronous
         # callers keep the existing create-on-demand behavior.
         if not state.get("workspace") and cancellation_check is None:
             state["workspace"] = self._workspace_dir(session_id)
 
+        phase = str(state.get("prewrite_phase") or "direction").strip().lower()
+        if phase == "estimate":
+            prewrite_kwargs: dict[str, Any] = {"resume_from": "run_estimate"}
+        else:
+            prewrite_kwargs = {"until": "identification_verify"}
+
         def run() -> dict:
             return run_prewrite(
                 state,
                 progress=progress_callback,
                 should_cancel=cancellation_check,
+                **prewrite_kwargs,
             )
 
         # Durable workers publish RunEvent rows. Avoid the legacy disk trace
@@ -426,6 +468,124 @@ class AgentFacade:
                 claim=state.get("claim"),
             )
         return state
+
+    def prepare_prewrite_confirm(
+        self,
+        session_id: str,
+        confirms: dict | None = None,
+    ) -> tuple[dict, dict]:
+        """Validate both FE confirms and the hetero hard-block, then snapshot."""
+        from agent.engine.prewrite_gates import (
+            evaluate_blocking_decision,
+            merge_confirm_flags,
+            persist_gate_fields,
+        )
+
+        state = persist_gate_fields(self.get_state(session_id), confirms or {})
+        rd = state.get("research_direction")
+        if not isinstance(rd, dict) or not (rd.get("question") or rd.get("dv")):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "prewrite_not_ready", "reason": "no_direction"},
+            )
+        if state.get("star_rating") == 0 or state.get("identification_failed"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "identification_blocked",
+                    "star_rating": state.get("star_rating"),
+                    "identification_failed": True,
+                },
+            )
+        if not state.get("identification_diag"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "prewrite_not_ready", "reason": "no_identification"},
+            )
+        flags = merge_confirm_flags(state, confirms or {})
+        if not flags["table1Confirmed"] or not flags["specConfirmed"]:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "confirms_incomplete",
+                    "table1Confirmed": flags["table1Confirmed"],
+                    "specConfirmed": flags["specConfirmed"],
+                    "blockingDecision": evaluate_blocking_decision(state, confirms or {}),
+                },
+            )
+        decision = evaluate_blocking_decision(state, confirms or {})
+        if decision.get("blocked"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "estimate_blocked",
+                    "blockingDecision": decision,
+                },
+            )
+        initial_state = persist_gate_fields(
+            self.prepare_prewrite_state(session_id),
+            confirms or {},
+            table1_confirmed=True,
+            spec_confirmed=True,
+        )
+        initial_state["prewrite_phase"] = "estimate"
+        return dict(rd), initial_state
+
+    def record_prewrite_confirms(self, session_id: str, confirms: dict | None = None) -> dict:
+        """Persist Table 1 / spec confirm flags without running estimate."""
+        from agent.engine.prewrite_gates import (
+            evaluate_blocking_decision,
+            merge_confirm_flags,
+            persist_gate_fields,
+        )
+
+        incoming = dict(confirms or {})
+        state = persist_gate_fields(self.get_state(session_id), incoming)
+        flags = merge_confirm_flags(state, incoming)
+        decision = evaluate_blocking_decision(state, incoming)
+        if flags["specConfirmed"] and decision.get("blocked"):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "estimate_blocked",
+                    "blockingDecision": decision,
+                },
+            )
+        state = persist_gate_fields(
+            state,
+            incoming,
+            table1_confirmed=flags["table1Confirmed"],
+            spec_confirmed=flags["specConfirmed"],
+        )
+        self.save_state(session_id, state)
+        return {
+            "ok": True,
+            "prewrite_gate": state.get("prewrite_gate"),
+            "table1": state.get("table1"),
+            "specification_equation": state.get("specification_equation"),
+            "main_specification": state.get("main_specification"),
+            **_public_prewrite_gates(state),
+        }
+
+    def confirm_prewrite_and_estimate(
+        self,
+        session_id: str,
+        confirms: dict | None = None,
+    ) -> dict:
+        """Continue a paused prewrite from estimate through outline."""
+        research_direction, initial_state = self.prepare_prewrite_confirm(
+            session_id, confirms
+        )
+        state = {**initial_state, "research_direction": research_direction}
+        try:
+            state = self.execute_prewrite(
+                session_id,
+                research_direction,
+                initial_state,
+            )
+            return state
+        finally:
+            self.save_state(session_id, state)
 
     def run_identification_verify(self, session_id: str) -> dict:
         """Run identification verification after method selection.
@@ -769,6 +929,53 @@ class AgentFacade:
             self.save_state(session_id, state)
             return state
 
+    def ensure_outline_bodies(
+        self,
+        session_id: str,
+        render_kwargs: Optional[dict] = None,
+    ) -> dict:
+        """Generate every outline chapter that still lacks a body.
+
+        Right-pane generate and doc-export both use this so a six-chapter
+        outline cannot export as intro-only or as empty headings.
+        Write-blocked slots are skipped; other generate failures stop the fill.
+        """
+        try:
+            from agent.engine.outline_bodies import missing_outline_specs
+        except Exception:
+            return self.get_state(session_id)
+        state = self.get_state(session_id)
+        title = state.get("title_chapter")
+        need_title = (
+            not isinstance(title, dict)
+            or not str(title.get("title") or "").strip()
+        )
+        if need_title:
+            try:
+                from agent.nodes.generate_title import generate_title as generate_title_node
+                title_result = generate_title_node(state)
+                if isinstance(title_result, dict) and title_result.get("title_chapter"):
+                    state = {**state, **title_result}
+                    self.save_state(session_id, state)
+            except Exception:
+                pass
+        for spec in missing_outline_specs(state):
+            chapter = {
+                "type": spec.get("type"),
+                "title": spec.get("title") or "",
+            }
+            if spec.get("method"):
+                chapter["method"] = spec["method"]
+            try:
+                state = self.generate_chapter(session_id, chapter, render_kwargs)
+            except HTTPException as exc:
+                if exc.status_code in {400, 409}:
+                    continue
+                if exc.status_code == 503:
+                    break
+                raise
+        return self.get_state(session_id)
+
     def export_document(self, session_id: str, template: str) -> dict:
         """Run export_docx node and return the result dict."""
         if export_docx_node is None:
@@ -776,6 +983,7 @@ class AgentFacade:
                 status_code=503,
                 detail="export_docx node not available (agent module missing)",
             )
+        self.ensure_outline_bodies(session_id)
         state = self.get_state(session_id)
         if not state.get("workspace"):
             state["workspace"] = self._workspace_dir(session_id)

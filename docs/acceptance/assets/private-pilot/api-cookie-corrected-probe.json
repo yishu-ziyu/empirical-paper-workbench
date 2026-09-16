@@ -1,0 +1,18 @@
+{
+  "scope": "API CookieJar only, not browser acceptance",
+  "login_status": 200,
+  "refresh_cookie_attributes": [
+    {
+      "name": "ep_access_refresh",
+      "path": "/auth",
+      "secure": true,
+      "http_only": true
+    }
+  ],
+  "request_path": "/api/auth/refresh",
+  "refresh_cookie_sent": false,
+  "refresh_status": 401,
+  "expectation": "Normal renewal requires HTTP 200",
+  "outcome": "known_reproduced_failure",
+  "collector_correction": "Original jar_refresh_paths selector used ep_refresh instead of actual ep_access_refresh. Original login cookie_attributes already captured actual name/path correctly; this separate probe uses correct name. No existing evidence overwritten."
+}

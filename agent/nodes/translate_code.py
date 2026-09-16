@@ -22,12 +22,17 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..design.spec import norm_method
+from ..design.spec import (
+    apply_heterogeneity_to_formula,
+    build_heterogeneity_ols_formula,
+    norm_method,
+)
 from ..protocols import TranslateCodeOutput
 from ..state import EconPaperState
 
 # Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
 _PANEL_METHOD_KEYS = {"did", "panel", "twfe", "fe"}
+_OLS_METHOD_KEYS = {"ols", "pooled ols", "pooled-ols", "pooled_ols", "linear"}
 
 _STUB_MARKERS = ("无 Python 代码可翻译", "无 Python 代码")
 _TAKEABLE_NEEDLES: dict[str, tuple[str, ...]] = {
@@ -157,6 +162,10 @@ def _translate_line_to_stata(line: str) -> str:
     if "add_constant" in s:
         return f"* {line}  (Stata regress 默认带常数项)"
 
+    pooled = _pooled_ols_command(s, lang="stata")
+    if pooled:
+        return pooled
+
     # sm.OLS(y, X).fit() → regress y X
     m = re.search(r'OLS\(\s*([^,]+),\s*([^)]+)\)\.fit\(\)', s)
     if m:
@@ -246,6 +255,10 @@ def _translate_line_to_r(line: str) -> str:
     # sm.add_constant(X) → R lm 默认带截距
     if "add_constant" in s:
         return f"# {line}  (R lm() 默认带截距)"
+
+    pooled = _pooled_ols_command(s, lang="r")
+    if pooled:
+        return pooled
 
     # sm.OLS(y, X).fit() → lm(y ~ X)
     m = re.search(r'OLS\(\s*([^,]+),\s*([^)]+)\)\.fit\(\)', s)
@@ -385,6 +398,95 @@ def _method_is_panel(method: Any) -> bool:
     return key in _PANEL_METHOD_KEYS
 
 
+def _method_is_ols(method: Any) -> bool:
+    """True for an explicit OLS / pooled-OLS paper direction."""
+    if norm_method(method) == "ols":
+        return True
+    key = str(method or "").strip().lower().replace("_", "-")
+    return key in _OLS_METHOD_KEYS
+
+
+_SMF_OLS_RE = re.compile(
+    r"""(?:smf\s*\.\s*)ols\(\s*['"]([^'"]+)['"]""",
+    re.IGNORECASE,
+)
+_FEOLS_FORMULA_RE = re.compile(
+    r"""(?<![A-Za-z])feols\(\s*['"]([^'"]+)['"]""",
+    re.IGNORECASE,
+)
+
+
+def _pooled_ols_formula(text: str) -> str | None:
+    """Pooled ``y ~ x`` from smf.ols / feols. FE bars (``| id + t``) are not OLS."""
+    if not text:
+        return None
+    match = _SMF_OLS_RE.search(text) or _FEOLS_FORMULA_RE.search(text)
+    if not match:
+        return None
+    formula = match.group(1).strip()
+    if not formula or "|" in formula or "~" not in formula:
+        return None
+    return formula
+
+
+def _patsy_term_to_stata(term: str) -> str:
+    """Map Patsy ``a:b`` / ``a*b`` to Stata ``c.a#c.b`` / ``c.a##c.b``.
+
+    Main effects already listed on the RHS stay as-is; ``#`` is the product
+    so we do not emit ``##`` for a ``:`` term (that would duplicate mains).
+    """
+    raw = term.strip()
+    if not raw or raw == "1":
+        return ""
+    if ":" in raw and "*" not in raw:
+        parts = [part.strip() for part in raw.split(":") if part.strip()]
+        if len(parts) >= 2 and all(re.fullmatch(r"[A-Za-z_]\w*", part) for part in parts):
+            return "#".join(f"c.{part}" for part in parts)
+    if "*" in raw and ":" not in raw:
+        parts = [part.strip() for part in raw.split("*") if part.strip()]
+        if len(parts) >= 2 and all(re.fullmatch(r"[A-Za-z_]\w*", part) for part in parts):
+            return "##".join(f"c.{part}" for part in parts)
+    return raw
+
+
+def _ols_formula_parts(
+    formula: str, fallback_y: str, fallback_plus: str
+) -> tuple[str, str]:
+    """Outcome + Patsy RHS from an estimate formula; strip ``| FE`` bars."""
+    src = (formula or "").strip()
+    if src and "~" in src:
+        y, rhs = src.split("~", 1)
+        y = y.strip()
+        rhs = rhs.split("|", 1)[0].strip()
+        if y and rhs:
+            return y, rhs
+    return fallback_y, fallback_plus
+
+
+def _stata_regress_rhs(patsy_rhs: str) -> str:
+    terms = [
+        _patsy_term_to_stata(part)
+        for part in patsy_rhs.split("+")
+        if part.strip() and part.strip() != "1"
+    ]
+    return " ".join(term for term in terms if term)
+
+
+def _pooled_ols_command(line: str, *, lang: str) -> str | None:
+    """Map pooled OLS Python (smf.ols / feols without FE) to regress / lm."""
+    formula = _pooled_ols_formula(line)
+    if not formula:
+        return None
+    y, rhs = formula.split("~", 1)
+    y = y.strip()
+    rhs = rhs.split("|", 1)[0].strip()
+    if lang == "stata":
+        return f"regress {y} {_stata_regress_rhs(rhs)}".rstrip()
+    if lang == "r":
+        return f"model <- lm({y} ~ {rhs}, data=df)"
+    return None
+
+
 def _python_is_takeable_regression(python: str) -> bool:
     """False for upload-only clean.py (DATA_PATH + step comments, no model)."""
     if not (python or "").strip():
@@ -423,8 +525,23 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
     controls = [col for col in controls if col not in skip]
     estimate = state.get("estimate")
     estimate = estimate if isinstance(estimate, dict) else {}
+    groups = (
+        _as_controls(spec.get("heterogeneity_groups"))
+        or _as_controls(rd.get("heterogeneity_groups"))
+        or _as_controls(estimate.get("heterogeneity_groups"))
+    )
     formula = str(estimate.get("formula") or spec.get("formula") or "").strip()
+    if groups:
+        if formula:
+            formula = apply_heterogeneity_to_formula(
+                formula, treatment=treatment, groups=groups
+            )
+        else:
+            formula = build_heterogeneity_ols_formula(
+                outcome, treatment, controls, groups
+            )
     method = _first_text(spec, rd, keys=("method",))
+    panel = _method_is_panel(method)
     return {
         "csv": csv_name,
         "outcome": outcome,
@@ -432,7 +549,8 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
         "controls": controls,
         "id_col": id_col,
         "time_col": time_col,
-        "panel": _method_is_panel(method),
+        "panel": panel,
+        "ols": (not panel) and _method_is_ols(method),
         "formula": formula,
     }
 
@@ -448,11 +566,17 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     controls = model["controls"]
     rhs_space = " ".join([treat, *controls])
     rhs_plus = " + ".join([treat, *controls])
+    eviews_rhs = rhs_space
     csv = model["csv"]
-    note = (
-        "Chapter text had no ```python fences. "
-        "Script is built from the session research direction, not StatsPAI."
-    )
+    if model["panel"]:
+        note = (
+            "Chapter text had no ```python fences. "
+            "Script is built from the session research direction, not StatsPAI."
+        )
+    else:
+        note = (
+            "OLS direction: Stata regress and R lm match the pooled OLS body."
+        )
 
     if model["panel"]:
         i, t = model["id_col"], model["time_col"]
@@ -471,7 +595,16 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
             f"({y} ~ {rhs_plus} | {i} + {t}) used in Python/Stata/R."
         )
     else:
-        fitted = model.get("formula") or f"{y} ~ {rhs_plus}"
+        y, rhs_plus = _ols_formula_parts(
+            str(model.get("formula") or ""), y, rhs_plus
+        )
+        rhs_space = _stata_regress_rhs(rhs_plus)
+        eviews_rhs = " ".join(
+            part.strip().replace(":", "*")
+            for part in rhs_plus.split("+")
+            if part.strip() and part.strip() != "1"
+        )
+        fitted = f"{y} ~ {rhs_plus}"
         spec_note = f"Common spec: pooled OLS {fitted}."
         py_formula = fitted
         py_fit = f'model = smf.ols("{py_formula}", data=df).fit()'
@@ -512,10 +645,10 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
         "# Auto-generated R script from research direction",
         f"# {note}",
         f"# {spec_note}",
-        "library(fixest)",
-        "library(lfe)",
-        f'df <- read.csv("{csv}")',
     ]
+    if model["panel"]:
+        r.extend(["library(fixest)", "library(lfe)"])
+    r.append(f'df <- read.csv("{csv}")')
     if model["panel"]:
         i, t = model["id_col"], model["time_col"]
         fe = f"{i} + {t}"
@@ -539,7 +672,7 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
         f"' {note}",
         f"' {eviews_note}",
         f"import {csv}",
-        f"ls {y} c {rhs_space}",
+        f"ls {y} c {eviews_rhs}",
     ]
     return {
         "py": py,
@@ -660,8 +793,24 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
     返回 ``{"code_translations": [{"lang", "code", "filename"}, ...]}``，
     固定 4 条：py / stata / r / eviews。
     """
-    python_code = _collect_python(state)
     model = _direction_model(state)
+
+    # OLS paper body → Stata regress / R lm. Chapter Python may quote the
+    # runtime estimator (statspai.feols) even for pooled OLS; that must not
+    # leak feols/xtreg/reghdfe into the downloadable scripts.
+    if model is not None and model.get("ols"):
+        scripts = _scripts_from_direction(model)
+        return _emit_translations(
+            state,
+            [
+                {"lang": "py", "code": scripts["py"], "filename": "analysis.py"},
+                {"lang": "stata", "code": scripts["stata"], "filename": "analysis.do"},
+                {"lang": "r", "code": scripts["r"], "filename": "analysis.R"},
+                {"lang": "eviews", "code": scripts["eviews"], "filename": "analysis.m"},
+            ],
+        )
+
+    python_code = _collect_python(state)
 
     # Upload-only clean.py is collected Python but not a regression. Translating
     # it yields comment-only Stata/R (read_csv(DATA_PATH) has no string path).

@@ -1,0 +1,146 @@
+[
+  {
+    "viewport": "desktop",
+    "section": "1",
+    "lang": "zh-CN",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1440,
+    "visibleSections": [
+      "1"
+    ],
+    "body": "econpaper\n真实案例\n当前范围\n教学案例\n\n面向实证研究的学生与研究者\n\n先看懂结果，\n再写下结论。\n\n比较两条真实估计，看清改变的设定，沿着数字找到数据与计算来源。先从 Card 1995 教学案例开始。\n\n看真实案例 ↓\n进入桌面工作台\n\n当前完整验证以 Card 教学案例为主。\n\nCard 1995\n历史运行回放\n教育是否提高工资？\n\n教育年限的系数 · 结果变量：对数工资\n\nAOLS\n0.0747\nBIV\n0.1315\n\n同一份数据，两条估计。差别值得展开看。\n\n复现待核：这是一组历史结果，不代表跨环境数值已复现。\n\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "desktop",
+    "section": "2",
+    "lang": "zh-CN",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1425,
+    "visibleSections": [
+      "2"
+    ],
+    "body": "econpaper\n真实案例\n当前范围\n教学案例\n\n02 / 一个真实案例\n\n数字不同，先检查设定。\n\n以下结果来自同一历史运行的两条设定。数值按四位小数展示；打开来源可核对完整记录。\n\n历史运行回放 · 2026-09-07 UTC · Card 1995\n\nA OLS\n0.0747\n\n控制变量后的相关估计\n\n样本量 3010 · 标准误 0.003498\n协方差: HC1\nB IV\n0.1315\n\n使用大学邻近的工具变量估计\n\n样本量 3010 · 标准误 0.054964\n协方差: nonrobust\n改变了什么\n\n估计器从 OLS 变为 IV；IV 使用 nearc4（大学邻近）作工具。协方差也从 HC1 变为 nonrobust，标准误并非完全同口径。\n\n保持了什么\n\n同一数据、教育年限与对数工资；同一经验二次项、人口与地区控制；两条估计的样本量均为 3010。\n\n查看数据与计算来源 ↗\n不能据此说：教育对每个人的工资都有相同因果影响。\n\nOLS 展示控制变量后的相关。IV 的解释依赖工具变量相关性、排除限制等假设；强度诊断不能单独证明工具有效。估计值更大，也不等于更接近真值。\n\n复现待核：这是一组历史结果，不代表跨环境数值已复现。\n\n当前范围 →\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "desktop",
+    "section": "3",
+    "lang": "zh-CN",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1425,
+    "visibleSections": [
+      "3"
+    ],
+    "body": "econpaper\n真实案例\n当前范围\n教学案例\n\n03 / 当前能力与限制\n\n从明确的范围开始。\n\n先判断这些能力是否适合你的研究，再决定下一步。\n\nCard 教学案例\n\n确认分析方案、真实运行、比较结果并检查来源；研究结论由你确认。\n\n这里的完整旅程仅在特定案例验证。不能由此推断任意数据和方法都能走通。\n\n使用自己的数据\n\n可以上传 CSV、Stata 或 Excel，记录变量类型与清洗留痕。\n\n可以导入与清洗；我们尚未完整验证任意自带数据从清洗到成文的全过程。\n\n章节与导出\n\n可以按章生成并确认，下载文档和分析代码。\n\n完整成文质量尚未验证；下载脚本不保证不同语言算出一致数值。\n\n带着一个问题，进入研究。\n\n在桌面工作台中选择「体验一项真实研究」，从 Card 案例开始；也可以带自己的数据，先确认可用范围。\n\n进入桌面工作台 →\n\n本页可在手机阅读。研究工作台请在桌面使用。\n\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "desktop",
+    "section": "1",
+    "lang": "en",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1425,
+    "visibleSections": [
+      "1"
+    ],
+    "body": "econpaper\nReal example\nCurrent scope\nTeaching case\n\nFOR STUDENTS AND RESEARCHERS DOING EMPIRICAL WORK\n\nUnderstand the result.\nThen write the claim.\n\nCompare two real estimates, inspect the specifications, and trace each number to its data and calculation. Start with the Card 1995 teaching case.\n\nExplore the real example ↓\nOpen desktop workbench\n\nThe most complete validation currently covers the Card teaching case.\n\nCard 1995\nHistorical run replay\nDoes education increase earnings?\n\nCoefficient on education · Outcome: log wage\n\nAOLS\n0.0747\nBIV\n0.1315\n\nOne dataset. Two estimates. Open up what changed.\n\nReproduction pending verification. These historical results do not establish cross-environment numerical replication.\n\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  },
+  {
+    "viewport": "desktop",
+    "section": "2",
+    "lang": "en",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1425,
+    "visibleSections": [
+      "2"
+    ],
+    "body": "econpaper\nReal example\nCurrent scope\nTeaching case\n\n02 / A REAL EXAMPLE\n\nDifferent numbers. Inspect the specifications.\n\nBoth estimates come from the same historical run. Values are rounded to four decimal places; open the sources for the full record.\n\nHistorical run replay · 2026-09-07 UTC · Card 1995\n\nA OLS\n0.0747\n\nConditional association estimate\n\nObservations 3010 · Standard error 0.003498\nCovariance: HC1\nB IV\n0.1315\n\nInstrumental-variable estimate using college proximity\n\nObservations 3010 · Standard error 0.054964\nCovariance: nonrobust\nWhat changed\n\nOLS becomes IV, using nearc4 (college proximity) as an instrument. Covariance also changes from HC1 to nonrobust; the standard errors are not directly like-for-like.\n\nWhat stayed fixed\n\nThe dataset, education and log wage; quadratic experience, demographic and regional controls. Both estimates have 3,010 observations.\n\nInspect data & calculation sources ↗\nYou cannot conclude: education has the same causal effect on everyone’s wages.\n\nOLS shows a conditional association. Interpreting IV depends on instrument relevance, exclusion and other assumptions; a strength diagnostic cannot establish instrument validity on its own. A larger estimate need not be closer to the truth.\n\nReproduction pending verification. These historical results do not establish cross-environment numerical replication.\n\nCurrent scope →\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  },
+  {
+    "viewport": "desktop",
+    "section": "3",
+    "lang": "en",
+    "width": 1440,
+    "height": 900,
+    "scrollWidth": 1425,
+    "visibleSections": [
+      "3"
+    ],
+    "body": "econpaper\nReal example\nCurrent scope\nTeaching case\n\n03 / CURRENT SCOPE & LIMITS\n\nStart with a defined scope.\n\nDecide whether these capabilities fit your study before taking the next step.\n\nThe Card teaching case\n\nConfirm analysis plans, run real estimates, compare results and inspect sources. You confirm the research claims.\n\nThe complete journey is verified for this specific case. It does not establish support for arbitrary datasets or methods.\n\nYour own data\n\nUpload CSV, Stata or Excel, with variable types and cleaning records.\n\nYou can import and clean your data. We have not fully verified the entire process from cleaning to writing for arbitrary datasets.\n\nChapters and exports\n\nGenerate and review chapters, and download documents and analysis code.\n\nThe quality of a complete paper has not been verified. Downloading scripts does not guarantee the same numerical results across languages.\n\nBring a question into the workbench.\n\nOn desktop, choose “Try a real study” to start with the Card case. You can also bring your own data after checking the supported scope.\n\nOpen desktop workbench →\n\nThis page is readable on mobile. Use the research workbench on desktop.\n\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "1",
+    "lang": "zh-CN",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "1"
+    ],
+    "body": "econpaper\n教学案例\n\n面向实证研究的学生与研究者\n\n先看懂结果，\n再写下结论。\n\n比较两条真实估计，看清改变的设定，沿着数字找到数据与计算来源。先从 Card 1995 教学案例开始。\n\n看真实案例 ↓\n了解桌面研究入口\n\n当前完整验证以 Card 教学案例为主。\n\nCard 1995\n历史运行回放\n教育是否提高工资？\n\n教育年限的系数 · 结果变量：对数工资\n\nAOLS\n0.0747\nBIV\n0.1315\n\n同一份数据，两条估计。差别值得展开看。\n\n复现待核：这是一组历史结果，不代表跨环境数值已复现。\n\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "2",
+    "lang": "zh-CN",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "2"
+    ],
+    "body": "econpaper\n教学案例\n\n02 / 一个真实案例\n\n数字不同，先检查设定。\n\n以下结果来自同一历史运行的两条设定。数值按四位小数展示；打开来源可核对完整记录。\n\n历史运行回放 · 2026-09-07 UTC · Card 1995\n\nA OLS\n0.0747\n\n控制变量后的相关估计\n\n样本量 3010 · 标准误 0.003498\n协方差: HC1\nB IV\n0.1315\n\n使用大学邻近的工具变量估计\n\n样本量 3010 · 标准误 0.054964\n协方差: nonrobust\n改变了什么\n\n估计器从 OLS 变为 IV；IV 使用 nearc4（大学邻近）作工具。协方差也从 HC1 变为 nonrobust，标准误并非完全同口径。\n\n保持了什么\n\n同一数据、教育年限与对数工资；同一经验二次项、人口与地区控制；两条估计的样本量均为 3010。\n\n查看数据与计算来源 ↗\n不能据此说：教育对每个人的工资都有相同因果影响。\n\nOLS 展示控制变量后的相关。IV 的解释依赖工具变量相关性、排除限制等假设；强度诊断不能单独证明工具有效。估计值更大，也不等于更接近真值。\n\n复现待核：这是一组历史结果，不代表跨环境数值已复现。\n\n当前范围 →\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "3",
+    "lang": "zh-CN",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "3"
+    ],
+    "body": "econpaper\n教学案例\n\n03 / 当前能力与限制\n\n从明确的范围开始。\n\n先判断这些能力是否适合你的研究，再决定下一步。\n\nCard 教学案例\n\n确认分析方案、真实运行、比较结果并检查来源；研究结论由你确认。\n\n这里的完整旅程仅在特定案例验证。不能由此推断任意数据和方法都能走通。\n\n使用自己的数据\n\n可以上传 CSV、Stata 或 Excel，记录变量类型与清洗留痕。\n\n可以导入与清洗；我们尚未完整验证任意自带数据从清洗到成文的全过程。\n\n章节与导出\n\n可以按章生成并确认，下载文档和分析代码。\n\n完整成文质量尚未验证；下载脚本不保证不同语言算出一致数值。\n\n带着一个问题，进入研究。\n\n在桌面工作台中选择「体验一项真实研究」，从 Card 案例开始；也可以带自己的数据，先确认可用范围。\n\n了解桌面研究入口 →\n\n本页可在手机阅读。研究工作台请在桌面使用。\n\nCard 1995 · 历史运行数据 · 复现待核\n审阅证据清单 ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "1",
+    "lang": "en",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "1"
+    ],
+    "body": "econpaper\nTeaching case\n\nFOR STUDENTS AND RESEARCHERS DOING EMPIRICAL WORK\n\nUnderstand the result.\nThen write the claim.\n\nCompare two real estimates, inspect the specifications, and trace each number to its data and calculation. Start with the Card 1995 teaching case.\n\nExplore the real example ↓\nAbout the desktop entry\n\nThe most complete validation currently covers the Card teaching case.\n\nCard 1995\nHistorical run replay\nDoes education increase earnings?\n\nCoefficient on education · Outcome: log wage\n\nAOLS\n0.0747\nBIV\n0.1315\n\nOne dataset. Two estimates. Open up what changed.\n\nReproduction pending verification. These historical results do not establish cross-environment numerical replication.\n\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "2",
+    "lang": "en",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "2"
+    ],
+    "body": "econpaper\nTeaching case\n\n02 / A REAL EXAMPLE\n\nDifferent numbers. Inspect the specifications.\n\nBoth estimates come from the same historical run. Values are rounded to four decimal places; open the sources for the full record.\n\nHistorical run replay · 2026-09-07 UTC · Card 1995\n\nA OLS\n0.0747\n\nConditional association estimate\n\nObservations 3010 · Standard error 0.003498\nCovariance: HC1\nB IV\n0.1315\n\nInstrumental-variable estimate using college proximity\n\nObservations 3010 · Standard error 0.054964\nCovariance: nonrobust\nWhat changed\n\nOLS becomes IV, using nearc4 (college proximity) as an instrument. Covariance also changes from HC1 to nonrobust; the standard errors are not directly like-for-like.\n\nWhat stayed fixed\n\nThe dataset, education and log wage; quadratic experience, demographic and regional controls. Both estimates have 3,010 observations.\n\nInspect data & calculation sources ↗\nYou cannot conclude: education has the same causal effect on everyone’s wages.\n\nOLS shows a conditional association. Interpreting IV depends on instrument relevance, exclusion and other assumptions; a strength diagnostic cannot establish instrument validity on its own. A larger estimate need not be closer to the truth.\n\nReproduction pending verification. These historical results do not establish cross-environment numerical replication.\n\nCurrent scope →\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  },
+  {
+    "viewport": "mobile",
+    "section": "3",
+    "lang": "en",
+    "width": 390,
+    "height": 844,
+    "scrollWidth": 390,
+    "visibleSections": [
+      "3"
+    ],
+    "body": "econpaper\nTeaching case\n\n03 / CURRENT SCOPE & LIMITS\n\nStart with a defined scope.\n\nDecide whether these capabilities fit your study before taking the next step.\n\nThe Card teaching case\n\nConfirm analysis plans, run real estimates, compare results and inspect sources. You confirm the research claims.\n\nThe complete journey is verified for this specific case. It does not establish support for arbitrary datasets or methods.\n\nYour own data\n\nUpload CSV, Stata or Excel, with variable types and cleaning records.\n\nYou can import and clean your data. We have not fully verified the entire process from cleaning to writing for arbitrary datasets.\n\nChapters and exports\n\nGenerate and review chapters, and download documents and analysis code.\n\nThe quality of a complete paper has not been verified. Downloading scripts does not guarantee the same numerical results across languages.\n\nBring a question into the workbench.\n\nOn desktop, choose “Try a real study” to start with the Card case. You can also bring your own data after checking the supported scope.\n\nAbout the desktop entry →\n\nThis page is readable on mobile. Use the research workbench on desktop.\n\nCard 1995 · Historical run data · Reproduction pending\nReview evidence ↗"
+  }
+]

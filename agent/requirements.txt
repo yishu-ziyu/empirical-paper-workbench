@@ -10,6 +10,9 @@ jinja2==3.1.6
 # --- 数据（cleaning / nodes 实际 import）---
 pandas==2.2.3
 numpy==2.1.0
+# Cleaning: pywinsor2 (Bryce). clean_winsor always passes cuts=(1, 99) and
+# replace=True; it does not use Stata winsor2's implicit-default call.
+pywinsor2==0.4.3
 statsmodels==0.14.6
 # StatsPAI.feols 的高维固定效应后端：缺失时 estimate 节点会静默回退 statsmodels.ols，
 # 与测试契约（statspai.feols）不一致 —— 必须显式安装。

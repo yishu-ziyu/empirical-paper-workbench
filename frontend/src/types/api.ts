@@ -238,6 +238,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/find-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Find Data Endpoint
+         * @description Read stored find-data plan. Empty unless design is confirmed.
+         */
+        get: operations["get_find_data_endpoint_sessions__session_id__find_data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan Find Data Endpoint
+         * @description Emit where/how plan from confirmed design facets + R-sources.
+         */
+        post: operations["plan_find_data_endpoint_sessions__session_id__find_data_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest Find Data Endpoint
+         * @description Label discovered / external_link candidates and optional teaching shelf.
+         */
+        post: operations["suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/fetch-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Card Zip Endpoint
+         * @description Download author-posted Card zip into session, or keep link + upload.
+         */
+        post: operations["fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Dataverse Endpoint
+         * @description Search Dataverse and download a public file, else keep the URL.
+         */
+        post: operations["fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/find-data/fetch-wdi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch Wdi Endpoint
+         * @description Download WDI into the session workspace, or return the WDI link.
+         *
+         *     Confirm-design required. Growth family only. Never copies the Barro
+         *     fixture. Does not set dataAttached.
+         */
+        post: operations["fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/upload": {
         parameters: {
             query?: never;
@@ -371,6 +494,70 @@ export interface paths {
         get: operations["export_sessions__session_id__export_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach Dataset
+         * @description Bind a user file or classic-5 entry. Does not set dataAttached.
+         */
+        post: operations["attach_dataset_sessions__session_id__attach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/confirm-attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Attach Dataset
+         * @description Confirm-attach is the only transition that sets dataAttached.
+         */
+        post: operations["confirm_attach_dataset_sessions__session_id__confirm_attach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classic-5/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rank classic-5 candidates from a confirmed design
+         * @description Rank built-in classic-5 catalog entries for a confirmed design.
+         *
+         *     Returns ranked candidates plus a non-catalog own-file action.
+         *     Without a confirmed design, candidates are empty (not a catalog success).
+         *     Does not attach, admit an upload, write ``dataAttached``, or lock spec.
+         */
+        post: operations["suggest_classic5_classic_5_suggest_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -849,6 +1036,46 @@ export interface paths {
         get: operations["get_versions_sessions__session_id__chapters__chapter_index__versions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/design/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Design Endpoint
+         * @description Propose a research-design draft from the session title (+ optional RQ).
+         */
+        post: operations["propose_design_endpoint_sessions__session_id__design_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/design/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Design Endpoint
+         * @description Lock the current session.design draft. Fail closed if none exists.
+         */
+        post: operations["confirm_design_endpoint_sessions__session_id__design_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1358,6 +1585,34 @@ export interface components {
             files: components["schemas"]["ArtifactFile"][];
         };
         /**
+         * AttachResponse
+         * @description POST /sessions/{id}/attach — bind only; never sets dataAttached.
+         */
+        AttachResponse: {
+            /** Session Id */
+            session_id: string;
+            /**
+             * Dataattached
+             * @description Always false. Confirm-attach is the only transition that sets this gate.
+             * @default false
+             */
+            dataAttached: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user_file" | "classic-5";
+            /** Entry Id */
+            entry_id?: string | null;
+            /** Upload Readiness */
+            upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Events Url */
+            events_url?: string | null;
+            dataset_meta?: components["schemas"]["DatasetMetaResponse"] | null;
+        };
+        /**
          * BalanceRequest
          * @description POST /sessions/{id}/balance 请求体。
          */
@@ -1619,6 +1874,159 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * Classic5CandidateResponse
+         * @description One classic-5 catalog candidate. Suggest never attaches or prefills spec.
+         *
+         *     ``candidates`` are found-scale only. Teaching stubs / n<200 extracts use
+         *     ``teaching_fixture=true`` and ``found=false`` on the teaching shelf.
+         */
+        Classic5CandidateResponse: {
+            /**
+             * Catalog Id
+             * @default classic-5
+             * @constant
+             */
+            catalog_id: "classic-5";
+            /** Entry Id */
+            entry_id: string;
+            /**
+             * Source
+             * @default classic-5
+             * @constant
+             */
+            source: "classic-5";
+            /** Title */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /** Tags */
+            tags?: string[];
+            /**
+             * Method
+             * @default
+             */
+            method: string;
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Score */
+            score: number;
+            /**
+             * Attached
+             * @default false
+             * @constant
+             */
+            attached: false;
+            /**
+             * Found
+             * @default false
+             */
+            found: boolean;
+            /**
+             * Teaching Fixture
+             * @default false
+             */
+            teaching_fixture: boolean;
+            /** N Rows */
+            n_rows?: number | null;
+            /** Honesty Warning */
+            honesty_warning?: string | null;
+        };
+        /**
+         * Classic5OwnFileActionResponse
+         * @description Non-catalog first-class acquire: captain-local real panel upload.
+         */
+        Classic5OwnFileActionResponse: {
+            /**
+             * Action
+             * @default upload_own_file
+             * @constant
+             */
+            action: "upload_own_file";
+            /**
+             * Catalog
+             * @default false
+             */
+            catalog: boolean;
+            /**
+             * Source
+             * @default captain-local-real
+             * @constant
+             */
+            source: "captain-local-real";
+        };
+        /**
+         * Classic5SuggestRequest
+         * @description POST /classic-5/suggest 请求体：session + optional TITLE/TOPIC 文本。
+         */
+        Classic5SuggestRequest: {
+            /** Session Id */
+            session_id?: string | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+        };
+        /**
+         * Classic5SuggestResponse
+         * @description POST /classic-5/suggest 返回体.
+         *
+         *     After a confirmed ``session.design``, ranked classic-5 candidates plus a
+         *     non-catalog own-file action. Without confirm, candidates stay empty.
+         *     ``candidates`` never include teaching toys as found data.
+         *     ``attached`` is always false: this path must not hang data or lock spec.
+         */
+        Classic5SuggestResponse: {
+            /**
+             * Catalog Id
+             * @default classic-5
+             * @constant
+             */
+            catalog_id: "classic-5";
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /**
+             * Design Confirmed
+             * @default false
+             */
+            design_confirmed: boolean;
+            /** Candidates */
+            candidates?: components["schemas"]["Classic5CandidateResponse"][];
+            /** Teaching */
+            teaching?: components["schemas"]["Classic5CandidateResponse"][];
+            own_file: components["schemas"]["Classic5OwnFileActionResponse"];
+            /**
+             * Attached
+             * @default false
+             * @constant
+             */
+            attached: false;
+        };
+        /**
          * CreateSessionResponse
          * @description POST /sessions 返回体。
          */
@@ -1683,6 +2091,15 @@ export interface components {
             session_id?: string | null;
             /** Status */
             status?: string | null;
+            /**
+             * Demo Success
+             * @default false
+             */
+            demo_success: boolean;
+            /** Honesty Warning */
+            honesty_warning?: string | null;
+            /** Source */
+            source?: string | null;
         };
         /** DatasetProvenanceResponse */
         DatasetProvenanceResponse: {
@@ -1709,6 +2126,16 @@ export interface components {
             /** Extract Kind */
             extract_kind?: string | null;
         };
+        /**
+         * DataverseFetchRequest
+         * @description Optional chosen Dataverse dataset / file. Empty body searches then fetches.
+         */
+        DataverseFetchRequest: {
+            /** Source Id */
+            source_id?: string | null;
+            /** File Id */
+            file_id?: string | null;
+        };
         /** DecisionEventResponse */
         DecisionEventResponse: {
             /** Id */
@@ -1721,6 +2148,33 @@ export interface components {
             payload?: {
                 [key: string]: unknown;
             };
+        };
+        /** DesignInteractionResponse */
+        DesignInteractionResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "did" | "het";
+            /** Left */
+            left: string;
+            /** Right */
+            right: string;
+            /** Term */
+            term: string;
+        };
+        /** DesignSourceResponse */
+        DesignSourceResponse: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
         };
         /** DeskChatTurn */
         DeskChatTurn: {
@@ -2301,6 +2755,142 @@ export interface components {
             conditions?: unknown[];
         };
         /**
+         * FindDataCandidateResponse
+         * @description Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.
+         *
+         *     Missing ``source_kind`` fails closed. Fixtures are never discovered/found.
+         */
+        FindDataCandidateResponse: {
+            /** Source Id */
+            source_id: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "discovered" | "teaching_fixture" | "external_link" | "fetched" | "captain_local_real" | "user_upload";
+            /** Source */
+            source?: string | null;
+            /** Title */
+            title: string;
+            /** Url Or Fixture */
+            url_or_fixture: string;
+            /** License */
+            license: string;
+            /** Suggested Cols */
+            suggested_cols?: string[];
+            /** Design Fit */
+            design_fit?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Honesty Label
+             * @default
+             */
+            honesty_label: string;
+            fetch?: components["schemas"]["FindDataFetchResponse"] | null;
+        };
+        /**
+         * FindDataFetchProjectionResponse
+         * @description Alias for WDI fetch projection; same shape as FindDataFetchResponse.
+         */
+        FindDataFetchProjectionResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
+         * FindDataFetchResponse
+         * @description Session download vs honest link vs teaching shelf. Not attach.
+         */
+        FindDataFetchResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "into_session" | "link_only" | "not_applicable";
+            /** Session Path */
+            session_path?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
+         * FindDataPlanBodyResponse
+         * @description Where / how to look. A family label without a venue is not a plan.
+         */
+        FindDataPlanBodyResponse: {
+            /** Where */
+            where: string;
+            /** How */
+            how: string;
+            /** Venues */
+            venues?: string[];
+            search_facets: components["schemas"]["FindDataSearchFacetsResponse"];
+        };
+        /**
+         * FindDataSearchFacetsResponse
+         * @description Confirmed Y/X/method/interactions used to search (not a confirm substitute).
+         */
+        FindDataSearchFacetsResponse: {
+            /**
+             * Method
+             * @default
+             */
+            method: string;
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Controls */
+            controls?: string[];
+            /** Interactions */
+            interactions?: string[];
+            /**
+             * Qtype
+             * @default
+             */
+            qType: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+            /** Query Terms */
+            query_terms?: string[];
+        };
+        /**
+         * FindDataTeachingShelfResponse
+         * @description Optional teaching-known extracts. Explicitly not a find result.
+         */
+        FindDataTeachingShelfResponse: {
+            /** Label */
+            label: string;
+            /** Candidates */
+            candidates?: components["schemas"]["FindDataCandidateResponse"][];
+        };
+        /**
          * GenerateChapterRequest
          * @description POST /sessions/{id}/generate-chapter 请求体。
          */
@@ -2638,6 +3228,19 @@ export interface components {
             /** Run Id */
             run_id: string;
         };
+        /**
+         * ProposeDesignRequest
+         * @description POST /sessions/{id}/design/propose 请求体。
+         */
+        ProposeDesignRequest: {
+            /** Title */
+            title: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+        };
         /** QueueFullResponse */
         QueueFullResponse: {
             /** Error */
@@ -2974,6 +3577,115 @@ export interface components {
             degraded: false;
         };
         /**
+         * SessionDesignConfirmResponse
+         * @description POST /sessions/{id}/design/confirm 返回体。
+         */
+        SessionDesignConfirmResponse: {
+            /** Ok */
+            ok: boolean;
+            design: components["schemas"]["SessionDesignResponse"];
+        };
+        /**
+         * SessionDesignResponse
+         * @description Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed.
+         */
+        SessionDesignResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /** Confirmed */
+            confirmed: boolean;
+            /** Proposed At */
+            proposed_at?: string | null;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+            source?: components["schemas"]["DesignSourceResponse"];
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "ols" | "did" | "iv" | "rd" | "scm";
+            /**
+             * Outcome
+             * @default
+             */
+            outcome: string;
+            /**
+             * Treatment
+             * @default
+             */
+            treatment: string;
+            /** Controls */
+            controls?: string[];
+            /**
+             * Group
+             * @default
+             */
+            group: string;
+            /**
+             * Treated
+             * @default
+             */
+            treated: string;
+            /**
+             * Period
+             * @default
+             */
+            period: string;
+            /**
+             * Time Col
+             * @default
+             */
+            time_col: string;
+            /**
+             * Id Col
+             * @default
+             */
+            id_col: string;
+            /**
+             * First Treat Col
+             * @default
+             */
+            first_treat_col: string;
+            /** Interactions */
+            interactions?: components["schemas"]["DesignInteractionResponse"][];
+            /**
+             * Qtype
+             * @default average
+             * @enum {string}
+             */
+            qType: "average" | "heterogeneity" | "causal";
+            /** Heterogeneity Groups */
+            heterogeneity_groups?: string[];
+            /** Catalog Entry Id */
+            catalog_entry_id?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * SessionFindDataResponse
+         * @description GET/POST find-data: plan after confirmed design. Not attach, not gold prefill.
+         */
+        SessionFindDataResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "missing" | "planned";
+            /** Planned At */
+            planned_at?: string | null;
+            /** Route Family */
+            route_family?: ("educ_wage" | "minwage" | "growth" | "macro" | "else") | null;
+            /** Primary Venue */
+            primary_venue?: string | null;
+            plan?: components["schemas"]["FindDataPlanBodyResponse"] | null;
+            /** Candidates */
+            candidates?: components["schemas"]["FindDataCandidateResponse"][];
+            teaching_shelf?: components["schemas"]["FindDataTeachingShelfResponse"] | null;
+        };
+        /**
          * SessionInfoResponse
          * @description GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。
          */
@@ -2987,6 +3699,12 @@ export interface components {
              * @default false
              */
             has_dataset: boolean;
+            /**
+             * Dataattached
+             * @description Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.
+             * @default false
+             */
+            dataAttached: boolean;
             /** Upload Readiness */
             upload_readiness?: ("PROCESSING" | "READY" | "FAILED" | "CANCELLED") | null;
             /** Claim */
@@ -3025,6 +3743,13 @@ export interface components {
                 [key: string]: unknown;
             }[];
             research?: components["schemas"]["ResearchLabResponse"] | null;
+            design?: components["schemas"]["SessionDesignResponse"] | null;
+            /**
+             * Allow Did
+             * @description DiD permission (DID-BE-gate). True only from confirmed session.design.method=did plus treated×period on that design. Catalog id / TITLE/TOPIC / form method=did are not setters. Missing is false.
+             * @default false
+             */
+            allow_did: boolean;
         };
         /**
          * SnapshotActiveRunResponse
@@ -3424,6 +4149,34 @@ export interface components {
             /** Versions */
             versions?: components["schemas"]["ChapterVersionItem"][];
         };
+        /**
+         * WdiFetchResponse
+         * @description FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.
+         *
+         *     Dedicated to this venue. Does not attach, does not use the Barro fixture.
+         */
+        WdiFetchResponse: {
+            /** Source Id */
+            source_id: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "fetched" | "external_link";
+            /** Title */
+            title: string;
+            /** Url Or Fixture */
+            url_or_fixture: string;
+            /** License */
+            license: string;
+            /** Suggested Cols */
+            suggested_cols?: string[];
+            /** Design Fit */
+            design_fit?: {
+                [key: string]: unknown;
+            };
+            fetch: components["schemas"]["FindDataFetchProjectionResponse"];
+        };
     };
     responses: never;
     parameters: never;
@@ -3731,6 +4484,196 @@ export interface operations {
             };
         };
     };
+    get_find_data_endpoint_sessions__session_id__find_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_find_data_endpoint_sessions__session_id__find_data_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DataverseFetchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionFindDataResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WdiFetchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_upload_post: {
         parameters: {
             query?: never;
@@ -3984,6 +4927,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_dataset_sessions__session_id__attach_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachResponse"];
+                };
+            };
+            /** @description Session busy, ingest not ready, or no candidate */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The durable run queue is full */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    confirm_attach_dataset_sessions__session_id__confirm_attach_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfoResponse"];
+                };
+            };
+            /** @description Ingest not ready, no candidate, or session busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_classic5_classic_5_suggest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Classic5SuggestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Classic5SuggestResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4821,6 +5882,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_design_endpoint_sessions__session_id__design_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposeDesignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDesignResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_design_endpoint_sessions__session_id__design_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDesignConfirmResponse"];
                 };
             };
             /** @description Validation Error */

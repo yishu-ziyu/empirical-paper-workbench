@@ -16,6 +16,12 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 评审门依赖：类型化评审通道 build_review_agent（agent/nodes/review_chapter.py）惰性
+# `from pydantic_ai import Agent`；容器里 import 不到只会静默降级成 mock_fallback，
+# 配了真 key 也走不到大模型。这里显式再钉一次 pin（与 backend/requirements.txt 和
+# agent/requirements.txt 的 2.35.3 一致），让「依赖安装层」自身可被守卫测试查到。
+RUN pip install --no-cache-dir "pydantic-ai-slim[openai]==2.35.3"
+
 # ------------------------------------------------------------------
 # 复制源码
 # ------------------------------------------------------------------

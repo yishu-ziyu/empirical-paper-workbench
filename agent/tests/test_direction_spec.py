@@ -1,5 +1,5 @@
 """Research direction normalizes into the spec downstream nodes read."""
-from agent.design.spec import DirectionSpec, slug_for_topic
+from agent.design.spec import DirectionSpec, display_estimate_engine_label, slug_for_topic
 
 
 def test_from_direction_dict_builds_main_specification():
@@ -243,3 +243,13 @@ def test_set_direction_guesses_exact_year_id_columns(tmp_path):
     assert out["research_direction"]["id_col"] == "id"
     guessed = out.get("degradations") or []
     assert any(item.get("reason") == "column_guessed" for item in guessed)
+
+
+def test_ols_engine_label_is_ols_not_feols():
+    assert display_estimate_engine_label("ols", "statspai.feols") == "OLS"
+    assert display_estimate_engine_label("OLS", "statspai.feols") == "OLS"
+    assert display_estimate_engine_label("ols", "statsmodels.ols") == "statsmodels.ols"
+    assert display_estimate_engine_label("ols", "estimate_agent") == "estimate_agent"
+    assert display_estimate_engine_label("did", "statspai.feols") == "statspai.feols"
+    assert display_estimate_engine_label("iv", "statspai.ivreg") == "statspai.ivreg"
+    assert display_estimate_engine_label("ols", None) == ""

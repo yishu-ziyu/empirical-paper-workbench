@@ -451,6 +451,24 @@ export const workbenchZh = {
   'presentation.spec.iv_region_dummies.label': 'IV · nearc4 与 1966 地区虚拟变量',
   'presentation.spec.iv_region_dummies.rationale': '加上 1966 年居住地区的 IV 局部回报。',
 
+  'findData.kicker': '找数据',
+  'findData.findResults': '检索结果',
+  'findData.findResultsHint': '检索到或已下载到本会话的公开来源。不是教学样本。',
+  'findData.kind.discovered': '检索到',
+  'findData.kind.fetched': '已下载到本会话',
+  'findData.kind.externalLink': '公开链接；请下载后上传',
+  'findData.kind.teaching': '教学已知样本 — 不是检索结果',
+  'findData.kind.captainLocalReal': '船长本地真实面板 — 不是检索结果',
+  'findData.kind.userUpload': '上传你自己的文件',
+  'findData.externalLink': '公开链接；请下载后上传',
+  'findData.externalLinkHint': '请跟随公开页下载后上传。不是检索命中。',
+  'findData.captainLocalReal': '船长本地真实面板（不是检索结果）',
+  'findData.captainLocalRealHint': '本地真实面板进入会话。不是检索命中，也不是教学玩具。',
+  'findData.teachingShelf': '教学已知样本（不是检索结果）',
+  'findData.teachingShelfHint': '教学已知样本。出现在这里不是检索成功。',
+  'findData.userUpload': '上传你自己的文件',
+  'findData.userUploadHint': '自己的文件，不是检索命中。',
+
   'agent.identity': '研究助手',
   'agent.looking': '正在查看',
 
@@ -954,6 +972,28 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
   'presentation.spec.iv_region_dummies.label': 'IV · nearc4 with 1966 region dummies',
   'presentation.spec.iv_region_dummies.rationale':
     'IV local return with 1966 region of residence.',
+
+  'findData.kicker': 'Find data',
+  'findData.findResults': 'Find results',
+  'findData.findResultsHint':
+    'Search hits or files downloaded into this session. Not teaching samples.',
+  'findData.kind.discovered': 'Search hit',
+  'findData.kind.fetched': 'Downloaded into this session',
+  'findData.kind.externalLink': 'Public link — download, then upload',
+  'findData.kind.teaching': 'Teaching-known extract — not a find result',
+  'findData.kind.captainLocalReal': 'Captain-local-real — not a find result',
+  'findData.kind.userUpload': 'Upload your own file',
+  'findData.externalLink': 'Public link — download, then upload',
+  'findData.externalLinkHint':
+    'Follow the public page, then upload. Not a search hit.',
+  'findData.captainLocalReal': 'Captain-local-real — not a find result',
+  'findData.captainLocalRealHint':
+    'A captain-local real panel entered the session. Not a search hit and not a teaching toy.',
+  'findData.teachingShelf': 'Teaching-known extract — not a find result',
+  'findData.teachingShelfHint':
+    'Teaching-known extract. Presence here is not a find result.',
+  'findData.userUpload': 'Upload your own file',
+  'findData.userUploadHint': 'Your own file, not a search hit.',
 
   'agent.identity': 'Agent',
   'agent.looking': 'Looking',

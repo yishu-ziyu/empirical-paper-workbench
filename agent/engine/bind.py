@@ -10,6 +10,7 @@ import math
 from numbers import Real
 from typing import Any, Iterable, Mapping
 
+from ..design.spec import display_estimate_engine_label
 from .data_eda import compute_csv_eda
 from .readiness import claim_mode, current_research_claim
 
@@ -321,7 +322,7 @@ def format_estimate_facts(
             f"估计状态：{_first_text(estimate, 'status')}",
             f"真实公式：{_first_text(estimate, 'formula')}",
             f"控制变量：{_controls_text(state)}",
-            f"估计器：{_first_text(estimate, 'estimator')}",
+            f"估计器：{display_estimate_engine_label(estimate.get('method'), estimate.get('estimator')) or _first_text(estimate, 'estimator')}",
             f"协方差/标准误设定：{_covariance_text(estimate)}",
             f"N：{_first_text(estimate, 'n')}",
             f"主处理变量行：{_first_text(estimate, 'treatment_row')}",

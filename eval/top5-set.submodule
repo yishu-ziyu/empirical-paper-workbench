@@ -1,0 +1,19 @@
+# Optional EVAL-top5 git submodule pointer (stub).
+#
+# This file is NOT registered in the product `.gitmodules`.
+# Product boot, `make test`, and session runtime must succeed when
+# `eval/top5-set/` is absent.
+#
+# When a real EVAL-top5 set repository exists, register it locally with:
+#
+#     git submodule add <EVAL-top5-remote-url> eval/top5-set
+#
+# The checkout must provide `eval/top5-set/manifest.json` with at most five
+# slots. It must not use classic-5 catalog ids as gold, must not include
+# gold chapter bodies, and must not add p-hack / ppt / xhs surfaces.
+#
+# Do not vendor the set into fixtures/classic-5/ or agent/eval/tasks/.
+#
+[submodule "eval/top5-set"]
+	path = eval/top5-set
+	url = REPLACE_WITH_EVAL_TOP5_REMOTE

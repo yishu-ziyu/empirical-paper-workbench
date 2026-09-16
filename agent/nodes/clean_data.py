@@ -86,7 +86,7 @@ def _step_config(
     if step_name == "missing":
         base["strategy"] = state.get("missing_strategy")
     elif step_name == "outliers":
-        base["cuts"] = state.get("outliers_cuts", (5, 95))
+        base["cuts"] = state.get("outliers_cuts", (1, 99))
         base["protected_columns"] = _design_columns(state)
     elif step_name == "transform":
         base.update(state.get("transform_config", {}))

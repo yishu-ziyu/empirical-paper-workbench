@@ -1,5 +1,6 @@
-# Sanitized CFPS-shaped association fixture
+# CFPS-shaped association fixture (quarantined)
 
-`sanitized_sample.csv` is synthetic data with the columns needed by the paper
-draft integration test. It contains no copied respondent records and exists
-only to prove that the product does not read the legacy project checkout.
+The synthetic 24-row CSV used by paper-draft tests now lives at
+`tests/fixtures/cfps_association.synthetic.csv`.
+
+It is not found data. Product suggest/find must not serve it.

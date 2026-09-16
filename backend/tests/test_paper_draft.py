@@ -13,9 +13,9 @@ from conftest import make_six_chapter_outline
 
 CFPS_CSV = (
     Path(__file__).resolve().parents[2]
+    / "tests"
     / "fixtures"
-    / "cfps_association"
-    / "sanitized_sample.csv"
+    / "cfps_association.synthetic.csv"
 )
 
 

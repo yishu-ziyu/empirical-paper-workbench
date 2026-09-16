@@ -3,6 +3,7 @@ import { useT } from '../lib/i18n'
 import { fetchSessionEvidence, type EvidenceModel } from '../lib/workspace'
 import {
   claimLabel,
+  displayEstimateEngineLabel,
   formatStatValue,
   normalizeEstimateTableSource,
   parseEstimateRows,
@@ -158,7 +159,10 @@ export default function EvidenceView({
       title: t('legacy.estimator'),
       detail: (
         <span>
-          {estimate?.estimator ? String(estimate.estimator) : none}
+          {displayEstimateEngineLabel(
+            estimate?.method ?? spec?.method,
+            estimate?.estimator,
+          ) || none}
           {estimate?.formula ? ` · ${String(estimate.formula)}` : ''}
         </span>
       ),

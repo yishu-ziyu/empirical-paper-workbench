@@ -15,6 +15,8 @@ def upload_data(state: EconPaperState) -> UploadDataOutput:
     若未提供任何数据集（开发 / 测试期），回写一个占位 dataset，保证 graph
     后续节点（clean_data）有载体可写 missing_count。
     """
+    from ..data_honesty import acquire_source_for_upload, honesty_for_n
+
     datasets = state.get("uploaded_datasets", [])
 
     if not datasets:
@@ -50,6 +52,13 @@ def upload_data(state: EconPaperState) -> UploadDataOutput:
             "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
             "missing_count": int(df.isna().sum().sum()),
         }
+        honesty = honesty_for_n(len(df), name=p.name)
+        meta["demo_success"] = bool(honesty["demo_success"])
+        if honesty.get("honesty_warning"):
+            meta["honesty_warning"] = honesty["honesty_warning"]
+        source = acquire_source_for_upload(p.name)
+        if source:
+            meta["source"] = source
         result.append(meta)
 
     return {"uploaded_datasets": result}

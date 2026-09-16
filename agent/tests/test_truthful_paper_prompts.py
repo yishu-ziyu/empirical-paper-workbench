@@ -933,7 +933,9 @@ def test_results_and_conclusion_bind_estimate_facts_and_forbid_causal_ols():
         system, user = get_prompt(chapter_type).render(**bound)
         prompt = system + "\n" + user
         assert state["estimate"]["formula"] in prompt
-        assert state["estimate"]["estimator"] in prompt
+        assert "估计器：OLS" in prompt
+        assert "statspai.feols" not in prompt
+        assert state["estimate"]["estimator"] == "statspai.feols"
         assert state["estimate"]["treatment_row"] in prompt
         assert "N：5" in prompt
         assert "主张类型：association" in prompt

@@ -4,17 +4,15 @@ Detects outliers via the IQR rule and clips only continuous columns that
 actually contain IQR outliers. Research-design columns and binary indicators
 are report-only. Before/after distribution stats are recorded per dataset.
 
-The report carries ``stats_pai_used`` (bool) so callers can tell whether the
-winsorization was delegated to StatsPAI or handled by the pandas fallback.
+Winsorization goes through ``clean_winsor`` (pywinsor2, explicit cuts=(1, 99),
+replace=True). That is not Stata ``winsor2``'s default call. ``stats_pai_used``
+is always False here: this step no longer delegates to StatsPAI.
 """
-import logging
-import sys
-
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from .winsor import WINSOR_CUTS, clean_winsor, winsor_audit_row
 
-_DEFAULT_CUTS = (5, 95)
+_DEFAULT_CUTS = WINSOR_CUTS
 
 
 class OutliersStep:
@@ -30,17 +28,10 @@ class OutliersStep:
         after_list: list = []
         iqr_outliers_list: list = []
         winsorized_list: list = []
-        stats_pai_used = False
-
-        sp_winsor = None
-        # 仅当 statspai 已加载（sys.modules 中存在）时才尝试使用；否则视为
-        # 不可用，直接走 pandas 降级。这样 statspai 被移除/未安装时能如实把
-        # stats_pai_used 标记为 False，而不是通过重新导入掩盖降级。
-        if sys.modules.get("statspai") is not None:
-            try:
-                from statspai import winsor as sp_winsor  # type: ignore
-            except ImportError:
-                sp_winsor = None
+        engine_list: list = []
+        columns_list: list = []
+        n_changed_list: list = []
+        skipped_list: list = []
 
         for i, ds in enumerate(datasets):
             path = ds.get("path")
@@ -49,6 +40,10 @@ class OutliersStep:
                 after_list.append({})
                 iqr_outliers_list.append({})
                 winsorized_list.append(False)
+                engine_list.append(None)
+                columns_list.append([])
+                n_changed_list.append({})
+                skipped_list.append({})
                 continue
 
             df = pd.read_csv(path)
@@ -58,6 +53,10 @@ class OutliersStep:
                 after_list.append({})
                 iqr_outliers_list.append({})
                 winsorized_list.append(False)
+                engine_list.append(None)
+                columns_list.append([])
+                n_changed_list.append({})
+                skipped_list.append({})
                 continue
 
             before = _distribution(df, numeric_cols)
@@ -70,22 +69,16 @@ class OutliersStep:
                 and int(df[column].nunique(dropna=True)) > 2
             ]
 
-            if sp_winsor is not None and winsor_cols:
-                try:
-                    df = sp_winsor(df, vars=winsor_cols, cuts=cuts, replace=True)
-                    stats_pai_used = True
-                except Exception:
-                    logger.warning(
-                        "StatsPAI winsor() failed for dataset %d, falling back to pandas", i
-                    )
-                    df = _winsorize_pandas(df, winsor_cols, cuts)
-            elif winsor_cols:
-                logger.warning(
-                    "StatsPAI not available for winsorize (dataset %d), using pandas fallback", i
-                )
-                df = _winsorize_pandas(df, winsor_cols, cuts)
-
+            df, audit = clean_winsor(
+                df,
+                winsor_cols,
+                cuts=cuts,
+                protected_columns=protected_columns,
+            )
             after = _distribution(df, numeric_cols)
+            row = winsor_audit_row(
+                audit, before=before, after=after, iqr_outliers=iqr_outliers
+            )
 
             if "original_path" not in ds:
                 ds["original_path"] = path
@@ -93,24 +86,30 @@ class OutliersStep:
             df.to_csv(sidecar_path, index=False)
             ds["path"] = sidecar_path
             ds.setdefault("step_paths", []).append(sidecar_path)
+            ds["outliers"] = row
 
-            ds["outliers"] = {
-                "before": before,
-                "after": after,
-                "iqr_outliers": iqr_outliers,
-                "winsorized": bool(winsor_cols),
-            }
             before_list.append(before)
             after_list.append(after)
             iqr_outliers_list.append(iqr_outliers)
-            winsorized_list.append(bool(winsor_cols))
+            winsorized_list.append(bool(row["columns"]))
+            engine_list.append(row["engine"])
+            columns_list.append(list(row["columns"]))
+            n_changed_list.append(dict(row["n_changed"]))
+            skipped_list.append(dict(row["skipped"]))
 
         return datasets, {
             "before": before_list,
             "after": after_list,
             "iqr_outliers": iqr_outliers_list,
             "winsorized": winsorized_list,
-            "stats_pai_used": stats_pai_used,
+            "stats_pai_used": False,
+            "engine": engine_list,
+            "cuts": [int(cuts[0]), int(cuts[1])] if cuts is not None else list(WINSOR_CUTS),
+            "columns": columns_list,
+            "n_changed": n_changed_list,
+            "skipped": skipped_list,
+            "stata_default": False,
+            "replace": True,
         }
 
 
@@ -143,16 +142,3 @@ def _iqr_outlier_counts(df: pd.DataFrame, cols: list) -> dict:
         upper = q3 + 1.5 * iqr
         out[c] = int(((s < lower) | (s > upper)).sum())
     return out
-
-
-def _winsorize_pandas(df: pd.DataFrame, cols: list, cuts) -> pd.DataFrame:
-    lo, hi = cuts[0] / 100.0, cuts[1] / 100.0
-    for c in cols:
-        s = df[c]
-        non_nan = s.dropna()
-        if non_nan.empty:
-            continue
-        lower = non_nan.quantile(lo)
-        upper = non_nan.quantile(hi)
-        df[c] = s.clip(lower=lower, upper=upper)
-    return df

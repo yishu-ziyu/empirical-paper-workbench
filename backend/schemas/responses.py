@@ -30,6 +30,9 @@ class DatasetMetaResponse(BaseModel):
     missing_count: Optional[int] = None
     session_id: Optional[str] = None
     status: Optional[str] = None
+    demo_success: bool = False
+    honesty_warning: Optional[str] = None
+    source: Optional[str] = None
 
 
 class ChapterResponse(BaseModel):
@@ -411,12 +414,79 @@ class ResearchLabResponse(BaseModel):
     claim: Optional[ClaimLedgerResponse] = None
 
 
+class DesignSourceResponse(BaseModel):
+    title: str = ""
+    question: str = ""
+
+
+class DesignInteractionResponse(BaseModel):
+    kind: Literal["did", "het"]
+    left: str
+    right: str
+    term: str
+
+
+class SessionDesignResponse(BaseModel):
+    """Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."""
+
+    status: Literal["draft", "confirmed"]
+    confirmed: bool
+    proposed_at: Optional[str] = None
+    confirmed_at: Optional[str] = None
+    source: DesignSourceResponse = Field(default_factory=DesignSourceResponse)
+    method: Literal["ols", "did", "iv", "rd", "scm"]
+    outcome: str = ""
+    treatment: str = ""
+    controls: List[str] = Field(default_factory=list)
+    group: str = ""
+    treated: str = ""
+    period: str = ""
+    time_col: str = ""
+    id_col: str = ""
+    first_treat_col: str = ""
+    interactions: List[DesignInteractionResponse] = Field(default_factory=list)
+    qType: Literal["average", "heterogeneity", "causal"] = "average"
+    heterogeneity_groups: List[str] = Field(default_factory=list)
+    catalog_entry_id: Optional[str] = None
+
+    model_config = {"extra": "allow"}
+
+
+class SessionDesignConfirmResponse(BaseModel):
+    """POST /sessions/{id}/design/confirm 返回体。"""
+
+    ok: bool
+    design: SessionDesignResponse
+
+
+class AttachResponse(BaseModel):
+    """POST /sessions/{id}/attach — bind only; never sets dataAttached."""
+
+    session_id: str
+    dataAttached: bool = Field(
+        default=False,
+        description="Always false. Confirm-attach is the only transition that sets this gate.",
+    )
+    source: Literal["user_file", "classic-5"]
+    entry_id: Optional[str] = None
+    upload_readiness: Optional[
+        Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
+    ] = None
+    run_id: Optional[str] = None
+    events_url: Optional[str] = None
+    dataset_meta: Optional[DatasetMetaResponse] = None
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
     session_id: str
     exists: bool
     has_dataset: bool = False
+    dataAttached: bool = Field(
+        default=False,
+        description="Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
+    )
     upload_readiness: Optional[
         Literal["PROCESSING", "READY", "FAILED", "CANCELLED"]
     ] = None
@@ -437,6 +507,72 @@ class SessionInfoResponse(BaseModel):
     active_run: Optional[SnapshotActiveRunResponse] = None
     degradations: List[Dict[str, Any]] = Field(default_factory=list)
     research: Optional[ResearchLabResponse] = None
+    design: Optional[SessionDesignResponse] = None
+    allow_did: bool = Field(
+        default=False,
+        description=(
+            "DiD permission (DID-BE-gate). True only from confirmed "
+            "session.design.method=did plus treated×period on that design. "
+            "Catalog id / TITLE/TOPIC / form method=did are not setters. "
+            "Missing is false."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# classic-5 suggest (DC-BE-suggest; rank candidates after confirmed design)
+# ---------------------------------------------------------------------------
+
+
+class Classic5OwnFileActionResponse(BaseModel):
+    """Non-catalog first-class acquire: captain-local real panel upload."""
+
+    action: Literal["upload_own_file"] = "upload_own_file"
+    catalog: bool = False
+    source: Literal["captain-local-real"] = "captain-local-real"
+
+
+class Classic5CandidateResponse(BaseModel):
+    """One classic-5 catalog candidate. Suggest never attaches or prefills spec.
+
+    ``candidates`` are found-scale only. Teaching stubs / n<200 extracts use
+    ``teaching_fixture=true`` and ``found=false`` on the teaching shelf.
+    """
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    entry_id: str
+    source: Literal["classic-5"] = "classic-5"
+    title: str
+    topic: str = ""
+    tags: List[str] = Field(default_factory=list)
+    method: str = ""
+    outcome: str = ""
+    treatment: str = ""
+    score: float
+    attached: Literal[False] = False
+    found: bool = False
+    teaching_fixture: bool = False
+    n_rows: Optional[int] = None
+    honesty_warning: Optional[str] = None
+
+
+class Classic5SuggestResponse(BaseModel):
+    """POST /classic-5/suggest 返回体.
+
+    After a confirmed ``session.design``, ranked classic-5 candidates plus a
+    non-catalog own-file action. Without confirm, candidates stay empty.
+    ``candidates`` never include teaching toys as found data.
+    ``attached`` is always false: this path must not hang data or lock spec.
+    """
+
+    catalog_id: Literal["classic-5"] = "classic-5"
+    title: str = ""
+    topic: str = ""
+    design_confirmed: bool = False
+    candidates: List[Classic5CandidateResponse] = Field(default_factory=list)
+    teaching: List[Classic5CandidateResponse] = Field(default_factory=list)
+    own_file: Classic5OwnFileActionResponse
+    attached: Literal[False] = False
 
 
 # ---------------------------------------------------------------------------
@@ -927,3 +1063,103 @@ class OutlierStepReportResponse(BaseModel):
     after: List[Dict[str, DistStatsResponse]] = Field(default_factory=list)
     iqr_outliers: List[Dict[str, int]] = Field(default_factory=list)
     winsorized: List[bool] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# find_data.py (FD-BE-plan)
+# ---------------------------------------------------------------------------
+
+
+class FindDataSearchFacetsResponse(BaseModel):
+    """Confirmed Y/X/method/interactions used to search (not a confirm substitute)."""
+
+    method: str = ""
+    outcome: str = ""
+    treatment: str = ""
+    controls: List[str] = Field(default_factory=list)
+    interactions: List[str] = Field(default_factory=list)
+    qType: str = ""
+    title: str = ""
+    question: str = ""
+    query_terms: List[str] = Field(default_factory=list)
+
+
+class FindDataPlanBodyResponse(BaseModel):
+    """Where / how to look. A family label without a venue is not a plan."""
+
+    where: str
+    how: str
+    venues: List[str] = Field(default_factory=list)
+    search_facets: FindDataSearchFacetsResponse
+
+
+class FindDataFetchResponse(BaseModel):
+    """Session download vs honest link vs teaching shelf. Not attach."""
+
+    status: Literal["into_session", "link_only", "not_applicable"]
+    session_path: Optional[str] = None
+    reason: str = ""
+
+
+class FindDataCandidateResponse(BaseModel):
+    """Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.
+
+    Missing ``source_kind`` fails closed. Fixtures are never discovered/found.
+    """
+
+    source_id: str
+    source_kind: Literal[
+        "discovered",
+        "teaching_fixture",
+        "external_link",
+        "fetched",
+        "captain_local_real",
+        "user_upload",
+    ]
+    source: Optional[str] = None
+    title: str
+    url_or_fixture: str
+    license: str
+    suggested_cols: List[str] = Field(default_factory=list)
+    design_fit: Dict[str, Any] = Field(default_factory=dict)
+    honesty_label: str = ""
+    fetch: Optional[FindDataFetchResponse] = None
+
+
+class FindDataTeachingShelfResponse(BaseModel):
+    """Optional teaching-known extracts. Explicitly not a find result."""
+
+    label: str
+    candidates: List[FindDataCandidateResponse] = Field(default_factory=list)
+
+
+class FindDataFetchProjectionResponse(FindDataFetchResponse):
+    """Alias for WDI fetch projection; same shape as FindDataFetchResponse."""
+
+
+class WdiFetchResponse(BaseModel):
+    """FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.
+
+    Dedicated to this venue. Does not attach, does not use the Barro fixture.
+    """
+
+    source_id: str
+    source_kind: Literal["fetched", "external_link"]
+    title: str
+    url_or_fixture: str
+    license: str
+    suggested_cols: List[str] = Field(default_factory=list)
+    design_fit: Dict[str, Any] = Field(default_factory=dict)
+    fetch: FindDataFetchProjectionResponse
+
+
+class SessionFindDataResponse(BaseModel):
+    """GET/POST find-data: plan after confirmed design. Not attach, not gold prefill."""
+
+    status: Literal["missing", "planned"]
+    planned_at: Optional[str] = None
+    route_family: Optional[Literal["educ_wage", "minwage", "growth", "macro", "else"]] = None
+    primary_venue: Optional[str] = None
+    plan: Optional[FindDataPlanBodyResponse] = None
+    candidates: List[FindDataCandidateResponse] = Field(default_factory=list)
+    teaching_shelf: Optional[FindDataTeachingShelfResponse] = None

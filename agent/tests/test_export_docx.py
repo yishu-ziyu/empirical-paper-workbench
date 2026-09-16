@@ -28,6 +28,7 @@ from agent.nodes.export_docx import (
     markdown_to_latex,
     normalize_template,
     render_template,
+    rewrite_mathrm_to_text_for_word,
     TEMPLATE_NAMES,
 )
 
@@ -501,6 +502,30 @@ def test_escape_tex_protects_cite_and_unmatched_dollar():
 
 
 _METHODS_EQ = r"\ln(\text{homicide}_{i}) = \beta_0 + \beta_1 post_{i} + \varepsilon_{i}"
+_MATHRM_EQ = (
+    r"\ln(\mathrm{Homicide}_{i}) = \beta_0 + \beta_1 post_{i} + \varepsilon_{i}"
+)
+_WORD_TEXT_EQ = (
+    r"\ln(\text{Homicide}_{i}) = \beta_0 + \beta_1 post_{i} + \varepsilon_{i}"
+)
+
+
+def _omml_has_intact_identifier(xml: str, ident: str) -> bool:
+    return bool(re.search(rf"<m:t[^>]*>{re.escape(ident)}</m:t>", xml))
+
+
+def _omml_has_letter_split_identifier(xml: str, ident: str) -> bool:
+    """Pandoc ``\\mathrm{Ident}`` emits each letter in its own ``m:t``."""
+    if not ident or _omml_has_intact_identifier(xml, ident):
+        return False
+    pattern = "".join(rf"<m:t[^>]*>{re.escape(ch)}</m:t>.*?" for ch in ident)
+    return bool(re.search(pattern, xml, flags=re.S))
+
+
+def _pandoc_available() -> bool:
+    import shutil
+
+    return shutil.which("pandoc") is not None
 _DOUBLE_ESCAPED_EQ = (
     r"\{\}ln(\{\}text\{homicide\}\_\{i\}) = \{\}beta\_0 + \{\}beta\_1 post\_\{i\}"
 )
@@ -770,6 +795,165 @@ def test_export_docx_methods_math_not_double_escaped(tmp_path, monkeypatch):
     assert "β_0" in xml
     assert "其中 i 表示州" in xml
     assert "oMath" in xml
+
+
+def test_rewrite_mathrm_to_text_for_word_keeps_identifier():
+    """Word-only preprocess: \\mathrm{Homicide} → \\text{Homicide}."""
+    assert rewrite_mathrm_to_text_for_word(_MATHRM_EQ) == _WORD_TEXT_EQ
+    assert r"\mathrm{Homicide}" not in rewrite_mathrm_to_text_for_word(_MATHRM_EQ)
+    assert rewrite_mathrm_to_text_for_word(_WORD_TEXT_EQ) == _WORD_TEXT_EQ
+    assert rewrite_mathrm_to_text_for_word(r"\mathrm*{Ident}") == r"\text{Ident}"
+    # PDF/literature neighbors stay untouched.
+    assert r"\operatorname{E}" in rewrite_mathrm_to_text_for_word(r"\operatorname{E}")
+    assert r"\mathbf{X}" in rewrite_mathrm_to_text_for_word(r"\mathbf{X}")
+
+
+def test_convert_docx_pandoc_input_rewrites_mathrm_not_paper_tex(
+    tmp_path, monkeypatch
+):
+    """Formal docx path feeds pandoc \\text{Homicide}; paper.tex keeps \\mathrm."""
+    import subprocess
+
+    captured: dict = {}
+
+    def fake_which(name):
+        return "/usr/bin/pandoc" if name == "pandoc" else None
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = list(cmd)
+        src = Path(cmd[1]).read_text(encoding="utf-8")
+        captured["src"] = src
+        Path(cmd[cmd.index("-o") + 1]).write_bytes(b"PK\x03\x04fake-docx")
+        return subprocess.CompletedProcess(cmd, 0, b"", b"")
+
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", fake_which)
+    monkeypatch.setattr("agent.nodes.export_docx.subprocess.run", fake_run)
+    tex = (
+        "\\title{Castle paper}\n"
+        "\\begin{document}\n"
+        "\\section{方法}\n"
+        f"$${_MATHRM_EQ}$$\n"
+        "\\end{document}\n"
+    )
+    path = convert_docx(tex, str(tmp_path))
+    assert path
+    assert captured["cmd"][0] == "pandoc"
+    assert Path(captured["cmd"][1]).name == "paper_word.tex"
+    assert r"\mathrm{Homicide}" not in captured["src"]
+    assert r"\text{Homicide}" in captured["src"]
+    assert _WORD_TEXT_EQ in captured["src"]
+    paper_tex = (tmp_path / "paper.tex").read_text(encoding="utf-8")
+    assert r"\mathrm{Homicide}" in paper_tex
+    assert paper_tex == tex
+
+
+def test_export_docx_markdown_mathrm_stays_on_pdf_path(tmp_path, monkeypatch):
+    """generate markdown → latex / xelatex keeps \\mathrm; only Word rewrites."""
+    captured: dict = {}
+
+    def fake_compile(tex, outdir):
+        captured["pdf_tex"] = tex
+        (Path(outdir) / "paper.tex").write_text(tex, encoding="utf-8")
+        return None
+
+    def fake_convert(tex, outdir):
+        captured["docx_tex"] = tex
+        captured["word_tex"] = rewrite_mathrm_to_text_for_word(tex)
+        return None
+
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", fake_compile)
+    monkeypatch.setattr("agent.nodes.export_docx.convert_docx", fake_convert)
+    state = _full_state(
+        workspace=str(tmp_path),
+        body_chapters=[
+            {
+                "type": "methods",
+                "title": "方法",
+                "content": f"## 计量模型\n\n$$\n{_MATHRM_EQ}\n$$\n",
+            }
+        ],
+    )
+    result = export_docx(state)
+    tex = result["latex_source"]
+    assert _MATHRM_EQ in tex
+    assert r"\mathrm{Homicide}" in tex
+    assert captured["pdf_tex"] == tex
+    assert captured["docx_tex"] == tex
+    assert r"\mathrm{Homicide}" in captured["pdf_tex"]
+    assert r"\text{Homicide}" in captured["word_tex"]
+    assert r"\mathrm{Homicide}" not in captured["word_tex"]
+    on_disk = (tmp_path / "paper.tex").read_text(encoding="utf-8")
+    assert r"\mathrm{Homicide}" in on_disk
+
+
+@pytest.mark.skipif(not _pandoc_available(), reason="pandoc not installed")
+def test_convert_docx_pandoc_omml_does_not_letter_split_mathrm(tmp_path):
+    """Live pandoc OMML keeps Homicide in one m:t (Mac-visible equation)."""
+    tex = (
+        "\\documentclass{article}\n"
+        "\\begin{document}\n"
+        f"$${_MATHRM_EQ}$$\n"
+        "\\end{document}\n"
+    )
+    path = convert_docx(tex, str(tmp_path))
+    assert path
+    with zipfile.ZipFile(path) as zf:
+        xml = zf.read("word/document.xml").decode("utf-8")
+    assert "oMath" in xml
+    assert _omml_has_intact_identifier(xml, "Homicide")
+    assert not _omml_has_letter_split_identifier(xml, "Homicide")
+    paper_tex = (tmp_path / "paper.tex").read_text(encoding="utf-8")
+    assert r"\mathrm{Homicide}" in paper_tex
+
+
+def test_export_docx_formal_path_word_text_pdf_mathrm(tmp_path, monkeypatch):
+    """Product markdown→docx: Word pandoc sees \\text; PDF/tex keep \\mathrm."""
+    import subprocess
+
+    captured: dict = {}
+
+    def fake_compile(tex, outdir):
+        captured["pdf_tex"] = tex
+        return None
+
+    def fake_which(name):
+        return "/usr/bin/pandoc" if name == "pandoc" else None
+
+    def fake_run(cmd, **kwargs):
+        captured["word_src"] = Path(cmd[1]).read_text(encoding="utf-8")
+        Path(cmd[cmd.index("-o") + 1]).write_bytes(b"PK\x03\x04fake-docx")
+        return subprocess.CompletedProcess(cmd, 0, b"", b"")
+
+    monkeypatch.setattr("agent.nodes.export_docx.compile_pdf", fake_compile)
+    monkeypatch.setattr("agent.nodes.export_docx.shutil.which", fake_which)
+    monkeypatch.setattr("agent.nodes.export_docx.subprocess.run", fake_run)
+    state = _full_state(
+        workspace=str(tmp_path),
+        body_chapters=[
+            {
+                "type": "methods",
+                "title": "方法",
+                "content": f"## 计量模型\n\n$$\n{_MATHRM_EQ}\n$$\n",
+            }
+        ],
+    )
+    result = export_docx(state)
+    assert result["docx_path"]
+    assert _MATHRM_EQ in result["latex_source"]
+    assert r"\mathrm{Homicide}" in captured["pdf_tex"]
+    assert captured["pdf_tex"] == result["latex_source"]
+    assert r"\text{Homicide}" in captured["word_src"]
+    assert r"\mathrm{Homicide}" not in captured["word_src"]
+    assert r"\mathrm{Homicide}" in (tmp_path / "paper.tex").read_text(encoding="utf-8")
+
+
+def test_omml_letter_split_detector_flags_per_letter_runs():
+    """Contract: one m:t per letter is the Mac-blank failure mode."""
+    split = "".join(f"<m:t>{ch}</m:t>" for ch in "Homicide")
+    intact = "<m:t>Homicide</m:t>"
+    assert _omml_has_letter_split_identifier(split, "Homicide")
+    assert not _omml_has_letter_split_identifier(intact, "Homicide")
+    assert _omml_has_intact_identifier(intact, "Homicide")
 
 
 def test_export_docx_ooxml_fallback_is_degraded(tmp_path, monkeypatch):

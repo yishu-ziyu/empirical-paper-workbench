@@ -7,8 +7,11 @@
 2. 选择模板（``state['export_template']``，默认 ``cn_journal``）
 3. Jinja2 渲染模板 → LaTeX 源码
 4. ``compile_pdf`` 调 ``latexmk -xelatex`` 生成 PDF（subprocess）
-5. ``convert_docx`` 优先 ``pandoc``；缺失或失败时写最小 OOXML ``.docx``
+5. ``convert_docx`` 优先 ``pandoc``（Word-only ``\\mathrm{Ident}`` →
+   ``\\text{Ident}`` so Mac Word keeps one ``m:t`` run）；缺失或失败时写最小 OOXML ``.docx``
 6. 返回 ``{"latex_source", "pdf_path", "docx_path", "degraded"}``
+   ``latex_source`` / ``paper.tex`` / ``compile_pdf`` stay on literature
+   ``\\mathrm``; the rewrite is only the Word/pandoc input.
 
 降级策略：``latexmk`` 不可用时 ``pdf_path=None``。docx 在 pandoc 缺失时
 仍写 OOXML，但 ``degraded=True``。仅当转换完全失败时 ``docx_path=None``。
@@ -754,8 +757,27 @@ def _write_simple_docx(path: Path, title: str, sections: List[dict]) -> None:
         zf.writestr("word/document.xml", document_xml)
 
 
+# Pandoc maps ``\mathrm{Homicide}`` to letter-split OMML (each letter its
+# own ``m:t``). Mac Word then shows a blank equation. ``\text{Homicide}``
+# stays one run. Literature source / PDF keep ``\mathrm``.
+_MATHRM_IDENT_RE = re.compile(r"\\mathrm\*?\{([^{}]*)\}")
+
+
+def rewrite_mathrm_to_text_for_word(tex: str) -> str:
+    """Word/docx-only: ``\\mathrm{Ident}`` → ``\\text{Ident}``.
+
+    Do not use this on the PDF/xelatex source. Nested braces are left
+    alone (``[^{}]*``) so we never rewrite past a math group.
+    """
+    return _MATHRM_IDENT_RE.sub(r"\\text{\1}", tex or "")
+
+
 def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
     """tex → docx. Prefer pandoc; if missing or failing, write a simple OOXML file.
+
+    Pandoc input is a Word-only copy with ``\\mathrm{Ident}`` rewritten
+    to ``\\text{Ident}``. ``paper.tex`` stays the original literature
+    source so the PDF/xelatex path is not mutated.
 
     成功返回 docx 绝对路径；pandoc 与 fallback 都失败时返回 None。
     """
@@ -764,6 +786,10 @@ def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
     out.mkdir(parents=True, exist_ok=True)
     tex_path = out / "paper.tex"
     tex_path.write_text(tex_source, encoding="utf-8")
+    word_tex_path = out / "paper_word.tex"
+    word_tex_path.write_text(
+        rewrite_mathrm_to_text_for_word(tex_source), encoding="utf-8"
+    )
     docx_path = out / "paper.docx"
 
     if shutil.which("pandoc") is not None:
@@ -771,7 +797,7 @@ def convert_docx(tex_source: str, output_dir: str) -> Optional[str]:
             subprocess.run(
                 [
                     "pandoc",
-                    str(tex_path),
+                    str(word_tex_path),
                     "-o",
                     str(docx_path),
                     "--from=latex",

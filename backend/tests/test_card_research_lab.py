@@ -39,6 +39,8 @@ def _boot(client) -> dict:
     assert data["session_id"]
     assert data["run_id"]
     assert data["events_url"] == f"/api/runs/{data['run_id']}/events"
+    meta = data.get("dataset_meta") or {}
+    assert meta.get("source") != "captain-local-real"
     return data
 
 

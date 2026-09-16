@@ -34,6 +34,7 @@ from auth import (
     require_auth_unless_debug,
     require_session_ownership,
 )
+from agent.data_honesty import acquire_source_for_upload, honesty_for_n
 from config import settings
 from facade import facade
 from models.user import User
@@ -53,7 +54,9 @@ from schemas.responses import (
     SnapshotDatasetResponse,
     UploadResponse,
 )
+from services.allow_did import session_allow_did
 from services.research_lab import lab_from_state, public_research
+from services.session_design import public_design
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
 
 router = APIRouter()
@@ -138,21 +141,36 @@ def _validated_upload_key(raw: str | None) -> str:
     return str(parsed)
 
 
-def _dataset_meta(df: pd.DataFrame, name: str | None = None) -> DatasetMetaResponse:
+def _dataset_meta(
+    df: pd.DataFrame,
+    name: str | None = None,
+    *,
+    captain_local: bool = False,
+) -> DatasetMetaResponse:
+    honesty = honesty_for_n(int(len(df)), name=name)
+    source = acquire_source_for_upload(name) if captain_local else None
     return DatasetMetaResponse(
         name=name,
         columns=[str(column) for column in df.columns],
         rows=int(len(df)),
         dtypes={str(column): str(dtype) for column, dtype in df.dtypes.items()},
         missing_count=int(df.isna().sum().sum()),
+        demo_success=bool(honesty["demo_success"]),
+        honesty_warning=honesty.get("honesty_warning"),
+        source=source,
     )
 
 
 def _normalize_dataframe(
-    df: pd.DataFrame, name: str | None = None
+    df: pd.DataFrame,
+    name: str | None = None,
+    *,
+    captain_local: bool = False,
 ) -> tuple[bytes, DatasetMetaResponse]:
     """Serialize and profile a parsed table away from the API event loop."""
-    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(df, name)
+    return df.to_csv(index=False).encode("utf-8"), _dataset_meta(
+        df, name, captain_local=captain_local
+    )
 
 
 def _upload_response(admission) -> UploadResponse:
@@ -168,6 +186,17 @@ def _upload_response(admission) -> UploadResponse:
             rows=metadata.get("rows"),
             dtypes=dict(metadata.get("dtypes") or {}),
             missing_count=metadata.get("missing_count"),
+            demo_success=bool(metadata.get("demo_success")),
+            honesty_warning=(
+                str(metadata["honesty_warning"])
+                if metadata.get("honesty_warning")
+                else None
+            ),
+            source=(
+                str(metadata["source"])
+                if isinstance(metadata.get("source"), str) and metadata.get("source")
+                else None
+            ),
         ),
     )
 
@@ -258,7 +287,10 @@ async def upload(
     #     The original file name is recorded server-side so the Project
     #     Snapshot can restore the workspace without client-side copies.
     csv_bytes, dataset_meta = await run_in_threadpool(
-        _normalize_dataframe, df, file.filename or ""
+        _normalize_dataframe,
+        df,
+        file.filename or "",
+        captain_local=True,
     )
     session_id = str(uuid.uuid4())
     user_id = current_user.id if current_user else None
@@ -274,6 +306,9 @@ async def upload(
             "session_id": session_id,
             "csv_path": str(csv_path),
             "uploaded_datasets": [{"path": str(csv_path), "format": "csv"}],
+            "dataAttached": False,
+            "data_attached": False,
+            "attach_candidate": {"source": "user_file"},
         }
         admission = await RunRepository().admit_upload(
             session_id=session_id,
@@ -379,19 +414,8 @@ async def list_sessions(
     ]
 
 
-@router.get("/sessions/{session_id}", response_model=SessionInfoResponse)
-async def get_session_info(
-    session_id: str,
-    current_user: Optional[User] = Depends(get_optional_user),
-) -> SessionInfoResponse:
-    """Return the Project Snapshot: the single research-state read model.
-
-    C1: besides the instrument readouts this carries the dataset metadata
-    (server-side), the in-flight durable run (RunRepository), and the visible
-    degradation summary. The frontend restores from this payload alone and
-    keeps no sessionStorage copies of these fields.
-    """
-    await run_in_threadpool(require_session_ownership, session_id, current_user)
+async def build_session_info(session_id: str) -> SessionInfoResponse:
+    """Project the Project Snapshot, including the dataAttached confirm-attach gate."""
     has_dataset = False
     extra: dict = {}
     try:
@@ -408,18 +432,41 @@ async def get_session_info(
         extra["degradations"] = public_degradations(
             await run_in_threadpool(facade.get_degradations, session_id)
         )
+        extra["allow_did"] = session_allow_did(state)
+        extra["dataAttached"] = (
+            state.get("dataAttached") is True or state.get("data_attached") is True
+        )
         if lab_from_state(state) is not None:
             extra["research"] = public_research(state)
+        extra["design"] = public_design(state)
     except Exception:
         extra = {}
     extra["dataset"] = await _snapshot_dataset(session_id)
     extra["active_run"] = await _snapshot_active_run(session_id)
+    extra.setdefault("allow_did", False)
+    extra.setdefault("dataAttached", False)
     return SessionInfoResponse(
         session_id=session_id,
         exists=True,
         has_dataset=has_dataset,
         **extra,
     )
+
+
+@router.get("/sessions/{session_id}", response_model=SessionInfoResponse)
+async def get_session_info(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> SessionInfoResponse:
+    """Return the Project Snapshot: the single research-state read model.
+
+    C1: besides the instrument readouts this carries the dataset metadata
+    (server-side), the in-flight durable run (RunRepository), and the visible
+    degradation summary. The frontend restores from this payload alone and
+    keeps no sessionStorage copies of these fields.
+    """
+    await run_in_threadpool(require_session_ownership, session_id, current_user)
+    return await build_session_info(session_id)
 
 
 async def _snapshot_dataset(session_id: str) -> Optional[SnapshotDatasetResponse]:

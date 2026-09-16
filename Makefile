@@ -4,14 +4,22 @@
 # Python 版本：项目锁定 3.12（3.14 下 numpy/pydantic 依赖装不上）。
 # 可用 PY=python3.12 覆盖，需机器上存在 python3.12。
 PY ?= python3.12
-DEPENDENCY_ROOT ?= $(if $(ECONPAPER_DEPENDENCY_ROOT),$(ECONPAPER_DEPENDENCY_ROOT),../dependencies)
+# StatsPAI 源码的位置。工作区搬动后布局变了：仓库在 `AI 产品/empirical-paper-workbench`，
+# 而 `dependencies/StatsPAI` 随 `经济学论文` 工作区走，不再与仓库同级。旧默认 `../dependencies`
+# 会指向不存在的路径（verify-deps 报 repo_exists: False）。
+# 注意不要用 $(abspath)：make 把它当「以空白分隔的多个名字」，路径含空格时会被切开。
+# 只给需要的命令传 ECONPAPER_DEPENDENCY_ROOT（见 verify-deps），**不要 export**：
+# agent/upstream.py 的默认值本身就是「未配置时取 workspace/dependencies」，全局导出会改变
+# 模块级 DEPENDENCY_ROOT，直接打挂 agent/tests/test_upstream.py::test_default_dependency_root_is_workspace_dependencies。
+DEPENDENCY_ROOT ?= $(if $(ECONPAPER_DEPENDENCY_ROOT),$(ECONPAPER_DEPENDENCY_ROOT),$(CURDIR)/../经济学论文/dependencies)
 FRONTEND_URL ?= http://127.0.0.1:5173
 BACKEND_URL ?= http://127.0.0.1:8000
 
 # import 根：与 backend/Dockerfile 的 ENV PYTHONPATH="/app:/app/backend" 同构。
 # 一份定义，dev-backend / gen-api 共用 —— 加新 target 时前缀 $(PYPATH) 即可，别再手写 PYTHONPATH=..。
-# 用绝对路径：cd 之后相对的 .. 会失效。
-PYPATH := PYTHONPATH=$(CURDIR):$(CURDIR)/backend
+# 用绝对路径：cd 之后相对的 .. 会失效。必须给整体加引号：工作区父目录名可能含空格（如 `AI 产品`），
+# 不加引号 /bin/sh 会在空格处截断，把 `产品/xxx:/Users/...` 当成命令执行并报 Error 127。
+PYPATH := PYTHONPATH="$(CURDIR):$(CURDIR)/backend"
 
 # 默认并发起 frontend + backend；Ctrl-C 同时杀掉
 dev:
@@ -26,9 +34,12 @@ dev-frontend:
 
 # host 绑 127.0.0.1 而非 0.0.0.0：开发机不暴露到局域网。
 # 容器内必须 0.0.0.0，见 backend/Dockerfile CMD（docker-compose 已收窄映射到 127.0.0.1:8000）
+# 用 `python -m uvicorn` 而非裸 `uvicorn`：venv 的控制台脚本 shebang 是写死的绝对路径，
+# 一旦工作区被移动就成 `bad interpreter`；而路径含空格时 shebang 本身无法修复
+# （内核在空格处截断）。`bin/python` 是符号链接，走模块方式不受这两件事影响。
 dev-backend:
 	cd backend && . .venv/bin/activate 2>/dev/null || true; \
-		DEBUG=true $(PYPATH) uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 127.0.0.1 --port 8000
+		DEBUG=true $(PYPATH) .venv/bin/python -m uvicorn main:app --reload --reload-dir . --reload-dir ../agent --host 127.0.0.1 --port 8000
 
 dev-runner:
 	cd backend && . .venv/bin/activate 2>/dev/null || true; \
@@ -41,20 +52,25 @@ install-frontend:
 	cd frontend && npm install
 
 # In-place LangGraph 0.x → v1 upgrades can remove overlapping prebuilt files.
+# 评审门依赖（pydantic-ai-slim）显式再钉一次：requirements.txt 已声明，但这里也是
+# 「backend 运行时怎么装依赖」的入口之一；漏了它 backend/runner 会静默降级成
+# mock 评审（agent/nodes/review_chapter.py 的 except → review_source="mock_fallback"）。
+# pin 与 agent/requirements.txt 一致；守卫测试见 backend/tests/test_typed_review_dep_declared.py。
 install-backend:
 	cd backend && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
-	pip install -r requirements.txt -r ../requirements-dev.txt; \
-	pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
-	pip install "pyfixest==0.60.0" || true
+	python -m pip install -r requirements.txt -r ../requirements-dev.txt; \
+	python -m pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
+	python -m pip install "pyfixest==0.60.0" || true; \
+	python -m pip install "pydantic-ai-slim[openai]==2.35.3"
 	backend/.venv/bin/python -m pip install -e "$(DEPENDENCY_ROOT)/StatsPAI"
 
 install-agent:
 	cd agent && $(PY) -m venv .venv || true; \
 	. .venv/bin/activate; \
-	pip install -r requirements.txt -r ../requirements-dev.txt; \
-	pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
-	pip install "pyfixest==0.60.0" || true
+	python -m pip install -r requirements.txt -r ../requirements-dev.txt; \
+	python -m pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
+	python -m pip install "pyfixest==0.60.0" || true
 	agent/.venv/bin/python -m pip install -e "$(DEPENDENCY_ROOT)/StatsPAI"
 
 # 验证 backend 健康检查
@@ -81,13 +97,18 @@ test-frontend:
 	cd frontend && npm test
 
 # 验证 graph 可 import（agent 冒烟测试）
+# 必须带 $(PYPATH)：agent 已耦合后端包（agent/engine/did_spec.py、agent/norms/loader.py 会
+# `from services.allow_did import ...`，backend/services 下），不带就会 ModuleNotFoundError: services。
 smoke-agent:
-	agent/.venv/bin/python -c "from agent.graph import graph; print('graph ok:', graph)"
+	$(PYPATH) agent/.venv/bin/python -c "from agent.graph import graph; print('graph ok:', graph)"
 
 # 两个运行环境都必须指向当前工作区的 StatsPAI 源码，不接受旧 editable install 或 PyPI 副本。
+# 同 smoke-agent，agent.upstream / agent.graph 会间接触达后端包，统一带 $(PYPATH)。
+# `ECONPAPER_DEPENDENCY_ROOT` 只在这两条命令里临时传（不可全局 export，理由见文件顶部注释）：
+# agent/upstream.py 的默认值是「workspace/dependencies」，而搬家后 StatsPAI 不在这里。
 verify-deps:
-	@echo "[verify-deps] agent StatsPAI editable source"; agent/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"
-	@echo "[verify-deps] backend StatsPAI editable source"; backend/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"
+	@echo "[verify-deps] agent StatsPAI editable source"; ECONPAPER_DEPENDENCY_ROOT="$(DEPENDENCY_ROOT)" $(PYPATH) agent/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"
+	@echo "[verify-deps] backend StatsPAI editable source"; ECONPAPER_DEPENDENCY_ROOT="$(DEPENDENCY_ROOT)" $(PYPATH) backend/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"
 
 # 验证 frontend / backend / agent 三件套都活
 verify: smoke-agent verify-deps
@@ -97,7 +118,7 @@ verify: smoke-agent verify-deps
 		curl --fail --silent --show-error $(BACKEND_URL)/openapi.json | \
 		backend/.venv/bin/python -c "import json, sys; assert json.load(sys.stdin)['info']['title'] == 'econpaper-backend'"
 	@curl --fail --silent --show-error $(BACKEND_URL)/health
-	@echo "[verify] agent import"; agent/.venv/bin/python -c "from agent.graph import graph; print('graph ok')"
+	@echo "[verify] agent import"; $(PYPATH) agent/.venv/bin/python -c "from agent.graph import graph; print('graph ok')"
 
 clean:
 	rm -rf frontend/node_modules frontend/dist backend/.venv agent/.venv

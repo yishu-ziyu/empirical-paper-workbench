@@ -85,9 +85,39 @@ def test_estimate_writes_treatment_row(tmp_path):
     assert "| x |" in out["results"]
     assert out["estimate"]["status"] == "ok"
     assert out["estimate"]["n"] == 6
+    assert out["estimate"]["demo_success"] is False
+    assert "below 200" in (out["estimate"].get("honesty_warning") or "")
     assert out["estimate"]["coef"] is not None
     assert out["estimate"]["table_rows"]
     assert any(row.startswith("| x |") for row in out["estimate"]["table_rows"])
+
+
+def test_ols_results_label_is_ols_not_feols(tmp_path):
+    """method=ols user-facing engine is OLS; stored estimator stays the engine."""
+    import pandas as pd
+
+    df = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [0, 1, 0, 1]})
+    csv_path = tmp_path / "ols.csv"
+    df.to_csv(csv_path, index=False)
+    out = estimate(
+        {
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "formula": "y ~ x",
+                "treatment": "x",
+                "outcome": "y",
+                "method": "ols",
+            },
+        }
+    )
+    payload = out["estimate"]
+    assert payload["method"] == "ols"
+    assert payload["estimator"] in {"statspai.feols", "statsmodels.ols"}
+    if "feols" in str(payload["estimator"]).lower():
+        assert "估计器：`OLS`" in out["results"]
+        assert "feols" not in out["results"].lower()
+    else:
+        assert payload["estimator"] in out["results"]
 
 
 def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
@@ -96,7 +126,7 @@ def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[2]
-    df = pd.read_csv(repo_root / "frontend/public/samples/course-panel.csv")
+    df = pd.read_csv(repo_root / "tests/fixtures/course-panel.synthetic.csv")
     csv_path = tmp_path / "course.csv"
     df.to_csv(csv_path, index=False)
     out = estimate(
@@ -122,6 +152,8 @@ def test_estimate_ols_table_includes_treat_coef_or_omitted(tmp_path):
         assert cells[2] == "—"
     else:
         float(cells[1])
+    assert out["estimate"]["demo_success"] is False
+    assert out["estimate"].get("honesty_warning")
 
 
 def test_estimate_omitted_control_not_in_data(tmp_path):

@@ -397,6 +397,286 @@
         }
       }
     },
+    "/sessions/{session_id}/find-data": {
+      "get": {
+        "summary": "Get Find Data Endpoint",
+        "description": "Read stored find-data plan. Empty unless design is confirmed.",
+        "operationId": "get_find_data_endpoint_sessions__session_id__find_data_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/plan": {
+      "post": {
+        "summary": "Plan Find Data Endpoint",
+        "description": "Emit where/how plan from confirmed design facets + R-sources.",
+        "operationId": "plan_find_data_endpoint_sessions__session_id__find_data_plan_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/suggest": {
+      "post": {
+        "summary": "Suggest Find Data Endpoint",
+        "description": "Label discovered / external_link candidates and optional teaching shelf.",
+        "operationId": "suggest_find_data_endpoint_sessions__session_id__find_data_suggest_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/fetch-card": {
+      "post": {
+        "summary": "Fetch Card Zip Endpoint",
+        "description": "Download author-posted Card zip into session, or keep link + upload.",
+        "operationId": "fetch_card_zip_endpoint_sessions__session_id__find_data_fetch_card_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/fetch-dataverse": {
+      "post": {
+        "summary": "Fetch Dataverse Endpoint",
+        "description": "Search Dataverse and download a public file, else keep the URL.",
+        "operationId": "fetch_dataverse_endpoint_sessions__session_id__find_data_fetch_dataverse_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataverseFetchRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionFindDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/find-data/fetch-wdi": {
+      "post": {
+        "summary": "Fetch Wdi Endpoint",
+        "description": "Download WDI into the session workspace, or return the WDI link.\n\nConfirm-design required. Growth family only. Never copies the Barro\nfixture. Does not set dataAttached.",
+        "operationId": "fetch_wdi_endpoint_sessions__session_id__find_data_fetch_wdi_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WdiFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "summary": "Upload",
@@ -755,6 +1035,165 @@
             }
           }
         }
+      }
+    },
+    "/sessions/{session_id}/attach": {
+      "post": {
+        "summary": "Attach Dataset",
+        "description": "Bind a user file or classic-5 entry. Does not set dataAttached.",
+        "operationId": "attach_dataset_sessions__session_id__attach_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Session busy, ingest not ready, or no candidate"
+          },
+          "429": {
+            "description": "The durable run queue is full"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/confirm-attach": {
+      "post": {
+        "summary": "Confirm Attach Dataset",
+        "description": "Confirm-attach is the only transition that sets dataAttached.",
+        "operationId": "confirm_attach_dataset_sessions__session_id__confirm_attach_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfoResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ingest not ready, no candidate, or session busy"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/classic-5/suggest": {
+      "post": {
+        "summary": "Rank classic-5 candidates from a confirmed design",
+        "description": "Rank built-in classic-5 catalog entries for a confirmed design.\n\nReturns ranked candidates plus a non-catalog own-file action.\nWithout a confirmed design, candidates are empty (not a catalog success).\nDoes not attach, admit an upload, write ``dataAttached``, or lock spec.",
+        "operationId": "suggest_classic5_classic_5_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Classic5SuggestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Classic5SuggestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/demos/card": {
@@ -2106,6 +2545,106 @@
         }
       }
     },
+    "/sessions/{session_id}/design/propose": {
+      "post": {
+        "summary": "Propose Design Endpoint",
+        "description": "Propose a research-design draft from the session title (+ optional RQ).",
+        "operationId": "propose_design_endpoint_sessions__session_id__design_propose_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeDesignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDesignResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/design/confirm": {
+      "post": {
+        "summary": "Confirm Design Endpoint",
+        "description": "Lock the current session.design draft. Fail closed if none exists.",
+        "operationId": "confirm_design_endpoint_sessions__session_id__design_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDesignConfirmResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/desk/discuss": {
       "post": {
         "summary": "Discuss Desk",
@@ -3206,6 +3745,95 @@
         ],
         "title": "ArtifactsResponse"
       },
+      "AttachResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "dataAttached": {
+            "type": "boolean",
+            "title": "Dataattached",
+            "description": "Always false. Confirm-attach is the only transition that sets this gate.",
+            "default": false
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user_file",
+              "classic-5"
+            ],
+            "title": "Source"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "upload_readiness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PROCESSING",
+                  "READY",
+                  "FAILED",
+                  "CANCELLED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload Readiness"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "events_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events Url"
+          },
+          "dataset_meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetMetaResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "source"
+        ],
+        "title": "AttachResponse",
+        "description": "POST /sessions/{id}/attach — bind only; never sets dataAttached."
+      },
       "BalanceRequest": {
         "properties": {
           "panel_id": {
@@ -3685,6 +4313,213 @@
         "title": "ClaimLedgerResponse",
         "description": "Deterministic Claim Ledger entry (not the paper-draft main-estimate claim)."
       },
+      "Classic5CandidateResponse": {
+        "properties": {
+          "catalog_id": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Catalog Id",
+            "default": "classic-5"
+          },
+          "entry_id": {
+            "type": "string",
+            "title": "Entry Id"
+          },
+          "source": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Source",
+            "default": "classic-5"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "attached": {
+            "type": "boolean",
+            "const": false,
+            "title": "Attached",
+            "default": false
+          },
+          "found": {
+            "type": "boolean",
+            "title": "Found",
+            "default": false
+          },
+          "teaching_fixture": {
+            "type": "boolean",
+            "title": "Teaching Fixture",
+            "default": false
+          },
+          "n_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Rows"
+          },
+          "honesty_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Honesty Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entry_id",
+          "title",
+          "score"
+        ],
+        "title": "Classic5CandidateResponse",
+        "description": "One classic-5 catalog candidate. Suggest never attaches or prefills spec.\n\n``candidates`` are found-scale only. Teaching stubs / n<200 extracts use\n``teaching_fixture=true`` and ``found=false`` on the teaching shelf."
+      },
+      "Classic5OwnFileActionResponse": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "upload_own_file",
+            "title": "Action",
+            "default": "upload_own_file"
+          },
+          "catalog": {
+            "type": "boolean",
+            "title": "Catalog",
+            "default": false
+          },
+          "source": {
+            "type": "string",
+            "const": "captain-local-real",
+            "title": "Source",
+            "default": "captain-local-real"
+          }
+        },
+        "type": "object",
+        "title": "Classic5OwnFileActionResponse",
+        "description": "Non-catalog first-class acquire: captain-local real panel upload."
+      },
+      "Classic5SuggestRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "Classic5SuggestRequest",
+        "description": "POST /classic-5/suggest 请求体：session + optional TITLE/TOPIC 文本。"
+      },
+      "Classic5SuggestResponse": {
+        "properties": {
+          "catalog_id": {
+            "type": "string",
+            "const": "classic-5",
+            "title": "Catalog Id",
+            "default": "classic-5"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": ""
+          },
+          "design_confirmed": {
+            "type": "boolean",
+            "title": "Design Confirmed",
+            "default": false
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Classic5CandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "teaching": {
+            "items": {
+              "$ref": "#/components/schemas/Classic5CandidateResponse"
+            },
+            "type": "array",
+            "title": "Teaching"
+          },
+          "own_file": {
+            "$ref": "#/components/schemas/Classic5OwnFileActionResponse"
+          },
+          "attached": {
+            "type": "boolean",
+            "const": false,
+            "title": "Attached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "own_file"
+        ],
+        "title": "Classic5SuggestResponse",
+        "description": "POST /classic-5/suggest 返回体.\n\nAfter a confirmed ``session.design``, ranked classic-5 candidates plus a\nnon-catalog own-file action. Without confirm, candidates stay empty.\n``candidates`` never include teaching toys as found data.\n``attached`` is always false: this path must not hang data or lock spec."
+      },
       "CreateSessionResponse": {
         "properties": {
           "session_id": {
@@ -3814,6 +4649,33 @@
               }
             ],
             "title": "Status"
+          },
+          "demo_success": {
+            "type": "boolean",
+            "title": "Demo Success",
+            "default": false
+          },
+          "honesty_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Honesty Warning"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -3857,6 +4719,35 @@
         "type": "object",
         "title": "DatasetProvenanceResponse"
       },
+      "DataverseFetchRequest": {
+        "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          }
+        },
+        "type": "object",
+        "title": "DataverseFetchRequest",
+        "description": "Optional chosen Dataverse dataset / file. Empty body searches then fetches."
+      },
       "DecisionEventResponse": {
         "properties": {
           "id": {
@@ -3884,6 +4775,54 @@
           "at"
         ],
         "title": "DecisionEventResponse"
+      },
+      "DesignInteractionResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "did",
+              "het"
+            ],
+            "title": "Kind"
+          },
+          "left": {
+            "type": "string",
+            "title": "Left"
+          },
+          "right": {
+            "type": "string",
+            "title": "Right"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "left",
+          "right",
+          "term"
+        ],
+        "title": "DesignInteractionResponse"
+      },
+      "DesignSourceResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DesignSourceResponse"
       },
       "DeskChatTurn": {
         "properties": {
@@ -5235,6 +6174,265 @@
         "title": "FilterResultResponse",
         "description": "POST /sessions/{id}/filter 返回体。"
       },
+      "FindDataCandidateResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "discovered",
+              "teaching_fixture",
+              "external_link",
+              "fetched",
+              "captain_local_real",
+              "user_upload"
+            ],
+            "title": "Source Kind"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url_or_fixture": {
+            "type": "string",
+            "title": "Url Or Fixture"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "suggested_cols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Cols"
+          },
+          "design_fit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Design Fit"
+          },
+          "honesty_label": {
+            "type": "string",
+            "title": "Honesty Label",
+            "default": ""
+          },
+          "fetch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataFetchResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_kind",
+          "title",
+          "url_or_fixture",
+          "license"
+        ],
+        "title": "FindDataCandidateResponse",
+        "description": "Real candidate shape (DECIDE-7 §5) plus DECIDE-10 ``source_kind``.\n\nMissing ``source_kind`` fails closed. Fixtures are never discovered/found."
+      },
+      "FindDataFetchProjectionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchProjectionResponse",
+        "description": "Alias for WDI fetch projection; same shape as FindDataFetchResponse."
+      },
+      "FindDataFetchResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "into_session",
+              "link_only",
+              "not_applicable"
+            ],
+            "title": "Status"
+          },
+          "session_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Path"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "FindDataFetchResponse",
+        "description": "Session download vs honest link vs teaching shelf. Not attach."
+      },
+      "FindDataPlanBodyResponse": {
+        "properties": {
+          "where": {
+            "type": "string",
+            "title": "Where"
+          },
+          "how": {
+            "type": "string",
+            "title": "How"
+          },
+          "venues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Venues"
+          },
+          "search_facets": {
+            "$ref": "#/components/schemas/FindDataSearchFacetsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "where",
+          "how",
+          "search_facets"
+        ],
+        "title": "FindDataPlanBodyResponse",
+        "description": "Where / how to look. A family label without a venue is not a plan."
+      },
+      "FindDataSearchFacetsResponse": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "default": ""
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Controls"
+          },
+          "interactions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "qType": {
+            "type": "string",
+            "title": "Qtype",
+            "default": ""
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          },
+          "query_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Query Terms"
+          }
+        },
+        "type": "object",
+        "title": "FindDataSearchFacetsResponse",
+        "description": "Confirmed Y/X/method/interactions used to search (not a confirm substitute)."
+      },
+      "FindDataTeachingShelfResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FindDataCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "FindDataTeachingShelfResponse",
+        "description": "Optional teaching-known extracts. Explicitly not a find result."
+      },
       "GenerateChapterRequest": {
         "properties": {
           "chapter": {
@@ -6111,6 +7309,25 @@
         ],
         "title": "PromoteRequest"
       },
+      "ProposeDesignRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "ProposeDesignRequest",
+        "description": "POST /sessions/{id}/design/propose 请求体。"
+      },
       "QueueFullResponse": {
         "properties": {
           "error": {
@@ -6915,6 +8132,252 @@
         ],
         "title": "SessionBusyResponse"
       },
+      "SessionDesignConfirmResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "design": {
+            "$ref": "#/components/schemas/SessionDesignResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "design"
+        ],
+        "title": "SessionDesignConfirmResponse",
+        "description": "POST /sessions/{id}/design/confirm 返回体。"
+      },
+      "SessionDesignResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "confirmed"
+            ],
+            "title": "Status"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "proposed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed At"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DesignSourceResponse"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "ols",
+              "did",
+              "iv",
+              "rd",
+              "scm"
+            ],
+            "title": "Method"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "default": ""
+          },
+          "treatment": {
+            "type": "string",
+            "title": "Treatment",
+            "default": ""
+          },
+          "controls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Controls"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group",
+            "default": ""
+          },
+          "treated": {
+            "type": "string",
+            "title": "Treated",
+            "default": ""
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": ""
+          },
+          "time_col": {
+            "type": "string",
+            "title": "Time Col",
+            "default": ""
+          },
+          "id_col": {
+            "type": "string",
+            "title": "Id Col",
+            "default": ""
+          },
+          "first_treat_col": {
+            "type": "string",
+            "title": "First Treat Col",
+            "default": ""
+          },
+          "interactions": {
+            "items": {
+              "$ref": "#/components/schemas/DesignInteractionResponse"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "qType": {
+            "type": "string",
+            "enum": [
+              "average",
+              "heterogeneity",
+              "causal"
+            ],
+            "title": "Qtype",
+            "default": "average"
+          },
+          "heterogeneity_groups": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Heterogeneity Groups"
+          },
+          "catalog_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Entry Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status",
+          "confirmed",
+          "method"
+        ],
+        "title": "SessionDesignResponse",
+        "description": "Formal-path ``session.design`` (draft vs confirmed). Missing/null is unconfirmed."
+      },
+      "SessionFindDataResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "planned"
+            ],
+            "title": "Status"
+          },
+          "planned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned At"
+          },
+          "route_family": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "educ_wage",
+                  "minwage",
+                  "growth",
+                  "macro",
+                  "else"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Family"
+          },
+          "primary_venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Venue"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataPlanBodyResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/FindDataCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "teaching_shelf": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FindDataTeachingShelfResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "SessionFindDataResponse",
+        "description": "GET/POST find-data: plan after confirmed design. Not attach, not gold prefill."
+      },
       "SessionInfoResponse": {
         "properties": {
           "session_id": {
@@ -6928,6 +8391,12 @@
           "has_dataset": {
             "type": "boolean",
             "title": "Has Dataset",
+            "default": false
+          },
+          "dataAttached": {
+            "type": "boolean",
+            "title": "Dataattached",
+            "description": "Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
             "default": false
           },
           "upload_readiness": {
@@ -7085,6 +8554,22 @@
                 "type": "null"
               }
             ]
+          },
+          "design": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionDesignResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allow_did": {
+            "type": "boolean",
+            "title": "Allow Did",
+            "description": "DiD permission (DID-BE-gate). True only from confirmed session.design.method=did plus treated×period on that design. Catalog id / TITLE/TOPIC / form method=did are not setters. Missing is false.",
+            "default": false
           }
         },
         "type": "object",
@@ -8059,6 +9544,60 @@
         ],
         "title": "VersionsResponse",
         "description": "GET /sessions/{id}/chapters/{chapter_index}/versions 返回体。"
+      },
+      "WdiFetchResponse": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "fetched",
+              "external_link"
+            ],
+            "title": "Source Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url_or_fixture": {
+            "type": "string",
+            "title": "Url Or Fixture"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "suggested_cols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested Cols"
+          },
+          "design_fit": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Design Fit"
+          },
+          "fetch": {
+            "$ref": "#/components/schemas/FindDataFetchProjectionResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_kind",
+          "title",
+          "url_or_fixture",
+          "license",
+          "fetch"
+        ],
+        "title": "WdiFetchResponse",
+        "description": "FD-BE-fetch-wdi: WDI bytes in session, or WDI URL + honest upload.\n\nDedicated to this venue. Does not attach, does not use the Barro fixture."
       }
     },
     "securitySchemes": {

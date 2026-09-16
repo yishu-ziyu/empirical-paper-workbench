@@ -37,7 +37,6 @@ export const LS_SAMPLE_KEY = 'econpaper_sample_direction'
 export const LS_PENDING_RUN_KEY = 'econpaper_pending_run_command'
 export const LS_PENDING_UPLOAD_KEY = 'econpaper_pending_upload'
 
-export const SAMPLE_CSV = '/samples/course-panel.csv'
 export const CARD_DEMO_FILENAME = 'card_1995.csv'
 export const SAMPLE_DIRECTION = {
   question: '这份课设样例里，年龄和收入是否相关？',
@@ -1268,24 +1267,6 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [takeCsv],
   )
 
-  const handleTrySample = useCallback(async () => {
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const res = await fetch(SAMPLE_CSV)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const blob = await res.blob()
-      const file = new File([blob], 'course-panel.csv', { type: 'text/csv' })
-      setShapedQuestion(SAMPLE_DIRECTION.question)
-      setSampleDirection(SAMPLE_DIRECTION)
-      sessionStorage.setItem(LS_SAMPLE_KEY, JSON.stringify(SAMPLE_DIRECTION))
-      await uploadCsv(file)
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
-      setUploading(false)
-    }
-  }, [uploadCsv])
-
   const handleTryCard = useCallback(async () => {
     sessionStorage.removeItem(LS_SAMPLE_KEY)
     setSampleDirection(null)
@@ -1339,6 +1320,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
       if (isCurrent()) setUploading(false)
     }
   }, [applySnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t])
+
+  const handleTrySample = handleTryCard
 
   const handleSaveExpectation = useCallback(
     async (payload: {

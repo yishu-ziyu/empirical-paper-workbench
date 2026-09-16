@@ -58,6 +58,7 @@ class EconPaperState(TypedDict, total=False):
     # 以下为占位字段，后续 ticket 逐步填充
     eda_results: List[Any]
     research_direction: Optional[dict]
+    design: Optional[dict]  # session.design draft|confirmed (infer-design)
     main_specification: Optional[dict]  # robustness_check / spec_curve 主设定
     spec_curve: Optional[dict]  # 探索臂设定表（全部规格留在桌上）
     outline: Optional[Any]
@@ -77,7 +78,7 @@ class EconPaperState(TypedDict, total=False):
     docx_path: Optional[str]
     degraded: bool
     # ADR-0003: clean_data 高级配置
-    outliers_cuts: tuple  # (low, high) 百分位，默认 (5, 95)
+    outliers_cuts: tuple  # (low, high) 百分位，默认 (1, 99)；显式传入，不用 Stata winsor2 默认调用
     # ADR-0003: generate_chapter render kwargs（模板占位符，backend 或 EDA 写入）
     research_question: Optional[str]
     data_summary: Optional[str]
@@ -86,9 +87,10 @@ class EconPaperState(TypedDict, total=False):
     # ADR-0004: 文献检索（search_literature 节点写入）
     literature_entries: List[Any]  # List[LiteratureEntry]，见 protocols.py
     literature_query: Optional[str]
-    literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled"
+    literature_source: Optional[str]  # "mock" | "semantic_scholar" | "disabled" | "r_lit_bar"
     literature_produced_by: Optional[str]
     literature_actions: List[str]  # #11: keyword / method_anchor / threat / citation_hop
+    find_lit: Optional[Any]  # R-lit-bar: hits / checkbox cards / checked export
     write_blocked: bool
     write_blockers: List[str]
     claim: Optional[str]

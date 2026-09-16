@@ -17,9 +17,11 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from agent.engine.did_spec import DID_MISSING_INTERACTION, can_form_did_main_term
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
+from services.allow_did import confirmed_did_method
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
     QueueFullResponse,
@@ -104,7 +106,8 @@ async def set_direction_endpoint(
 ) -> RunAcceptedResponse:
     """Persist a pre-write command and return before research work begins."""
     require_session_ownership(session_id, current_user)
-    upload_readiness = facade.get_state(session_id).get("upload_readiness")
+    state = facade.get_state(session_id)
+    upload_readiness = state.get("upload_readiness")
     if upload_readiness in {"PROCESSING", "FAILED", "CANCELLED"}:
         raise HTTPException(
             status_code=409,
@@ -114,6 +117,19 @@ async def set_direction_endpoint(
             },
         )
     rd = payload.model_dump()
+    merged = {**state, "research_direction": rd}
+    if confirmed_did_method(state):
+        if not can_form_did_main_term(merged, rd):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": DID_MISSING_INTERACTION,
+                    "message": (
+                        "confirmed method=did requires treated×period "
+                        "(or equivalent 2×2 DiD main term)"
+                    ),
+                },
+            )
     try:
         run = await RunRepository().enqueue(
             session_id=session_id,

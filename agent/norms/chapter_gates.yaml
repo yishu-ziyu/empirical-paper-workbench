@@ -1,0 +1,67 @@
+# NORMS-BE distilled AER chapter gates (DECIDE-8).
+# Hook: chapter write. Formal-path checks require confirmed session.design.
+# Reads PREWRITE-PAUSE / R-lit-bar / clean_winsor; does not own those flags.
+# Not an AER-Skills dump. Not a Claude skill runner. No p-hack helper.
+version: 1
+hook: write
+allowed_export_formats:
+  - tex
+  - pdf
+  - docx
+  - py
+  - do
+  - R
+  - m
+forbidden_export_formats:
+  - ppt
+  - pptx
+  - xhs
+  - 小红书
+gates:
+  - id: did_requires_treated_period
+    when:
+      confirmed_design: true
+      method: did
+    blocker: did_missing_interaction
+  - id: het_requires_interaction
+    when:
+      confirmed_design: true
+      qType: heterogeneity
+    blocker: het_missing_interaction
+  - id: data_attached
+    when:
+      confirmed_design: true
+    blocker: data_not_attached
+  - id: clean_winsor_audit
+    when:
+      confirmed_design: true
+    blocker: clean_winsor_not_recorded
+  - id: table1_confirmed
+    when:
+      confirmed_design: true
+    blocker: table1_not_confirmed
+  - id: spec_confirmed
+    when:
+      confirmed_design: true
+    blocker: spec_not_confirmed
+  - id: identification_recorded
+    when:
+      confirmed_design: true
+    blocker: identification_not_recorded
+  - id: robustness_recorded
+    when:
+      confirmed_design: true
+      chapter: results
+    blocker: robustness_not_recorded
+  - id: r_lit_bar
+    when:
+      chapter: lit_review
+    blocker: r_lit_bar_need_5_cards
+  - id: export_allowed_formats
+    when:
+      export_format: present
+    blocker: export_format_not_allowed
+  - id: no_skill_runner
+    blocker: skill_runner_not_allowed
+  - id: no_phack
+    blocker: phack_not_allowed

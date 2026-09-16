@@ -48,7 +48,7 @@ export default function WorkspacePreview() {
         <section className="flex flex-col bg-[#fbfbfa] px-5 py-6 sm:px-8">
           <div className="mb-4 inline-flex w-fit items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 py-1.5 text-[12px] text-ink/80">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black/[0.06] text-[14px] leading-none">+</span>
-            course-panel.csv
+            own.csv
           </div>
           <p className="ml-auto max-w-[22em] rounded-[20px] bg-ink px-4 py-2.5 text-[13px] leading-6 text-white">
             {t('guide.previewQuestion')}

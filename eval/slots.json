@@ -1,0 +1,15 @@
+{
+  "eval_id": "EVAL-top5",
+  "max_slots": 5,
+  "product_runtime": false,
+  "catalog_answer_key": false,
+  "gold_body_reads": false,
+  "slots": [
+    "slot-01",
+    "slot-02",
+    "slot-03",
+    "slot-04",
+    "slot-05"
+  ],
+  "notes": "Opaque placeholders. Filled only by the optional submodule checkout. Not classic-5 catalog ids and not session gold."
+}

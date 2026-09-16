@@ -28,6 +28,7 @@ from ..state import EconPaperState
 
 # Panel/DiD methods that may emit TWFE. OLS + guessed CSV id/year is not this.
 _PANEL_METHOD_KEYS = {"did", "panel", "twfe", "fe"}
+_OLS_METHOD_KEYS = {"ols", "pooled ols", "pooled-ols", "pooled_ols", "linear"}
 
 _STUB_MARKERS = ("无 Python 代码可翻译", "无 Python 代码")
 _TAKEABLE_NEEDLES: dict[str, tuple[str, ...]] = {
@@ -157,6 +158,10 @@ def _translate_line_to_stata(line: str) -> str:
     if "add_constant" in s:
         return f"* {line}  (Stata regress 默认带常数项)"
 
+    pooled = _pooled_ols_command(s, lang="stata")
+    if pooled:
+        return pooled
+
     # sm.OLS(y, X).fit() → regress y X
     m = re.search(r'OLS\(\s*([^,]+),\s*([^)]+)\)\.fit\(\)', s)
     if m:
@@ -246,6 +251,10 @@ def _translate_line_to_r(line: str) -> str:
     # sm.add_constant(X) → R lm 默认带截距
     if "add_constant" in s:
         return f"# {line}  (R lm() 默认带截距)"
+
+    pooled = _pooled_ols_command(s, lang="r")
+    if pooled:
+        return pooled
 
     # sm.OLS(y, X).fit() → lm(y ~ X)
     m = re.search(r'OLS\(\s*([^,]+),\s*([^)]+)\)\.fit\(\)', s)
@@ -385,6 +394,52 @@ def _method_is_panel(method: Any) -> bool:
     return key in _PANEL_METHOD_KEYS
 
 
+def _method_is_ols(method: Any) -> bool:
+    """True for an explicit OLS / pooled-OLS paper direction."""
+    if norm_method(method) == "ols":
+        return True
+    key = str(method or "").strip().lower().replace("_", "-")
+    return key in _OLS_METHOD_KEYS
+
+
+_SMF_OLS_RE = re.compile(
+    r"""(?:smf\s*\.\s*)ols\(\s*['"]([^'"]+)['"]""",
+    re.IGNORECASE,
+)
+_FEOLS_FORMULA_RE = re.compile(
+    r"""(?<![A-Za-z])feols\(\s*['"]([^'"]+)['"]""",
+    re.IGNORECASE,
+)
+
+
+def _pooled_ols_formula(text: str) -> str | None:
+    """Pooled ``y ~ x`` from smf.ols / feols. FE bars (``| id + t``) are not OLS."""
+    if not text:
+        return None
+    match = _SMF_OLS_RE.search(text) or _FEOLS_FORMULA_RE.search(text)
+    if not match:
+        return None
+    formula = match.group(1).strip()
+    if not formula or "|" in formula or "~" not in formula:
+        return None
+    return formula
+
+
+def _pooled_ols_command(line: str, *, lang: str) -> str | None:
+    """Map pooled OLS Python (smf.ols / feols without FE) to regress / lm."""
+    formula = _pooled_ols_formula(line)
+    if not formula:
+        return None
+    y, rhs = formula.split("~", 1)
+    y = y.strip()
+    rhs_vars = [part.strip() for part in rhs.split("+") if part.strip() and part.strip() != "1"]
+    if lang == "stata":
+        return f"regress {y} {' '.join(rhs_vars)}".rstrip()
+    if lang == "r":
+        return f"model <- lm({formula}, data=df)"
+    return None
+
+
 def _python_is_takeable_regression(python: str) -> bool:
     """False for upload-only clean.py (DATA_PATH + step comments, no model)."""
     if not (python or "").strip():
@@ -425,6 +480,7 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
     estimate = estimate if isinstance(estimate, dict) else {}
     formula = str(estimate.get("formula") or spec.get("formula") or "").strip()
     method = _first_text(spec, rd, keys=("method",))
+    panel = _method_is_panel(method)
     return {
         "csv": csv_name,
         "outcome": outcome,
@@ -432,7 +488,8 @@ def _direction_model(state: EconPaperState) -> dict[str, Any] | None:
         "controls": controls,
         "id_col": id_col,
         "time_col": time_col,
-        "panel": _method_is_panel(method),
+        "panel": panel,
+        "ols": (not panel) and _method_is_ols(method),
         "formula": formula,
     }
 
@@ -449,10 +506,15 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
     rhs_space = " ".join([treat, *controls])
     rhs_plus = " + ".join([treat, *controls])
     csv = model["csv"]
-    note = (
-        "Chapter text had no ```python fences. "
-        "Script is built from the session research direction, not StatsPAI."
-    )
+    if model["panel"]:
+        note = (
+            "Chapter text had no ```python fences. "
+            "Script is built from the session research direction, not StatsPAI."
+        )
+    else:
+        note = (
+            "OLS direction: Stata regress and R lm match the pooled OLS body."
+        )
 
     if model["panel"]:
         i, t = model["id_col"], model["time_col"]
@@ -512,10 +574,10 @@ def _scripts_from_direction(model: dict[str, Any]) -> dict[str, str]:
         "# Auto-generated R script from research direction",
         f"# {note}",
         f"# {spec_note}",
-        "library(fixest)",
-        "library(lfe)",
-        f'df <- read.csv("{csv}")',
     ]
+    if model["panel"]:
+        r.extend(["library(fixest)", "library(lfe)"])
+    r.append(f'df <- read.csv("{csv}")')
     if model["panel"]:
         i, t = model["id_col"], model["time_col"]
         fe = f"{i} + {t}"
@@ -660,8 +722,24 @@ def translate_code(state: EconPaperState) -> TranslateCodeOutput:
     返回 ``{"code_translations": [{"lang", "code", "filename"}, ...]}``，
     固定 4 条：py / stata / r / eviews。
     """
-    python_code = _collect_python(state)
     model = _direction_model(state)
+
+    # OLS paper body → Stata regress / R lm. Chapter Python may quote the
+    # runtime estimator (statspai.feols) even for pooled OLS; that must not
+    # leak feols/xtreg/reghdfe into the downloadable scripts.
+    if model is not None and model.get("ols"):
+        scripts = _scripts_from_direction(model)
+        return _emit_translations(
+            state,
+            [
+                {"lang": "py", "code": scripts["py"], "filename": "analysis.py"},
+                {"lang": "stata", "code": scripts["stata"], "filename": "analysis.do"},
+                {"lang": "r", "code": scripts["r"], "filename": "analysis.R"},
+                {"lang": "eviews", "code": scripts["eviews"], "filename": "analysis.m"},
+            ],
+        )
+
+    python_code = _collect_python(state)
 
     # Upload-only clean.py is collected Python but not a regression. Translating
     # it yields comment-only Stata/R (read_csv(DATA_PATH) has no string path).

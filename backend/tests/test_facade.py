@@ -676,6 +676,79 @@ def test_export_document_calls_node_and_persists_template(monkeypatch):
     facade.drop_session(sid)
 
 
+def test_export_document_fills_missing_six_chapter_bodies(monkeypatch):
+    """export_document writes every outline chapter before calling export_docx."""
+    from conftest import make_six_chapter_outline, make_write_ready_state
+
+    generated = []
+
+    def fake_generate_chapter(state):
+        chapter = dict(state.get("current_chapter") or {})
+        chapter_type = chapter.get("type") or "intro"
+        generated.append(chapter_type)
+        chapter["content"] = f"{chapter_type} 正文段落。"
+        bodies = list(state.get("body_chapters") or [])
+        while len(bodies) < 6:
+            bodies.append({})
+        idx = {
+            "intro": 0,
+            "lit_review": 1,
+            "data_desc": 2,
+            "methods": 3,
+            "results": 4,
+            "conclusion": 5,
+        }.get(chapter_type, 0)
+        bodies[idx] = chapter
+        return {"body_chapters": bodies, "current_chapter_index": idx + 1}
+
+    captured = {}
+
+    def fake_export_docx(state):
+        captured["types"] = [
+            ch.get("type")
+            for ch in (state.get("body_chapters") or [])
+            if isinstance(ch, dict) and str(ch.get("content") or "").strip()
+        ]
+        return {
+            "latex_source": "\\title{T}",
+            "pdf_path": None,
+            "docx_path": None,
+            "degraded": True,
+        }
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+    monkeypatch.setattr("facade.export_docx_node", fake_export_docx)
+
+    sid = "test-export-six"
+    facade.seed_state(
+        sid,
+        make_write_ready_state(
+            outline=make_six_chapter_outline(),
+            body_chapters=[
+                {"type": "intro", "title": "引言", "content": "已有引言。"}
+            ],
+        ),
+    )
+    facade.export_document(sid, "cn_journal")
+    assert generated == [
+        "lit_review",
+        "data_desc",
+        "methods",
+        "results",
+        "conclusion",
+    ]
+    assert captured["types"] == [
+        "intro",
+        "lit_review",
+        "data_desc",
+        "methods",
+        "results",
+        "conclusion",
+    ]
+    facade.drop_session(sid)
+
+
 def test_export_document_503_when_node_missing(monkeypatch):
     """export_document raises 503 when export_docx_node is None."""
     monkeypatch.setattr("facade.export_docx_node", None)

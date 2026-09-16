@@ -31,6 +31,7 @@ from ..engine.did_spec import (
     did_spec_applies,
     did_spec_block_reason,
 )
+from ..engine.ols_lock import ols_lock_active, pooled_ols_formula
 from ..protocols import EstimateOutput
 from ..state import EconPaperState
 
@@ -601,12 +602,19 @@ def _bacon_forbidden_over(state: EconPaperState) -> bool:
     return False
 
 
-def _estimate_ols(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
+def _estimate_ols(
+    df: Any, spec: Dict[str, Any], formula: str, *, lock: bool = False
+) -> EstimateOutput:
     treatment = spec.get("treatment") or spec.get("treatment_col") or "treat"
     cluster = spec.get("cluster") or spec.get("cluster_col") or None
     if cluster == "":
         cluster = None
     requested = str(formula)
+    if lock:
+        # OLS hard lock (issue #24): an OLS paper never carries a ``| FE`` spec,
+        # so drop the pyfixest ``| entity + time`` syntax before fitting. The
+        # stored ``estimator`` still records the engine that actually ran.
+        requested = pooled_ols_formula(requested)
     fitted, estimator, fit_formula = _fit(requested, df, cluster)
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
@@ -923,7 +931,10 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
         elif method == "did":
             result = _estimate_did(df, spec, state)
         else:
-            result = _estimate_ols(df, spec, str(formula))
+            # OLS / unspecified: apply the OLS hard lock to the pooled formula.
+            result = _estimate_ols(
+                df, spec, str(formula), lock=ols_lock_active(state, method)
+            )
     except Exception as exc:
         return _error(
             f"主估计失败：{exc}",

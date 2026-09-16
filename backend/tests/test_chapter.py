@@ -246,3 +246,41 @@ def test_results_blocked_without_estimate_stamp(client):
     assert detail["write_blocked"] is True
     assert "no_results" in detail["write_blockers"]
     assert facade.get_state(sid).get("results") == "FAKE TABLE"
+
+
+def test_generate_all_six_then_doc_export_has_bodies(client):
+    """Six-chapter outline generate + export must not be intro-only."""
+    import re
+    import routers.doc_export  # noqa: F401
+
+    sid = _seed_write_ready()
+    types = [
+        ("intro", "引言"),
+        ("lit_review", "文献综述"),
+        ("data_desc", "数据描述"),
+        ("methods", "方法"),
+        ("results", "结果"),
+        ("conclusion", "结论"),
+    ]
+    for chapter_type, title in types:
+        resp = client.post(
+            f"/sessions/{sid}/generate-chapter",
+            json={"chapter": {"type": chapter_type, "title": title}},
+        )
+        assert resp.status_code == 200, f"{chapter_type}: {resp.text}"
+        chapter = resp.json()["chapter"]
+        assert chapter["type"] == chapter_type
+        assert str(chapter.get("content") or "").strip()
+
+    export = client.get(f"/sessions/{sid}/doc-export", params={"format": "tex"})
+    assert export.status_code == 200, export.text
+    tex = export.text
+    assert "Untitled section" not in tex
+    for _chapter_type, title in types:
+        assert f"\\section{{{title}}}" in tex
+    parts = re.split(r"\\section\{([^}]*)\}", tex)
+    for i in range(1, len(parts), 2):
+        title = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        assert body.strip(), f"empty chapter body under \\section{{{title}}}"
+

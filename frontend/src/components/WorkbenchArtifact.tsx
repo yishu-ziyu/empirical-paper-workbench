@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AttachPanel from './AttachPanel'
 import { CsvDropZone } from './CsvDropZone'
 import DirectionForm from './DirectionForm'
 import EdaSidebar from './EdaSidebar'
@@ -15,6 +16,7 @@ import VersionHistory from './VersionHistory'
 import type { WorkbenchViewId } from './WorkbenchSidebar'
 import type { WorkspaceApi } from '../lib/workspace'
 import { toDirectionInitial } from '../lib/workspace'
+import { fileCandidate } from '../lib/attachCandidate'
 import { useT } from '../lib/i18n'
 import {
   ExpectationEditor,
@@ -177,6 +179,18 @@ export default function WorkbenchArtifact({
           <p data-testid="now-hint" className="mb-6 font-serif text-[15px] leading-7 text-ink">
             {nowHintText}
           </p>
+          {!ws.research?.teaching_case ? (
+            <AttachPanel
+              topic={ws.shapedQuestion}
+              prefill={ws.csvName ? fileCandidate(ws.csvName) : null}
+              uploading={ws.uploading}
+              uploadReadiness={ws.uploadReadiness}
+              onBrowse={() => ws.fileInputRef.current?.click()}
+              onFile={(file) => {
+                void ws.takeCsv(file)
+              }}
+            />
+          ) : null}
           {ws.research?.question ? (
             <ResearchQuestionCard question={ws.research.question} />
           ) : null}

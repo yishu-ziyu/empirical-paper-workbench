@@ -1,0 +1,31 @@
+# econpaper Codex Task State
+
+- Task ID: 20260915-fm-e-build-did-narrow-1-did-be-gate
+- Status: complete
+- Git context（分支可选）: `cursor/did-be-gate-8102` @ `9d439896eab7430c43cb190e1e4692c1aa6baf5f` (base `feat/fm-e-build-did-narrow-1` @ `45c18dedbdecfd7fa965007e4646ad5a91b9ec0d`)
+- Goal: DID-BE-gate — title/catalog path sets `allow_did` (default false). Only classic Card–Krueger / minwage TITLE/TOPIC or catalog identity may set true.
+- Hard bar: Form method=did is not the setter. No fixtures CSV / catalog inventory edits. No treated×period. No WORD-FIX / HET-CODE-EXPORT / PREWRITE-PAUSE. Push branch only; author yishu-ziyu; no PR.
+- Session / run ID:
+- Current research stage:
+- Current review / approval gate:
+- Verified facts:
+  - Contract: `docs/did-narrow-exception-contract.md` §1
+  - Existing catalog token: `minimum-wage-employment` in `fixtures/classic-5/catalog.json` (read only)
+  - CLASSIC-FIXTURES landed separately: `feat/fm-e-build-classic-fixtures-1` @ `24e79c46` renamed minwage ranking id to `ck1994_long` and added `barro1991_growth`
+  - This branch does not rewrite fixture CSVs; gate keys `minimum-wage-employment` / `ck1994` / `ck1994_long` + minwage title keywords
+- Current hypothesis:
+- Changed files:
+  - `backend/services/allow_did.py` (matcher)
+  - `backend/routers/sessions.py` (snapshot + POST /sessions/{id}/title-topic)
+  - `backend/services/data_attach.py` (catalog identity on attach)
+  - `backend/schemas/responses.py` (`allow_did` on snapshot)
+  - `backend/tests/test_allow_did.py`
+- Failed paths:
+- Data / output evidence locations:
+- Test evidence:
+  - `backend/tests/test_allow_did.py` + `test_classic5_suggest.py`: 52 passed after ck1994_long / barro alignment
+  - `backend/tests/test_data_attach.py`: 17 passed
+  - OpenAPI drift check: frontend/openapi.json, docs/api/openapi.json, types/api.ts match live app
+- Pending external state: no PR (HARD STOP); this branch does not carry fixture CSV bytes
+- Next action: none (branch pushed; no PR)
+- Updated at: 2026-09-15

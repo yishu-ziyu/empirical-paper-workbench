@@ -389,6 +389,83 @@ def test_translate_code_direction_without_python_fences_emits_panel_scripts():
     assert "y ~ treat" not in by_lang["stata"]
 
 
+def test_translate_to_stata_smf_ols_formula_becomes_regress():
+    """smf.ols('y ~ x', data=df).fit() 翻成 regress，不是注释。"""
+    state = make_state(
+        body_chapters=[
+            {
+                "type": "results",
+                "title": "结果",
+                "content": (
+                    "```python\n"
+                    "import pandas as pd\n"
+                    "import statsmodels.formula.api as smf\n"
+                    "df = pd.read_csv('data.csv')\n"
+                    "model = smf.ols('wage ~ educ + experience', data=df).fit()\n"
+                    "print(model.summary())\n"
+                    "```\n"
+                ),
+            }
+        ]
+    )
+    result = translate_code(state)
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    assert "regress wage educ experience" in by_lang["stata"]
+    assert "lm(wage ~ educ + experience" in by_lang["r"]
+    assert "xtreg" not in by_lang["stata"]
+    assert "feols" not in by_lang["r"]
+
+
+def test_translate_code_ols_feols_python_still_emits_regress():
+    """OLS body quoting statspai.feols still exports regress/lm, not feols/xtreg."""
+    result = translate_code(
+        make_state(
+            csv_path="/tmp/user.csv",
+            research_direction={
+                "question": "age on income",
+                "dv": "income",
+                "iv": "age",
+                "method": "OLS",
+                "id_col": "id",
+                "time_col": "year",
+            },
+            estimate={
+                "method": "ols",
+                "estimator": "statspai.feols",
+                "formula": "income ~ age",
+                "status": "ok",
+            },
+            body_chapters=[
+                {
+                    "type": "methods",
+                    "content": (
+                        "本文使用 OLS。\n\n"
+                        "```python\n"
+                        "import pandas as pd\n"
+                        "import statspai\n"
+                        "df = pd.read_csv('user.csv')\n"
+                        "model = statspai.feols('income ~ age', data=df)\n"
+                        "```\n"
+                    ),
+                },
+                {"type": "results", "content": "OLS 主结果，系数显著。"},
+            ],
+        )
+    )
+    by_lang = {t["lang"]: t["code"] for t in result["code_translations"]}
+    stata = by_lang["stata"]
+    r_code = by_lang["r"]
+    assert "regress income age" in stata
+    assert "xtreg" not in stata
+    assert "reghdfe" not in stata
+    assert "feols" not in stata
+    assert "lm(income ~ age" in r_code
+    assert "feols" not in r_code
+    assert "felm" not in r_code
+    assert "library(fixest)" not in r_code
+    assert 'smf.ols("income ~ age"' in by_lang["py"]
+
+
 def test_translate_code_ols_guessed_id_year_emits_regress_not_xtreg(tmp_path):
     """OLS stays pooled OLS when set_direction guessed CSV id+year."""
     cleaning_report, csv_path = _upload_cleaning_report(tmp_path)

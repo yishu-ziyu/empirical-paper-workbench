@@ -28,6 +28,13 @@ import {
   persistSessionId,
   readStoredSessionId,
 } from './session'
+import {
+  AdmissionConflictError,
+  canRunEstimate,
+  parseAdmissionConflict,
+  shouldDivertToAttach,
+  snapshotAttachFields,
+} from './dataAttachedGate'
 
 // localStorage / sessionStorage keys owned by the workspace.
 // Research truth keys (csv meta, data columns, active-run handles) were
@@ -250,6 +257,8 @@ export async function acceptDirectionRun(
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     if (response.status < 500) clearPendingRun(sessionId, idempotencyKey)
+    const conflict = parseAdmissionConflict(response.status, payload)
+    if (conflict) throw conflict
     const retryAfter = response.headers.get('Retry-After')
     throw new Error(retryAfter ? `HTTP ${response.status}; retry after ${retryAfter}s` : `HTTP ${response.status}`)
   }
@@ -281,6 +290,8 @@ export async function recoverFromSnapshot(
   }
   const pending = readPendingRun(sessionId)
   if (!pending) return null
+  // Fail closed: never replay estimate / direction while confirm-attach is unset.
+  if (!canRunEstimate(snapshotAttachFields(snapshot))) return null
   const accepted = await acceptDirectionRun(
     sessionId,
     pending.direction,
@@ -337,6 +348,22 @@ export function chapterIndexForApply(
     return idx >= 0 ? idx : 0
   }
   return Math.min(Math.max(0, opts.currentIndex), accepted.length - 1)
+}
+
+export function chapterHasBody(
+  chapter: { content?: string | null } | undefined | null,
+): boolean {
+  return Boolean(String(chapter?.content || '').replace(/^#{1,6}\s+.*$/gm, '').trim())
+}
+
+export function chaptersMissingBodies<T extends { type: string; title: string }>(
+  outline: T[],
+  written: { type?: string; content?: string | null }[],
+): T[] {
+  return outline.filter((ch) => {
+    const writtenCh = written.find((item) => item.type === ch.type)
+    return !chapterHasBody(writtenCh)
+  })
 }
 
 export function createRestoreSnapshotGate() {
@@ -407,7 +434,8 @@ export function snapshotHasDesk(data: WorkspaceSnapshot): boolean {
       (data.body_chapters && data.body_chapters.length) ||
       data.research_direction ||
       data.dataset ||
-      data.research,
+      data.research ||
+      Object.prototype.hasOwnProperty.call(data, 'dataAttached'),
   )
 }
 
@@ -478,6 +506,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadReadiness, setUploadReadiness] = useState<UploadReadiness | undefined>()
+  const [dataAttached, setDataAttached] = useState<boolean | null>(null)
   const [uploadNeedsReselect, setUploadNeedsReselect] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -611,6 +640,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         invalidateSessionWork()
         activeSessionRef.current = nextSessionId
         setUploadReadiness(undefined)
+        setDataAttached(null)
         setUploadNeedsReselect(false)
       }
       setSessionId(nextSessionId)
@@ -688,6 +718,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setUploadNeedsReselect(
         data.upload_readiness === 'FAILED' || data.upload_readiness === 'CANCELLED',
       )
+    }
+    const attach = snapshotAttachFields(data)
+    if (Object.prototype.hasOwnProperty.call(attach, 'dataAttached')) {
+      setDataAttached(attach.dataAttached === true)
+    } else if (data.upload_readiness != null) {
+      // Upload-era snapshot without the product flag: fail closed.
+      setDataAttached(false)
     }
     if (data.dataset) setDataset(data.dataset)
     setResearch(data.research ?? null)
@@ -1343,7 +1380,23 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [applySnapshot],
   )
 
+  const attachSnapshot = () =>
+    snapshotAttachFields({
+      ...(dataAttached !== null ? { dataAttached } : {}),
+      upload_readiness: uploadReadiness,
+      research,
+    })
+
+  const openAttachConfirm = useCallback(() => {
+    setDirectionOpen(false)
+    setWorkbenchTab('data')
+  }, [])
+
   const handleFreezeSpecSpace = useCallback(async () => {
+    if (shouldDivertToAttach(attachSnapshot())) {
+      openAttachConfirm()
+      return
+    }
     const sid = activeSessionRef.current
     if (!sid) return
     const resp = await apiFetch(
@@ -1355,7 +1408,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     )
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     applySnapshot(await fetchSessionSnapshot(sid))
-  }, [applySnapshot])
+  }, [applySnapshot, dataAttached, openAttachConfirm, research, uploadReadiness])
 
   const waitForSpecRun = useCallback(
     async (
@@ -1415,6 +1468,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
   )
 
   const handleRunSpecSpace = useCallback(async () => {
+    if (shouldDivertToAttach(attachSnapshot())) {
+      openAttachConfirm()
+      return
+    }
     const sid = activeSessionRef.current
     if (!sid) return
     const resp = await apiFetch(
@@ -1441,7 +1498,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     } catch {
       /* 由 waitForSpecRun 记录为 specRunFailure，避免 unhandledrejection */
     }
-  }, [showGlobalError, waitForSpecRun])
+  }, [dataAttached, openAttachConfirm, research, showGlobalError, uploadReadiness, waitForSpecRun])
 
   const handleRunSpec = useCallback(
     async (specId: string, mode: 'canonical' | 'preview' = 'preview') => {
@@ -1577,6 +1634,17 @@ export function useWorkspace(opts: WorkspaceOptions) {
 
   const handleDirectionSubmit = useCallback(
     async (data: DirectionFormData) => {
+      const attach = snapshotAttachFields({
+        ...(dataAttached !== null ? { dataAttached } : {}),
+        upload_readiness: uploadReadiness,
+        research,
+      })
+      if (shouldDivertToAttach(attach) || !canRunEstimate(attach)) {
+        showGlobalError(t('app.directionBlockedNotAttached'))
+        setDirectionOpen(false)
+        setWorkbenchTab('data')
+        return
+      }
       if (directionGateForReadiness(uploadReadiness).disabled) {
         showGlobalError(t('app.directionUploadNotReady'))
         return
@@ -1639,9 +1707,21 @@ export function useWorkspace(opts: WorkspaceOptions) {
         setEvidenceRefreshKey((key) => key + 1)
       } catch (err) {
         if (!(err instanceof DOMException && err.name === 'AbortError')) {
-          const message = err instanceof Error ? err.message : String(err)
-          setRunFailure(message)
-          showGlobalError(err instanceof Error && err.message !== 'HTTP 500' ? message : t('app.directionFailed'))
+          if (err instanceof AdmissionConflictError) {
+            setRunFailure(err.message)
+            if (err.code === 'upload_not_ready') {
+              setDataAttached(false)
+              showGlobalError(t('app.directionUploadNotReady'))
+              setDirectionOpen(false)
+              setWorkbenchTab('data')
+            } else {
+              showGlobalError(t('app.directionSessionBusy'))
+            }
+          } else {
+            const message = err instanceof Error ? err.message : String(err)
+            setRunFailure(message)
+            showGlobalError(err instanceof Error && err.message !== 'HTTP 500' ? message : t('app.directionFailed'))
+          }
         }
       } finally {
         if (runAbortRef.current === controller) runAbortRef.current = null
@@ -1651,7 +1731,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         }
       }
     },
-    [ensureSession, applySnapshot, showGlobalError, switchSession, t, uploadReadiness],
+    [applySnapshot, dataAttached, ensureSession, research, showGlobalError, switchSession, t, uploadReadiness],
   )
 
   const runGenerateChapter = useCallback(
@@ -1685,7 +1765,17 @@ export function useWorkspace(opts: WorkspaceOptions) {
         return
       }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      if (payload.chapter) {
+      if (Array.isArray(payload.body_chapters) && payload.body_chapters.length) {
+        setWrittenChapters((prev) => {
+          const byType = new Map(
+            prev.filter((ch) => ch.type).map((ch) => [ch.type, ch]),
+          )
+          for (const ch of payload.body_chapters as WrittenChapter[]) {
+            if (ch?.type && chapterHasBody(ch)) byType.set(ch.type, ch)
+          }
+          return Array.from(byType.values())
+        })
+      } else if (payload.chapter && chapterHasBody(payload.chapter)) {
         setWrittenChapters((prev) => {
           const next = prev.filter((ch) => ch.type !== payload.chapter.type)
           return [...next, payload.chapter]
@@ -1725,7 +1815,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       const ch = outline[index]
       if (!ch) return
       setCurrentChapterIndex(index)
-      const existing = writtenChapters.find((item) => item.type === ch.type && item.content)
+      const existing = writtenChapters.find((item) => item.type === ch.type && chapterHasBody(item))
       if (existing) return
       if (identFailed) {
         showGlobalError(t('app.identBlocked'))
@@ -1839,11 +1929,16 @@ export function useWorkspace(opts: WorkspaceOptions) {
           currentType: outline[currentChapterIndex]?.type,
           currentIndex: currentChapterIndex,
         })
-        const ch = accepted[useIdx]
-        if (!ch) return
-        setCurrentChapterIndex(useIdx)
-        setWritingType(ch.type)
-        await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+        const missing = chaptersMissingBodies(accepted, writtenChapters)
+        const targets = missing.length
+          ? missing
+          : [accepted[useIdx]].filter(Boolean)
+        for (const ch of targets) {
+          const idx = accepted.findIndex((item) => item.type === ch.type)
+          if (idx >= 0) setCurrentChapterIndex(idx)
+          setWritingType(ch.type)
+          await runGenerateChapter(ch.type, ch.title, payload?.render_kwargs)
+        }
       } catch (err) {
         showGlobalError(err instanceof Error ? err.message : t('bench.writeBlocked'))
       } finally {
@@ -1855,6 +1950,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       outline,
       outlineLocked,
       currentChapterIndex,
+      writtenChapters,
       sessionId,
       postResumeOutline,
       runGenerateChapter,
@@ -1948,12 +2044,20 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const hasReadout = Boolean(
     claim || treatmentRow || literatureSource || identFailed || robustnessStatus,
   )
+  const attachGateSnapshot = snapshotAttachFields({
+    ...(dataAttached !== null ? { dataAttached } : {}),
+    upload_readiness: uploadReadiness,
+    research,
+  })
+  const formalAttachBlocked = shouldDivertToAttach(attachGateSnapshot)
   const directionGate = directionGateForReadiness(uploadReadiness)
   const directionDisabledReason = directionGate.disabled
     ? uploadReadiness === 'PROCESSING'
       ? t('app.directionBlockedProcessing')
       : t('app.directionBlockedUploadFailed')
-    : null
+    : formalAttachBlocked
+      ? t('app.directionBlockedNotAttached')
+      : null
   const canExport = writtenChapters.some((ch) => Boolean(ch.content))
   const railItems = outline.map((ch) => {
     const written = writtenChapters.find((item) => item.type === ch.type)
@@ -1976,6 +2080,8 @@ export function useWorkspace(opts: WorkspaceOptions) {
     uploading,
     uploadError,
     uploadReadiness,
+    dataAttached: dataAttached === true,
+    formalAttachBlocked,
     uploadNeedsReselect,
     uploadStatus,
     fileInputRef,
@@ -2070,6 +2176,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     handleApproveClaim,
     handleDraftClaim,
     handlePreparePaper,
+    openAttachConfirm,
     handleDirectionSubmit,
     handleWriteChapter,
     handleSelectChapter,

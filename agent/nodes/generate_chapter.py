@@ -25,6 +25,11 @@ from __future__ import annotations
 from typing import Any
 
 from ..engine.bind import bind_chapter_kwargs
+from ..engine.ols_lock import (
+    OLS_PROMPT_LOCK,
+    ols_lock_active,
+    sanitize_ols_text,
+)
 from ..engine.readiness import paper_ready_to_write, resolve_slot, results_is_grounded
 from ..prompts import get_prompt
 from ..protocols import GenerateChapterOutput
@@ -168,6 +173,13 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         format_threat_constraints,
     )
 
+    lock_ols = ols_lock_active(state, kwargs.get("method") or chapter_spec.get("method"))
+    if lock_ols:
+        if OLS_PROMPT_LOCK not in system:
+            system = f"{system}\n\n{OLS_PROMPT_LOCK}"
+        if OLS_PROMPT_LOCK not in user:
+            user = f"{user}\n\n{OLS_PROMPT_LOCK}"
+
     threat_text = format_threat_constraints(active_threat_cards(state))
     if threat_text:
         user = f"{user}\n\n识别威胁约束（必须在正文处理）：\n{threat_text}"
@@ -177,6 +189,8 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
     provider = str(router.get_config("generate").provider or "").strip().lower()
     raw_prose = call_llm(system, user)
     prose = str(raw_prose or "")
+    if lock_ols:
+        prose = sanitize_ols_text(prose)
     if not prose.strip():
         generation_source = "fallback"
         generation_degraded = True
@@ -197,12 +211,16 @@ def generate_chapter(state: EconPaperState) -> GenerateChapterOutput:
         and est.get("status") in ("ok", "degraded")
     ):
         table = (state.get("results") or "").strip()
+        if lock_ols:
+            table = sanitize_ols_text(table)
         content = prose + "\n\n" + table if table else prose
     elif str(chapter_type) == "data_desc":
         eda_table = str(bound.get("eda_results") or "").strip()
         content = prose + "\n\n" + eda_table if eda_table else prose
     else:
         content = prose
+    if lock_ols:
+        content = sanitize_ols_text(content)
 
     body_chapters: list = list(state.get("body_chapters", []) or [])
     while len(body_chapters) < _NUM_CHAPTERS:

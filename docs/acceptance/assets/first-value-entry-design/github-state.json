@@ -1,0 +1,76 @@
+{
+  "baseline": "c02eb05a12b99a435def10ba613eb99c5ac18201",
+  "pr33": {
+    "baseRefName": "main",
+    "headRefOid": "0ee17abac7f6f6b72f868a4fdc27306b1adafb8e",
+    "mergeCommit": {
+      "oid": "c02eb05a12b99a435def10ba613eb99c5ac18201"
+    },
+    "mergedAt": "2026-09-08T03:32:40Z",
+    "state": "MERGED",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-07T19:37:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/yishu-ziyu/empirical-paper-workbench/actions/runs/34156074192/job/101848058419",
+        "name": "后端 + Agent pytest",
+        "startedAt": "2026-09-07T19:34:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-07T19:35:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/yishu-ziyu/empirical-paper-workbench/actions/runs/34156074192/job/101848058632",
+        "name": "前端 类型 / 测试 / lint / 构建",
+        "startedAt": "2026-09-07T19:34:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-07T19:35:32Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/yishu-ziyu/empirical-paper-workbench/actions/runs/34156074192/job/101848058594",
+        "name": "API 契约同步 + 前端类型",
+        "startedAt": "2026-09-07T19:34:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-07T19:35:18Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/yishu-ziyu/empirical-paper-workbench/actions/runs/34156074192/job/101848058603",
+        "name": "Docker 镜像构建",
+        "startedAt": "2026-09-07T19:34:11Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-09-07T19:34:37Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://dashboard.gitguardian.com",
+        "name": "GitGuardian Security Checks",
+        "startedAt": "2026-09-07T19:34:05Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ]
+  },
+  "issue30": {
+    "closedAt": "2026-09-08T03:33:57Z",
+    "state": "CLOSED",
+    "url": "https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30"
+  },
+  "issue34": {
+    "state": "OPEN",
+    "title": "Card 测试间歇失败：核实 runner 终态与结果提交（根因待查）",
+    "url": "https://github.com/yishu-ziyu/empirical-paper-workbench/issues/34"
+  },
+  "original_worktree": "clean on fix/runner-logging-lifecycle; no user changes found",
+  "review_branch": "review/first-value-entry"
+}

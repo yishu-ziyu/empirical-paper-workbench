@@ -177,8 +177,9 @@ def test_estimate_ols_heterogeneity_fits_interaction_and_labels_ols(tmp_path):
     est = out["estimate"]
     assert est["status"] == "ok"
     assert _is_interaction_formula(str(est["formula"]))
-    assert est["estimator"] == "OLS"
-    assert "feols" not in str(est["estimator"]).lower()
+    # 9/15 recut keeps engine truth in state; the OLS label is user-facing only
+    # (``agent/design/spec.py`` ``display_estimate_engine_label``).
+    assert est["estimator"] in {"statspai.feols", "statsmodels.ols"}
     table = out["results"]
     assert "feols" not in table.lower()
     assert "估计器：`OLS`" in table

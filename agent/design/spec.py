@@ -77,6 +77,261 @@ def _as_str_list(value: Any) -> list[str]:
     return [str(c).strip() for c in value if str(c).strip()]
 
 
+# Question / column tokens that mean a grouping factor, not a mere additive dummy.
+_GROUP_ALIASES: dict[str, tuple[str, ...]] = {
+    "region": ("region", "reg", "reg66", "south", "urban", "smsa"),
+    "south": ("south",),
+    "urban": ("urban", "smsa"),
+    "female": ("female", "sex", "gender"),
+    "black": ("black", "race"),
+}
+_TREATMENT_ALIASES = (
+    "educ",
+    "edu",
+    "education",
+    "schooling",
+    "教育",
+    "受教育",
+    "学历",
+)
+_HETERO_QUESTION_RE = re.compile(
+    r"heterogen|interact|vary(?:s|ies)?\s+by|by[- ]group|subgroup|"
+    r"×|异质|交互|分组|分地区|分区域|是否因|是否随|按地区|按区域",
+    re.I,
+)
+_CROSS_RE = re.compile(
+    r"([A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*)"
+    r"(?:\s*[×*⋅·]\s*|\s+[xX]\s+)"
+    r"([A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*)"
+)
+_BY_GROUP_RE = re.compile(
+    r"(?:vary(?:s|ies)?\s+by|by[- ]group|分|按|因)\s*"
+    r"([A-Za-z_\u4e00-\u9fff][A-Za-z0-9_\u4e00-\u9fff]*)",
+    re.I,
+)
+_GROUP_WORD_RE = re.compile(
+    r"\b(region|south|urban|female|black|race)\b|地区|区域|地域",
+    re.I,
+)
+
+
+def _norm_token(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _token_key(value: Any) -> str:
+    return _norm_token(value).lower()
+
+
+def _is_treatment_token(token: str, treatment: str = "") -> bool:
+    key = _token_key(token)
+    if not key:
+        return False
+    treat = _token_key(treatment)
+    if treat and key == treat:
+        return True
+    return key in _TREATMENT_ALIASES or key.startswith("educ")
+
+
+def _resolve_group_token(token: str, pool: list[str]) -> str:
+    """Map a question word onto a real column / control name when possible."""
+    raw = _norm_token(token)
+    if not raw:
+        return ""
+    if raw in {"地区", "区域", "地域"}:
+        raw = "region"
+    key = raw.lower()
+    lowered = {_token_key(item): _norm_token(item) for item in pool if _norm_token(item)}
+    if key in lowered:
+        return lowered[key]
+    for alias, names in _GROUP_ALIASES.items():
+        if key == alias or key in names:
+            for name in names:
+                if name in lowered:
+                    return lowered[name]
+            return alias
+    return raw
+
+
+def _looks_like_heterogeneity_question(question: str) -> bool:
+    text = _norm_token(question)
+    if not text:
+        return False
+    if _HETERO_QUESTION_RE.search(text):
+        return True
+    if _CROSS_RE.search(text):
+        return True
+    return bool(re.search(r"educ(?:ation)?\s+.+\s+region|region.+\seduc", text, re.I))
+
+
+def infer_heterogeneity_groups(
+    question: str,
+    *,
+    treatment: str = "",
+    controls: list[str] | None = None,
+    columns: list[str] | None = None,
+    explicit: list[str] | None = None,
+) -> list[str]:
+    """Resolve grouping factors for educ×group (or by-group educ).
+
+    Explicit ``heterogeneity_groups`` win. Otherwise a question about
+    educ×region / heterogeneity by region yields the group name, not an
+    additive-only region dummy.
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def _add(token: str) -> None:
+        name = _norm_token(token)
+        key = _token_key(name)
+        if not name or key in seen or _is_treatment_token(name, treatment):
+            return
+        seen.add(key)
+        found.append(name)
+
+    for item in explicit or []:
+        _add(item)
+    if found:
+        return found
+
+    text = _norm_token(question)
+    if not text or not _looks_like_heterogeneity_question(text):
+        return []
+
+    pool = [
+        _norm_token(item)
+        for item in [*(controls or []), *(columns or [])]
+        if _norm_token(item)
+    ]
+    def _known_or_pooled(token: str) -> str:
+        resolved = _resolve_group_token(token, pool)
+        key = _token_key(resolved)
+        if key in {_token_key(item) for item in pool}:
+            return resolved
+        if key in _GROUP_ALIASES or key == "region" or token in {"地区", "区域", "地域"}:
+            return resolved
+        return ""
+
+    for match in _CROSS_RE.finditer(text):
+        left, right = match.group(1), match.group(2)
+        if _is_treatment_token(left, treatment) or left in {"教育", "受教育", "学历"}:
+            _add(_known_or_pooled(right))
+        elif _is_treatment_token(right, treatment) or right in {"教育", "受教育", "学历"}:
+            _add(_known_or_pooled(left))
+        else:
+            _add(_known_or_pooled(right))
+    for match in _BY_GROUP_RE.finditer(text):
+        _add(_known_or_pooled(match.group(1)))
+    for match in _GROUP_WORD_RE.finditer(text):
+        _add(_known_or_pooled(match.group(0)))
+    if not found and pool:
+        for item in pool:
+            if _token_key(item) in _GROUP_ALIASES or _token_key(item) == "region":
+                _add(item)
+    return found
+
+
+def interaction_term(treatment: str, group: str) -> str:
+    """Patsy / formulaic ``treat:group`` term (educ×region)."""
+    return f"{_norm_token(treatment)}:{_norm_token(group)}"
+
+
+def formula_has_treatment_group_interaction(
+    formula: str, treatment: str, group: str
+) -> bool:
+    """True when the RHS already has treat:group or treat*group."""
+    if "~" not in str(formula or "") or not treatment or not group:
+        return False
+    rhs = str(formula).split("~", 1)[1].split("|", 1)[0]
+    compact = re.sub(r"\s+", "", rhs).lower()
+    treat = _token_key(treatment)
+    grp = _token_key(group)
+    return (
+        f"{treat}:{grp}" in compact
+        or f"{grp}:{treat}" in compact
+        or f"{treat}*{grp}" in compact
+        or f"{grp}*{treat}" in compact
+    )
+
+
+def heterogeneity_rhs_terms(treatment: str, groups: list[str]) -> list[str]:
+    """``group + treat:group`` for each grouping factor."""
+    terms: list[str] = []
+    seen: set[str] = set()
+    treat = _norm_token(treatment)
+    for group in groups:
+        name = _norm_token(group)
+        if not name or not treat or _token_key(name) == _token_key(treat):
+            continue
+        for term in (name, interaction_term(treat, name)):
+            key = term.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            terms.append(term)
+    return terms
+
+
+def build_heterogeneity_ols_formula(
+    outcome: str,
+    treatment: str,
+    controls: list[str] | None = None,
+    groups: list[str] | None = None,
+) -> str:
+    """Main OLS formula: additive controls plus educ×group, never group-only."""
+    y = _norm_token(outcome)
+    treat = _norm_token(treatment)
+    group_list = [_norm_token(g) for g in (groups or []) if _norm_token(g)]
+    group_keys = {_token_key(g) for g in group_list}
+    rhs: list[str] = []
+    if treat:
+        rhs.append(treat)
+    for control in controls or []:
+        name = _norm_token(control)
+        if not name or _token_key(name) == _token_key(treat) or _token_key(name) in group_keys:
+            continue
+        rhs.append(name)
+    rhs.extend(heterogeneity_rhs_terms(treat, group_list))
+    return f"{y} ~ {' + '.join(rhs)}" if rhs else f"{y} ~"
+
+
+def apply_heterogeneity_to_formula(
+    formula: str,
+    spec: dict[str, Any] | None = None,
+    *,
+    treatment: str = "",
+    groups: list[str] | None = None,
+) -> str:
+    """Rewrite an additive-only group dummy into treat + group + treat:group."""
+    payload = spec if isinstance(spec, dict) else {}
+    treat = _norm_token(treatment or payload.get("treatment") or payload.get("treatment_col"))
+    group_list = [
+        _norm_token(g)
+        for g in (groups if groups is not None else payload.get("heterogeneity_groups") or [])
+        if _norm_token(g)
+    ]
+    src = str(formula or "").strip()
+    if not src or not treat or not group_list:
+        return src
+    if all(formula_has_treatment_group_interaction(src, treat, group) for group in group_list):
+        return src
+    if "~" not in src:
+        return src
+    outcome, rhs = src.split("~", 1)
+    rhs_core, fe = (rhs.split("|", 1) + [""])[:2]
+    existing = [part.strip() for part in rhs_core.split("+") if part.strip()]
+    existing_keys = {part.replace(" ", "").lower() for part in existing}
+    for term in heterogeneity_rhs_terms(treat, group_list):
+        if term.replace(" ", "").lower() not in existing_keys:
+            existing.append(term)
+            existing_keys.add(term.replace(" ", "").lower())
+    rebuilt = f"{outcome.strip()} ~ {' + '.join(existing)}"
+    fe = fe.strip()
+    if fe:
+        rebuilt = f"{rebuilt} | {fe}"
+    return rebuilt
+
+
 def _first_str(rd: dict[str, Any], *keys: str) -> str:
     for key in keys:
         raw = rd.get(key)
@@ -119,8 +374,12 @@ class DirectionSpec:
         return asdict(self)
 
     def _ols_formula(self) -> str:
-        rhs = [self.treatment, *[c for c in self.controls if c and c != self.treatment]]
-        return f"{self.outcome} ~ {' + '.join(rhs)}"
+        return build_heterogeneity_ols_formula(
+            self.outcome,
+            self.treatment,
+            self.controls,
+            self.heterogeneity_groups,
+        )
 
     def _iv_formula(self) -> str:
         endog = self.endogenous or self.treatment
@@ -279,7 +538,11 @@ class DirectionSpec:
             topic = rd.strip()
             if not topic:
                 return None
-            return cls(topic=topic, slug=slug_for_topic(topic))
+            return cls(
+                topic=topic,
+                slug=slug_for_topic(topic),
+                heterogeneity_groups=infer_heterogeneity_groups(topic),
+            )
         if not isinstance(rd, dict):
             return None
         topic = str(rd.get("question") or rd.get("topic") or "").strip()
@@ -291,6 +554,7 @@ class DirectionSpec:
             return None
         controls = _as_str_list(rd.get("controls"))
         instruments = _as_str_list(rd.get("instruments"))
+        columns = _as_str_list(rd.get("columns") or rd.get("available_columns"))
         if not instruments:
             one = _first_str(rd, "instrument", "instrument_col")
             if one:
@@ -331,5 +595,11 @@ class DirectionSpec:
             treatment_time=treatment_time,
             cluster=_first_str(rd, "cluster", "cluster_col"),
             cluster_levels=_as_str_list(rd.get("cluster_levels")),
-            heterogeneity_groups=_as_str_list(rd.get("heterogeneity_groups")),
+            heterogeneity_groups=infer_heterogeneity_groups(
+                topic,
+                treatment=treatment,
+                controls=controls,
+                columns=columns,
+                explicit=_as_str_list(rd.get("heterogeneity_groups")),
+            ),
         )

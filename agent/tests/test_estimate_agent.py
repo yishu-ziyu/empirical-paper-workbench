@@ -94,7 +94,8 @@ def test_mapping_pass_keeps_state_contract():
     payload = out["estimate"]
     assert payload["status"] == "ok"
     assert payload["produced_by"] == "estimate"
-    assert payload["estimator"] == "estimate_agent"
+    assert payload["estimator"] == "OLS"
+    assert "feols" not in str(payload["estimator"]).lower()
     assert payload["method"] == "ols"
     assert payload["treatment"] == "x"
     assert payload["treatment_row"] == "| x | 0.5000 | 0.1000 | 0.0200 |"
@@ -102,9 +103,27 @@ def test_mapping_pass_keeps_state_contract():
     assert payload["n"] == 6 and payload["stars"] == 2
     # results 表格式与固定分派一致（结果章按这个引用）
     assert "# 主结果" in out["results"]
+    assert "估计器：`OLS`" in out["results"]
+    assert "feols" not in out["results"].lower()
     assert "| 变量 | 系数 | SE | p |" in out["results"]
     assert "| x | 0.5000 | 0.1000 | 0.0200 |" in out["results"]
     assert "N = 6" in out["results"]
+
+
+def test_mapping_ols_rewrites_additive_region_to_interaction():
+    spec = {
+        "formula": "lwage ~ educ + region",
+        "treatment": "educ",
+        "outcome": "lwage",
+        "heterogeneity_groups": ["region"],
+        "method": "ols",
+    }
+    out = estimate_output_from_agent(PASS_OUTPUT, method="ols", spec=spec)
+    formula = str(out["estimate"]["formula"])
+    compact = formula.replace(" ", "")
+    assert "educ:region" in compact or "educ*region" in compact
+    assert out["estimate"]["estimator"] == "OLS"
+    assert "feols" not in (out["results"] + formula).lower()
 
 
 def test_mapping_fail_writes_no_numbers():
@@ -278,7 +297,8 @@ def test_test_model_full_run_state_contract(tmp_path):
     payload = out["estimate"]
     assert payload["status"] == "ok"          # TestModel 取 Literal 第一个值 pass
     assert payload["produced_by"] == "estimate"
-    assert payload["estimator"] == "estimate_agent"
+    assert payload["estimator"] == "OLS"
+    assert "feols" not in str(payload["estimator"]).lower()
     assert payload["method"] == "ols"
     assert "| 变量 | 系数 | SE | p |" in out["results"]
 

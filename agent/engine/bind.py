@@ -311,7 +311,10 @@ def _covariance_text(estimate: Mapping[str, Any]) -> str:
 
 
 def format_estimate_facts(
-    state: Mapping[str, Any], *, effective_claim: str | None = None
+    state: Mapping[str, Any],
+    *,
+    effective_claim: str | None = None,
+    method: Any = None,
 ) -> str:
     """Project the executed estimate and its design inputs into one fact block."""
     estimate = state.get("estimate") or {}
@@ -578,7 +581,7 @@ def bind_chapter_kwargs(state: Mapping[str, Any], chapter_spec: Mapping[str, Any
     results = state.get("results") or ""
     robustness_table = rob.get("summary_table") or ""
     estimate_facts = format_estimate_facts(
-        state, effective_claim=effective_claim
+        state, effective_claim=effective_claim, method=requested_method
     )
     if ols_lock_active(state, requested_method):
         results = sanitize_ols_text(str(results))

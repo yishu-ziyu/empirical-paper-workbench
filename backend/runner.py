@@ -214,6 +214,9 @@ async def process_one_run(
         initial_state = dict(claimed.payload["initial_state"])
         if claimed.kind == "prewrite":
             initial_state["source_run_id"] = claimed.run_id
+            phase = claimed.payload.get("phase") or initial_state.get("prewrite_phase")
+            if phase:
+                initial_state["prewrite_phase"] = phase
             direction = claimed.payload["research_direction"]
             state = await asyncio.to_thread(
                 execute_prewrite_supervised,

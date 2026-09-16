@@ -310,8 +310,8 @@ def _patch_prewrite_nodes(monkeypatch, calls, *, star_rating=3):
     monkeypatch.setattr("agent.nodes.generate_outline.generate_outline", fake_outline)
 
 
-def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
-    """预写顺序：识别 → 估计 → 稳健性 → 文献 → 标题 → 大纲。"""
+def test_set_direction_and_outline_pauses_before_estimate(monkeypatch):
+    """方向阶段：识别后停下，不自动跑估计／稳健性／大纲。"""
     calls = []
     _patch_prewrite_nodes(monkeypatch, calls)
 
@@ -320,9 +320,33 @@ def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
     rd = {"question": "q", "method": "OLS"}
     result = facade.set_direction_and_outline(sid, rd)
 
+    assert calls == ["set_direction", "identification_verify"]
+    assert result["research_direction"] == rd
+    assert result["star_rating"] == 3
+    assert result.get("prewrite_gate") == "awaiting_estimate"
+    assert result.get("outline") in (None, [])
+    assert not (result.get("estimate") or {}).get("produced_by")
+    assert facade.get_state(sid).get("prewrite_gate") == "awaiting_estimate"
+    facade.drop_session(sid)
+
+
+def test_confirm_prewrite_and_estimate_resumes_from_estimate(monkeypatch):
+    """确认后续：从 estimate 接到大纲。"""
+    calls = []
+    _patch_prewrite_nodes(monkeypatch, calls)
+
+    sid = "test-confirm"
+    facade.seed_state(sid, {})
+    rd = {"question": "q", "method": "OLS"}
+    paused = facade.set_direction_and_outline(sid, rd)
+    assert paused.get("prewrite_gate") == "awaiting_estimate"
+    calls.clear()
+
+    result = facade.confirm_prewrite_and_estimate(
+        sid,
+        {"table1Confirmed": True, "specConfirmed": True},
+    )
     assert calls == [
-        "set_direction",
-        "identification_verify",
         "estimate",
         "robustness_check",
         "search_literature",
@@ -330,11 +354,9 @@ def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
         "generate_title",
         "generate_outline",
     ]
-    assert result["research_direction"] == rd
     assert result["outline"] == [{"type": "intro"}]
-    assert result["star_rating"] == 3
     assert result["estimate"]["produced_by"] == "estimate"
-    assert facade.get_state(sid)["outline"] == [{"type": "intro"}]
+    assert result.get("prewrite_gate") == "estimate_complete"
     facade.drop_session(sid)
 
 

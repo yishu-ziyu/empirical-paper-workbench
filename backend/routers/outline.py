@@ -2,7 +2,8 @@
 
 - POST /sessions/{id}/direction: 接受 {question, dv, iv, controls, method, template}
   → 写入 state.research_direction → set_direction → 识别验真
-  → 非 0 星再 generate_outline → 返回 outline + 识别报告
+  → 非 0 星写入 Table 1 + 主设定方程并停下，不自动跑 estimate
+- POST /sessions/{id}/prewrite/confirm: 客户端确认后继续 estimate → robustness → outline
 - POST /sessions/{id}/resume: 接受用户调整后的 outline → 写入 state.user_adjusted_outline
   → 重跑 generate_outline (采用调整版) → 返回 {ok, outline}
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from agent.engine.did_spec import DID_MISSING_INTERACTION, can_form_did_main_term
@@ -24,6 +26,8 @@ from models.user import User
 from services.allow_did import confirmed_did_method
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
+    PrewriteConfirmRequest,
+    PrewriteGateResponse,
     QueueFullResponse,
     ResumeResponse,
     RunAcceptedResponse,
@@ -63,6 +67,8 @@ class DirectionRequest(BaseModel):
     cluster: Optional[str] = None
     cluster_levels: List[str] = Field(default_factory=list)
     heterogeneity_groups: List[str] = Field(default_factory=list)
+    qType: Optional[str] = None
+    specMode: Optional[str] = None
     model_config = {"extra": "allow"}
 
 
@@ -136,7 +142,11 @@ async def set_direction_endpoint(
             kind="prewrite",
             payload={
                 "research_direction": rd,
-                "initial_state": facade.prepare_prewrite_state(session_id),
+                "initial_state": {
+                    **facade.prepare_prewrite_state(session_id),
+                    "prewrite_phase": "direction",
+                },
+                "phase": "direction",
             },
             idempotency_key=idempotency_key,
         )
@@ -158,6 +168,94 @@ async def set_direction_endpoint(
         session_id=run.session_id,
         status="PENDING",
         events_url=f"/api/runs/{run.run_id}/events",
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/prewrite/confirm",
+    response_model=RunAcceptedResponse | PrewriteGateResponse,
+    responses={
+        200: {
+            "model": PrewriteGateResponse,
+            "description": "Table 1 / spec confirms recorded; estimate not started.",
+        },
+        202: {
+            "model": RunAcceptedResponse,
+            "description": "Both confirms accepted; estimate run enqueued.",
+        },
+        409: {
+            "model": SessionBusyResponse,
+            "description": "Session busy, confirms incomplete, identification blocked, or hetero hard-block.",
+        },
+        429: {
+            "model": QueueFullResponse,
+            "description": "The durable run queue is full.",
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds before retrying admission.",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
+)
+async def confirm_prewrite_endpoint(
+    session_id: str,
+    payload: PrewriteConfirmRequest = PrewriteConfirmRequest(),
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=200,
+    ),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Record FE confirm flags, or continue estimate after both CTAs."""
+    require_session_ownership(session_id, current_user)
+    confirms = payload.model_dump(exclude_none=True)
+    if payload.action == "record_confirms":
+        recorded = facade.record_prewrite_confirms(session_id, confirms)
+        return JSONResponse(
+            status_code=200,
+            content=PrewriteGateResponse(**recorded).model_dump(mode="json"),
+        )
+    if payload.action != "continue_estimate":
+        raise HTTPException(status_code=422, detail="unsupported confirm action")
+    research_direction, initial_state = facade.prepare_prewrite_confirm(
+        session_id, confirms
+    )
+    try:
+        run = await RunRepository().enqueue(
+            session_id=session_id,
+            kind="prewrite",
+            payload={
+                "research_direction": research_direction,
+                "initial_state": initial_state,
+                "phase": "estimate",
+            },
+            idempotency_key=idempotency_key,
+        )
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="Session not found") from exc
+    except SessionBusy as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "session_busy", "run_id": exc.run_id},
+        ) from exc
+    except QueueFull as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="run queue is full",
+            headers={"Retry-After": "5"},
+        ) from exc
+    return JSONResponse(
+        status_code=202,
+        content=RunAcceptedResponse(
+            run_id=run.run_id,
+            session_id=run.session_id,
+            status="PENDING",
+            events_url=f"/api/runs/{run.run_id}/events",
+        ).model_dump(mode="json"),
     )
 
 

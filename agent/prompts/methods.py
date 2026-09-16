@@ -5,6 +5,7 @@ association：写相关 / 条件关联。
 """
 from __future__ import annotations
 
+from ..engine.ols_lock import OLS_PROMPT_LOCK, method_triggers_ols_lock
 from .revision import REVISION_BLOCK, fill_revision
 
 _CAUSAL_METHODS = {"did", "iv", "rd", "rdd", "scm"}
@@ -110,5 +111,10 @@ def render(**kwargs) -> tuple[str, str]:
     claim = filled.get("claim") or ""
     method = filled.get("method") or ""
     if _uses_ident_prompt(claim, method):
-        return CAUSAL_SYSTEM_PROMPT, CAUSAL_USER_TEMPLATE.format(**filled)
-    return SYSTEM_PROMPT, USER_TEMPLATE.format(**filled)
+        system, user = CAUSAL_SYSTEM_PROMPT, CAUSAL_USER_TEMPLATE.format(**filled)
+    else:
+        system, user = SYSTEM_PROMPT, USER_TEMPLATE.format(**filled)
+    if method_triggers_ols_lock(method):
+        system = f"{system}\n\n{OLS_PROMPT_LOCK}"
+        user = f"{user}\n\n{OLS_PROMPT_LOCK}"
+    return system, user

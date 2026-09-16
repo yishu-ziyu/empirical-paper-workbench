@@ -261,16 +261,17 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
-    jti = payload.get("jti") or ""
-    from auth import is_jti_revoked
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid refresh token payload")
+    if not isinstance(jti, str) or not jti or not isinstance(exp, (int, float)):
+        raise HTTPException(status_code=401, detail="Invalid refresh token payload")
+    if not await revoke_jti(db, jti, float(exp)):
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
 
-    if jti and is_jti_revoked(jti):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token has been revoked",
-        )
-
-    user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == int(user_id)))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
@@ -279,10 +280,8 @@ async def refresh_token(
             detail="User not found",
         )
 
-    # Rotate: the presented refresh token must never work again.
-    exp = payload.get("exp")
-    if jti and exp:
-        revoke_jti(jti, float(exp))
+    # Persist consumption before the replacement credentials leave this process.
+    await db.commit()
 
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
@@ -299,6 +298,7 @@ async def logout(
     request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Log out: revoke the presented refresh token and clear cookies.
 
@@ -315,8 +315,9 @@ async def logout(
             )
             jti = payload.get("jti")
             exp = payload.get("exp")
-            if jti and exp:
-                revoke_jti(str(jti), float(exp))
+            if payload.get("typ") == "refresh" and jti and exp:
+                await revoke_jti(db, str(jti), float(exp))
+                await db.commit()
         except JWTError:
             pass  # already-expired refresh: clearing cookies is enough
     clear_auth_cookies(response)

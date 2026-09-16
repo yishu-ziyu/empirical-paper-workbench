@@ -1,0 +1,21 @@
+{
+  "scope": "API-only normal login and exact resume/research equality; browser NOT RUN",
+  "source_sha": "8a994f7d101064d25f7482c38c64f2f59eb5573b",
+  "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0",
+  "services_recreated": [
+    "backend",
+    "runner",
+    "frontend",
+    "gateway"
+  ],
+  "volumes_retained": true,
+  "exact_json_equal": true,
+  "snapshot_sha256": "ef7c744226f8d50c0d19411f6d38bba14a02d040b0b21fbd87e1e2118dfde571",
+  "canonical_spec_id": "iv_region_dummies",
+  "specification_runs": 12,
+  "body_chapters_count": 6,
+  "commands": [
+    "PILOT_ENV_FILE=<private SSOT config> deploy/private-pilot/ops.sh rebuild",
+    "normal account login; GET /sessions/<id> and /sessions/<id>/research before and after"
+  ]
+}

@@ -121,6 +121,39 @@ describe('WorkbenchArtifact research lab', () => {
     expect(screen.getByTestId('spec-space')).toBeInTheDocument()
     expect(screen.getByTestId('spec-space-freeze')).toHaveTextContent('确认分析方案')
     expect(screen.queryByText(/βA → βB|compare/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('attach-panel')).not.toBeInTheDocument()
+  })
+
+  test('formal question tab shows attach panel; prefill stays a candidate and hides tables', () => {
+    render(
+      <I18nProvider>
+        <WorkbenchArtifact
+          ws={mockWs('question', {
+            research: undefined,
+            shapedQuestion: '高铁开通是否促进县域创业？',
+            csvName: 'county.csv',
+            uploadReadiness: 'READY',
+            uploading: false,
+          })}
+          sessionId={null}
+          hasSuccessfulEstimate={false}
+          onOpenDirection={vi.fn()}
+          onOpenEvidence={vi.fn()}
+          onSelectView={vi.fn()}
+          onOpenCode={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('attach-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('attach-topic')).toHaveTextContent('高铁开通')
+    expect(screen.getByTestId('attach-candidate')).toHaveTextContent('county.csv')
+    expect(screen.getByTestId('attach-candidate-status')).toHaveTextContent('候选（未挂接）')
+    expect(screen.getByTestId('attach-confirm-btn')).toBeEnabled()
+    expect(screen.queryByTestId('eda-sidebar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('dataset-summary')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('table1-pause')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('teaching-case-badge')).not.toBeInTheDocument()
   })
 
   test('Paper writing puts ChapterWriter and evidence anchor first, collapses research trace', () => {

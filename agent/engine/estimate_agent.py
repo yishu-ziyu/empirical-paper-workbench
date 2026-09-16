@@ -25,6 +25,13 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 
+from .ols_lock import (
+    OLS_ESTIMATOR_LABEL,
+    OLS_PROMPT_LOCK,
+    method_triggers_ols_lock,
+    pooled_ols_formula,
+)
+from ..design.spec import apply_heterogeneity_to_formula
 from .sandbox import SandboxResult, SandboxSession, SubprocessSession, open_session
 from ..llm.router import MINIMAX_BASE_URL, router
 from ..state import EconPaperState
@@ -409,17 +416,30 @@ def _method_of(state: EconPaperState, spec: dict) -> str:
     return norm_method(raw)
 
 
+def _spec_formula(method: str, spec: dict) -> str:
+    if method_triggers_ols_lock(method or spec.get("method")):
+        raw = spec.get("formula") or spec.get("feols_formula") or ""
+        formula = pooled_ols_formula(str(raw))
+    else:
+        formula = str(spec.get("feols_formula") or spec.get("formula") or "")
+    return apply_heterogeneity_to_formula(formula, spec)
+
+
 def _user_prompt(method: str, spec: dict, csv_name: str) -> str:
     controls = spec.get("controls") or []
-    return _USER_PROMPT_TMPL.format(
+    formula = _spec_formula(method, spec) or "(未给出，由你根据方法构造)"
+    prompt = _USER_PROMPT_TMPL.format(
         method=method or "(未指定，请依据 profiling 判断最合适的主流方法)",
-        formula=spec.get("feols_formula") or spec.get("formula") or "(未给出，由你根据方法构造)",
+        formula=formula,
         treatment=spec.get("endogenous") or spec.get("treatment") or spec.get("treatment_col") or "(未指定)",
         outcome=spec.get("outcome") or "(未指定)",
         controls=", ".join(str(c) for c in controls) or "(无)",
         cluster=spec.get("cluster") or spec.get("cluster_col") or "(无)",
         csv_name=csv_name,
     )
+    if method_triggers_ols_lock(method or spec.get("method")):
+        prompt = f"{prompt}\n\n{OLS_PROMPT_LOCK}"
+    return prompt
 
 
 def profiling_text_from_state(state: EconPaperState) -> str:
@@ -467,8 +487,12 @@ def estimate_output_from_agent(
     treatment_row 留空、不写 coef/se/p —— 与"不编造假系数"红线一致。
     ``history_compact`` 为纯增量溯源键（六段结构化轮次摘要，供步骤卡展示）。
     """
-    estimator = "estimate_agent"
     method_label = method or str(spec.get("method") or "ols")
+    estimator = (
+        OLS_ESTIMATOR_LABEL
+        if method_triggers_ols_lock(method_label)
+        else "estimate_agent"
+    )
     if out.verdict == "pass":
         treatment = str(
             spec.get("endogenous")
@@ -479,7 +503,7 @@ def estimate_output_from_agent(
         treatment_row = (
             f"| {treatment} | {_fmt(out.coefficient)} | {_fmt(out.se)} | {_fmt(out.pvalue)} |"
         )
-        formula = str(spec.get("feols_formula") or spec.get("formula") or "")
+        formula = _spec_formula(method_label, spec)
         n = None if out.n_obs is None else int(out.n_obs)
         payload: dict = {
             "status": "ok",
@@ -532,7 +556,7 @@ def estimate_output_from_agent(
             "final_code": out.final_code,
             **(
                 {"formula": str(formula)}
-                if (formula := spec.get("feols_formula") or spec.get("formula"))
+                if (formula := _spec_formula(method_label, spec))
                 else {}
             ),
         },

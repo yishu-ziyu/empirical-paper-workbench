@@ -1,0 +1,71 @@
+[
+  {
+    "lang": "zh",
+    "action": "open source",
+    "open": true
+  },
+  {
+    "lang": "zh",
+    "action": "expanded source layout",
+    "overflow": false,
+    "visible": "不能据此说：教育对每个人的工资都有相同因果影响。\n\nOLS 展示控制变量后的相关。IV 的解释依赖工具变量相关性、排除限制等假设；强度诊断不能单独证明工具有效。估计值更大，也不等于更接近真值。"
+  },
+  {
+    "lang": "en",
+    "action": "open source",
+    "open": true
+  },
+  {
+    "lang": "en",
+    "action": "expanded source layout",
+    "overflow": false,
+    "visible": "You cannot conclude: education has the same causal effect on everyone’s wages.\n\nOLS shows a conditional association. Interpreting IV depends on instrument relevance, exclusion and other assumptions; a strength diagnostic cannot establish instrument validity on its own. A larger estimate need not be closer to the truth."
+  },
+  {
+    "action": "full page",
+    "visibleSections": [
+      "1",
+      "2",
+      "3"
+    ]
+  },
+  {
+    "action": "desktop entry opens design handoff",
+    "open": true,
+    "text": "Proposed desktop handoff\n\nThe proposed page opens the existing empty desk, where you choose “Try a real study”. This review does not connect to the workbench or create or replace a session. Mobile is for presentation only. The handoff needs separate implementation and acceptance.\n\nBack to the design"
+  },
+  {
+    "action": "Escape closes handoff",
+    "open": true
+  },
+  {
+    "action": "390 canvas on desktop, all sections",
+    "canvasWidth": 390,
+    "canvasScrollWidth": 390,
+    "visible": [
+      "1",
+      "2",
+      "3"
+    ],
+    "mobileLabel": "inline",
+    "desktopLabel": "none"
+  },
+  {
+    "action": "full page language change retains all sections",
+    "language": "zh-CN",
+    "visible": [
+      "1",
+      "2",
+      "3"
+    ],
+    "resourceUrls": []
+  },
+  {
+    "action": "close button",
+    "open": false
+  },
+  {
+    "action": "native Escape key (CDP)",
+    "open": false
+  }
+]

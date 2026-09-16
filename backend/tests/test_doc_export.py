@@ -288,3 +288,53 @@ def test_doc_export_undergrad_alias_returns_docx(
     assert resp.content.startswith(b"PK")
     ctype = resp.headers.get("content-type", "").lower()
     assert "wordprocessingml" in ctype or "octet-stream" in ctype or "docx" in ctype
+
+
+def test_doc_export_fills_all_six_outline_bodies(client):
+    """Intro-only state + six-chapter outline must export every chapter body."""
+    import re
+    from conftest import make_title_chapter, make_write_ready_state
+
+    sid = "doc-export-six-chapter"
+    facade.seed_state(
+        sid,
+        make_write_ready_state(
+            title_chapter=make_title_chapter("年龄与收入"),
+            body_chapters=[
+                {
+                    "type": "intro",
+                    "title": "引言",
+                    "content": "教育回报是经典议题。",
+                    "status": "generated",
+                }
+            ],
+        ),
+    )
+    try:
+        resp = client.get(
+            f"/sessions/{sid}/doc-export",
+            params={"format": "tex"},
+        )
+        assert resp.status_code == 200, resp.text
+        tex = resp.text
+        titles = ["引言", "文献综述", "数据描述", "方法", "结果", "结论"]
+        for title in titles:
+            assert f"\\section{{{title}}}" in tex, tex
+        parts = re.split(r"\\section\{([^}]*)\}", tex)
+        assert "Untitled" not in tex
+        for i in range(1, len(parts), 2):
+            title = parts[i]
+            body = parts[i + 1] if i + 1 < len(parts) else ""
+            assert body.strip(), f"empty chapter body under \\section{{{title}}}"
+        bodies = facade.get_state(sid).get("body_chapters") or []
+        written = [
+            ch
+            for ch in bodies
+            if isinstance(ch, dict) and str(ch.get("content") or "").strip()
+        ]
+        assert {ch.get("type") for ch in written} >= set(
+            ("intro", "lit_review", "data_desc", "methods", "results", "conclusion")
+        )
+    finally:
+        facade.drop_session(sid)
+

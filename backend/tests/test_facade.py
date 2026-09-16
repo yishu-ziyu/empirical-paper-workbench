@@ -310,8 +310,8 @@ def _patch_prewrite_nodes(monkeypatch, calls, *, star_rating=3):
     monkeypatch.setattr("agent.nodes.generate_outline.generate_outline", fake_outline)
 
 
-def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
-    """预写顺序：识别 → 估计 → 稳健性 → 文献 → 标题 → 大纲。"""
+def test_set_direction_and_outline_pauses_before_estimate(monkeypatch):
+    """方向阶段：识别后停下，不自动跑估计／稳健性／大纲。"""
     calls = []
     _patch_prewrite_nodes(monkeypatch, calls)
 
@@ -320,9 +320,33 @@ def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
     rd = {"question": "q", "method": "OLS"}
     result = facade.set_direction_and_outline(sid, rd)
 
+    assert calls == ["set_direction", "identification_verify"]
+    assert result["research_direction"] == rd
+    assert result["star_rating"] == 3
+    assert result.get("prewrite_gate") == "awaiting_estimate"
+    assert result.get("outline") in (None, [])
+    assert not (result.get("estimate") or {}).get("produced_by")
+    assert facade.get_state(sid).get("prewrite_gate") == "awaiting_estimate"
+    facade.drop_session(sid)
+
+
+def test_confirm_prewrite_and_estimate_resumes_from_estimate(monkeypatch):
+    """确认后续：从 estimate 接到大纲。"""
+    calls = []
+    _patch_prewrite_nodes(monkeypatch, calls)
+
+    sid = "test-confirm"
+    facade.seed_state(sid, {})
+    rd = {"question": "q", "method": "OLS"}
+    paused = facade.set_direction_and_outline(sid, rd)
+    assert paused.get("prewrite_gate") == "awaiting_estimate"
+    calls.clear()
+
+    result = facade.confirm_prewrite_and_estimate(
+        sid,
+        {"table1Confirmed": True, "specConfirmed": True},
+    )
     assert calls == [
-        "set_direction",
-        "identification_verify",
         "estimate",
         "robustness_check",
         "search_literature",
@@ -330,11 +354,9 @@ def test_set_direction_and_outline_calls_both_nodes(monkeypatch):
         "generate_title",
         "generate_outline",
     ]
-    assert result["research_direction"] == rd
     assert result["outline"] == [{"type": "intro"}]
-    assert result["star_rating"] == 3
     assert result["estimate"]["produced_by"] == "estimate"
-    assert facade.get_state(sid)["outline"] == [{"type": "intro"}]
+    assert result.get("prewrite_gate") == "estimate_complete"
     facade.drop_session(sid)
 
 
@@ -673,6 +695,79 @@ def test_export_document_calls_node_and_persists_template(monkeypatch):
     assert result["latex_source"] == "\\title{T}"
     # template + result persisted into state
     assert facade.get_state(sid)["export_template"] == "master_thesis"
+    facade.drop_session(sid)
+
+
+def test_export_document_fills_missing_six_chapter_bodies(monkeypatch):
+    """export_document writes every outline chapter before calling export_docx."""
+    from conftest import make_six_chapter_outline, make_write_ready_state
+
+    generated = []
+
+    def fake_generate_chapter(state):
+        chapter = dict(state.get("current_chapter") or {})
+        chapter_type = chapter.get("type") or "intro"
+        generated.append(chapter_type)
+        chapter["content"] = f"{chapter_type} 正文段落。"
+        bodies = list(state.get("body_chapters") or [])
+        while len(bodies) < 6:
+            bodies.append({})
+        idx = {
+            "intro": 0,
+            "lit_review": 1,
+            "data_desc": 2,
+            "methods": 3,
+            "results": 4,
+            "conclusion": 5,
+        }.get(chapter_type, 0)
+        bodies[idx] = chapter
+        return {"body_chapters": bodies, "current_chapter_index": idx + 1}
+
+    captured = {}
+
+    def fake_export_docx(state):
+        captured["types"] = [
+            ch.get("type")
+            for ch in (state.get("body_chapters") or [])
+            if isinstance(ch, dict) and str(ch.get("content") or "").strip()
+        ]
+        return {
+            "latex_source": "\\title{T}",
+            "pdf_path": None,
+            "docx_path": None,
+            "degraded": True,
+        }
+
+    monkeypatch.setattr("facade.generate_chapter_node", fake_generate_chapter)
+    monkeypatch.setattr("facade.review_chapter_node", lambda state: {})
+    monkeypatch.setattr("facade.export_docx_node", fake_export_docx)
+
+    sid = "test-export-six"
+    facade.seed_state(
+        sid,
+        make_write_ready_state(
+            outline=make_six_chapter_outline(),
+            body_chapters=[
+                {"type": "intro", "title": "引言", "content": "已有引言。"}
+            ],
+        ),
+    )
+    facade.export_document(sid, "cn_journal")
+    assert generated == [
+        "lit_review",
+        "data_desc",
+        "methods",
+        "results",
+        "conclusion",
+    ]
+    assert captured["types"] == [
+        "intro",
+        "lit_review",
+        "data_desc",
+        "methods",
+        "results",
+        "conclusion",
+    ]
     facade.drop_session(sid)
 
 

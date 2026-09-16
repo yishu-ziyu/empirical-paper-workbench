@@ -1,0 +1,933 @@
+{
+  "scope": "API only; browser NOT RUN; LLM generation NOT exercised by this script",
+  "url": "https://localhost:18443",
+  "started_at_utc": "2026-09-08T05:18:21Z",
+  "checks": [
+    {
+      "check": "gateway denial /",
+      "method": "GET",
+      "path": "/",
+      "http_status": 401,
+      "elapsed_seconds": 0.021,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/auth/me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.012,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway denial /api/sessions",
+      "method": "GET",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.006,
+      "response_bytes": 179,
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway application readiness anonymous me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.023,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous session creation denied",
+      "method": "POST",
+      "path": "/api/sessions",
+      "http_status": 401,
+      "elapsed_seconds": 0.007,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "a register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "http_status": 201,
+      "elapsed_seconds": 0.28,
+      "response_bytes": 198,
+      "expectation": "HTTP 201",
+      "outcome": "pass"
+    },
+    {
+      "check": "a login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "http_status": 200,
+      "elapsed_seconds": 0.242,
+      "response_bytes": 51,
+      "access_token_body_empty": true,
+      "cookie_attributes": [
+        {
+          "name": "ep_access",
+          "path": "/",
+          "secure": true,
+          "http_only": true
+        },
+        {
+          "name": "ep_access_refresh",
+          "path": "/auth",
+          "secure": true,
+          "http_only": true
+        }
+      ],
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "a authenticated me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.01,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "b register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "http_status": 201,
+      "elapsed_seconds": 0.248,
+      "response_bytes": 198,
+      "expectation": "HTTP 201",
+      "outcome": "pass"
+    },
+    {
+      "check": "b login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "http_status": 200,
+      "elapsed_seconds": 0.248,
+      "response_bytes": 51,
+      "access_token_body_empty": true,
+      "cookie_attributes": [
+        {
+          "name": "ep_access",
+          "path": "/",
+          "secure": true,
+          "http_only": true
+        },
+        {
+          "name": "ep_access_refresh",
+          "path": "/auth",
+          "secure": true,
+          "http_only": true
+        }
+      ],
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "b authenticated me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "first refresh through actual proxy",
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "http_status": 401,
+      "elapsed_seconds": 0.012,
+      "response_bytes": 94,
+      "detail": "Missing refresh token",
+      "expectation": "Refresh should return 200 for normal renewal",
+      "outcome": "known_reproduced_failure"
+    },
+    {
+      "check": "Card admission",
+      "method": "POST",
+      "path": "/api/demos/card",
+      "http_status": 202,
+      "elapsed_seconds": 1.005,
+      "response_bytes": 1219,
+      "expectation": "HTTP 202",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card bootstrap SSE",
+      "run_id": "342d3df4-954f-4ae8-9994-a2070a40df19",
+      "frames": [
+        {
+          "seq": 1,
+          "type": "run.accepted",
+          "status": "PENDING",
+          "arrival_seconds": 0.046
+        },
+        {
+          "seq": 2,
+          "type": "run.claimed",
+          "status": "RUNNING",
+          "attempt": 1,
+          "arrival_seconds": 0.549
+        },
+        {
+          "seq": 3,
+          "type": "run.progress",
+          "status": "started",
+          "node": "upload_data",
+          "arrival_seconds": 2.065
+        },
+        {
+          "seq": 4,
+          "type": "run.progress",
+          "status": "completed",
+          "node": "upload_data",
+          "arrival_seconds": 2.066
+        },
+        {
+          "seq": 5,
+          "type": "run.progress",
+          "status": "started",
+          "node": "clean_data",
+          "arrival_seconds": 2.066
+        },
+        {
+          "seq": 6,
+          "type": "run.progress",
+          "status": "completed",
+          "node": "clean_data",
+          "arrival_seconds": 2.066
+        },
+        {
+          "seq": 7,
+          "type": "run.succeeded",
+          "status": "SUCCEEDED",
+          "arrival_seconds": 2.066
+        }
+      ],
+      "http_status": 200,
+      "expectation": "HTTP 200, terminal run.succeeded, SUCCEEDED status and nonempty result",
+      "outcome": "pass",
+      "run": {
+        "status": "SUCCEEDED",
+        "attempt": 1,
+        "error": null,
+        "result_present": true
+      },
+      "terminal_event_types": [
+        "run.succeeded"
+      ]
+    },
+    {
+      "check": "Card bootstrap SSE after stream check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card bootstrap SSE terminal read",
+      "method": "GET",
+      "path": "/api/runs/342d3df4-954f-4ae8-9994-a2070a40df19",
+      "http_status": 200,
+      "elapsed_seconds": 0.012,
+      "response_bytes": 715,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card prior expectation",
+      "method": "PUT",
+      "path": "/api/sessions/b0c198b9-68d2-4ced-9e6b-8d87c74578d0/research/expectation",
+      "http_status": 200,
+      "elapsed_seconds": 0.02,
+      "response_bytes": 9826,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card freeze",
+      "method": "POST",
+      "path": "/api/sessions/b0c198b9-68d2-4ced-9e6b-8d87c74578d0/research/specification-space/freeze",
+      "http_status": 200,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 10042,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification execution admission",
+      "method": "POST",
+      "path": "/api/sessions/b0c198b9-68d2-4ced-9e6b-8d87c74578d0/research/specification-space/run",
+      "http_status": 202,
+      "elapsed_seconds": 0.016,
+      "response_bytes": 189,
+      "expectation": "HTTP 202",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification SSE",
+      "run_id": "c96fd037-efc9-4ac6-a249-95769cbce028",
+      "frames": [
+        {
+          "seq": 1,
+          "type": "run.accepted",
+          "status": "PENDING",
+          "arrival_seconds": 0.011
+        },
+        {
+          "seq": 2,
+          "type": "run.claimed",
+          "status": "RUNNING",
+          "attempt": 1,
+          "arrival_seconds": 1.019
+        },
+        {
+          "seq": 3,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_linear_exper",
+          "arrival_seconds": 1.02
+        },
+        {
+          "seq": 4,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_quadratic_exper",
+          "arrival_seconds": 2.542
+        },
+        {
+          "seq": 5,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_demographics",
+          "arrival_seconds": 2.542
+        },
+        {
+          "seq": 6,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_urban_south",
+          "arrival_seconds": 2.543
+        },
+        {
+          "seq": 7,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_full_controls",
+          "arrival_seconds": 2.543
+        },
+        {
+          "seq": 8,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_nearc4_linear",
+          "arrival_seconds": 2.543
+        },
+        {
+          "seq": 9,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_nearc4_quadratic",
+          "arrival_seconds": 3.045
+        },
+        {
+          "seq": 10,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_nearc4_demographics",
+          "arrival_seconds": 3.592
+        },
+        {
+          "seq": 11,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_nearc4_urban_south",
+          "arrival_seconds": 3.593
+        },
+        {
+          "seq": 12,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_nearc4_full",
+          "arrival_seconds": 3.594
+        },
+        {
+          "seq": 13,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "ols_region_dummies",
+          "arrival_seconds": 4.056
+        },
+        {
+          "seq": 14,
+          "type": "run.progress",
+          "status": "running",
+          "node": "spec_run",
+          "spec_id": "iv_region_dummies",
+          "arrival_seconds": 4.056
+        },
+        {
+          "seq": 15,
+          "type": "run.progress",
+          "status": "done",
+          "node": "spec_run",
+          "arrival_seconds": 4.057
+        },
+        {
+          "seq": 16,
+          "type": "run.succeeded",
+          "status": "SUCCEEDED",
+          "arrival_seconds": 4.057
+        }
+      ],
+      "http_status": 200,
+      "expectation": "HTTP 200, terminal run.succeeded, SUCCEEDED status and nonempty result",
+      "outcome": "pass",
+      "run": {
+        "status": "SUCCEEDED",
+        "attempt": 1,
+        "error": null,
+        "result_present": true
+      },
+      "terminal_event_types": [
+        "run.succeeded"
+      ]
+    },
+    {
+      "check": "Card specification SSE after stream check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card specification SSE terminal read",
+      "method": "GET",
+      "path": "/api/runs/c96fd037-efc9-4ac6-a249-95769cbce028",
+      "http_status": 200,
+      "elapsed_seconds": 0.012,
+      "response_bytes": 231,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "Card research result",
+      "method": "GET",
+      "path": "/api/sessions/b0c198b9-68d2-4ced-9e6b-8d87c74578d0/research",
+      "http_status": 200,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 31461,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "before isolation a check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.01,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "before isolation b check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.007,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "upload greater than 1 MiB",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 202,
+      "elapsed_seconds": 0.133,
+      "response_bytes": 390,
+      "expectation": "HTTP 202",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c",
+      "http_status": 401,
+      "elapsed_seconds": 0.011,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "method": "GET",
+      "path": "/api/runs/6031ca26-b635-46e5-b3d0-f9a0c27204e8",
+      "http_status": 401,
+      "elapsed_seconds": 0.01,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "method": "GET",
+      "path": "/api/runs/6031ca26-b635-46e5-b3d0-f9a0c27204e8/events",
+      "http_status": 401,
+      "elapsed_seconds": 0.015,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/export?format=tex",
+      "http_status": 401,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/artifacts",
+      "http_status": 401,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden mutation",
+      "method": "POST",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/research/specification-space/freeze",
+      "http_status": 401,
+      "elapsed_seconds": 0.011,
+      "response_bytes": 132,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous forbidden delete",
+      "method": "DELETE",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c",
+      "http_status": 401,
+      "elapsed_seconds": 0.008,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous upload capability isolation",
+      "method": "POST",
+      "path": "/api/upload/resolve",
+      "http_status": 404,
+      "elapsed_seconds": 0.007,
+      "response_bytes": 70,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c",
+      "http_status": 403,
+      "elapsed_seconds": 0.011,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "method": "GET",
+      "path": "/api/runs/6031ca26-b635-46e5-b3d0-f9a0c27204e8",
+      "http_status": 403,
+      "elapsed_seconds": 0.011,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "method": "GET",
+      "path": "/api/runs/6031ca26-b635-46e5-b3d0-f9a0c27204e8/events",
+      "http_status": 403,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/export?format=tex",
+      "http_status": 403,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden read",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/artifacts",
+      "http_status": 403,
+      "elapsed_seconds": 0.008,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden mutation",
+      "method": "POST",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c/research/specification-space/freeze",
+      "http_status": 403,
+      "elapsed_seconds": 0.009,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account forbidden delete",
+      "method": "DELETE",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c",
+      "http_status": 403,
+      "elapsed_seconds": 0.01,
+      "response_bytes": 106,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "other account upload capability isolation",
+      "method": "POST",
+      "path": "/api/upload/resolve",
+      "http_status": 404,
+      "elapsed_seconds": 0.008,
+      "response_bytes": 70,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "pass"
+    },
+    {
+      "check": "owner session after forbidden deletes",
+      "method": "GET",
+      "path": "/api/sessions/57aaf7fa-1b73-4d54-9521-97502298cf4c",
+      "http_status": 200,
+      "elapsed_seconds": 0.017,
+      "response_bytes": 656,
+      "expectation": "HTTP 401/403/404",
+      "outcome": "fail"
+    },
+    {
+      "check": "owner upload resolution",
+      "method": "POST",
+      "path": "/api/upload/resolve",
+      "http_status": 202,
+      "elapsed_seconds": 0.008,
+      "response_bytes": 390,
+      "expectation": "HTTP 202",
+      "outcome": "pass"
+    },
+    {
+      "check": "owner current run",
+      "method": "GET",
+      "path": "/api/runs/6031ca26-b635-46e5-b3d0-f9a0c27204e8",
+      "http_status": 200,
+      "elapsed_seconds": 0.015,
+      "response_bytes": 200,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "anonymous upload denied",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 401,
+      "elapsed_seconds": 0.006,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    },
+    {
+      "check": "upload over product and gateway limits",
+      "method": "POST",
+      "path": "/api/upload",
+      "http_status": 413,
+      "elapsed_seconds": 0.382,
+      "response_bytes": 43,
+      "detail": "File exceeds 50MB upload limit",
+      "expectation": "HTTP 413",
+      "outcome": "pass"
+    },
+    {
+      "check": "gateway rejects over-limit Content-Length before body",
+      "http_status": 413,
+      "declared_bytes": 54525952,
+      "body_sent_bytes": 0,
+      "expectation": "HTTP 413",
+      "outcome": "pass"
+    },
+    {
+      "check": "before logout check identity",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 200,
+      "elapsed_seconds": 0.026,
+      "response_bytes": 198,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "logout",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "http_status": 200,
+      "elapsed_seconds": 0.008,
+      "response_bytes": 11,
+      "expectation": "HTTP 200",
+      "outcome": "pass"
+    },
+    {
+      "check": "after logout protected me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "http_status": 401,
+      "elapsed_seconds": 0.006,
+      "response_bytes": 86,
+      "detail": "Not authenticated",
+      "expectation": "HTTP 401",
+      "outcome": "pass"
+    }
+  ],
+  "limitations": [
+    "Cookie policy is Python CookieJar, not browser evidence.",
+    "No access-expiry renewal success or real chapter generation claimed."
+  ],
+  "refresh_cookie_policy": {
+    "jar_refresh_paths": [],
+    "refresh_sent_to_api_auth_refresh": false
+  },
+  "card_resources": {
+    "session_id": "b0c198b9-68d2-4ced-9e6b-8d87c74578d0",
+    "upload_run_id": "342d3df4-954f-4ae8-9994-a2070a40df19",
+    "spec_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+  },
+  "card_results": {
+    "completed_specification_runs": 12,
+    "total_specification_runs": 12,
+    "provenance": {
+      "source": "statspai:papers/data_card1995.csv",
+      "citation": "Card, D. (1995). Using Geographic Variation in College Proximity to Estimate the Return to Schooling.",
+      "checksum": "eda514228a77327ab9aa20df72b89256cdec579482fa9dbbe4e3d757748c9bf2",
+      "redistribution": "runtime load from StatsPAI dependency, no second public copy",
+      "extract_kind": "wooldridge_card_34"
+    },
+    "runs": [
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_linear_exper",
+        "spec_id": "ols_linear_exper",
+        "status": "ok",
+        "coef": 0.09316801925809672,
+        "se": 0.0036117504634999736,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_quadratic_exper",
+        "spec_id": "ols_quadratic_exper",
+        "status": "ok",
+        "coef": 0.09317070905908183,
+        "se": 0.0035802285282375288,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper + expersq",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_demographics",
+        "spec_id": "ols_demographics",
+        "status": "ok",
+        "coef": 0.08176204668442189,
+        "se": 0.0035815216785630064,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper + expersq + black",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_urban_south",
+        "spec_id": "ols_urban_south",
+        "status": "ok",
+        "coef": 0.07400899420057304,
+        "se": 0.0035054349569210185,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper + expersq + black + smsa + south",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_full_controls",
+        "spec_id": "ols_full_controls",
+        "status": "ok",
+        "coef": 0.07400899420057304,
+        "se": 0.0035054349569210185,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper + expersq + black + smsa + south",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_nearc4_linear",
+        "spec_id": "iv_nearc4_linear",
+        "status": "ok",
+        "coef": 0.26204345406833407,
+        "se": 0.03449961109771719,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_nearc4_quadratic",
+        "spec_id": "iv_nearc4_quadratic",
+        "status": "ok",
+        "coef": 0.25871554894183646,
+        "se": 0.03403612933792096,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_nearc4_demographics",
+        "spec_id": "iv_nearc4_demographics",
+        "status": "ok",
+        "coef": 0.2554938140693995,
+        "se": 0.038111234105934894,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_nearc4_urban_south",
+        "spec_id": "iv_nearc4_urban_south",
+        "status": "ok",
+        "coef": 0.13228883999713006,
+        "se": 0.049233236118039835,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_nearc4_full",
+        "spec_id": "iv_nearc4_full",
+        "status": "ok",
+        "coef": 0.13228883999713006,
+        "se": 0.049233236118039835,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:ols_region_dummies",
+        "spec_id": "ols_region_dummies",
+        "status": "ok",
+        "coef": 0.07469325559311328,
+        "se": 0.003498345658478739,
+        "n": 3010,
+        "estimator": "statspai.feols",
+        "formula": "lwage ~ educ + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+        "covariance": "HC1",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      },
+      {
+        "id": "c96fd037-efc9-4ac6-a249-95769cbce028:iv_region_dummies",
+        "spec_id": "iv_region_dummies",
+        "status": "ok",
+        "coef": 0.13150383624724782,
+        "se": 0.05496367260152569,
+        "n": 3010,
+        "estimator": "statspai.ivreg",
+        "formula": "lwage ~ (educ ~ nearc4) + exper + expersq + black + smsa + south + smsa66 + reg661 + reg662 + reg663 + reg664 + reg665 + reg666 + reg667 + reg668",
+        "covariance": "nonrobust",
+        "producer_run_id": "c96fd037-efc9-4ac6-a249-95769cbce028"
+      }
+    ]
+  },
+  "synthetic_csv": {
+    "bytes": 1200006,
+    "rows": 200000,
+    "columns": [
+      "x",
+      "y",
+      "z"
+    ],
+    "sha256": "0cd397c10d78c84fe6e7e64fff01321b8a4060301528fb144d6b17f5d0558811"
+  },
+  "owned_resources": {
+    "session_id": "57aaf7fa-1b73-4d54-9521-97502298cf4c",
+    "run_id": "6031ca26-b635-46e5-b3d0-f9a0c27204e8"
+  },
+  "run_observation": {
+    "status": "PENDING",
+    "attempt": 0,
+    "error_present": false,
+    "result_present": false
+  },
+  "completed_at_utc": "2026-09-08T05:18:30Z",
+  "card_evaluation": {
+    "expectation": "At least two completed specification runs with actual coefficient, SE and n",
+    "outcome": "pass"
+  },
+  "overall": "incomplete: browser, normal renewal and real LLM journey not accepted"
+}

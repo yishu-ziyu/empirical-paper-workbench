@@ -2062,6 +2062,123 @@
         }
       }
     },
+    "/sessions/{session_id}/prewrite/confirm": {
+      "post": {
+        "summary": "Confirm Prewrite Endpoint",
+        "description": "Record FE confirm flags, or continue estimate after both CTAs.",
+        "operationId": "confirm_prewrite_endpoint_sessions__session_id__prewrite_confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrewriteConfirmRequest",
+                "default": {
+                  "action": "continue_estimate",
+                  "table1Confirmed": false,
+                  "specConfirmed": false
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Table 1 / spec confirms recorded; estimate not started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RunAcceptedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PrewriteGateResponse"
+                    }
+                  ],
+                  "title": "Response Confirm Prewrite Endpoint Sessions  Session Id  Prewrite Confirm Post",
+                  "$ref": "#/components/schemas/PrewriteGateResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Both confirms accepted; estimate run enqueued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Session busy, confirms incomplete, identification blocked, or hetero hard-block.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBusyResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The durable run queue is full.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds before retrying admission.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueFullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/resume": {
       "post": {
         "summary": "Resume Endpoint",
@@ -3878,6 +3995,72 @@
         "title": "BalanceResponse",
         "description": "POST /sessions/{id}/balance 返回体。\n\n修复漂移 1：统一字段名为 ``balanced`` / ``unbalanced`` / ``n_periods``\n/ ``attrition_rate``。后端 BalanceStep 的 step report 只含\n``balanced`` / ``n_periods`` / ``attrition_rate``，``unbalanced`` 在\nrouter 层补算（balanced 减去总 panel 数，或在 facade 层补）。"
       },
+      "BlockingDecisionResponse": {
+        "properties": {
+          "blocked": {
+            "type": "boolean",
+            "title": "Blocked",
+            "default": false
+          },
+          "isBlock": {
+            "type": "boolean",
+            "title": "Isblock",
+            "default": false
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
+          },
+          "hasInteraction": {
+            "type": "boolean",
+            "title": "Hasinteraction",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "BlockingDecisionResponse",
+        "description": "Hard-block readout for the estimate-prep rail (FE ``is-block``)."
+      },
       "Body_transcribe_desk_desk_transcribe_post": {
         "properties": {
           "file": {
@@ -5246,6 +5429,28 @@
             },
             "type": "array",
             "title": "Heterogeneity Groups"
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
           }
         },
         "additionalProperties": true,
@@ -5359,6 +5564,76 @@
               }
             ],
             "title": "Robustness Status"
+          },
+          "main_specification": {
+            "title": "Main Specification"
+          },
+          "table1": {
+            "title": "Table1"
+          },
+          "specification_equation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification Equation"
+          },
+          "prewrite_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Gate"
+          },
+          "table1Confirmed": {
+            "type": "boolean",
+            "title": "Table1Confirmed",
+            "default": false
+          },
+          "specConfirmed": {
+            "type": "boolean",
+            "title": "Specconfirmed",
+            "default": false
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
+          },
+          "blockingDecision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockingDecisionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7215,6 +7490,147 @@
         "title": "PaperSourceEvidenceResponse",
         "description": "Resolver-verified source metadata; no fabricated full-text excerpt."
       },
+      "PrewriteConfirmRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "record_confirms",
+              "continue_estimate"
+            ],
+            "title": "Action",
+            "default": "continue_estimate"
+          },
+          "table1Confirmed": {
+            "type": "boolean",
+            "title": "Table1Confirmed",
+            "default": false
+          },
+          "specConfirmed": {
+            "type": "boolean",
+            "title": "Specconfirmed",
+            "default": false
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
+          },
+          "hasInteraction": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasinteraction"
+          }
+        },
+        "type": "object",
+        "title": "PrewriteConfirmRequest",
+        "description": "POST /sessions/{id}/prewrite/confirm 请求体。\n\n估计前必须两段确认：``table1Confirmed``（Table 1 CTA）与\n``specConfirmed``（方程 + 题型→设定 CTA）。``action=record_confirms``\n只落盘确认态；``continue_estimate`` 在两段都为 true 且未被硬挡时才\n入队 estimate。硬挡：``qType === heterogeneity`` 且设定无交互。"
+      },
+      "PrewriteGateResponse": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "prewrite_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Gate"
+          },
+          "table1Confirmed": {
+            "type": "boolean",
+            "title": "Table1Confirmed",
+            "default": false
+          },
+          "specConfirmed": {
+            "type": "boolean",
+            "title": "Specconfirmed",
+            "default": false
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
+          },
+          "blockingDecision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockingDecisionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "table1": {
+            "title": "Table1"
+          },
+          "specification_equation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification Equation"
+          },
+          "main_specification": {
+            "title": "Main Specification"
+          }
+        },
+        "type": "object",
+        "title": "PrewriteGateResponse",
+        "description": "``action=record_confirms`` 的 200 返回：确认旗标 + blockingDecision。"
+      },
       "ProgressChapterSummary": {
         "properties": {
           "type": {
@@ -8516,6 +8932,76 @@
           },
           "research_direction": {
             "title": "Research Direction"
+          },
+          "main_specification": {
+            "title": "Main Specification"
+          },
+          "table1": {
+            "title": "Table1"
+          },
+          "specification_equation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification Equation"
+          },
+          "prewrite_gate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prewrite Gate"
+          },
+          "table1Confirmed": {
+            "type": "boolean",
+            "title": "Table1Confirmed",
+            "default": false
+          },
+          "specConfirmed": {
+            "type": "boolean",
+            "title": "Specconfirmed",
+            "default": false
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          },
+          "specMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specmode"
+          },
+          "blockingDecision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockingDecisionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "dataset": {
             "anyOf": [

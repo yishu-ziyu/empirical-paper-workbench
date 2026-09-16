@@ -6,6 +6,8 @@ langchain==1.3.18
 langchain-core==1.6.1
 langchain-openai==1.6.0
 pydantic==2.13.5
+# Typed review agent; must match agent/requirements.txt.
+pydantic-ai-slim[openai]==2.35.3
 httpx==0.27.0
 pandas==2.2.3
 openpyxl==3.1.5
@@ -31,18 +33,23 @@ psycopg[binary]==3.2.3
 statsmodels==0.14.6
 langgraph-checkpoint-postgres==3.1.2
 langgraph-checkpoint-sqlite==3.1.1  # isolated durable Agent spike
+# 评审门：Facade 调 agent review_chapter 的类型化评审通道（build_review_agent →
+# pydantic_ai.Agent）。缺失时 backend/runner 进程 import 失败，评审静默降级 mock，
+# 即便配了真 key 也永远走不到大模型。与 agent/requirements 对齐。
+# 守卫测试：backend/tests/test_typed_review_dep_declared.py（三处安装路径任缺一处即失败）。
+pydantic-ai-slim[openai]==2.35.3
 # Optional extra (not required): pip install statspai
 # Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
 # Sibling checkout (same as agent venv):
 # From econpaper/: python -m pip install -e ../dependencies/StatsPAI
 # A missing install must not 500 POST /direction; nodes degrade.
+# --- 私有试点部署（deploy/private-pilot）：可复现的锁定安装 ---
+# 开发机走上面的 sibling checkout（`-e`，`make verify-deps` 要求 statspai
+# source_matches_repo）；pilot 部署走下面这条挂 sha256 的 sdist 钉版。
+pyfixest==0.60.0  # existing Card OLS uses statspai.feols
+linearmodels==7.0  # existing Card IV estimator
+# Verified upstream source; normal wheel installation (never editable).
+StatsPAI @ https://codeload.github.com/brycewang-stanford/StatsPAI/tar.gz/a98b6743cc797ddd9cc33de1772c3ea3e3f0c394#sha256=a5882d80b31b472de9e7d952c012193aada389cbb8090f6fd2886a6987f199d6
 
 # --- S3 / 对象存储 ---
 boto3>=1.35.0
-
-# --- 评审门（Facade 调 agent 的类型化评审通道）---
-# build_review_agent（agent/nodes/review_chapter.py）惰性 `from pydantic_ai import Agent`，
-# 异常被兜成 review_source="mock_fallback" + review_degraded=True —— 缺依赖不报错、只降级。
-# backend/runner 与容器都跑在 backend venv 上，所以这里必须声明；pin 与 agent/requirements.txt 一致。
-# 守卫测试：backend/tests/test_typed_review_dep_declared.py（三处安装路径任缺一处即失败）。
-pydantic-ai-slim[openai]==2.35.3

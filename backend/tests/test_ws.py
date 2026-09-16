@@ -52,8 +52,9 @@ def test_ws_streams_status_messages(uploaded_session, client):
 def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
     """WS streams generate_title tokens as streaming_chunk frames."""
     mock_llm_for("generate_title", return_value="Mocked Title")
-    # 图在清洗后因无研究方向而 HITL 暂停；先按产品真实路径设方向,
-    # 跑完预写(含 generate_title)再开 WS,才有标题可流。
+    # PREWRITE-PAUSE：/direction 现在只跑到 identification_verify 就停（Table 1 +
+    # 方程要先确认），generate_title 在 prewrite/confirm 之后的 estimate 臂里才跑。
+    # 所以这里按产品真实路径走两段：设方向 → 确认 → 跑完预写，再开 WS 才有标题可流。
     direction = client.post(
         f"/sessions/{uploaded_session}/direction",
         headers={"Idempotency-Key": "ws-direction"},
@@ -71,7 +72,24 @@ def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
     )
     run_id = direction.json()["run_id"]
     assert asyncio.run(process_one_run(owner="ws-test", run_id=run_id)) is True
-    assert client.get(f"/runs/{run_id}").json()["status"] == "SUCCEEDED"
+
+    confirmed = client.post(
+        f"/sessions/{uploaded_session}/prewrite/confirm",
+        headers={"Idempotency-Key": "ws-confirm"},
+        json={
+            "action": "continue_estimate",
+            "table1Confirmed": True,
+            "specConfirmed": True,
+        },
+    )
+    assert confirmed.status_code == 202, (
+        f"prewrite confirm failed: {confirmed.status_code}: {confirmed.text}"
+    )
+    confirm_run_id = confirmed.json()["run_id"]
+    assert (
+        asyncio.run(process_one_run(owner="ws-test", run_id=confirm_run_id)) is True
+    )
+    assert client.get(f"/runs/{confirm_run_id}").json()["status"] == "SUCCEEDED"
     messages = _drain_ws(client, uploaded_session)
     chunks = [m for m in messages if m.get("type") == "streaming_chunk"]
     assert len(chunks) > 0, "no streaming_chunk frames received over WS"

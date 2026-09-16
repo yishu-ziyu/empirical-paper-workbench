@@ -88,6 +88,7 @@ econpaper/
 │   ├── prompts/        # 6 章模板 prompt
 │   ├── llm/            # LLM 路由（多提供商支持）
 │   └── templates/      # 4 套 LaTeX 模板
+├── eval/             # Optional EVAL-top5 harness (offline; not product runtime)
 └── docs/             # 文档
     ├── api/            # API 文档（OpenAPI 规范 + 端点说明）
     ├── adr/            # 架构决策记录（7 个 ADR）
@@ -106,6 +107,7 @@ econpaper/
 | [部署文档](docs/deployment.md) | 环境要求、安装步骤、配置表、故障排查 |
 | [OpenAPI 规范](docs/api/openapi.json) | OpenAPI 3.1 完整规范（25 个端点） |
 | [架构决策记录](docs/adr/) | 7 个 ADR 覆盖关键设计决策 |
+| [EVAL-top5](docs/eval-top5.md) | 可选离线 top-5 eval；不是产品 catalog 答案 |
 
 ## 开发命令
 

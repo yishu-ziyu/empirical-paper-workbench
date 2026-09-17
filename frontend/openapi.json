@@ -5862,11 +5862,47 @@
               }
             ],
             "title": "Report"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/IdentificationPermissionsResponse"
           }
         },
         "type": "object",
         "title": "EvidenceIdentificationResponse",
-        "description": "识别验真读数（identification_verify 节点产物）。"
+        "description": "识别验真读数（identification_verify 节点产物）。\n\n三轴分开报：``execution`` 说检查跑到哪一步，``assessment`` 说发现了什么，\n``permissions`` 说接下来允许做什么。``passed`` 是三态 —— ``None`` 表示尚未\n评估，它既不等于通过也不等于否定。"
       },
       "EvidenceMetricRef": {
         "properties": {
@@ -6804,10 +6840,84 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "IdentificationPermissionsResponse": {
+        "properties": {
+          "view_and_describe_data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View And Describe Data"
+          },
+          "edit_design": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Design"
+          },
+          "continue_to_estimate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continue To Estimate"
+          },
+          "causal_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causal Language"
+          },
+          "promote_main_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promote Main Result"
+          },
+          "requires_disclosure": {
+            "type": "boolean",
+            "title": "Requires Disclosure",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "IdentificationPermissionsResponse",
+        "description": "识别结论允许做什么。三档取值：``allow`` / ``confirm`` / ``forbid``。\n\n口径与判定函数同源（agent.engine.identification_state.permissions_for）。\n字段为 ``None`` 表示未知 —— 消费方按最保守的 ``forbid`` 处理，不要当成允许。"
+      },
       "IdentificationResponse": {
         "properties": {
           "passed": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Passed"
           },
           "star_rating": {
@@ -6833,9 +6943,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "passed"
-        ],
         "title": "IdentificationResponse"
       },
       "JourneyResponse": {

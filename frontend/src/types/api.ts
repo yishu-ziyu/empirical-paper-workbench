@@ -2574,6 +2574,10 @@ export interface components {
         /**
          * EvidenceIdentificationResponse
          * @description 识别验真读数（identification_verify 节点产物）。
+         *
+         *     三轴分开报：``execution`` 说检查跑到哪一步，``assessment`` 说发现了什么，
+         *     ``permissions`` 说接下来允许做什么。``passed`` 是三态 —— ``None`` 表示尚未
+         *     评估，它既不等于通过也不等于否定。
          */
         EvidenceIdentificationResponse: {
             /** Star Rating */
@@ -2585,6 +2589,13 @@ export interface components {
             failed: boolean;
             /** Report */
             report?: string | null;
+            /** Passed */
+            passed?: boolean | null;
+            /** Execution */
+            execution?: string | null;
+            /** Assessment */
+            assessment?: string | null;
+            permissions?: components["schemas"]["IdentificationPermissionsResponse"];
         };
         /**
          * EvidenceMetricRef
@@ -3004,10 +3015,34 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * IdentificationPermissionsResponse
+         * @description 识别结论允许做什么。三档取值：``allow`` / ``confirm`` / ``forbid``。
+         *
+         *     口径与判定函数同源（agent.engine.identification_state.permissions_for）。
+         *     字段为 ``None`` 表示未知 —— 消费方按最保守的 ``forbid`` 处理，不要当成允许。
+         */
+        IdentificationPermissionsResponse: {
+            /** View And Describe Data */
+            view_and_describe_data?: string | null;
+            /** Edit Design */
+            edit_design?: string | null;
+            /** Continue To Estimate */
+            continue_to_estimate?: string | null;
+            /** Causal Language */
+            causal_language?: string | null;
+            /** Promote Main Result */
+            promote_main_result?: string | null;
+            /**
+             * Requires Disclosure
+             * @default false
+             */
+            requires_disclosure: boolean;
+        };
         /** IdentificationResponse */
         IdentificationResponse: {
             /** Passed */
-            passed: boolean;
+            passed?: boolean | null;
             /** Star Rating */
             star_rating?: number | null;
             /**

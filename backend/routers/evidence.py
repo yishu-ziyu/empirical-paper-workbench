@@ -121,12 +121,20 @@ def _evidence_blockers(state: dict) -> list[str]:
 
 
 def _identification(state: dict) -> EvidenceIdentificationResponse:
+    from agent.engine.identification_state import identification_decision
+
     diag = state.get("identification_diag") or {}
     report = diag.get("report") if isinstance(diag, dict) else None
+    decision = identification_decision(state)
     return EvidenceIdentificationResponse(
         star_rating=state.get("star_rating"),
         failed=bool(state.get("identification_failed")),
         report=report if isinstance(report, str) else None,
+        # 面板报的就是流程用的那一份判定，不另算一遍。
+        passed=decision["passed"],
+        execution=decision["execution"],
+        assessment=decision["assessment"],
+        permissions=decision["permissions"],
     )
 
 

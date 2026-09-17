@@ -117,6 +117,24 @@ export default function EvidenceView({
   const codeArtifacts = Array.isArray(provenance?.code) ? provenance.code : []
   const hasCodeArtifact = codeArtifacts.length > 0
 
+  // 识别读数按三轴报：跑到哪一步（execution）、发现了什么（assessment）、
+  // 允许做什么（permissions）。跑不成或跳过就是「尚未核查」——写成「通过」等于
+  // 把没核过的风险说成没风险；有风险也不能只说「通过」。
+  const ident = evidence?.identification
+  const identStars =
+    ident?.star_rating != null
+      ? '★'.repeat(ident.star_rating) + '☆'.repeat(Math.max(0, 3 - ident.star_rating))
+      : '—'
+  const identLabel = (() => {
+    if (!ident || (!ident.report && !ident.assessment && ident.passed == null)) {
+      return t('evidenceView.identNone')
+    }
+    if (ident.failed || ident.passed === false) return t('evidenceView.identFail')
+    if (ident.assessment === 'risk_not_found') return `${t('evidenceView.identPass')}（${identStars}）`
+    if (ident.assessment === 'risk_found') return `${t('evidenceView.identRisk')}（${identStars}）`
+    return `${t('evidenceView.identUnknown')}（${identStars}）`
+  })()
+
   const none = t('legacy.none')
   const detailRows: Array<{ label: string; value: string }> = direction
     ? [
@@ -346,16 +364,7 @@ export default function EvidenceView({
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-wb-line pt-2.5 text-[12px] text-wb-muted">
               <span data-testid="evidence-identification">
                 {t('evidenceView.identification')}：
-                {evidence?.identification?.failed
-                  ? t('evidenceView.identFail')
-                  : evidence?.identification?.report
-                    ? `${t('evidenceView.identPass')}（${
-                        evidence?.identification?.star_rating != null
-                          ? '★'.repeat(evidence.identification.star_rating) +
-                            '☆'.repeat(3 - evidence.identification.star_rating)
-                          : '—'
-                      }）`
-                    : t('evidenceView.identNone')}
+                {identLabel}
               </span>
               <span data-testid="evidence-robustness">
                 {t('evidenceView.robustness')}：

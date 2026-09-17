@@ -7,6 +7,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from .identification_state import (
+    PERMISSION_FORBID,
+    identification_decision,
+    identification_hard_block,
+    permission_is,
+)
+
 SLOT_REQUIREMENTS = {
     "intro": ("identification",),
     "data_desc": ("identification",),
@@ -40,7 +47,9 @@ TRUTH_KEYS = frozenset(
 
 def paper_ready_to_write(state: dict, chapter_type: str) -> tuple[bool, list[str]]:
     missing: list[str] = []
-    if state.get("star_rating") == 0:
+    # 阻断口径来自 identification_state：与图的条件边、串行预写路径、HTTP Facade 同一函数。
+    # 阻挡码沿用 "star_0"，它已经流到 write_blockers 与前端 InstrumentReadout。
+    if identification_hard_block(state):
         return False, ["star_0"]
     from .did_spec import DID_MISSING_INTERACTION, did_spec_block_reason
 
@@ -189,12 +198,20 @@ def literature_ran(state: dict) -> bool:
 
 
 def machine_claim(state: dict) -> str:
+    """机器给出的主张档位：blocked / causal_with_caveat / association。
+
+    因果档不再直接读星级，而读 ``identification_state`` 的 ``causal_language``
+    许可：``confirm``（1–2 星，可写因果但必须披露留痕）与 ``allow`` 都给
+    ``causal_with_caveat``；``forbid``（0 星与未知）落到 association。
+    """
     rd = state.get("research_direction") or {}
     method = str(rd.get("method") or "").strip().lower()
-    star = state.get("star_rating")
-    if star == 0:
+    decision = identification_decision(state)
+    if decision["hard_block"]:
         return "blocked"
-    if method in {"did", "iv", "rd", "rdd", "scm"} and isinstance(star, int) and star >= 1:
+    if method in {"did", "iv", "rd", "rdd", "scm"} and not permission_is(
+        decision["permissions"]["causal_language"], PERMISSION_FORBID
+    ):
         return "causal_with_caveat"
     return "association"
 

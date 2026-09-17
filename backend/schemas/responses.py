@@ -601,12 +601,39 @@ class Classic5SuggestResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class IdentificationPermissionsResponse(BaseModel):
+    """识别结论允许做什么。三档取值：``allow`` / ``confirm`` / ``forbid``。
+
+    口径与判定函数同源（agent.engine.identification_state.permissions_for）。
+    字段为 ``None`` 表示未知 —— 消费方按最保守的 ``forbid`` 处理，不要当成允许。
+    """
+
+    view_and_describe_data: Optional[str] = None
+    edit_design: Optional[str] = None
+    continue_to_estimate: Optional[str] = None
+    causal_language: Optional[str] = None
+    promote_main_result: Optional[str] = None
+    # 披露不是许可档位，是「写进正文时必须说清楚」的布尔要求。
+    requires_disclosure: bool = False
+
+
 class EvidenceIdentificationResponse(BaseModel):
-    """识别验真读数（identification_verify 节点产物）。"""
+    """识别验真读数（identification_verify 节点产物）。
+
+    三轴分开报：``execution`` 说检查跑到哪一步，``assessment`` 说发现了什么，
+    ``permissions`` 说接下来允许做什么。``passed`` 是三态 —— ``None`` 表示尚未
+    评估，它既不等于通过也不等于否定。
+    """
 
     star_rating: Optional[int] = None
     failed: bool = False
     report: Optional[str] = None
+    passed: Optional[bool] = None
+    execution: Optional[str] = None
+    assessment: Optional[str] = None
+    permissions: IdentificationPermissionsResponse = Field(
+        default_factory=IdentificationPermissionsResponse
+    )
 
 
 class EvidenceRobustnessResponse(BaseModel):

@@ -59,7 +59,11 @@ def _missing_method_anchor(state: Dict[str, Any], content: str) -> bool:
 
 
 def _hard_reject(state: Dict[str, Any]) -> Optional[str]:
-    if state.get("identification_failed") or state.get("star_rating") == 0:
+    # 判定口径与真图一致，不另写一套：内联判断会漏掉 diag 里的星级、也会把
+    # 非 True 的失败标记当成没事。
+    from ..engine.identification_state import identification_hard_block
+
+    if identification_hard_block(state):
         return "识别没过关"
     if _invented_citation(state):
         return "引用编号对不上"

@@ -12,6 +12,12 @@ from typing import Any, Iterable, Mapping
 
 from ..design.spec import display_estimate_engine_label
 from .data_eda import compute_csv_eda
+from .identification_state import (
+    ROLE_EFFECT_ESTIMATE,
+    design_validity_diagnostics,
+    identification_untrustworthy,
+    role_of,
+)
 from .ols_lock import ols_lock_active, sanitize_ols_text
 from .readiness import claim_mode, current_research_claim
 
@@ -29,13 +35,6 @@ _CAUSAL_ESTIMATORS = {
     "iv": frozenset({"statspai.ivreg"}),
     "rd": frozenset({"statspai.rdrobust"}),
     "scm": frozenset({"statspai.synth"}),
-}
-_FAILED_IDENTIFICATION_STATUSES = {
-    "degraded",
-    "error",
-    "failed",
-    "failure",
-    "blocked",
 }
 _PASSED_STATUSES = {"ok", "pass", "passed", "success"}
 _FAILURE_TEXT_MARKERS = (
@@ -147,7 +146,10 @@ def _is_bad_provenance(value: Any) -> bool:
 def _evidence_tree_is_successful(value: Any) -> bool:
     """Reject explicit failure or synthetic markers anywhere in evidence."""
     if isinstance(value, Mapping):
-        if "status" in value:
+        # 效应估计记录（如 Callaway–Sant'Anna 的点估计与 p 值）不是设计有效性检查，
+        # 它的 status 没有 pass/fail 语义，别拿通过状态表去卡它。它的异常走单独一条
+        # 不带 role 的 error 记录，仍然会被下面的检查抓住。
+        if "status" in value and role_of(value) != ROLE_EFFECT_ESTIMATE:
             status = str(value.get("status") or "").strip().lower()
             if status not in _PASSED_STATUSES:
                 return False
@@ -350,15 +352,13 @@ def _is_supported_causal_estimator(method: str, estimator: Any) -> bool:
 
 
 def _identification_failed(state: Mapping[str, Any]) -> bool:
-    if state.get("identification_failed") is True or state.get("star_rating") == 0:
-        return True
-    diag = state.get("identification_diag") or {}
-    if not isinstance(diag, Mapping):
-        return False
-    if diag.get("passed") is False or diag.get("degraded") is True:
-        return True
-    status = str(diag.get("status") or "").strip().lower()
-    return status in _FAILED_IDENTIFICATION_STATUSES
+    """识别结论是否不可信到不能支撑因果主张（保守档，供章节绑定用）。
+
+    比流程闸门严一档：流程只在硬阻断时停，这里额外把「跑了但有硬失败项」与
+    diag 根部的失败状态也算不可信 —— 章节绑定据此决定主张怎么写。两级口径都在
+    ``identification_state`` 里，这里不再内联 ``star_rating == 0``。
+    """
+    return identification_untrustworthy(state)
 
 
 def _identification_passed(state: Mapping[str, Any], method: str) -> bool:
@@ -387,11 +387,15 @@ def _identification_passed(state: Mapping[str, Any], method: str) -> bool:
     diagnostics = diag.get("diagnostics")
     if not isinstance(diagnostics, list) or not diagnostics:
         return False
+    # 只看设计有效性检查。效应估计记录（role=effect_estimate）证明「算出来是多少」，
+    # 不证明「设计站得住」，所以不参与这条判定。
+    design = design_validity_diagnostics(diagnostics)
+    if not design:
+        return False
     return all(
-        isinstance(item, Mapping)
-        and str(item.get("status") or "").strip().lower() in _PASSED_STATUSES
+        str(item.get("status") or "").strip().lower() in _PASSED_STATUSES
         and _evidence_tree_is_successful(item)
-        for item in diagnostics
+        for item in design
     )
 
 

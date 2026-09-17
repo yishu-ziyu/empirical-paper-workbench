@@ -12,12 +12,31 @@ API 跑对应诊断：
 每个诊断独立 try/except 降级：单次失败不阻塞整体，失败记录进
 ``diagnostics``，最终 ``passed`` 由所有诊断共同决定。节点不 import
 fastapi，纯函数，输入 state 返回待合并的 dict，与现有节点风格一致。
+
+判定口径集中在 ``agent/engine/identification_state.py``（issue #40 参谋意见
+§2.2、§4）：这里只负责跑诊断、把每条检查的 ``status`` 记准，然后交给它算出
+``execution`` / ``assessment`` / ``passed`` / ``star_rating`` / ``permissions``。
+本节点不再自己算星级 —— 两份判定会漂移，而漂移正是「同一输入从不同入口得到不同
+许可决定」的来源。
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from ..engine.identification_state import (
+    ASSESSMENT_INSUFFICIENT_EVIDENCE,
+    ASSESSMENT_NOT_APPLICABLE,
+    ASSESSMENT_RISK_FOUND,
+    ASSESSMENT_RISK_NOT_FOUND,
+    EXECUTION_COMPLETED,
+    EXECUTION_FAILED,
+    EXECUTION_NOT_RUN,
+    EXECUTION_PARTIAL,
+    ROLE_EFFECT_ESTIMATE,
+    assess_diagnostics,
+    permissions_for,
+)
 from ..state import EconPaperState
 
 # 弱工具变量 first-stage F 阈值（Stock & Yogo 经验值）
@@ -171,7 +190,10 @@ def _diag_did(
         })
         report_lines.append(f"Goodman-Bacon 分解失败: {exc}")
 
-    # 交错 DiD 稳健估计（可选，数据支持时）
+    # 交错 DiD 稳健估计（可选，数据支持时）。
+    # 记成 role="effect_estimate"：这是「估计出来是多少」，不是「设计站不站得住」。
+    # 旧写法拿效应的 p<0.05 生成 pass、否则 warn，等于把显著性当成设计有效性，还会把
+    # 缺失的 p 值经 `or 0.0` 折成 0 —— 于是没跑出 p 值反而判成显著通过。两条都去掉。
     if d.get("treatment_group_col") or d.get("first_treat_col"):
         g_col = d.get("treatment_group_col") or d.get("first_treat_col")
         try:
@@ -179,20 +201,34 @@ def _diag_did(
             cs = statspai.callaway_santanna(
                 cs_df, y=outcome, g=g_col, t=time_col, i=id_col
             )
-            cs_ok = float(getattr(cs, "pvalue", 0.0) or 0.0) < MANIPULATION_ALPHA
+            raw_p = getattr(cs, "pvalue", None)
+            try:
+                pvalue = float(raw_p) if raw_p is not None else None
+            except (TypeError, ValueError):
+                pvalue = None
             diagnostics.append({
                 "test": "callaway_santanna",
-                "status": "pass" if cs_ok else "warn",
+                "role": ROLE_EFFECT_ESTIMATE,
+                "status": "reported",
                 "estimate": getattr(cs, "estimate", None),
-                "pvalue": getattr(cs, "pvalue", None),
+                "pvalue": pvalue,
+                # 缺失 p 值保留为未知，不当作 0，也不推断显著与否。
+                "significant_at_0_05": (
+                    None if pvalue is None else bool(pvalue < MANIPULATION_ALPHA)
+                ),
             })
             report_lines.append(
                 f"Callaway-Sant'Anna 估计: β={getattr(cs, 'estimate', None)}, "
-                f"p={getattr(cs, 'pvalue', None)}。"
+                f"p={pvalue if pvalue is not None else '缺失'}（效应估计记录，"
+                "不参与设计有效性判定）。"
             )
         except Exception as exc:  # pragma: no cover - 降级路径
+            # 同样是效应估计这一支：它失败说明这个稳健估计没算出来，不等于
+            # Goodman-Bacon 那条设计有效性检查没通过。记录保留、报告里说出来，
+            # 但不冒充「设计有效性未核查」。
             diagnostics.append({
                 "test": "callaway_santanna",
+                "role": ROLE_EFFECT_ESTIMATE,
                 "status": "error",
                 "error": str(exc),
             })
@@ -478,33 +514,91 @@ _DISPATCH = {
 }
 
 
-def _compute_star_rating(
-    diagnostics: List[Dict[str, Any]], passed: bool
-) -> Optional[int]:
-    """根据诊断结果计算 0-3 星评分。未跑成诊断时返回 None（不截断）。
+_EXECUTION_TEXT = {
+    EXECUTION_COMPLETED: "已完成",
+    EXECUTION_PARTIAL: "只完成了一部分",
+    EXECUTION_FAILED: "没有跑成",
+    EXECUTION_NOT_RUN: "尚未运行",
+}
 
-    规则：
-    - 没有任何可评估诊断（全 skipped / 仅 error）→ None（缺列或缺工具，不是 0 星）
-    - 全部诊断通过 → 3 星
-    - 存在 warn 但无 fail → 2 星
-    - 存在 fail 但有部分 pass → 1 星（继续但标注）
-    - 全部 fail → 0 星（完全不可信，截断）
+_ASSESSMENT_TEXT = {
+    ASSESSMENT_RISK_FOUND: "发现了需要处理的风险",
+    ASSESSMENT_RISK_NOT_FOUND: "没有发现这类风险",
+    ASSESSMENT_INSUFFICIENT_EVIDENCE: "证据不足，尚未核查",
+    ASSESSMENT_NOT_APPLICABLE: "本次没有适用的检查",
+}
+
+
+def _build_report(report_lines: List[str], assessed: Dict[str, Any]) -> str:
+    """把「执行到哪一步」和「发现了什么」分开写清楚。
+
+    未知不能被写成通过，执行失败也不能被写成「该方法不成立」：前一句会把没核过的
+    风险说成没风险，后一句会把基础设施问题说成科学结论。
     """
-    del passed  # 星级只看 diagnostics 状态，passed 由调用方另行写入
-    active = [d for d in diagnostics if d.get("status") != "skipped"]
-    evaluable = [d for d in active if d.get("status") in ("pass", "warn", "fail")]
-    if not evaluable:
-        return None
-    fails = [d for d in evaluable if d.get("status") == "fail"]
-    warns = [d for d in evaluable if d.get("status") == "warn"]
-    passes = [d for d in evaluable if d.get("status") == "pass"]
-    if passes and not fails and not warns:
-        return 3
-    if passes and not fails:
-        return 2
-    if passes and fails:
-        return 1
-    return 0
+    lines = list(report_lines) if report_lines else ["无诊断结果。"]
+    counts = assessed["counts"]
+    execution = assessed["execution"]
+    assessment = assessed["assessment"]
+    star = assessed["star_rating"]
+    evaluable = counts["pass"] + counts["warn"] + counts["fail"]
+
+    lines.append(
+        f"识别检查执行情况：{_EXECUTION_TEXT[execution]}"
+        f"（可评估 {evaluable} 项：通过 {counts['pass']}、告警 {counts['warn']}、"
+        f"不通过 {counts['fail']}；未跑成 {counts['error']}、跳过 {counts['skipped']}）"
+    )
+    lines.append(f"发现：{_ASSESSMENT_TEXT[assessment]}")
+    if execution == EXECUTION_FAILED:
+        lines.append(
+            "诊断工具没有运行成功，识别策略的风险尚未核查；写作可继续，"
+            "但不要据此声称识别已验真。"
+        )
+
+    if star is None:
+        lines.append(
+            "识别策略尚未评分：没有可评估的诊断"
+            "（检查时间 / 个体 / 工具变量等列是否已指定）。未知不等于通过。"
+        )
+    else:
+        lines.append(f"识别策略星级：{'★' * star}{'☆' * (3 - star)}（{star}星）")
+        if star == 0:
+            lines.append("⚠️ 0星：识别策略完全不可信，流程已截断，请调整研究设计后重试。")
+        elif star == 1:
+            lines.append("⚠️ 有诊断不通过，已标注；因果表述与主结果晋升需要用户确认。")
+        elif star == 2:
+            lines.append("⚠️ 存在识别风险，已标注并在后续步骤中披露。")
+
+    if assessment == ASSESSMENT_RISK_NOT_FOUND:
+        lines.append("结论：跑到的检查都没有发现问题；这不等于风险不存在。")
+    return "\n".join(lines)
+
+
+def _diag_payload(
+    *,
+    strategy: Any,
+    diagnostics: List[Dict[str, Any]],
+    report: str,
+    execution: str,
+    assessment: str,
+    passed: Optional[bool],
+    star_rating: Optional[int],
+) -> Dict[str, Any]:
+    """三轴状态 + 展示字段 + 许可，一次组装，结构恒定。"""
+    return {
+        "strategy": strategy,
+        "diagnostics": diagnostics,
+        "execution": execution,
+        "assessment": assessment,
+        "passed": passed,
+        "star_rating": star_rating,
+        "permissions": permissions_for(
+            assessment=assessment,
+            star_rating=star_rating,
+            has_failures=passed is False,
+            hard_block=star_rating == 0,
+        ),
+        "report": report,
+    }
 
 
 def identification_verify(state: EconPaperState) -> Dict[str, Any]:
@@ -513,10 +607,13 @@ def identification_verify(state: EconPaperState) -> Dict[str, Any]:
     读取 ``state.research_direction``（dict）与 ``state.csv_path``，按
     method 分派到 StatsPAI 诊断，收集 ``diagnostics`` 并生成自然语言
     ``report``。写入 ``identification_diag``（含 strategy / diagnostics /
-    passed / report / star_rating）与 ``identification_failed``。
+    execution / assessment / passed / star_rating / permissions / report）
+    与 ``identification_failed``。
 
-    星级评分（0-3 星）：0 星 = 完全不可信，识别策略截断（HITL_pause 图内
-    中断）；1-2 星 = 继续但标注风险；3 星 = 最佳。
+    ``identification_failed`` 只表示**硬阻断**（0 星或没有数据）。跑不成、跑不全
+    一律不是硬阻断：``passed`` 写 ``None``（未知），由 ``permissions`` 说明未知状态
+    下允许做什么。评估档位与许可口径见
+    ``agent/engine/identification_state.py``。
 
     边界：无 research_direction 或 csv_path 时返回空或
     ``identification_failed=True``；数据读取失败降级为 failed 报告，不抛异常。
@@ -538,28 +635,35 @@ def identification_verify(state: EconPaperState) -> Dict[str, Any]:
             if raw
             else "尚未指定可诊断的识别方法（DiD / IV / RD / SCM）。写作可继续。"
         )
+        # 没有可诊断的方法：不是「通过」，也不是「不通过」——本次没有适用的检查。
         return {
-            "identification_diag": {
-                "strategy": raw.lower() or None,
-                "diagnostics": [],
-                "passed": True,
-                "report": report,
-                "star_rating": None,
-            },
+            "identification_diag": _diag_payload(
+                strategy=raw.lower() or None,
+                diagnostics=[],
+                report=report,
+                execution=EXECUTION_NOT_RUN,
+                assessment=ASSESSMENT_NOT_APPLICABLE,
+                passed=None,
+                star_rating=None,
+            ),
             "identification_failed": False,
             "star_rating": None,
         }
 
     csv_path = state.get("csv_path")
     if not csv_path:
+        # 没有数据就无法评估，而且必须停下：这一档是产品已定的「未挂数据不许跑估计」，
+        # 不是识别诊断给出的科学结论，所以用 execution=not_run 而不是假装跑了 0 星。
         return {
-            "identification_diag": {
-                "strategy": method,
-                "diagnostics": [],
-                "passed": False,
-                "report": "还没有数据文件，无法验真识别。请先上传 CSV。",
-                "star_rating": 0,
-            },
+            "identification_diag": _diag_payload(
+                strategy=method,
+                diagnostics=[],
+                report="还没有数据文件，无法验真识别。请先上传 CSV。",
+                execution=EXECUTION_NOT_RUN,
+                assessment=ASSESSMENT_INSUFFICIENT_EVIDENCE,
+                passed=False,
+                star_rating=0,
+            ),
             "identification_failed": True,
             "star_rating": 0,
         }
@@ -570,42 +674,38 @@ def identification_verify(state: EconPaperState) -> Dict[str, Any]:
         df = pd.read_csv(csv_path)
     except Exception as exc:
         return {
-            "identification_diag": {
-                "strategy": method,
-                "diagnostics": [],
-                "passed": False,
-                "report": f"无法读取数据: {exc}",
-                "star_rating": 0,
-            },
+            "identification_diag": _diag_payload(
+                strategy=method,
+                diagnostics=[],
+                report=f"无法读取数据: {exc}",
+                execution=EXECUTION_FAILED,
+                assessment=ASSESSMENT_INSUFFICIENT_EVIDENCE,
+                passed=False,
+                star_rating=0,
+            ),
             "identification_failed": True,
             "star_rating": 0,
         }
 
     diagnostics: List[Dict[str, Any]] = []
     report_lines: List[str] = []
-    passed = _DISPATCH[method](df, d, diagnostics, report_lines)
+    # 分派函数的返回值不参与判定：设计有效性以每条诊断的 status 为准。留两条会漂移。
+    _DISPATCH[method](df, d, diagnostics, report_lines)
 
-    star_rating = _compute_star_rating(diagnostics, passed)
-    report = "\n".join(report_lines) if report_lines else "无诊断结果。"
-    if star_rating is None:
-        report += "\n识别策略尚未评分：缺少可运行的诊断（检查时间 / 个体 / 工具变量等列是否已指定）。"
-    else:
-        report += (
-            f"\n识别策略星级：{'★' * star_rating}{'☆' * (3 - star_rating)}"
-            f"（{star_rating}星）"
-        )
-        if star_rating == 0:
-            report += "\n⚠️ 0星：识别策略完全不可信，流程已截断，请调整研究设计后重试。"
-        elif star_rating <= 2:
-            report += "\n⚠️ 存在识别风险，已标注并在后续步骤中披露。"
+    assessed = assess_diagnostics(diagnostics)
+    star_rating = assessed["star_rating"]
+    report = _build_report(report_lines, assessed)
     out: Dict[str, Any] = {
-        "identification_diag": {
-            "strategy": method,
-            "diagnostics": diagnostics,
-            "passed": passed if star_rating is not None else True,
-            "report": report,
-            "star_rating": star_rating,
-        },
+        "identification_diag": _diag_payload(
+            strategy=method,
+            diagnostics=diagnostics,
+            report=report,
+            execution=assessed["execution"],
+            assessment=assessed["assessment"],
+            passed=assessed["passed"],
+            star_rating=star_rating,
+        ),
+        # 只有 0 星是硬阻断。全 warn、全 error、全 skipped 都不停流程。
         "identification_failed": star_rating == 0,
         "star_rating": star_rating,
     }

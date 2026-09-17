@@ -14,7 +14,8 @@ router = APIRouter()
 
 
 class IdentificationResponse(BaseModel):
-    passed: bool
+    # 三态：True 没有硬失败项 / False 有硬失败项 / None 尚未评估。未知不等于通过。
+    passed: Optional[bool] = None
     star_rating: Optional[int] = None
     identification_failed: bool = False
     diagnosis: Dict[str, Any] = Field(default_factory=dict)
@@ -36,7 +37,7 @@ async def run_identification(
     require_session_ownership(session_id, current_user)
     result = facade.run_identification_verify(session_id)
     return IdentificationResponse(
-        passed=bool(result.get("passed")),
+        passed=result.get("passed"),
         star_rating=result.get("star_rating"),
         identification_failed=bool(result.get("identification_failed")),
         diagnosis=result.get("diagnosis") or {},

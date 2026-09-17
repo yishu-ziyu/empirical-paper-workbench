@@ -21,6 +21,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 
+from .engine.identification_state import identification_hard_block
 from .engine.prewrite import PRWRITE_SEQUENCE, PRWRITE_NODES
 from .nodes.clean_data import clean_data
 from .nodes.hitl_pause import hitl_pause
@@ -50,10 +51,14 @@ def route_after_clean(state: EconPaperState) -> str:
 def route_after_identification(state: EconPaperState) -> str | list[str]:
     """identification_verify 后的条件边路由。
 
-    - 0 星 → HITL_pause（不进估计、不进文献）
+    - 硬阻断（0 星，或没有数据 / 显式识别失败）→ HITL_pause（不进估计、不进文献）
     - 否则 → 估计与文献并行，扇入 generate_title
+
+    判定来自 ``agent.engine.identification_state``：串行 Facade 路径、章节写入闸门、
+    HTTP Facade 读的是同一个函数。此前这条边只看 ``star_rating == 0``，而串行路径还看
+    ``identification_failed`` —— 同一份 state 从两个入口会得到相反结论。
     """
-    if state.get("star_rating") == 0:
+    if identification_hard_block(state):
         return "hitl_pause"
     return ["run_estimate", "search_literature"]
 

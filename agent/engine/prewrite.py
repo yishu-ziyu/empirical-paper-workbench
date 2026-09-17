@@ -23,6 +23,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .cancellation import cancellation_scope, raise_if_cancelled
+from .identification_state import identification_hard_block
 from .prewrite_preview import (
     PREWRITE_GATE_ESTIMATE_COMPLETE,
     build_prewrite_preview,
@@ -120,7 +121,8 @@ def run_prewrite(
                 progress(node_id, "completed", {})
             if node_id == "identification_verify":
                 state["claim"] = claim_mode(state)
-                if state.get("star_rating") == 0 or state.get("identification_failed"):
+                # 与图的条件边共用同一个判定函数，不再内联 star_rating == 0。
+                if identification_hard_block(state):
                     if progress:
                         progress(
                             node_id,

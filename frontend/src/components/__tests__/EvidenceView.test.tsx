@@ -124,3 +124,60 @@ describe('EvidenceView provenance layers', () => {
     expect(layer).not.toHaveTextContent('feols')
   })
 })
+
+describe('EvidenceView identification readout', () => {
+  beforeEach(() => {
+    fetchEvidence.mockReset()
+  })
+
+  async function renderIdent(identification: Record<string, unknown>) {
+    fetchEvidence.mockResolvedValue(sixLayerEvidence({ identification }) as never)
+    render(<I18nProvider><EvidenceView sessionId="sess-1" /></I18nProvider>)
+    await waitFor(() => {
+      expect(screen.getByTestId('evidence-identification')).toBeInTheDocument()
+    })
+    return screen.getByTestId('evidence-identification')
+  }
+
+  test('尚未评估不写「通过」：passed=null 报尚未核查', async () => {
+    const node = await renderIdent({
+      failed: false,
+      report: '诊断工具没有运行成功，识别策略的风险尚未核查。',
+      passed: null,
+      star_rating: null,
+      execution: 'failed',
+      assessment: 'insufficient_evidence',
+    })
+
+    expect(node).toHaveTextContent('尚未核查')
+    expect(node).not.toHaveTextContent('通过')
+  })
+
+  test('有风险不等于通过：assessment=risk_found 必须说出来', async () => {
+    const node = await renderIdent({
+      failed: false,
+      report: 'IV 诊断: first-stage F=6.0，存在弱工具变量风险。',
+      passed: true,
+      star_rating: 2,
+      execution: 'completed',
+      assessment: 'risk_found',
+    })
+
+    expect(node).toHaveTextContent('有风险，需披露')
+    expect(node).not.toHaveTextContent('通过')
+  })
+
+  test('干净通过才写通过', async () => {
+    const node = await renderIdent({
+      failed: false,
+      report: '识别策略星级：★★★（3星）',
+      passed: true,
+      star_rating: 3,
+      execution: 'completed',
+      assessment: 'risk_not_found',
+    })
+
+    expect(node).toHaveTextContent('通过')
+    expect(node).toHaveTextContent('★★★')
+  })
+})

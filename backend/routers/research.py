@@ -304,7 +304,28 @@ async def promote_preview(
     await run_in_threadpool(require_session_ownership, session_id, current_user)
 
     def _write() -> dict:
+        from agent.engine.identification_state import (
+            PERMISSION_FORBID,
+            identification_decision,
+            permission_is,
+        )
+
         state = facade.get_state(session_id)
+        # 「必须拦住」一档：识别被硬阻断，或设计有效性检查有硬失败项时，结果不能升为主结果。
+        # 未知（尚未评估）不在禁止之列 —— 未知不是拒绝的依据；它只把许可降为需确认，
+        # 由前端在增量二里补上显式确认，本入口不替用户做那个决定。
+        decision = identification_decision(state)
+        if permission_is(
+            decision["permissions"]["promote_main_result"], PERMISSION_FORBID
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "identification_blocks_main_result",
+                    "star_rating": decision["star_rating"],
+                    "assessment": decision["assessment"],
+                },
+            )
         lab = require_lab(state)
         run = find_run(lab, body.run_id)
         current_estimate = state.get("estimate") if isinstance(state.get("estimate"), dict) else None

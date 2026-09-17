@@ -395,6 +395,9 @@ export const workbenchZh = {
   'evidenceView.identification': '识别',
   'evidenceView.identFail': '未通过',
   'evidenceView.identPass': '通过',
+  // 跑不成、跳过就是没核过：写成「通过」等于把没核过的风险说成没风险。
+  'evidenceView.identUnknown': '尚未核查',
+  'evidenceView.identRisk': '有风险，需披露',
   'evidenceView.identNone': '暂无',
   'evidenceView.robustness': '稳健性',
   'evidenceView.robustDegraded': '已跑（降级）',
@@ -940,6 +943,8 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
   'evidenceView.identification': 'Identification',
   'evidenceView.identFail': 'Failed',
   'evidenceView.identPass': 'Passed',
+  'evidenceView.identUnknown': 'Not checked yet',
+  'evidenceView.identRisk': 'At risk — disclose',
   'evidenceView.identNone': 'None yet',
   'evidenceView.robustness': 'Robustness',
   'evidenceView.robustDegraded': 'Ran (degraded)',

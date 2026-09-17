@@ -158,10 +158,14 @@ class AgentFacade:
     @staticmethod
     def instrument_fields(state: dict) -> dict:
         """Desk readout + outline/chapters the UI can rehydrate after refresh."""
+        from agent.engine.identification_state import identification_hard_block
+
         diag = state.get("identification_diag") or {}
         report = diag.get("report") if isinstance(diag, dict) else None
         blockers = [str(item) for item in (state.get("write_blockers") or []) if item]
-        if state.get("star_rating") == 0 and "star_0" not in blockers:
+        # 口径来自 agent.engine.identification_state，与图的条件边、串行预写路径、
+        # 章节写入闸门同一函数，避免同一个 state 在不同入口得到不同结论。
+        if identification_hard_block(state) and "star_0" not in blockers:
             blockers = ["star_0", *blockers]
         gate_fields = _public_prewrite_gates(state)
         decision = gate_fields.get("blockingDecision") or {}
@@ -475,6 +479,7 @@ class AgentFacade:
         confirms: dict | None = None,
     ) -> tuple[dict, dict]:
         """Validate both FE confirms and the hetero hard-block, then snapshot."""
+        from agent.engine.identification_state import identification_hard_block
         from agent.engine.prewrite_gates import (
             evaluate_blocking_decision,
             merge_confirm_flags,
@@ -488,7 +493,7 @@ class AgentFacade:
                 status_code=409,
                 detail={"code": "prewrite_not_ready", "reason": "no_direction"},
             )
-        if state.get("star_rating") == 0 or state.get("identification_failed"):
+        if identification_hard_block(state):
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -591,7 +596,9 @@ class AgentFacade:
         """Run identification verification after method selection.
 
         Reads current state, runs diagnostics, writes back to session.
-        Returns diagnosis dict with passed/report.
+        Returns the diagnosis tri-state: ``passed`` is ``True`` (no hard failure),
+        ``False`` (a check failed) or ``None`` (not assessed yet — which is not a
+        pass). ``star_rating`` is ``None`` rather than ``0`` when nothing ran.
         """
         if identification_verify_node is None:
             raise HTTPException(
@@ -602,10 +609,12 @@ class AgentFacade:
         result = identification_verify_node(state)
         state = {**state, **result}
         self.save_state(session_id, state)
+        diag = result.get("identification_diag") or {}
         return {
-            "passed": result.get("identification_failed") is not True,
-            "diagnosis": result.get("identification_diag", {}),
-            "star_rating": result.get("star_rating", 0),
+            # 三态：True 没有硬失败项 / False 有硬失败项 / None 尚未评估。未知不等于通过。
+            "passed": diag.get("passed"),
+            "diagnosis": diag,
+            "star_rating": result.get("star_rating"),
             "identification_failed": result.get("identification_failed") is True,
         }
 

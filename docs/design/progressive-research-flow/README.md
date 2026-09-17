@@ -48,3 +48,8 @@
 - `live-run-progress-open.png` 真实 run 进行中，披露区展开显示后端真实事件
 - `draft-01-idea.png` 审阅稿第 01 状态
 - `old-first-value-hero.png` 旧稿 first-value-entry 首屏（对照密度）
+
+## 外部评审
+
+给云端模型的独立评审问题与本次改动汇总：`docs/reviews/20260917-progressive-flow-review-brief.md`。
+它带上 `cd45d65..60feb83` 的交接块、我实测过的验证命令与结果、以及 9 个待答复的问题。

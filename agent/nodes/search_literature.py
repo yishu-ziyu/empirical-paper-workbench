@@ -253,7 +253,14 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
     entries, effective_source = _dispatch_search(query, source)
 
     family = _method_family(research_direction)
-    anchors = _method_anchors(family)
+    # Mock corpus anchors are only valid evidence when the corpus itself is the
+    # source. On a real-source branch they would smuggle mock DOIs into results
+    # that claim to come from Crossref / S2 / Apodex.
+    anchors = (
+        _method_anchors(family)
+        if effective_source in {"mock", "mock_degraded"}
+        else []
+    )
     threat: List[LiteratureEntry] = []
     if family:
         threat_query = METHOD_THREAT_QUERIES.get(family, "")
@@ -263,9 +270,20 @@ def search_literature(state: EconPaperState) -> LiteratureOutput:
                 if effective_source in {"mock", "mock_degraded"}
                 else source
             )
-            threat, _threat_src = _dispatch_search(threat_query, threat_source)
+            threat, threat_src = _dispatch_search(threat_query, threat_source)
+            # A real branch whose threat search fell back to the mock corpus must
+            # not smuggle mock entries in under a real literature_source. No
+            # result is better than an invented one.
+            if (
+                effective_source not in {"mock", "mock_degraded"}
+                and threat_src in {"mock", "mock_degraded"}
+            ):
+                threat = []
 
-    unique = _merge_unique(anchors, entries, threat)
+    # Order = must-have first: anchors, then the method's threat papers, then the
+    # generic keyword results. Putting `threat` before `entries` keeps a required
+    # counterexample from being silently truncated by MAX_LITERATURE_ENTRIES.
+    unique = _merge_unique(anchors, threat, entries)
     actions = ["keyword"]
     if anchors:
         actions.append("method_anchor")

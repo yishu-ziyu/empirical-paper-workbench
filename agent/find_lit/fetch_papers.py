@@ -21,6 +21,14 @@ SOURCE_CROSSREF = "crossref"
 SOURCE_S2 = "semantic_scholar"
 V1_SOURCES = (SOURCE_OPENALEX, SOURCE_CROSSREF, SOURCE_S2)
 
+# Same three sources, two jobs. `purpose` selects *how the caller planned the
+# query* (and what evidence artifact it builds), not an after-the-fact label:
+# fetch_papers never reorders or rewrites hits by purpose.
+PURPOSE_METHOD_CHECK = "method_check"
+PURPOSE_TOPIC_POSITIONING = "topic_positioning"
+VALID_PURPOSES = (PURPOSE_METHOD_CHECK, PURPOSE_TOPIC_POSITIONING)
+DEFAULT_PURPOSE = PURPOSE_TOPIC_POSITIONING
+
 # Analog of DATA-RIGOR "no synthetic as found": these are not FL hits.
 _NOT_FOUND_SOURCES = frozenset(
     {"mock", "synthetic", "mock_degraded", "mock_corpus", "gold"}
@@ -141,11 +149,12 @@ def _run_searchers(
     return hits, status
 
 
-def empty_fetch(*, query: str = "") -> dict[str, Any]:
+def empty_fetch(*, query: str = "", purpose: str = DEFAULT_PURPOSE) -> dict[str, Any]:
     return {
         "hits": [],
         "source_status": {},
         "query": query,
+        "purpose": purpose,
         "chapter_written": False,
     }
 
@@ -153,16 +162,26 @@ def empty_fetch(*, query: str = "") -> dict[str, Any]:
 def fetch_papers(
     query: str,
     *,
+    purpose: str = DEFAULT_PURPOSE,
     searchers: Iterable[tuple[str, Searcher]] | None = None,
 ) -> dict[str, Any]:
-    """Three-source search + DOI dedupe. No cards, no chapter, no literature_entries."""
+    """Three-source search + DOI dedupe. No cards, no chapter, no literature_entries.
+
+    `purpose` is method_check | topic_positioning. It records *why* the caller
+    planned this query (method-applicability vs who-did-similar-work); it does
+    not reorder or rewrite hits, so topic positioning keeps its old behaviour.
+    """
+    resolved = str(purpose or DEFAULT_PURPOSE).strip() or DEFAULT_PURPOSE
+    if resolved not in VALID_PURPOSES:
+        resolved = DEFAULT_PURPOSE
     q = str(query or "").strip()
     if not q:
-        return empty_fetch()
+        return empty_fetch(purpose=resolved)
     raw, source_status = _run_searchers(q, searchers or default_searchers())
     return {
         "hits": dedupe_hits(raw),
         "source_status": source_status,
         "query": q,
+        "purpose": resolved,
         "chapter_written": False,
     }

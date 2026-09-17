@@ -150,10 +150,15 @@ def run_pipeline(state: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str], List
     state.update(identification_verify(state))
     nodes_run.append("identification_verify")
 
-    # route_after_identification：0 星 → hitl_pause（真图等用户调整）；
+    # route_after_identification：硬阻断 → hitl_pause（真图等用户调整）；
     # headless 无用户输入，直接截断打分，让 pipeline_completed 判 fail。
-    if state.get("star_rating") == 0:
-        stop_reasons.append("route_after_identification: 0 星截断（真图进 hitl_pause）")
+    # 判定必须问真图用的那个函数：内联 star_rating == 0 会漏掉
+    # identification_failed=True 而没有星级的 state，于是这个台架继续跑估计，
+    # 而真图已经停在 hitl_pause —— 同一份 state 两个结论。
+    from ..engine.identification_state import identification_hard_block
+
+    if identification_hard_block(state):
+        stop_reasons.append("route_after_identification: 识别硬阻断（真图进 hitl_pause）")
         return state, nodes_run, stop_reasons
 
     state.update(estimate(state))

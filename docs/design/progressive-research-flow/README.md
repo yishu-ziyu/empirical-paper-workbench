@@ -36,3 +36,15 @@
 当前设计基线与 Agent 交接协议见：
 
 `docs/specs/frontend-interaction-current.md`
+
+## 与真实产品核对 + 本轮接线
+
+`WIRING.md`：审阅稿与真实运行中的产品逐项核对（token、字体、布局密度、哪些按钮无逻辑、
+哪些步骤是定时器而不是事件），以及本轮把「分析中」的路径披露接到**真实 `run.progress` 事件**
+上的最小接线与真实运行证据。
+
+运行实拍（`shots/`）：
+- `live-desk-entry.png` 真实产品空桌（纸张/米白 + Instrument Serif）
+- `live-run-progress-open.png` 真实 run 进行中，披露区展开显示后端真实事件
+- `draft-01-idea.png` 审阅稿第 01 状态
+- `old-first-value-hero.png` 旧稿 first-value-entry 首屏（对照密度）

@@ -13,6 +13,7 @@
 // reattaches to snapshot.active_run via /runs/{id}/events.
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { OutlineChapter } from '../components/Outline'
 import type { DirectionFormData, DirectionFormInitial } from '../components/DirectionForm'
 import type { PausePayload } from '../components/WriteLoop'
@@ -22,6 +23,7 @@ import {
   RunTerminalError,
   waitForRun,
 } from './runEvents'
+import type { RunProgressEvent } from './runEvents'
 import type { components } from '../types/api'
 import {
   clearStoredSessionId,
@@ -35,6 +37,21 @@ import {
   shouldDivertToAttach,
   snapshotAttachFields,
 } from './dataAttachedGate'
+
+/**
+ * run 事件的收集器（给 `waitForRun` 的 onEvent 用）。
+ *
+ * 只留有 `node` 的 `run.progress`：没有节点的其它事件（accepted/claimed/succeeded）
+ * 不构成一个步骤，收下来只会让展示层去猜。顺序即真实发生顺序，不排序、不补齐。
+ */
+function collectRunStep(
+  append: Dispatch<SetStateAction<RunProgressEvent[]>>,
+): (event: RunProgressEvent) => void {
+  return (event) => {
+    if (event.type !== 'run.progress' || !event.node) return
+    append((prev) => (prev.length >= 200 ? prev : [...prev, event]))
+  }
+}
 
 // localStorage / sessionStorage keys owned by the workspace.
 // Research truth keys (csv meta, data columns, active-run handles) were
@@ -567,6 +584,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
   >('question')
   const [directionBusy, setDirectionBusy] = useState(false)
   const [runFailure, setRunFailure] = useState<string | null>(null)
+  // 最近一次预写 run 收到的**真实**进度事件（run.progress 的 node/status）。
+  // 只存稳定标签字段，不引入第二套状态机：展示层用 projectRunSteps 现投影。
+  const [runSteps, setRunSteps] = useState<RunProgressEvent[]>([])
   const activeSessionRef = useRef(sessionId)
   const sessionEpochRef = useRef(0)
   const runAbortRef = useRef<AbortController | null>(null)
@@ -1264,7 +1284,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
         controller = new AbortController()
         runAbortRef.current?.abort()
         runAbortRef.current = controller
-        const result = await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+        setRunSteps([])
+        const result = await waitForRun(
+          accepted.run_id,
+          accepted.events_url,
+          controller.signal,
+          collectRunStep(setRunSteps),
+        )
         if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
         clearPendingUpload(intent.idempotencyKey)
         uploadOperationRef.current = null
@@ -1341,7 +1367,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
       controller = new AbortController()
       runAbortRef.current?.abort()
       runAbortRef.current = controller
-      const result = await waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+      setRunSteps([])
+      const result = await waitForRun(
+        accepted.run_id,
+        accepted.events_url,
+        controller.signal,
+        collectRunStep(setRunSteps),
+      )
       if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
       clearPendingUpload(intent.idempotencyKey)
       uploadOperationRef.current = null
@@ -1680,10 +1712,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
           controller = new AbortController()
           runAbortRef.current?.abort()
           runAbortRef.current = controller
+          setRunSteps([])
           await waitForRun(
             accepted.run_id,
             accepted.events_url,
             controller.signal,
+            collectRunStep(setRunSteps),
           )
           if (
             sessionEpochRef.current !== operationEpoch ||
@@ -2125,6 +2159,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     currentChapterIndex,
     outlineLocked,
     runFailure,
+    runSteps,
     evidenceRefreshKey,
     activeRun,
     research,

@@ -16,6 +16,7 @@ import WorkbenchSidebar, {
 } from './components/WorkbenchSidebar'
 import AgentRail from './components/AgentRail'
 import AgentCursorRoot from './components/AgentCursorLayer'
+import RunProgressDisclosure from './components/RunProgressDisclosure'
 import type { WorkspaceDecision, WorkspaceSuggestion } from './components/WorkspaceDecisionRail'
 import ReadingFocus from './components/ReadingFocus'
 import type { ResizableWorkspaceHandle } from './components/ResizableWorkspace'
@@ -794,6 +795,8 @@ function App() {
                   ? t('status.lastFailed', { error: ws.runFailure })
                   : t('status.idle')}
         </span>
+        {/* 次级披露：有真实 run 事件才出现；没有事件时整块不存在（不拿定时器充当进度）。 */}
+        <RunProgressDisclosure events={ws.runSteps} />
         {ws.degraded ? (
           <span data-testid="run-degradations" className="text-wb-warning">
             {t('status.degradations', { n: ws.degradations.length })}

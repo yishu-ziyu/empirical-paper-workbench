@@ -1,4 +1,4 @@
-/* Hallmark · genre: editorial · design-system: DESIGN.md · designed-as-app · macrostructure: Workbench(步骤卡时间线)
+/* Hallmark · genre: editorial · design-system: docs/design/interaction-motion-rules.md · designed-as-app · macrostructure: Workbench(步骤卡时间线)
  * 空桌步骤卡时间线（Phase B：把 Agent 循环亮在产品上）。
  *
  * 每步一张卡：方向凝练 → 清洗八步 → 估计门（可展开看轮次摘要/最终代码）→ 各章写作。

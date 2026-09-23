@@ -225,7 +225,7 @@
         "purpose": "章节审批决定的权威记录",
         "invariants": [
           "审批行与 run 事件同事务落库",
-          "force 必留 reviewer_bypassed_review 标记（CONTEXT.md 契约）",
+          "force 必留 reviewer_bypassed_review 标记（docs/product/glossary.md 契约）",
           "无审批记录的版本不得导出"
         ]
       },
@@ -635,7 +635,7 @@
     },
     {
       "title": "审批权威与导出硬门",
-      "pressure": "红队证实导出路径（doc_export.py:48 → export_docx.py:600）既不读审批记录也不检查章节 status——只要 body_chapters 有内容即可交付，违反 CONTEXT.md『approve_chapter 才转 approved』的产品契约与 devlog 北极星『审批硬证据门』",
+      "pressure": "红队证实导出路径（doc_export.py:48 → export_docx.py:600）既不读审批记录也不检查章节 status——只要 body_chapters 有内容即可交付，违反 docs/product/glossary.md『approve_chapter 才转 approved』的产品契约与 devlog 北极星『审批硬证据门』",
       "decision": "approvals 表为审批权威（与 run_events 同事务）；export 端点前置校验：导出所含每个 body 章节必须存在匹配 version_sha256 的 approve 记录，否则 409 review_gate；force 路径沿用 reviewer_bypassed_review 留痕",
       "alternatives": [
         "只在前端隐藏导出按钮（UX 不是执法——不可信边缘原则）",
@@ -2321,7 +2321,7 @@
           },
           {
             "text": "唯一备份指引为手动 tar 卷快照，未保证停机一致性；make docker-clean 会连数据卷一起销毁",
-            "source": "docs/deployment.md:161-164; Makefile:115"
+            "source": "docs/deployment/README.md:161-164; Makefile:115"
           },
           {
             "text": "checkpointer 为章节内容权威 + 审批状态所在库",
@@ -2468,7 +2468,7 @@
           },
           {
             "text": "deployment.md:135 仍宣称 /ws/* → backend 可用",
-            "source": "docs/deployment.md:135"
+            "source": "docs/deployment/README.md:135"
           }
         ],
         "whyItMatters": "维护者会以为实时通道存在而围绕它设计；文档宣称与实现相反是审计能遇到的最危险漂移。",
@@ -2606,7 +2606,7 @@
         "evidence": [
           {
             "text": "文档：curl http://localhost/health、前端 http://localhost、架构图 Nginx (80)",
-            "source": "docs/deployment.md:106,110,133-137"
+            "source": "docs/deployment/README.md:106,110,133-137"
           },
           {
             "text": "实际：127.0.0.1:8080:80；全仓 8080 仅此一处且无注释",

@@ -9,7 +9,7 @@
 - Result: pass
 - Session / run ID:
 - Verification commands: `make test` (check-api-drift + agent + backend + frontend). `make verify` skipped (services down).
-- Output evidence locations: `agent/data_honesty.py`; `backend/routers/attach.py`; `fixtures/classic-5/ck1994_long.csv`; `docs/real-fetch-contract.md`; `agent/find_data/honesty.py`; `agent/find_data/card_zip.py`; `agent/find_data/dataverse.py`; `agent/find_data/fetch_wdi.py`; `frontend/src/components/FindDataHonesty.tsx`
+- Output evidence locations: `agent/data_honesty.py`; `backend/routers/attach.py`; `fixtures/classic-5/ck1994_long.csv`; `docs/contracts/real-fetch-contract.md`; `agent/find_data/honesty.py`; `agent/find_data/card_zip.py`; `agent/find_data/dataverse.py`; `agent/find_data/fetch_wdi.py`; `frontend/src/components/FindDataHonesty.tsx`
 
 ## 成功动作
 

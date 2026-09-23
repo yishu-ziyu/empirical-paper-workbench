@@ -1,4 +1,4 @@
-.PHONY: dev dev-frontend dev-backend dev-runner install install-frontend install-backend install-agent health test test-agent test-backend test-frontend smoke-agent verify-deps verify clean gen-api check-api-drift \
+.PHONY: dev dev-frontend dev-backend dev-runner install install-frontend install-backend install-agent health test test-agent test-backend test-frontend smoke-agent verify-deps verify clean gen-api check-api-drift docs-check \
         docker-up docker-down docker-build docker-logs docker-ps docker-clean
 
 # Python 版本：项目锁定 3.12（3.14 下 numpy/pydantic 依赖装不上）。
@@ -72,6 +72,10 @@ install-agent:
 	python -m pip install --force-reinstall --no-deps "langgraph-prebuilt==1.1.0"; \
 	python -m pip install "pyfixest==0.60.0" || true
 	agent/.venv/bin/python -m pip install -e "$(DEPENDENCY_ROOT)/StatsPAI"
+
+# 文档检查：断链、孤儿文档、超长文档（规则见 docs/conventions.md）
+docs-check:
+	@python3 scripts/check_docs.py
 
 # 验证 backend 健康检查
 health:

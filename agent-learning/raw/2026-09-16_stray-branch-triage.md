@@ -24,15 +24,15 @@
 - 先用「最近祖先 ref 差集」把每个分支的**自己的产物**切出来，避免把整条 9/15 串行链的继承物重复记账：20 个分支里只有 2 个（`backend-typed-review-dep`、`b-six-chapter-bodies`、`c-ols-export`、`ols-lock-twfe-phrasing`）是从 `main` 起枝，其余都是从链上前一个 ref 起枝。
 - 用 blob 相等当最强证据：`feat/fm-e-build-classic-fixtures-1` 的三个夹具文件（`fixtures/classic-5/SOURCE.txt` / `barro1991_growth.csv` / `ck1994_long.csv`）与顶端 `git rev-parse` 完全相同（`beb66616` / `e43e4f61` / `56b0cab3`），直接判「已重做」，不需要读内容。
 - 用「同路径符号超集」判「已重做」：`backend/services/classic5_catalog.py`（分支 9 个符号 / 顶端 15 个，含 `rank_entries_for_design`）、`backend/services/data_attach.py`（顶端多 `attach_gate_fields`）、`agent/engine/did_spec.py`（顶端多 `did_spec_applies`）、`backend/tests/test_data_attach.py`（416 行 vs 354 行）。
-- 用顶端自己的台账正文而不是分支名来定性「被重切」：顶端 `runtime/tasks/20260915-fm-e-build-did-gate-recut.md` 明写「Did not revive `cursor/did-be-gate-8102` @ `71be39f1`」，与顶端 `docs/did-narrow-exception-contract.md` 的 superseded 存根互相印证，支撑 `did-be-gate-8102` / `did-narrow-1` 判「已重做」（且说明其旧口径是被主动撤销，不是漏做）。
-- 用「顶端合同引用了却不存在的文件」做真缺口的交叉证据：三份顶端合同把 `docs/data-completion-contract.md` 列为 sister contract，`git cat-file -e` 却 exit 128 —— 悬空引用，比单看路径不存在更有说服力。
+- 用顶端自己的台账正文而不是分支名来定性「被重切」：顶端 `runtime/tasks/20260915-fm-e-build-did-gate-recut.md` 明写「Did not revive `cursor/did-be-gate-8102` @ `71be39f1`」，与顶端 `docs/contracts/did-narrow-exception-contract.md` 的 superseded 存根互相印证，支撑 `did-be-gate-8102` / `did-narrow-1` 判「已重做」（且说明其旧口径是被主动撤销，不是漏做）。
+- 用「顶端合同引用了却不存在的文件」做真缺口的交叉证据：三份顶端合同把 `docs/contracts/data-completion-contract.md` 列为 sister contract，`git cat-file -e` 却 exit 128 —— 悬空引用，比单看路径不存在更有说服力。
 - `gh` 只读查询把两个 GitHub 未闭合项坐实（#24 OPEN、#37 OPEN），让 C3-1 / C3-3 有仓库外的独立佐证。
 
 ## 失败动作与根因
 
 - `gh issue view 24 --repo yishu-ziyu/econpaper` 失败（GraphQL: Could not resolve to a Repository）。根因：仓库名是我按上下文猜的，没先读 remote。改法：先 `git remote -v` 拿到 `yishu-ziyu/empirical-paper-workbench` 再查。
 - `git log <b> --not A --not B ...` 把全部 refs 都当作包含项，输出 20 行无关提交。根因：git 的 `--not` 是「翻转其后所有 revision 前缀」的开关，第二个 `--not` 又把语义翻回来了。改法：改用 `^<ref>` 前缀逐个排除。
-- 参照集只用 20 个非祖先分支时，`feat/fm-e-build-bryce-g0` 的差集被算成 72 个文件、32 个提交（把顶端已有的 `did-spec-recut-1` 整条链都算成它的）。根因：它的起枝点 `bf695715`（= `did-spec-recut-1` tip）不在那 20 个 ref 里，而在顶端的祖先集合里。改法：参照集扩到 9/15 全部 49 个 ref + 顶端 + main，bryce-g0 收敛为只加 `docs/bryce-tools-contract.md`。
+- 参照集只用 20 个非祖先分支时，`feat/fm-e-build-bryce-g0` 的差集被算成 72 个文件、32 个提交（把顶端已有的 `did-spec-recut-1` 整条链都算成它的）。根因：它的起枝点 `bf695715`（= `did-spec-recut-1` tip）不在那 20 个 ref 里，而在顶端的祖先集合里。改法：参照集扩到 9/15 全部 49 个 ref + 顶端 + main，bryce-g0 收敛为只加 `docs/contracts/bryce-tools-contract.md`。
 - 其余为只读查询，无失败。
 
 ## 可复现条件

@@ -143,5 +143,5 @@ StepReport = {
 ## References
 
 - 架构评审：improve-codebase-architecture session 2（2026-07-28）
-- 词汇表：[CONTEXT.md](../../CONTEXT.md) — CleaningStep / StepReport / CleaningPipeline
+- 词汇表：[docs/product/glossary.md](../product/glossary.md) — CleaningStep / StepReport / CleaningPipeline
 - 前序 ADR：[ADR-0001](0001-split-title-and-body-chapters-in-state.md)（chapters 拆分，同一架构评审周期）

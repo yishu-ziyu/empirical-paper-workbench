@@ -339,7 +339,7 @@ workspace/
 
 ### 下一步（to-tickets 阶段输入）
 
-本 spec 完成后，进入 `to-tickets` 阶段，拆成 tracer-bullet 垂直切片。每个 ticket 声明 blocking edges。**实际 ticket 已发布到** [econpaper/.scratch/copaper-pivot-v1/issues/](../../.scratch/copaper-pivot-v1/issues/)，共 11 个：
+本 spec 完成后，进入 `to-tickets` 阶段，拆成 tracer-bullet 垂直切片。每个 ticket 声明 blocking edges。**实际 ticket 已发布到** `econpaper/.scratch/copaper-pivot-v1/issues/`（该目录已不在仓库中），共 11 个：
 
 | # | Ticket | Blocked by | 端到端 demo |
 |---|---|---|---|

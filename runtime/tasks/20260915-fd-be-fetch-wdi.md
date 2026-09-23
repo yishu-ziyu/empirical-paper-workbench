@@ -7,7 +7,7 @@
 - Hard bar: confirmed growth design required; no `dataAttached`; Barro fixture is not the WDI fetch; write-set is WDI fetch + tests only; no PR
 - Session / run ID:
 - Current research stage:
-- Current review / approval gate: FD-BE-fetch-wdi accept (docs/real-fetch-contract.md §8.1)
+- Current review / approval gate: FD-BE-fetch-wdi accept (docs/contracts/real-fetch-contract.md §8.1)
 - Verified facts:
   - Start: `feat/fm-e-build-real-fetch-1` @ `8303340`
   - POST `/sessions/{id}/find-data/fetch-wdi` writes `workspace/fetch/wdi_NY.GDP.PCAP.KD.ZG.csv` on mocked World Bank JSON, else `external_link` + WDI URL

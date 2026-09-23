@@ -9,7 +9,7 @@
 - Current research stage: NORMS-BE yaml + hooks
 - Current review / approval gate: none (no PR)
 - Verified facts:
-  - G0 freeze: `docs/bryce-tools-contract.md` on `feat/fm-e-build-bryce-g0` §0.1 / §2.3 / §4.3 / §7.3
+  - G0 freeze: `docs/contracts/bryce-tools-contract.md` on `feat/fm-e-build-bryce-g0` §0.1 / §2.3 / §4.3 / §7.3
   - Start SHA `4546e4de` is DATA-RIGOR tip
   - Propose always calls `assert_propose_gates`; missing yaml or DiD/HET without interaction hard-blocks
   - Write calls `chapter_write_blockers`; confirmed path requires dataAttached + clean_winsor + table1 then spec; lit_review still R-lit-bar

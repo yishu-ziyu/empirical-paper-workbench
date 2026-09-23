@@ -48,7 +48,7 @@ implementer 实现并自检；validator 按 C1–C6 独立复跑命令；本批�
 
 ### C3 顶层 EVAL-top5 台架可用且保持隔离
 
-程序：从 `feat/fm-e-build-eval-top5-1` 搬入顶层 `eval/`（`harness.py`、`slots.json`、`pytest.ini`、`top5-set.submodule`、`tests/test_eval_top5.py`、`README.md`）与 `docs/eval-top5.md`。搬后执行：
+程序：从 `feat/fm-e-build-eval-top5-1` 搬入顶层 `eval/`（`harness.py`、`slots.json`、`pytest.ini`、`top5-set.submodule`、`tests/test_eval_top5.py`、`README.md`）与 `docs/dev/eval-top5.md`。搬后执行：
 
 1. `agent/.venv/bin/python -m pytest eval/tests -q` → 用例通过（数字记录）。
 2. 隔离性：`git grep -n -E "from eval|import eval|eval\.harness" -- agent backend frontend` → **0 命中**，即产品运行时不得 import 它。
@@ -56,24 +56,24 @@ implementer 实现并自检；validator 按 C1–C6 独立复跑命令；本批�
 
 预期：3 项全过。注意：`eval/` 与顶端既有 `agent/eval/` 是两套东西，**不得合并或改名**（盘点 C3-2 已确认无文件重合）。
 
-### C4 `docs/data-completion-contract.md` 落地，三处悬空引用成立
+### C4 `docs/contracts/data-completion-contract.md` 落地，三处悬空引用成立
 
-程序：从 `docs/fm-e-build-data-complete-1-g0` 搬入 `docs/data-completion-contract.md`，然后逐处复核引用它的一方所声称的内容在该文件里成立：
+程序：从 `docs/fm-e-build-data-complete-1-g0` 搬入 `docs/contracts/data-completion-contract.md`，然后逐处复核引用它的一方所声称的内容在该文件里成立：
 
-- `docs/find-data-lit-contract.md:8` 与 `:502`
-- `docs/infer-design-contract.md:320` 与 `:478`
-- `docs/real-fetch-contract.md:583`
+- `docs/contracts/find-data-lit-contract.md:8` 与 `:502`
+- `docs/contracts/infer-design-contract.md:320` 与 `:478`
+- `docs/contracts/real-fetch-contract.md:583`
 
 预期：文件存在；上述 5 处引用处，每处把「引用原文」与「被引文件对应章节」成对贴出，逐处判定成立或不成立并给出结论。**若某处声称的内容在搬入文件里并不存在，必须如实报告该处仍不成立，不得改引用原文去迁就。**
 
-### C5 `docs/bryce-tools-contract.md` 落地，「四件 IN」逐件可证
+### C5 `docs/contracts/bryce-tools-contract.md` 落地，「四件 IN」逐件可证
 
-程序：从 `feat/fm-e-build-bryce-g0` 搬入 `docs/bryce-tools-contract.md`，并对契约声明的四件逐件在顶端给出实现证据（命令 + 命中位置），至少覆盖：FL 复用、CL winsor、NORMS 闸门、OLS 标签。
+程序：从 `feat/fm-e-build-bryce-g0` 搬入 `docs/contracts/bryce-tools-contract.md`，并对契约声明的四件逐件在顶端给出实现证据（命令 + 命中位置），至少覆盖：FL 复用、CL winsor、NORMS 闸门、OLS 标签。
 预期：文件存在；四件逐件有命中；无法在顶端找到实现的那件如实标为不成立。
 
 ### C6 takeaway 数学研究笔记落地，且其 BLOCKED 状态不被改写
 
-程序：从 `fix/fm-e-takeaway-g0-contract` 搬入 `docs/takeaway-math-research-notes.md`。
+程序：从 `fix/fm-e-takeaway-g0-contract` 搬入 `docs/notes/takeaway-math-research-notes.md`。
 预期：文件存在；其记录的「MATH-1 在真机 Word 里公式仍是转义 LaTeX」保持 **BLOCKED/OPEN** 原状，**不得**改写成已完成——批 F（C10 Word 公式排版）才是处理它的地方，本批只还原记录。
 
 ## Evidence

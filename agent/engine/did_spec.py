@@ -5,7 +5,7 @@ Trigger is confirmed ``session.design.method=did`` (DECIDE-6), not catalog
 estimate / no write-as-estimated). Does not emit ``| entity + time`` as a
 DiD substitute and does not rewrite the OLS lock.
 
-See docs/infer-design-contract.md §7.3.
+See docs/contracts/infer-design-contract.md §7.3.
 """
 from __future__ import annotations
 

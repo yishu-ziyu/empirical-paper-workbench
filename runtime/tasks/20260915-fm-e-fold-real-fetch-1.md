@@ -12,7 +12,7 @@
   - Serial `--no-ff` merges. Product conflicts: find_data candidates/plan/router/schemas + OpenAPI/STATE/wiki. Honesty structure taken; captain-local-real kept on plan venues, not find-success. Fixtures on teaching shelf only.
   - ck1994_long blob identical to base (`56b0cab3`).
   - `POST /sessions/{id}/attach` and `/confirm-attach` still registered. `data_honesty.py` demo_success gates remain.
-  - Slice files present: `docs/real-fetch-contract.md`, `agent/find_data/honesty.py`, `card_zip.py`, `dataverse.py`, `fetch_wdi.py`, `frontend/src/components/FindDataHonesty.tsx`.
+  - Slice files present: `docs/contracts/real-fetch-contract.md`, `agent/find_data/honesty.py`, `card_zip.py`, `dataverse.py`, `fetch_wdi.py`, `frontend/src/components/FindDataHonesty.tsx`.
 - Current hypothesis: sibling REAL-FETCH write-sets needed one SHA with BRYCE+attach for honest find + live fetch.
 - Changed files: six serial merges; OpenAPI regen; STATE/wiki unions; this task + learning record
 - Failed paths: env missing venvs; installed locally for `make test` only. Not a product change.

@@ -1,0 +1,6 @@
+# Historical records over 400 lines. Frozen as records; may not grow.
+# Living docs never go here: split them instead (docs/conventions.md).
+423 docs/acceptance/card-canonical-research-experience-validator.md
+401 docs/adr/0004-sakana-review-and-literature-nodes.md
+422 docs/plans/2026-09-01-1252-chore-local-workspace-cleanup-plan.md
+475 docs/plans/2026-09-02-1324-fix-durable-upload-recovery-plan.md

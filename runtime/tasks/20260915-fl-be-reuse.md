@@ -4,7 +4,7 @@
 - Status: complete
 - Git context: `feat/fm-e-build-fl-be-reuse-1` from `fix/fm-e-build-data-rigor-1` @ `4546e4de`
 - Goal: Thin-wrap `fetch_papers.py` into existing `find_lit` (OpenAlex+Crossref+S2 DOI dedupe). Checkbox before write. No parallel lit pipeline. Respect DATA-RIGOR (no synthetic as found).
-- Hard bar: DECIDE-8 FL-BE-reuse in `docs/bryce-tools-contract.md` §7.1 (read from `feat/fm-e-build-bryce-g0` @ `077a2150`). Formal econpaper only. Write-set: find_lit / fetch_papers integration + tests only.
+- Hard bar: DECIDE-8 FL-BE-reuse in `docs/contracts/bryce-tools-contract.md` §7.1 (read from `feat/fm-e-build-bryce-g0` @ `077a2150`). Formal econpaper only. Write-set: find_lit / fetch_papers integration + tests only.
 - Session / run ID:
 - Current research stage: FIND-LIT reuse
 - Current review / approval gate: none (no PR)

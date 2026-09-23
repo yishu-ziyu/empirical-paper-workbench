@@ -1,6 +1,6 @@
 /**
  * FIND-DATA honesty types (FD-FE-honesty).
- * docs/real-fetch-contract.md §2–§3. Not OpenAPI; backend honesty owns the public shape.
+ * docs/contracts/real-fetch-contract.md §2–§3. Not OpenAPI; backend honesty owns the public shape.
  */
 
 export const FIND_DATA_SOURCE_KINDS = [

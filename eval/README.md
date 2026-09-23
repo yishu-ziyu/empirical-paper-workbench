@@ -4,8 +4,8 @@ V1 evaluation for DECIDE-8 **top5 eval only**. This directory is a harness
 plus a submodule stub. It is **not** the product catalog, **not** a session
 answer key, and **not** on the default runtime path.
 
-Contract: `docs/bryce-tools-contract.md` §2.4 / §4.4 / §7.4.
-How to run: `docs/eval-top5.md`.
+Contract: `docs/contracts/bryce-tools-contract.md` §2.4 / §4.4 / §7.4.
+How to run: `docs/dev/eval-top5.md`.
 
 ## What this is
 

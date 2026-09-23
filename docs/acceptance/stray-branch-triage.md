@@ -106,5 +106,5 @@ validator 独立复核结论 ACCEPT（C1–C5 全 PASS，6 条 `已重做` 与 1
 3. **证据行的第二个计数错误**（在 `runtime/STATE.md` 判定表内，非本契约文本）：`feat/fm-e-build-classic-fixtures-1` 一行原写 `catalog.json` 分支 79 行，实测 103 行（顶端 133 行）。已改。该行判定 `已重做` 的依据是三个夹具文件 blob 完全相同，不受此计数影响。
 4. **「意译当逐字引文」**：`runtime/STATE.md` C3-1 原把一句中译放在引号里呈现为分支源码原文；源码实为英文 `There is intentionally no negation window. Any hit is a TWFE claim.`。已替换为原文并注明系复核后更正。判定方向 `真缺口` 不变。
 5. **C5 的变更路径枚举**：C5 原写「改动只涉及 C4 的三个文件」，实际还有本契约文件自身（派发方在开工前写成，属输入工件）。已在任务文件 `Changed files` 中补为 4 个。
-6. **未覆盖的既成事实**：契约 `Not this` 只禁「合并 / rebase / 删除 / push」，未覆盖**本地指针 reset**。2026-09-16 开工前，本地 8 个旧分支已 reset 到各自 `origin` 同名分支（目的：消除历史重写造成的假分叉）。复核确认：7 个分支新旧 tree 完全相同；`main` 由 `452a8954` → `79c9c915` 为 23 个文件的纯新增（仅 `docs/local-runner.md` 含 +46/−12），旧 tip 已不可从任何 ref 到达（只存于 reflog），**内容层无损失**。该项已登记在任务文件 `Git context` 与其学习记录里，供后续会话知悉。
+6. **未覆盖的既成事实**：契约 `Not this` 只禁「合并 / rebase / 删除 / push」，未覆盖**本地指针 reset**。2026-09-16 开工前，本地 8 个旧分支已 reset 到各自 `origin` 同名分支（目的：消除历史重写造成的假分叉）。复核确认：7 个分支新旧 tree 完全相同；`main` 由 `452a8954` → `79c9c915` 为 23 个文件的纯新增（仅 `docs/dev/local-runner.md` 含 +46/−12），旧 tip 已不可从任何 ref 到达（只存于 reflog），**内容层无损失**。该项已登记在任务文件 `Git context` 与其学习记录里，供后续会话知悉。
 

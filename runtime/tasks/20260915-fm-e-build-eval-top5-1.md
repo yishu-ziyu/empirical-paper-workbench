@@ -20,10 +20,10 @@
   - `eval/top5-set.submodule`
   - `eval/README.md`
   - `eval/tests/test_eval_top5.py`
-  - `docs/eval-top5.md`
+  - `docs/dev/eval-top5.md`
   - `README.md`
 - Failed paths:
-- Data / output evidence locations: `docs/eval-top5.md`
+- Data / output evidence locations: `docs/dev/eval-top5.md`
 - Test evidence: `cd eval && python -m pytest -q` — 21 passed. `python eval/harness.py` → skipped; flag + `--offline` → set_absent exit 0. `make test` not run here (backend/.venv and StatsPAI absent). `make verify` skipped (services down).
 - Pending external state: no PR
 - Next action: none; branch pushed; no PR

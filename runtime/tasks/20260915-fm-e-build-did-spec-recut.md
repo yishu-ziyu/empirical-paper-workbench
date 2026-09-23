@@ -22,7 +22,7 @@
   - `backend/routers/outline.py`
   - `agent/tests/test_did_spec.py`
   - `backend/tests/test_did_spec.py`
-  - `docs/did-narrow-exception-contract.md`
+  - `docs/contracts/did-narrow-exception-contract.md`
 - Failed paths: first pass bound `design.treated`/`period` slots; removed
 - Data / output evidence locations: `agent-learning/raw/2026-09-15_did-be-spec-recut.md`
 - Test evidence: `make test` 2026-09-15 — agent 881 passed / 2 skipped; backend 549 passed / 8 skipped; frontend 431 passed (58 files); check-api-drift green. `make verify` skipped (services down).

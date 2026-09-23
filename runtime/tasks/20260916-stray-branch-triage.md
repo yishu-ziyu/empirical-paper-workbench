@@ -16,7 +16,7 @@
   - C3-1（issue #24 两个漏法）：顶端无 `agent/engine/ols_lock.py`，`agent/nodes/generate_chapter.py` 无 TWFE 清洗，`agent/prompts/methods.py` 无 OLS 硬锁注入；否定跨度与「州+年份固定效应」字面两类处理在顶端 0 命中。`gh issue view 24` → `{"state":"OPEN"}`。判**真缺口**。
   - C3-2（顶层 `eval/`）：`git cat-file -e <top>:eval` → exit 128；分支 `eval/`（harness.py / slots.json / top5-set.submodule / tests）与顶端 `agent/eval/`（judge / personas / packets / run_task / tasks）无文件重合，不是同一件事。判**真缺口**。
   - C3-3（`pydantic-ai-slim`）：顶端 `backend/requirements.txt` 只有 `:8:pydantic==2.13.5`；分支 PR #37 加的 `pydantic-ai-slim[openai]==2.35.3` 不在顶端。顶端 `agent/nodes/review_chapter.py:302-331` 把 ImportError 吞成 `mock_fallback`，`Makefile:47` 与 `backend/Dockerfile:17` 不装 agent 依赖（只有 CI 装）。`gh pr view 37` → OPEN。判**真缺口**。
-  - 悬空引用：顶端 `docs/find-data-lit-contract.md:8/:502`、`docs/infer-design-contract.md:320/:478`、`docs/real-fetch-contract.md:583` 都把 `docs/data-completion-contract.md` 列为 sister contract，但该文件在顶端不存在。
+  - 悬空引用：顶端 `docs/contracts/find-data-lit-contract.md:8/:502`、`docs/contracts/infer-design-contract.md:320/:478`、`docs/contracts/real-fetch-contract.md:583` 都把 `docs/contracts/data-completion-contract.md` 列为 sister contract，但该文件在顶端不存在。
   - 被认定为「已重做」的 6 条都不是靠分支名或台账行：4 条给的是顶端同路径超集符号（`suggest_candidates`、`did_spec_applies`、`confirm_attach_dataset`、`attach_gate_fields` 等），1 条给的是三个文件 blob 完全相同（classic-5 夹具），1 条给的是顶端 superseded 存根正文（did-narrow 合同）。
 - Current hypothesis: 这批 20 个分支是 9/15 的一条**独立串行产品线**（DATA-COMPLETE / PREWRITE-PAUSE / WORD-FIX / OLS lock / HET-CODE-EXPORT / EVAL-top5 / BRYCE-G0 等「外部并行写集」），顶端只吸收了其中的 DC-BE-attach / classic-5 suggest / DID-BE-gate-spec / classic-5 夹具四类意图，其余靠重切而非合入；前端两片（dataAttached 门、attach 面板）与五个后端/文档件在顶端完全不存在。
 - Changed files:（4 个，逐条列在下面）
@@ -27,7 +27,7 @@
 - Failed paths:（4 条，逐条列在下面；均为工具用法问题，无产品代码失败）
   - `gh issue view 24 --repo yishu-ziyu/econpaper` 仓库名猜错 → 用 `git remote -v` 取到真实仓库 `yishu-ziyu/empirical-paper-workbench` 后成功。
   - `git log <b> --not A --not B` 因 `--not` 会成对翻转语义而把全部 refs 都算进来 → 改用 `^ref` 前缀逐个排除。
-  - 只拿 20 个非祖先分支当参照集时，`cursor/fm-e-build-bryce-g0` 的「自己的产物」被算成 72 个文件（因为它从 `did-spec-recut-1` 起枝，而该 ref 不在 20 个里）→ 参照集扩到 9/15 全部 49 个 ref，bryce-g0 收敛为只加 `docs/bryce-tools-contract.md`。
+  - 只拿 20 个非祖先分支当参照集时，`cursor/fm-e-build-bryce-g0` 的「自己的产物」被算成 72 个文件（因为它从 `did-spec-recut-1` 起枝，而该 ref 不在 20 个里）→ 参照集扩到 9/15 全部 49 个 ref，bryce-g0 收敛为只加 `docs/contracts/bryce-tools-contract.md`。
   - 未按 zsh 写带 `printf '%-52s'` 的循环或 `${VAR#prefix}`；全部用 `python3 - <<'PY'` + `subprocess.run` 执行。
 - Data / output evidence locations: `runtime/STATE.md` 新增节的 20 行判定表 + C3-1/2/3 三个独立结论；逐条命令与输出片段内联在该节及其证据行里，不另存大日志。
 - Test evidence: 本轮**未执行任何测试**（契约 Not this 明确排除；且本机两个 venv 控制台脚本因路径带空格失效、顶端新增依赖未装，跑出来的失败不是产品结论）。所有结论只基于 git 树、`git cat-file` / `git grep` 退出码与 `gh` 只读查询。
@@ -36,7 +36,7 @@
   - `gh pr view 37` → OPEN（backend 声明 pydantic-ai，对应第 1 条分支）。
   - 顶端当前 open PR 共 3 条：#37、#36 `deploy/private-pilot`、#35 `review/first-value-entry`（后两条不属于本轮 20 个分支）。
   - 用户需拍板：14 条 `真缺口` 里哪些要补做、两类「半覆盖」是否接受现状、悬空的 data-completion 合同引用是补文件还是改引用。`origin/*` 引用与本地分支全部保持原状（含 `origin/cursor/backend-typed-review-dep-70ab` 等 20 个端点）。
-- Next action: 契约已闭环（validator ACCEPT）。等待用户决定 14 条 `真缺口` 的补齐范围（尤其 3 条「半覆盖」与两个 GitHub 未闭合项 #24 / #37），以及悬空的 `docs/data-completion-contract.md` 引用如何处置。本轮改动尚未提交、未推送。
+- Next action: 契约已闭环（validator ACCEPT）。等待用户决定 14 条 `真缺口` 的补齐范围（尤其 3 条「半覆盖」与两个 GitHub 未闭合项 #24 / #37），以及悬空的 `docs/contracts/data-completion-contract.md` 引用如何处置。本轮改动尚未提交、未推送。
 - Updated at: 2026-09-16
 
 不得写入凭据、用户原始数据、未公开论文正文、私人对话或隐藏推理。

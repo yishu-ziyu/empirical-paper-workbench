@@ -63,4 +63,4 @@ class EconPaperState(TypedDict, total=False):
 ## References
 
 - 架构评审：improve-codebase-architecture session（2026-07-28）
-- 词汇表：[CONTEXT.md](../../CONTEXT.md) — Title Chapter / Body Chapter / Chapter Index
+- 词汇表：[docs/product/glossary.md](../product/glossary.md) — Title Chapter / Body Chapter / Chapter Index

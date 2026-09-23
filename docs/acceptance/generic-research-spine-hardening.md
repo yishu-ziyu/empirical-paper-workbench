@@ -123,7 +123,7 @@ M0 / M2 / M3 / M4、C29–C33 / C35–C36、Card 有判据时的 Unexpected / Ex
 - C21：boot 注入 FAILED（4s 出现）：单一 "Boot failed · 启动失败" 卡 + Retry Card + Back to desk（m4b-boot-failure-single-surface.png）；programmatically 验证同屏无 "仍在进行"/"确认 Admissible Space"/"重新选择文件"。
 - C22：`new-study-entry` 单击回空桌、localStorage 会话清除、Try Card 可见（m4c-new-study-empty-desk.png）；New study→Try Card 落 Question 页。
 - C23：矩阵行与 History 均可交互（见 supplement 判定表）——死交互不可复现，机理记录于 Audit Supplement，未改交互语义。
-- C24：repo-owned launcher 确定性复现 BrokenPipe→run 误标 FAILED；独立 issue https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；docs/local-runner.md 记录前置条件；研究节点无 BrokenPipe 吞噬。
+- C24：repo-owned launcher 确定性复现 BrokenPipe→run 误标 FAILED；独立 issue https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；docs/dev/local-runner.md 记录前置条件；研究节点无 BrokenPipe 吞噬。
 - C25/C26/C27：clean first-user journey 全程走通（ supplement 方法附注），全程 console 零错误；evidence_revision 1→2、claim v1→v2、stale→redraft→approve、explicit Promote（canonical=iv_region_dummies）、grounded 门（Results 基于证据）、provenance 均保持。
 - C28：`make test`、`tsc --noEmit`、`npm run lint`、`npm run build` 全部 0 退出（最终提交后复跑记录见 PR 描述）。
 

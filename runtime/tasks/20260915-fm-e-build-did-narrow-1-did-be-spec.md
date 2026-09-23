@@ -9,7 +9,7 @@
 - Current research stage:
 - Current review / approval gate:
 - Verified facts:
-  - Contract: `docs/did-narrow-exception-contract.md` §2
+  - Contract: `docs/contracts/did-narrow-exception-contract.md` §2
   - Gate already on tip: `allow_did` from title/catalog only
   - Counts: `treat:post` / `treat * post` / `treat_post` / `did` dummy
   - Does not count: treat alone, `| id + year`, method=did, first_treat_col

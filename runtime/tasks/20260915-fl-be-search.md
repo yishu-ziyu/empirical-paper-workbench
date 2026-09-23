@@ -4,7 +4,7 @@
 - Status: complete
 - Git context: `feat/fm-e-build-fl-be-search-1` from `feat/fm-e-build-find-data-lit-1` @ `7851335f`
 - Goal: Literature search V1 — OpenAlex + Crossref + S2, DOI dedupe, ≥5 verifiable checkbox cards, checked → refs.bib / CSL-JSON, mailto polite pool. Replace generate-as-lit. No gold biblio paste.
-- Hard bar: R-lit-bar in `docs/find-data-lit-contract.md` §7–§8. Formal econpaper only. Write-set disjoint from FD / INF / DID / attach / FE / docs.
+- Hard bar: R-lit-bar in `docs/contracts/find-data-lit-contract.md` §7–§8. Formal econpaper only. Write-set disjoint from FD / INF / DID / attach / FE / docs.
 - Session / run ID:
 - Current research stage: FIND-LIT search
 - Current review / approval gate: none (no PR)

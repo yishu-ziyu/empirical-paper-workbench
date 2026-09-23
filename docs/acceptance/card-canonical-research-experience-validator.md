@@ -414,7 +414,7 @@ This report is ACCEPT.
 | J-0 失败态四种矛盾信号 | boot 注入 FAILED：单一 "Boot failed · 启动失败" 卡（upload_pipeline_failed + Retry Card + Back to desk），无"仍在进行/去冻结/重新选择文件"同屏 ✓ |
 | K5/P5 无回桌入口 | 会话内 "New study · 回工作台" 单击回空桌；Try Card 重开新研究落 Question 页（修复了跨会话视图残留）✓ |
 | K4/P5 矩阵行/History 2 "死交互" | **不可复现（automation/语义伪象）**：硬刷新后 el.click() 单击 OLS 行、再单击 IV 行，从 "Select two specifications…" 占位重建 0.0747→0.1315 对比；History 按钮真实切换 run（title "Switch run (1/2)"↔"(2/2)"）。审计观察到"无效果"的机理：① toggle 语义下点击已选中行会反选、Compare 消失，观感像死；② challenge preview 与 exploratory 是同一 spec 的重复估计，两个 run 系数逐位相同（0.13150383…），History 切换无可见变化。记录在案，不为过审改交互语义 |
-| BrokenPipe（J-0 infra） | repo-owned launcher 下确定性复现（`python -m runner | true` → run 误标 FAILED），独立 issue 跟踪：https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；本分支只在 docs/local-runner.md 记录本地运行前置条件，不在研究节点吞异常 |
+| BrokenPipe（J-0 infra） | repo-owned launcher 下确定性复现（`python -m runner | true` → run 误标 FAILED），独立 issue 跟踪：https://github.com/yishu-ziyu/empirical-paper-workbench/issues/30 ；本分支只在 docs/dev/local-runner.md 记录本地运行前置条件，不在研究节点吞异常 |
 
 ## 方法附注
 

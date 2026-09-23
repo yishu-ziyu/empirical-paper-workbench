@@ -10,7 +10,7 @@
 - Current review / approval gate: pushed; no PR
 - Verified facts: `session_allow_did` ignores catalog/title/form/stamps. `confirmed_did_method` is the spec hard-block hook. `make test` green.
 - Current hypothesis: confirmed design is the only DiD unlock
-- Changed files: `backend/services/allow_did.py`, `backend/tests/test_allow_did.py`, `backend/routers/sessions.py`, `backend/schemas/responses.py`, OpenAPI sync, `docs/did-narrow-exception-contract.md` deprecation note
+- Changed files: `backend/services/allow_did.py`, `backend/tests/test_allow_did.py`, `backend/routers/sessions.py`, `backend/schemas/responses.py`, OpenAPI sync, `docs/contracts/did-narrow-exception-contract.md` deprecation note
 - Failed paths: none after recut
 - Data / output evidence locations: `backend/tests/test_allow_did.py`
 - Test evidence: `make test` 2026-09-15 — agent 818 passed / 2 skipped; backend 494 passed / 8 skipped; frontend 431 passed; check-api-drift green. `make verify` skipped (services down).

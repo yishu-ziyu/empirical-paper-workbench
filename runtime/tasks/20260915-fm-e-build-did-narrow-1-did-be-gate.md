@@ -9,7 +9,7 @@
 - Current research stage:
 - Current review / approval gate:
 - Verified facts:
-  - Contract: `docs/did-narrow-exception-contract.md` §1
+  - Contract: `docs/contracts/did-narrow-exception-contract.md` §1
   - Existing catalog token: `minimum-wage-employment` in `fixtures/classic-5/catalog.json` (read only)
   - CLASSIC-FIXTURES landed separately: `feat/fm-e-build-classic-fixtures-1` @ `24e79c46` renamed minwage ranking id to `ck1994_long` and added `barro1991_growth`
   - This branch does not rewrite fixture CSVs; gate keys `minimum-wage-employment` / `ck1994` / `ck1994_long` + minwage title keywords

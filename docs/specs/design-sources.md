@@ -15,7 +15,7 @@ Notion 不是奕枢色板。
 本窗用 MCP 实拉了 24 页，不是只看 doctor。
 
 本机货架从 `Documents/design-notes/living/INDEX.md` 进。
-`DESIGN.md` 里蜡笔红段落是旧档案，不是现行命令。
+旧根目录 `DESIGN.md` 的蜡笔红段落已删除；仅存的第 10 节交互与动效纪律在 [interaction-motion-rules.md](../design/interaction-motion-rules.md)。
 
 ## Notion 这轮读过的页
 

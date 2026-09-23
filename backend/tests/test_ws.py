@@ -13,7 +13,9 @@ assertion.
 
 import asyncio
 
+from facade import facade
 from runner import process_one_run
+from .confirmation_helpers import observed, confirm_seen_attach
 
 
 def _drain_ws(client, session_id, max_messages=20):
@@ -52,6 +54,23 @@ def test_ws_streams_status_messages(uploaded_session, client):
 def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
     """WS streams generate_title tokens as streaming_chunk frames."""
     mock_llm_for("generate_title", return_value="Mocked Title")
+    # FORMAL-CONFIRMATION-CHAIN-1：upload-era 会话须先确认挂接，/direction 才受理。
+    attached = confirm_seen_attach(client, uploaded_session)
+    assert attached.status_code == 200, attached.text
+    # FORMAL-CONFIRMATION-CHAIN-2 R1：正式会话还须有已确认设计，方向才可入队。
+    facade.update_state(
+        uploaded_session,
+        design={
+            "status": "confirmed",
+            "confirmed": True,
+            "proposed_at": "2026-09-17T00:00:00Z",
+            "confirmed_at": "2026-09-17T00:05:00Z",
+            "method": "ols",
+            "outcome": "income",
+            "treatment": "age",
+            "controls": [],
+        },
+    )
     # PREWRITE-PAUSE：/direction 现在只跑到 identification_verify 就停（Table 1 +
     # 方程要先确认），generate_title 在 prewrite/confirm 之后的 estimate 臂里才跑。
     # 所以这里按产品真实路径走两段：设方向 → 确认 → 跑完预写，再开 WS 才有标题可流。
@@ -59,6 +78,7 @@ def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
         f"/sessions/{uploaded_session}/direction",
         headers={"Idempotency-Key": "ws-direction"},
         json={
+            **observed(client, uploaded_session),
             "question": "年龄与收入",
             "dv": "income",
             "iv": "age",
@@ -75,12 +95,24 @@ def test_ws_streams_title_chunks(uploaded_session, client, mock_llm_for):
 
     confirmed = client.post(
         f"/sessions/{uploaded_session}/prewrite/confirm",
+        headers={"Idempotency-Key": "ws-record-t1"},
+        json={"action": "record_confirms", "table1Confirmed": True, **observed(client, uploaded_session)},
+    )
+    assert confirmed.status_code == 200, (
+        f"table1 confirm failed: {confirmed.status_code}: {confirmed.text}"
+    )
+    confirmed = client.post(
+        f"/sessions/{uploaded_session}/prewrite/confirm",
+        headers={"Idempotency-Key": "ws-record-spec"},
+        json={"action": "record_confirms", "specConfirmed": True, **observed(client, uploaded_session)},
+    )
+    assert confirmed.status_code == 200, (
+        f"spec confirm failed: {confirmed.status_code}: {confirmed.text}"
+    )
+    confirmed = client.post(
+        f"/sessions/{uploaded_session}/prewrite/confirm",
         headers={"Idempotency-Key": "ws-confirm"},
-        json={
-            "action": "continue_estimate",
-            "table1Confirmed": True,
-            "specConfirmed": True,
-        },
+        json={"action": "continue_estimate", **observed(client, uploaded_session)},
     )
     assert confirmed.status_code == 202, (
         f"prewrite confirm failed: {confirmed.status_code}: {confirmed.text}"

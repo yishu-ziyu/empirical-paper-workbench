@@ -274,22 +274,15 @@ async def attach_user_file_bytes(
     return admission
 
 
-async def confirm_attach(session_id: str) -> dict[str, Any]:
+async def confirm_attach(session_id: str, *, expected_target: dict | None = None) -> dict[str, Any]:
     """Set dataAttached only when ingest is READY and a dataset is bound."""
-    active = await _active_run_id(session_id)
-    if active is not None:
-        raise _session_busy(active)
-    try:
-        csv_path = await run_in_threadpool(facade.get_csv_path, session_id)
-    except Exception:
-        csv_path = None
-    has_dataset = bool(csv_path)
-    state = await run_in_threadpool(facade.get_state, session_id)
-    if not has_dataset:
-        raise _no_candidate()
-    require_ingest_ready(state, has_dataset=True)
-    return await run_in_threadpool(
-        facade.update_state,
-        session_id,
-        **attach_gate_fields(True),
-    )
+    from services.formal_binding import require_observed_target
+
+    def confirm(state: dict) -> dict:
+        if not state.get("csv_path"):
+            raise _no_candidate()
+        require_ingest_ready(state, has_dataset=True)
+        require_observed_target(state, expected_target, ("dataset",))
+        return {**state, **attach_gate_fields(True)}
+
+    return await run_in_threadpool(facade.mutate_state, session_id, confirm, idle=True)

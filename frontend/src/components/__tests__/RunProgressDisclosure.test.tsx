@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { I18nProvider } from '../../lib/i18n'
+import {
+  appendRunProgressEvent,
+  createRunProgressState,
+} from '../../lib/runSteps'
 import RunProgressDisclosure from '../RunProgressDisclosure'
 import type { RunProgressEvent } from '../../lib/runEvents'
 
@@ -10,9 +14,14 @@ const ev = (over: Partial<RunProgressEvent>): RunProgressEvent => ({
 })
 
 function renderDisclosure(events: RunProgressEvent[]) {
+  const owner = { sessionId: 'session-1', runId: 'run-1', kind: 'prewrite' }
+  const progress = events.reduce(
+    (state, event) => appendRunProgressEvent(state, owner, event),
+    createRunProgressState(owner),
+  )
   return render(
     <I18nProvider>
-      <RunProgressDisclosure events={events} />
+      <RunProgressDisclosure progress={progress} />
     </I18nProvider>,
   )
 }
@@ -65,17 +74,29 @@ describe('RunProgressDisclosure', () => {
     ])
   })
 
-  test('被拦住时如实标出，不写成「已完成」', () => {
+  test('被拦住时折叠摘要也明确写出，不靠琥珀色圆点暗示', () => {
     renderDisclosure([ev({ node: 'identification_verify', status: 'blocked' })])
     const step = screen.getByTestId('run-progress-step')
     expect(step).toHaveAttribute('data-step-status', 'blocked')
     expect(step).toHaveTextContent('被拦住')
-    expect(screen.getByTestId('run-progress-active')).toHaveTextContent('核对识别策略')
+    expect(screen.getByTestId('run-progress-active')).toHaveTextContent('核对识别策略 · 被拦住')
   })
 
-  test('未知节点显示后端原始节点名，不改写成看起来像已知步骤', () => {
+  test('未知节点用诚实的用户文案，技术标识只留在展开详情', () => {
     renderDisclosure([ev({ node: 'legacy_node_x', status: 'started' })])
+    expect(screen.getByTestId('run-progress-active')).toHaveTextContent('一个尚未命名的后台步骤')
     expect(screen.getByTestId('run-progress-step')).toHaveTextContent('legacy_node_x')
+  })
+
+  test('已收到的步骤都完成但 run 尚未终结时只说等待结果', () => {
+    renderDisclosure([
+      ev({ node: 'upload_data', status: 'completed' }),
+      ev({ node: 'clean_data', status: 'completed' }),
+    ])
+    expect(screen.getByTestId('run-progress-active')).toHaveTextContent(
+      '已收到的步骤完成，正在等待运行结果',
+    )
+    expect(screen.getByTestId('run-progress-active')).not.toHaveTextContent('这一步已完成')
   })
 
   test('页面里不出现百分比或倒计时', () => {

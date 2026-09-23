@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import session_factory
 from models.research_session import ResearchSession
 from models.run import Run, RunEvent
+from services.formal_binding import (
+    archive_stale_run_result,
+    binding_is_current,
+    supersede_dataset,
+)
 from services.research_lab import merge_spec_run_lab, strip_spec_run_result
 
 
@@ -149,18 +154,19 @@ class RunRepository:
         kind: RunKind,
         payload: dict[str, Any],
         idempotency_key: str | None,
+        prepare: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     ) -> Run:
         if kind not in SUPPORTED_RUN_KINDS:
             raise ValueError(f"unsupported run kind: {kind}")
         try:
             async with self._factory() as db:
                 async with _write_transaction(db):
-                    locked_session_id = await db.scalar(
-                        select(ResearchSession.session_id)
+                    session = await db.scalar(
+                        select(ResearchSession)
                         .where(ResearchSession.session_id == session_id)
                         .with_for_update()
                     )
-                    if locked_session_id is None:
+                    if session is None:
                         raise SessionNotFound(
                             f"session {session_id} no longer exists"
                         )
@@ -170,6 +176,7 @@ class RunRepository:
                             db, session_id, kind, idempotency_key
                         )
                         if existing is not None:
+                            self._validate_intent_replay(existing, payload)
                             return existing
 
                     active = await self._active_run(db, session_id)
@@ -184,6 +191,9 @@ class RunRepository:
                     if int(pending or 0) >= self.queue_capacity:
                         raise QueueFull("run queue is full")
 
+                    if prepare is not None:
+                        current = {**dict(session.state or {}), "csv_path": session.csv_path}
+                        payload = {**prepare(current), "intent": payload.get("intent")}
                     run = Run(
                         run_id=str(uuid.uuid4()),
                         session_id=session_id,
@@ -205,6 +215,7 @@ class RunRepository:
                         db, session_id, kind, idempotency_key
                     )
                     if existing is not None:
+                        self._validate_intent_replay(existing, payload)
                         return existing
                 active = await self._active_run(db, session_id)
                 if active is not None:
@@ -215,6 +226,13 @@ class RunRepository:
                         f"session {session_id} no longer exists"
                     )
             raise
+
+    @staticmethod
+    def _validate_intent_replay(existing: Run, payload: dict) -> None:
+        intent = payload.get("intent")
+        if intent is not None and (existing.payload or {}).get("intent") != intent:
+            from fastapi import HTTPException
+            raise HTTPException(409, detail={"code": "idempotency_conflict"})
 
     async def admit_upload(
         self,
@@ -255,6 +273,10 @@ class RunRepository:
 
                     state = _json_safe(initial_state)
                     state["upload_readiness"] = "PROCESSING"
+                    # Explicit category for a session the new flow creates:
+                    # legacy is never inferred from a missing marker.
+                    state["session_kind"] = "formal"
+                    state = _with_dataset_binding(state, input_fingerprint)
                     session = ResearchSession(
                         session_id=session_id,
                         user_id=user_id,
@@ -361,6 +383,9 @@ class RunRepository:
                             f"session {session_id} no longer exists"
                         )
                     current = dict(session.state or {})
+                    # New data supersedes the previous dataset revision and the
+                    # approvals/preview built for it (R3).
+                    current = supersede_dataset(current, fingerprint=input_fingerprint)
                     state = {**current, **_json_safe(extra_state)}
                     state["upload_readiness"] = "PROCESSING"
                     state["data_attached"] = False
@@ -456,6 +481,19 @@ class RunRepository:
                 Run.idempotency_key == idempotency_key,
             )
         )
+
+    async def find_run_by_key(
+        self, session_id: str, kind: str, idempotency_key: str | None
+    ) -> Run | None:
+        """Resolve an accepted work item by its delivery credential.
+
+        Write endpoints call this first so a retry after a lost response
+        rejoins the run it already created instead of creating a second one.
+        """
+        if not idempotency_key:
+            return None
+        async with self._factory() as db:
+            return await self._idempotent_run(db, session_id, kind, idempotency_key)
 
     @staticmethod
     async def _active_run(db: AsyncSession, session_id: str) -> Run | None:
@@ -656,6 +694,28 @@ class RunRepository:
                 run.lease_expires_at = _now() + timedelta(seconds=lease_seconds)
                 run.updated_at = _now()
 
+    async def relinquish(self, run_id: str, *, owner: str, lease_epoch: int) -> bool:
+        """Return stopped work only while the same unexpired lease is ours.
+
+        Cancelled, completed, deleted or reclaimed work cannot be resurrected.
+        A new claimant increments the epoch before it can write any result.
+        """
+        try:
+            async with self._factory() as db:
+                async with _write_transaction(db):
+                    run = await self._locked_run(db, run_id)
+                    self._require_lease(run, owner, lease_epoch)
+                    run.status = "PENDING"
+                    run.lease_owner = None
+                    run.lease_expires_at = None
+                    run.updated_at = _now()
+                    await self._append_locked(db, run, "run.requeued", {
+                        "status": "PENDING", "reason": "worker_stopped", "previous_epoch": lease_epoch,
+                    })
+            return True
+        except LeaseLost:
+            return False
+
     async def complete(
         self,
         run_id: str,
@@ -727,6 +787,22 @@ class RunRepository:
                         session.csv_path = str(csv_path) if csv_path else None
                     if run.kind == "upload_pipeline":
                         changed["upload_readiness"] = "READY"
+                    # A pre-write run is only allowed to publish into the
+                    # version it was admitted under. If the design or the
+                    # dataset moved while it worked, its result belongs to
+                    # history, not to the current state (R3/C8).
+                    binding = (run.payload or {}).get("binding")
+                    if (
+                        run.kind == "prewrite"
+                        and changed
+                        and not binding_is_current(current_state, binding)
+                    ):
+                        current_state = archive_stale_run_result(
+                            current_state, binding=binding, result=changed
+                        )
+                        changed = {}
+                if changed.get("estimate") and run.kind == "prewrite":
+                    changed["evidence_stale"] = False
                 session.state = {**current_state, **changed}
                 run.result = safe_result
                 run.status = "SUCCEEDED"
@@ -823,6 +899,11 @@ class RunRepository:
             raise LeaseLost(
                 f"run {run.run_id} lease moved to epoch {run.lease_epoch}"
             )
+
+
+def _with_dataset_binding(state: dict[str, Any], fingerprint: str) -> dict[str, Any]:
+    """Record the dataset revision + fingerprint a fresh upload bound."""
+    return supersede_dataset(state, fingerprint=fingerprint)
 
 
 def _is_readable_file(raw_path: str) -> bool:

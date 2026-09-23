@@ -18,14 +18,18 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from agent.engine.did_spec import DID_MISSING_INTERACTION, can_form_did_main_term
 from auth import get_optional_user, require_session_ownership
 from facade import facade
 from models.user import User
 from services.allow_did import confirmed_did_method
+from services.formal_binding import align_direction, run_binding, require_observed_target
+from services.formal_chain import require_confirm_attached, require_design_confirmed
 from run_repository import QueueFull, RunRepository, SessionBusy, SessionNotFound
 from schemas.responses import (
+    ConfirmationTarget,
     PrewriteConfirmRequest,
     PrewriteGateResponse,
     QueueFullResponse,
@@ -45,6 +49,7 @@ class DirectionRequest(BaseModel):
     """
 
     question: str
+    expectedTarget: Optional[ConfirmationTarget] = None
     dv: str
     iv: str
     controls: List[str] = Field(default_factory=list)
@@ -112,42 +117,31 @@ async def set_direction_endpoint(
 ) -> RunAcceptedResponse:
     """Persist a pre-write command and return before research work begins."""
     require_session_ownership(session_id, current_user)
-    state = facade.get_state(session_id)
-    upload_readiness = state.get("upload_readiness")
-    if upload_readiness in {"PROCESSING", "FAILED", "CANCELLED"}:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "upload_not_ready",
-                "upload_readiness": upload_readiness,
-            },
-        )
-    rd = payload.model_dump()
-    merged = {**state, "research_direction": rd}
-    if confirmed_did_method(state):
-        if not can_form_did_main_term(merged, rd):
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": DID_MISSING_INTERACTION,
-                    "message": (
-                        "confirmed method=did requires treated×period "
-                        "(or equivalent 2×2 DiD main term)"
-                    ),
-                },
-            )
+    expected = payload.expectedTarget.model_dump() if payload.expectedTarget else None
+    submitted = payload.model_dump(exclude={"expectedTarget"})
+    intent = {"action": "direction", "input": submitted, "target": expected}
+
+    def prepare(current: dict) -> dict:
+        # All preconditions and the inserted payload use the same locked state.
+        readiness = current.get("upload_readiness")
+        if readiness in {"PROCESSING", "FAILED", "CANCELLED"}:
+            raise HTTPException(409, detail={"code": "upload_not_ready", "upload_readiness": readiness})
+        require_confirm_attached(current)
+        require_design_confirmed(current)
+        require_observed_target(current, expected, ("design", "dataset"))
+        direction = align_direction(current, submitted)
+        if confirmed_did_method(current) and not can_form_did_main_term({**current, "research_direction": direction}, direction):
+            raise HTTPException(409, detail={"code": DID_MISSING_INTERACTION})
+        return {"research_direction": direction,
+                "initial_state": {**current, "prewrite_phase": "direction"},
+                "phase": "direction", "binding": run_binding(current)}
+
     try:
         run = await RunRepository().enqueue(
             session_id=session_id,
             kind="prewrite",
-            payload={
-                "research_direction": rd,
-                "initial_state": {
-                    **facade.prepare_prewrite_state(session_id),
-                    "prewrite_phase": "direction",
-                },
-                "phase": "direction",
-            },
+            payload={"intent": intent},
+            prepare=prepare,
             idempotency_key=idempotency_key,
         )
     except SessionNotFound as exc:
@@ -212,27 +206,30 @@ async def confirm_prewrite_endpoint(
 ):
     """Record FE confirm flags, or continue estimate after both CTAs."""
     require_session_ownership(session_id, current_user)
-    confirms = payload.model_dump(exclude_none=True)
+    confirms = payload.model_dump()
+    intent = {"action": payload.action, "input": confirms}
     if payload.action == "record_confirms":
-        recorded = facade.record_prewrite_confirms(session_id, confirms)
+        # The facade validates the target, checks idle and writes atomically.
+        recorded = await run_in_threadpool(facade.record_prewrite_confirms,
+            session_id, confirms, idempotency_key=idempotency_key
+        )
         return JSONResponse(
             status_code=200,
             content=PrewriteGateResponse(**recorded).model_dump(mode="json"),
         )
     if payload.action != "continue_estimate":
         raise HTTPException(status_code=422, detail="unsupported confirm action")
-    research_direction, initial_state = facade.prepare_prewrite_confirm(
-        session_id, confirms
-    )
+    def prepare(current: dict) -> dict:
+        direction, initial = facade.prepare_prewrite_confirm(session_id, confirms, state=current)
+        return {"research_direction": direction, "initial_state": initial,
+                "phase": "estimate", "binding": run_binding(current)}
+
     try:
         run = await RunRepository().enqueue(
             session_id=session_id,
             kind="prewrite",
-            payload={
-                "research_direction": research_direction,
-                "initial_state": initial_state,
-                "phase": "estimate",
-            },
+            payload={"intent": intent},
+            prepare=prepare,
             idempotency_key=idempotency_key,
         )
     except SessionNotFound as exc:

@@ -13,16 +13,32 @@ import uuid
 
 from facade import facade
 from runner import process_one_run
+from .confirmation_helpers import observed, confirm_seen_attach
+
+
+def _record_confirms(client, session_id: str) -> None:
+    """The real two-step confirmation path (CHAIN-2 R2): sample, then setting.
+
+    The flags are projections of version-bound confirmation records, so they
+    cannot be passed in on the estimate call any more.
+    """
+    for key, body in (
+        (f"record-t1-{session_id}", {"action": "record_confirms", "table1Confirmed": True}),
+        (f"record-spec-{session_id}", {"action": "record_confirms", "specConfirmed": True}),
+    ):
+        recorded = client.post(
+            f"/sessions/{session_id}/prewrite/confirm",
+            json={**observed(client, session_id), **body},
+            headers={"Idempotency-Key": key},
+        )
+        assert recorded.status_code == 200, recorded.text
 
 
 def _confirm_and_finish(client, session_id: str) -> dict:
+    _record_confirms(client, session_id)
     accepted = client.post(
         f"/sessions/{session_id}/prewrite/confirm",
-        json={
-            "action": "continue_estimate",
-            "table1Confirmed": True,
-            "specConfirmed": True,
-        },
+        json={"action": "continue_estimate", **observed(client, session_id)},
         headers={"Idempotency-Key": f"confirm-{session_id}"},
     )
     assert accepted.status_code == 202, accepted.text
@@ -46,7 +62,7 @@ def _post_and_finish(
 ) -> dict:
     accepted = client.post(
         f"/sessions/{session_id}/direction",
-        json=payload,
+        json={**payload, **observed(client, session_id)},
         headers={"Idempotency-Key": f"test-{session_id}"},
     )
     assert accepted.status_code == 202, accepted.text
@@ -91,14 +107,47 @@ def test_direction_rejects_explicit_non_ready_upload_state(client, readiness):
         facade.drop_session(sid)
 
 
-@pytest.mark.parametrize("state", [{"upload_readiness": "READY"}, {}])
-def test_direction_allows_ready_and_legacy_sessions(client, state):
+@pytest.mark.parametrize(
+    "state,expected",
+    [
+        # Upload-era READY means ingest-ready only; the formal path now
+        # requires the human confirm-attach before direction (frozen in
+        # docs/contracts/data-completion-contract.md §2/§2a; the FE gate
+        # dataAttachedGate.ts already blocked this case — the BE is aligned
+        # to the same product gate in FORMAL-CONFIRMATION-CHAIN-1).
+        ({"upload_readiness": "READY"}, 409),
+        # Confirm-attached upload-era session with the confirmed design that
+        # the submitted direction executes proceeds (CHAIN-2 R1: a formal
+        # session never reaches direction by omitting the design).
+        (
+            {
+                "upload_readiness": "READY",
+                "dataAttached": True,
+                "data_attached": True,
+                "design": {
+                    "status": "confirmed",
+                    "confirmed": True,
+                    "method": "ols",
+                    "outcome": "y",
+                    "treatment": "x",
+                    "controls": [],
+                },
+            },
+            202,
+        ),
+        # Legacy sessions (no explicit upload_readiness, no category marker)
+        # stay on KTD-era behavior; the new gate must not narrow them.
+        ({}, 202),
+    ],
+)
+def test_direction_gate_by_confirm_attach_and_legacy_boundary(client, state, expected):
     sid = f"direction-gate-allowed-{uuid.uuid4().hex[:8]}"
     facade.seed_state(sid, {"csv_path": "/tmp/input.csv", **state})
     try:
         response = client.post(
             f"/sessions/{sid}/direction",
             json={
+                **observed(client, sid),
                 "question": "x on y",
                 "dv": "y",
                 "iv": "x",
@@ -107,7 +156,9 @@ def test_direction_allows_ready_and_legacy_sessions(client, state):
             },
             headers={"Idempotency-Key": str(uuid.uuid4())},
         )
-        assert response.status_code == 202, response.text
+        assert response.status_code == expected, response.text
+        if expected == 409:
+            assert response.json()["detail"]["code"] == "data_not_attached"
     finally:
         facade.drop_session(sid)
 
@@ -211,9 +262,33 @@ def test_post_direction_runs_identification_without_blocking_ols(client):
 
 
 def test_post_direction_endpoint(uploaded_session, client):
-    """POST /sessions/{id}/direction 接受研究方向并返回 6 章 outline。"""
+    """POST /sessions/{id}/direction 接受研究方向并返回 6 章 outline。
+
+    FORMAL-CONFIRMATION-CHAIN-1: the upload-era session must be
+    confirm-attached first (the real user path); READY alone no longer
+    admits direction.
+    FORMAL-CONFIRMATION-CHAIN-2 (R1): it must also carry the confirmed
+    design whose content the direction executes; a formal session can no
+    longer reach direction by never proposing one.
+    """
     if uploaded_session == "red-stage-dummy-session-id":
         pytest.skip("upload pipeline unavailable in this env (graph/psycopg)")
+    attached = confirm_seen_attach(client, uploaded_session)
+    assert attached.status_code == 200, attached.text
+    assert attached.json()["dataAttached"] is True
+    facade.update_state(
+        uploaded_session,
+        design={
+            "status": "confirmed",
+            "confirmed": True,
+            "proposed_at": "2026-09-17T00:00:00Z",
+            "confirmed_at": "2026-09-17T00:05:00Z",
+            "method": "ols",
+            "outcome": "income",
+            "treatment": "age",
+            "controls": [],
+        },
+    )
     data = _post_and_finish(
         client,
         uploaded_session,

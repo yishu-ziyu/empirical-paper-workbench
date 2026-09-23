@@ -624,6 +624,35 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('direction-disabled-reason')).toHaveTextContent('数据清理完成后')
     expect(screen.queryByText('正在估计主结果并检索文献…')).not.toBeInTheDocument()
 
+    // 真实 SSE progress 必须穿过 workspace 收集器进入底栏，不只是在组件单测里成立。
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            seq: 1,
+            type: 'run.progress',
+            status: 'completed',
+            node: 'upload_data',
+          }),
+        }),
+      )
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            seq: 2,
+            type: 'run.progress',
+            status: 'started',
+            node: 'clean_data',
+          }),
+        }),
+      )
+    })
+    expect(await screen.findByTestId('run-progress-disclosure')).toHaveAttribute(
+      'data-run-id',
+      'run-upload-202',
+    )
+    expect(screen.getByTestId('run-progress-active')).toHaveTextContent('清洗数据')
+
     await act(async () => {
       AppFakeEventSource.latest?.onmessage?.(
         new MessageEvent('message', {
@@ -633,6 +662,7 @@ describe('App 三栏布局', () => {
     })
     await waitFor(() => {
       expect(localStorage.getItem('econpaper_pending_upload')).toBeNull()
+      expect(screen.queryByTestId('run-progress-disclosure')).not.toBeInTheDocument()
     })
     // DC-FE-gate: READY ingest is not confirm-attach. Direction / estimate stay closed.
     expect(screen.getByTestId('direction-disabled-reason')).toHaveTextContent('请先确认挂接数据')
@@ -828,10 +858,18 @@ describe('App 三栏布局', () => {
     await waitFor(() => expect(localStorage.getItem('econpaper_session_id')).toBe('sess-second'))
 
     firstSource?.onmessage?.(
-      new MessageEvent('message', { data: JSON.stringify({ status: 'SUCCEEDED' }) }),
+      new MessageEvent('message', {
+        data: JSON.stringify({
+          seq: 9,
+          type: 'run.progress',
+          node: 'clean_data',
+          status: 'started',
+        }),
+      }),
     )
     await Promise.resolve()
     expect(localStorage.getItem('econpaper_session_id')).toBe('sess-second')
+    expect(screen.queryByTestId('run-progress-disclosure')).not.toBeInTheDocument()
     // 数据集展示来自最新 upload 响应的 dataset_meta（Data 视图），晚到的旧结果不覆盖
     fireEvent.click(screen.getByTestId('rail-data'))
     expect(await screen.findByTestId('dataset-summary')).toHaveTextContent('second.csv')
@@ -962,6 +1000,67 @@ describe('App 三栏布局', () => {
     })
     expect(screen.getByTestId('upload-live-status')).toHaveTextContent('恢复')
     expect(screen.queryByText('正在估计主结果并检索文献…')).not.toBeInTheDocument()
+  })
+
+  test('刷新恢复正在运行的 prewrite 时，SSE 回放仍显示真实步骤', async () => {
+    vi.stubGlobal('EventSource', AppFakeEventSource)
+    localStorage.setItem('econpaper_session_id', 'sess-recovered-prewrite')
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      const href = String(url)
+      if (href.endsWith('/sessions/sess-recovered-prewrite')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              exists: true,
+              has_dataset: true,
+              session_id: 'sess-recovered-prewrite',
+              upload_readiness: 'READY',
+              active_run: {
+                run_id: 'run-recovered-prewrite',
+                kind: 'prewrite',
+                status: 'RUNNING',
+              },
+              dataset: { name: 'panel.csv', rows: 2, columns: ['income', 'age'] },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      if (href.endsWith('/runs/run-recovered-prewrite')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: 'RUNNING' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    renderWithI18n(<App />)
+    await waitFor(() => {
+      expect(AppFakeEventSource.latest?.url).toBe('/api/runs/run-recovered-prewrite/events')
+    })
+
+    await act(async () => {
+      AppFakeEventSource.latest?.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            seq: 3,
+            type: 'run.progress',
+            node: 'identification_verify',
+            status: 'started',
+          }),
+        }),
+      )
+    })
+
+    expect(await screen.findByTestId('run-progress-disclosure')).toHaveAttribute(
+      'data-run-id',
+      'run-recovered-prewrite',
+    )
+    expect(screen.getByTestId('run-progress-active')).toHaveTextContent('核对识别策略')
   })
 
   test('刷新时新上传意图优先于旧上传 Run', async () => {
@@ -2174,6 +2273,7 @@ describe('App 三栏布局', () => {
     expect(running).toHaveTextContent('正在运行分析方案 0/2')
     expect(screen.getByTestId('spec-space-run')).toHaveTextContent('正在运行 0/2')
     expect(screen.getByTestId('spec-space-run')).toBeDisabled()
+    expect(screen.queryByTestId('run-progress-disclosure')).not.toBeInTheDocument()
 
     // 逐 spec 进度事件（SSE 投影 spec_id）
     await act(async () => {

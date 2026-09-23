@@ -15,6 +15,15 @@ export interface AttachPanelProps {
   prefill?: AttachCandidate | null
   uploading?: boolean
   uploadReadiness?: 'READY' | 'PROCESSING' | 'FAILED' | 'CANCELLED'
+  /**
+   * 已挂接事实：只来自后端 snapshot（dataAttached）/ confirm-attach 响应。
+   * 本组件不再做任何本地成功判定（FORMAL-CONFIRMATION-CHAIN-1 C3）。
+   */
+  attached?: boolean
+  /** confirm-attach 请求进行中：只显示等待，不显示成功。 */
+  confirming?: boolean
+  /** 上一次 confirm-attach 失败的稳定文案；保留候选、允许重试。 */
+  confirmError?: string | null
   onBrowse: () => void
   onFile?: (file: File) => void
   onConfirmAttach?: (candidate: AttachCandidate) => void
@@ -39,13 +48,17 @@ function confirmBlockReason(
 
 /**
  * Formal TITLE/TOPIC attach chrome: 找 / 选 / 传 / 确认挂接.
- * Prefill and pick/upload stay candidates. This panel does not set dataAttached.
+ * Prefill and pick/upload stay candidates. dataAttached is only rendered
+ * from the backend truth passed in via `attached`.
  */
 export default function AttachPanel({
   topic = '',
   prefill = null,
   uploading = false,
   uploadReadiness,
+  attached = false,
+  confirming = false,
+  confirmError = null,
   onBrowse,
   onFile,
   onConfirmAttach,
@@ -53,43 +66,43 @@ export default function AttachPanel({
   const { t } = useT()
   const [step, setStep] = useState<AttachPanelStep>(prefill ? 'select' : 'find')
   const [candidate, setCandidate] = useState<AttachCandidate | null>(prefill)
-  const [confirmed, setConfirmed] = useState(false)
   const prefillKey = prefill ? candidateKey(prefill) : ''
 
   useEffect(() => {
     if (!prefillKey || !prefill) return
     setCandidate(prefill)
-    setConfirmed(false)
     setStep('select')
     // Identity is prefillKey; a new object with the same key must not reset confirm.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillKey])
 
-  const block = confirmBlockReason(candidate, uploading, uploadReadiness)
-  const confirmDisabled = confirmed || block !== null
-  const confirmTitle = confirmed
+  const block = attached ? null : confirmBlockReason(candidate, uploading, uploadReadiness)
+  const confirmDisabled = attached || confirming || block !== null
+  const confirmTitle = attached
     ? t('attach.hung')
-    : block === 'ready'
-      ? t('attach.confirmNeedReady')
-      : block === 'candidate'
-        ? t('attach.confirmNeedCandidate')
-        : undefined
+    : confirming
+      ? t('attach.confirmSending')
+      : block === 'ready'
+        ? t('attach.confirmNeedReady')
+        : block === 'candidate'
+          ? t('attach.confirmNeedCandidate')
+          : undefined
 
   const statusLabel = useMemo(() => {
+    if (attached) return t('attach.hung')
+    if (confirming) return t('attach.confirmSending')
     if (!candidate) return t('attach.noCandidate')
-    return confirmed ? t('attach.hung') : t('attach.candidateOnly')
-  }, [candidate, confirmed, t])
+    return t('attach.candidateOnly')
+  }, [attached, candidate, confirming, t])
 
   function chooseFile(file: File) {
     setCandidate(fileCandidate(file.name))
-    setConfirmed(false)
     setStep('select')
     onFile?.(file)
   }
 
   function confirmAttach() {
     if (confirmDisabled || !candidate) return
-    setConfirmed(true)
     onConfirmAttach?.(candidate)
   }
 
@@ -113,7 +126,7 @@ export default function AttachPanel({
         </p>
       ) : null}
 
-      {prefill && !confirmed ? (
+      {prefill && !attached ? (
         <p data-testid="attach-prefill-note" className="mb-4 text-[12px] leading-5 text-muted">
           {t('attach.prefillNote')}
         </p>
@@ -173,7 +186,6 @@ export default function AttachPanel({
               data-testid="attach-select-candidate"
               onClick={() => {
                 setCandidate(candidate)
-                setConfirmed(false)
               }}
               className="mt-3 w-full rounded-md border border-ink/15 bg-cream px-3 py-2 text-left text-[13px] text-ink"
             >
@@ -221,9 +233,20 @@ export default function AttachPanel({
           title={confirmTitle}
           className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {confirmed ? t('attach.hung') : t('attach.confirm')}
+          {attached ? t('attach.hung') : t('attach.confirm')}
         </button>
       </div>
+
+      {confirming ? (
+        <p data-testid="attach-confirming" role="status" aria-live="polite" className="mt-2 text-[12px] text-muted">
+          {t('attach.confirmSending')}
+        </p>
+      ) : null}
+      {confirmError ? (
+        <p data-testid="attach-confirm-error" role="alert" className="mt-2 text-[12px] text-danger">
+          {confirmError}
+        </p>
+      ) : null}
     </section>
   )
 }

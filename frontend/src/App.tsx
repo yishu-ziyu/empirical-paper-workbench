@@ -29,6 +29,7 @@ import {
 } from './lib/workspace'
 import { formatStatValue } from './lib/readoutTable'
 import { displaySurpriseObserved } from './lib/i18nPresentation'
+import { agentSpikeEnabled } from './lib/featureFlags'
 import WorkbenchArtifact from './components/WorkbenchArtifact'
 
 function App() {
@@ -48,9 +49,10 @@ function App() {
   const [authPage, setAuthPage] = useState<'login' | 'register' | null>(null)
   const workspaceRef = useRef<ResizableWorkspaceHandle>(null)
 
-  const spikeRoute =
+  const spikeRoute = agentSpikeEnabled() && (
     window.location.pathname === '/spike' ||
     new URLSearchParams(window.location.search).get('spike') === '1'
+  )
 
   const openDirection = () => {
     if (ws.formalAttachBlocked) {
@@ -67,8 +69,14 @@ function App() {
 
   // 方向一确认，中栏回到论文工作区（写作流）；刷新恢复的落地在
   // workspace.ts 里决定（有研究内容时直接落 Overview）。
+  // 正式确认链例外：方向 run 停在预览（awaiting_estimate）时，下一步是
+  // 样本/设定确认（问题页），不把人带去论文页（FORMAL-CONFIRMATION-CHAIN-1 C5）。
   useEffect(() => {
-    if (ws.directionSummary && ws.workbenchTab === 'question') {
+    if (
+      ws.directionSummary &&
+      ws.workbenchTab === 'question' &&
+      ws.prewriteGate !== 'awaiting_estimate'
+    ) {
       ws.setWorkbenchTab('paper')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,6 +95,33 @@ function App() {
 
   let blockingDecision: WorkspaceDecision | null = null
 
+  // R8：右栏「下一步」与主区确认卡消费同一待办事实（prewriteStep），
+  // 不能在还要求确认样本时说「没有需要你确认的事」。
+  const prewriteDecision: WorkspaceDecision | null =
+    ws.prewriteGate !== 'awaiting_estimate' || ws.estimateStarting
+      ? null
+      : ws.prewriteStep === 'sample'
+        ? {
+            title: t('decision.prewriteSample'),
+            reason: t('decision.prewriteSampleReason'),
+          }
+        : ws.prewriteStep === 'setting'
+          ? {
+              title: t('decision.prewriteSetting'),
+              reason: t('decision.prewriteSettingReason'),
+            }
+          : ws.prewriteStep === 'risk'
+            ? {
+                title: t('decision.prewriteRisk'),
+                reason: t('decision.prewriteRiskReason'),
+              }
+            : ws.prewriteStep === 'forbidden'
+              ? {
+                  title: t('decision.prewriteForbidden'),
+                  reason: t('decision.prewriteForbiddenReason'),
+                }
+              : null
+
   if (ws.bootFailure) {
     // C21：终态失败时只有 failure surface 一个真相，抑制一切推进文案。
     blockingDecision = null
@@ -97,6 +132,12 @@ function App() {
       reason: t('decision.confirmAttachReason'),
       actionLabel: t('decision.openAttach'),
       onAction: ws.openAttachConfirm,
+    }
+  } else if (prewriteDecision) {
+    blockingDecision = {
+      ...prewriteDecision,
+      actionLabel: t('decision.openPrewrite'),
+      onAction: () => ws.setWorkbenchTab('question'),
     }
   } else if (isQuestionGroup) {
     if (ws.identFailed) {
@@ -384,6 +425,11 @@ function App() {
           onConfirm={(title) => {
             ws.setShapedQuestion(title)
             ws.setDeskOpen(false)
+            // C1：问题确认即建立同一会话并提出设计草稿（持久化，刷新可恢复）；
+            // 会话建立失败时留在工作台，设计卡内可重试提出。
+            void ws.ensureSessionActive().then((sid) => {
+              if (sid && !ws.design) void ws.proposeDesign(title, '')
+            })
           }}
         />
       </>
@@ -772,7 +818,7 @@ function App() {
 
       <footer
         data-testid="run-status-bar"
-        className="flex h-8 shrink-0 items-center gap-4 overflow-hidden border-t border-wb-line bg-wb-surface px-5 font-mono text-[11px] text-wb-muted"
+        className="relative flex h-8 shrink-0 items-center gap-4 overflow-visible border-t border-wb-line bg-wb-surface px-5 font-mono text-[11px] text-wb-muted"
       >
         <span data-testid="run-state" className="flex items-center gap-1.5">
           <span
@@ -796,7 +842,7 @@ function App() {
                   : t('status.idle')}
         </span>
         {/* 次级披露：有真实 run 事件才出现；没有事件时整块不存在（不拿定时器充当进度）。 */}
-        <RunProgressDisclosure events={ws.runSteps} />
+        <RunProgressDisclosure progress={ws.runProgress} />
         {ws.degraded ? (
           <span data-testid="run-degradations" className="text-wb-warning">
             {t('status.degradations', { n: ws.degradations.length })}

@@ -185,3 +185,115 @@ def test_router_reload_rereads_env(monkeypatch):
     assert gen.provider == "minimax"
     assert gen.model == "MiniMax-M3"
     assert gen.api_key == "sk-reload"
+
+
+# ---------------------------------------------------------------------------
+# R7 回归：显式 mock 不得被真实供应商覆盖（独立评审 2026-09-17）
+# ---------------------------------------------------------------------------
+def test_econpaper_mock_covers_all_roles_outside_pytest(monkeypatch):
+    """ECONPAPER_LLM=mock 且有 MiniMax key 时，所有角色（含 desk）仍全 mock。"""
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
+    monkeypatch.setattr("agent.llm.router.in_pytest", lambda: False)
+    router = LLMRouter()
+    for role in ("generate", "review", "title", "outline", "desk", "default"):
+        assert router.get_config(role).provider == "mock", role
+        assert router.get_config(role).api_key is None, role
+
+
+def test_explicit_mock_does_not_load_ssot(monkeypatch):
+    """显式 mock 下 from_env 不读取真实 SSOT。"""
+    def _forbid():
+        raise AssertionError("mock 模式不得加载 SSOT")
+
+    monkeypatch.setattr("agent.llm.router.load_ssot", _forbid)
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    monkeypatch.setattr("agent.llm.router.in_pytest", lambda: False)
+    config = LLMConfig.from_env("GENERATE")
+    assert config.provider == "mock"
+    assert config.api_key is None
+
+
+def test_reload_preserves_explicit_mock(monkeypatch):
+    """reload 之后显式 mock 仍然覆盖所有角色。"""
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-minimax")
+    monkeypatch.setattr("agent.llm.router.in_pytest", lambda: False)
+    router = LLMRouter()
+    router.reload()
+    for role in ("generate", "review", "desk", "default"):
+        assert router.get_config(role).provider == "mock", role
+
+
+def test_assert_mock_isolation_raises_on_contamination(monkeypatch):
+    """启动配置断言：mock 下混入真实供应商配置必须抛错。"""
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    router = LLMRouter()
+    router.assert_mock_isolation()
+    router._configs["desk"] = LLMConfig(
+        provider="minimax", model="MiniMax-M3", api_key="sk-test"
+    )
+    with pytest.raises(RuntimeError):
+        router.assert_mock_isolation()
+
+
+def test_mock_wins_in_non_pytest_subprocess():
+    """非 pytest 子进程：显式 mock 覆盖所有角色与 reload，且不加载 SSOT。"""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[2]
+    code = (
+        "from agent.llm.router import LLMRouter;"
+        "from agent.llm import ssot;"
+        "r = LLMRouter();"
+        "roles = ['generate','review','title','outline','desk','default'];"
+        "bad = [x for x in roles if r.get_config(x).provider != 'mock'];"
+        "r.reload();"
+        "bad += [x + ':reload' for x in roles if r.get_config(x).provider != 'mock'];"
+        "bad += ['ssot'] if ssot._LOADED else [];"
+        "print('NONMOCK:' + ','.join(bad) if bad else 'ALL_MOCK')"
+    )
+    env = dict(os.environ)
+    env["ECONPAPER_LLM"] = "mock"
+    env["MINIMAX_API_KEY"] = "sk-test-minimax"
+    env.pop("PYTEST_CURRENT_TEST", None)
+    env["PYTHONPATH"] = str(repo) + os.pathsep + env.get("PYTHONPATH", "")
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=repo,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ALL_MOCK" in result.stdout, result.stdout + result.stderr
+
+
+def test_mock_call_llm_never_touches_network(monkeypatch):
+    """外部连接阻断：mock 下所有角色的 call_llm 不发起任何 HTTP 请求。"""
+    import urllib.request
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("mock 模式不得发起网络请求")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    try:
+        import httpx
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", _boom)
+    except ImportError:
+        pass
+    monkeypatch.setenv("ECONPAPER_LLM", "mock")
+    from agent.llm.router import router as singleton_router
+
+    singleton_router.reload()
+    try:
+        for role in ("generate", "review", "title", "outline", "desk", "default"):
+            result = call_llm("test prompt", node_type=role)
+            assert isinstance(result, str) and result, role
+    finally:
+        singleton_router.reload()

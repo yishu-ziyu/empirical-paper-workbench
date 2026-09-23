@@ -215,9 +215,27 @@ async def get_evidence(
     provenance = _provenance(session_id, raw_estimate)
     await _attach_producer_run(raw_estimate, provenance)
 
+    from services.formal_binding import chain
+    history = []
+    seen = set()
+    for entry in reversed(chain(state)["history"]):
+        old = entry.get("estimate")
+        if not isinstance(old, dict):
+            old = (entry.get("result") or {}).get("estimate")
+        if not isinstance(old, dict) or not old:
+            continue
+        identity = old.get("source_run_id") or (entry.get("at"), old.get("formula"), old.get("coef"))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        history.append({"at": entry.get("at"), "run_id": old.get("source_run_id"),
+                        "formula": old.get("formula"), "coef": old.get("coef"), "n": old.get("n")})
+
     return EvidenceResponse(
         session_id=session_id,
         available=available,
+        evidence_stale=state.get("evidence_stale") is True,
+        history=history,
         blockers=_evidence_blockers(state),
         estimate=estimate if isinstance(estimate, dict) else None,
         results=results if isinstance(results, str) else None,

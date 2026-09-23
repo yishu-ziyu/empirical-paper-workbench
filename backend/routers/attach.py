@@ -17,7 +17,7 @@ from starlette.responses import JSONResponse
 from auth import get_optional_user, require_auth_unless_debug, require_session_ownership
 from models.user import User
 from routers.sessions import _upload_response, _validated_upload_key, build_session_info
-from schemas.responses import AttachResponse, SessionInfoResponse
+from schemas.responses import AttachResponse, SessionInfoResponse, ConfirmationTarget
 from services.data_attach import (
     attach_classic5,
     attach_user_file_bytes,
@@ -31,6 +31,10 @@ router = APIRouter()
 class AttachRequest(BaseModel):
     source: Literal["classic-5", "user_file"]
     entry_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
+
+
+class ConfirmAttachRequest(BaseModel):
+    expectedTarget: Optional[ConfirmationTarget] = None
 
 
 def _attach_from_admission(admission, *, source: str, entry_id: str | None) -> AttachResponse:
@@ -137,10 +141,12 @@ async def attach_dataset(
 )
 async def confirm_attach_dataset(
     session_id: str,
+    payload: Optional[ConfirmAttachRequest] = None,
     current_user: Optional[User] = Depends(get_optional_user),
 ) -> SessionInfoResponse:
     """Confirm-attach is the only transition that sets dataAttached."""
     await run_in_threadpool(require_session_ownership, session_id, current_user)
     require_auth_unless_debug(current_user)
-    await confirm_attach(session_id)
+    expected = payload.expectedTarget.model_dump() if payload and payload.expectedTarget else None
+    await confirm_attach(session_id, expected_target=expected)
     return await build_session_info(session_id)

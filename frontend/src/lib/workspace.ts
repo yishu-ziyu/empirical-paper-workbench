@@ -12,8 +12,7 @@
 // mirrored into web storage; refresh recovery re-reads the snapshot and
 // reattaches to snapshot.active_run via /runs/{id}/events.
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { OutlineChapter } from '../components/Outline'
 import type { DirectionFormData, DirectionFormInitial } from '../components/DirectionForm'
 import type { PausePayload } from '../components/WriteLoop'
@@ -24,6 +23,12 @@ import {
   waitForRun,
 } from './runEvents'
 import type { RunProgressEvent } from './runEvents'
+import {
+  appendRunProgressEvent,
+  createRunProgressState,
+  type RunProgressOwner,
+  type RunProgressState,
+} from './runSteps'
 import type { components } from '../types/api'
 import {
   clearStoredSessionId,
@@ -37,21 +42,21 @@ import {
   shouldDivertToAttach,
   snapshotAttachFields,
 } from './dataAttachedGate'
-
-/**
- * run 事件的收集器（给 `waitForRun` 的 onEvent 用）。
- *
- * 只留有 `node` 的 `run.progress`：没有节点的其它事件（accepted/claimed/succeeded）
- * 不构成一个步骤，收下来只会让展示层去猜。顺序即真实发生顺序，不排序、不补齐。
- */
-function collectRunStep(
-  append: Dispatch<SetStateAction<RunProgressEvent[]>>,
-): (event: RunProgressEvent) => void {
-  return (event) => {
-    if (event.type !== 'run.progress' || !event.node) return
-    append((prev) => (prev.length >= 200 ? prev : [...prev, event]))
-  }
-}
+import {
+  CommandRefusalError,
+  attachIntentSignature,
+  classifyCommandFailure,
+  createConfirmationRegistry,
+  designRevisionOf,
+  prewritePendingStep,
+  previewVersionOf,
+  readContinuePermission,
+  readDetailCode,
+  refusalMessageKey,
+  type ConfirmationOwnership,
+  type ConfirmationTarget,
+  type ContinuePermission,
+} from './confirmationCommands'
 
 // localStorage / sessionStorage keys owned by the workspace.
 // Research truth keys (csv meta, data columns, active-run handles) were
@@ -75,6 +80,10 @@ type ReviewInfo = components['schemas']['ReviewInfoResponse']
 type WrittenChapter = components['schemas']['ChapterResponse']
 type RunAccepted = components['schemas']['RunAcceptedResponse']
 type ExpectationCriterion = components['schemas']['ExpectationCriterion']
+type SessionDesign = components['schemas']['SessionDesignResponse']
+type PrewriteGate = components['schemas']['PrewriteGateResponse']
+type BlockingDecision = components['schemas']['BlockingDecisionResponse']
+export type { SessionDesign, BlockingDecision }
 type DirectionAcceptance =
   | RunAccepted
   | { immediate_result: Record<string, any> }
@@ -243,6 +252,119 @@ export async function fetchSessionEvidence(
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   return response.json()
+}
+
+// ── 正式研究确认链（FORMAL-CONFIRMATION-CHAIN-1）─────────────────────
+// 设计提出/确认、同会话 attach、confirm-attach、估计前两段确认。
+// 所有「已确认」事实只来自后端响应 / snapshot 回读，本地不做成功判定。
+
+export async function acceptDesignPropose(
+  sessionId: string,
+  title: string,
+  question: string,
+): Promise<SessionDesign> {
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/design/propose`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ title, question }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new RunRequestError(response.status)
+  return payload as SessionDesign
+}
+
+export async function acceptDesignConfirm(
+  sessionId: string,
+  expectedRevision?: string | null,
+): Promise<SessionDesign> {
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/design/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    // The revision the user was looking at: the server refuses to lock a
+    // different draft (another window may have replaced it).
+    body: JSON.stringify(expectedRevision ? { expectedRevision } : {}),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new CommandRefusalError(response.status, readDetailCode(payload))
+  return (payload as { design: SessionDesign }).design
+}
+
+export async function acceptSessionAttach(
+  sessionId: string,
+  file: File,
+  idempotencyKey: string,
+): Promise<UploadAcceptance> {
+  const formData = new FormData()
+  formData.append('source', 'user_file')
+  formData.append('file', file)
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/attach`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey, ...authHeaders() },
+    body: formData,
+  })
+  return uploadResponse(response)
+}
+
+export async function acceptConfirmAttach(
+  sessionId: string,
+  expectedTarget?: ConfirmationTarget | null,
+): Promise<WorkspaceSnapshot> {
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/confirm-attach`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ expectedTarget }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const conflict = parseAdmissionConflict(response.status, payload)
+    if (conflict) throw conflict
+    throw new CommandRefusalError(response.status, readDetailCode(payload))
+  }
+  return payload as WorkspaceSnapshot
+}
+
+export type PrewriteConfirmAction =
+  | {
+      action: 'record_confirms'
+      expectedTarget?: ConfirmationTarget | null
+      table1Confirmed?: boolean
+      specConfirmed?: boolean
+      riskConfirmed?: boolean
+      qType?: string
+      specMode?: string
+    }
+  | {
+      action: 'continue_estimate'
+      expectedTarget?: ConfirmationTarget | null
+      qType?: string
+      specMode?: string
+    }
+
+export async function acceptPrewriteConfirm(
+  sessionId: string,
+  body: PrewriteConfirmAction,
+  idempotencyKey: string,
+): Promise<{ status: number; gate: PrewriteGate | null; run: RunAccepted | null }> {
+  const response = await apiFetch(`${API_BASE}/sessions/${sessionId}/prewrite/confirm`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+      ...authHeaders(),
+    },
+    body: JSON.stringify(body),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const conflict = parseAdmissionConflict(response.status, payload)
+    if (conflict) throw conflict
+    throw new CommandRefusalError(response.status, readDetailCode(payload))
+  }
+  // 200 = flags recorded (no run); 202 = estimate run accepted.
+  if (response.status === 202) {
+    return { status: 202, gate: null, run: payload as RunAccepted }
+  }
+  return { status: 200, gate: payload as PrewriteGate, run: null }
 }
 
 export function eventsUrlFor(runId: string): string {
@@ -584,9 +706,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
   >('question')
   const [directionBusy, setDirectionBusy] = useState(false)
   const [runFailure, setRunFailure] = useState<string | null>(null)
-  // 最近一次预写 run 收到的**真实**进度事件（run.progress 的 node/status）。
-  // 只存稳定标签字段，不引入第二套状态机：展示层用 projectRunSteps 现投影。
-  const [runSteps, setRunSteps] = useState<RunProgressEvent[]>([])
+  // 底栏只展示当前 run 的短期观测；完整历史仍由后端 RunEvent / 账本负责。
+  // sessionId + runId + kind 是所有权边界，旧 run 的晚到事件不能写入新 run。
+  const [runProgress, setRunProgress] = useState<RunProgressState | null>(null)
   const activeSessionRef = useRef(sessionId)
   const sessionEpochRef = useRef(0)
   const runAbortRef = useRef<AbortController | null>(null)
@@ -630,9 +752,105 @@ export function useWorkspace(opts: WorkspaceOptions) {
     category: string
     kind: 'card' | 'upload'
   } | null>(null)
+  // ── 正式研究确认链（FORMAL-CONFIRMATION-CHAIN-1）────────────────
+  // 设计草稿/确认、估计前两段确认（table1Confirmed/specConfirmed）与
+  // confirm-attach 的事实全部以后端响应 + snapshot 回读为准（C2/C3/C5）。
+  const [design, setDesign] = useState<SessionDesign | null>(null)
+  const [designProposing, setDesignProposing] = useState(false)
+  const [designConfirming, setDesignConfirming] = useState(false)
+  const [designError, setDesignError] = useState<string | null>(null)
+  const [attachConfirming, setAttachConfirming] = useState(false)
+  const [attachConfirmError, setAttachConfirmError] = useState<string | null>(null)
+  const [prewriteGate, setPrewriteGate] = useState<string | null>(null)
+  const [table1, setTable1] = useState<Record<string, any> | null>(null)
+  const [specificationEquation, setSpecificationEquation] = useState<string | null>(null)
+  const [table1Confirmed, setTable1Confirmed] = useState(false)
+  const [specConfirmed, setSpecConfirmed] = useState(false)
+  const [blockingDecision, setBlockingDecision] = useState<BlockingDecision | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState<'table1' | 'spec' | 'risk' | null>(null)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+  const [estimateStarting, setEstimateStarting] = useState(false)
+  // #40 许可与风险决定：只来自 snapshot，未知不等于已通过（C9/R6）。
+  const [continuePermission, setContinuePermission] = useState<ContinuePermission>('unknown')
+  const [riskConfirmed, setRiskConfirmed] = useState(false)
+  const [sessionKind, setSessionKind] = useState<
+    'formal' | 'legacy' | 'card_teaching' | null
+  >(null)
+  // 确认命令的所有权与投递凭证（R4 / §3）：会话归属、对象版本、意图 key。
+  const commands = useMemo(() => createConfirmationRegistry(), [])
   // research 的镜像 ref：run 等待回调里读取最新研究状态而不重挂回调。
   const researchRef = useRef<ResearchLab | null>(null)
   researchRef.current = research
+  // design 的镜像 ref：takeCsv 路由同会话 attach 时读取最新设计状态。
+  const designRef = useRef<SessionDesign | null>(null)
+  designRef.current = design
+  // 版本镜像：在途命令在每次 await 之后用它核对「还是不是当初那个对象」。
+  const designRevisionRef = useRef<string | null>(null)
+  designRevisionRef.current = designRevisionOf(design)
+  const targetsRef = useRef<ConfirmationTarget | null>(null)
+  const datasetSignatureRef = useRef<string | null>(null)
+  const previewVersionRef = useRef<string | null>(null)
+  const continuePermissionRef = useRef<ContinuePermission>('unknown')
+  continuePermissionRef.current = continuePermission
+  const riskConfirmedRef = useRef(false)
+  riskConfirmedRef.current = riskConfirmed
+
+  const clearRunProgress = useCallback((owner?: RunProgressOwner) => {
+    setRunProgress((current) => {
+      if (!current || !owner) return null
+      if (
+        current.sessionId === owner.sessionId
+        && current.runId === owner.runId
+        && current.kind === owner.kind
+      ) return null
+      return current
+    })
+  }, [])
+
+  /**
+   * 六条 run 等待路径的唯一接缝：统一处理 run 所有权、真实事件收集和终态清理。
+   * spec_run 传 discloseSteps=false，继续使用自己的 k/总数，而不是复制一套同名步骤。
+   */
+  const waitForTrackedRun = useCallback(
+    async ({
+      sessionId: ownerSessionId,
+      runId,
+      kind,
+      eventsUrl,
+      signal,
+      discloseSteps = true,
+      onEvent,
+    }: {
+      sessionId: string
+      runId: string
+      kind: RunKind
+      eventsUrl: string
+      signal: AbortSignal
+      discloseSteps?: boolean
+      onEvent?: (event: RunProgressEvent) => void
+    }): Promise<Record<string, any>> => {
+      const owner: RunProgressOwner = {
+        sessionId: ownerSessionId,
+        runId,
+        kind,
+      }
+      if (discloseSteps) setRunProgress(createRunProgressState(owner))
+      else setRunProgress(null)
+      try {
+        return await waitForRun(runId, eventsUrl, signal, (event) => {
+          if (discloseSteps) {
+            setRunProgress((current) =>
+              current ? appendRunProgressEvent(current, owner, event) : current,
+            )
+          }
+          onEvent?.(event)
+        })
+      } finally {
+        if (discloseSteps) clearRunProgress(owner)
+      }
+    },
+    [clearRunProgress],
+  )
 
   const showGlobalError = useCallback((message: string) => {
     setGlobalError(message)
@@ -642,9 +860,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
 
   const invalidateSessionWork = useCallback(() => {
     sessionEpochRef.current += 1
+    // Session/exit switch: every in-flight confirmation loses its ownership.
+    commands.invalidateAll()
     runAbortRef.current?.abort()
     runAbortRef.current = null
-    directionOperationRef.current = null
     setDirectionBusy(false)
     setUploading(false)
     setActiveRun(null)
@@ -652,7 +871,29 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setSpecRunProgress(null)
     setSpecRunFailure(null)
     setBootFailure(null)
-  }, [])
+    clearRunProgress()
+    setDesign(null)
+    targetsRef.current = null
+    datasetSignatureRef.current = null
+    previewVersionRef.current = null
+    setDesignProposing(false)
+    setDesignConfirming(false)
+    setDesignError(null)
+    setAttachConfirming(false)
+    setAttachConfirmError(null)
+    setPrewriteGate(null)
+    setTable1(null)
+    setSpecificationEquation(null)
+    setTable1Confirmed(false)
+    setSpecConfirmed(false)
+    setBlockingDecision(null)
+    setConfirmError(null)
+    setConfirmBusy(null)
+    setEstimateStarting(false)
+    setContinuePermission('unknown')
+    setRiskConfirmed(false)
+    setSessionKind(null)
+  }, [clearRunProgress, commands])
 
   const switchSession = useCallback(
     (nextSessionId: string | null) => {
@@ -691,9 +932,11 @@ export function useWorkspace(opts: WorkspaceOptions) {
     clearStoredSessionId()
     localStorage.removeItem(LS_GUIDE_KEY)
     clearAllCommandStorage()
+    // 会话生命周期结束：确认投递凭证不留给下一个登录身份。
+    commands.clearAllIntents()
     setShowGuide(false)
     setDeskOpen(true)
-  }, [invalidateSessionWork, setAuthed, switchSession])
+  }, [commands, invalidateSessionWork, setAuthed, switchSession])
 
   const ensureSession = useCallback(async (): Promise<string> => {
     if (activeSessionRef.current) return activeSessionRef.current
@@ -703,8 +946,21 @@ export function useWorkspace(opts: WorkspaceOptions) {
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
+    if (!data.session_id) throw new Error('session create returned no id')
     return data.session_id as string
   }, [])
+
+  /** 建会话并立即切换为当前会话（设计提出等正式入口用，C1）。 */
+  const ensureSessionActive = useCallback(async (): Promise<string | null> => {
+    try {
+      const sid = await ensureSession()
+      if (!sid) return null
+      if (activeSessionRef.current !== sid) switchSession(sid)
+      return sid
+    } catch {
+      return null
+    }
+  }, [ensureSession, switchSession])
 
   const refreshReview = useCallback(
     async (sid: string) => {
@@ -725,6 +981,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const applySnapshot = useCallback((data: WorkspaceSnapshot) => {
     if (data.exists === false) return
     if (!snapshotHasDesk(data)) return
+    targetsRef.current = data.confirmation_targets ?? null
+    datasetSignatureRef.current = targetsRef.current?.dataset ?? null
+    previewVersionRef.current = previewVersionOf({ targets: targetsRef.current })
+    setEvidenceRefreshKey((key) => key + 1)
     setActiveRun(data.active_run ?? null)
     setClaim(data.claim ?? null)
     setStarRating(data.star_rating ?? null)
@@ -752,7 +1012,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setWriteBlockers(Array.isArray(data.write_blockers) ? data.write_blockers : [])
     setIdentFailed(Boolean(data.identification_failed))
     setRobustnessStatus(data.robustness_status ?? null)
-    if (data.identification_report) setIdentReport(data.identification_report)
+    setIdentReport(data.identification_report ?? null)
     if (Array.isArray(data.outline) && data.outline.length) {
       setOutline(data.outline)
     }
@@ -797,6 +1057,36 @@ export function useWorkspace(opts: WorkspaceOptions) {
         treatment_time: rd.treatment_time || prev?.treatment_time,
       }))
     }
+    // 正式确认链事实（C1/C5）：全部以后端投影为准，不本地发明。
+    if (Object.prototype.hasOwnProperty.call(data, 'design')) {
+      setDesign(data.design ?? null)
+      const source = data.design?.source
+      if (data.design && typeof source?.title === 'string' && source.title.trim()) {
+        setShapedQuestion((prev) => prev || source.title!.trim())
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'prewrite_gate')) {
+      setPrewriteGate(data.prewrite_gate ?? null)
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'table1')) {
+      setTable1((data.table1 as Record<string, any> | null) ?? null)
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'specification_equation')) {
+      setSpecificationEquation(data.specification_equation ?? null)
+    }
+    if (typeof data.table1Confirmed === 'boolean') setTable1Confirmed(data.table1Confirmed)
+    if (typeof data.specConfirmed === 'boolean') setSpecConfirmed(data.specConfirmed)
+    // #40 许可与风险决定只按 snapshot 重建；缺字段按最保守的 unknown / false。
+    setRiskConfirmed(data.riskConfirmed === true)
+    setContinuePermission(readContinuePermission(data.permissions))
+    if (Object.prototype.hasOwnProperty.call(data, 'session_kind')) {
+      setSessionKind(
+        (data.session_kind as 'formal' | 'legacy' | 'card_teaching' | null | undefined) ?? null,
+      )
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'blockingDecision')) {
+      setBlockingDecision(data.blockingDecision ?? null)
+    }
   }, [])
 
   const returnToUploadDesk = useCallback(
@@ -819,6 +1109,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const handleNewStudy = useCallback(() => {
     uploadOperationRef.current = null
     clearAllCommandStorage()
+    commands.clearAllIntents()
     clearStoredSessionId()
     switchSession(null)
     // 新研究从问题卡开始，不携带上一个会话停留的视图。
@@ -827,7 +1118,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setDeskOpen(true)
     setUploadError(null)
     setUploadStatus(null)
-  }, [switchSession])
+  }, [commands, switchSession])
 
   const handleUploadRunError = useCallback(
     (error: unknown, _sid: string | null, _runId: string | null) => {
@@ -904,9 +1195,14 @@ export function useWorkspace(opts: WorkspaceOptions) {
       activeSessionRef.current === saved
     const attach = (command: RecoveredCommand, sid: string) => {
       const isUpload = command.kind === 'run' && command.runKind === 'upload_pipeline'
+      const isSpecRun = command.kind === 'run' && command.runKind === 'spec_run'
       if (isUpload) {
         setUploading(true)
         setUploadStatus(tRef.current('app.uploadRecovering'))
+      } else if (isSpecRun) {
+        setSpecRunFailure(null)
+        const total = includedSpecCount(researchRef.current)
+        setSpecRunProgress(total > 0 ? { done: 0, total } : null)
       } else if (command.kind === 'run') {
         setDirectionBusy(true)
       }
@@ -914,9 +1210,29 @@ export function useWorkspace(opts: WorkspaceOptions) {
       restoreController = controller
       runAbortRef.current?.abort()
       runAbortRef.current = controller
-      const waitFor = command.kind === 'run'
-        ? waitForRun(command.runId, eventsUrlFor(command.runId), controller.signal)
-        : Promise.resolve(command.result)
+      const seenSpecIds = new Set<string>()
+      let waitFor: Promise<Record<string, any>>
+      if (command.kind === 'run') {
+        waitFor = waitForTrackedRun({
+          sessionId: sid,
+          runId: command.runId,
+          kind: command.runKind,
+          eventsUrl: eventsUrlFor(command.runId),
+          signal: controller.signal,
+          discloseSteps: !isSpecRun,
+          onEvent: isSpecRun
+            ? (event) => {
+                if (!event.specId || seenSpecIds.has(event.specId)) return
+                seenSpecIds.add(event.specId)
+                const total = includedSpecCount(researchRef.current)
+                setSpecRunProgress(total > 0 ? { done: seenSpecIds.size, total } : null)
+              }
+            : undefined,
+        })
+      } else {
+        clearRunProgress()
+        waitFor = Promise.resolve(command.result)
+      }
       void waitFor
         .then((result) => {
           if (!isCurrent()) return
@@ -926,6 +1242,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
             setUploadReadiness('READY')
             setUploadStatus(tRef.current('app.uploadReady'))
           }
+          if (isSpecRun) setSpecRunProgress(null)
           snapshotGate.applyRun(() => applySnapshot(result as WorkspaceSnapshot))
         })
         // The durable terminal state is the snapshot; re-read it once the
@@ -939,7 +1256,16 @@ export function useWorkspace(opts: WorkspaceOptions) {
           if (!isCurrent()) return
           if (isUpload) {
             handleUploadRunError(error, sid, null)
+          } else if (isSpecRun && !(error instanceof DOMException && error.name === 'AbortError')) {
+            setActiveRun(null)
+            setSpecRunProgress(null)
+            const category =
+              error instanceof RunTerminalError
+                ? error.message || `run_${error.status.toLowerCase()}`
+                : 'spec_run_failed'
+            setSpecRunFailure({ category })
           } else if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            setActiveRun(null)
             setRunFailure(error instanceof Error ? error.message : String(error))
             showGlobalError(error instanceof Error ? error.message : String(error))
           }
@@ -948,7 +1274,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
           if (runAbortRef.current === controller) runAbortRef.current = null
           if (isCurrent()) {
             if (isUpload) setUploading(false)
-            else setDirectionBusy(false)
+            else if (!isSpecRun) setDirectionBusy(false)
             setEvidenceRefreshKey((key) => key + 1)
           }
         })
@@ -993,7 +1319,14 @@ export function useWorkspace(opts: WorkspaceOptions) {
       }
     }
     // t / language is intentionally not a dependency: restore is session-bound.
-  }, [applySnapshot, handleUploadRunError, returnToUploadDesk, showGlobalError])
+  }, [
+    applySnapshot,
+    clearRunProgress,
+    handleUploadRunError,
+    returnToUploadDesk,
+    showGlobalError,
+    waitForTrackedRun,
+  ])
 
   useEffect(() => {
     if (sessionId) {
@@ -1176,6 +1509,491 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [closeGuide, switchSession],
   )
 
+  // ── 正式研究确认链动作（FORMAL-CONFIRMATION-CHAIN-2）─────────────
+  // 每个命令先取得所有权（sessionId + epoch + 对象版本），每个 await 之后
+  // 再核对归属；结果只在「还是当初那个对象」时应用（R4）。
+
+  type SnapshotReadback =
+    | { status: 'verified'; snapshot: WorkspaceSnapshot }
+    | { status: 'mismatch'; snapshot: WorkspaceSnapshot }
+    | { status: 'unreadable' }
+    | { status: 'stale' }
+
+  /**
+   * 回读 snapshot 并按 holds 判定：只有服务端投影确认了这次变更才叫
+   * 「已确认」。回读失败或与响应不一致时不显示成功（§3）。
+   */
+  const readBackVerified = useCallback(
+    async (
+      ownership: ConfirmationOwnership,
+      holds: (snapshot: WorkspaceSnapshot) => boolean,
+    ): Promise<SnapshotReadback> => {
+      let fresh: WorkspaceSnapshot | null = null
+      try {
+        fresh = await fetchSessionSnapshot(ownership.sessionId)
+      } catch {
+        fresh = null
+      }
+      if (!commands.isCurrent(ownership)) return { status: 'stale' }
+      if (!fresh) return { status: 'unreadable' }
+      applySnapshot(fresh)
+      return holds(fresh)
+        ? { status: 'verified', snapshot: fresh }
+        : { status: 'mismatch', snapshot: fresh }
+    },
+    [applySnapshot, commands],
+  )
+
+  /** 失败/回读核对：先看清服务端实际状态，再决定怎么报（§3 C6/C7）。 */
+  const readBackState = useCallback(
+    (ownership: ConfirmationOwnership) => readBackVerified(ownership, () => true),
+    [readBackVerified],
+  )
+
+  const proposeDesign = useCallback(
+    async (title: string, question: string, opts?: { revise?: boolean }) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      // 已确认的设计不被意外重提清掉；修订走显式入口（C8）。
+      if (designRef.current?.status === 'confirmed' && !opts?.revise) return
+      const ownership = commands.begin({
+        kind: 'design_propose',
+        sessionId: sid,
+        version: null,
+      })
+      if (!ownership) return
+      setDesignProposing(true)
+      setDesignError(null)
+      try {
+        const draft = await acceptDesignPropose(sid, title, question)
+        if (!commands.isCurrent(ownership)) return
+        const readback = await readBackVerified(
+          ownership,
+          (snapshot) => snapshot.design?.revision === draft.revision,
+        )
+        if (readback.status === 'stale') return
+        // 草稿不是批准：回读不可用时也展示服务端刚返回的草稿，下一份
+        // snapshot 会再对齐；「已确认」永远只来自回读。
+        if (readback.status === 'unreadable') setDesign(draft)
+      } catch {
+        if (!commands.isCurrent(ownership)) return
+        setDesignError(t('designProposal.proposeFailed'))
+        await readBackState(ownership)
+      } finally {
+        const still = commands.isOwned(ownership)
+        commands.finish(ownership)
+        if (still) setDesignProposing(false)
+      }
+    },
+    [commands, readBackState, readBackVerified, t],
+  )
+
+  const confirmDesign = useCallback(
+    async (expectedRevision?: string | null) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const ownership = commands.begin({
+        kind: 'design_confirm',
+        sessionId: sid,
+        version: () => designRevisionRef.current,
+      })
+      if (!ownership) return
+      const holdsConfirmed = (snapshot: WorkspaceSnapshot) =>
+        snapshot.design?.status === 'confirmed' && snapshot.design?.confirmed === true &&
+        designRevisionOf(snapshot.design) === (expectedRevision ?? ownership.version)
+      setDesignConfirming(true)
+      setDesignError(null)
+      try {
+        // 确认的是所见草稿的版本；服务端拒绝锁定另一份（R5）。
+        await acceptDesignConfirm(sid, expectedRevision ?? ownership.version)
+        if (!commands.isCurrent(ownership)) return
+        const readback = await readBackVerified(ownership, holdsConfirmed)
+        if (readback.status === 'verified' || readback.status === 'stale') return
+        setDesignError(t('designProposal.confirmUnverified'))
+      } catch (err) {
+        if (!commands.isCurrent(ownership)) return
+        const refused = refusalMessageKey(err)
+        if (refused || classifyCommandFailure(err) === 'refused') {
+          setDesignError(t(refused ?? 'designProposal.confirmFailed'))
+          await readBackState(ownership)
+          return
+        }
+        // 响应丢失：服务端可能已经锁定，先回读再判断（§3）。
+        const readback = await readBackVerified(ownership, holdsConfirmed)
+        if (readback.status === 'verified' || readback.status === 'stale') return
+        setDesignError(t('designProposal.confirmUnverified'))
+      } finally {
+        const still = commands.isOwned(ownership)
+        commands.finish(ownership)
+        if (still) setDesignConfirming(false)
+      }
+    },
+    [commands, readBackState, readBackVerified, t],
+  )
+
+  /** 同会话挂接：已有正式会话时把文件绑到当前 session，不丢设计（C3）。 */
+  const attachCsvToSession = useCallback(
+    async (file: File) => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      uploadRecoveryEpochRef.current += 1
+      // 换候选（再挂一份文件）使上一份在途请求失效。
+      const ownership = commands.begin({
+        kind: 'attach',
+        sessionId: sid,
+        version: null,
+        takeover: true,
+      })
+      if (!ownership) return
+      // 同一份文件的同一意图在成功前复用同一 Idempotency-Key：响应丢失后
+      // 重试还是同一个请求，不会挂出第二份数据（§3）。
+      let signature: string
+      try {
+        signature = await attachIntentSignature(file)
+      } catch (error) {
+        if (commands.isOwned(ownership)) handleUploadRunError(error, sid, null)
+        commands.finish(ownership)
+        return
+      }
+      if (!commands.isOwned(ownership)) return
+      // Selecting new bytes invalidates confirmations still in flight for
+      // the previous candidate, even before the upload response arrives.
+      commands.invalidateKind('attach_confirm')
+      commands.invalidateKind('prewrite_record')
+      setAttachConfirming(false)
+      setConfirmBusy(null)
+      const idempotencyKey = commands.intentKey({
+        sessionId: sid,
+        kind: 'attach',
+        signature,
+      })
+      uploadOperationRef.current = idempotencyKey
+      setUploading(true)
+      setCleaningReport(null)
+      setUploadError(null)
+      setUploadNeedsReselect(false)
+      setAttachConfirmError(null)
+      setUploadStatus(t('app.uploadSubmitting'))
+      let controller: AbortController | null = null
+      const isCurrent = () => commands.isOwned(ownership)
+      try {
+        const accepted = await acceptSessionAttach(sid, file, idempotencyKey)
+        if (!isCurrent()) return
+        applyUploadMetadata(accepted, file.name)
+        if (!isCurrent()) return
+        if (!accepted.run_id || !accepted.events_url) {
+          commands.clearIntent({ sessionId: sid, kind: 'attach', signature })
+          uploadOperationRef.current = null
+          setUploadReadiness('READY')
+          setUploadStatus(t('app.uploadReady'))
+          setUploading(false)
+          return
+        }
+        setUploadReadiness('PROCESSING')
+        setUploadStatus(t('app.uploadProcessing'))
+        controller = new AbortController()
+        runAbortRef.current?.abort()
+        runAbortRef.current = controller
+        await waitForTrackedRun({
+          sessionId: sid,
+          runId: accepted.run_id,
+          kind: 'upload_pipeline',
+          eventsUrl: accepted.events_url,
+          signal: controller.signal,
+        })
+        if (!isCurrent() || activeSessionRef.current !== sid) return
+        // Keep the candidate busy until the authoritative identity has been
+        // read. A terminal run payload is not the public confirmation target.
+        const fresh = await fetchSessionSnapshot(sid)
+        if (!isCurrent()) return
+        commands.clearIntent({ sessionId: sid, kind: 'attach', signature })
+        uploadOperationRef.current = null
+        setUploadReadiness('READY')
+        setUploadStatus(t('app.uploadReady'))
+        setUploading(false)
+        applySnapshot(fresh)
+      } catch (err) {
+        if (isCurrent()) {
+          // 确定拒绝才丢弃投递凭证；未知投递保留原意图供重试。
+          if (refusalMessageKey(err) || classifyCommandFailure(err) === 'refused') {
+            commands.clearIntent({ sessionId: sid, kind: 'attach', signature })
+          }
+          handleUploadRunError(err, sid, null)
+        }
+      } finally {
+        if (runAbortRef.current === controller) runAbortRef.current = null
+        const still = isCurrent()
+        commands.finish(ownership)
+        if (still) {
+          setUploading(false)
+          if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+      }
+    },
+    [applySnapshot, applyUploadMetadata, commands, handleUploadRunError, t, waitForTrackedRun],
+  )
+
+  const confirmAttach = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    const ownership = commands.begin({
+      kind: 'attach_confirm',
+      sessionId: sid,
+      // 换数据/换候选后，在途的挂接确认不再属于当前对象（R4）。
+      version: () => datasetSignatureRef.current,
+    })
+    if (!ownership) return
+    const observed = targetsRef.current
+    const holdsAttached = (snapshot: WorkspaceSnapshot) => snapshot.dataAttached === true &&
+      snapshot.confirmation_targets?.dataset === observed?.dataset
+    setAttachConfirming(true)
+    setAttachConfirmError(null)
+    try {
+      await acceptConfirmAttach(sid, observed)
+      if (!commands.isCurrent(ownership)) return
+      // 已挂接只由回读确认；失败保持未确认且可重试（C2/C3）。
+      const readback = await readBackVerified(ownership, holdsAttached)
+      if (readback.status === 'verified' || readback.status === 'stale') return
+      setAttachConfirmError(
+        readback.status === 'unreadable'
+          ? t('attach.confirmUnverified')
+          : t('attach.confirmFailedGeneric'),
+      )
+    } catch (err) {
+      if (!commands.isCurrent(ownership)) return
+      const refused = refusalMessageKey(err)
+      if (refused) {
+        setAttachConfirmError(t(refused))
+      } else if (err instanceof AdmissionConflictError) {
+        setAttachConfirmError(
+          err.code === 'session_busy'
+            ? t('attach.confirmFailedBusy')
+            : t('attach.confirmFailedGeneric'),
+        )
+      } else if (classifyCommandFailure(err) === 'refused') {
+        setAttachConfirmError(t('attach.confirmFailedGeneric'))
+      } else {
+        // 响应丢失：不能当普通拒绝，先回读服务端实际状态。
+        setAttachConfirmError(t('attach.confirmUnverified'))
+      }
+      await readBackState(ownership)
+    } finally {
+      const still = commands.isOwned(ownership)
+      commands.finish(ownership)
+      if (still) setAttachConfirming(false)
+    }
+  }, [commands, readBackState, readBackVerified, t])
+
+  /**
+   * 记录样本/设定/风险确认（200 只回读标志，绝不本地置真，也不启动 run）。
+   * 服务端把旗标做成版本绑定记录的投影：回读一致才显示已确认。
+   */
+  const recordPrewriteConfirms = useCallback(
+    async (which: 'table1' | 'spec' | 'risk') => {
+      const sid = activeSessionRef.current
+      if (!sid) return
+      const ownership = commands.begin({
+        kind: 'prewrite_record',
+        sessionId: sid,
+        version: () => previewVersionRef.current,
+      })
+      if (!ownership) return
+      const signature = `record:${which}:${ownership.version ?? 'none'}`
+      const idempotencyKey = commands.intentKey({
+        sessionId: sid,
+        kind: 'prewrite_record',
+        signature,
+      })
+      const holds = (snapshot: WorkspaceSnapshot) =>
+        previewVersionOf({ targets: snapshot.confirmation_targets }) === ownership.version && (which === 'table1'
+          ? snapshot.table1Confirmed === true
+          : which === 'spec'
+            ? snapshot.specConfirmed === true
+            : snapshot.riskConfirmed === true)
+      const body: PrewriteConfirmAction =
+        which === 'table1'
+          ? { action: 'record_confirms', table1Confirmed: true }
+          : which === 'spec'
+            ? { action: 'record_confirms', specConfirmed: true }
+            : { action: 'record_confirms', riskConfirmed: true }
+      setConfirmBusy(which)
+      setConfirmError(null)
+      try {
+        await acceptPrewriteConfirm(sid, { ...body, expectedTarget: targetsRef.current }, idempotencyKey)
+        if (!commands.isCurrent(ownership)) return
+        const readback = await readBackVerified(ownership, holds)
+        if (readback.status === 'verified') {
+          commands.clearIntent({ sessionId: sid, kind: 'prewrite_record', signature })
+          return
+        }
+        if (readback.status === 'stale') return
+        setConfirmError(t('prewrite.confirmUnverified'))
+      } catch (err) {
+        if (!commands.isCurrent(ownership)) return
+        const refused = refusalMessageKey(err)
+        if (refused || classifyCommandFailure(err) === 'refused') {
+          commands.clearIntent({ sessionId: sid, kind: 'prewrite_record', signature })
+          setConfirmError(t(refused ?? 'prewrite.confirmFailed'))
+          await readBackState(ownership)
+          return
+        }
+        // 响应丢失：服务端可能已经记录，先回读再判断（§3）。
+        const readback = await readBackVerified(ownership, holds)
+        if (readback.status === 'stale') return
+        if (readback.status === 'verified') {
+          commands.clearIntent({ sessionId: sid, kind: 'prewrite_record', signature })
+          return
+        }
+        setConfirmError(t('prewrite.confirmUnverified'))
+      } finally {
+        const still = commands.isOwned(ownership)
+        commands.finish(ownership)
+        if (still) setConfirmBusy(null)
+      }
+    },
+    [commands, readBackState, readBackVerified, t],
+  )
+
+  /** 许可允许且两段确认齐时才启动估计：只有 202 返回的 run 才进入统一等待（C6）。 */
+  const continueEstimate = useCallback(async () => {
+    const sid = activeSessionRef.current
+    if (!sid) return
+    // #40 三档许可在入口逐动作消费（R6）。
+    const permission = continuePermissionRef.current
+    if (permission === 'forbid') {
+      setConfirmError(t('prewrite.refusedForbidden'))
+      return
+    }
+    if (permission === 'confirm' && !riskConfirmedRef.current) {
+      setConfirmError(t('prewrite.refusedRiskRequired'))
+      return
+    }
+    const ownership = commands.begin({
+      kind: 'prewrite_estimate',
+      sessionId: sid,
+      version: () => previewVersionRef.current,
+    })
+    if (!ownership) return
+    const signature = `estimate:${ownership.version ?? 'none'}`
+    const observed = targetsRef.current
+    // 同一意图在成功前复用同一 key：响应丢失后的重试接回同一个 run（§3）。
+    const idempotencyKey = commands.intentKey({
+      sessionId: sid,
+      kind: 'prewrite_estimate',
+      signature,
+    })
+    setEstimateStarting(true)
+    setConfirmError(null)
+    setRunFailure(null)
+    clearRunProgress()
+    let controller: AbortController | null = null
+    let runAccepted = false
+    const trackRun = async (
+      runId: string,
+      eventsUrl: string,
+      kind: RunKind = 'prewrite',
+    ) => {
+      controller = new AbortController()
+      runAbortRef.current?.abort()
+      runAbortRef.current = controller
+      setDirectionBusy(true)
+      await waitForTrackedRun({
+        sessionId: sid,
+        runId,
+        kind,
+        eventsUrl,
+        signal: controller.signal,
+      })
+      if (!commands.isOwned(ownership)) return
+      const fresh = await fetchSessionSnapshot(sid).catch(() => null)
+      if (!commands.isOwned(ownership)) return
+      if (fresh) applySnapshot(fresh)
+      setEvidenceRefreshKey((key) => key + 1)
+    }
+    try {
+      const { run } = await acceptPrewriteConfirm(
+        sid,
+        { action: 'continue_estimate', expectedTarget: observed },
+        idempotencyKey,
+      )
+      if (!commands.isCurrent(ownership)) return
+      commands.clearIntent({ sessionId: sid, kind: 'prewrite_estimate', signature })
+      if (!run?.run_id) {
+        // 200 / 空 run：只回读确认事实，不等待、不虚构进度。
+        const readback = await readBackVerified(ownership, () => true)
+        if (readback.status === 'unreadable') {
+          setConfirmError(t('prewrite.confirmUnverified'))
+        }
+        return
+      }
+      runAccepted = true
+      await trackRun(run.run_id, run.events_url || eventsUrlFor(run.run_id))
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (!commands.isOwned(ownership)) return
+      if (runAccepted) {
+        // run 已经入队：它的终态失败与预览版本是否移动无关，必须报出来。
+        if (err instanceof AdmissionConflictError || err instanceof RunRequestError) {
+          setConfirmError(t('prewrite.confirmFailed'))
+        } else {
+          setRunFailure(err instanceof Error ? err.message : String(err))
+        }
+        const fresh = await fetchSessionSnapshot(sid).catch(() => null)
+        if (fresh && commands.isOwned(ownership)) applySnapshot(fresh)
+        setEvidenceRefreshKey((key) => key + 1)
+        return
+      }
+      if (!commands.isCurrent(ownership)) return
+      const refused = refusalMessageKey(err)
+      if (refused || classifyCommandFailure(err) === 'refused') {
+        commands.clearIntent({ sessionId: sid, kind: 'prewrite_estimate', signature })
+        setConfirmError(t(refused ?? 'prewrite.confirmFailed'))
+        await readBackState(ownership)
+        return
+      }
+      // 响应丢失：服务端可能已经入队。回读不到的仍是未知，保留原意图
+      // key 供重试；已有 active_run 就接回同一等待，不重复入队（§3）。
+      const readback = await readBackState(ownership)
+      if (readback.status === 'stale') return
+      const active = readback.status === 'unreadable' ? null : readback.snapshot.active_run
+      if (active?.run_id && commands.isCurrent(ownership)) {
+        // A session's active run might be a different command. Resolve this
+        // command's receipt by replaying its exact key/body, never by guessing
+        // ownership from active_run alone. At most one automatic replay.
+        try {
+          const receipt = await acceptPrewriteConfirm(sid,
+            { action: 'continue_estimate', expectedTarget: observed }, idempotencyKey)
+          if (!commands.isCurrent(ownership) || !receipt.run?.run_id) return
+          commands.clearIntent({ sessionId: sid, kind: 'prewrite_estimate', signature })
+          await trackRun(receipt.run.run_id, receipt.run.events_url || eventsUrlFor(receipt.run.run_id))
+        } catch (retryError) {
+          if (!commands.isOwned(ownership)) return
+          const key = refusalMessageKey(retryError)
+          setConfirmError(t(key ?? 'prewrite.confirmUnverified'))
+        }
+        return
+      }
+      setConfirmError(t('prewrite.confirmUnverified'))
+    } finally {
+      if (runAbortRef.current === controller) runAbortRef.current = null
+      const still = commands.isOwned(ownership)
+      commands.finish(ownership)
+      if (still) {
+        setEstimateStarting(false)
+        setDirectionBusy(false)
+      }
+    }
+  }, [
+    applySnapshot,
+    clearRunProgress,
+    commands,
+    readBackState,
+    readBackVerified,
+    t,
+    waitForTrackedRun,
+  ])
+
+
   useEffect(() => {
     const pending = readPendingUploadIntent()
     if (!pending) return
@@ -1211,7 +2029,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
         controller = new AbortController()
         runAbortRef.current?.abort()
         runAbortRef.current = controller
-        return waitForRun(accepted.run_id, accepted.events_url, controller.signal)
+        return waitForTrackedRun({
+          sessionId: accepted.session_id,
+          runId: accepted.run_id,
+          kind: 'upload_pipeline',
+          eventsUrl: accepted.events_url,
+          signal: controller.signal,
+        })
       })
       .then(async (result) => {
         if (!result || !sid || !isCurrent()) return
@@ -1248,7 +2072,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         runAbortRef.current = null
       }
     }
-  }, [applySnapshot, applyUploadMetadata, handleUploadRunError])
+  }, [applySnapshot, applyUploadMetadata, handleUploadRunError, waitForTrackedRun])
 
   const uploadCsv = useCallback(
     async (file: File) => {
@@ -1284,13 +2108,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
         controller = new AbortController()
         runAbortRef.current?.abort()
         runAbortRef.current = controller
-        setRunSteps([])
-        const result = await waitForRun(
-          accepted.run_id,
-          accepted.events_url,
-          controller.signal,
-          collectRunStep(setRunSteps),
-        )
+        const result = await waitForTrackedRun({
+          sessionId: accepted.session_id,
+          runId: accepted.run_id,
+          kind: 'upload_pipeline',
+          eventsUrl: accepted.events_url,
+          signal: controller.signal,
+        })
         if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
         clearPendingUpload(intent.idempotencyKey)
         uploadOperationRef.current = null
@@ -1309,16 +2133,33 @@ export function useWorkspace(opts: WorkspaceOptions) {
         }
       }
     },
-    [applySnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t],
+    [
+      applySnapshot,
+      applyUploadMetadata,
+      handleUploadRunError,
+      invalidateSessionWork,
+      t,
+      waitForTrackedRun,
+    ],
   )
 
   const takeCsv = useCallback(
     async (file: File) => {
       sessionStorage.removeItem(LS_SAMPLE_KEY)
       setSampleDirection(null)
+      const sid = activeSessionRef.current
+      const isTeaching = Boolean(researchRef.current?.teaching_case)
+      // 已有设计（草稿或已确认）的正式会话：文件绑到当前 session，保留
+      // 设计与确认事实（C3）。无设计的上传时代会话维持既有语义：新文件
+      // 走 /upload 新建会话，不悄悄换掉旧研究的数据。
+      const hasDesign = designRef.current != null
+      if (sid && !isTeaching && hasDesign) {
+        await attachCsvToSession(file)
+        return
+      }
       await uploadCsv(file)
     },
-    [uploadCsv],
+    [attachCsvToSession, uploadCsv],
   )
 
   const handleFileSelect = useCallback(
@@ -1367,13 +2208,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
       controller = new AbortController()
       runAbortRef.current?.abort()
       runAbortRef.current = controller
-      setRunSteps([])
-      const result = await waitForRun(
-        accepted.run_id,
-        accepted.events_url,
-        controller.signal,
-        collectRunStep(setRunSteps),
-      )
+      const result = await waitForTrackedRun({
+        sessionId: accepted.session_id,
+        runId: accepted.run_id,
+        kind: 'upload_pipeline',
+        eventsUrl: accepted.events_url,
+        signal: controller.signal,
+      })
       if (!isCurrent() || activeSessionRef.current !== accepted.session_id) return
       clearPendingUpload(intent.idempotencyKey)
       uploadOperationRef.current = null
@@ -1388,7 +2229,14 @@ export function useWorkspace(opts: WorkspaceOptions) {
       if (runAbortRef.current === controller) runAbortRef.current = null
       if (isCurrent()) setUploading(false)
     }
-  }, [applySnapshot, applyUploadMetadata, handleUploadRunError, invalidateSessionWork, t])
+  }, [
+    applySnapshot,
+    applyUploadMetadata,
+    handleUploadRunError,
+    invalidateSessionWork,
+    t,
+    waitForTrackedRun,
+  ])
 
   const handleTrySample = handleTryCard
 
@@ -1412,12 +2260,15 @@ export function useWorkspace(opts: WorkspaceOptions) {
     [applySnapshot],
   )
 
-  const attachSnapshot = () =>
-    snapshotAttachFields({
-      ...(dataAttached !== null ? { dataAttached } : {}),
-      upload_readiness: uploadReadiness,
-      research,
-    })
+  const attachSnapshot = useCallback(
+    () =>
+      snapshotAttachFields({
+        ...(dataAttached !== null ? { dataAttached } : {}),
+        upload_readiness: uploadReadiness,
+        research,
+      }),
+    [dataAttached, research, uploadReadiness],
+  )
 
   const openAttachConfirm = useCallback(() => {
     setDirectionOpen(false)
@@ -1440,7 +2291,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     )
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     applySnapshot(await fetchSessionSnapshot(sid))
-  }, [applySnapshot, dataAttached, openAttachConfirm, research, uploadReadiness])
+  }, [applySnapshot, attachSnapshot, openAttachConfirm])
 
   const waitForSpecRun = useCallback(
     async (
@@ -1458,12 +2309,20 @@ export function useWorkspace(opts: WorkspaceOptions) {
       setSpecRunProgress(knownTotal > 0 ? { done: 0, total: knownTotal } : null)
       const isCurrentWait = () => runAbortRef.current === controller
       try {
-        await waitForRun(accepted.run_id, accepted.events_url, controller.signal, (event) => {
-          if (!event.specId || seen.has(event.specId)) return
-          seen.add(event.specId)
-          const total = includedSpecCount(researchRef.current)
-          // 分母未知（如刷新恢复后重挂）时保持 indeterminate，不虚构。
-          setSpecRunProgress(total > 0 ? { done: seen.size, total } : null)
+        await waitForTrackedRun({
+          sessionId: sid,
+          runId: accepted.run_id,
+          kind: 'spec_run',
+          eventsUrl: accepted.events_url,
+          signal: controller.signal,
+          discloseSteps: false,
+          onEvent: (event) => {
+            if (!event.specId || seen.has(event.specId)) return
+            seen.add(event.specId)
+            const total = includedSpecCount(researchRef.current)
+            // 分母未知（如刷新恢复后重挂）时保持 indeterminate，不虚构。
+            setSpecRunProgress(total > 0 ? { done: seen.size, total } : null)
+          },
         })
         if (activeSessionRef.current !== sid) return
         // 成功终态：真相以快照为准，本地运行态一律解除（C10/C12）。
@@ -1496,7 +2355,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
         setSpecRunFailure({ category })
       }
     },
-    [applySnapshot],
+    [applySnapshot, waitForTrackedRun],
   )
 
   const handleRunSpecSpace = useCallback(async () => {
@@ -1530,7 +2389,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     } catch {
       /* 由 waitForSpecRun 记录为 specRunFailure，避免 unhandledrejection */
     }
-  }, [dataAttached, openAttachConfirm, research, showGlobalError, uploadReadiness, waitForSpecRun])
+  }, [attachSnapshot, openAttachConfirm, showGlobalError, waitForSpecRun])
 
   const handleRunSpec = useCallback(
     async (specId: string, mode: 'canonical' | 'preview' = 'preview') => {
@@ -1686,6 +2545,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       directionOperationRef.current = operation
       setDirectionBusy(true)
       setRunFailure(null)
+      clearRunProgress()
       const startingEpoch = sessionEpochRef.current
       let sid: string | null = null
       let operationEpoch = sessionEpochRef.current
@@ -1702,8 +2562,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
         directionOperationRef.current = operation
         operationEpoch = sessionEpochRef.current
         const idempotencyKey = crypto.randomUUID()
-        writePendingRun(sid, { idempotencyKey, direction: data })
-        const accepted = await acceptDirectionRun(sid, data, idempotencyKey)
+        const direction = { ...data, expectedTarget: targetsRef.current }
+        writePendingRun(sid, { idempotencyKey, direction })
+        const accepted = await acceptDirectionRun(sid, direction, idempotencyKey)
         if ('immediate_result' in accepted) {
           clearPendingRun(sid, idempotencyKey)
           applySnapshot(accepted.immediate_result as WorkspaceSnapshot)
@@ -1712,13 +2573,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
           controller = new AbortController()
           runAbortRef.current?.abort()
           runAbortRef.current = controller
-          setRunSteps([])
-          await waitForRun(
-            accepted.run_id,
-            accepted.events_url,
-            controller.signal,
-            collectRunStep(setRunSteps),
-          )
+          await waitForTrackedRun({
+            sessionId: sid,
+            runId: accepted.run_id,
+            kind: 'prewrite',
+            eventsUrl: accepted.events_url,
+            signal: controller.signal,
+          })
           if (
             sessionEpochRef.current !== operationEpoch ||
             activeSessionRef.current !== sid
@@ -1748,6 +2609,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
               showGlobalError(t('app.directionUploadNotReady'))
               setDirectionOpen(false)
               setWorkbenchTab('data')
+            } else if (err.code === 'data_not_attached') {
+              setDataAttached(false)
+              showGlobalError(t('app.directionBlockedNotAttached'))
+              setDirectionOpen(false)
+              setWorkbenchTab('data')
+            } else if (err.code === 'design_unconfirmed') {
+              showGlobalError(t('app.directionDesignUnconfirmed'))
             } else {
               showGlobalError(t('app.directionSessionBusy'))
             }
@@ -1765,7 +2633,18 @@ export function useWorkspace(opts: WorkspaceOptions) {
         }
       }
     },
-    [applySnapshot, dataAttached, ensureSession, research, showGlobalError, switchSession, t, uploadReadiness],
+    [
+      applySnapshot,
+      clearRunProgress,
+      dataAttached,
+      ensureSession,
+      research,
+      showGlobalError,
+      switchSession,
+      t,
+      uploadReadiness,
+      waitForTrackedRun,
+    ],
   )
 
   const runGenerateChapter = useCallback(
@@ -2093,6 +2972,13 @@ export function useWorkspace(opts: WorkspaceOptions) {
       ? t('app.directionBlockedNotAttached')
       : null
   const canExport = writtenChapters.some((ch) => Boolean(ch.content))
+  // 同一待办事实（R8）：卡片与右栏「下一步」消费同一个 prewriteStep。
+  const prewriteStep = prewritePendingStep({
+    table1Confirmed,
+    specConfirmed,
+    continuePermission,
+    riskConfirmed,
+  })
   const railItems = outline.map((ch) => {
     const written = writtenChapters.find((item) => item.type === ch.type)
     return {
@@ -2159,19 +3045,39 @@ export function useWorkspace(opts: WorkspaceOptions) {
     currentChapterIndex,
     outlineLocked,
     runFailure,
-    runSteps,
+    runProgress,
     evidenceRefreshKey,
+    evidenceVersion: JSON.stringify(targetsRef.current),
     activeRun,
     research,
     specRunProgress,
     specRunFailure,
     bootFailure,
+    design,
+    designProposing,
+    designConfirming,
+    designError,
+    attachConfirming,
+    attachConfirmError,
+    prewriteGate,
+    table1,
+    specificationEquation,
+    table1Confirmed,
+    specConfirmed,
+    blockingDecision,
+    confirmBusy,
+    confirmError,
+    estimateStarting,
+    continuePermission,
+    riskConfirmed,
+    sessionKind,
     // derived
     hasReadout,
     canExport,
     hasExported,
     railItems,
     writtenChapter,
+    prewriteStep,
     // actions
     setEdaOpen,
     setUploadError,
@@ -2194,6 +3100,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     handleLogout,
     handleNewStudy,
     ensureSession,
+    ensureSessionActive,
     refreshReview,
     uploadCsv,
     takeCsv,
@@ -2213,6 +3120,11 @@ export function useWorkspace(opts: WorkspaceOptions) {
     handlePreparePaper,
     openAttachConfirm,
     handleDirectionSubmit,
+    proposeDesign,
+    confirmDesign,
+    confirmAttach,
+    recordPrewriteConfirms,
+    continueEstimate,
     handleWriteChapter,
     handleSelectChapter,
     handleSaveEdit,

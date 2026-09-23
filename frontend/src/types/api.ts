@@ -1074,6 +1074,10 @@ export interface paths {
         /**
          * Propose Design Endpoint
          * @description Propose a research-design draft from the session title (+ optional RQ).
+         *
+         *     A new draft supersedes the previous approved version: its approvals and the
+         *     preview built for it stop counting (the archived copy stays readable), so a
+         *     re-proposed design never runs behind the old confirmation.
          */
         post: operations["propose_design_endpoint_sessions__session_id__design_propose_post"];
         delete?: never;
@@ -1094,6 +1098,9 @@ export interface paths {
         /**
          * Confirm Design Endpoint
          * @description Lock the current session.design draft. Fail closed if none exists.
+         *
+         *     Formal sessions must name the observed revision. Comparison and lock are
+         *     performed together in the session store; only legacy callers may omit it.
          */
         post: operations["confirm_design_endpoint_sessions__session_id__design_confirm_post"];
         delete?: never;
@@ -2075,6 +2082,35 @@ export interface components {
              */
             attached: false;
         };
+        /** ConfirmAttachRequest */
+        ConfirmAttachRequest: {
+            expectedTarget?: components["schemas"]["ConfirmationTarget"] | null;
+        };
+        /**
+         * ConfirmDesignRequest
+         * @description POST /sessions/{id}/design/confirm 请求体（可选）。
+         *
+         *     ``expectedRevision`` 是客户端确认时看到的草稿版本（``design.revision``）。
+         *     另一窗口替换草稿后，确认明确冲突，而不是确认一份用户没看过的草稿。
+         */
+        ConfirmDesignRequest: {
+            /** Expectedrevision */
+            expectedRevision?: string | null;
+        };
+        /**
+         * ConfirmationTarget
+         * @description Opaque identities of the objects shown to the user, issued by the server.
+         */
+        ConfirmationTarget: {
+            /** Design */
+            design?: string | null;
+            /** Dataset */
+            dataset?: string | null;
+            /** Preview */
+            preview?: string | null;
+            /** Diagnosis */
+            diagnosis?: string | null;
+        };
         /**
          * CreateSessionResponse
          * @description POST /sessions 返回体。
@@ -2372,6 +2408,7 @@ export interface components {
         DirectionRequest: {
             /** Question */
             question: string;
+            expectedTarget?: components["schemas"]["ConfirmationTarget"] | null;
             /** Dv */
             dv: string;
             /** Iv */
@@ -2663,6 +2700,13 @@ export interface components {
              * @default false
              */
             available: boolean;
+            /**
+             * Evidence Stale
+             * @default false
+             */
+            evidence_stale: boolean;
+            /** History */
+            history?: components["schemas"]["HistoricalEvidenceResponse"][];
             /** Blockers */
             blockers?: string[];
             /** Estimate */
@@ -3016,6 +3060,22 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * HistoricalEvidenceResponse
+         * @description Public summary of a superseded computation; no raw state or file paths.
+         */
+        HistoricalEvidenceResponse: {
+            /** At */
+            at?: string | null;
+            /** Run Id */
+            run_id?: string | null;
+            /** Formula */
+            formula?: string | null;
+            /** Coef */
+            coef?: number | null;
+            /** N */
+            n?: number | null;
+        };
+        /**
          * IdentificationPermissionsResponse
          * @description 识别结论允许做什么。三档取值：``allow`` / ``confirm`` / ``forbid``。
          *
@@ -3324,6 +3384,7 @@ export interface components {
              * @enum {string}
              */
             action: "record_confirms" | "continue_estimate";
+            expectedTarget?: components["schemas"]["ConfirmationTarget"] | null;
             /**
              * Table1Confirmed
              * @default false
@@ -3334,6 +3395,12 @@ export interface components {
              * @default false
              */
             specConfirmed: boolean;
+            /**
+             * Riskconfirmed
+             * @description Explicit decision about the #40 risk (action=record_confirms). Bound to the diagnosis and design it was made about; confirming the sample/setting does not stand in for it.
+             * @default false
+             */
+            riskConfirmed: boolean;
             /** Qtype */
             qType?: string | null;
             /** Specmode */
@@ -3351,6 +3418,7 @@ export interface components {
              * @default true
              */
             ok: boolean;
+            confirmation_targets?: components["schemas"]["ConfirmationTarget"];
             /** Prewrite Gate */
             prewrite_gate?: string | null;
             /**
@@ -3363,6 +3431,11 @@ export interface components {
              * @default false
              */
             specConfirmed: boolean;
+            /**
+             * Riskconfirmed
+             * @default false
+             */
+            riskConfirmed: boolean;
             /** Qtype */
             qType?: string | null;
             /** Specmode */
@@ -3775,6 +3848,8 @@ export interface components {
             status: "draft" | "confirmed";
             /** Confirmed */
             confirmed: boolean;
+            /** Revision */
+            revision?: string | null;
             /** Proposed At */
             proposed_at?: string | null;
             /** Confirmed At */
@@ -3870,6 +3945,12 @@ export interface components {
         SessionInfoResponse: {
             /** Session Id */
             session_id: string;
+            confirmation_targets?: components["schemas"]["ConfirmationTarget"];
+            /**
+             * Evidence Stale
+             * @default false
+             */
+            evidence_stale: boolean;
             /** Exists */
             exists: boolean;
             /**
@@ -3877,6 +3958,11 @@ export interface components {
              * @default false
              */
             has_dataset: boolean;
+            /**
+             * Session Kind
+             * @description Explicit session category. New formal sessions carry 'formal'; sessions without a marker are legacy and keep KTD-era behavior.
+             */
+            session_kind?: ("formal" | "legacy" | "card_teaching") | null;
             /**
              * Dataattached
              * @description Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.
@@ -3932,6 +4018,19 @@ export interface components {
              * @default false
              */
             specConfirmed: boolean;
+            /**
+             * Riskconfirmed
+             * @description A current risk decision exists for this diagnosis and design (#40 permission=confirm).
+             * @default false
+             */
+            riskConfirmed: boolean;
+            /**
+             * Permissions
+             * @description #40 tri-state permission per action (allow / confirm / forbid); unknown is neither a pass nor a forbid.
+             */
+            permissions?: {
+                [key: string]: unknown;
+            } | null;
             /** Qtype */
             qType?: string | null;
             /** Specmode */
@@ -5197,7 +5296,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConfirmAttachRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -6206,7 +6309,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConfirmDesignRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

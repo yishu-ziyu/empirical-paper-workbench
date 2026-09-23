@@ -46,7 +46,8 @@ def public_design(state: Any) -> dict[str, Any] | None:
         return None
     if design.get("status") not in {STATUS_DRAFT, STATUS_CONFIRMED}:
         return None
-    return dict(design)
+    from services.formal_binding import design_revision
+    return {**design, "revision": design_revision(design)}
 
 
 def is_confirmed_object(design: Any) -> bool:

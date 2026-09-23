@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from facade import facade
+from .confirmation_helpers import confirm_seen_design, confirm_seen_attach
 from run_repository import RunRepository
 from runner import process_one_run
 
@@ -55,7 +56,7 @@ def _confirm_design(client, session_id: str, title: str = "最低工资对就业
         json={"title": title, "question": ""},
     )
     assert proposed.status_code == 200, proposed.text
-    confirmed = client.post(f"/sessions/{session_id}/design/confirm")
+    confirmed = confirm_seen_design(client, session_id)
     assert confirmed.status_code == 200, confirmed.text
     return confirmed.json()["design"]
 
@@ -93,7 +94,7 @@ def test_upload_does_not_set_data_attached(client, sample_csv_path):
     assert snap["dataset"]["columns"]
     assert snap["dataAttached"] is False
 
-    confirmed = client.post(f"/sessions/{sid}/confirm-attach")
+    confirmed = confirm_seen_attach(client, sid)
     assert confirmed.status_code == 200, confirmed.text
     body = confirmed.json()
     assert body["dataAttached"] is True
@@ -156,7 +157,7 @@ def test_classic5_attach_then_confirm_sets_data_attached(client, tmp_path, monke
     assert snap["dataAttached"] is False
     assert snap.get("research") is None
 
-    confirmed = client.post(f"/sessions/{sid}/confirm-attach")
+    confirmed = confirm_seen_attach(client, sid)
     assert confirmed.status_code == 200, confirmed.text
     assert confirmed.json()["dataAttached"] is True
     assert confirmed.json()["upload_readiness"] == "READY"
@@ -193,7 +194,7 @@ def test_confirm_attach_after_confirmed_design_preserves_design(
     _finish_upload_run(accepted.json()["run_id"])
     assert client.get(f"/sessions/{sid}").json()["dataAttached"] is False
 
-    confirmed = client.post(f"/sessions/{sid}/confirm-attach")
+    confirmed = confirm_seen_attach(client, sid)
     assert confirmed.status_code == 200, confirmed.text
     snap = confirmed.json()
     assert snap["dataAttached"] is True
@@ -222,7 +223,7 @@ def test_classic5_env_entry_override(client, tmp_path, monkeypatch):
     snap = client.get(f"/sessions/{sid}").json()
     assert snap["dataAttached"] is False
     assert "y" in snap["dataset"]["columns"]
-    assert client.post(f"/sessions/{sid}/confirm-attach").json()["dataAttached"] is True
+    assert confirm_seen_attach(client, sid).json()["dataAttached"] is True
 
 
 def test_user_file_attach_to_existing_session(client):
@@ -241,7 +242,7 @@ def test_user_file_attach_to_existing_session(client):
     assert snap["dataAttached"] is False
     assert snap["upload_readiness"] == "READY"
     assert "income" in snap["dataset"]["columns"]
-    assert client.post(f"/sessions/{sid}/confirm-attach").json()["dataAttached"] is True
+    assert confirm_seen_attach(client, sid).json()["dataAttached"] is True
 
 
 @pytest.mark.parametrize("readiness", ["PROCESSING", "FAILED", "CANCELLED"])
@@ -338,7 +339,7 @@ def test_new_classic5_candidate_clears_data_attached(client, tmp_path, monkeypat
         headers=_key(),
     )
     _finish_upload_run(first.json()["run_id"])
-    assert client.post(f"/sessions/{sid}/confirm-attach").json()["dataAttached"] is True
+    assert confirm_seen_attach(client, sid).json()["dataAttached"] is True
 
     rebound = client.post(
         f"/sessions/{sid}/attach",
@@ -350,7 +351,7 @@ def test_new_classic5_candidate_clears_data_attached(client, tmp_path, monkeypat
     assert client.get(f"/sessions/{sid}").json()["dataAttached"] is False
     _finish_upload_run(rebound.json()["run_id"])
     assert client.get(f"/sessions/{sid}").json()["dataAttached"] is False
-    assert client.post(f"/sessions/{sid}/confirm-attach").json()["dataAttached"] is True
+    assert confirm_seen_attach(client, sid).json()["dataAttached"] is True
 
 
 def test_unknown_classic5_entry_is_rejected(client, tmp_path, monkeypatch):
@@ -387,8 +388,8 @@ def test_confirm_attach_is_idempotent_when_already_attached(client, sample_csv_p
         )
     sid = accepted.json()["session_id"]
     _finish_upload_run(accepted.json()["run_id"])
-    first = client.post(f"/sessions/{sid}/confirm-attach")
-    second = client.post(f"/sessions/{sid}/confirm-attach")
+    first = confirm_seen_attach(client, sid)
+    second = confirm_seen_attach(client, sid)
     assert first.status_code == second.status_code == 200
     assert first.json()["dataAttached"] is True
     assert second.json()["dataAttached"] is True

@@ -48,10 +48,14 @@ def test_has_session_false_for_unknown():
 
 
 def test_get_state_returns_empty_for_new_session():
-    """A freshly created session has an empty state dict."""
+    """A freshly created session carries only its explicit category.
+
+    FORMAL-CONFIRMATION-CHAIN-2 (R1): the new flow stamps ``session_kind`` at
+    creation, so "no marker" can never be read as legacy for a new session.
+    """
     sid = facade.create_session()
     state = facade.get_state(sid)
-    assert state == {}
+    assert state == {"session_kind": "formal"}
     facade.drop_session(sid)
 
 

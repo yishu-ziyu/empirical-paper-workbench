@@ -1,9 +1,10 @@
 """ADR-0008: 多 LLM 路由器。
 
 配置优先级：
-1. ECONPAPER_LLM=mock → 全 mock（本地关真模型）
+1. ECONPAPER_LLM=mock → 全 mock（最高优先级：所有角色一律 mock，
+   不读取真实 SSOT/凭据，reload 与子进程同样生效）
 2. GENERATE_LLM_* / REVIEW_LLM_* 显式环境变量
-3. pytest → mock（单测不打网）
+3. pytest → mock（单测不打网、不读 SSOT）
 4. 本机 SSOT 有 MiniMax key → MiniMax
 5. mock（无 key）
 """
@@ -42,14 +43,16 @@ class LLMConfig:
     @classmethod
     def from_env(cls, prefix: str) -> "LLMConfig":
         """prefix=GENERATE → GENERATE_LLM_PROVIDER / MODEL / API_KEY / BASE_URL。"""
+        if os.environ.get("ECONPAPER_LLM") == "mock":
+            # 显式 mock 是最高优先级：直接返回，不读取真实 SSOT/凭据。
+            return cls(provider="mock", model="default")
+        if in_pytest() and not _env(f"{prefix}_LLM_PROVIDER"):
+            # 单测默认 mock：不读 SSOT，不打网。
+            return cls(provider="mock", model="default")
         load_ssot()
         explicit = _env(f"{prefix}_LLM_PROVIDER")
-        if os.environ.get("ECONPAPER_LLM") == "mock":
-            provider = "mock"
-        elif explicit:
+        if explicit:
             provider = explicit
-        elif in_pytest():
-            provider = "mock"
         elif _env("MINIMAX_API_KEY", "MINIMAX_TOKEN_PLAN_KEY"):
             provider = "minimax"
         else:
@@ -96,18 +99,20 @@ class LLMRouter:
         self._configs["title"] = self._configs["generate"]
         self._configs["outline"] = self._configs["generate"]
         self._configs["desk"] = LLMConfig.from_env("DESK")
-        if self._configs["desk"].provider == "mock" and not in_pytest():
-            key = os.environ.get("MINIMAX_API_KEY")
-            if key:
-                self._configs["desk"] = LLMConfig(
-                    provider="minimax",
-                    model=os.environ.get("MINIMAX_MODEL") or MINIMAX_MODEL,
-                    api_key=key,
-                    base_url=os.environ.get("MINIMAX_OPENAI_BASE_URL") or MINIMAX_BASE_URL,
-                )
         if self._configs["desk"].provider == "mock":
             self._configs["desk"] = self._configs["generate"]
         self._configs["default"] = self._configs["generate"]
+        self.assert_mock_isolation()
+
+    def assert_mock_isolation(self) -> None:
+        """启动配置断言：显式 mock 下任何角色都不得解析出真实供应商/凭据。"""
+        if os.environ.get("ECONPAPER_LLM") != "mock":
+            return
+        for role, config in self._configs.items():
+            if config.provider != "mock" or config.api_key:
+                raise RuntimeError(
+                    "ECONPAPER_LLM=mock 但 LLM 角色解析为非 mock 配置: " + role
+                )
 
     def reload(self) -> None:
         """Re-read env. Backend startup calls this after process env is ready."""

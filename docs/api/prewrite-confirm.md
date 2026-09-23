@@ -21,6 +21,45 @@ gate plus the two FE confirm flags from FM-E-DESIGN-ENTRY-GUIDE-1.
 4. `POST /sessions/{session_id}/prewrite/confirm` records flags and, when both
    are true and not hard-blocked, enqueues estimate.
 
+### Version binding (FORMAL-CONFIRMATION-CHAIN-2)
+
+From this batch on, an approval names the object it approved:
+
+- a confirm is only accepted when the generated **Table 1 and equation are the
+  current preview**: `preview_identity = f(design projection, dataset
+  revision, main specification, Table 1, equation)`. Confirmations carry that
+  identity; a moved preview leaves them behind instead of silently approving
+  the new one. There is no preview → **409 `preview_not_ready`**.
+- the **sample (Table 1) confirmation comes first**; a setting confirmation
+  without a current sample confirmation is **409
+  `sample_confirmation_required`**.
+- stored `table1Confirmed` / `specConfirmed` are **projections** of the
+  version-bound records, so a `true` from an earlier preview cannot start an
+  estimate: `continue_estimate` recomputes them and answers **409
+  `confirmation_stale`** when approvals no longer name the current version.
+- a new design draft (`POST /sessions/{id}/design/propose`), new data
+  (`/attach`, `/upload`) or new cleaning/sample rules (`/transform`,
+  `/filter`) revoke the affected approvals and clear the live preview
+  (Table 1, equation, `awaiting_estimate`, both flags). The previous version
+  is archived in the session's `formal_chain.history`, not deleted, and the
+  direction must be re-run with the same content as the confirmed design
+  (`POST /direction` answers **409 `design_execution_mismatch`** otherwise).
+- `Idempotency-Key` is a delivery credential for each of these write
+  endpoints: repeating the same intention returns the same run / the same
+  recorded gate and never writes a second run or a second confirmation.
+- `POST /sessions/{id}/design/confirm` optionally takes the draft revision the
+  client was looking at: `{"expectedRevision": design.proposed_at}`. The lock is
+  refused with **409 `design_revision_mismatch`** (`detail.expected` /
+  `detail.submitted`) when the session now holds a different draft, so another
+  window cannot make the user approve a version they never saw. Omitting the
+  field keeps the previous behaviour.
+- `#40` tri-state permission is consumed at the estimate entry:
+  `forbid` never opens (hard block), `confirm` needs a risk decision —
+  `{"action": "record_confirms", "riskConfirmed": true}` — bound to the
+  **diagnosis and design it was made about** (**409
+  `risk_confirmation_required`** otherwise), and an unknown assessment is
+  `allow` and adds no gate of its own.
+
 The LangGraph batch path (`graph.invoke`) still runs the full
 `PRWRITE_SEQUENCE`. The workbench HITL path is `run_prewrite(until=…)` /
 `run_prewrite(resume_from=…)`.
@@ -60,20 +99,22 @@ Equation + 题型→设定 CTA:
 ```json
 {
   "action": "continue_estimate",
-  "table1Confirmed": true,
-  "specConfirmed": true,
   "qType": "heterogeneity",
   "specMode": "interaction"
 }
 ```
 
-If both flags were already recorded, `{ "action": "continue_estimate" }` is enough.
+If both confirms were already **recorded and are still bound to the current
+version**, `{ "action": "continue_estimate" }` is enough. Flags sent on this
+call do not create an approval (that is what `record_confirms` is for); the
+server recomputes both from the version-bound records.
 
 | Field | Type | Required | Default | Meaning |
 |-------|------|----------|---------|---------|
 | `action` | `"record_confirms"` \| `"continue_estimate"` | no | `continue_estimate` | Record flags only, or enqueue estimate |
-| `table1Confirmed` | bool | for continue | `false` | Table 1 CTA |
-| `specConfirmed` | bool | for continue | `false` | Equation + 题型→设定 CTA |
+| `table1Confirmed` | bool | no | `false` | Table 1 CTA (records the sample confirmation, bound to the current preview) |
+| `specConfirmed` | bool | no | `false` | Equation + 题型→设定 CTA (requires the sample confirmation first) |
+| `riskConfirmed` | bool | no | `false` | Explicit #40 risk decision, bound to the current diagnosis + design |
 | `qType` | `"average"` \| `"heterogeneity"` \| `"causal"` | no | persisted / direction | 题型 |
 | `specMode` | `"interaction"` \| `"level"` | no | inferred from formula | 设定是否含交互 |
 | `hasInteraction` | bool | no | inferred | Explicit educ×region / `*` / `:` / `×` |
@@ -136,7 +177,13 @@ change `qType` away from `heterogeneity`, then confirm again.
 
 | Status | `detail.code` | When |
 |--------|----------------|------|
-| 409 | `confirms_incomplete` | continue without both `table1Confirmed` and `specConfirmed` |
+| 409 | `confirms_incomplete` | continue without a sample + setting confirmation |
+| 409 | `preview_not_ready` | no generated Table 1 / equation to confirm |
+| 409 | `sample_confirmation_required` | setting confirmed before (or without) the current sample confirmation |
+| 409 | `confirmation_stale` | stored confirms no longer name the current design/dataset/preview |
+| 409 | `risk_confirmation_required` | `permissions.continue_to_estimate === "confirm"` and no current risk decision |
+| 409 | `risk_confirmation_not_applicable` | risk decision without a diagnosis to bind it to |
+| 409 | `design_execution_mismatch` | `/direction` payload contradicts the confirmed design (extra keys `field`, `expected`, `submitted`) |
 | 409 | `estimate_blocked` | heterogeneity × no interaction (`blockingDecision` attached) |
 | 409 | `prewrite_not_ready` | No direction, or identification never ran |
 | 409 | `identification_blocked` | 0-star or `identification_failed` |
@@ -154,8 +201,11 @@ change `qType` away from `heterogeneity`, then confirm again.
 | `table1` | descriptives for spec columns |
 | `specification_equation` | Display equation |
 | `main_specification` | Spec from `set_direction` |
-| `table1Confirmed` | Table 1 CTA recorded |
-| `specConfirmed` | Equation / 题型→设定 CTA recorded |
+| `table1Confirmed` | Table 1 CTA recorded **for the current preview** |
+| `specConfirmed` | Equation / 题型→设定 CTA recorded **for the current preview** |
+| `riskConfirmed` | a current #40 risk decision is on file for this diagnosis + design |
+| `permissions` | #40 tri-state permission per action (`allow` / `confirm` / `forbid`) |
+| `session_kind` | `formal` / `legacy` / `card_teaching` (new sessions are stamped `formal`) |
 | `qType` | `average` / `heterogeneity` / `causal` |
 | `specMode` | `interaction` / `level` |
 | `blockingDecision` | `{blocked, isBlock, code, reason, qType, specMode, hasInteraction}` |

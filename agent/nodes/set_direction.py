@@ -139,7 +139,16 @@ def set_direction(state: EconPaperState) -> SetDirectionOutput:
         return {"research_direction": rd}
 
     rd_dict = dict(rd) if isinstance(rd, dict) else {"question": rd}
-    projected, degradations = project_method_columns(state, rd_dict)
+    design = state.get("design")
+    if isinstance(design, dict) and design.get("status") == "confirmed" and design.get("confirmed") is True:
+        # On the formal path the approved version owns method columns.
+        # Legacy column inference must not silently add a different panel,
+        # instrument or grouping variable after that approval.
+        # Admission already validated this payload against the approved
+        # design; the compute node must not import HTTP service-layer guards.
+        projected, degradations = rd_dict, []
+    else:
+        projected, degradations = project_method_columns(state, rd_dict)
     spec = DirectionSpec.from_direction(projected) or spec
     enriched = spec.enrich_direction(projected)
     out: SetDirectionOutput = {"research_direction": enriched}

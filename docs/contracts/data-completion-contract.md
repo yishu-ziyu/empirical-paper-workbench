@@ -1,5 +1,7 @@
 # Data-completion contract (TITLE/TOPIC only)
 
+> 2026-09-17 顺序说明：按 [新业务顺序](../specs/research-intent-to-design.md)，无设计时可以接入候选数据并检查文件/字段；候选的行数和元数据不冒充已经采用的分析样本。正式 Table 1/设定确认与正式估计仍需当前数据的挂接确认。其他文档“先确认设计才能接入数据”的旧限制不再适用，本文件的数据采用与真实计算门槛并未撤销。
+
 Status: frozen (G0 serial contract)  
 Task: `FM-E-BUILD-DATA-COMPLETE-1` · slice **G0**  
 Product line: **formal econpaper only** (ADR-0010 web product; user study path)  

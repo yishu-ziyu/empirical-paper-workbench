@@ -1,5 +1,7 @@
 # Infer-design contract (title-first; DECIDE-6)
 
+> 2026-09-17 顺序修订：用户已确认 [意图 → 数据可行性 → 可执行设计确认](../specs/research-intent-to-design.md)。本文件 §0/§5 及其他位置要求“数据候选/接入前先确认设计”的条款已被替代，下面保留为原决策记录；不得再按旧顺序阻止数据检查。设计确认权、候选非答案、DiD 交互项与正式执行前置条件继续适用。修复旧实现按 [独立评审](../reviews/20260917-formal-confirmation-chain-independent-review.md)，下一批按新规格实施。
+
 Status: frozen (G0 serial contract)  
 Task: `FM-E-BUILD-INFER-DESIGN-1` · slice **INF-G0**  
 Product line: **formal econpaper only** (ADR-0010 web product; user study path)  

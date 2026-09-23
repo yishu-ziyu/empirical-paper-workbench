@@ -20,6 +20,8 @@ export interface DirectionFormData {
   cutoff?: number
   unit_col?: string
   treatment_time?: string
+  /** 题型（average / heterogeneity / causal）：透传给 /direction，参与 hard-block 判定。 */
+  qType?: string
 }
 
 function methodKind(method: string): 'ols' | 'did' | 'iv' | 'rd' | 'scm' | '' {

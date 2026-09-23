@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import os
 import random
 import shutil
@@ -36,10 +37,16 @@ from upload_artifacts import (
 LEASE_SECONDS = 60
 HEARTBEAT_SECONDS = 20
 CANCELLATION_POLL_SECONDS = 0.25
-AUTHORITY_PROBE_TIMEOUT_SECONDS = 0.2
-AUTHORITY_FAILURE_GRACE_SECONDS = 0.4
+AUTHORITY_PROBE_TIMEOUT_SECONDS = 0.65
+# A negative authority answer stops work immediately. A slow-but-successful
+# probe is allowed enough room for short SQLite/Postgres contention, while a
+# continuously unavailable/stuck authority still trips the existing <1s
+# cancellation contract. Every progress/terminal write remains owner+epoch
+# fenced, so a stale worker cannot publish even inside this bounded window.
+AUTHORITY_FAILURE_GRACE_SECONDS = 0.5
 PROGRESS_WRITE_TIMEOUT_SECONDS = 0.2
 DEFAULT_CONCURRENCY = 3
+logger = logging.getLogger("econpaper.runner")
 
 
 def _default_owner() -> str:
@@ -114,11 +121,17 @@ async def _heartbeat(
     owner: str,
     lease_epoch: int,
     lease_lost: threading.Event,
+    *,
+    poll_seconds: float = CANCELLATION_POLL_SECONDS,
+    probe_timeout_seconds: float = AUTHORITY_PROBE_TIMEOUT_SECONDS,
+    authority_failure_grace_seconds: float = AUTHORITY_FAILURE_GRACE_SECONDS,
+    heartbeat_seconds: float = HEARTBEAT_SECONDS,
 ) -> None:
-    next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
+    next_heartbeat = time.monotonic() + heartbeat_seconds
     authority_failure_started: float | None = None
     while True:
-        await asyncio.sleep(CANCELLATION_POLL_SECONDS)
+        await asyncio.sleep(poll_seconds)
+        probe_started = time.monotonic()
         try:
             lease_is_current = await asyncio.wait_for(
                 repo.lease_is_current(
@@ -126,9 +139,10 @@ async def _heartbeat(
                     owner=owner,
                     lease_epoch=lease_epoch,
                 ),
-                timeout=AUTHORITY_PROBE_TIMEOUT_SECONDS,
+                timeout=probe_timeout_seconds,
             )
             if not lease_is_current:
+                logger.warning("authority_lost run=%s epoch=%s reason=not_current", run_id, lease_epoch)
                 lease_lost.set()
                 return
             authority_failure_started = None
@@ -140,17 +154,22 @@ async def _heartbeat(
                         lease_epoch=lease_epoch,
                         lease_seconds=LEASE_SECONDS,
                     ),
-                    timeout=AUTHORITY_PROBE_TIMEOUT_SECONDS,
+                    timeout=probe_timeout_seconds,
                 )
-                next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
+                next_heartbeat = time.monotonic() + heartbeat_seconds
         except LeaseLost:
             lease_lost.set()
             return
-        except Exception:
+        except Exception as exc:
             now = time.monotonic()
             if authority_failure_started is None:
-                authority_failure_started = now
-            elif now - authority_failure_started >= AUTHORITY_FAILURE_GRACE_SECONDS:
+                # Count time already spent waiting for a stuck probe. Without
+                # this, a timeout only starts the grace clock after it returns,
+                # stretching a nominal sub-second fence well past one second.
+                authority_failure_started = probe_started
+            if now - authority_failure_started >= authority_failure_grace_seconds:
+                logger.warning("authority_lost run=%s epoch=%s reason=%s elapsed=%.3f",
+                               run_id, lease_epoch, type(exc).__name__, now - probe_started)
                 lease_lost.set()
                 return
 
@@ -170,6 +189,9 @@ async def process_one_run(
     )
     if claimed is None:
         return False
+    started = time.monotonic()
+    logger.info("execution_start run=%s kind=%s attempt=%s epoch=%s",
+                claimed.run_id, claimed.kind, claimed.attempt, claimed.lease_epoch)
 
     loop = asyncio.get_running_loop()
     lease_lost = threading.Event()
@@ -183,6 +205,19 @@ async def process_one_run(
         )
     )
     upload_attempt: Path | None = None
+
+    async def relinquish_stopped_work() -> None:
+        try:
+            released = await asyncio.wait_for(repo.relinquish(
+                claimed.run_id, owner=worker, lease_epoch=claimed.lease_epoch,
+            ), timeout=1.0)
+            if released:
+                logger.info("execution_requeued run=%s epoch=%s", claimed.run_id, claimed.lease_epoch)
+                await asyncio.sleep(0.25)
+        except Exception as exc:
+            # If the store remains unavailable, the existing lease-expiry
+            # recovery still applies. Never pretend that it was relinquished.
+            logger.warning("relinquish_unavailable run=%s reason=%s", claimed.run_id, type(exc).__name__)
 
     def progress(node: str, status: str, detail: dict) -> None:
         if lease_lost.is_set():
@@ -254,7 +289,10 @@ async def process_one_run(
         else:
             raise RuntimeError("unsupported run kind")
     except (ExecutionCancelled, LeaseLost):
+        logger.warning("execution_cancelled run=%s epoch=%s elapsed=%.3f",
+                       claimed.run_id, claimed.lease_epoch, time.monotonic() - started)
         _remove_upload_attempt(upload_attempt)
+        await relinquish_stopped_work()
         return True
     except Exception as exc:
         try:
@@ -308,15 +346,20 @@ async def process_one_run(
                 finally:
                     _remove_upload_attempt(upload_attempt)
                 break
-            except Exception:
+            except Exception as exc:
+                logger.warning("terminal_commit_retry run=%s epoch=%s attempt=%s reason=%s",
+                               claimed.run_id, claimed.lease_epoch, attempt + 1, type(exc).__name__)
                 if attempt < 2:
                     await asyncio.sleep(0.1 * (2**attempt))
                     continue
                 # Execution succeeded, but its atomic terminal commit did not.
-                # Keep the run reclaimable instead of reporting a false business
-                # failure; another leased attempt can safely recompute it.
+                # Return a still-owned lease promptly instead of imposing an
+                # idle 60-second expiry wait after local work already stopped.
+                await relinquish_stopped_work()
                 break
     finally:
+        logger.info("execution_end run=%s epoch=%s elapsed=%.3f", claimed.run_id,
+                    claimed.lease_epoch, time.monotonic() - started)
         heartbeat.cancel()
         try:
             await heartbeat

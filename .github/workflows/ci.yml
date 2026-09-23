@@ -6,6 +6,44 @@ on:
   pull_request:
 
 jobs:
+  pr-integration-handoff:
+    name: PR 合并树 + 交接事实
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 验证真实合并树与 diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git cat-file -e "$BASE_SHA^{commit}"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          git merge-tree --write-tree "$BASE_SHA" "$HEAD_SHA" >/dev/null
+          git merge-base --is-ancestor "$BASE_SHA" HEAD
+          git diff --check "$BASE_SHA...$HEAD_SHA"
+
+          {
+            echo "## PR machine facts"
+            echo
+            echo "- base_sha: \`$BASE_SHA\`"
+            echo "- head_sha: \`$HEAD_SHA\`"
+            echo "- merge_base: \`$(git merge-base "$BASE_SHA" "$HEAD_SHA")\`"
+            echo
+            echo "### Changed files"
+            echo '```text'
+            git diff --name-status "$BASE_SHA...$HEAD_SHA"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 检查人工交接字段
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python .github/scripts/check_pr_handoff.py
+
   backend:
     name: 后端 + Agent pytest
     runs-on: ubuntu-latest

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -40,7 +41,9 @@ async def lifespan(app: FastAPI):
         from agent.llm.ssot import load_ssot
         from agent.llm.router import router as llm_router
 
-        load_ssot()
+        if os.environ.get("ECONPAPER_LLM") != "mock":
+            # 显式 mock 不读取真实 SSOT/凭据。
+            load_ssot()
         llm_router.reload()
         gen = llm_router.get_config("generate")
         rev = llm_router.get_config("review")

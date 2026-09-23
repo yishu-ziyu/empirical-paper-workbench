@@ -1125,6 +1125,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ConfirmAttachRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2102,7 +2119,8 @@
                 "default": {
                   "action": "continue_estimate",
                   "table1Confirmed": false,
-                  "specConfirmed": false
+                  "specConfirmed": false,
+                  "riskConfirmed": false
                 }
               }
             }
@@ -2665,7 +2683,7 @@
     "/sessions/{session_id}/design/propose": {
       "post": {
         "summary": "Propose Design Endpoint",
-        "description": "Propose a research-design draft from the session title (+ optional RQ).",
+        "description": "Propose a research-design draft from the session title (+ optional RQ).\n\nA new draft supersedes the previous approved version: its approvals and the\npreview built for it stop counting (the archived copy stays readable), so a\nre-proposed design never runs behind the old confirmation.",
         "operationId": "propose_design_endpoint_sessions__session_id__design_propose_post",
         "security": [
           {
@@ -2720,7 +2738,7 @@
     "/sessions/{session_id}/design/confirm": {
       "post": {
         "summary": "Confirm Design Endpoint",
-        "description": "Lock the current session.design draft. Fail closed if none exists.",
+        "description": "Lock the current session.design draft. Fail closed if none exists.\n\nFormal sessions must name the observed revision. Comparison and lock are\nperformed together in the session store; only legacy callers may omit it.",
         "operationId": "confirm_design_endpoint_sessions__session_id__design_confirm_post",
         "security": [
           {
@@ -2738,6 +2756,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ConfirmDesignRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4703,6 +4738,91 @@
         "title": "Classic5SuggestResponse",
         "description": "POST /classic-5/suggest 返回体.\n\nAfter a confirmed ``session.design``, ranked classic-5 candidates plus a\nnon-catalog own-file action. Without confirm, candidates stay empty.\n``candidates`` never include teaching toys as found data.\n``attached`` is always false: this path must not hang data or lock spec."
       },
+      "ConfirmAttachRequest": {
+        "properties": {
+          "expectedTarget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ConfirmAttachRequest"
+      },
+      "ConfirmDesignRequest": {
+        "properties": {
+          "expectedRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedrevision"
+          }
+        },
+        "type": "object",
+        "title": "ConfirmDesignRequest",
+        "description": "POST /sessions/{id}/design/confirm 请求体（可选）。\n\n``expectedRevision`` 是客户端确认时看到的草稿版本（``design.revision``）。\n另一窗口替换草稿后，确认明确冲突，而不是确认一份用户没看过的草稿。"
+      },
+      "ConfirmationTarget": {
+        "properties": {
+          "design": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Design"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview"
+          },
+          "diagnosis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          }
+        },
+        "type": "object",
+        "title": "ConfirmationTarget",
+        "description": "Opaque identities of the objects shown to the user, issued by the server."
+      },
       "CreateSessionResponse": {
         "properties": {
           "session_id": {
@@ -5227,6 +5347,16 @@
           "question": {
             "type": "string",
             "title": "Question"
+          },
+          "expectedTarget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "dv": {
             "type": "string",
@@ -6047,6 +6177,18 @@
             "title": "Available",
             "default": false
           },
+          "evidence_stale": {
+            "type": "boolean",
+            "title": "Evidence Stale",
+            "default": false
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoricalEvidenceResponse"
+            },
+            "type": "array",
+            "title": "History"
+          },
           "blockers": {
             "items": {
               "type": "string"
@@ -6840,6 +6982,68 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HistoricalEvidenceResponse": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "coef": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coef"
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          }
+        },
+        "type": "object",
+        "title": "HistoricalEvidenceResponse",
+        "description": "Public summary of a superseded computation; no raw state or file paths."
+      },
       "IdentificationPermissionsResponse": {
         "properties": {
           "view_and_describe_data": {
@@ -7608,6 +7812,16 @@
             "title": "Action",
             "default": "continue_estimate"
           },
+          "expectedTarget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "table1Confirmed": {
             "type": "boolean",
             "title": "Table1Confirmed",
@@ -7616,6 +7830,12 @@
           "specConfirmed": {
             "type": "boolean",
             "title": "Specconfirmed",
+            "default": false
+          },
+          "riskConfirmed": {
+            "type": "boolean",
+            "title": "Riskconfirmed",
+            "description": "Explicit decision about the #40 risk (action=record_confirms). Bound to the diagnosis and design it was made about; confirming the sample/setting does not stand in for it.",
             "default": false
           },
           "qType": {
@@ -7663,6 +7883,9 @@
             "title": "Ok",
             "default": true
           },
+          "confirmation_targets": {
+            "$ref": "#/components/schemas/ConfirmationTarget"
+          },
           "prewrite_gate": {
             "anyOf": [
               {
@@ -7682,6 +7905,11 @@
           "specConfirmed": {
             "type": "boolean",
             "title": "Specconfirmed",
+            "default": false
+          },
+          "riskConfirmed": {
+            "type": "boolean",
+            "title": "Riskconfirmed",
             "default": false
           },
           "qType": {
@@ -8687,6 +8915,17 @@
             "type": "boolean",
             "title": "Confirmed"
           },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
           "proposed_at": {
             "anyOf": [
               {
@@ -8907,6 +9146,14 @@
             "type": "string",
             "title": "Session Id"
           },
+          "confirmation_targets": {
+            "$ref": "#/components/schemas/ConfirmationTarget"
+          },
+          "evidence_stale": {
+            "type": "boolean",
+            "title": "Evidence Stale",
+            "default": false
+          },
           "exists": {
             "type": "boolean",
             "title": "Exists"
@@ -8915,6 +9162,23 @@
             "type": "boolean",
             "title": "Has Dataset",
             "default": false
+          },
+          "session_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "formal",
+                  "legacy",
+                  "card_teaching"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Kind",
+            "description": "Explicit session category. New formal sessions carry 'formal'; sessions without a marker are legacy and keep KTD-era behavior."
           },
           "dataAttached": {
             "type": "boolean",
@@ -9077,6 +9341,25 @@
             "type": "boolean",
             "title": "Specconfirmed",
             "default": false
+          },
+          "riskConfirmed": {
+            "type": "boolean",
+            "title": "Riskconfirmed",
+            "description": "A current risk decision exists for this diagnosis and design (#40 permission=confirm).",
+            "default": false
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permissions",
+            "description": "#40 tri-state permission per action (allow / confirm / forbid); unknown is neither a pass nor a forbid."
           },
           "qType": {
             "anyOf": [

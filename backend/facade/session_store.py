@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select, text
@@ -78,14 +78,23 @@ class SessionStore:
         with self._factory() as db:
             return db.get(ResearchSession, session_id) is not None
 
-    def create(self, session_id: str, user_id: Optional[int]) -> str:
+    def create(
+        self,
+        session_id: str,
+        user_id: Optional[int],
+        state: Optional[dict] = None,
+    ) -> str:
         with self._factory.begin() as db:
             row = db.get(ResearchSession, session_id)
             if row is None:
-                db.add(ResearchSession(session_id=session_id, user_id=user_id))
+                db.add(
+                    ResearchSession(
+                        session_id=session_id, user_id=user_id, state=state or {}
+                    )
+                )
             else:
                 row.user_id = user_id
-                row.state = {}
+                row.state = state or {}
                 row.csv_path = None
                 row.metadata_json = {}
         return session_id
@@ -149,6 +158,36 @@ class SessionStore:
     def save_state(self, session_id: str, state: dict) -> None:
         with self._factory.begin() as db:
             self._write_state(self._locked_row(db, session_id), state)
+
+    def mutate_state(
+        self, session_id: str, mutate: Callable[[dict], dict], *, idle: bool = False
+    ) -> dict:
+        """Read, validate and write under one session lock, also on SQLite.
+
+        Callbacks perform no I/O. This is the confirmation transaction, not a
+        read followed by a second transaction which might approve a new object.
+        """
+        from models.run import Run
+
+        with self._factory() as db:
+            if db.bind.dialect.name == "sqlite":
+                db.execute(text("BEGIN IMMEDIATE"))
+            try:
+                row = self._locked_row(db, session_id)
+                if idle:
+                    active = db.scalar(select(Run.run_id).where(
+                        Run.session_id == session_id,
+                        Run.status.in_(("PENDING", "RUNNING", "RECONCILING")),
+                    ).limit(1))
+                    if active:
+                        raise HTTPException(409, detail={"code": "session_busy", "run_id": active})
+                state = mutate(self._project_state(row))
+                self._write_state(row, state)
+                db.commit()
+                return self._project_state(row)
+            except BaseException:
+                db.rollback()
+                raise
 
     def update_state(self, session_id: str, **fields) -> dict:
         with self._factory.begin() as db:

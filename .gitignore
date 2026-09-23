@@ -38,3 +38,6 @@ backend/data/
 # Run 工件目录（trace/checkpoints/outputs，运行时生成，不入版本控制）
 runs/
 backend/runs/
+
+# Local tool traces
+.statamcp/

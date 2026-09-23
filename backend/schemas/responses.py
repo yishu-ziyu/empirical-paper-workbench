@@ -431,6 +431,7 @@ class SessionDesignResponse(BaseModel):
 
     status: Literal["draft", "confirmed"]
     confirmed: bool
+    revision: Optional[str] = None
     proposed_at: Optional[str] = None
     confirmed_at: Optional[str] = None
     source: DesignSourceResponse = Field(default_factory=DesignSourceResponse)
@@ -489,12 +490,32 @@ class BlockingDecisionResponse(BaseModel):
     hasInteraction: bool = False
 
 
+class ConfirmationTarget(BaseModel):
+    """Opaque identities of the objects shown to the user, issued by the server."""
+
+    design: Optional[str] = None
+    dataset: Optional[str] = None
+    preview: Optional[str] = None
+    diagnosis: Optional[str] = None
+
+
 class SessionInfoResponse(BaseModel):
     """GET /sessions/{id} 返回体：唯一研究状态读模型（Project Snapshot）。"""
 
     session_id: str
+    confirmation_targets: ConfirmationTarget = Field(default_factory=ConfirmationTarget)
+    evidence_stale: bool = False
     exists: bool
     has_dataset: bool = False
+    session_kind: Optional[
+        Literal["formal", "legacy", "card_teaching"]
+    ] = Field(
+        default=None,
+        description=(
+            "Explicit session category. New formal sessions carry 'formal'; "
+            "sessions without a marker are legacy and keep KTD-era behavior."
+        ),
+    )
     dataAttached: bool = Field(
         default=False,
         description="Confirm-attach product gate. True only after POST /sessions/{id}/confirm-attach.",
@@ -521,6 +542,20 @@ class SessionInfoResponse(BaseModel):
     prewrite_gate: Optional[str] = None
     table1Confirmed: bool = False
     specConfirmed: bool = False
+    riskConfirmed: bool = Field(
+        default=False,
+        description=(
+            "A current risk decision exists for this diagnosis and design "
+            "(#40 permission=confirm)."
+        ),
+    )
+    permissions: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "#40 tri-state permission per action (allow / confirm / forbid); "
+            "unknown is neither a pass nor a forbid."
+        ),
+    )
     qType: Optional[str] = None
     specMode: Optional[str] = None
     blockingDecision: Optional[BlockingDecisionResponse] = None
@@ -670,6 +705,16 @@ class EvidenceProvenanceResponse(BaseModel):
     artifacts: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class HistoricalEvidenceResponse(BaseModel):
+    """Public summary of a superseded computation; no raw state or file paths."""
+
+    at: Optional[str] = None
+    run_id: Optional[str] = None
+    formula: Optional[str] = None
+    coef: Optional[float] = None
+    n: Optional[int] = None
+
+
 class EvidenceResponse(BaseModel):
     """GET /sessions/{id}/evidence 返回体。
 
@@ -679,6 +724,8 @@ class EvidenceResponse(BaseModel):
 
     session_id: str
     available: bool = False
+    evidence_stale: bool = False
+    history: List[HistoricalEvidenceResponse] = Field(default_factory=list)
     blockers: List[str] = Field(default_factory=list)
     estimate: Optional[Dict[str, Any]] = None
     results: Optional[str] = None
@@ -737,8 +784,17 @@ class PrewriteConfirmRequest(BaseModel):
     """
 
     action: Literal["record_confirms", "continue_estimate"] = "continue_estimate"
+    expectedTarget: Optional[ConfirmationTarget] = None
     table1Confirmed: bool = False
     specConfirmed: bool = False
+    riskConfirmed: bool = Field(
+        default=False,
+        description=(
+            "Explicit decision about the #40 risk (action=record_confirms). "
+            "Bound to the diagnosis and design it was made about; confirming "
+            "the sample/setting does not stand in for it."
+        ),
+    )
     qType: Optional[str] = None
     specMode: Optional[str] = None
     hasInteraction: Optional[bool] = None
@@ -748,9 +804,11 @@ class PrewriteGateResponse(BaseModel):
     """``action=record_confirms`` 的 200 返回：确认旗标 + blockingDecision。"""
 
     ok: bool = True
+    confirmation_targets: ConfirmationTarget = Field(default_factory=ConfirmationTarget)
     prewrite_gate: Optional[str] = None
     table1Confirmed: bool = False
     specConfirmed: bool = False
+    riskConfirmed: bool = False
     qType: Optional[str] = None
     specMode: Optional[str] = None
     blockingDecision: Optional[BlockingDecisionResponse] = None

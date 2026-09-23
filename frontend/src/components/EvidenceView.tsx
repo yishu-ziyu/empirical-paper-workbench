@@ -62,7 +62,7 @@ export default function EvidenceView({
   }, [sessionId, refreshKey])
 
   const estimate: Record<string, any> =
-    (evidence?.estimate as Record<string, any> | null) ?? fallbackEstimate ?? {}
+    evidence ? (evidence.estimate as Record<string, any> | null) ?? {} : fallbackEstimate ?? {}
   const failed = Boolean(
     !evidence?.available &&
       ((evidence?.blockers ?? []).includes('estimate_failed') ||
@@ -285,8 +285,23 @@ export default function EvidenceView({
           data-testid="evidence-missing"
           className="mb-4 rounded-lg border border-wb-line bg-wb-surface px-4 py-3 text-[13px] leading-6 text-wb-muted"
         >
-          {t('evidenceView.noMain')}
+          {t(evidence?.evidence_stale ? 'evidenceView.superseded' : 'evidenceView.noMain')}
         </div>
+      ) : null}
+      {evidence?.history && evidence.history.length > 0 ? (
+        <details data-testid="evidence-history" className="mb-4 rounded-lg border border-wb-line bg-wb-surface px-4 py-3 text-[13px]">
+          <summary className="cursor-pointer">{t('evidenceView.history')}</summary>
+          {evidence.history.map((item, index) => (
+            <p key={item.run_id ?? index} className="mt-3 font-mono text-xs text-wb-muted">
+              {item.formula || '—'} · β {formatStatValue(item.coef, 'coef')} · N {item.n ?? '—'}
+              {item.run_id ? (
+                <a className="ml-3 text-wb-primary underline" href={`/api/runs/${encodeURIComponent(item.run_id)}`}>
+                  {t('evidenceView.historyRun')}
+                </a>
+              ) : null}
+            </p>
+          ))}
+        </details>
       ) : null}
       {loadError ? (
         <p data-testid="evidence-load-error" className="mb-3 text-xs text-wb-warning">

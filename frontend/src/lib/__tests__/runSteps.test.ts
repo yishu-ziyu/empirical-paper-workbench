@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { projectRunSteps, RUN_NODE_LABEL_KEYS } from '../runSteps'
+import {
+  appendRunProgressEvent,
+  createRunProgressState,
+  projectRunSteps,
+  RUN_NODE_LABEL_KEYS,
+} from '../runSteps'
 import type { RunProgressEvent } from '../runEvents'
 
 const ev = (over: Partial<RunProgressEvent>): RunProgressEvent => ({
@@ -45,16 +50,15 @@ describe('projectRunSteps', () => {
     expect(progress.blocked).toBe(false)
   })
 
-  test('设定跑批词表：running / done 也认', () => {
+  test('后端第二套状态词表：running / done 也认', () => {
     const progress = projectRunSteps([
-      ev({ node: 'spec_run', status: 'running', specId: 'ols_linear_exper' }),
-      ev({ node: 'spec_run', status: 'done', specId: 'ols_linear_exper' }),
+      ev({ node: 'legacy_batch', status: 'running' }),
+      ev({ node: 'legacy_batch', status: 'done' }),
     ])
     expect(progress.steps).toHaveLength(1)
     expect(progress.steps[0]).toMatchObject({
-      node: 'spec_run',
+      node: 'legacy_batch',
       status: 'done',
-      specId: 'ols_linear_exper',
     })
   })
 
@@ -65,6 +69,21 @@ describe('projectRunSteps', () => {
     ])
     expect(progress.blocked).toBe(true)
     expect(progress.activeNode).toBe('search_literature')
+    expect(progress.blockedStep?.node).toBe('identification_verify')
+    expect(progress.activeSteps.map((step) => step.node)).toEqual([
+      'identification_verify',
+      'search_literature',
+    ])
+  })
+
+  test('当前摘要候选按最后一次真实更新，而不是首次出现位置', () => {
+    const progress = projectRunSteps([
+      ev({ seq: 1, node: 'run_estimate', status: 'started' }),
+      ev({ seq: 2, node: 'search_literature', status: 'started' }),
+      ev({ seq: 3, node: 'run_estimate', status: 'blocked' }),
+    ])
+    expect(progress.latestUnresolvedStep?.node).toBe('run_estimate')
+    expect(progress.blockedStep?.node).toBe('run_estimate')
   })
 
   test('同一节点出现多次只占一行，位置按首次出现', () => {
@@ -93,6 +112,8 @@ describe('projectRunSteps', () => {
     }
     expect(Object.keys(RUN_NODE_LABEL_KEYS)).toContain('identification_verify')
     expect(Object.keys(RUN_NODE_LABEL_KEYS)).toContain('run_estimate')
+    // spec_run 保留自己的 k/总数 UI；通用步骤披露不维护一份不可达文案。
+    expect(Object.keys(RUN_NODE_LABEL_KEYS)).not.toContain('spec_run')
   })
 
   test('产出结构里没有百分比 / 预计时间 / 剩余步数这类字段', () => {
@@ -102,12 +123,89 @@ describe('projectRunSteps', () => {
     expect(Object.keys(progress).sort()).toEqual([
       'activeLabelKey',
       'activeNode',
+      'activeSteps',
       'blocked',
+      'blockedStep',
       'hasSteps',
+      'latestUnresolvedStep',
       'steps',
     ])
     for (const step of progress.steps) {
       expect(Object.keys(step).every((k) => ['node', 'labelKey', 'status', 'specId'].includes(k))).toBe(true)
     }
+  })
+})
+
+describe('run-scoped progress buffer', () => {
+  const owner = {
+    sessionId: 'session-a',
+    runId: 'run-a',
+    kind: 'prewrite',
+  }
+
+  test('同一个步骤在达到容量后仍能收到完成状态，不会冻结在进行中', () => {
+    let state = createRunProgressState(owner)
+    for (let index = 0; index < 200; index += 1) {
+      state = appendRunProgressEvent(
+        state,
+        owner,
+        ev({ seq: index + 1, node: `node_${index}`, status: 'started' }),
+      )
+    }
+    state = appendRunProgressEvent(
+      state,
+      owner,
+      ev({ seq: 201, node: 'node_199', status: 'completed' }),
+    )
+
+    expect(state.events).toHaveLength(200)
+    expect(state.events.find((event) => event.node === 'node_199')?.status).toBe('completed')
+    expect(state.truncated).toBe(false)
+  })
+
+  test('超过容量时保留最新事实并明确记录省略数量', () => {
+    let state = createRunProgressState(owner)
+    for (let index = 0; index < 201; index += 1) {
+      state = appendRunProgressEvent(
+        state,
+        owner,
+        ev({ seq: index + 1, node: `node_${index}`, status: index < 150 ? 'completed' : 'started' }),
+      )
+    }
+
+    expect(state.events).toHaveLength(200)
+    expect(state.events.some((event) => event.node === 'node_200')).toBe(true)
+    expect(state.truncated).toBe(true)
+    expect(state.omittedCount).toBe(1)
+  })
+
+  test('旧 run 的晚到事件不能写入新 run', () => {
+    const newOwner = { sessionId: 'session-a', runId: 'run-b', kind: 'upload_pipeline' }
+    const current = createRunProgressState(newOwner)
+    const next = appendRunProgressEvent(
+      current,
+      owner,
+      ev({ seq: 1, node: 'clean_data', status: 'started' }),
+    )
+
+    expect(next).toBe(current)
+    expect(next.events).toEqual([])
+  })
+
+  test('重复或倒序 seq 不会把较新的事实覆盖回旧状态', () => {
+    let state = createRunProgressState(owner)
+    state = appendRunProgressEvent(
+      state,
+      owner,
+      ev({ seq: 2, node: 'clean_data', status: 'completed' }),
+    )
+    state = appendRunProgressEvent(
+      state,
+      owner,
+      ev({ seq: 1, node: 'clean_data', status: 'started' }),
+    )
+
+    expect(state.events[0].status).toBe('completed')
+    expect(state.lastSeq).toBe(2)
   })
 })

@@ -159,11 +159,16 @@ def test_direction_returns_404_if_session_disappears_during_admission(
     sid = "test-run-admission-delete-race"
     facade.seed_state(sid, {"csv_path": "/tmp/input.csv"})
 
-    def delete_after_ownership_check(_session_id: str) -> dict:
-        facade.drop_session(sid)
-        return {"csv_path": "/tmp/input.csv"}
+    from routers import outline as outline_router
+    original_check = outline_router.require_session_ownership
 
-    monkeypatch.setattr(facade, "prepare_prewrite_state", delete_after_ownership_check)
+    def delete_after_ownership_check(_session_id: str, current_user) -> None:
+        original_check(_session_id, current_user)
+        facade.drop_session(sid)
+
+    # Admission now prepares its snapshot inside the insert transaction; the
+    # old prepare_prewrite_state hook is not an admission race boundary anymore.
+    monkeypatch.setattr(outline_router, "require_session_ownership", delete_after_ownership_check)
     response = client.post(
         f"/sessions/{sid}/direction",
         json=_direction(),
@@ -1270,7 +1275,10 @@ def test_upload_terminal_commit_outage_leaves_run_reclaimable(tmp_path, monkeypa
         assert failure_called is False
         durable = asyncio.run(RunRepository().get(admission.run.run_id))
         assert durable is not None
-        assert durable.status == "RUNNING"
+        # A stopped worker relinquishes its still-valid lease, without a
+        # business failure or an idle wait for the original 60-second expiry.
+        assert durable.status == "PENDING"
+        assert durable.lease_owner is None
         assert facade.get_state(sid)["upload_readiness"] == "PROCESSING"
     finally:
         monkeypatch.undo()
@@ -1618,7 +1626,8 @@ def test_completion_store_outage_does_not_report_business_failure(
         assert completion_attempts == 3
         durable = asyncio.run(RunRepository().get(run_id))
         assert durable is not None
-        assert durable.status == "RUNNING"
+        assert durable.status == "PENDING"
+        assert durable.lease_owner is None
         assert durable.result is None
     finally:
         # Restore the real class methods before using purge_session.
@@ -2010,6 +2019,40 @@ def test_single_authority_probe_failure_does_not_cancel_the_run():
             )
         )
         await asyncio.sleep(0.8)
+        assert not lease_lost.is_set()
+        heartbeat.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await heartbeat
+
+    asyncio.run(scenario())
+
+
+def test_slow_successful_authority_probe_does_not_false_cancel():
+    lease_lost = threading.Event()
+
+    class SlowRecoveringRepository:
+        def __init__(self):
+            self.calls = 0
+
+        async def lease_is_current(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                # This exceeded the former 200ms probe timeout under a loaded
+                # SQLite suite, despite returning an authoritative True.
+                await asyncio.sleep(0.35)
+            return True
+
+    async def scenario():
+        heartbeat = asyncio.create_task(
+            _heartbeat(
+                SlowRecoveringRepository(),
+                "run-with-slow-recovery",
+                "worker",
+                1,
+                lease_lost,
+            )
+        )
+        await asyncio.sleep(0.9)
         assert not lease_lost.is_set()
         heartbeat.cancel()
         with pytest.raises(asyncio.CancelledError):

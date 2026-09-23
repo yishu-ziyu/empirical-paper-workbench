@@ -125,3 +125,25 @@
    「因果 vs 相关」这个真正的设计分叉，后端有 `claim_mode` / 识别许可这套真实语义
    （见 `agent/engine/identification_state.py`），但审阅稿把它画成了一个装饰性追问。
    这条属于设计待定，本轮没有替它做决定。
+
+---
+
+## 4. 独立评审后的加固（2026-09-17）
+
+上面的 §2–§3 是 `60feb83` 当时的实现与已知缺口，保留作历史记录；后续修复以
+`docs/acceptance/progressive-run-truth-fixes.md` 为准。已经闭合的关键项：
+
+- 分支先合入 `main@d2f5533`，#40 与渐进披露在同一集成树上验证，不再用端点 diff 猜合并结果。
+- `runSteps` 改为带 `sessionId / runId / kind` 的当前-run观测；旧 run 晚到事件不再污染新 run。
+- 新运行与刷新恢复共用 `waitForTrackedRun`，不再有三处接了、三处漏接的分叉。
+- blocked 摘要明确写「被拦住」；progress 全 done 但 run 未终结时只写“等待运行结果”。
+- 200 条容量改为可更新、可淘汰、可见截断，不再达到上限后静默冻结。
+- `spec_run` 继续使用自己的 k/总数，删除通用披露中的不可达映射与死文案。
+- 未知节点摘要使用中性文案，展开详情保留原始 node。
+- 面板增加小屏高度上限、滚动、锚定与 live region；实验 `/spike` 加生产门禁。
+- App 级测试现已覆盖 SSE → workspace → 披露，以及刷新恢复与旧 run 晚到事件。
+- 完整 backend 压测式套件暴露出 authority probe 的 200ms timeout 会在短暂数据库拥塞时
+  误把合法 run 留在 `RUNNING`；现允许慢探针在 650ms 内返回，同时保留持续失权 <1s 取消与
+  owner/epoch 写入 fencing，不以放宽旧安全要求换稳定性。
+
+仍需真人浏览器证据的不是接线正确性，而是小屏/键盘/VoiceOver 与一次真实方向 run 的体验。

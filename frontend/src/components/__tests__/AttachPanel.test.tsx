@@ -46,7 +46,7 @@ describe('AttachPanel formal TITLE/TOPIC chrome', () => {
     }
   })
 
-  test('prefill is a candidate only until confirm-attach', async () => {
+  test('clicking confirm without a backend confirmation never shows 已挂接 (C3 defect)', async () => {
     const user = userEvent.setup()
     const onConfirmAttach = vi.fn()
     renderPanel({
@@ -54,20 +54,80 @@ describe('AttachPanel formal TITLE/TOPIC chrome', () => {
       onConfirmAttach,
     })
 
-    expect(screen.getByTestId('attach-prefill-note')).toBeInTheDocument()
-    expect(screen.getByTestId('attach-candidate')).toHaveTextContent('own-panel.csv')
-    expect(screen.getByTestId('attach-candidate-status')).toHaveTextContent('候选（未挂接）')
     const confirm = screen.getByTestId('attach-confirm-btn')
     expect(confirm).toBeEnabled()
-    expect(onConfirmAttach).not.toHaveBeenCalled()
-
     await user.click(confirm)
+
+    // The click was delivered, but the backend has not confirmed anything:
+    // the panel must keep showing the candidate as unattached (no local
+    // success verdict) and stay retryable.
     expect(onConfirmAttach).toHaveBeenCalledTimes(1)
-    expect(onConfirmAttach).toHaveBeenCalledWith(fileCandidate('own-panel.csv'))
+    expect(screen.getByTestId('attach-candidate-status')).toHaveTextContent('候选（未挂接）')
+    expect(screen.getByTestId('attach-confirm-btn')).toBeEnabled()
+  })
+
+  test('attached state comes from the backend snapshot, not from the click', async () => {
+    const user = userEvent.setup()
+    const onConfirmAttach = vi.fn()
+    const { rerender } = renderPanel({
+      prefill: fileCandidate('own-panel.csv'),
+      onConfirmAttach,
+    })
+
+    await user.click(screen.getByTestId('attach-confirm-btn'))
+    expect(screen.getByTestId('attach-candidate-status')).toHaveTextContent('候选（未挂接）')
+
+    // Backend snapshot now reports dataAttached=true.
+    rerender(
+      <I18nProvider>
+        <AttachPanel
+          onBrowse={vi.fn()}
+          prefill={fileCandidate('own-panel.csv')}
+          attached
+        />
+      </I18nProvider>,
+    )
     expect(screen.getByTestId('attach-candidate-status')).toHaveTextContent('已挂接')
-    expect(confirm).toBeDisabled()
-    expect(screen.queryByTestId('table1-pause')).not.toBeInTheDocument()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.getByTestId('attach-confirm-btn')).toBeDisabled()
+  })
+
+  test('waiting shows only waiting; a failure keeps the candidate and allows retry', async () => {
+    const user = userEvent.setup()
+    const onConfirmAttach = vi.fn()
+    const { rerender } = renderPanel({
+      prefill: fileCandidate('own-panel.csv'),
+      onConfirmAttach,
+    })
+
+    await user.click(screen.getByTestId('attach-confirm-btn'))
+    // In flight: waiting state only, no success wording.
+    rerender(
+      <I18nProvider>
+        <AttachPanel
+          onBrowse={vi.fn()}
+          prefill={fileCandidate('own-panel.csv')}
+          confirming
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('attach-confirm-btn')).toBeDisabled()
+    expect(screen.getByTestId('attach-candidate-status')).not.toHaveTextContent('已挂接')
+    expect(screen.getByTestId('attach-confirming')).toBeInTheDocument()
+
+    // Backend refused (e.g. 409 upload_not_ready): error surface, candidate
+    // preserved, button retryable.
+    rerender(
+      <I18nProvider>
+        <AttachPanel
+          onBrowse={vi.fn()}
+          prefill={fileCandidate('own-panel.csv')}
+          confirmError="数据处理尚未完成，请稍后重试。"
+        />
+      </I18nProvider>,
+    )
+    expect(screen.getByTestId('attach-confirm-error')).toHaveTextContent('尚未完成')
+    expect(screen.getByTestId('attach-candidate')).toHaveTextContent('own-panel.csv')
+    expect(screen.getByTestId('attach-confirm-btn')).toBeEnabled()
   })
 
   test('dropping a csv on 传 sets candidate and leaves confirm-attach unfired', async () => {

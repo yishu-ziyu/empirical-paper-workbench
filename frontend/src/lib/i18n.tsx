@@ -40,6 +40,9 @@ const zh = {
   'app.directionUploadNotReady': '数据尚未就绪，暂时不能提交研究方向。',
   'app.directionBlockedNotAttached': '请先确认挂接数据，才能提交研究方向或运行估计。',
   'app.directionSessionBusy': '当前会话已有进行中的任务，请等待结束后再试。',
+  'app.directionDesignUnconfirmed': '设计还没有确认，暂时不能提交方向或启动估计。',
+  'app.directionDesignMismatch':
+    '提交的执行内容与已确认的设计不一致，请按已确认版本修改后再提交。',
   'app.hint': '请上传 CSV、Stata 或 Excel 文件开始分析',
   'app.logout': '退出',
   'app.login': '登录',
@@ -601,6 +604,10 @@ const en: typeof zh = {
   'app.directionUploadNotReady': 'The dataset is not ready, so the research direction cannot be submitted yet.',
   'app.directionBlockedNotAttached': 'Confirm-attach the dataset before submitting a research direction or running an estimate.',
   'app.directionSessionBusy': 'This session already has a running task. Wait until it finishes, then try again.',
+  'app.directionDesignUnconfirmed':
+    'The design is not confirmed yet, so the direction and the estimate cannot run.',
+  'app.directionDesignMismatch':
+    'The submitted execution content disagrees with the confirmed design. Align it with the confirmed version and resubmit.',
   'app.hint': 'Upload a CSV, Stata, or Excel file to start',
   'app.logout': 'Logout',
   'app.login': 'Sign in',

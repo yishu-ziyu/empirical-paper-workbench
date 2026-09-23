@@ -18,7 +18,11 @@ export type FormalAttachSnapshot = {
 
 export type FormalAttachSurface = 'table1' | 'spec' | 'direction' | 'estimate'
 
-export type AdmissionConflictCode = 'upload_not_ready' | 'session_busy'
+export type AdmissionConflictCode =
+  | 'upload_not_ready'
+  | 'session_busy'
+  | 'data_not_attached'
+  | 'design_unconfirmed'
 
 export class AdmissionConflictError extends Error {
   readonly status = 409
@@ -97,7 +101,14 @@ export function snapshotAttachFields(data: object): FormalAttachSnapshot {
 }
 
 function conflictCode(value: unknown): AdmissionConflictCode | null {
-  if (value === 'upload_not_ready' || value === 'session_busy') return value
+  if (
+    value === 'upload_not_ready' ||
+    value === 'session_busy' ||
+    value === 'data_not_attached' ||
+    value === 'design_unconfirmed'
+  ) {
+    return value
+  }
   return null
 }
 

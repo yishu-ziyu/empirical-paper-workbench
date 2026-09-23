@@ -10,6 +10,7 @@ import pytest
 from fastapi import HTTPException
 
 from facade import facade
+from .confirmation_helpers import confirm_seen_design
 from services.session_design import (
     DESIGN_NOT_PROPOSED,
     DesignNotProposed,
@@ -124,7 +125,7 @@ def test_unconfirmed_cannot_unlock_spec():
 def test_confirm_endpoint_locks_draft(client):
     sid = _seed("confirm-locks-draft", _draft())
     try:
-        resp = client.post(f"/sessions/{sid}/design/confirm")
+        resp = confirm_seen_design(client, sid)
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["ok"] is True
@@ -171,10 +172,10 @@ def test_confirm_unknown_session_404(client):
 def test_confirm_idempotent_http(client):
     sid = _seed("confirm-idempotent", _draft())
     try:
-        first = client.post(f"/sessions/{sid}/design/confirm")
+        first = confirm_seen_design(client, sid)
         assert first.status_code == 200
         stamp = first.json()["design"]["confirmed_at"]
-        second = client.post(f"/sessions/{sid}/design/confirm")
+        second = confirm_seen_design(client, sid)
         assert second.status_code == 200
         assert second.json()["design"]["status"] == "confirmed"
         assert second.json()["design"]["confirmed_at"] == stamp
@@ -195,7 +196,7 @@ def test_confirm_does_not_write_downstream_gates(client):
         research_direction=None,
     )
     try:
-        resp = client.post(f"/sessions/{sid}/design/confirm")
+        resp = confirm_seen_design(client, sid)
         assert resp.status_code == 200, resp.text
         state = facade.get_state(sid)
         assert state["dataAttached"] is False
@@ -219,7 +220,7 @@ def test_snapshot_projects_draft_and_confirmed(client):
         assert before.status_code == 200
         assert before.json()["design"]["status"] == "draft"
         assert before.json()["design"]["confirmed"] is False
-        client.post(f"/sessions/{sid}/design/confirm")
+        confirm_seen_design(client, sid)
         after = client.get(f"/sessions/{sid}")
         assert after.json()["design"]["status"] == "confirmed"
         assert after.json()["design"]["confirmed"] is True

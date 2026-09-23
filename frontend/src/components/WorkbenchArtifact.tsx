@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import AttachPanel from './AttachPanel'
+import DesignProposalCard from './DesignProposalCard'
+import PrewriteConfirmCard from './PrewriteConfirmCard'
 import { CsvDropZone } from './CsvDropZone'
 import DirectionForm from './DirectionForm'
 import EdaSidebar from './EdaSidebar'
@@ -125,6 +127,33 @@ export default function WorkbenchArtifact({
 
   const writtenChaptersWithContent = ws.railItems.filter((ch) => Boolean(ch.content))
 
+  // 已确认设计 → 方向表单的执行侧初始值（设计锁是上游事实，方向是投影）。
+  const confirmedDesign = ws.design?.status === 'confirmed' ? ws.design : null
+  const designDirectionInitial = confirmedDesign
+    ? {
+        question: confirmedDesign.source?.title || ws.shapedQuestion,
+        dv: confirmedDesign.outcome || undefined,
+        iv: confirmedDesign.treatment || undefined,
+        controls: confirmedDesign.controls?.length
+          ? confirmedDesign.controls.join(', ')
+          : undefined,
+        method: confirmedDesign.method
+          ? confirmedDesign.method.toUpperCase()
+          : undefined,
+      }
+    : undefined
+  const directionInitial =
+    toDirectionInitial(ws.directionRecord) ??
+    (designDirectionInitial && (designDirectionInitial.dv || designDirectionInitial.iv)
+      ? designDirectionInitial
+      : undefined) ??
+    ws.sampleDirection ??
+    (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
+  const designQType = confirmedDesign?.qType
+  const submitDirection = (data: Parameters<typeof ws.handleDirectionSubmit>[0]) => {
+    ws.handleDirectionSubmit(designQType ? { ...data, qType: designQType } : data)
+  }
+
   const paperTabButton = (id: PaperTab, label: string) => (
     <button
       key={id}
@@ -180,14 +209,37 @@ export default function WorkbenchArtifact({
             {nowHintText}
           </p>
           {!ws.research?.teaching_case ? (
+            <DesignProposalCard
+              shapedQuestion={ws.shapedQuestion}
+              design={ws.design}
+              proposing={ws.designProposing}
+              confirming={ws.designConfirming}
+              error={ws.designError}
+              onPropose={(title, question, opts) => {
+                void ws.ensureSessionActive().then((sid) => {
+                  if (sid) void ws.proposeDesign(title, question, opts)
+                })
+              }}
+              onConfirm={(payload) => {
+                void ws.confirmDesign(payload.expectedRevision)
+              }}
+            />
+          ) : null}
+          {!ws.research?.teaching_case ? (
             <AttachPanel
               topic={ws.shapedQuestion}
               prefill={ws.csvName ? fileCandidate(ws.csvName) : null}
               uploading={ws.uploading}
               uploadReadiness={ws.uploadReadiness}
+              attached={ws.dataAttached}
+              confirming={ws.attachConfirming}
+              confirmError={ws.attachConfirmError}
               onBrowse={() => ws.fileInputRef.current?.click()}
               onFile={(file) => {
                 void ws.takeCsv(file)
+              }}
+              onConfirmAttach={() => {
+                void ws.confirmAttach()
               }}
             />
           ) : null}
@@ -216,13 +268,9 @@ export default function WorkbenchArtifact({
                     {t('app.directionTitle')}
                   </h2>
                   <DirectionForm
-                    onSubmit={ws.handleDirectionSubmit}
+                    onSubmit={submitDirection}
                     initialQuestion={ws.shapedQuestion}
-                    initial={
-                      toDirectionInitial(ws.directionRecord) ??
-                      ws.sampleDirection ??
-                      (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
-                    }
+                    initial={directionInitial}
                     columns={ws.dataColumns}
                     disabled={Boolean(ws.directionDisabledReason)}
                     disabledReason={ws.directionDisabledReason}
@@ -250,13 +298,16 @@ export default function WorkbenchArtifact({
                 </div>
                 {ws.directionOpen ? (
                   <DirectionForm
-                    onSubmit={ws.handleDirectionSubmit}
-                    initialQuestion={ws.shapedQuestion}
-                    initial={
-                      toDirectionInitial(ws.directionRecord) ??
-                      ws.sampleDirection ??
-                      (ws.shapedQuestion ? { question: ws.shapedQuestion } : undefined)
+                    key={
+                      ws.directionRecord
+                        ? 'direction-record'
+                        : confirmedDesign
+                          ? `design-${confirmedDesign.confirmed_at ?? 'draft'}`
+                          : 'direction-blank'
                     }
+                    onSubmit={submitDirection}
+                    initialQuestion={ws.shapedQuestion}
+                    initial={directionInitial}
                     columns={ws.dataColumns}
                     disabled={Boolean(ws.directionDisabledReason)}
                     disabledReason={ws.directionDisabledReason}
@@ -274,11 +325,58 @@ export default function WorkbenchArtifact({
               </p>
             )}
           </section>
+
+          {!ws.research?.teaching_case ? (
+            <PrewriteConfirmCard
+              table1={ws.table1}
+              specificationEquation={ws.specificationEquation}
+              table1Confirmed={ws.table1Confirmed}
+              specConfirmed={ws.specConfirmed}
+              blockingDecision={ws.blockingDecision}
+              confirmBusy={ws.confirmBusy}
+              confirmError={ws.confirmError}
+              estimateStarting={ws.estimateStarting}
+              awaitingEstimate={ws.prewriteGate === 'awaiting_estimate'}
+              estimateComplete={ws.prewriteGate === 'estimate_complete'}
+              continuePermission={ws.continuePermission}
+              riskConfirmed={ws.riskConfirmed}
+              onConfirmTable1={() => {
+                void ws.recordPrewriteConfirms('table1')
+              }}
+              onConfirmSpec={() => {
+                void ws.recordPrewriteConfirms('spec')
+              }}
+              onConfirmRisk={() => {
+                void ws.recordPrewriteConfirms('risk')
+              }}
+              onStartEstimate={() => {
+                void ws.continueEstimate()
+              }}
+            />
+          ) : null}
         </div>
       )}
 
       {ws.workbenchTab === 'data' && (
         <div className="mx-auto max-w-[46rem] px-6 py-8 sm:px-8">
+          {!ws.research?.teaching_case ? (
+            <AttachPanel
+              topic={ws.shapedQuestion}
+              prefill={ws.csvName ? fileCandidate(ws.csvName) : null}
+              uploading={ws.uploading}
+              uploadReadiness={ws.uploadReadiness}
+              attached={ws.dataAttached}
+              confirming={ws.attachConfirming}
+              confirmError={ws.attachConfirmError}
+              onBrowse={() => ws.fileInputRef.current?.click()}
+              onFile={(file) => {
+                void ws.takeCsv(file)
+              }}
+              onConfirmAttach={() => {
+                void ws.confirmAttach()
+              }}
+            />
+          ) : null}
           <section className="mb-6">
             <h2 className="mb-4 font-serif text-[1.35rem] text-ink">
               {t('workbench.dataTitle')}
@@ -386,6 +484,7 @@ export default function WorkbenchArtifact({
             />
           ) : sessionId ? (
             <EvidenceView
+              key={`${sessionId}:${ws.evidenceVersion}`}
               sessionId={sessionId}
               refreshKey={ws.evidenceRefreshKey}
               fallbackEstimate={ws.estimateMeta}

@@ -55,6 +55,7 @@ from schemas.responses import (
     UploadResponse,
 )
 from services.allow_did import session_allow_did
+from services.formal_chain import read_session_kind
 from services.research_lab import lab_from_state, public_research
 from services.session_design import public_design
 from upload_artifacts import publish_normalized_upload, remove_owned_upload
@@ -427,6 +428,9 @@ async def build_session_info(session_id: str) -> SessionInfoResponse:
     try:
         state = await run_in_threadpool(facade.get_state, session_id)
         extra = public_instrument_fields(state)
+        kind = read_session_kind(state)
+        if kind in {"formal", "legacy", "card_teaching"}:
+            extra["session_kind"] = kind
         readiness = state.get("upload_readiness")
         if readiness in {"PROCESSING", "READY", "FAILED", "CANCELLED"}:
             extra["upload_readiness"] = readiness
@@ -440,6 +444,9 @@ async def build_session_info(session_id: str) -> SessionInfoResponse:
         if lab_from_state(state) is not None:
             extra["research"] = public_research(state)
         extra["design"] = public_design(state)
+        from services.formal_binding import confirmation_targets
+        extra["confirmation_targets"] = confirmation_targets(state)
+        extra["evidence_stale"] = state.get("evidence_stale") is True
     except Exception:
         extra = {}
     extra["dataset"] = await _snapshot_dataset(session_id)

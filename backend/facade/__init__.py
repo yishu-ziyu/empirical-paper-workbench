@@ -23,7 +23,7 @@ import shutil
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, List, Optional
+from typing import Any, Callable, Iterator, List, Optional
 
 import run_store
 from fastapi import HTTPException
@@ -54,6 +54,13 @@ from .session_store import SessionStore
 
 
 logger = logging.getLogger(__name__)
+
+
+def risk_is_current(state: dict) -> bool:
+    """A current #40 risk decision is on file for this diagnosis + design."""
+    from services.formal_binding import risk_is_current as _risk_is_current
+
+    return _risk_is_current(state)
 
 
 def _public_prewrite_gates(state: dict) -> dict[str, Any]:
@@ -90,13 +97,16 @@ class AgentFacade:
         session_id: Optional[str] = None,
         user_id: Optional[int] = None,
     ) -> str:
-        """Create an empty session and return its id.
+        """Create an empty formal session and return its id.
 
-        匿名会话（无 user_id）用于未登录上传。
+        匿名会话（无 user_id）用于未登录上传。新流程创建的会话写入显式类别：
+        legacy 判定只能来自显式标记或历史数据缺失，不能由「字段缺失」推断。
         """
+        from services.formal_chain import formal_category_fields
+
         if session_id is None:
             session_id = str(uuid.uuid4())
-        self._store.create(session_id, user_id)
+        self._store.create(session_id, user_id, state=formal_category_fields())
         # Run 工件目录：会话创建即建档（trace/checkpoints/outputs 的根）
         try:
             run_store.write_manifest(session_id, user_id=user_id)
@@ -158,14 +168,15 @@ class AgentFacade:
     @staticmethod
     def instrument_fields(state: dict) -> dict:
         """Desk readout + outline/chapters the UI can rehydrate after refresh."""
-        from agent.engine.identification_state import identification_hard_block
+        from agent.engine.identification_state import identification_decision
 
         diag = state.get("identification_diag") or {}
         report = diag.get("report") if isinstance(diag, dict) else None
         blockers = [str(item) for item in (state.get("write_blockers") or []) if item]
         # 口径来自 agent.engine.identification_state，与图的条件边、串行预写路径、
         # 章节写入闸门同一函数，避免同一个 state 在不同入口得到不同结论。
-        if identification_hard_block(state) and "star_0" not in blockers:
+        identification = identification_decision(state)
+        if identification["hard_block"] and "star_0" not in blockers:
             blockers = ["star_0", *blockers]
         gate_fields = _public_prewrite_gates(state)
         decision = gate_fields.get("blockingDecision") or {}
@@ -224,6 +235,11 @@ class AgentFacade:
             "table1": state.get("table1"),
             "specification_equation": state.get("specification_equation"),
             "prewrite_gate": state.get("prewrite_gate"),
+            # #40 tri-state permission + whether the current risk decision is
+            # on file: the FE renders the risk CTA from these, not from a
+            # locally invented state.
+            "permissions": identification["permissions"],
+            "riskConfirmed": risk_is_current(state),
             **_public_prewrite_gates(state),
         }
 
@@ -237,6 +253,10 @@ class AgentFacade:
     def save_state(self, session_id: str, state: dict) -> None:
         """Overwrite the durable session state."""
         self._store.save_state(session_id, state)
+
+    def mutate_state(self, session_id: str, mutate: Callable[[dict], dict], *, idle: bool = False) -> dict:
+        """Apply an I/O-free transition inside the session's write transaction."""
+        return self._store.mutate_state(session_id, mutate, idle=idle)
 
     def update_state(self, session_id: str, **fields) -> dict:
         """Merge fields into the session state and return the new state."""
@@ -477,16 +497,46 @@ class AgentFacade:
         self,
         session_id: str,
         confirms: dict | None = None,
+        *,
+        state: dict | None = None,
     ) -> tuple[dict, dict]:
-        """Validate both FE confirms and the hetero hard-block, then snapshot."""
-        from agent.engine.identification_state import identification_hard_block
+        """Validate both confirms, the version binding and the #40 permission."""
+        from agent.engine.identification_state import (
+            PERMISSION_CONFIRM,
+            identification_decision,
+            identification_hard_block,
+        )
         from agent.engine.prewrite_gates import (
             evaluate_blocking_decision,
             merge_confirm_flags,
             persist_gate_fields,
         )
+        from services.formal_binding import (
+            CODE_CONFIRMATIONS_STALE,
+            CODE_RISK_CONFIRMATION_REQUIRED,
+            align_direction,
+            bound_confirm_flags,
+            risk_is_current,
+            stale_confirmation_present,
+        )
+        from services.formal_chain import (
+            formal_path_applies,
+            require_confirm_attached,
+            require_design_confirmed,
+        )
 
-        state = persist_gate_fields(self.get_state(session_id), confirms or {})
+        from services.formal_binding import validate_confirmation_options
+        state = self.get_state(session_id) if state is None else state
+        validate_confirmation_options(state, confirms or {})
+        state = persist_gate_fields(state, confirms or {})
+        # Formal-path fail-closed gates (data-completion §2a rule 4,
+        # infer-design §5.2 rule 4): estimate never runs without
+        # confirm-attach or behind an unconfirmed design draft.
+        require_confirm_attached(state)
+        require_design_confirmed(state)
+        from services.formal_binding import require_observed_target
+        require_observed_target(state, (confirms or {}).get("expectedTarget"),
+                                ("design", "dataset", "preview", "diagnosis"))
         rd = state.get("research_direction")
         if not isinstance(rd, dict) or not (rd.get("question") or rd.get("dv")):
             raise HTTPException(
@@ -507,17 +557,37 @@ class AgentFacade:
                 status_code=409,
                 detail={"code": "prewrite_not_ready", "reason": "no_identification"},
             )
-        flags = merge_confirm_flags(state, confirms or {})
-        if not flags["table1Confirmed"] or not flags["specConfirmed"]:
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "confirms_incomplete",
-                    "table1Confirmed": flags["table1Confirmed"],
-                    "specConfirmed": flags["specConfirmed"],
-                    "blockingDecision": evaluate_blocking_decision(state, confirms or {}),
-                },
-            )
+        if formal_path_applies(state):
+            # R2/R3: the flags are projections of version-bound confirmations,
+            # so a stored ``true`` from an earlier preview cannot start this
+            # estimate. The executed direction is the approved one.
+            flags = bound_confirm_flags(state)
+            if not flags["table1Confirmed"] or not flags["specConfirmed"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": (
+                            CODE_CONFIRMATIONS_STALE
+                            if stale_confirmation_present(state)
+                            else "confirms_incomplete"
+                        ),
+                        **flags,
+                        "blockingDecision": evaluate_blocking_decision(state, confirms or {}),
+                    },
+                )
+            rd = align_direction(state, rd)
+        else:
+            flags = merge_confirm_flags(state, confirms or {})
+            if not flags["table1Confirmed"] or not flags["specConfirmed"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "confirms_incomplete",
+                        "table1Confirmed": flags["table1Confirmed"],
+                        "specConfirmed": flags["specConfirmed"],
+                        "blockingDecision": evaluate_blocking_decision(state, confirms or {}),
+                    },
+                )
         decision = evaluate_blocking_decision(state, confirms or {})
         if decision.get("blocked"):
             raise HTTPException(
@@ -527,8 +597,19 @@ class AgentFacade:
                     "blockingDecision": decision,
                 },
             )
+        # R6: consume the #40 permission for this exact action. ``forbid`` is
+        # already refused above as a hard block; ``confirm`` needs a risk
+        # decision bound to this diagnosis and design, which confirming the
+        # sample/setting cannot stand in for. Unknown assessments are ``allow``
+        # and add no gate of their own.
+        permission = identification_decision(state)["permissions"]["continue_to_estimate"]
+        if permission == PERMISSION_CONFIRM and not risk_is_current(state):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": CODE_RISK_CONFIRMATION_REQUIRED},
+            )
         initial_state = persist_gate_fields(
-            self.prepare_prewrite_state(session_id),
+            dict(state),
             confirms or {},
             table1_confirmed=True,
             spec_confirmed=True,
@@ -536,39 +617,36 @@ class AgentFacade:
         initial_state["prewrite_phase"] = "estimate"
         return dict(rd), initial_state
 
-    def record_prewrite_confirms(self, session_id: str, confirms: dict | None = None) -> dict:
-        """Persist Table 1 / spec confirm flags without running estimate."""
-        from agent.engine.prewrite_gates import (
-            evaluate_blocking_decision,
-            merge_confirm_flags,
-            persist_gate_fields,
+    def record_prewrite_confirms(
+        self,
+        session_id: str,
+        confirms: dict | None = None,
+        *,
+        idempotency_key: str | None = None,
+    ) -> dict:
+        """Record Table 1 / spec / risk confirmations without running estimate.
+
+        On the formal path every confirmation is written with the preview and
+        design revision it was given (R2/R3); the flags are then projected from
+        those records so they cannot outlive the objects they approved.
+        """
+        from services.formal_binding import (
+            apply_confirmation_command, confirmation_targets, risk_is_current,
+        )
+        incoming = dict(confirms or {})
+        state = self._store.mutate_state(
+            session_id, lambda current: apply_confirmation_command(current, incoming, idempotency_key),
+            idle=True,
         )
 
-        incoming = dict(confirms or {})
-        state = persist_gate_fields(self.get_state(session_id), incoming)
-        flags = merge_confirm_flags(state, incoming)
-        decision = evaluate_blocking_decision(state, incoming)
-        if flags["specConfirmed"] and decision.get("blocked"):
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "estimate_blocked",
-                    "blockingDecision": decision,
-                },
-            )
-        state = persist_gate_fields(
-            state,
-            incoming,
-            table1_confirmed=flags["table1Confirmed"],
-            spec_confirmed=flags["specConfirmed"],
-        )
-        self.save_state(session_id, state)
         return {
             "ok": True,
             "prewrite_gate": state.get("prewrite_gate"),
             "table1": state.get("table1"),
             "specification_equation": state.get("specification_equation"),
             "main_specification": state.get("main_specification"),
+            "riskConfirmed": risk_is_current(state),
+            "confirmation_targets": confirmation_targets(state),
             **_public_prewrite_gates(state),
         }
 
@@ -1044,6 +1122,7 @@ class AgentFacade:
         step_config = {**config, "workspace": "/tmp", "order": 0}
         datasets, _report = TransformStepCls().run(datasets, step_config)
         self.save_datasets(session_id, datasets)
+        self._supersede_sample(session_id, reason="transform")
         return datasets
 
     def filter_sample(self, session_id: str, conditions: list) -> list:
@@ -1061,7 +1140,21 @@ class AgentFacade:
         }
         datasets, _report = FilterStepCls().run(datasets, step_config)
         self.save_datasets(session_id, datasets)
+        self._supersede_sample(session_id, reason="filter")
         return datasets
+
+    def _supersede_sample(self, session_id: str, *, reason: str) -> None:
+        """Cleaning / sample-filter change: revoke the sample-bound approvals.
+
+        The previous preview and confirmations were about the old sample
+        definition; they are archived, not silently reused (spec §5).
+        """
+        from services.formal_binding import supersede_sample_definition
+
+        state = self.get_state(session_id)
+        updated = supersede_sample_definition(state, reason=reason)
+        if updated != state:
+            self.save_state(session_id, updated)
 
     def balance_panel(
         self, session_id: str, panel_id: str, time_col: str
@@ -1125,7 +1218,7 @@ class AgentFacade:
         self.save_state(session_id, state)
         return charls_config
 
-    def confirm_design(self, session_id: str) -> dict:
+    def confirm_design(self, session_id: str, expected_revision: str | None = None) -> dict:
         """Lock session.design (draft → confirmed). Fail closed without a draft.
 
         Does not attach data, suggest catalog rows, set allow_did, or write
@@ -1133,16 +1226,20 @@ class AgentFacade:
         design is idempotent.
         """
         from services.session_design import DesignNotProposed, lock_confirmed_design
+        from services.formal_binding import design_revision
+        from services.formal_chain import formal_path_applies
 
-        state = self.get_state(session_id)
-        try:
-            locked = lock_confirmed_design(state.get("design"))
-        except DesignNotProposed as exc:
-            raise HTTPException(
-                status_code=409,
-                detail={"code": exc.code},
-            ) from exc
-        return self.update_state(session_id, design=locked)["design"]
+        def confirm(state: dict) -> dict:
+            revision = design_revision(state.get("design"))
+            try:
+                locked = lock_confirmed_design(state.get("design"))
+            except DesignNotProposed as exc:
+                raise HTTPException(409, detail={"code": exc.code}) from exc
+            if formal_path_applies(state) and (not expected_revision or expected_revision != revision):
+                raise HTTPException(409, detail={"code": "design_revision_mismatch", "expected": revision})
+            return {**state, "design": {**locked, "revision": revision}}
+
+        return self._store.mutate_state(session_id, confirm)["design"]
 
     # ------------------------------------------------------------------
     # ADR-0007: HITL 人工评审

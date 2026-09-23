@@ -4,6 +4,14 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| FORMAL-CONFIRMATION-CHAIN-3 | `runtime/tasks/20260918-formal-confirmation-chain-3.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + inherited changes | 2026-09-18 | ACCEPT；S1–S5、响应丢失与 run 重领已闭合，全量/真实桌面/320×568 均通过；下一步 INTENT-TO-DESIGN-1 |
+| FORMAL-CHAIN-2-REVIEW | `runtime/tasks/20260917-formal-chain-2-review.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + CHAIN-2 受评实现未变 | 2026-09-18 | REJECT；153 项既有测试通过，5 个新 API 反例违约；桌面真实链路及换数据反例已验，小屏超时后恢复；详见 CHAIN-2 独立评审 |
+| FORMAL-CONFIRMATION-CHAIN-2 | `runtime/tasks/20260917-formal-confirmation-chain-2.md` | review-rejected | `feat/progressive-research-flow` @ `2d83c2c9c716` + inherited + CHAIN-1/2 交付（未提交） | 2026-09-18 | 原交付保留；修复 docs/reviews/20260917-formal-confirmation-chain-2-independent-review.md 的 S1–S5，补运行重领与代码溯源证据后重审 |
+| FORMAL-CHAIN-REVIEW-2 | `runtime/tasks/20260917-formal-chain-independent-review.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + 受评实现未变 | 2026-09-17 | REJECT；评审和意图优先新规格已写；交执行者修复后重审 |
+| FORMAL-CONFIRMATION-CHAIN-1 | `runtime/tasks/20260917-formal-confirmation-chain-1.md` | review-rejected | `feat/progressive-research-flow` @ `2d83c2c9c716` + inherited + 17 源码/测试文件（未提交） | 2026-09-17 | C1–C12 全 PASS 不成立；按 docs/reviews/20260917-formal-confirmation-chain-independent-review.md 修复，保留原交付供对照 |
+| EXECUTION-REVIEW-SPEC-1 | `runtime/tasks/20260917-execution-review-spec.md` | complete | `feat/progressive-research-flow` @ `2d83c2c9c716` + inherited changes | 2026-09-17 | 执行规范已备；交本地 Agent 按 `docs/acceptance/formal-confirmation-chain.md` 实现首批，之后独立 review；尚未执行 |
+| CORE-PRODUCT-CONTRACT-1 | `runtime/tasks/20260917-core-product-contract.md` | complete | `feat/progressive-research-flow` @ `2d83c2c9c716` + existing fixes | 2026-09-17 | 短契约与页面映射已写；截图读取已验证；待确认 P0 范围后补正式确认链；未改产品代码、未提交 |
+| PROGRESSIVE-RUN-TRUTH-1 | `runtime/tasks/20260917-progressive-run-truth-fixes.md` | complete | `feat/progressive-research-flow` @ `2d83c2c9c716` + uncommitted fixes | 2026-09-17 | 自动化全绿；待用户决定 commit/push，并做小屏/键盘/VoiceOver/真实方向 run 真人复验 |
 | STRAY-GAP-CLOSURE-1 | `runtime/tasks/20260916-stray-gap-closure.md` | active | `feat/fm-e-build-fold-real-fetch-1` @ `a274d56` | 2026-09-16 | 补齐 14 条游离缺口，分 7 批；批 A 契约 `docs/acceptance/stray-gap-closure-batch-a.md`；不推远端 |
 | STRAY-BRANCH-TRIAGE-1 | `runtime/tasks/20260916-stray-branch-triage.md` | complete | `feat/fm-e-build-fold-real-fetch-1` @ `a274d56` | 2026-09-16 | 20/20 判定已出（已重做 6 / 真缺口 14 / 待定 0）；validator ACCEPT；待用户决定 14 条缺口的补齐范围；未提交、未推送 |
 | FM-E-FOLD-REAL-FETCH-1 | `runtime/tasks/20260915-fm-e-fold-real-fetch-1.md` | complete | `feat/fm-e-build-fold-real-fetch-1` | 2026-09-15 | pushed; `make test` green; no PR |

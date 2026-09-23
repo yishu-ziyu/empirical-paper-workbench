@@ -1,0 +1,29 @@
+# 正式确认链：直接修复 S1–S5
+
+- Task ID: FORMAL-CONFIRMATION-CHAIN-3
+- Status: complete
+- Git context: feat/progressive-research-flow @ 2d83c2c9c716c0708eb5303840e76f51749583d1 + 全部继承未提交修改
+- Goal: 确认用户所见版本、原子确认/入队、完整执行参数对齐、过期证据不再作为当前结果、幂等意图冲突；排查运行反复领取。
+- Hard bar: 直接执行，不委派，不 commit/push/merge/部署；不读取/传播真实配置或用户数据；不放宽租约 fencing 和失败测试。
+- Acceptance: S1–S5 各自反例修复前失败、修复后通过；桌面与小屏真实三进程合成数据链路；替换数据后旧结果退出当前视图且历史保留；同意图重放不重算。
+- Evidence: ../empirical-paper-workbench-evidence/formal-confirmation-chain-3/
+- Baseline: 开始时关键源码哈希与 CHAIN-2 交付一致，完整初始差异由 DevSpace 记录；一次批量复制基线请求被工具阻止，未重试复制，未触碰敏感副本。
+- Verified facts:
+  - S1：snapshot 公开 opaque `confirmation_targets`；挂接、方向、样本/设定/风险确认与估计启动均携带用户所见 target，服务端在当前事务内比对；旧 preview / diagnosis / dataset 不得批准新版。
+  - S2：新 draft 使用唯一 UUID `revision`；正式设计确认必须提交所见 revision，比较与锁定在同一 session 写事务内完成；同一秒两版草稿不再碰撞。
+  - S3：执行方向按已确认设计完整对齐，覆盖 RD cutoff/running、IV instrument/endogenous、DiD time/id/interaction、cluster、qType/specMode 等；空白设计字段不能被请求任意补成新分析含义。
+  - S4：设计/数据/样本规则变更会归档旧 preview 与 evidence，并清掉当前 estimate/results/diagnostics/robustness/code；证据读模型显示“历史结果”，不会把旧系数继续当当前结果。结果章标记 stale/needs_regeneration。
+  - S5：同 Idempotency-Key 只可重放同 kind + 同 intent；方向与估计阶段、不同确认内容复用同 key 返回 `idempotency_conflict`。已接受的同意图在目标后来变化后仍可接回原 run。
+  - 响应丢失：前端复用 sessionStorage 中同一意图凭证并回读 snapshot/active_run；真实浏览器故障注入分别丢弃一次 sample 200 响应和 estimate 202 响应，最终接回原意图且未重复运行。
+  - run 重领：短暂 authority probe 延迟不再误取消；本地执行停止或 terminal commit 连续失败时，只在同 owner+epoch 仍持有租约时 relinquish 为 PENDING，旧 epoch 仍受 fencing；最终浏览器运行均 attempt=1，无重复领取。
+  - mock 隔离继承 CHAIN-2 修复：显式 `ECONPAPER_LLM=mock` 不读 SSOT，各角色全 mock；本轮未调用真实模型。
+- Test evidence:
+  - 最新全量 `make test`：agent 1072 passed / 2 skipped；backend 712 passed / 8 skipped / 13 subtests；frontend 554 passed；OpenAPI drift 通过。日志：`../empirical-paper-workbench-evidence/formal-confirmation-chain-3/make-test-final.log`。
+  - 崩溃恢复后复跑关键后端 78 项、前端 48 项、LLM router 22 项，全部通过。
+  - `git diff --check` 通过；`npm run lint` 0 errors / 6 既有 Fast Refresh warnings；`npm run build` 通过，保留既有 >500k chunk 提示。
+  - 真三进程浏览器：桌面与 320×568 均 PASS；首轮 β=31.9631147541，替换数据后 β=94.9631147541；刷新恢复同一 session；viewport 横向 overflow=0。证据：`../empirical-paper-workbench-evidence/formal-confirmation-chain-3/final-browser/`。
+  - 换数据中间态截图实际读取：旧 β 只出现在历史结果，当前读数为空，直到新估计完成。
+- Known gaps: 真人 VoiceOver 尚未验；证据页“执行代码”溯源层仍是既有缺口；匿名开发模式会产生 `/auth/me` 401 console noise；这些不阻断本任务 S1–S5。
+- Sensitive evidence boundary: CHAIN-1 旧基线中的 `.env` 副本未读取、未删除、未传播；清理仍需单独确认范围。
+- Next action: 可进入 `INTENT-TO-DESIGN-1`，按 `docs/specs/research-intent-to-design.md` 实现“研究意图 → 数据可行性 → 可执行设计确认”的产品路径；不要恢复“数据前必须先确认设计”的旧顺序。
+- Updated at: 2026-09-18 01:42 +0800

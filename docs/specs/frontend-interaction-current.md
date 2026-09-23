@@ -1,5 +1,7 @@
 # 当前前端交互基线（2026-09-17）
 
+> 业务顺序更新：用户已确认“明确研究意图 → 数据可行性检查 → 确认可执行设计 → 正式分析”，详见 [研究意图到可执行设计](research-intent-to-design.md)。下文的“分析进行中”不得被解释为数据检查前已经获准正式估计；技术确认链接线与体验设计分别验收。此前提出的首轮固定展示“问题/比较/结论边界”未被采纳，不作为本文件要求。
+
 > 这是当前讨论与后续 Coding Agent 交接的**唯一设计基线**。聊天截图、临时 HTML、旧探索稿只作参考；发生冲突时，以本文件 + 当前分支代码/运行事实为准。
 
 ## 0. 工作规则
@@ -103,7 +105,9 @@
 
 ## 7. Agent ↔ Agent 交接协议
 
-任何 Agent 做完工作后，必须留下：
+任何 Agent 做完工作后，必须留下下面的事实。PR 场景以 `.github/pull_request_template.md`
+为唯一人工填写入口；CI 自动生成 `base_sha` / `head_sha` / merge-base / changed files 与检查结果，
+不要再手抄这些容易漂移的机器事实。非 PR 交接仍可使用完整文本块：
 
 ```text
 HANDOFF TO NEXT AGENT
@@ -137,3 +141,12 @@ commits_pushed:
 ```
 
 接手 Agent 必须先读本文件，再看目标分支相对 `main` 的 diff，不得只依据上一位 Agent 的自然语言总结。
+
+PR CI 至少校验：
+
+- `base_sha + head_sha` 的真实 merge tree 可以生成；
+- 三点 diff 无 whitespace error；
+- `what_changed`、`runtime_evidence`、`known_gaps_or_disagreements`、
+  `facts_vs_requests` 四段人工事实非空。
+
+机器能够从 Git 得到的内容不要求人重复维护；机器无法知道的运行证据与分歧必须由人明确写出。

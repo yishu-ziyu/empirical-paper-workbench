@@ -74,3 +74,8 @@ def effect_from_fit(fit) -> tuple[float | None, float | None, float | None, int 
 - 估计 Agent 路径没有 `call`：它报告的 `final_code` 尚未核实为实际执行的代码，复现脚本只列为“未纳入”。
 - `effect_from_fit` 在不传变量名时读 `CausalResult.estimate`。此前新版 StatsPAI 的 CausalResult 也带 `params`，RD / SCM / CS 因此出现过 `status=ok` 却没有系数（2026-09-24 修复，回归测试在 `backend/tests/test_replication_script.py`）。
 
+## 读结果与读字段（2026-09-24）
+
+- 从估计结果里取系数、标准误、p 值、样本量，只用 `agent.engine.results.read_effect`。不要在节点里自己读 `params`、`to_dict()` 或 `estimate` 属性。
+- 读设计字段只用 `agent.design.fields.field(spec, name)`，规范名优先，只收纯拼写别名；“内生变量缺省取处理变量”这类方法规则写在调用处。新增拼写先加进 `ALIASES`，并保证设定的生成方给各拼写写同一个值（`agent/tests/test_design_fields.py`）。
+

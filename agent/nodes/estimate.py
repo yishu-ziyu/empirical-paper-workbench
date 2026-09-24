@@ -23,12 +23,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..design.fields import field
 from ..data_honesty import honesty_for_n
 from ..design.spec import (
     apply_heterogeneity_to_formula,
     display_estimate_engine_label,
     norm_method,
 )
+from ..engine.results import read_effect
 from ..engine.did_spec import (
     DID_MISSING_INTERACTION,
     apply_did_spec,
@@ -148,52 +150,11 @@ def _stamp_estimate_honesty(
         payload.pop("honesty_warning", None)
 
 
-def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
-    try:
-        d = result.to_dict()
-        coefs = d.get("coefficients", {})
-        entry = coefs.get(var) or coefs.get("treat") or {}
-        if entry:
-            return entry.get("estimate"), entry.get("std_error"), entry.get("p_value")
-    except Exception:
-        pass
-    try:
-        se_src = getattr(result, "bse", None)
-        if se_src is None:
-            se_src = result.std_errors
-        return float(result.params[var]), float(se_src[var]), float(result.pvalues[var])
-    except Exception:
-        return None, None, None
-
-
 def effect_from_fit(
     fit: Any, var: str | None = None
 ) -> tuple[Optional[float], Optional[float], Optional[float], Optional[int]]:
-    """抽出 (coef, se, p, n)。CausalResult 用 ``estimate``，不要 ``float(result)``。
-
-    RD / SCM / CS 调用时不传 ``var``：读 ``estimate``。新版 StatsPAI 的
-    CausalResult 也带 ``params``，不能再用“没有 params”来判断，否则会按
-    "treat" 去找系数而得到 None（曾导致 status=ok 却没有系数）。
-    """
-    if hasattr(fit, "estimate") and (var is None or not hasattr(fit, "params")):
-        coef = float(fit.estimate)
-        se = None if getattr(fit, "se", None) is None else float(fit.se)
-        pval = getattr(fit, "pvalue", None)
-        p = None if pval is None else float(pval)
-        n_raw = getattr(fit, "n_obs", None)
-        n = None if n_raw is None else int(n_raw)
-        return coef, se, p, n
-    label = var or "treat"
-    coef, se, p = _coef_se_p(fit, label)
-    n_raw = getattr(fit, "nobs", None)
-    if n_raw is None:
-        n_raw = getattr(fit, "n_obs", None)
-    if n_raw is None:
-        info = getattr(fit, "data_info", None) or {}
-        if isinstance(info, dict):
-            n_raw = info.get("nobs") or info.get("n_obs")
-    n = None if n_raw is None else int(n_raw)
-    return coef, se, p, n
+    """抽出 (coef, se, p, n)。实现在 ``agent.engine.results.read_effect``（全产品唯一读法）。"""
+    return tuple(read_effect(fit, var))  # type: ignore[return-value]
 
 
 def _jsonable(value: Any) -> Any:
@@ -344,7 +305,7 @@ def _rhs_simple_names(formula: str) -> List[str]:
 def table_var_names(spec: Dict[str, Any], formula: Optional[str] = None) -> List[str]:
     """Treatment first, then controls / simple formula RHS. Never invent names."""
     names: List[str] = []
-    treatment = spec.get("treatment") or spec.get("treatment_col")
+    treatment = field(spec, "treatment")
     if treatment:
         names.append(str(treatment))
     for name in _as_name_list(spec.get("controls")):
@@ -640,11 +601,11 @@ def _iv_formula(spec: Dict[str, Any]) -> Optional[str]:
     if "(" in str(formula) and "~" in str(formula).split("(", 1)[-1]:
         return str(formula)
     outcome = spec.get("outcome")
-    endog = spec.get("endogenous") or spec.get("treatment")
+    endog = field(spec, "endogenous") or field(spec, "treatment")
     instruments = spec.get("instruments") or []
     if isinstance(instruments, str):
         instruments = [instruments]
-    one = spec.get("instrument") or spec.get("instrument_col")
+    one = field(spec, "instrument")
     if one and not instruments:
         instruments = [one]
     if not (outcome and endog and instruments):
@@ -665,7 +626,7 @@ def _has_instruments(spec: Dict[str, Any]) -> bool:
         instruments = [instruments]
     if instruments:
         return True
-    return bool(spec.get("instrument") or spec.get("instrument_col"))
+    return bool(field(spec, "instrument"))
 
 
 def _bacon_forbidden_over(state: EconPaperState) -> bool:
@@ -689,8 +650,8 @@ def _bacon_forbidden_over(state: EconPaperState) -> bool:
 def _estimate_ols(
     df: Any, spec: Dict[str, Any], formula: str, *, lock: bool = False
 ) -> EstimateOutput:
-    treatment = spec.get("treatment") or spec.get("treatment_col") or "treat"
-    cluster = spec.get("cluster") or spec.get("cluster_col") or None
+    treatment = field(spec, "treatment") or "treat"
+    cluster = field(spec, "cluster")
     if cluster == "":
         cluster = None
     requested = apply_heterogeneity_to_formula(str(formula), spec, treatment=str(treatment))
@@ -734,8 +695,8 @@ def _estimate_ols(
 def _estimate_iv(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
     import statspai
 
-    treatment = spec.get("endogenous") or spec.get("treatment") or "treat"
-    cluster = spec.get("cluster") or spec.get("cluster_col") or None
+    treatment = field(spec, "endogenous") or field(spec, "treatment") or "treat"
+    cluster = field(spec, "cluster")
     if cluster == "":
         cluster = None
     kwargs: Dict[str, Any] = {"data": df}
@@ -811,8 +772,8 @@ def _estimate_scm(df: Any, spec: Dict[str, Any]) -> EstimateOutput:
     import statspai
 
     outcome = spec.get("outcome")
-    unit = spec.get("unit") or spec.get("unit_col")
-    time_col = spec.get("time") or spec.get("time_col")
+    unit = field(spec, "unit")
+    time_col = field(spec, "time")
     treated_unit = spec.get("treated_unit")
     treatment_time = spec.get("treatment_time")
     synth_kwargs = {
@@ -855,8 +816,8 @@ def _estimate_did(df: Any, spec: Dict[str, Any], state: EconPaperState) -> Estim
         import statspai
 
         outcome = spec.get("outcome")
-        time_col = spec.get("time_col") or spec.get("time")
-        id_col = spec.get("id_col") or spec.get("id")
+        time_col = field(spec, "time")
+        id_col = field(spec, "id")
         cs_kwargs = {"y": outcome, "g": first_treat, "t": time_col, "i": id_col}
         fitted = statspai.callaway_santanna(df, **cs_kwargs)
         call = call_record("statspai.callaway_santanna", data="first", kwargs=cs_kwargs)
@@ -975,8 +936,8 @@ def _estimate_fixed(state: EconPaperState) -> EstimateOutput:
             )
         formula = None
     elif method == "scm":
-        unit = spec.get("unit") or spec.get("unit_col")
-        time_col = spec.get("time") or spec.get("time_col")
+        unit = field(spec, "unit")
+        time_col = field(spec, "time")
         if not csv_path or not spec.get("outcome") or not unit or not time_col:
             return _error(
                 "主估计未跑：SCM 缺少 unit/time 或数据路径",

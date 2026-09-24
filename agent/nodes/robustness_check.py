@@ -19,58 +19,24 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ..design.fields import field
 from ..design.spec import apply_heterogeneity_to_formula, interaction_term, norm_method
 from ..engine.ols_lock import method_triggers_ols_lock
+from ..engine.results import read_effect
 from ..state import EconPaperState
 
 
 def _coef_of(result: Any, var: str) -> Optional[float]:
-    """取回归结果中指定变量的系数（缺失返回 None）。
-
-    兼容 statspai.feols 的 ``to_dict()`` 结构与 statsmodels 的
-    ``params``（当 pyfixest 不可用、feols 降级到 statsmodels 时）。
-    """
-    try:
-        d = result.to_dict()
-        coefs = d.get("coefficients", {})
-        entry = coefs.get(var) or coefs.get("treat") or {}
-        return entry.get("estimate")
-    except Exception:
-        pass
-    try:
-        return float(result.params[var])
-    except Exception:
-        return None
+    """系数；读法见 ``agent.engine.results.read_effect``（全产品唯一读法）。"""
+    return read_effect(result, var).coef
 
 
 def _se_of(result: Any, var: str) -> Optional[float]:
-    """取回归结果中指定变量的标准误（缺失返回 None）。"""
-    try:
-        d = result.to_dict()
-        coefs = d.get("coefficients", {})
-        entry = coefs.get(var) or coefs.get("treat") or {}
-        return entry.get("std_error")
-    except Exception:
-        pass
-    try:
-        return float(result.bse[var])
-    except Exception:
-        return None
+    return read_effect(result, var).se
 
 
 def _p_of(result: Any, var: str) -> Optional[float]:
-    """取回归结果中指定变量的 p 值（缺失返回 None）。"""
-    try:
-        d = result.to_dict()
-        coefs = d.get("coefficients", {})
-        entry = coefs.get(var) or coefs.get("treat") or {}
-        return entry.get("p_value")
-    except Exception:
-        pass
-    try:
-        return float(result.pvalues[var])
-    except Exception:
-        return None
+    return read_effect(result, var).p
 
 
 def _sm_ols(formula: str, data: Any, cluster: Optional[str] = None) -> Any:
@@ -231,8 +197,8 @@ def _run_placebo(
     # SCM：时点安慰剂
     if method_norm in ("scm", "synthetic-control", "synthetic control"):
         outcome = main_spec.get("outcome")
-        unit = main_spec.get("unit") or main_spec.get("unit_col")
-        time_col = main_spec.get("time") or main_spec.get("time_col")
+        unit = field(main_spec, "unit")
+        time_col = field(main_spec, "time")
         treated_unit = main_spec.get("treated_unit")
         treatment_time = main_spec.get("treatment_time")
         if all([outcome, unit, time_col, treated_unit is not None, treatment_time is not None]):
@@ -271,8 +237,8 @@ def _run_placebo(
 
     # 默认：聚类稳健 bootstrap 安慰剂
     treatment = main_spec.get("treatment") or "treat"
-    cluster = main_spec.get("cluster") or main_spec.get("cluster_col")
-    outcome = main_spec.get("outcome") or main_spec.get("y")
+    cluster = field(main_spec, "cluster")
+    outcome = field(main_spec, "outcome") or main_spec.get("y")
     if not all([outcome, treatment, cluster]):
         return []
     try:
@@ -313,14 +279,14 @@ def _is_cs_estimate(state: EconPaperState) -> bool:
 
 
 def _cs_fields(main_spec: Dict[str, Any]) -> tuple[Any, Any, Any, Any]:
-    outcome = main_spec.get("outcome") or main_spec.get("y")
+    outcome = field(main_spec, "outcome") or main_spec.get("y")
     group = (
         main_spec.get("first_treat_col")
         or main_spec.get("g")
         or main_spec.get("treatment_group_col")
     )
-    time_col = main_spec.get("time_col") or main_spec.get("time")
-    id_col = main_spec.get("id_col") or main_spec.get("id") or main_spec.get("unit_col")
+    time_col = field(main_spec, "time")
+    id_col = field(main_spec, "id") or main_spec.get("unit_col")
     return outcome, group, time_col, id_col
 
 
@@ -389,9 +355,9 @@ def _run_cs_battery(
             "control_group": variant["control_group"],
             "notyet_cutoff": variant["notyet_cutoff"],
             "level": f"{variant['control_group']}/{variant['notyet_cutoff']}",
-            "coef": getattr(res, "estimate", None),
-            "se": getattr(res, "se", None),
-            "p": getattr(res, "pvalue", None),
+            "coef": read_effect(res).coef,
+            "se": read_effect(res).se,
+            "p": read_effect(res).p,
         })
     return results
 
@@ -414,7 +380,7 @@ def _is_iv_formula(main_spec: Dict[str, Any]) -> bool:
         instruments = [instruments]
     if instruments:
         return True
-    return bool(main_spec.get("instrument") or main_spec.get("instrument_col"))
+    return bool(field(main_spec, "instrument"))
 
 
 def _refused_ols_battery() -> Dict[str, Any]:
@@ -446,9 +412,9 @@ def _run_iv_battery(
     formula = main_spec.get("iv_formula") or main_spec.get("formula")
     if not formula:
         return []
-    treatment = main_spec.get("endogenous") or main_spec.get("treatment") or "treat"
+    treatment = field(main_spec, "endogenous") or field(main_spec, "treatment") or "treat"
     levels = list(main_spec.get("cluster_levels") or [])
-    cluster = main_spec.get("cluster") or main_spec.get("cluster_col")
+    cluster = field(main_spec, "cluster")
     if cluster and cluster not in levels:
         levels.append(cluster)
     try:
@@ -524,9 +490,9 @@ def _run_rd_battery(
         results.append({
             "type": "rd_variant",
             "level": f"{variant['kernel']}/donut={variant['donut']}",
-            "coef": getattr(res, "estimate", None),
-            "se": getattr(res, "se", None),
-            "p": getattr(res, "pvalue", None),
+            "coef": read_effect(res).coef,
+            "se": read_effect(res).se,
+            "p": read_effect(res).p,
         })
     return results
 

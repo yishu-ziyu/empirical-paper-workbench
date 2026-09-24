@@ -24,6 +24,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from ..design.fields import field
+from ..engine.results import read_effect
 from ..engine.identification_state import (
     ASSESSMENT_INSUFFICIENT_EVIDENCE,
     ASSESSMENT_NOT_APPLICABLE,
@@ -105,10 +107,10 @@ def _diag_did(
     report_lines: List[str],
 ) -> bool:
     """交错 DiD 诊断：Goodman-Bacon 分解（+ 可选 Callaway-Sant'Anna）。"""
-    outcome = d.get("outcome_col") or d.get("outcome")
-    treatment = d.get("treatment_col") or d.get("treatment")
-    time_col = d.get("time_col") or d.get("time")
-    id_col = d.get("id_col") or d.get("id")
+    outcome = field(d, "outcome")
+    treatment = field(d, "treatment")
+    time_col = field(d, "time")
+    id_col = field(d, "id")
     if not all([outcome, treatment, time_col, id_col]):
         diagnostics.append({
             "test": "bacon_decomposition",
@@ -201,7 +203,7 @@ def _diag_did(
             cs = statspai.callaway_santanna(
                 cs_df, y=outcome, g=g_col, t=time_col, i=id_col
             )
-            raw_p = getattr(cs, "pvalue", None)
+            raw_p = read_effect(cs).p
             try:
                 pvalue = float(raw_p) if raw_p is not None else None
             except (TypeError, ValueError):
@@ -210,7 +212,7 @@ def _diag_did(
                 "test": "callaway_santanna",
                 "role": ROLE_EFFECT_ESTIMATE,
                 "status": "reported",
-                "estimate": getattr(cs, "estimate", None),
+                "estimate": read_effect(cs).coef,
                 "pvalue": pvalue,
                 # 缺失 p 值保留为未知，不当作 0，也不推断显著与否。
                 "significant_at_0_05": (
@@ -244,9 +246,9 @@ def _diag_iv(
     report_lines: List[str],
 ) -> bool:
     """IV 诊断：iv_diag（含 first-stage F / AR 置信集）+ effective_f_test。"""
-    outcome = d.get("outcome_col") or d.get("outcome")
-    endog = d.get("endogenous_col") or d.get("endogenous") or d.get("treatment_col")
-    instrument = d.get("instrument_col") or d.get("instrument")
+    outcome = field(d, "outcome")
+    endog = field(d, "endogenous") or field(d, "treatment")
+    instrument = field(d, "instrument")
     if not all([outcome, endog, instrument]):
         diagnostics.append({
             "test": "iv_diag",
@@ -343,7 +345,7 @@ def _diag_rd(
     """RD 诊断：McCrary 密度检验（连续性）+ rdrobust 对照估计。"""
     running = d.get("running_var") or d.get("running_variable")
     cutoff = d.get("cutoff", 0) or 0
-    outcome = d.get("outcome_col") or d.get("outcome")
+    outcome = field(d, "outcome")
     if not running:
         diagnostics.append({
             "test": "mccrary_test",
@@ -365,7 +367,7 @@ def _diag_rd(
 
     try:
         mcc = statspai.mccrary_test(df, x=running, c=c)
-        pvalue = getattr(mcc, "pvalue", None)
+        pvalue = read_effect(mcc).p
         try:
             pvalue = float(pvalue)
         except (TypeError, ValueError):
@@ -375,8 +377,8 @@ def _diag_rd(
             "test": "mccrary_test",
             "status": "pass" if density_ok else "fail",
             "pvalue": pvalue,
-            "se": getattr(mcc, "se", None),
-            "estimate": getattr(mcc, "estimate", None),
+            "se": read_effect(mcc).se,
+            "estimate": read_effect(mcc).coef,
         })
         report_lines.append(
             f"McCrary 密度检验: p={pvalue if pvalue is not None else 'N/A'}。"
@@ -398,7 +400,7 @@ def _diag_rd(
     if outcome:
         try:
             rd = statspai.rdrobust(df, y=outcome, x=running, c=c)
-            rd_p = getattr(rd, "pvalue", None)
+            rd_p = read_effect(rd).p
             try:
                 rd_p = float(rd_p)
             except (TypeError, ValueError):
@@ -406,8 +408,8 @@ def _diag_rd(
             diagnostics.append({
                 "test": "rdrobust",
                 "status": "pass",
-                "estimate": getattr(rd, "estimate", None),
-                "se": getattr(rd, "se", None),
+                "estimate": read_effect(rd).coef,
+                "se": read_effect(rd).se,
                 "pvalue": rd_p,
                 "ci": getattr(rd, "ci", None),
             })
@@ -433,9 +435,9 @@ def _diag_scm(
     report_lines: List[str],
 ) -> bool:
     """SCM 诊断：时点安慰剂（synth_time_placebo）收集安慰剂分布。"""
-    outcome = d.get("outcome_col") or d.get("outcome")
-    unit = d.get("unit_col") or d.get("unit")
-    time_col = d.get("time_col") or d.get("time")
+    outcome = field(d, "outcome")
+    unit = field(d, "unit")
+    time_col = field(d, "time")
     treated_unit = d.get("treated_unit")
     treatment_time = d.get("treatment_time")
     if not all([outcome, unit, time_col, treatment_time is not None]):

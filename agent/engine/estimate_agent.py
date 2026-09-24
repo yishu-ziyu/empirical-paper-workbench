@@ -31,6 +31,7 @@ from .ols_lock import (
     method_triggers_ols_lock,
     pooled_ols_formula,
 )
+from ..design.fields import field
 from ..design.spec import apply_heterogeneity_to_formula
 from .sandbox import SandboxResult, SandboxSession, SubprocessSession, open_session
 from ..llm.router import MINIMAX_BASE_URL, router
@@ -383,7 +384,7 @@ def run_estimate_via_agent(agent, state: EconPaperState, *, session: Optional[Sa
     history_compact = compact_history_six_section(
         result.all_messages(),
         method=method,
-        treatment=str(spec.get("treatment") or spec.get("endogenous") or ""),
+        treatment=str(field(spec, "treatment") or field(spec, "endogenous") or ""),
     )
     logger.info(
         "estimate agent 完成：verdict=%s coef=%s iterations=%s",
@@ -431,10 +432,10 @@ def _user_prompt(method: str, spec: dict, csv_name: str) -> str:
     prompt = _USER_PROMPT_TMPL.format(
         method=method or "(未指定，请依据 profiling 判断最合适的主流方法)",
         formula=formula,
-        treatment=spec.get("endogenous") or spec.get("treatment") or spec.get("treatment_col") or "(未指定)",
+        treatment=field(spec, "endogenous") or field(spec, "treatment") or "(未指定)",
         outcome=spec.get("outcome") or "(未指定)",
         controls=", ".join(str(c) for c in controls) or "(无)",
-        cluster=spec.get("cluster") or spec.get("cluster_col") or "(无)",
+        cluster=field(spec, "cluster") or "(无)",
         csv_name=csv_name,
     )
     if method_triggers_ols_lock(method or spec.get("method")):
@@ -525,7 +526,7 @@ def estimate_output_from_agent(
             payload["history_compact"] = history_compact
         if n is not None:
             payload["n"] = n
-        cluster = spec.get("cluster") or spec.get("cluster_col") or None
+        cluster = field(spec, "cluster")
         if cluster:
             payload["cluster"] = str(cluster)
         lines = ["# 主结果", "", f"估计器：`{estimator}`"]

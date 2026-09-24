@@ -59,6 +59,14 @@ flowchart TD
 
 同一个设计字段在不同地方的读法也不一致，例如时间列在一处读 `time`，另一处读 `time_col`，还有的两个都试；聚类在 DiD 的 TWFE 分支里被算出来，又没有传下去。
 
+## 字段靠“补全所有拼写”维持一致
+
+识别核查读原始研究方向 `research_direction`，主估计读整理后的 `main_specification`，两者不是同一个对象。正式流程先在 `formal_binding.align_direction` 里把方向规范化（结局与处理只留 `dv` / `iv`，工具变量只留复数 `instruments`），再由 `set_direction` 调用 `DirectionSpec.enrich_direction`，把每个字段的所有拼写（`outcome` / `outcome_col`、`instrument` / `instrument_col` 等）重新写回方向里，识别核查才读得到。
+
+2026-09-24 按真实顺序（`align_direction` → `set_direction` → 识别核查）实测：IV、DiD、SCM、RD 的诊断都正常运行，均为 3 星。能用，但一致性靠“把所有别名都写一遍”维持：新增阶段只要用了没被覆盖的拼写，就会悄悄读不到字段。
+
+更正：本节此前写过“正式流程里识别诊断基本没有运行”。那次实测跳过了 `set_direction`，结论错误，已撤回。
+
 ## 写死的案例知识
 
 | 位置 | 写死了什么 | 影响 |
@@ -91,3 +99,11 @@ flowchart TD
 3. 识别核查、稳健性检验迁到适配器；此时 DiD 的聚类问题会作为“字段只读一次”的自然结果被修掉，而不是单独打补丁。
 4. 研究台账按已确认的设计参数化，去掉 Card 常量。
 5. 设计提议改为基于问题与数据列的推断。
+
+## 进展
+
+- 2026-09-24 第 1 步完成，未改变产品行为：
+  - 读结果只剩一处：`agent/engine/results.py::read_effect`。主估计、稳健性检验、识别核查都改用它；`agent/tests/test_results_reader.py` 把四套旧读法原样复制为参照，在 feols、ivreg、statsmodels、rdrobust、synth、Callaway–Sant'Anna、密度检验的真实结果上逐值比对一致。
+  - 读设计字段改用 `agent/design/fields.py::field`（规范名优先，只收纯拼写别名）。主估计、识别核查、稳健性检验、估计 Agent 已切换；`agent/tests/test_design_fields.py` 守住“生成方写出的各拼写取值相同”这一前提。
+  - 尚未处理：研究方向的 `dv` / `iv` 词汇与主设定词汇并存（第 3 步识别核查改读主设定时解决）；`set_direction`、`DirectionSpec.from_direction`、研究台账里的读法。
+

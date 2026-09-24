@@ -65,3 +65,12 @@ def effect_from_fit(fit) -> tuple[float | None, float | None, float | None, int 
 缺公式或列：`status="error"`，`results` 为错误句，`treatment_row` 为空。结果章就绪失败（`no_results`），不让模型补系数。
 
 ---
+
+## 估计调用记录与复现（2026-09-24）
+
+固定分派的每个估计器在调用处写 `estimate.call = {function, data, args, kwargs}`（`agent.nodes.estimate.call_record`），同时写 `estimate.environment`（Python 与库版本）。设定运行的记录（`specification_runs[*].call`、`diagnostics.call`）用同一格式。复现脚本只按这份记录还原调用，见 [API · 复现](../../../api/reference/03-endpoint-details/07-export.md)。
+
+- 覆盖：`statspai.feols`、`statsmodels.ols`（缺 StatsPAI 时的退路）、`statspai.ivreg`、`statspai.rdrobust`、`statspai.synth`、`statspai.callaway_santanna`、`statspai.effective_f_test`。
+- 估计 Agent 路径没有 `call`：它报告的 `final_code` 尚未核实为实际执行的代码，复现脚本只列为“未纳入”。
+- `effect_from_fit` 在不传变量名时读 `CausalResult.estimate`。此前新版 StatsPAI 的 CausalResult 也带 `params`，RD / SCM / CS 因此出现过 `status=ok` 却没有系数（2026-09-24 修复，回归测试在 `backend/tests/test_replication_script.py`）。
+

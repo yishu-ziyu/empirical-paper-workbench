@@ -9,6 +9,8 @@ from agent.nodes.estimate import (
     _estimate_iv,
     _estimate_ols,
     analysis_dataset_identity,
+    call_record,
+    runtime_environment,
 )
 from services.research_lab import (
     _as_float,
@@ -46,20 +48,6 @@ def _num(value: Any) -> float | None:
     return _as_float(value)
 
 
-def _environment() -> dict[str, str]:
-    """Library versions at run time, published with the replication script."""
-    import platform
-    from importlib import metadata
-
-    env = {"python": platform.python_version(), "pandas": pd.__version__}
-    for dist in ("statspai", "statsmodels"):
-        try:
-            env[dist] = metadata.version(dist)
-        except metadata.PackageNotFoundError:
-            continue
-    return env
-
-
 def _covariance(estimator: str) -> str:
     if estimator == "statspai.ivreg":
         return "nonrobust"
@@ -71,13 +59,13 @@ def _iv_diagnostics(df: pd.DataFrame, controls: list[str]) -> dict[str, Any]:
     import statspai
 
     try:
-        result = statspai.effective_f_test(
-            df,
-            endog=IV_DIAG_ENDOG,
-            instruments=list(IV_DIAG_INSTRUMENTS),
-            exog=list(controls) or None,
-            vcov=IV_DIAG_VCOV,
-        )
+        diag_kwargs = {
+            "endog": IV_DIAG_ENDOG,
+            "instruments": list(IV_DIAG_INSTRUMENTS),
+            "exog": list(controls) or None,
+            "vcov": IV_DIAG_VCOV,
+        }
+        result = statspai.effective_f_test(df, **diag_kwargs)
         f_eff = _num(result.get("F_eff"))
         first_stage = _num(result.get("first_stage_F"))
         return {
@@ -87,6 +75,7 @@ def _iv_diagnostics(df: pd.DataFrame, controls: list[str]) -> dict[str, Any]:
             "strength": result.get("strength"),
             "covariance": IV_DIAG_VCOV,
             "controls": list(controls),
+            "call": call_record("statspai.effective_f_test", data="first", kwargs=diag_kwargs),
         }
     except Exception as exc:
         return {
@@ -126,6 +115,7 @@ def _run_one(
         "label": definition.get("label"),
         "choices": list(definition.get("choices") or []),
         "estimator": estimator,
+        "call": estimate.get("call"),
         "method": estimator_kind,
         "formula": estimate.get("formula") or formula,
         "covariance": _covariance(estimator),
@@ -144,7 +134,7 @@ def _run_one(
         },
         "created_at": _now(),
         "relation": relation,
-        "environment": _environment(),
+        "environment": runtime_environment(),
     }
 
 

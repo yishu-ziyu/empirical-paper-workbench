@@ -27,12 +27,12 @@
 
 ## GET /sessions/{session_id}/replication-script
 
-复现脚本：研究台账里每条设定运行**实际执行**的调用，按运行顺序排列（`backend/services/replication.py`）。与 `code-export` 不同，不经过 `translate_code`。
+复现脚本：研究中**实际执行**的估计调用，按运行顺序排列（`backend/services/replication.py`）。与 `code-export` 不同，不经过 `translate_code`。
 
-- 估计器按记录还原：`statspai.feols` / `statspai.ivreg` / `statsmodels.ols`；IV 的第一阶段检验与 `services/spec_run.py` 共用同一组参数常量。
-- 脚本开头校验分析数据的 sha256，不符时 `SystemExit`。
-- 不认识的估计器不会被改写，只在脚本末尾列为“未纳入”；研究时失败的运行保留为注释。
-- 覆盖范围：研究台账的设定运行；正式估计主流程尚未覆盖。
+- 覆盖：研究台账的设定运行，以及固定分派产生的主估计（OLS、IV、RD、SCM、DiD）。每个调用按估计器在调用处写下的 `call` 记录还原；旧的设定运行记录没有 `call` 时，按 spec_run 的默认调用还原。
+- 每份数据文件读入前校验 sha256，不符时 `SystemExit`。设定运行和主估计读不同文件时，各自加载。
+- 不纳入、并在脚本末尾写明原因：估计 Agent 路径（其报告的代码尚未核实为实际执行）、不认识的估计器。研究时失败的运行保留为注释。
+- 尚未覆盖：稳健性检验与设定曲线、设定运行之外的识别诊断、清洗步骤、描述统计表。
 
 **响应 200**：`text/x-python`，`Content-Disposition: attachment; filename="replication.py"`。
 
@@ -42,7 +42,7 @@
 
 ## GET /sessions/{session_id}/replication-package
 
-复现包 zip：`replication.py`、`analysis_data.csv`（研究时读取的那份文件，字节相同）、`README.md`。解压后运行 `python replication.py` 即可复现。
+复现包 zip：`replication.py`、每份被读取的数据文件 `data_<sha256 前 8 位>.csv`（研究时读取的那份文件，字节相同）、`README.md`。解压后运行 `python replication.py` 即可复现。
 
 **响应 200**：`application/zip`，`Content-Disposition: attachment; filename="replication-package.zip"`。
 

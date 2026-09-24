@@ -117,6 +117,8 @@ def _stamp_estimate_lineage(state: EconPaperState, out: EstimateOutput) -> Estim
     identity = analysis_dataset_identity(state, state.get("csv_path"))
     if identity is not None:
         payload["analysis_dataset"] = identity
+    if payload.get("call"):
+        payload["environment"] = runtime_environment()
     _stamp_estimate_honesty(state, payload, identity)
     return out
 
@@ -167,8 +169,13 @@ def _coef_se_p(result: Any, var: str) -> tuple[Optional[float], Optional[float],
 def effect_from_fit(
     fit: Any, var: str | None = None
 ) -> tuple[Optional[float], Optional[float], Optional[float], Optional[int]]:
-    """抽出 (coef, se, p, n)。CausalResult 用 ``estimate``，不要 ``float(result)``。"""
-    if hasattr(fit, "estimate") and not hasattr(fit, "params"):
+    """抽出 (coef, se, p, n)。CausalResult 用 ``estimate``，不要 ``float(result)``。
+
+    RD / SCM / CS 调用时不传 ``var``：读 ``estimate``。新版 StatsPAI 的
+    CausalResult 也带 ``params``，不能再用“没有 params”来判断，否则会按
+    "treat" 去找系数而得到 None（曾导致 status=ok 却没有系数）。
+    """
+    if hasattr(fit, "estimate") and (var is None or not hasattr(fit, "params")):
         coef = float(fit.estimate)
         se = None if getattr(fit, "se", None) is None else float(fit.se)
         pval = getattr(fit, "pvalue", None)
@@ -189,7 +196,54 @@ def effect_from_fit(
     return coef, se, p, n
 
 
-def _fit_statsmodels(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+def _jsonable(value: Any) -> Any:
+    """Plain JSON value for a call argument (numpy scalars → Python)."""
+    if hasattr(value, "item") and not isinstance(value, (str, bytes)):
+        try:
+            return value.item()
+        except Exception:
+            return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    return value
+
+
+def runtime_environment() -> Dict[str, str]:
+    """Library versions at run time, published with the replication script."""
+    import platform
+    from importlib import metadata
+
+    env: Dict[str, str] = {"python": platform.python_version()}
+    for dist in ("pandas", "statspai", "statsmodels"):
+        try:
+            env[dist] = metadata.version(dist)
+        except metadata.PackageNotFoundError:
+            continue
+    return env
+
+
+def call_record(
+    function: str, *, data: str, args: tuple = (), kwargs: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """The estimator call exactly as made, for the replication script.
+
+    ``data`` says where the DataFrame went: ``"first"`` (first positional
+    argument) or ``"data"`` (``data=df`` keyword after ``args``). Recorded at
+    the call site so the published code cannot drift from what ran.
+    """
+    return {
+        "function": function,
+        "data": data,
+        "args": [_jsonable(a) for a in args],
+        "kwargs": {k: _jsonable(v) for k, v in (kwargs or {}).items()},
+    }
+
+
+def _fit_statsmodels(
+    formula: str, df: Any, cluster: Optional[str], call_out: Optional[Dict[str, Any]] = None
+) -> tuple[Any, str, str]:
     """Pooled OLS. Formula is the spec actually passed to statsmodels, not pyfixest FE."""
     import statsmodels.formula.api as smf
 
@@ -197,10 +251,22 @@ def _fit_statsmodels(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any
     fit_kwargs: Dict[str, Any] = {}
     if cluster is not None:
         fit_kwargs = {"cov_type": "cluster", "cov_kwds": {"groups": df[cluster]}}
-    return smf.ols(sm_formula, data=df).fit(**fit_kwargs), "statsmodels.ols", sm_formula
+    fitted = smf.ols(sm_formula, data=df).fit(**fit_kwargs)
+    if call_out is not None:
+        call_out.update(
+            call_record(
+                "statsmodels.ols",
+                data="data",
+                args=(sm_formula,),
+                kwargs={"cluster": cluster} if cluster is not None else {},
+            )
+        )
+    return fitted, "statsmodels.ols", sm_formula
 
 
-def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
+def _fit(
+    formula: str, df: Any, cluster: Optional[str], call_out: Optional[Dict[str, Any]] = None
+) -> tuple[Any, str, str]:
     """Fit feols when StatsPAI is installed.
 
     Statsmodels fallback is missing-package only (``ImportError``). Any other
@@ -210,15 +276,19 @@ def _fit(formula: str, df: Any, cluster: Optional[str]) -> tuple[Any, str, str]:
     try:
         import statspai
     except ImportError:
-        return _fit_statsmodels(formula, df, cluster)
+        return _fit_statsmodels(formula, df, cluster, call_out)
 
     kwargs: Dict[str, Any] = {"data": df}
     if cluster:
         kwargs["vcov"] = {"CRV1": cluster}
     try:
-        return statspai.feols(formula, **kwargs), "statspai.feols", str(formula)
+        fitted = statspai.feols(formula, **kwargs)
     except ImportError:
-        return _fit_statsmodels(formula, df, cluster)
+        return _fit_statsmodels(formula, df, cluster, call_out)
+    if call_out is not None:
+        extra = {k: v for k, v in kwargs.items() if k != "data"}
+        call_out.update(call_record("statspai.feols", data="data", args=(str(formula),), kwargs=extra))
+    return fitted, "statspai.feols", str(formula)
 
 
 def _fmt(x: Optional[float]) -> str:
@@ -629,7 +699,8 @@ def _estimate_ols(
         # so drop the pyfixest ``| entity + time`` syntax before fitting. The
         # stored ``estimator`` still records the engine that actually ran.
         requested = pooled_ols_formula(requested)
-    fitted, estimator, fit_formula = _fit(requested, df, cluster)
+    call: Dict[str, Any] = {}
+    fitted, estimator, fit_formula = _fit(requested, df, cluster, call)
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
@@ -652,6 +723,8 @@ def _estimate_ols(
         "p": p,
         "cluster": cluster,
     }
+    if call:
+        payload["call"] = call
     out: EstimateOutput = {"results": _ok_table(payload), "estimate": payload}
     if dropped_fe:
         out["degradations"] = [_fe_dropped_degradation()]
@@ -669,6 +742,12 @@ def _estimate_iv(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
     if cluster:
         kwargs["cluster"] = cluster
     fitted = statspai.ivreg(formula, **kwargs)
+    call = call_record(
+        "statspai.ivreg",
+        data="data",
+        args=(formula,),
+        kwargs={k: v for k, v in kwargs.items() if k != "data"},
+    )
     coef, se, p, n = effect_from_fit(fitted, str(treatment))
     n = int(n or len(df))
     table_rows = _table_rows_from_fit(fitted, spec, formula, str(treatment))
@@ -679,6 +758,7 @@ def _estimate_iv(df: Any, spec: Dict[str, Any], formula: str) -> EstimateOutput:
         "status": "ok",
         "produced_by": "estimate",
         "estimator": "statspai.ivreg",
+        "call": call,
         "method": "iv",
         "formula": formula,
         "treatment": treatment,
@@ -704,6 +784,7 @@ def _estimate_rd(df: Any, spec: Dict[str, Any]) -> EstimateOutput:
     except (TypeError, ValueError):
         c = 0.0
     fitted = statspai.rdrobust(df, y=outcome, x=running, c=c)
+    call = call_record("statspai.rdrobust", data="first", kwargs={"y": outcome, "x": running, "c": c})
     coef, se, p, n = effect_from_fit(fitted)
     n = int(n or len(df))
     treatment_row = f"| RD | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
@@ -712,6 +793,7 @@ def _estimate_rd(df: Any, spec: Dict[str, Any]) -> EstimateOutput:
         "status": "ok",
         "produced_by": "estimate",
         "estimator": "statspai.rdrobust",
+        "call": call,
         "method": "rd",
         "formula": formula,
         "treatment": "RD",
@@ -733,14 +815,15 @@ def _estimate_scm(df: Any, spec: Dict[str, Any]) -> EstimateOutput:
     time_col = spec.get("time") or spec.get("time_col")
     treated_unit = spec.get("treated_unit")
     treatment_time = spec.get("treatment_time")
-    fitted = statspai.synth(
-        df,
-        outcome=outcome,
-        unit=unit,
-        time=time_col,
-        treated_unit=treated_unit,
-        treatment_time=treatment_time,
-    )
+    synth_kwargs = {
+        "outcome": outcome,
+        "unit": unit,
+        "time": time_col,
+        "treated_unit": treated_unit,
+        "treatment_time": treatment_time,
+    }
+    fitted = statspai.synth(df, **synth_kwargs)
+    call = call_record("statspai.synth", data="first", kwargs=synth_kwargs)
     coef, se, p, n = effect_from_fit(fitted)
     n = int(n or len(df))
     treatment_row = f"| SCM_gap | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
@@ -752,6 +835,7 @@ def _estimate_scm(df: Any, spec: Dict[str, Any]) -> EstimateOutput:
         "status": "ok",
         "produced_by": "estimate",
         "estimator": "statspai.synth",
+        "call": call,
         "method": "scm",
         "formula": formula,
         "treatment": "SCM_gap",
@@ -773,9 +857,9 @@ def _estimate_did(df: Any, spec: Dict[str, Any], state: EconPaperState) -> Estim
         outcome = spec.get("outcome")
         time_col = spec.get("time_col") or spec.get("time")
         id_col = spec.get("id_col") or spec.get("id")
-        fitted = statspai.callaway_santanna(
-            df, y=outcome, g=first_treat, t=time_col, i=id_col
-        )
+        cs_kwargs = {"y": outcome, "g": first_treat, "t": time_col, "i": id_col}
+        fitted = statspai.callaway_santanna(df, **cs_kwargs)
+        call = call_record("statspai.callaway_santanna", data="first", kwargs=cs_kwargs)
         coef, se, p, n = effect_from_fit(fitted)
         n = int(n or len(df))
         treatment_row = f"| ATT | {_fmt(coef)} | {_fmt(se)} | {_fmt(p)} |"
@@ -784,6 +868,7 @@ def _estimate_did(df: Any, spec: Dict[str, Any], state: EconPaperState) -> Estim
             "status": "ok",
             "produced_by": "estimate",
             "estimator": "statspai.callaway_santanna",
+            "call": call,
             "method": "did",
             "formula": formula,
             "treatment": "ATT",

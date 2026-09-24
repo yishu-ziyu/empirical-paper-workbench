@@ -13,7 +13,7 @@
 - Changed files: backend/services/replication.py, backend/services/spec_run.py, backend/routers/code_export.py, backend/tests/test_replication_script.py, frontend/src/components/CodeExportDialog.tsx(+test), frontend/src/lib/i18n.tsx, openapi 三件, docs（acceptance/api/specs/design）；原型移至 frontend/prototypes/
 - Failed paths: —
 - Data / output evidence locations: backend/tests/test_replication_script.py
-- Test evidence: make test 通过（agent 1072 / backend 727 / frontend 558）；复现包实跑比对通过
+- Test evidence: 第一轮 make test 通过（backend 727）；第二轮 make test 通过（agent 1072 / backend 733 / frontend 全过），主估计 OLS/IV/RD/SCM 实跑比对通过
 - Pending external state: —
-- Next action: 无；后续为 Notebook 界面与正式估计主流程的计算记录
+- Next action: 第二轮（主估计）已完成；后续：估计 Agent 执行核实、稳健性与清洗的计算记录、Notebook 界面；DiD TWFE 聚类未传入的问题待另行处理
 - Updated at: 2026-09-24

@@ -58,3 +58,18 @@
 未做：开发服务器上的人工下载。测试已在进程内走真实 HTTP 路由、真实 runner 和真实数据，并实际执行脚本；登录后的界面点击没有在浏览器里走一遍。
 
 过程中发现并修复：原型放在 `frontend/src/prototypes/` 时触发了 `cardCanonicalLiterals` 守卫（产品源码不得写死 Card 系数），已移到 `frontend/prototypes/`，没有放宽测试。
+
+## 第二轮：正式估计主流程（2026-09-24）：通过
+
+范围：固定分派的主估计（OLS、IV、RD、SCM、DiD）纳入复现脚本；估计 Agent 路径只列为“未纳入”。
+
+| 条目 | 证据 |
+|---|---|
+| 调用在调用处记录 | `estimate.call` / `specification_runs[*].call` / `diagnostics.call`；`test_main_estimate_script_reproduces_recorded_numbers` 断言 `call` 存在 |
+| 主估计可复现 | 同一测试对 OLS（ck1994）、IV（Card）、RD、SCM（固定种子生成的数据）各跑一次真实 `estimate()`，打包、运行脚本，系数与标准误逐一比对 |
+| 多份数据 | `test_spec_runs_and_main_estimate_on_different_files`：两份数据各自打包、各自校验 |
+| Agent 路径不冒充 | `test_agent_path_estimate_is_not_passed_off_as_executed` |
+
+发现并修复：RD / SCM / CS 的主估计此前报告 `status=ok` 但系数为 None（`effect_from_fit` 误判新版 CausalResult）。由本轮“实际运行并比对数字”的测试发现，先写失败测试再修复。
+
+发现、未修（另行处理）：`_estimate_did` 的 TWFE 分支算出了聚类变量（缺省退回个体 id），但调用 `_estimate_ols` 时没有传入，实际只按设定里的 `cluster` 聚类。复现脚本如实反映实际调用。

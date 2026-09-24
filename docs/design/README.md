@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [empirical-pipeline.md](empirical-pipeline.md) | **实证是怎么做出来的（2026-09-24 梳理）**：两条路径、方法知识散落位置、写死的案例知识、方法适配器方向 |
 | [paper-workspace/](paper-workspace/README.md) | **创作台方案（2026-09-24 方向已确认，未实施）**：写小论文的三栏工作区、助手光标，以及界面、数据、传输、前后端的分层设计 |
 | [interaction-motion-rules.md](interaction-motion-rules.md) | 现行交互与动效纪律：阶段化等待、动效时长、门禁文案、焦点环 |
 | [progressive-research-flow/](progressive-research-flow/README.md) | 渐进研究流审阅稿（2026-09-17 当前方向），含 [接线说明](progressive-research-flow/WIRING.md) 与 [交接](progressive-research-flow/HANDOFF.md) |

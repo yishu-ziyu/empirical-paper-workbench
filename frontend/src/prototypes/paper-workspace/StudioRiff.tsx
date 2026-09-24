@@ -353,7 +353,7 @@ export default function StudioRiff() {
                 </Editable>
               </Row>
 
-              <Row show={booted >= 5}>
+              <Row show={booted >= 5} wide>
                 <Figure main={main} />
               </Row>
 
@@ -555,8 +555,9 @@ function ToolCard({ t }: { t: Tool }) {
 
 /* ------------------------------------------------------------------ manuscript pieces */
 
-function Row({ show, margin, children }: { show: boolean; margin?: ReactNode; children: ReactNode }) {
+function Row({ show, margin, wide, children }: { show: boolean; margin?: ReactNode; wide?: boolean; children: ReactNode }) {
   if (!show) return null
+  if (wide) return <div className="rf-set mt-6 text-[15.5px] leading-[1.85]">{children}</div>
   return (
     <div className="rf-set mt-6 grid grid-cols-[minmax(0,1fr)_190px] gap-8 text-[15.5px] leading-[1.85] [text-align:justify]">
       <div className="min-w-0">{children}</div>
@@ -612,14 +613,17 @@ function Table({ main, note, selecting, typing, onOpen }: { main: Main; note: st
         <div className="relative grid grid-cols-[46%_27%_27%] py-1">
           <span />
           {[OLS, IV].map((r, i) => (
-            <span key={r.method} className={`text-right transition-colors duration-300 ${i === col ? 'text-accent' : ''}`}>({i + 1}) {r.method}{i === col && ' · 主'}</span>
+            <span key={r.method} className={`pr-2 text-right transition-colors duration-300 ${i === col ? 'text-accent' : ''}`}>
+              ({i + 1}) {r.method}
+              <span className={`block font-sans text-[10.5px] leading-none transition-opacity duration-300 ${i === col ? 'opacity-100' : 'opacity-0'}`}>主设定</span>
+            </span>
           ))}
         </div>
         <div className="rf-draw-x h-[.6px] bg-[#151515]" style={{ animationDelay: '.12s' }} />
         <div className="relative grid grid-cols-[46%_27%_27%] py-1.5">
           <span>受教育年限</span>
           {[OLS, IV].map((r) => (
-            <span key={r.method} className="text-right">
+            <span key={r.method} className="pr-2 text-right">
               <Ref run={r} value={r.coef} onOpen={onOpen} />
               <sup>{stars(r.p)}</sup>
               <span className="block text-[12px] text-[#666]">({fmt(r.se)})</span>
@@ -628,8 +632,8 @@ function Table({ main, note, selecting, typing, onOpen }: { main: Main; note: st
         </div>
         <div className="relative grid grid-cols-[46%_27%_27%] pb-1.5 text-[#666]">
           <span>第一阶段 F</span>
-          <span className="text-right">—</span>
-          <span className="rf-tnum text-right">{FIRST_STAGE.f}</span>
+          <span className="pr-2 text-right">—</span>
+          <span className="rf-tnum pr-2 text-right">{FIRST_STAGE.f}</span>
         </div>
       </div>
       <div className="rf-draw-x h-[1.2px] bg-[#151515]" style={{ animationDelay: '.24s' }} />
@@ -642,29 +646,42 @@ function Table({ main, note, selecting, typing, onOpen }: { main: Main; note: st
 }
 
 function Figure({ main }: { main: Main }) {
-  const W = 520
-  const x = (v: number) => 40 + (Math.max(0, v) / 0.26) * (W - 60)
+  const W = 740
+  const H = 150
+  const L = 64
+  const R = 24
+  const x = (v: number) => L + (Math.max(0, v) / 0.25) * (W - L - R)
+  const rows = [OLS, IV]
   return (
-    <figure data-target="figure" className="my-2">
-      <svg key={main} viewBox={`0 0 ${W} 104`} className="w-full" style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>
-        <line x1={x(0)} x2={x(0.26)} y1={80} y2={80} stroke="#151515" strokeWidth={0.7} />
-        {[0, 0.1, 0.2].map((t) => (
-          <text key={t} x={x(t)} y={96} fontSize={9} textAnchor="middle" fill="#777">{t.toFixed(1)}</text>
+    <figure data-target="figure" className="my-3">
+      <svg key={main} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ fontFamily: '-apple-system, "PingFang SC", sans-serif' }}>
+        {[0, 0.05, 0.1, 0.15, 0.2, 0.25].map((t) => (
+          <g key={t}>
+            <line x1={x(t)} x2={x(t)} y1={14} y2={H - 30} stroke={t === 0 ? '#9a958c' : '#e7e3da'} strokeWidth={t === 0 ? 1 : 1} />
+            <text x={x(t)} y={H - 12} fontSize={11} textAnchor="middle" fill="#8a857c">{t.toFixed(2)}</text>
+          </g>
         ))}
-        {[OLS, IV].map((r, i) => {
+        {rows.map((r, i) => {
           const [lo, hi] = ci(r)
-          const y = 26 + i * 30
+          const y = 40 + i * 44
           const on = main === r.method
+          const c = on ? '#2f6b4f' : '#8a857c'
           return (
             <g key={r.method}>
-              <text x={2} y={y + 3} fontSize={10} fill={on ? '#2f6b4f' : '#151515'}>{r.method}</text>
-              <line x1={x(lo)} x2={x(hi)} y1={y} y2={y} stroke={on ? '#2f6b4f' : '#151515'} strokeWidth={on ? 2 : 1} className="rf-stroke" style={{ ['--len' as string]: x(hi) - x(lo), animationDelay: `${i * 0.15}s` }} />
-              <circle cx={x(r.coef)} cy={y} r={on ? 4 : 3} fill={on ? '#2f6b4f' : '#151515'} className="rf-rise" style={{ animationDelay: `${0.5 + i * 0.15}s` }} />
+              <text x={L - 12} y={y + 4} fontSize={12.5} textAnchor="end" fill={on ? '#151515' : '#8a857c'} fontWeight={on ? 600 : 400}>{r.method}</text>
+              <line x1={x(lo)} x2={x(hi)} y1={y} y2={y} stroke={c} strokeWidth={on ? 3 : 2} strokeLinecap="round" className="rf-stroke" style={{ ['--len' as string]: x(hi) - x(lo), animationDelay: `${i * 0.15}s` }} />
+              {[lo, hi].map((v, k) => (
+                <line key={k} x1={x(v)} x2={x(v)} y1={y - 5} y2={y + 5} stroke={c} strokeWidth={on ? 2 : 1.5} className="rf-rise" style={{ animationDelay: `${0.6 + i * 0.15}s` }} />
+              ))}
+              <circle cx={x(r.coef)} cy={y} r={on ? 6 : 5} fill="#fffdf9" stroke={c} strokeWidth={on ? 3 : 2} className="rf-rise" style={{ animationDelay: `${0.5 + i * 0.15}s` }} />
+              <text x={x(r.coef)} y={y - 12} fontSize={11.5} textAnchor="middle" fill={on ? '#151515' : '#8a857c'} className="rf-rise" style={{ animationDelay: `${0.7 + i * 0.15}s` }}>
+                {fmt(r.coef, 3)}
+              </text>
             </g>
           )
         })}
       </svg>
-      <figcaption className="text-[12.5px] leading-[1.6]">图 1　两种估计及其 95% 置信区间：IV 高于 OLS，但区间宽得多。主设定以绿色标出。</figcaption>
+      <figcaption className="mx-auto mt-1 max-w-[620px] text-[13px] leading-[1.6]">图 1　两种估计及其 95% 置信区间：IV 点估计约为 OLS 的 1.8 倍，但区间从 {fmt(Math.max(ci(IV)[0], 0), 3)} 到 {fmt(ci(IV)[1], 3)}，宽得多。主设定以绿色标出。</figcaption>
     </figure>
   )
 }
@@ -769,8 +786,8 @@ function Notebook({ trace, main }: { trace: number | null; main: Main }) {
                 <span>[{c.id}] ✓</span>
                 <span className="ml-auto rounded bg-accent/[.08] px-1.5 py-0.5 font-sans text-[11px] text-accent">用于：{c.used}</span>
               </div>
-              <pre className="overflow-x-auto px-4 py-2.5 font-mono text-[12px] leading-[1.7]">{c.code}</pre>
-              <pre className="border-t border-black/[.05] bg-[#fafaf8] px-4 py-2 font-mono text-[12px] text-ink/80">{c.out}</pre>
+              <pre className="whitespace-pre-wrap break-words px-4 py-2.5 font-mono text-[12px] leading-[1.7]">{c.code}</pre>
+              <pre className="whitespace-pre-wrap break-words border-t border-black/[.05] bg-[#fafaf8] px-4 py-2 font-mono text-[12px] text-ink/80">{c.out}</pre>
             </div>
           ))}
         </div>

@@ -1366,6 +1366,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/replication-script": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Replication Script
+         * @description 实际运行的计算调用，按运行顺序排列的 Python 脚本（附件下载）。
+         *
+         *     与 ``/code-export`` 不同：这里不经过 ``translate_code``，每一行调用都来自
+         *     研究台账里设定运行的记录（估计器、公式、数据哈希）。
+         *
+         *     Raises
+         *     ------
+         *     HTTPException
+         *         - 404: 会话没有任何设定运行
+         */
+        get: operations["replication_script_sessions__session_id__replication_script_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/replication-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Replication Package
+         * @description 复现包 zip：replication.py + 研究时读取的数据文件（字节相同）+ README。
+         *
+         *     Raises
+         *     ------
+         *     HTTPException
+         *         - 404: 会话没有任何设定运行
+         *         - 409: 分析数据文件已不存在，或与记录的 sha256 不一致
+         */
+        get: operations["replication_package_sessions__session_id__replication_package_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/doc-export": {
         parameters: {
             query?: never;
@@ -6676,6 +6730,68 @@ export interface operations {
             query?: {
                 format?: string;
             };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replication_script_sessions__session_id__replication_script_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replication_package_sessions__session_id__replication_package_get: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 session_id: string;

@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from auth import get_optional_user, require_session_ownership
@@ -233,3 +233,66 @@ async def export_code(
 
 
 # 路由注册统一在 main.py include_router，不再 import 侧自注册。
+
+
+# ---------------------------------------------------------------------------
+# Replication: the code that actually ran (not a translation)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sessions/{session_id}/replication-script")
+async def replication_script(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """实际运行的计算调用，按运行顺序排列的 Python 脚本（附件下载）。
+
+    与 ``/code-export`` 不同：这里不经过 ``translate_code``，每一行调用都来自
+    研究台账里设定运行的记录（估计器、公式、数据哈希）。
+
+    Raises
+    ------
+    HTTPException
+        - 404: 会话没有任何设定运行
+    """
+    from services.replication import SCRIPT_FILENAME, NoComputations, build_script
+
+    require_session_ownership(session_id, current_user)
+    try:
+        script = build_script(facade.get_state(session_id), session_id=session_id)
+    except NoComputations as exc:
+        raise HTTPException(status_code=404, detail=f"No computations to replicate: {exc}") from exc
+    return PlainTextResponse(
+        content=script,
+        media_type="text/x-python",
+        headers={"Content-Disposition": f'attachment; filename="{SCRIPT_FILENAME}"'},
+    )
+
+
+@router.get("/sessions/{session_id}/replication-package")
+async def replication_package(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """复现包 zip：replication.py + 研究时读取的数据文件（字节相同）+ README。
+
+    Raises
+    ------
+    HTTPException
+        - 404: 会话没有任何设定运行
+        - 409: 分析数据文件已不存在，或与记录的 sha256 不一致
+    """
+    from services.replication import DatasetUnavailable, NoComputations, build_package
+
+    require_session_ownership(session_id, current_user)
+    try:
+        blob = build_package(facade.get_state(session_id), session_id=session_id)
+    except NoComputations as exc:
+        raise HTTPException(status_code=404, detail=f"No computations to replicate: {exc}") from exc
+    except DatasetUnavailable as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(
+        content=blob,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="replication-package.zip"'},
+    )

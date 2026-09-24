@@ -460,8 +460,15 @@ const zh = {
 
   // CodeExportDialog
   'codeExport.title': '下载代码',
-  'codeExport.desc': '选择要下载的代码格式。每种格式包含相同的分析逻辑，适配对应统计软件的语法。',
+  'codeExport.desc': '复现包是研究中实际运行的代码和数据，用它能重跑出相同的数字。下面的其他格式由分析记录翻译而来，数值尚未核对。',
   'codeExport.close': '关闭',
+  'codeExport.replication.title': '复现包 · 实际运行的代码',
+  'codeExport.replication.desc': 'replication.py + 研究时的数据 + 说明，解压后运行即可重现结果',
+  'codeExport.replication.scriptOnly': '只下载脚本 replication.py',
+  'codeExport.replication.noRuns': '这项研究还没有设定运行，暂时没有可复现的计算。',
+  'codeExport.replication.dataChanged': '研究时使用的数据文件已不存在或已被改动，无法打包。',
+  'codeExport.replication.failed': '下载失败，请稍后重试。',
+  'codeExport.translatedHeading': '翻译版 · 数值未核对',
 
   // DocExportDialog
   'docExport.title': '导出文档',
@@ -1009,8 +1016,15 @@ const en: typeof zh = {
   'charls.confirm': 'Confirm',
 
   'codeExport.title': 'Download Code',
-  'codeExport.desc': 'Select a code format to download. Each format contains the same analysis logic adapted to the corresponding statistical software syntax.',
+  'codeExport.desc': 'The replication package is the code that actually ran, with its data; rerunning it reproduces the same numbers. The other formats are translated from the analysis record and have not been numerically checked.',
   'codeExport.close': 'Close',
+  'codeExport.replication.title': 'Replication package · code that actually ran',
+  'codeExport.replication.desc': 'replication.py + the data used + a README; unzip and run to reproduce',
+  'codeExport.replication.scriptOnly': 'Script only: replication.py',
+  'codeExport.replication.noRuns': 'This study has no specification runs yet, so there is nothing to replicate.',
+  'codeExport.replication.dataChanged': 'The data file used in the study is missing or has changed, so it cannot be packaged.',
+  'codeExport.replication.failed': 'Download failed. Please try again.',
+  'codeExport.translatedHeading': 'Translated · not numerically checked',
 
   'docExport.title': 'Export Document',
   'docExport.selectTemplate': 'Select Template',

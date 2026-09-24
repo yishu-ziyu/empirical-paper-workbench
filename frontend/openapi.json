@@ -3333,6 +3333,92 @@
         }
       }
     },
+    "/sessions/{session_id}/replication-script": {
+      "get": {
+        "summary": "Replication Script",
+        "description": "实际运行的计算调用，按运行顺序排列的 Python 脚本（附件下载）。\n\n与 ``/code-export`` 不同：这里不经过 ``translate_code``，每一行调用都来自\n研究台账里设定运行的记录（估计器、公式、数据哈希）。\n\nRaises\n------\nHTTPException\n    - 404: 会话没有任何设定运行",
+        "operationId": "replication_script_sessions__session_id__replication_script_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{session_id}/replication-package": {
+      "get": {
+        "summary": "Replication Package",
+        "description": "复现包 zip：replication.py + 研究时读取的数据文件（字节相同）+ README。\n\nRaises\n------\nHTTPException\n    - 404: 会话没有任何设定运行\n    - 409: 分析数据文件已不存在，或与记录的 sha256 不一致",
+        "operationId": "replication_package_sessions__session_id__replication_package_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sessions/{session_id}/doc-export": {
       "get": {
         "summary": "Export Document",

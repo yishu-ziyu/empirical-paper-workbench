@@ -27,6 +27,12 @@ from services.research_lab import (
 
 ProgressFn = Callable[[str, str, dict], None]
 
+# First-stage diagnostic call, shared with services.replication so the
+# published replication script cannot drift from what actually ran.
+IV_DIAG_ENDOG = "educ"
+IV_DIAG_INSTRUMENTS = ("nearc4",)
+IV_DIAG_VCOV = "HC1"
+
 
 class SpecRunRejected(RuntimeError):
     """Stable worker failure; not an HTTP 500 / NameError."""
@@ -38,6 +44,20 @@ class SpecRunRejected(RuntimeError):
 
 def _num(value: Any) -> float | None:
     return _as_float(value)
+
+
+def _environment() -> dict[str, str]:
+    """Library versions at run time, published with the replication script."""
+    import platform
+    from importlib import metadata
+
+    env = {"python": platform.python_version(), "pandas": pd.__version__}
+    for dist in ("statspai", "statsmodels"):
+        try:
+            env[dist] = metadata.version(dist)
+        except metadata.PackageNotFoundError:
+            continue
+    return env
 
 
 def _covariance(estimator: str) -> str:
@@ -53,10 +73,10 @@ def _iv_diagnostics(df: pd.DataFrame, controls: list[str]) -> dict[str, Any]:
     try:
         result = statspai.effective_f_test(
             df,
-            endog="educ",
-            instruments=["nearc4"],
+            endog=IV_DIAG_ENDOG,
+            instruments=list(IV_DIAG_INSTRUMENTS),
             exog=list(controls) or None,
-            vcov="HC1",
+            vcov=IV_DIAG_VCOV,
         )
         f_eff = _num(result.get("F_eff"))
         first_stage = _num(result.get("first_stage_F"))
@@ -65,7 +85,7 @@ def _iv_diagnostics(df: pd.DataFrame, controls: list[str]) -> dict[str, Any]:
             "F_eff": f_eff,
             "first_stage_F": first_stage,
             "strength": result.get("strength"),
-            "covariance": "HC1",
+            "covariance": IV_DIAG_VCOV,
             "controls": list(controls),
         }
     except Exception as exc:
@@ -124,6 +144,7 @@ def _run_one(
         },
         "created_at": _now(),
         "relation": relation,
+        "environment": _environment(),
     }
 
 

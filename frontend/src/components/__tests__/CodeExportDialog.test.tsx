@@ -6,8 +6,10 @@
 // 3. 点击按钮 → 调 GET /sessions/{id}/code-export?format=xxx
 // 4. isOpen=false 时不渲染
 // 5. onClose 触发关闭
+// 6. 第一项是复现包 / 复现脚本（实际运行的代码），翻译版单独成栏并标“数值未核对”
+//    （docs/acceptance/replication-script.md）
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CodeExportDialog, { type CodeExportDialogProps } from '../CodeExportDialog'
 import { I18nProvider } from '../../lib/i18n'
@@ -65,26 +67,30 @@ describe('CodeExportDialog 代码导出对话框', () => {
 
   test('Python 按钮显示 .py 扩展名', () => {
     renderWithI18n(<CodeExportDialog {...baseProps} />)
-    expect(screen.getByText(/Python/)).toBeInTheDocument()
-    expect(screen.getByText(/\.py/)).toBeInTheDocument()
+    const translated = within(screen.getByTestId('code-export-translated'))
+    expect(translated.getByText(/Python/)).toBeInTheDocument()
+    expect(translated.getByText(/\.py/)).toBeInTheDocument()
   })
 
   test('Stata 按钮显示 .do 扩展名', () => {
     renderWithI18n(<CodeExportDialog {...baseProps} />)
-    expect(screen.getByText(/Stata/)).toBeInTheDocument()
-    expect(screen.getByText(/\.do/)).toBeInTheDocument()
+    const translated = within(screen.getByTestId('code-export-translated'))
+    expect(translated.getByText(/Stata/)).toBeInTheDocument()
+    expect(translated.getByText(/\.do/)).toBeInTheDocument()
   })
 
   test('R 按钮显示 .R 扩展名', () => {
     renderWithI18n(<CodeExportDialog {...baseProps} />)
-    expect(screen.getByText(/^R\b/)).toBeInTheDocument()
-    expect(screen.getByText(/\.R/)).toBeInTheDocument()
+    const translated = within(screen.getByTestId('code-export-translated'))
+    expect(translated.getByText(/^R\b/)).toBeInTheDocument()
+    expect(translated.getByText(/\.R/)).toBeInTheDocument()
   })
 
   test('EViews 按钮显示 .m 扩展名', () => {
     renderWithI18n(<CodeExportDialog {...baseProps} />)
-    expect(screen.getByText(/EViews/)).toBeInTheDocument()
-    expect(screen.getByText(/\.m/)).toBeInTheDocument()
+    const translated = within(screen.getByTestId('code-export-translated'))
+    expect(translated.getByText(/EViews/)).toBeInTheDocument()
+    expect(translated.getByText(/\.m/)).toBeInTheDocument()
   })
 
   test('点击 Python 按钮触发 fetch 请求 format=py（cookie 凭证，无遗留 Bearer 头）', async () => {
@@ -152,5 +158,40 @@ describe('CodeExportDialog 代码导出对话框', () => {
     const closeBtn = screen.getByTestId('code-export-close')
     await user.click(closeBtn)
     expect(onClose).toHaveBeenCalled()
+  })
+  test('复现包是第一项，请求 replication-package', async () => {
+    const user = userEvent.setup()
+    renderWithI18n(<CodeExportDialog {...baseProps} />)
+    const pkg = screen.getByTestId('replication-package-button')
+    const first = screen.getByTestId('code-export-dialog').querySelectorAll('button[data-testid]')[1]
+    expect(first).toBe(pkg) // [0] is the close button
+    await user.click(pkg)
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/sessions/test-session-123/replication-package'),
+      expect.objectContaining({ credentials: 'include' }),
+    )
+  })
+
+  test('只下载脚本请求 replication-script，不走 code-export', async () => {
+    const user = userEvent.setup()
+    renderWithI18n(<CodeExportDialog {...baseProps} />)
+    await user.click(screen.getByTestId('replication-script-button'))
+    const url = (fetch as unknown as { mock: { calls: Array<[string]> } }).mock.calls[0][0]
+    expect(url).toContain('/sessions/test-session-123/replication-script')
+    expect(url).not.toContain('code-export')
+  })
+
+  test('没有设定运行（404）时说明原因，不静默', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve('') }))
+    const user = userEvent.setup()
+    renderWithI18n(<CodeExportDialog {...baseProps} />)
+    await user.click(screen.getByTestId('replication-package-button'))
+    expect(await screen.findByTestId('replication-error')).toHaveTextContent(/还没有设定运行|no specification runs/)
+  })
+
+  test('翻译版单独成栏，标明数值未核对', () => {
+    renderWithI18n(<CodeExportDialog {...baseProps} />)
+    expect(screen.getByText(/翻译版 · 数值未核对|Translated · not numerically checked/)).toBeInTheDocument()
+    expect(within(screen.getByTestId('code-export-translated')).getAllByTestId('code-export-button')).toHaveLength(4)
   })
 })

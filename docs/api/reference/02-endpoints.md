@@ -23,7 +23,9 @@
 | sample | `/sessions/{id}/balance` | POST | 面板平衡性检查（sub-step 7） |
 | charls | `/sessions/{id}/charls/detect` | GET | CHARLS 数据集检测 |
 | charls | `/sessions/{id}/charls/confirm` | POST | 确认 CHARLS 向导配置 |
-| code_export | `/sessions/{id}/code-export` | GET | 导出代码文件（py / do / R / m） |
+| code_export | `/sessions/{id}/replication-package` | GET | 复现包 zip：实际运行的代码 + 研究时的数据 + README |
+| code_export | `/sessions/{id}/replication-script` | GET | 复现脚本 `replication.py`：设定运行实际执行的调用 |
+| code_export | `/sessions/{id}/code-export` | GET | 导出翻译版代码（py / do / R / m），数值未核对 |
 | doc_export | `/sessions/{id}/doc-export` | GET | 导出文档（tex / pdf / docx） |
 | progress | `/sessions/{id}/progress` | GET | 查询论文完成进度 |
 | review | `/sessions/{id}/review` | GET | 获取当前章的评审信息 |

@@ -1,0 +1,107 @@
+/* Motion shared by the three riffs. Draw-ins use clip-path the way laper#draw does;
+   everything else is transform/opacity. Global reduced-motion rule in index.css collapses these. */
+
+:root {
+  --draw-ease: cubic-bezier(.2, .7, .2, 1);
+  --out: cubic-bezier(.23, 1, .32, 1);
+}
+
+/* hairline drawn left → right / top → bottom */
+@keyframes rf-draw-x { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+@keyframes rf-draw-y { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+.rf-draw-x { animation: rf-draw-x .9s var(--draw-ease) both; }
+.rf-draw-y { animation: rf-draw-y .9s var(--draw-ease) both; }
+
+/* a block being typeset: revealed top → bottom like a sheet coming out of the press */
+@keyframes rf-set {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(6px); }
+  to { clip-path: inset(0 0 -2px 0); transform: none; }
+}
+.rf-set { animation: rf-set .7s var(--draw-ease) backwards; }
+
+/* fade-up for small arrivals */
+@keyframes rf-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.rf-rise { animation: rf-rise .22s var(--out) both; }
+
+/* ink insertion for proofreading marks */
+@keyframes rf-ink { from { opacity: 0; transform: translateY(-3px) scale(.98); } to { opacity: 1; transform: none; } }
+.rf-ink { animation: rf-ink .26s var(--out) both; }
+
+/* strike line drawn across old text */
+.rf-strike { position: relative; }
+.rf-strike::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 55%;
+  height: 1px;
+  background: currentColor;
+  animation: rf-draw-x .45s var(--draw-ease) both;
+}
+
+/* diamond pin (laper) */
+@keyframes rf-pin { 0%, 55% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(.4); } 100% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1); } }
+.rf-pin {
+  position: absolute;
+  width: 7px; height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  animation: rf-pin .76s ease-out both;
+}
+
+/* SVG stroke draw (bento#chart method); set --len on the element */
+@keyframes rf-stroke { from { stroke-dashoffset: var(--len, 400); } to { stroke-dashoffset: 0; } }
+.rf-stroke { stroke-dasharray: var(--len, 400); animation: rf-stroke 1s var(--draw-ease) both; }
+
+/* caret blink for the agent's live typing */
+@keyframes rf-blink { 50% { opacity: 0; } }
+.rf-caret { display: inline-block; width: .5ch; animation: rf-blink 1s steps(1) infinite; }
+
+/* working shimmer bar: a thin line sweeping while the agent computes */
+@keyframes rf-sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.rf-sweep { position: relative; overflow: hidden; }
+.rf-sweep::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: .5;
+  animation: rf-sweep 1.1s var(--draw-ease) infinite;
+}
+
+/* gold packet travelling (querypath) */
+.rf-packet {
+  position: absolute;
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  background: #e2b93b;
+  box-shadow: 0 0 0 4px rgba(226, 185, 59, .18), 0 0 18px rgba(226, 185, 59, .7);
+  transition: transform .34s cubic-bezier(.65, 0, .35, 1), opacity .2s ease-out;
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* dot grid (laper #grid) */
+.rf-dots {
+  background-image: radial-gradient(rgba(107, 115, 112, .22) 1px, transparent 1px);
+  background-size: 7px 7px;
+}
+@keyframes rf-pattern { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0); } }
+.rf-pattern { animation: rf-pattern 1.8s cubic-bezier(.16, 1, .3, 1) .2s both; }
+
+.rf-tnum { font-variant-numeric: tabular-nums; }
+
+/* Apple-Intelligence-style edge light (FocusRiff) */
+@keyframes ai-rotate { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.ai-spin {
+  background: conic-gradient(from 0deg, #5ac8fa, #007aff, #bf5af2, #ff375f, #ff9f0a, #ffd60a, #5ac8fa);
+  animation: ai-rotate 3.2s linear infinite;
+}
+/* new text arrives with a light sweep, then settles to ink */
+@keyframes ai-sweep { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.ai-text {
+  background: linear-gradient(90deg, #1d1d1f 0%, #1d1d1f 40%, #bf5af2 48%, #007aff 52%, #1d1d1f 60%, #1d1d1f 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-sweep 1.4s cubic-bezier(.23, 1, .32, 1) both;
+}
+@media (prefers-reduced-motion: reduce) { .ai-spin { animation: none; } .ai-text { animation: none; background: none; color: #1d1d1f; } }

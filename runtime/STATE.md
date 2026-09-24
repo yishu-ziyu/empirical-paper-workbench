@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| METHOD-ADAPTER-1 | `runtime/tasks/20260924-method-adapter.md` | paused | `main@a0e61089` | 2026-09-24 | 第 1 步完成（统一读结果与读字段）；恢复时先写 OLS/IV 适配器接口一页说明给用户确认 |
 | REPLICATION-SCRIPT-1 | `runtime/tasks/20260924-replication-script.md` | complete | `main@84f6f946` + 本任务提交 | 2026-09-24 | 两轮通过（设定运行 + 主估计）；修复 RD/SCM/CS 无系数；待办：Agent 路径核实、DiD TWFE 聚类未传入 |
 | FORMAL-CONFIRMATION-CHAIN-3 | `runtime/tasks/20260918-formal-confirmation-chain-3.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + inherited changes | 2026-09-18 | ACCEPT；S1–S5、响应丢失与 run 重领已闭合，全量/真实桌面/320×568 均通过；下一步 INTENT-TO-DESIGN-1 |
 | FORMAL-CHAIN-2-REVIEW | `runtime/tasks/20260917-formal-chain-2-review.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + CHAIN-2 受评实现未变 | 2026-09-18 | REJECT；153 项既有测试通过，5 个新 API 反例违约；桌面真实链路及换数据反例已验，小屏超时后恢复；详见 CHAIN-2 独立评审 |

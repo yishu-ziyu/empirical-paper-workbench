@@ -1,0 +1,24 @@
+# econpaper Codex Task State
+
+- Task ID: METHOD-ADAPTER-1
+- Status: paused（用户要求在第 1 步后暂停，2026-09-24）
+- Git context（分支可选）: main @ a0e61089（已推送）
+- Goal: 把“一种方法需要知道的所有事”收拢到方法适配器，消除各阶段按方法分支与按案例写死的逻辑
+- Hard bar: 每一步单独可验收；前几步不改变产品行为（现有全部测试不改动即通过，另有刻画测试逐值比对）
+- Session / run ID: —
+- Current research stage: 第 1 步完成；第 2–5 步未开始
+- Current review / approval gate: 继续前由用户确认；用户倾向先看适配器接口一页说明再动手
+- Verified facts:
+  - 现状梳理见 docs/design/empirical-pipeline.md（两条路径、方法知识散落表、写死的案例知识、建议方向与落地顺序）
+  - 第 1 步：读结果统一为 agent/engine/results.py::read_effect；读设计字段统一为 agent/design/fields.py::field；主估计、识别核查、稳健性检验、估计 Agent 已切换；make test 全过（agent 1088 / backend 733 / frontend 全过）
+  - 正式流程的识别诊断实际能运行（align_direction → set_direction.enrich_direction → identification_verify，IV/DiD/SCM/RD 均 3 星）；此前“诊断没有运行”的结论是跳过 set_direction 的错误实测，已撤回
+  - 写死的案例知识仍在：propose_design 正则认题目；research_lab 的 lwage/educ/nearc4 常量；spec_run 第一阶段检验 educ/nearc4
+  - 已知未修问题：_estimate_did 的 TWFE 分支算出聚类变量却未传给估计（计划在第 3 步随“字段只读一次”解决，不单独打补丁）
+- Current hypothesis: 适配器按方法声明 字段 / 调用（即 call 记录）/ 读结果 / 诊断与稳健性变体 / 导出名称，各阶段变为通用循环
+- Changed files: agent/engine/results.py, agent/design/fields.py, agent/nodes/{estimate,identification_verify,robustness_check}.py, agent/engine/estimate_agent.py, agent/tests/{test_results_reader,test_design_fields}.py, docs/design/empirical-pipeline.md, docs/specs/paper-engine/04-proposed-design/06-main-specification.md
+- Failed paths: 直接调用 identification_verify(align_direction 输出) 得出“诊断被跳过”——漏了 set_direction，结论错误
+- Data / output evidence locations: agent/tests/test_results_reader.py；agent/tests/test_design_fields.py；docs/design/empirical-pipeline.md「进展」
+- Test evidence: make test 通过（2026-09-24）
+- Pending external state: 无
+- Next action: 第 2 步前先写一页适配器接口说明（OLS、IV 两种方法的字段 / call / 读结果 / 诊断），给用户确认后再改主估计与设定运行
+- Updated at: 2026-09-24

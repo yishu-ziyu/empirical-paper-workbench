@@ -18,7 +18,7 @@ if (tremorPlugin) plugins.push(tremorPlugin);
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', './prototypes/**/*.{html,ts,tsx}'],
   theme: {
     extend: {
       colors: {

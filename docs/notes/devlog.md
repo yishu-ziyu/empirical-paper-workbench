@@ -3,6 +3,51 @@
 > 记录产品每一步真实进展。规则：一条一个日期，写了什么、为什么、验收数字、
 > 还欠什么。决策性内容不在这里展开，指向 docs/adr/ 对应条目。
 
+## 2026-09-25 —— 第 3 轮补审修复：SSE 断开泄漏 P1 + 4 个 P3
+
+对象：`docs/reviews/20260925-retro-review-9e830281.md` 列出的 6 项。
+
+- **P1（SSE 断开致 SQLite 写锁死）**：`routers/run_execution.py` 的
+  `generate()` 里 `await repo.events_after(...)` / `await repo.get(...)`
+  改成 `await asyncio.shield(...)`；`finally` 里释放 `_sse_connections`
+  计数同理。根因：Starlette 用 anyio cancel scope 取消断开的生成器，取消
+  会在同一个已取消的 scope 里对后续每个 await 重新投递，未加保护时
+  DB session 的 close 会被这个重投递打断，连接/aiosqlite 后台线程可能
+  半开半关。`asyncio.shield` 把查询+session close 整体挪成独立 task：
+  外层立刻停流，内层的 DB 往返总能自己跑完再关连接。
+  **诚实记录**：本地用真实 uvicorn + 真实 TCP 断开（顺序 250 次随机时机
+  + 20 次强制命中查询窗口的确定性重放 + 300 次并发批量断开）都没能在
+  当前依赖版本（SQLAlchemy 2.0.36 / Starlette 0.38.6 / aiosqlite）下复现
+  出锁死或连接泄漏——`ROLLBACK` 每次都正常收尾。组件级测试改为直接断言
+  "被取消时 DB 往返协程本身有没有被允许跑完"（`asyncio.shield` 的直接
+  效果），而不是断言下游的 SQLite 症状；红/绿都已用 `git stash` 单独验证。
+- **P3 幂等 key 跨阶段复用**：`services/formal_binding.py` 新增
+  `ledger_claims_key`；`run_repository.enqueue()` 用它挡"记录确认"用过的
+  key 被 `continue_estimate` 复用；`facade/session_store.py` 的
+  `mutate_state(idempotency_key=...)` 反向挡 run 队列用过的 key 被
+  `record_confirms` 复用。两个方向都是 409 `idempotency_conflict`。
+- **P3 409 清掉别人的运行指示**：`workspace.ts` 的 `continueEstimate` 只在
+  自己真正调用了 `trackRun`（本地 `ownsDirectionBusy` 标记）时才在
+  `finally` 里清 `directionBusy`；`PrewriteConfirmCard` 新增
+  `hasActiveRun` prop，任何 run 在跑（本地或刷新接回）都禁用"开始估计"。
+- **P3 会话忙时上传提示成"处理失败"**：`uploadResponse()` 对 409 先走
+  `parseAdmissionConflict`，`handleUploadRunError` 对 `session_busy` 显示
+  忙碌文案（`app.uploadBusy`），不再套用"请重新选择文件"。
+- **P3 换数据后右栏不提示重查方向**：`applySnapshot` 新增
+  `mainSpecification` 状态（`supersede_dataset` 清空这个字段但保留
+  `research_direction` 摘要，是唯一能分辨"方向仍对着当前数据"的后端信号）；
+  `App.tsx` 据此加一条 `decision.directionStale` 分支。
+- **`git diff --check` 失败**：`services/formal_chain.py:139` 与
+  `20260918-formal-confirmation-chain-3-closeout.md` 末尾各多一个空行，删掉。
+
+**验收数字**：agent 1088 passed + 2 skipped；backend 736 passed + 8
+skipped + 13 subtests；frontend 562 passed（75 files）；`tsc -b` 0 error；
+`oxlint` 0 error（既有 warning 不算）；`git diff --check` 0；`make
+docs-check` / `check_docs.py --changed main` 均 0 未处理项。
+
+**已知缺口**：VoiceOver、完整 Tab 顺序、P1 在 Postgres 下的行为、真实数据
+验收——均不在本轮范围内，原样留给下一轮。
+
 ## 2026-08-27（夜）—— 分支大清理：全仓只留 main
 
 合流后的分支考古（`git branch -a` + `git cherry` 内容级比对）收尾：

@@ -572,6 +572,22 @@ def request_replay(
     return True
 
 
+def ledger_claims_key(state: Mapping[str, Any] | None, key: str | None) -> bool:
+    """True when ``key`` already names a recorded session-ledger intention.
+
+    The request ledger (``record_confirms`` replay, this module) and the
+    durable run queue (``continue_estimate`` / direction / spec_run
+    admission, ``run_repository.RunRepository``) are two different
+    idempotency stores that happen to share one HTTP ``Idempotency-Key``
+    header on the formal-confirmation endpoint. A key must name exactly one
+    intention; reusing it across the two systems must not let both execute
+    silently (P3 idempotency-conflict gap).
+    """
+    if not key:
+        return False
+    return isinstance(chain(state)["requests"].get(str(key)), dict)
+
+
 def remember_request(
     state: dict[str, Any],
     key: str | None,

@@ -46,7 +46,14 @@ From this batch on, an approval names the object it approved:
   (`POST /direction` answers **409 `design_execution_mismatch`** otherwise).
 - `Idempotency-Key` is a delivery credential for each of these write
   endpoints: repeating the same intention returns the same run / the same
-  recorded gate and never writes a second run or a second confirmation.
+  recorded gate and never writes a second run or a second confirmation. A key
+  names exactly **one** intention: reusing it for a *different* `action`
+  (`record_confirms` once, then `continue_estimate` with the same key, or the
+  reverse) is **409 `idempotency_conflict`** — it never silently executes
+  both. `record_confirms` replay is checked against the session's request
+  ledger; `continue_estimate` replay is checked against the durable run
+  queue; each side also checks the *other* store for the same key before
+  admitting.
 - `POST /sessions/{id}/design/confirm` optionally takes the draft revision the
   client was looking at: `{"expectedRevision": design.proposed_at}`. The lock is
   refused with **409 `design_revision_mismatch`** (`detail.expected` /
@@ -188,8 +195,18 @@ change `qType` away from `heterogeneity`, then confirm again.
 | 409 | `prewrite_not_ready` | No direction, or identification never ran |
 | 409 | `identification_blocked` | 0-star or `identification_failed` |
 | 409 | `session_busy` | Another durable run is active |
+| 409 | `idempotency_conflict` | `Idempotency-Key` was already used for a different `action` (`record_confirms` vs. `continue_estimate`) |
 | 404 | — | Session missing |
 | 429 | — | Run queue full (`Retry-After: 5`) |
+
+## SSE reattachment (`GET /runs/{run_id}/events`)
+
+The client rebuilds this stream on refresh instead of holding a socket open.
+A disconnect at any point — including mid read — stops the stream promptly
+and always finishes closing its own database session; it cannot leak a
+connection or block a later write (P1 fix, `routers/run_execution.py`). This
+is independent of dialect: it is safe on both the SQLite dev engine and
+Postgres.
 
 ## Snapshot fields after direction
 

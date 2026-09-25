@@ -434,6 +434,29 @@ describe('App 三栏布局', () => {
     expect(screen.getByTestId('decision-blocker-reason')).toHaveTextContent('设计未通过')
   })
 
+  test('P3: 换数据后右栏提示重新核查研究方向，不说"没有需要确认的事"', async () => {
+    localStorage.setItem('econpaper_session_id', 'test-sess')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            exists: true,
+            research_direction: { method: 'OLS', dv: 'income', iv: 'age', question: '年龄与收入' },
+            // supersede_dataset 清掉了 main_specification（换数据的后端真实
+            // 信号），但 research_direction 还留着旧数据的摘要。
+            main_specification: null,
+          }),
+      }),
+    )
+    renderWithI18n(<App />)
+
+    expect(await screen.findByTestId('decision-blocker')).toBeInTheDocument()
+    expect(screen.getByTestId('decision-blocker-title')).toHaveTextContent('重新核查研究方向')
+    expect(screen.queryByText('当前没有需要你确认的事')).not.toBeInTheDocument()
+  })
+
   test('专注阅读提示可进入收起状态，八秒无操作后变成胶囊并可恢复', () => {
     vi.useFakeTimers()
     localStorage.setItem('econpaper_session_id', 'test-sess')

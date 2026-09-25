@@ -30,6 +30,7 @@ function renderCard(props: Partial<React.ComponentProps<typeof PrewriteConfirmCa
         confirmBusy={null}
         confirmError={null}
         estimateStarting={false}
+        hasActiveRun={false}
         awaitingEstimate
         estimateComplete={false}
         continuePermission="allow"
@@ -85,6 +86,18 @@ describe('PrewriteConfirmCard — #40 permission tri-state (R6)', () => {
     expect(start).toBeDisabled()
     expect(screen.getByTestId('prewrite-forbid-reason')).toBeInTheDocument()
     expect(screen.queryByTestId('confirm-risk-btn')).not.toBeInTheDocument()
+    fireEvent.click(start)
+    expect(onStartEstimate).not.toHaveBeenCalled()
+  })
+
+  it('P3: keeps start-estimate disabled while another run is already active (e.g. resumed after refresh)', () => {
+    const { onStartEstimate } = renderCard({
+      continuePermission: 'allow',
+      hasActiveRun: true,
+      ...BOTH_CONFIRMED,
+    })
+    const start = screen.getByTestId('start-estimate-btn')
+    expect(start).toBeDisabled()
     fireEvent.click(start)
     expect(onStartEstimate).not.toHaveBeenCalled()
   })

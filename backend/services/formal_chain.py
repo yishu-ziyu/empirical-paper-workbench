@@ -136,4 +136,3 @@ def require_design_confirmed(state: dict[str, Any]) -> None:
         status_code=409,
         detail={"code": CODE_DESIGN_UNCONFIRMED},
     )
-

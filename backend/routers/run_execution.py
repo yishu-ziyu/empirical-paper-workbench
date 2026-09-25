@@ -268,7 +268,23 @@ async def stream_run_events(
             while True:
                 if await request.is_disconnected():
                     return
-                events = await repo.events_after(run_id, cursor)
+                # A disconnect can cancel this coroutine at any await point,
+                # including while a DB read is in flight. Starlette delivers
+                # that cancellation through an anyio cancel scope, which keeps
+                # re-raising CancelledError at every subsequent checkpoint in
+                # *this* task until the scope is unwound -- so an unshielded
+                # `await repo.events_after(...)` would abandon its
+                # AsyncSession mid-close: the underlying aiosqlite connection
+                # never finishes closing, its background thread never exits,
+                # and it keeps holding a read lock forever (P1: repeated
+                # disconnects eventually wedge every writer on SQLite,
+                # PENDING runs never advance, POST /sessions starts failing
+                # with 500). `asyncio.shield` runs the query (and the
+                # `async with` session close that follows it) as an
+                # independent task: our disconnect still stops the stream
+                # immediately, but the DB round trip always finishes and the
+                # connection always closes.
+                events = await asyncio.shield(repo.events_after(run_id, cursor))
                 terminal_event = False
                 for event in events:
                     cursor = event.seq
@@ -287,18 +303,25 @@ async def stream_run_events(
                     return
                 idle_ticks += 1
                 if idle_ticks % 30 == 0:
-                    latest = await repo.get(run_id)
+                    latest = await asyncio.shield(repo.get(run_id))
                     if latest is None or latest.status in TERMINAL_STATUSES:
                         return
                     yield ": heartbeat\n\n"
                 await asyncio.sleep(0.5)
         finally:
-            async with _sse_connections_lock:
-                remaining = _sse_connections.get(run_id, 1) - 1
-                if remaining > 0:
-                    _sse_connections[run_id] = remaining
-                else:
-                    _sse_connections.pop(run_id, None)
+            # Same reasoning as above: this cleanup itself runs inside the
+            # cancelled scope on a disconnect, so the lock acquire below must
+            # not be abandoned mid-release either (it would leak the slot and
+            # eventually make every future stream for this run_id see 429).
+            await asyncio.shield(_release_sse_slot(run_id))
+
+    async def _release_sse_slot(run_id: str) -> None:
+        async with _sse_connections_lock:
+            remaining = _sse_connections.get(run_id, 1) - 1
+            if remaining > 0:
+                _sse_connections[run_id] = remaining
+            else:
+                _sse_connections.pop(run_id, None)
 
     return StreamingResponse(
         generate(),

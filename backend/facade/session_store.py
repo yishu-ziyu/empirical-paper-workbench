@@ -160,7 +160,12 @@ class SessionStore:
             self._write_state(self._locked_row(db, session_id), state)
 
     def mutate_state(
-        self, session_id: str, mutate: Callable[[dict], dict], *, idle: bool = False
+        self,
+        session_id: str,
+        mutate: Callable[[dict], dict],
+        *,
+        idle: bool = False,
+        idempotency_key: str | None = None,
     ) -> dict:
         """Read, validate and write under one session lock, also on SQLite.
 
@@ -174,6 +179,22 @@ class SessionStore:
                 db.execute(text("BEGIN IMMEDIATE"))
             try:
                 row = self._locked_row(db, session_id)
+                if idempotency_key:
+                    # The durable run queue (continue_estimate / direction /
+                    # spec_run admission) shares this HTTP Idempotency-Key
+                    # header with the request ledger below. A key already
+                    # spent on a run must not also be replayed into the
+                    # ledger as a different intention (P3 idempotency gap).
+                    claimed = db.scalar(
+                        select(Run.run_id)
+                        .where(
+                            Run.session_id == session_id,
+                            Run.idempotency_key == idempotency_key,
+                        )
+                        .limit(1)
+                    )
+                    if claimed:
+                        raise HTTPException(409, detail={"code": "idempotency_conflict"})
                 if idle:
                     active = db.scalar(select(Run.run_id).where(
                         Run.session_id == session_id,

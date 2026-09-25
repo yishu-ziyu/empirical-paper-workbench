@@ -13,6 +13,8 @@ export interface PrewriteConfirmCardProps {
   confirmBusy: 'table1' | 'spec' | 'risk' | null
   confirmError: string | null
   estimateStarting: boolean
+  /** 有 run 正在跑（本地发起或刷新后接回的都算）：不能再发起估计。 */
+  hasActiveRun: boolean
   /** 方向 run 停在预览处（prewrite_gate = awaiting_estimate）。 */
   awaitingEstimate: boolean
   estimateComplete: boolean
@@ -46,6 +48,7 @@ export default function PrewriteConfirmCard({
   confirmBusy,
   confirmError,
   estimateStarting,
+  hasActiveRun,
   awaitingEstimate,
   estimateComplete,
   continuePermission,
@@ -72,15 +75,17 @@ export default function PrewriteConfirmCard({
         : continuePermission === 'allow'
           ? t('prewrite.permissionAllow')
           : t('prewrite.permissionUnknown')
-  const startDisabledReason = forbidden
-    ? t('prewrite.startForbidden')
-    : riskRequired
-      ? t('prewrite.startNeedRisk')
-      : !table1Confirmed || !specConfirmed
-        ? t('prewrite.startNeedBoth')
-        : blocked
-          ? blockingDecision?.reason || undefined
-          : undefined
+  const startDisabledReason = hasActiveRun
+    ? t('prewrite.refusedBusy')
+    : forbidden
+      ? t('prewrite.startForbidden')
+      : riskRequired
+        ? t('prewrite.startNeedRisk')
+        : !table1Confirmed || !specConfirmed
+          ? t('prewrite.startNeedBoth')
+          : blocked
+            ? blockingDecision?.reason || undefined
+            : undefined
 
   if (estimateComplete) {
     return (
@@ -251,12 +256,13 @@ export default function PrewriteConfirmCard({
             blocked ||
             forbidden ||
             riskRequired ||
-            estimateStarting
+            estimateStarting ||
+            hasActiveRun
           }
           title={startDisabledReason}
           className="rounded-lg bg-accent px-4 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {estimateStarting ? t('prewrite.starting') : t('prewrite.startEstimate')}
+          {estimateStarting || hasActiveRun ? t('prewrite.starting') : t('prewrite.startEstimate')}
         </button>
         {forbidden ? (
           <p

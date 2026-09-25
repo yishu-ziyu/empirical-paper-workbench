@@ -179,6 +179,22 @@ function App() {
         actionLabel: t('decision.openDirection'),
         onAction: openDirection,
       }
+    } else if (
+      // 换数据后 supersede_dataset 清掉 main_specification（后端真实信号，
+      // 见 backend/services/formal_binding.py），但 research_direction 还留
+      // 着旧数据的摘要：不重新核查，右栏不能说"没有需要确认的事"（P3）。
+      !ws.research?.teaching_case &&
+      ws.directionSummary &&
+      !ws.directionOpen &&
+      !ws.directionBusy &&
+      !ws.mainSpecification
+    ) {
+      blockingDecision = {
+        title: t('decision.directionStale'),
+        reason: t('decision.directionStaleReason'),
+        actionLabel: t('decision.openDirection'),
+        onAction: openDirection,
+      }
     }
   } else if (isEvidenceTab) {
     if (ws.runFailure) {

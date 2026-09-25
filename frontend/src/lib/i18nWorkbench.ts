@@ -244,6 +244,8 @@ export const workbenchZh = {
   'decision.confirmDirectionEdit': '确认修改后的研究方向',
   'decision.confirmDirectionReason': '需要你确认研究问题、变量和方法；确认后系统才会运行估计。',
   'decision.confirmDirectionEditReason': '研究方向正在修改；提交这次修改后，系统才会按新设计继续。',
+  'decision.directionStale': '数据已更换，需要重新核查研究方向',
+  'decision.directionStaleReason': '换了数据后，原来的估计设定已失效；重新核查研究方向，系统才会用新数据继续。',
   'decision.openDirection': '打开研究方向',
   'decision.runSpecs': '运行分析方案',
   'decision.runSpecsReason': '分析方案已确认。运行纳入的设定，才能看到真实估计。',
@@ -888,6 +890,9 @@ export const workbenchEn: { [K in keyof typeof workbenchZh]: string } = {
     'Confirm the question, variables, and method. Estimation starts after that.',
   'decision.confirmDirectionEditReason':
     'The direction is being edited. Submit this change before the system continues.',
+  'decision.directionStale': 'The dataset changed; recheck the research direction',
+  'decision.directionStaleReason':
+    'The dataset changed, so the previous estimate setup no longer applies. Recheck the research direction before the system continues with the new data.',
   'decision.openDirection': 'Open research direction',
   'decision.runSpecs': 'Run analysis plans',
   'decision.runSpecsReason':

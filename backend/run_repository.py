@@ -22,6 +22,7 @@ from models.run import Run, RunEvent
 from services.formal_binding import (
     archive_stale_run_result,
     binding_is_current,
+    ledger_claims_key,
     supersede_dataset,
 )
 from services.research_lab import merge_spec_run_lab, strip_spec_run_result
@@ -170,6 +171,7 @@ class RunRepository:
                         raise SessionNotFound(
                             f"session {session_id} no longer exists"
                         )
+                    self._reject_cross_ledger_key(session, idempotency_key)
                     await self._lock_admission(db)
                     if idempotency_key:
                         existing = await self._idempotent_run(
@@ -210,6 +212,12 @@ class RunRepository:
                 return run
         except IntegrityError:
             async with self._factory() as db:
+                session = await db.get(ResearchSession, session_id)
+                if session is None:
+                    raise SessionNotFound(
+                        f"session {session_id} no longer exists"
+                    )
+                self._reject_cross_ledger_key(session, idempotency_key)
                 if idempotency_key:
                     existing = await self._idempotent_run(
                         db, session_id, kind, idempotency_key
@@ -220,17 +228,28 @@ class RunRepository:
                 active = await self._active_run(db, session_id)
                 if active is not None:
                     raise SessionBusy(active.run_id)
-                session = await db.get(ResearchSession, session_id)
-                if session is None:
-                    raise SessionNotFound(
-                        f"session {session_id} no longer exists"
-                    )
             raise
 
     @staticmethod
     def _validate_intent_replay(existing: Run, payload: dict) -> None:
         intent = payload.get("intent")
         if intent is not None and (existing.payload or {}).get("intent") != intent:
+            from fastapi import HTTPException
+            raise HTTPException(409, detail={"code": "idempotency_conflict"})
+
+    @staticmethod
+    def _reject_cross_ledger_key(
+        session: ResearchSession, idempotency_key: str | None
+    ) -> None:
+        """Refuse a key already spent on the session request ledger.
+
+        ``record_confirms`` (``services.formal_binding.request_replay``) and
+        run admission share one HTTP ``Idempotency-Key`` header on the
+        formal-confirmation endpoint but are two independent idempotency
+        stores. Without this check the same key could be replayed into both
+        systems and both intentions would execute for real.
+        """
+        if idempotency_key and ledger_claims_key(session.state, idempotency_key):
             from fastapi import HTTPException
             raise HTTPException(409, detail={"code": "idempotency_conflict"})
 

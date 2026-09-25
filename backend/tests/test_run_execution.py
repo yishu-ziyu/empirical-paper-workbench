@@ -2143,6 +2143,108 @@ def test_sse_resumes_after_last_event_id(client):
         facade.drop_session(sid)
 
 
+def test_sse_disconnect_mid_query_lets_the_db_round_trip_finish(monkeypatch):
+    """P1: a client disconnect mid-query must not abandon the DB round trip.
+
+    ``StreamingResponse`` stops a disconnected generator by cancelling it
+    through an anyio cancel scope (``routers.run_execution.stream_run_events``
+    is driven the same way Starlette drives it here: a task group whose
+    cancel scope is cancelled while the generator awaits a DB call). Before
+    the fix, that cancellation is delivered straight into
+    ``repo.events_after``'s ``async with self._factory() as db:`` block,
+    aborting the read and its session close before they finish -- across many
+    reconnect/disconnect cycles this is what the independent review observed
+    leaking aiosqlite connections until every future write failed (P1: run
+    stuck PENDING, ``POST /sessions`` 500, only a restart recovers). Wrapping
+    the call in ``asyncio.shield`` runs the query and its session close as an
+    independent task: the stream still stops immediately, but the DB round
+    trip always finishes on its own, so it never leaves a session half open.
+
+    Kept alongside this: a concurrent write against the same run must keep
+    succeeding across the disconnect (the acceptance contract's "反复断开加
+    并发写入，写入必须持续成功").
+    """
+    import anyio
+    from sqlalchemy import select as sa_select
+
+    from routers.run_execution import stream_run_events
+
+    sid = "test-sse-disconnect-leak"
+    facade.seed_state(sid, {"csv_path": "/tmp/input.csv"})
+
+    async def scenario():
+        repo = RunRepository()
+        run = await repo.enqueue(
+            session_id=sid,
+            kind="prewrite",
+            payload=_direction(),
+            idempotency_key="sse-disconnect-leak-1",
+        )
+
+        started = asyncio.Event()
+        finished = asyncio.Event()
+
+        async def leaky_events_after(self, run_id, seq):
+            # Same query shape as the real method, but held open long enough
+            # to guarantee the task-group cancellation below lands while the
+            # DB session is still active.
+            async with self._factory() as db:
+                await db.execute(
+                    sa_select(RunEvent).where(RunEvent.run_id == run_id)
+                )
+                started.set()
+                await asyncio.sleep(0.3)
+                # Reached only if this coroutine's own execution -- not just
+                # its enclosing task -- was allowed to run to completion.
+                finished.set()
+                return []
+
+        monkeypatch.setattr(RunRepository, "events_after", leaky_events_after)
+
+        class _NeverDisconnects:
+            async def is_disconnected(self) -> bool:
+                return False
+
+        response = await stream_run_events(
+            _NeverDisconnects(), run.run_id, last_event_id=None, current_user=None
+        )
+        body_iterator = response.body_iterator
+
+        async def drive():
+            async for _ in body_iterator:
+                pass
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(drive)
+            await started.wait()
+            # Mirrors Starlette's StreamingResponse.__call__: cancel the
+            # scope the streaming task runs in, exactly like a real client
+            # disconnect does.
+            tg.cancel_scope.cancel()
+
+        # The task group above only waits for the (now-cancelled) streaming
+        # task, not for a shielded background task -- give the DB round trip
+        # time to finish on its own (it only needs to outlast the 0.3s sleep).
+        await asyncio.sleep(0.6)
+        assert finished.is_set(), (
+            "the disconnect aborted the DB read before it finished; "
+            "generate() must shield repo.events_after(...)"
+        )
+
+        # Acceptance contract: a concurrent write against the same run keeps
+        # succeeding across the disconnect.
+        second = await asyncio.wait_for(
+            repo.append_event(run.run_id, "run.progress", {"status": "RUNNING"}),
+            timeout=2.0,
+        )
+        assert second.event_type == "run.progress"
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        facade.drop_session(sid)
+
+
 def test_public_event_projects_spec_id_for_spec_run_progress():
     """M2/C9: spec_run progress spec_id rides the SSE projection (stable ids only)."""
     from routers.run_execution import _public_event

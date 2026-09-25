@@ -4,6 +4,8 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| REFRESH-LOCK-AND-P3-1 | `runtime/tasks/20260925-refresh-lock-and-p3.md` | awaiting-merge | `fix/refresh-lock-and-p3` from `main@66d49f0b`（本地，不 push） | 2026-09-26 | 评审 ACCEPT；待用户决定合并；2 个 P3 残留 |
+| RETRO-REVIEW-9E830281 | `runtime/tasks/20260925-retro-review-9e830281.md` | complete | `e1c06a88..9e830281`（只读 worktree） | 2026-09-25 | REJECT：既存 P1（SSE 断开致 SQLite 锁死），S1–S5 已闭合；待定修复任务 |
 | METHOD-ADAPTER-1 | `runtime/tasks/20260924-method-adapter.md` | paused | `main@a0e61089` | 2026-09-24 | 第 1 步完成（统一读结果与读字段）；恢复时先写 OLS/IV 适配器接口一页说明给用户确认 |
 | REPLICATION-SCRIPT-1 | `runtime/tasks/20260924-replication-script.md` | complete | `main@84f6f946` + 本任务提交 | 2026-09-24 | 两轮通过（设定运行 + 主估计）；修复 RD/SCM/CS 无系数；待办：Agent 路径核实、DiD TWFE 聚类未传入 |
 | FORMAL-CONFIRMATION-CHAIN-3 | `runtime/tasks/20260918-formal-confirmation-chain-3.md` | complete | `feat/progressive-research-flow@2d83c2c9c716` + inherited changes | 2026-09-18 | ACCEPT；S1–S5、响应丢失与 run 重领已闭合，全量/真实桌面/320×568 均通过；下一步 INTENT-TO-DESIGN-1 |

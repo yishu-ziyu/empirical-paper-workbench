@@ -886,6 +886,55 @@ def test_confirm_replay_returns_the_same_result_without_second_record(client, tm
         facade.drop_session(sid)
 
 
+def test_confirm_key_reused_for_estimate_is_idempotency_conflict(client, tmp_path):
+    """record_confirms 用的 key 被 continue_estimate 复用：语义不同必须 409。"""
+    sid = _seed("idem-cross-a", _formal_state(tmp_path))
+    try:
+        first = _post(
+            client, sid, {"action": "record_confirms", "table1Confirmed": True}, "shared-key"
+        )
+        assert first.status_code == 200, first.text
+        second = _post(
+            client, sid, {"action": "record_confirms", "specConfirmed": True}, "k2"
+        )
+        assert second.status_code == 200, second.text
+
+        conflict = _post(client, sid, {"action": "continue_estimate"}, "shared-key")
+        assert conflict.status_code == 409, conflict.text
+        assert conflict.json()["detail"]["code"] == "idempotency_conflict"
+        assert _active_run(sid) is None
+    finally:
+        facade.drop_session(sid)
+
+
+def test_estimate_key_reused_for_confirm_is_idempotency_conflict(client, tmp_path):
+    """continue_estimate 用的 key 被 record_confirms 复用：语义不同必须 409。"""
+    sid = _seed("idem-cross-b", _formal_state(tmp_path))
+    try:
+        assert (
+            _post(
+                client, sid, {"action": "record_confirms", "table1Confirmed": True}, "k1"
+            ).status_code
+            == 200
+        )
+        assert (
+            _post(
+                client, sid, {"action": "record_confirms", "specConfirmed": True}, "k2"
+            ).status_code
+            == 200
+        )
+        estimate = _post(client, sid, {"action": "continue_estimate"}, "shared-key-2")
+        assert estimate.status_code == 202, estimate.text
+
+        conflict = _post(
+            client, sid, {"action": "record_confirms", "table1Confirmed": True}, "shared-key-2"
+        )
+        assert conflict.status_code == 409, conflict.text
+        assert conflict.json()["detail"]["code"] == "idempotency_conflict"
+    finally:
+        facade.drop_session(sid)
+
+
 async def _runs_for_session(session_id: str):
     repo = RunRepository()
     async with repo._factory() as db:  # noqa: SLF001 - test-only introspection

@@ -637,6 +637,7 @@ class AgentFacade:
         state = self._store.mutate_state(
             session_id, lambda current: apply_confirmation_command(current, incoming, idempotency_key),
             idle=True,
+            idempotency_key=idempotency_key,
         )
 
         return {

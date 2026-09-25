@@ -336,6 +336,7 @@ export default function WorkbenchArtifact({
               confirmBusy={ws.confirmBusy}
               confirmError={ws.confirmError}
               estimateStarting={ws.estimateStarting}
+              hasActiveRun={ws.directionBusy}
               awaitingEstimate={ws.prewriteGate === 'awaiting_estimate'}
               estimateComplete={ws.prewriteGate === 'estimate_complete'}
               continuePermission={ws.continuePermission}

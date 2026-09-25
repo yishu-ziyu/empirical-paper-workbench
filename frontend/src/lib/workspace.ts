@@ -186,7 +186,14 @@ function clearPendingUpload(idempotencyKey?: string) {
 
 async function uploadResponse(response: Response): Promise<UploadAcceptance> {
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new RunRequestError(response.status)
+  if (!response.ok) {
+    // A 409 session_busy here means the session has another run going, not
+    // that this upload is invalid -- handleUploadRunError must be able to
+    // tell the two apart instead of always reporting "processing failed".
+    const conflict = parseAdmissionConflict(response.status, payload)
+    if (conflict) throw conflict
+    throw new RunRequestError(response.status)
+  }
   return payload as UploadAcceptance
 }
 
@@ -717,6 +724,9 @@ export function useWorkspace(opts: WorkspaceOptions) {
   const uploadOperationRef = useRef<string | null>(readPendingUploadIntent()?.idempotencyKey ?? null)
   const [directionOpen, setDirectionOpen] = useState(true)
   const [directionSummary, setDirectionSummary] = useState<string | null>(null)
+  // 换数据后 supersede_dataset 会清掉 main_specification（P3）：这是唯一
+  // 能分辨"方向仍对着当前数据"和"数据已换、方向要重新核查"的后端事实。
+  const [mainSpecification, setMainSpecification] = useState<unknown>(null)
   const [claim, setClaim] = useState<string | null>(null)
   const [starRating, setStarRating] = useState<number | null>(null)
   const [treatmentRow, setTreatmentRow] = useState<string | null>(null)
@@ -882,6 +892,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     setAttachConfirming(false)
     setAttachConfirmError(null)
     setPrewriteGate(null)
+    setMainSpecification(null)
     setTable1(null)
     setSpecificationEquation(null)
     setTable1Confirmed(false)
@@ -1025,6 +1036,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       }
       if (data.body_chapters.some((ch) => ch.content)) setOutlineLocked(true)
     }
+    setMainSpecification(data.main_specification ?? null)
     const researchDirection = (data.research_direction ?? null) as Record<string, any> | null
     const summary = directionLine(researchDirection)
     if (summary) {
@@ -1135,6 +1147,14 @@ export function useWorkspace(opts: WorkspaceOptions) {
       }
       if (error instanceof RunRequestError && error.status === 404) {
         returnToUploadDesk(tRef.current('app.uploadMissing'))
+        return
+      }
+      if (error instanceof AdmissionConflictError && error.code === 'session_busy') {
+        // The session has another run going -- the file itself is fine, so
+        // this must read as busy, not as a processing failure that tells
+        // the user to reselect a file that was never the problem.
+        setUploadError(tRef.current('app.uploadBusy'))
+        setUploadStatus(tRef.current('app.uploadBusy'))
         return
       }
       if (error instanceof RunRequestError && error.status < 500) {
@@ -1888,6 +1908,12 @@ export function useWorkspace(opts: WorkspaceOptions) {
     clearRunProgress()
     let controller: AbortController | null = null
     let runAccepted = false
+    // Set only once this call itself put the run indicator up (inside
+    // trackRun below). A 409 that never reaches trackRun must not clear
+    // someone else's (e.g. the refresh-restore effect's) busy indicator in
+    // the finally block -- that run is still going even though this call
+    // failed.
+    let ownsDirectionBusy = false
     const trackRun = async (
       runId: string,
       eventsUrl: string,
@@ -1896,6 +1922,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
       controller = new AbortController()
       runAbortRef.current?.abort()
       runAbortRef.current = controller
+      ownsDirectionBusy = true
       setDirectionBusy(true)
       await waitForTrackedRun({
         sessionId: sid,
@@ -1980,7 +2007,10 @@ export function useWorkspace(opts: WorkspaceOptions) {
       commands.finish(ownership)
       if (still) {
         setEstimateStarting(false)
-        setDirectionBusy(false)
+        // Only this call's own run indicator, never one someone else (e.g.
+        // a resumed run from the refresh-restore effect) is holding: a 409
+        // here means a run is still going, not that it is safe to clear.
+        if (ownsDirectionBusy) setDirectionBusy(false)
       }
     }
   }, [
@@ -3028,6 +3058,7 @@ export function useWorkspace(opts: WorkspaceOptions) {
     directionDisabledReason,
     directionOpen,
     directionSummary,
+    mainSpecification,
     claim,
     starRating,
     treatmentRow,

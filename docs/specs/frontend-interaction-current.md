@@ -104,6 +104,21 @@
 4. 第一条结果是否足够克制，第二条结果是否在主动动作后再披露。
 5. 整体是否继承旧稿的纸张/编辑气质，而不是回到 SaaS 仪表盘。
 
+## 6a. 会话忙 / 换数据后的状态一致性（P3，2026-09-25）
+
+- **有 run 在跑时不能再发起估计**：无论这个 run 是本次操作发起的，还是刷新
+  后从后端接回的，“开始估计”按钮都保持禁用（`PrewriteConfirmCard` 的
+  `hasActiveRun`）。就算按钮被绕过点到（竞态窗口），后端 409 `session_busy`
+  也不能清掉别人持有的运行指示：`workspace.ts` 的 `continueEstimate` 只清自
+  己发起的 busy 状态，不动别人的。
+- **会话忙时上传要显示为忙**：`POST /upload` 或 `/attach` 返回 409
+  `session_busy` 时，界面提示“会话正在运行其他任务，请稍后再试”，不是“数据
+  处理失败，请重新选择文件”——文件本身没有问题。
+- **换数据后要提示重新核查方向**：后端 `supersede_dataset` 清空
+  `main_specification` 但保留 `research_direction` 的摘要；右栏据此判断“方
+  向摘要还在，但设定已经不属于当前数据”，显示“数据已更换，需要重新核查研
+  究方向”，不说“当前没有需要你确认的事”。
+
 ## 7. Agent ↔ Agent 交接协议
 
 任何 Agent 做完工作后，必须留下下面的事实。PR 场景以 `.github/pull_request_template.md`

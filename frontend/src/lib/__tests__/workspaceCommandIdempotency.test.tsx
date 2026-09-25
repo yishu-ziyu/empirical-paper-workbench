@@ -342,3 +342,29 @@ describe('a lost acknowledgement is resolved by reading the server back', () => 
     expect(result.current.designError).toBe('design.revisionMismatch')
   })
 })
+
+describe('P3: a busy session shows as busy, not as a failed upload', () => {
+  it('reports session_busy on attach as busy instead of "reselect the file"', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (init?.method === 'POST' && href.endsWith('/sessions/A/attach')) {
+        return Promise.resolve(
+          json({ detail: { code: 'session_busy', run_id: 'other-run' } }, 409),
+        )
+      }
+      if (href.endsWith('/sessions/A')) return Promise.resolve(json(awaitingSnapshot()))
+      return Promise.resolve(json({}))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await mountAwaiting()
+
+    const file = new File(['income,age\n100,30'], 'wages.csv', { type: 'text/csv' })
+    await act(async () => {
+      await result.current.takeCsv(file)
+    })
+
+    // mountAwaiting's t() is the identity function: these are i18n keys.
+    expect(result.current.uploadError).toBe('app.uploadBusy')
+    expect(result.current.uploadNeedsReselect).toBe(false)
+  })
+})

@@ -285,6 +285,53 @@ describe('R4 confirmation ownership — design', () => {
   })
 })
 
+describe('P3: a 409 while starting the estimate must not clear a run someone else holds', () => {
+  it('keeps directionBusy set when continueEstimate 409s while a refresh-restored run is still tracked', async () => {
+    const restoredRunId = 'restored-run'
+    const awaitingSnapshot = snapshotOf('A', {
+      dataAttached: true,
+      active_run: { run_id: restoredRunId, kind: 'prewrite', status: 'RUNNING' },
+      prewrite_gate: 'awaiting_estimate',
+      table1: { produced_by: 'prewrite_preview', columns: ['variable'], rows: [{ variable: 'age' }], n: 5 },
+      specification_equation: 'income = β₀ + β₁ age + ε',
+      table1Confirmed: true,
+      specConfirmed: true,
+      permissions: { continue_to_estimate: 'allow' },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        const href = String(url)
+        if (init?.method === 'POST' && href.endsWith('/sessions/A/prewrite/confirm')) {
+          return Promise.resolve(
+            json({ detail: { code: 'session_busy', run_id: restoredRunId } }, 409),
+          )
+        }
+        if (href.endsWith(`/runs/${restoredRunId}`)) {
+          // Never reaches a terminal state: the restore-tracked run is still
+          // going for the whole test, exactly like a real in-flight estimate.
+          return new Promise(() => {})
+        }
+        if (href.endsWith('/sessions/A')) return Promise.resolve(json(awaitingSnapshot))
+        return Promise.resolve(json({}))
+      }),
+    )
+
+    const { result } = await mountWorkspace()
+    await waitFor(() => expect(result.current.directionBusy).toBe(true))
+
+    await act(async () => {
+      await result.current.continueEstimate()
+    })
+
+    // The restore's run indicator must survive this call's own 409: the
+    // restored run is still going even though this call was refused.
+    expect(result.current.directionBusy).toBe(true)
+    // mountWorkspace's t() is the identity function: this is the i18n key.
+    expect(result.current.confirmError).toBe('prewrite.refusedBusy')
+  })
+})
+
 describe('R4 confirmation ownership — attach', () => {
   it('drops a late confirm-attach instead of entering the next session', async () => {
     const confirm = deferred<Response>()

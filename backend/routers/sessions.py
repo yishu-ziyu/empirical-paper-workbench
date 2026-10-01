@@ -79,10 +79,8 @@ def _read_tabular_upload(source: BinaryIO, filename: str) -> pd.DataFrame:
     source.seek(0)
     if header[:2] == b"PK":
         return pd.read_excel(source, sheet_name=0)
-    if header == b"<stata_dta>":
-        return pd.read_stata(source)
-    if filename.lower().endswith(".dta"):
-        return pd.read_stata(source)
+    if header == b"<stata_dta>" or filename.lower().endswith(".dta"):
+        return _read_stata_codes(source)
     last_exc: Exception | None = None
     for enc in ("utf-8-sig", "gb18030"):
         try:
@@ -91,6 +89,53 @@ def _read_tabular_upload(source: BinaryIO, filename: str) -> pd.DataFrame:
         except UnicodeDecodeError as exc:
             last_exc = exc
     raise ValueError(f"unrecognized or corrupted data file: {last_exc}") from last_exc
+
+
+# Per-column cap for value labels kept in dataset metadata. Survey files
+# (CGSS / CFPS) label hundreds of columns; the codebook is for reading, the
+# numeric codes stay the analysis truth.
+_MAX_VALUE_LABELS_PER_COLUMN = 40
+
+
+def _read_stata_codes(source: BinaryIO) -> pd.DataFrame:
+    """Read a Stata file as Stata itself stores it: numeric codes + labels aside.
+
+    ``pd.read_stata`` defaults to turning every value-labelled column into a
+    categorical of label strings. For Chinese survey data that (a) raises on
+    duplicated labels (CGSS 2023: two occupation codes share one label) and
+    (b) turns numeric columns with labelled missing codes (CFPS ``-8 不适用``)
+    into a mix of text and numbers that regressions cannot use. Keep the
+    numeric codes, and carry the variable / value labels in ``df.attrs`` so
+    dataset metadata can show the codebook.
+    """
+    source.seek(0)
+    with pd.io.stata.StataReader(source, convert_categoricals=False) as reader:
+        df = reader.read(convert_categoricals=False)
+        variable_labels = {
+            str(col): str(label)
+            for col, label in (reader.variable_labels() or {}).items()
+            if label
+        }
+        label_sets = reader.value_labels() or {}
+        # Column → label-set name. pandas keeps this list private; degrade to
+        # "no value labels" rather than fail the upload if it moves.
+        set_names = list(getattr(reader, "_lbllist", []) or [])
+    value_labels: dict[str, dict[str, str]] = {}
+    for col, set_name in zip(df.columns, set_names):
+        mapping = label_sets.get(set_name) if set_name else None
+        if not mapping:
+            continue
+        items = list(mapping.items())[:_MAX_VALUE_LABELS_PER_COLUMN]
+        value_labels[str(col)] = {_code_text(code): str(text) for code, text in items}
+    df.attrs["variable_labels"] = variable_labels
+    df.attrs["value_labels"] = value_labels
+    return df
+
+
+def _code_text(code: object) -> str:
+    if isinstance(code, float) and code.is_integer():
+        return str(int(code))
+    return str(code)
 
 
 def _reject_if_content_length_too_large(request: Request, max_bytes: int) -> None:
@@ -156,6 +201,8 @@ def _dataset_meta(
         rows=int(len(df)),
         dtypes={str(column): str(dtype) for column, dtype in df.dtypes.items()},
         missing_count=int(df.isna().sum().sum()),
+        variable_labels=dict(df.attrs.get("variable_labels") or {}),
+        value_labels=dict(df.attrs.get("value_labels") or {}),
         demo_success=bool(honesty["demo_success"]),
         honesty_warning=honesty.get("honesty_warning"),
         source=source,
@@ -187,6 +234,8 @@ def _upload_response(admission) -> UploadResponse:
             rows=metadata.get("rows"),
             dtypes=dict(metadata.get("dtypes") or {}),
             missing_count=metadata.get("missing_count"),
+            variable_labels=dict(metadata.get("variable_labels") or {}),
+            value_labels=dict(metadata.get("value_labels") or {}),
             demo_success=bool(metadata.get("demo_success")),
             honesty_warning=(
                 str(metadata["honesty_warning"])
@@ -495,7 +544,15 @@ async def _snapshot_dataset(session_id: str) -> Optional[SnapshotDatasetResponse
         csv_path = entry.get("csv_path")
         if csv_path and Path(csv_path).name != f"{session_id}.csv":
             name = Path(csv_path).name
-    return SnapshotDatasetResponse(name=name, rows=rows, columns=columns)
+    variable_labels = meta.get("variable_labels")
+    value_labels = meta.get("value_labels")
+    return SnapshotDatasetResponse(
+        name=name,
+        rows=rows,
+        columns=columns,
+        variable_labels=variable_labels if isinstance(variable_labels, dict) else {},
+        value_labels=value_labels if isinstance(value_labels, dict) else {},
+    )
 
 
 async def _snapshot_active_run(

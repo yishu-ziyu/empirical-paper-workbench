@@ -110,6 +110,75 @@ def test_upload_accepts_stata_dta(client):
     assert meta["rows"] == 3
 
 
+def _survey_style_dta() -> BytesIO:
+    """CGSS/CFPS-shaped .dta: labelled codes, labelled missing codes, a
+    label set where two codes share one text (pandas refuses that by default)."""
+    df = pd.DataFrame(
+        {
+            "income": [35000, -8, 52000, -1],
+            "occ": [1, 2, 1, 2],
+            "edu": [3, 6, -8, 9],
+        }
+    )
+    buf = BytesIO()
+    df.to_stata(
+        buf,
+        write_index=False,
+        version=118,
+        variable_labels={"income": "个人去年全年总收入", "edu": "最高教育程度"},
+        value_labels={
+            "income": {-8: "不适用", -1: "拒绝回答"},
+            "occ": {1: "安全保卫工作人员", 2: "安全保卫工作人员"},
+            "edu": {-8: "不适用", 3: "初中", 6: "高中", 9: "大学本科"},
+        },
+    )
+    buf.seek(0)
+    return buf
+
+
+def test_upload_dta_keeps_numeric_codes_and_codebook(client):
+    """Survey .dta with duplicated value labels uploads; codes stay numeric.
+
+    Regression for CGSS 2023 ("Unsupported or corrupted data file") and CFPS
+    (labelled numeric columns turned into label strings).
+    """
+    resp = client.post(
+        "/upload",
+        files={"file": ("survey.dta", _survey_style_dta(), "application/octet-stream")},
+        headers=_upload_headers(),
+    )
+    assert resp.status_code == 202, resp.text
+    meta = resp.json()["dataset_meta"]
+    assert meta["columns"] == ["income", "occ", "edu"]
+    for column in ("income", "occ", "edu"):
+        assert not meta["dtypes"][column].startswith(("object", "category")), meta["dtypes"]
+    assert meta["variable_labels"]["income"] == "个人去年全年总收入"
+    assert meta["value_labels"]["edu"]["9"] == "大学本科"
+    assert meta["value_labels"]["income"]["-8"] == "不适用"
+
+    session_id = resp.json()["session_id"]
+    entry = facade.get_session_entry(session_id)
+    stored = pd.read_csv(entry["csv_path"])
+    assert stored["income"].tolist() == [35000, -8, 52000, -1]
+    assert stored["edu"].tolist() == [3, 6, -8, 9]
+
+    snapshot = client.get(f"/sessions/{session_id}").json()["dataset"]
+    assert snapshot["variable_labels"]["edu"] == "最高教育程度"
+    assert snapshot["value_labels"]["occ"] == {"1": "安全保卫工作人员", "2": "安全保卫工作人员"}
+
+
+def test_upload_csv_has_empty_codebook(client, sample_csv_path):
+    with open(sample_csv_path, "rb") as f:
+        resp = client.post(
+            "/upload",
+            files={"file": ("sample.csv", f, "text/csv")},
+            headers=_upload_headers(),
+        )
+    assert resp.status_code == 202, resp.text
+    meta = resp.json()["dataset_meta"]
+    assert meta["variable_labels"] == {} and meta["value_labels"] == {}
+
+
 def test_upload_accepts_dta_without_extension_hint(client):
     """Stata 117+ has a text header, so .dta content is detected even misnamed .csv."""
     df = pd.DataFrame({"x": [1.0, 2.0]})

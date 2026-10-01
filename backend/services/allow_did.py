@@ -6,6 +6,12 @@ Permission is a derived projection of confirmed ``session.design``:
 2. ``method`` normalizes to ``did``
 3. the confirmed design names the treated×period main term
 
+Naming the main term means the literal treat/treated/nj × post/period/after
+interaction (or a constructed dummy such as ``treat_post`` / ``nj_after`` /
+``did``), or the structured form: ``design.treated`` / ``design.period``
+slots echoed by a ``kind="did"`` interaction item with matching left/right
+(real user columns like ``urban_hukou:post1999``).
+
 Catalog identity (``ck1994``, ``ck1994_long``, ``minimum-wage-employment``,
 …), TITLE/TOPIC text, form ``method=did``, and a stamped ``allow_did`` flag
 are not setters. Missing / null / absent is false. Fail closed.
@@ -79,6 +85,36 @@ def confirmed_did_method(state: Mapping[str, Any] | None) -> bool:
     return norm_method(design.get("method")) == "did"
 
 
+def structured_treated_period(design: Mapping[str, Any] | None) -> tuple[str, str]:
+    """``(treated, period)`` named by a ``kind="did"`` interaction item.
+
+    The slots must be non-empty, differ, and be echoed by an interaction
+    item with ``kind == "did"``, ``left == treated``, ``right == period``.
+    Real-column designs (``treated="urban_hukou"``, ``period="post1999"``)
+    pass here; slots alone, or a ``kind="het"`` item, do not. ``("", "")``
+    when the structured form is absent.
+    """
+    if not isinstance(design, dict):
+        return "", ""
+    treated = str(design.get("treated") or "").strip()
+    period = str(design.get("period") or "").strip()
+    if not treated or not period or treated == period:
+        return "", ""
+    raw = design.get("interactions")
+    if not isinstance(raw, list):
+        return "", ""
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("kind") or "").strip().lower() != "did":
+            continue
+        left = str(item.get("left") or "").strip()
+        right = str(item.get("right") or "").strip()
+        if left == treated and right == period:
+            return treated, period
+    return "", ""
+
+
 def has_treated_period_interaction(design: Mapping[str, Any] | None) -> bool:
     """True when the design names the 2×2 main term (§2.4).
 
@@ -87,6 +123,8 @@ def has_treated_period_interaction(design: Mapping[str, Any] | None) -> bool:
     """
     if not isinstance(design, dict):
         return False
+    if structured_treated_period(design) != ("", ""):
+        return True
     for blob in _interaction_blobs(design):
         if _INTERACTION_RE.search(blob):
             return True

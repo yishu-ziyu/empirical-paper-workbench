@@ -212,8 +212,16 @@ def map_design_to_data(
             )
         if not out.get("group"):
             out["group"] = treated
+    if method == "did":
+        # The 2x2 term already crosses treated and period; a het item on the
+        # same columns would duplicate it (treated:period:treated).
+        did_cols = {out.get("treated"), out.get("period")}
+        groups = [g for g in groups if g not in did_cols]
+        out["heterogeneity_groups"] = groups
     if treatment:
         for group in groups:
+            if group == treatment:
+                continue
             interactions.append(
                 {"kind": "het", "left": treatment, "right": group, "term": f"{treatment}:{group}"}
             )
@@ -266,8 +274,15 @@ def apply_design_overrides(
         if out.get("method") == "did" and out.get("treated") and out.get("period"):
             interactions.append({"kind": "did", "left": out["treated"], "right": out["period"],
                                  "term": f"{out['treated']}:{out['period']}"})
+        if out.get("method") == "did":
+            did_cols = {out.get("treated"), out.get("period")}
+            out["heterogeneity_groups"] = [
+                g for g in out.get("heterogeneity_groups") or [] if g not in did_cols
+            ]
         if out.get("treatment"):
             for group in out.get("heterogeneity_groups") or []:
+                if group == out["treatment"]:
+                    continue
                 interactions.append({"kind": "het", "left": out["treatment"], "right": group,
                                      "term": f"{out['treatment']}:{group}"})
         out["interactions"] = interactions

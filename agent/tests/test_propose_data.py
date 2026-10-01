@@ -144,3 +144,16 @@ def test_explicit_iv_method_is_kept():
     mapped = map_design_to_data(draft, ds, title="教育回报的工具变量估计", question="用父亲教育作工具变量做 IV", llm=wants_ols)
     assert mapped["method"] == "iv"
     assert mapped["instruments"] == ["a89b"]
+
+
+def test_did_overrides_do_not_duplicate_treated_as_het_group():
+    from agent.design.propose_data import apply_design_overrides
+
+    draft = {"method": "ols", "heterogeneity_groups": ["urban_hukou"], "interactions": []}
+    cols = ["college", "urban_hukou", "post1999", "male"]
+    out = apply_design_overrides(draft, {"method": "did", "outcome": "college", "treated": "urban_hukou",
+                                          "period": "post1999", "treatment": "post1999"}, cols)
+    kinds = [(i["kind"], i["term"]) for i in out["interactions"]]
+    assert kinds == [("did", "urban_hukou:post1999")]
+    assert out["heterogeneity_groups"] == []
+    assert out["qType"] == "causal"

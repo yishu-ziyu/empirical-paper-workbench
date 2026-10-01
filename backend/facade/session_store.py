@@ -217,6 +217,13 @@ class SessionStore:
             self._write_state(row, state)
             return self._project_state(row)
 
+    def update_metadata(self, session_id: str, **fields) -> dict:
+        """Merge dataset metadata (rows / columns / dtypes) on the session row."""
+        with self._factory.begin() as db:
+            row = self._locked_row(db, session_id)
+            row.metadata_json = {**dict(row.metadata_json or {}), **fields}
+            return dict(row.metadata_json)
+
     def save_entry(self, session_id: str, *, state: dict, csv_path: str) -> dict:
         """Atomically persist upload output and its dataset path."""
         with self._factory.begin() as db:

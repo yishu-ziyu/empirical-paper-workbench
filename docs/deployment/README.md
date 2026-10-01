@@ -180,7 +180,7 @@ backend → postgres:5432
 
 ### 按角色的 LLM 配置
 
-模型路由（`agent/llm/router.py`，ADR-0008）按角色读取 `<ROLE>_LLM_PROVIDER` / `_MODEL` / `_API_KEY` / `_BASE_URL`，角色为 `GENERATE`（写作、标题、大纲）、`REVIEW`（评审）、`DESK`（空桌讨论，未配时用 `GENERATE`）。未显式配置角色时，若有 `MINIMAX_API_KEY` / `MINIMAX_TOKEN_PLAN_KEY` 就用 MiniMax（`MINIMAX_MODEL`，默认 `MiniMax-M3`）。
+模型路由（`agent/llm/router.py`，ADR-0008）按角色读取 `<ROLE>_LLM_PROVIDER` / `_MODEL` / `_API_KEY` / `_BASE_URL`，角色为 `GENERATE`（写作、标题、大纲）、`REVIEW`（评审）、`DESK`（空桌讨论）。注意：未配 `DESK_LLM_PROVIDER` 时，只要环境里有 `MINIMAX_API_KEY` / `MINIMAX_TOKEN_PLAN_KEY`，DESK 就解析成 MiniMax + `MINIMAX_MODEL`（默认 `MiniMax-M3`），而不是沿用 `GENERATE`；只有没有 MiniMax 密钥时才回落到 `GENERATE`。未显式配置角色时，若有 `MINIMAX_API_KEY` / `MINIMAX_TOKEN_PLAN_KEY` 就用 MiniMax（`MINIMAX_MODEL`，默认 `MiniMax-M3`）。
 
 | 变量 | 例子 | 说明 |
 |------|------|------|

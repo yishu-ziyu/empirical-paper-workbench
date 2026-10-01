@@ -230,8 +230,16 @@ def _clean_winsor_recorded(state: Mapping[str, Any]) -> bool:
     for step in report.get("steps") or []:
         if not isinstance(step, dict):
             continue
-        if str(step.get("name") or "").strip() == "clean_winsor":
+        name = str(step.get("name") or "").strip()
+        if name == "clean_winsor":
             return True
+        # The upload pipeline runs winsorization inside its ``outliers`` step
+        # (``clean_winsor`` + ``winsor_audit_row``). A successful step whose
+        # report carries that audit is the record this gate asks for.
+        if name == "outliers" and step.get("status") == "success":
+            audit = step.get("report")
+            if isinstance(audit, dict) and "columns" in audit and "cuts" in audit:
+                return True
     return False
 
 

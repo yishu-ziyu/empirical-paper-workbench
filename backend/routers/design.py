@@ -7,7 +7,7 @@ writes chapters.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,15 +21,49 @@ from schemas.responses import SessionDesignConfirmResponse, SessionDesignRespons
 from services.formal_binding import supersede_design
 
 from agent.design.propose import propose_design
+from agent.norms.loader import assert_propose_gates
+from agent.design.propose_data import apply_design_overrides, map_design_to_data
 
 router = APIRouter()
 
 
+class DesignOverrides(BaseModel):
+    """User edits to the draft. Column names must exist in the attached data."""
+
+    method: Optional[str] = None
+    outcome: Optional[str] = None
+    treatment: Optional[str] = None
+    controls: Optional[List[str]] = None
+    heterogeneity_groups: Optional[List[str]] = None
+    instruments: Optional[List[str]] = None
+    group: Optional[str] = None
+    treated: Optional[str] = None
+    period: Optional[str] = None
+    time_col: Optional[str] = None
+    id_col: Optional[str] = None
+    qType: Optional[str] = None
+
+
 class ProposeDesignRequest(BaseModel):
-    """POST /sessions/{id}/design/propose 请求体。"""
+    """POST /sessions/{id}/design/propose 请求体。
+
+    With a dataset already on the session, the draft's variable slots are
+    mapped to real columns (generate model + schema validation). ``overrides``
+    is the user's own edit of the draft and wins over the proposal.
+    """
 
     title: str
     question: str = ""
+    overrides: Optional[DesignOverrides] = None
+
+
+def _session_dataset(session_id: str) -> dict:
+    try:
+        entry = facade.get_session_entry(session_id) or {}
+    except Exception:
+        return {}
+    keys = ("name", "rows", "columns", "dtypes", "variable_labels", "value_labels")
+    return {key: entry.get(key) for key in keys if entry.get(key) is not None}
 
 
 class ConfirmDesignRequest(BaseModel):
@@ -66,6 +100,32 @@ async def propose_design_endpoint(
         draft = propose_design(title, question)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    dataset = await run_in_threadpool(_session_dataset, session_id)
+    if dataset.get("columns"):
+        draft = await run_in_threadpool(
+            lambda: map_design_to_data(draft, dataset, title=title, question=question)
+        )
+    if payload.overrides is not None:
+        try:
+            draft = apply_design_overrides(
+                draft,
+                payload.overrides.model_dump(exclude_none=True),
+                dataset.get("columns") or [],
+            )
+        except ValueError as exc:
+            code, _, column = str(exc).partition(":")
+            raise HTTPException(
+                status_code=400,
+                detail={"code": code, "column": column} if column else {"code": code},
+            ) from exc
+    if dataset.get("columns") or payload.overrides is not None:
+        try:
+            assert_propose_gates(draft)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": str(exc), "proposal": draft.get("proposal") or {}},
+            ) from exc
     draft["revision"] = str(uuid4())
     await run_in_threadpool(
         facade.mutate_state, session_id,

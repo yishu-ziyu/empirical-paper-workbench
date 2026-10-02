@@ -6,6 +6,8 @@ the result objects the product actually produces.
 """
 from __future__ import annotations
 
+import importlib
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -14,10 +16,17 @@ import pytest
 
 from agent.engine.results import Effect, read_effect
 
-statspai = pytest.importorskip("statspai")
-
 REPO = Path(__file__).resolve().parents[2]
 CK = REPO / "fixtures/classic-5/ck1994_long.csv"
+
+
+@pytest.fixture
+def statspai():
+    # Optional estimator dependency must not skip the dependency-free reader test.
+    if importlib.util.find_spec("statspai") is None:
+        pytest.skip("Optional StatsPAI estimator dependency is not installed")
+    # A present but broken install must fail, including missing transitive imports.
+    return importlib.import_module("statspai")
 
 
 # ---- legacy readers (verbatim reference, do not "fix") ---------------------
@@ -102,37 +111,52 @@ def _panel():
     return pd.DataFrame(rows)
 
 
-def _card():
+def _card(statspai):
     # same location rule as backend/services/card_demo.py
     path = Path(statspai.__file__).resolve().parents[2] / "papers" / "data_card1995.csv"
     if not path.is_file():
-        pytest.skip("Card data not available")
+        pytest.skip("IV reader case requires external papers/data_card1995.csv (not bundled with PyPI StatsPAI)")
     return pd.read_csv(path)
 
 
-def regression_fits():
+@pytest.fixture
+def regression_fit(request, statspai):
+    name = request.param
+    if name == "ivreg":
+        return name, statspai.ivreg("lwage ~ (educ ~ nearc4) + exper + expersq", data=_card(statspai)), "educ"
+
     ck = pd.read_csv(CK)
     import statsmodels.formula.api as smf
 
-    yield "feols", statspai.feols("fte ~ treated + period", data=ck), "treated"
-    yield "feols_interaction", statspai.feols("fte ~ treated * period", data=ck), "treated:period"
-    yield "statsmodels_ols", smf.ols("fte ~ treated + period", data=ck).fit(), "treated"
-    yield "statsmodels_cluster", smf.ols("fte ~ treated", data=ck).fit(cov_type="cluster", cov_kwds={"groups": ck["store_id"]}), "treated"
-    card = _card()
-    yield "ivreg", statspai.ivreg("lwage ~ (educ ~ nearc4) + exper + expersq", data=card), "educ"
+    if name == "feols":
+        return name, statspai.feols("fte ~ treated + period", data=ck), "treated"
+    if name == "feols_interaction":
+        return name, statspai.feols("fte ~ treated * period", data=ck), "treated:period"
+    if name == "statsmodels_ols":
+        return name, smf.ols("fte ~ treated + period", data=ck).fit(), "treated"
+    if name == "statsmodels_cluster":
+        return name, smf.ols("fte ~ treated", data=ck).fit(cov_type="cluster", cov_kwds={"groups": ck["store_id"]}), "treated"
+    raise ValueError(f"Unknown regression reader case: {name}")
 
 
-def causal_fits():
-    rd = _rd_df()
+@pytest.fixture
+def causal_fit(request, statspai):
+    name = request.param
+    if name == "rdrobust":
+        return name, statspai.rdrobust(_rd_df(), y="y", x="x", c=0.0)
+    if name == "mccrary":
+        return name, statspai.mccrary_test(_rd_df(), x="x", c=0.0)
     panel = _panel()
-    yield "rdrobust", statspai.rdrobust(rd, y="y", x="x", c=0.0)
-    yield "mccrary", statspai.mccrary_test(rd, x="x", c=0.0)
-    yield "synth", statspai.synth(panel.assign(unit=panel["name"]), outcome="y", unit="unit", time="year", treated_unit="u0", treatment_time=2012)
-    yield "callaway_santanna", statspai.callaway_santanna(panel, y="y", g="first_treat", t="year", i="unit")
+    if name == "synth":
+        return name, statspai.synth(panel.assign(unit=panel["name"]), outcome="y", unit="unit", time="year", treated_unit="u0", treatment_time=2012)
+    if name == "callaway_santanna":
+        return name, statspai.callaway_santanna(panel, y="y", g="first_treat", t="year", i="unit")
+    raise ValueError(f"Unknown causal reader case: {name}")
 
 
-@pytest.mark.parametrize("name,fit,var", list(regression_fits()), ids=lambda x: x if isinstance(x, str) else "")
-def test_regression_results_match_every_legacy_reader(name, fit, var):
+@pytest.mark.parametrize("regression_fit", ["feols", "feols_interaction", "statsmodels_ols", "statsmodels_cluster", "ivreg"], indirect=True)
+def test_regression_results_match_every_legacy_reader(regression_fit):
+    name, fit, var = regression_fit
     new = read_effect(fit, var)
     assert isinstance(new, Effect)
     old = legacy_effect_from_fit(fit, var)
@@ -146,8 +170,9 @@ def test_regression_results_match_every_legacy_reader(name, fit, var):
     assert new.coef is not None and new.se is not None, name
 
 
-@pytest.mark.parametrize("name,fit", list(causal_fits()), ids=lambda x: x if isinstance(x, str) else "")
-def test_causal_results_match_every_legacy_reader(name, fit):
+@pytest.mark.parametrize("causal_fit", ["rdrobust", "mccrary", "synth", "callaway_santanna"], indirect=True)
+def test_causal_results_match_every_legacy_reader(causal_fit):
+    name, fit = causal_fit
     new = read_effect(fit)
     old = legacy_effect_from_fit(fit)
     for got, ref in zip(new, old):

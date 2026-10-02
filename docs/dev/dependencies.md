@@ -20,6 +20,25 @@ python -m pip install -e ../dependencies/StatsPAI
 The repository-local symbolic links are part of the upstream tree; no external
 workspace path is embedded in them.
 
+### Result-reader tests without the external Card file
+
+The editable StatsPAI checkout can include `papers/data_card1995.csv` beside
+its Python package; the PyPI distribution does not bundle that external file.
+`agent/tests/test_results_reader.py` collects named cases without fitting models.
+Fixtures fit each model only when its test runs. A missing external CSV skips
+only the IV reader case; CK regressions, causal cases and the empty-result case
+still execute. If StatsPAI itself is absent, estimator cases skip individually
+while the dependency-free empty-result test still executes. A broken installed
+package, malformed CSV or fitting error fails instead of becoming a skip.
+
+```bash
+python -m pytest --collect-only -q agent/tests/test_results_reader.py
+python -m pytest -q -rs agent/tests/test_results_reader.py
+```
+
+The file-location rule here is a test fixture convention; it does not change
+production Card loading or replace an absent dataset with synthetic data.
+
 ## Rejected runtime-dependency claims
 
 - AERS revision `1c83d671dec19006aa7ce7605cb5a8980fc7b138` is not loaded by

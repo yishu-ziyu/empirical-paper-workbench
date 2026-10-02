@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| CI-READER-CARD-62 | `runtime/tasks/20261003-ci-reader-card-isolation.md` | active | fix/ci-results-reader-card-isolation from main@db5f5b62 | 2026-10-03 | 实现6627554独立ACCEPT；记录复审后发布PR并跑完整CI |
 | P3-LEFTOVERS-1 | `runtime/tasks/20260926-p3-leftovers.md` | blocked | main（未开分支） | 2026-09-26 | 等用户说开始：key 先记录确认再上传 + SQLite WAL/busy_timeout |
 | REFRESH-LOCK-AND-P3-1 | `runtime/tasks/20260925-refresh-lock-and-p3.md` | complete | `fix/refresh-lock-and-p3` from `main@66d49f0b`（本地，不 push） | 2026-09-26 | 已本地合并 main@d325426e，未 push；2 个 P3 残留待立项 |
 | RETRO-REVIEW-9E830281 | `runtime/tasks/20260925-retro-review-9e830281.md` | complete | `e1c06a88..9e830281`（只读 worktree） | 2026-09-25 | REJECT：既存 P1（SSE 断开致 SQLite 锁死），S1–S5 已闭合；待定修复任务 |

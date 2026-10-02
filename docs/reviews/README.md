@@ -4,6 +4,7 @@
 
 | 文档 | 结论 |
 |---|---|
+| [20261003-ci-card-reader-independent-review.md](20261003-ci-card-reader-independent-review.md) | Issue #62 缺 Card 隔离独立评审：ACCEPT（候选 6627554） |
 | [20260917-progressive-flow-review-brief.md](20260917-progressive-flow-review-brief.md) | 给外部评审的“渐进研究流”问题清单 |
 | [20260917-formal-confirmation-chain-independent-review.md](20260917-formal-confirmation-chain-independent-review.md) | 正式确认链第 1 轮：REJECT |
 | [20260917-formal-confirmation-chain-2-independent-review.md](20260917-formal-confirmation-chain-2-independent-review.md) | 正式确认链第 2 轮：REJECT（S1–S5） |

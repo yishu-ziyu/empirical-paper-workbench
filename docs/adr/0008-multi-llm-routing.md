@@ -277,3 +277,7 @@ def call_review_llm(chapter_content, rubric_template, research_direction, litera
 - **Stage 2**（本 ADR）：`call_review_llm` 接真实 LLM SDK，加 provider 白名单与 API key 校验。
 - **Stage 3**（本 ADR）：`generate_chapter` / `generate_title` / `generate_outline` 接入路由器，实现生成与评审用不同模型。
 - **ADR 0010**（待评估）：LLM 调用成本监控与配额管理 —— 多 LLM 启用后按 provider 分别计费、限流。
+
+## Addendum 2026-10-02：强制思考的模型
+
+`MiniMax-M3.1-Flash-Preview` 不接受 `thinking.type=disabled`（HTTP 400，错误码 2013），之前所有 GENERATE 调用都失败。`call_llm` 现在遇到这类 400 会记住模型名，改发 `reasoning_effort: "low"` 重试一次，其他 400 不重试。配置表见 [部署文档](../deployment/README.md#按角色的-llm-配置)。

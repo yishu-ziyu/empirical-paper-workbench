@@ -152,14 +152,14 @@ backend → postgres:5432
 | `CHECKPOINT_DB_URL` | `postgresql://econpaper:econpaper_pass@postgres:5432/econpaper` | LangGraph checkpoint 连接 |
 | `DATABASE_URL` | `postgresql+asyncpg://econpaper:econpaper_pass@postgres:5432/econpaper` | 用户认证数据库连接 |
 | `JWT_SECRET_KEY` | 需自行设置 | JWT 签名密钥（生产环境必须修改） |
-| `LLM_API_KEY` | 需自行设置 | LLM API 密钥 |
+| `GENERATE_LLM_*` / `REVIEW_LLM_*` | 需自行设置 | 按角色的模型配置，见下方“按角色的 LLM 配置” |
 | `POSTGRES_PASSWORD` | `econpaper_pass` | PostgreSQL 密码（生产环境必须修改） |
 
 #### 生产环境注意事项
 
 1. **修改默认密码**：编辑 `.env` 中的 `JWT_SECRET_KEY` 和 `POSTGRES_PASSWORD`
 2. **配置 CORS**：`CORS_ORIGINS=https://你的域名.com`
-3. **设置 LLM**：填入 `LLM_API_KEY`
+3. **设置 LLM**：按下方“按角色的 LLM 配置”填 `GENERATE_LLM_*` 与 `REVIEW_LLM_*`（`LLM_API_KEY` 不被模型路由读取）
 4. **HTTPS**：建议在 Nginx 前加反向代理（如 Caddy / Traefik）自动管理 TLS
 5. **备份**：`pgdata` 卷包含数据库，定期备份：
    ```bash
@@ -175,10 +175,22 @@ backend → postgres:5432
 | `UPLOAD_DIR` | `./uploads` | 上传文件存储目录 |
 | `MAX_UPLOAD_SIZE_MB` | `50` | 上传文件大小限制（MB） |
 | `CHECKPOINT_DB_URL` | `postgresql://mahaoxuan@localhost:5432/econpaper` | PostgreSQL 连接字符串 |
-| `LLM_PROVIDER` | `openai` | LLM 提供商 |
-| `LLM_API_KEY` | `""` | LLM API 密钥 |
-| `LLM_MODEL` | `gpt-4o-mini` | LLM 模型名称 |
+| `LLM_PROVIDER` / `LLM_API_KEY` / `LLM_MODEL` | `openai` / `""` / `gpt-4o-mini` | 旧变量，只留在 `Settings` 里；**模型路由不读取**，请用下方角色变量 |
 | `HTTPX_TIMEOUT_SECONDS` | `30.0` | HTTP 客户端超时时间（秒） |
+
+### 按角色的 LLM 配置
+
+模型路由（`agent/llm/router.py`，ADR-0008）按角色读取 `<ROLE>_LLM_PROVIDER` / `_MODEL` / `_API_KEY` / `_BASE_URL`，角色为 `GENERATE`（写作、标题、大纲）、`REVIEW`（评审）、`DESK`（空桌讨论）。注意：未配 `DESK_LLM_PROVIDER` 时，只要环境里有 `MINIMAX_API_KEY` / `MINIMAX_TOKEN_PLAN_KEY`，DESK 就解析成 MiniMax + `MINIMAX_MODEL`（默认 `MiniMax-M3`），而不是沿用 `GENERATE`；只有没有 MiniMax 密钥时才回落到 `GENERATE`。未显式配置角色时，若有 `MINIMAX_API_KEY` / `MINIMAX_TOKEN_PLAN_KEY` 就用 MiniMax（`MINIMAX_MODEL`，默认 `MiniMax-M3`）。
+
+| 变量 | 例子 | 说明 |
+|------|------|------|
+| `GENERATE_LLM_PROVIDER` | `minimax` | `minimax` 或 `openai`（任意 OpenAI 兼容端点） |
+| `GENERATE_LLM_MODEL` | `MiniMax-M3.1-Flash-Preview` | 模型名 |
+| `REVIEW_LLM_PROVIDER` | `openai` | 评审可用另一家模型，如智谱 GLM |
+| `REVIEW_LLM_BASE_URL` | `https://open.bigmodel.cn/api/coding/paas/v4` | OpenAI 兼容地址 |
+| `REVIEW_LLM_MODEL` / `REVIEW_LLM_API_KEY` | `glm-5.3` / 自行设置 | 模型与密钥 |
+
+MiniMax 通道默认发 `thinking: {"type": "disabled"}`，避免思维链混进正文。强制开思考的模型（如 `MiniMax-M3.1-Flash-Preview`）会以 HTTP 400 拒绝；`call_llm` 被拒一次后记住该模型，改发 `reasoning_effort: "low"` 重试，返回里的 `<think>` 块照旧剥掉。
 
 ### 生产环境 CORS 配置
 

@@ -32,6 +32,8 @@ gates:
     when:
       confirmed_design: true
     blocker: data_not_attached
+  # Satisfied by a step named clean_winsor, or by the upload pipeline's
+  # successful `outliers` step whose report carries the winsor audit (columns + cuts).
   - id: clean_winsor_audit
     when:
       confirmed_design: true

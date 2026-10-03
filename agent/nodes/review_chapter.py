@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -133,6 +135,8 @@ _GROUNDING_CODES = (
 UNCITED_TOPIC_PENALTY = -0.5
 _CITE_MARKER_RE = re.compile(r"\[(\d+)\]")
 
+logger = logging.getLogger(__name__)
+
 
 class ReviewRubricResult(BaseModel):
     """Provider-validated five-dimensional review rubric."""
@@ -154,6 +158,20 @@ class ReviewResult(BaseModel):
     rubric: ReviewRubricResult
     feedback: str = Field(min_length=1)
     suggestions: str = Field(min_length=1)
+
+    @field_validator("rubric", mode="before")
+    @classmethod
+    def _decode_json_string_rubric(cls, value: Any) -> Any:
+        """Some providers (glm-5.3) send the nested rubric as a JSON string.
+
+        Decode it once; the five dimensions are still validated strictly.
+        """
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
 
     @field_validator("feedback", "suggestions")
     @classmethod
@@ -315,7 +333,11 @@ def call_review_llm(
             "review_degraded": False,
             "review_typed": True,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "review LLM failed (%s/%s): %s: %s; falling back to mock review",
+            config.provider, config.model, type(exc).__name__, str(exc)[:200],
+        )
         result = mock_review_llm(
             chapter_content,
             rubric_template,

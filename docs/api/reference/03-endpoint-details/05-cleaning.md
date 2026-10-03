@@ -5,6 +5,8 @@
 
 ## POST /sessions/{session_id}/transform
 
+**落盘语义（2026-10 修复）**：`transform` 与 `filter` 的结果写入该会话工作区的 sidecar CSV（不再写共享 `/tmp`），并更新 `state.csv_path`、数据元信息（行数/列）与 `sample_operations` 历史。之后的 Table 1、`/estimate` 与快照都基于新样本；操作前后的行数可在快照中核对。
+
 变量重编码与构造（sub-step 5）。支持类型：`log_transform` / `onehot` / `label` / `bin` / `interaction` / `policy_dummy`。
 
 **请求体示例（log_transform）**：

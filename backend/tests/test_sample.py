@@ -112,3 +112,45 @@ def test_balance_missing_params(client):
         json={"panel_id": "", "time_col": ""},
     )
     assert resp.status_code == 400
+
+
+def test_filter_and_transform_change_what_the_analysis_reads(client):
+    """Regression: /filter returned 200 but Table 1 / estimate kept the old file.
+
+    The steps wrote /tmp/00_filter_0.csv (shared by every session) and never
+    moved state.csv_path. Now the result is the analysis file, steps chain,
+    dataset metadata follows, and sessions do not share sidecars.
+    """
+    import pandas as pd
+    from facade import facade
+
+    sid = _upload_csv(client)
+    other = _upload_csv(client)
+    before = facade.get_state(sid)["csv_path"]
+
+    resp = client.post(
+        f"/sessions/{sid}/filter",
+        json={"conditions": [{"col": "age", "op": ">=", "val": 40}]},
+    )
+    assert resp.status_code == 200, resp.text
+    resp = client.post(
+        f"/sessions/{sid}/transform", json={"type": "log_transform", "column": "income"}
+    )
+    assert resp.status_code == 200, resp.text
+
+    state = facade.get_state(sid)
+    assert state["csv_path"] != before
+    analysis = pd.read_csv(state["csv_path"])
+    assert len(analysis) == 4  # filter survived the later transform
+    assert "income_log" in analysis.columns
+    assert [op["op"] for op in state["sample_operations"]] == ["filter", "transform"]
+    assert state["sample_operations"][0]["rows_before"] == 6
+    assert state["sample_operations"][0]["rows_after"] == 4
+    assert not state["csv_path"].startswith("/tmp/00_")
+
+    snapshot = client.get(f"/sessions/{sid}").json()["dataset"]
+    assert snapshot["rows"] == 4
+    assert "income_log" in snapshot["columns"]
+
+    # The other session's analysis data is untouched.
+    assert len(pd.read_csv(facade.get_state(other)["csv_path"])) == 6

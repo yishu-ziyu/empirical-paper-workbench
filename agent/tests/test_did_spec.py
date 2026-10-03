@@ -321,3 +321,183 @@ def test_het_interaction_does_not_count_as_did_term():
     assert not can_form_did_main_term(
         state, {"dv": "emp", "iv": "treat", "method": "did"}
     )
+
+
+def _real_column_design(*, interactions: list) -> dict:
+    return {
+        "status": "confirmed",
+        "confirmed": True,
+        "method": "did",
+        "outcome": "wage",
+        "treatment": "urban_hukou",
+        "treated": "urban_hukou",
+        "period": "post1999",
+        "interactions": interactions,
+    }
+
+
+_REAL_DID_TERM = {
+    "kind": "did",
+    "left": "urban_hukou",
+    "right": "post1999",
+    "term": "urban_hukou:post1999",
+}
+
+
+def test_has_did_main_term_accepts_structured_real_columns():
+    design = _real_column_design(interactions=[_REAL_DID_TERM])
+    assert has_did_main_term(
+        {"formula": "wage ~ urban_hukou * post1999", "treatment": "urban_hukou"},
+        design=design,
+    )
+    assert has_did_main_term(
+        {"treatment": "urban_hukou:post1999"}, design=design
+    )
+    # Slots without the did interaction item never unlock the structured path.
+    assert not has_did_main_term(
+        {"formula": "wage ~ urban_hukou * post1999", "treatment": "urban_hukou"},
+        design=_real_column_design(interactions=[]),
+    )
+    # A het item naming the same columns does not count either.
+    assert not has_did_main_term(
+        {"formula": "wage ~ urban_hukou * post1999", "treatment": "urban_hukou"},
+        design=_real_column_design(
+            interactions=[{"kind": "het", **{k: v for k, v in _REAL_DID_TERM.items() if k != "kind"}}]
+        ),
+    )
+    # The interaction written only as main effects does not count.
+    assert not has_did_main_term(
+        {"formula": "wage ~ urban_hukou + post1999", "treatment": "urban_hukou"},
+        design=design,
+    )
+
+
+def test_force_builds_real_column_interaction():
+    forced = force_did_main_term(
+        {"outcome": "wage", "treatment": "urban_hukou", "formula": "wage ~ urban_hukou"},
+        columns=["wage", "urban_hukou", "post1999"],
+        design=_real_column_design(interactions=[_REAL_DID_TERM]),
+    )
+    assert forced is not None
+    assert forced["formula"] == "wage ~ urban_hukou * post1999"
+    assert forced["treatment"] == "urban_hukou:post1999"
+    assert "feols_formula" not in forced
+    assert "|" not in forced["formula"]
+
+
+def test_force_real_column_slots_without_did_item_is_none():
+    assert (
+        force_did_main_term(
+            {"outcome": "wage", "treatment": "urban_hukou", "formula": "wage ~ urban_hukou"},
+            columns=["wage", "urban_hukou", "post1999"],
+            design=_real_column_design(interactions=[]),
+        )
+        is None
+    )
+
+
+def test_can_form_real_column_design_from_direction():
+    state = {"design": _real_column_design(interactions=[_REAL_DID_TERM])}
+    assert can_form_did_main_term(
+        state, {"dv": "wage", "iv": "urban_hukou", "method": "did"}
+    )
+    assert not can_form_did_main_term(
+        {"design": _real_column_design(interactions=[])},
+        {"dv": "wage", "iv": "urban_hukou", "method": "did"},
+    )
+
+
+def test_set_direction_real_columns_main_specification(tmp_path):
+    csv_path = tmp_path / "hukou.csv"
+    pd.DataFrame(
+        {
+            "wage": [1.0, 1.2, 2.0, 2.4, 1.1, 1.3, 2.1, 2.5],
+            "urban_hukou": [0, 0, 1, 1, 0, 0, 1, 1],
+            "post1999": [0, 1, 0, 1, 0, 1, 0, 1],
+        }
+    ).to_csv(csv_path, index=False)
+    out = set_direction(
+        {
+            "design": _real_column_design(interactions=[_REAL_DID_TERM]),
+            "csv_path": str(csv_path),
+            "research_direction": {
+                "question": "医保整合与工资",
+                "dv": "wage",
+                "iv": "urban_hukou",
+                "method": "did",
+            },
+        }
+    )
+    spec = out["main_specification"]
+    assert "urban_hukou * post1999" in spec["formula"]
+    assert spec["treatment"] == "urban_hukou:post1999"
+    assert "|" not in spec["formula"]
+    assert "feols_formula" not in spec
+
+
+def test_estimate_real_column_confirmed_did_runs_2x2(tmp_path):
+    csv_path = tmp_path / "hukou.csv"
+    pd.DataFrame(
+        {
+            "wage": [1.0, 1.2, 2.0, 2.6, 1.1, 1.0, 2.1, 2.8],
+            "urban_hukou": [0, 0, 1, 1, 0, 0, 1, 1],
+            "post1999": [0, 1, 0, 1, 0, 1, 0, 1],
+        }
+    ).to_csv(csv_path, index=False)
+    out = estimate(
+        {
+            "design": _real_column_design(interactions=[_REAL_DID_TERM]),
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "formula": "wage ~ urban_hukou",
+                "treatment": "urban_hukou",
+                "outcome": "wage",
+                "method": "did",
+                "feols_formula": "wage ~ urban_hukou | pid + year",
+            },
+        }
+    )
+    payload = out["estimate"]
+    assert payload["status"] == "ok"
+    assert payload.get("error") != DID_MISSING_INTERACTION
+    assert payload["treatment_row"]
+    assert "urban_hukou" in (payload.get("formula") or "")
+    assert "post1999" in (payload.get("formula") or "")
+    assert "|" not in (payload.get("formula") or "")
+    assert payload["coef"] is not None
+
+
+def test_estimate_real_column_slots_without_did_item_still_blocks(tmp_path):
+    csv_path = tmp_path / "hukou.csv"
+    pd.DataFrame(
+        {
+            "wage": [1.0, 1.2, 2.0, 2.6],
+            "urban_hukou": [0, 0, 1, 1],
+            "post1999": [0, 1, 0, 1],
+        }
+    ).to_csv(csv_path, index=False)
+    out = estimate(
+        {
+            "design": _real_column_design(interactions=[]),
+            "csv_path": str(csv_path),
+            "main_specification": {
+                "formula": "wage ~ urban_hukou",
+                "treatment": "urban_hukou",
+                "outcome": "wage",
+                "method": "did",
+            },
+        }
+    )
+    payload = out["estimate"]
+    assert payload["status"] == "error"
+    assert payload["error"] == DID_MISSING_INTERACTION
+
+
+def test_structured_interaction_requires_whole_column_names():
+    from agent.engine.did_spec import _names_structured_interaction
+
+    assert _names_structured_interaction("y ~ urban_hukou * post1999", "urban_hukou", "post1999")
+    assert _names_structured_interaction("post1999:urban_hukou", "urban_hukou", "post1999")
+    # substrings of longer names must not count
+    assert not _names_structured_interaction("y ~ urban_hukou:post1999", "hukou", "post")
+    assert not _names_structured_interaction("y ~ xurban_hukou:post1999x", "urban_hukou", "post1999")

@@ -16,6 +16,7 @@ from services.allow_did import (
     confirmed_did_method,
     design_from_state,
     has_treated_period_interaction,
+    structured_treated_period,
 )
 
 DID_MISSING_INTERACTION = "did_missing_interaction"
@@ -88,17 +89,34 @@ def has_did_main_term(
     direction: Mapping[str, Any] | None = None,
     columns: Any = (),
     extra_text: str = "",
+    design: Mapping[str, Any] | None = None,
 ) -> bool:
     """True when the spec names treated×period or an equivalent 2×2 dummy.
 
     ``method=did``, ``| entity + time``, and treat/post main effects alone
-    do not count.
+    do not count. Real-column designs count when the spec names the
+    ``design.treated:design.period`` interaction those slots declare.
     """
     haystack = _haystack(spec, direction, extra_text)
     if _INTERACTION_RE.search(haystack):
         return True
     tokens = _tokens(haystack) | {_norm(c) for c in (columns or ()) if str(c).strip()}
-    return bool(tokens & _DUMMY_NAMES)
+    if tokens & _DUMMY_NAMES:
+        return True
+    treated, period = structured_treated_period(design)
+    if treated and period and _names_structured_interaction(haystack, treated, period):
+        return True
+    return False
+
+
+def _names_structured_interaction(haystack: str, treated: str, period: str) -> bool:
+    """``treated:period`` / ``treated*period`` (either order) as whole names."""
+    text = haystack or ""
+    t, p = re.escape(str(treated)), re.escape(str(period))
+    mark = r"\s*(?::|\*|×|#)\s*"
+    edge_l, edge_r = r"(?<![A-Za-z0-9_])", r"(?![A-Za-z0-9_])"
+    pattern = rf"{edge_l}(?:{t}{mark}{p}|{p}{mark}{t}){edge_r}"
+    return re.search(pattern, text, flags=re.IGNORECASE) is not None
 
 
 def force_did_main_term(
@@ -132,6 +150,10 @@ def force_did_main_term(
     if treated and period:
         return _spec_with_term(base, outcome, treated, interaction=period)
 
+    s_treated, s_period = structured_treated_period(design or {})
+    if s_treated and s_period:
+        return _spec_with_term(base, outcome, s_treated, interaction=s_period)
+
     if has_did_main_term(base, rd, columns):
         formula = str(base.get("formula") or "").split("|", 1)[0].strip()
         if formula:
@@ -158,7 +180,7 @@ def can_form_did_main_term(
     columns = columns_from_state(state)
     if has_treated_period_interaction(design):
         return True
-    if has_did_main_term(spec, rd, columns):
+    if has_did_main_term(spec, rd, columns, design=design):
         return True
     return force_did_main_term(spec, columns=columns, direction=rd, design=design) is not None
 
@@ -195,7 +217,7 @@ def did_spec_block_reason(state: Mapping[str, Any] | None) -> str | None:
     estimate = state.get("estimate")
     if isinstance(estimate, dict):
         extra = str(estimate.get("formula") or "")
-    if has_did_main_term(spec, rd, extra_text=extra):
+    if has_did_main_term(spec, rd, extra_text=extra, design=design_from_state(state)):
         return None
     return DID_MISSING_INTERACTION
 

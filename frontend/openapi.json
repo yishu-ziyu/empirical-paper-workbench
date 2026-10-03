@@ -5017,6 +5017,23 @@
             ],
             "title": "Missing Count"
           },
+          "variable_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Variable Labels"
+          },
+          "value_labels": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Value Labels"
+          },
           "session_id": {
             "anyOf": [
               {
@@ -9601,6 +9618,23 @@
             },
             "type": "array",
             "title": "Columns"
+          },
+          "variable_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Variable Labels"
+          },
+          "value_labels": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Value Labels"
           },
           "path": {
             "anyOf": [

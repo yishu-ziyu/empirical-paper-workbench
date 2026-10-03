@@ -5197,6 +5197,154 @@
         ],
         "title": "DesignInteractionResponse"
       },
+      "DesignOverrides": {
+        "properties": {
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "treatment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment"
+          },
+          "controls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Controls"
+          },
+          "heterogeneity_groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heterogeneity Groups"
+          },
+          "instruments": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruments"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "treated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treated"
+          },
+          "period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period"
+          },
+          "time_col": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Col"
+          },
+          "id_col": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Col"
+          },
+          "qType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qtype"
+          }
+        },
+        "type": "object",
+        "title": "DesignOverrides",
+        "description": "User edits to the draft. Column names must exist in the attached data."
+      },
       "DesignSourceResponse": {
         "properties": {
           "title": {
@@ -8156,6 +8304,16 @@
             "type": "string",
             "title": "Question",
             "default": ""
+          },
+          "overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DesignOverrides"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8163,7 +8321,7 @@
           "title"
         ],
         "title": "ProposeDesignRequest",
-        "description": "POST /sessions/{id}/design/propose 请求体。"
+        "description": "POST /sessions/{id}/design/propose 请求体。\n\nWith a dataset already on the session, the draft's variable slots are\nmapped to real columns (generate model + schema validation). ``overrides``\nis the user's own edit of the draft and wins over the proposal."
       },
       "QueueFullResponse": {
         "properties": {

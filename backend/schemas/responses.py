@@ -28,6 +28,10 @@ class DatasetMetaResponse(BaseModel):
     rows: Optional[int] = None
     dtypes: Dict[str, Any] = Field(default_factory=dict)
     missing_count: Optional[int] = None
+    # Stata codebook (empty for CSV / Excel): column → variable label, and
+    # column → {code: label}. Codes stay numeric in the data itself.
+    variable_labels: Dict[str, str] = Field(default_factory=dict)
+    value_labels: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     session_id: Optional[str] = None
     status: Optional[str] = None
     demo_success: bool = False
@@ -108,6 +112,8 @@ class SnapshotDatasetResponse(BaseModel):
     name: Optional[str] = None
     rows: Optional[int] = None
     columns: List[str] = Field(default_factory=list)
+    variable_labels: Dict[str, str] = Field(default_factory=dict)
+    value_labels: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     path: Optional[str] = None
     hash: Optional[str] = None
     version: Optional[str] = None

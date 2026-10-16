@@ -2226,6 +2226,16 @@ export interface components {
             };
             /** Missing Count */
             missing_count?: number | null;
+            /** Variable Labels */
+            variable_labels?: {
+                [key: string]: string;
+            };
+            /** Value Labels */
+            value_labels?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
             /** Session Id */
             session_id?: string | null;
             /** Status */
@@ -4137,6 +4147,16 @@ export interface components {
             rows?: number | null;
             /** Columns */
             columns?: string[];
+            /** Variable Labels */
+            variable_labels?: {
+                [key: string]: string;
+            };
+            /** Value Labels */
+            value_labels?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
             /** Path */
             path?: string | null;
             /** Hash */

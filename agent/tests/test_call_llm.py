@@ -311,3 +311,67 @@ def test_call_llm_cancellable_transport_preserves_http_error(monkeypatch):
     with cancellation_scope(lambda: False):
         with pytest.raises(RuntimeError, match="LLM HTTP 429"):
             call_llm("fail", node_type="title")
+
+
+def test_call_llm_retries_when_model_requires_adaptive_thinking(monkeypatch):
+    """MiniMax-M3.1-Flash-Preview refuses thinking=disabled with HTTP 400."""
+    import io
+    import urllib.error
+
+    from agent.llm import call_llm as module
+
+    module._ADAPTIVE_THINKING_MODELS.discard("MiniMax-M3.1-Flash-Preview")
+    bodies: list[dict] = []
+
+    def fake_urlopen(req, timeout=0):
+        data = json.loads(req.data.decode("utf-8"))
+        bodies.append(data)
+        if data.get("thinking") == {"type": "disabled"}:
+            raise urllib.error.HTTPError(
+                req.full_url, 400, "Bad Request", {},
+                io.BytesIO(
+                    b'{"error":{"message":"invalid params, model requires adaptive thinking; '
+                    b'thinking.type=\\"disabled\\" is not allowed (2013)"}}'
+                ),
+            )
+        return _FakeResp({"choices": [{"message": {"content": "<think>x</think>正文"}}]})
+
+    monkeypatch.setattr(
+        "agent.llm.call_llm.router.get_config",
+        lambda node: LLMConfig(
+            provider="minimax",
+            model="MiniMax-M3.1-Flash-Preview",
+            api_key="sk-test",
+            base_url="https://api.minimaxi.com/v1",
+        ),
+    )
+    monkeypatch.setattr("agent.llm.call_llm.urllib.request.urlopen", fake_urlopen)
+
+    assert call_llm("hi", node_type="generate") == "正文"
+    assert bodies[0]["thinking"] == {"type": "disabled"}
+    assert "thinking" not in bodies[1] and bodies[1]["reasoning_effort"] == "low"
+    # Remembered: the next call goes straight to the accepted shape.
+    assert call_llm("again", node_type="generate") == "正文"
+    assert len(bodies) == 3 and "thinking" not in bodies[2]
+    module._ADAPTIVE_THINKING_MODELS.discard("MiniMax-M3.1-Flash-Preview")
+
+
+def test_call_llm_does_not_retry_other_http_400(monkeypatch):
+    import io
+    import urllib.error
+
+    calls = []
+
+    def fake_urlopen(req, timeout=0):
+        calls.append(1)
+        raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"bad model"}'))
+
+    monkeypatch.setattr(
+        "agent.llm.call_llm.router.get_config",
+        lambda node: LLMConfig(provider="minimax", model="MiniMax-M3", api_key="sk-test",
+                               base_url="https://api.minimaxi.com/v1"),
+    )
+    monkeypatch.setattr("agent.llm.call_llm.urllib.request.urlopen", fake_urlopen)
+    with pytest.raises(RuntimeError, match="HTTP 400"):
+        call_llm("hi", node_type="generate")
+    assert len(calls) == 1

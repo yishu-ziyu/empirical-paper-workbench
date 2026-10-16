@@ -21,6 +21,17 @@ from ..engine.cancellation import (
 )
 from .router import router, LLMConfig
 
+# Models that refused ``thinking.type=disabled`` in this process.
+_ADAPTIVE_THINKING_MODELS: set[str] = set()
+
+
+def _requires_adaptive_thinking(exc: BaseException) -> bool:
+    text = str(exc)
+    return "HTTP 400" in text and "thinking" in text and (
+        "requires adaptive thinking" in text or "is not allowed" in text
+    )
+
+
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _THINK_OPEN = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
 
@@ -82,8 +93,13 @@ def _request_payload(
         "temperature": 0.3,
     }
     # MiniMax-M3 默认把思维链写进 content；写作通道关掉，避免正文脏掉。
+    # 有的模型（MiniMax-M3.1-Flash-Preview）强制开思考、拒绝 disabled：
+    # 被拒一次后记住该模型，改用最低思考档；<think> 块照旧剥掉。
     if (config.provider or "").lower() in ("minimax", "minimax_openai"):
-        payload["thinking"] = {"type": "disabled"}
+        if config.model in _ADAPTIVE_THINKING_MODELS:
+            payload["reasoning_effort"] = "low"
+        else:
+            payload["thinking"] = {"type": "disabled"}
     headers = {
         "Authorization": f"Bearer {config.api_key}",
         "Content-Type": "application/json",
@@ -205,6 +221,11 @@ def call_llm(
     config = router.get_config(node_type)
     if config.provider == "mock":
         return _MOCK_TEXT.get(node_type, _MOCK_TEXT["default"])
-    if cancellation_enabled():
-        return _chat_completions_cancellable(config, prompt, system)
-    return _chat_completions(config, prompt, system)
+    send = _chat_completions_cancellable if cancellation_enabled() else _chat_completions
+    try:
+        return send(config, prompt, system)
+    except RuntimeError as exc:
+        if config.model in _ADAPTIVE_THINKING_MODELS or not _requires_adaptive_thinking(exc):
+            raise
+        _ADAPTIVE_THINKING_MODELS.add(config.model)
+        return send(config, prompt, system)

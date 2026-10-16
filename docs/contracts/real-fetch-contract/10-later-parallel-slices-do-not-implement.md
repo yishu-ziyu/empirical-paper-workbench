@@ -7,7 +7,7 @@ G0 owns **only** `docs/contracts/real-fetch-contract.md`.
 
 | Slice | Owns | Must not write |
 |---|---|---|
-| **FD-BE-honesty** | `source_kind` on candidates; never fixture-as-found; never toy-as-found; `captain_local_real` / `source=captain-local-real` label; teaching-shelf projection; DATA-RIGOR copy tokens; n<200 demo-claim fail-closed (warning contract) | Attach implementation, catalog auto-select, `allow_did`, chapter bodies, FE chrome ownership, fetch HTTP clients, moving toys into `tests/` in G0, vendoring Desktop/经济学论文 files |
+| **FD-BE-honesty** | `source_kind` on candidates; never fixture-as-found; never toy-as-found; `captain_local_real` / `source=captain-local-real` label; teaching-shelf projection; DATA-RIGOR copy tokens; n<200 demo-claim fail-closed (warning contract) | Attach implementation, catalog auto-select, `allow_did`, chapter bodies, FE chrome ownership, fetch HTTP clients, moving toys into `tests/` in G0, vendoring research/materials files |
 | **FD-BE-fetch-card** | Card / minwage zip resolve + session download or link+upload | Classic-5 CSV bytes, `/demos/card`, confirm-attach, DiD permission, WDI/Dataverse clients |
 | **FD-BE-fetch-dataverse** | Dataverse file download into session when API allows; else URL | Fixture substitution, attach, teaching-shelf copy ownership |
 | **FD-BE-fetch-wdi** | WDI public download into session when API allows; else URL | Barro as fetch, attach, Card zip client |

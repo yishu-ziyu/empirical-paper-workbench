@@ -21,7 +21,7 @@ pyfixest==0.60.0
 dill>=0.3.8
 # Optional extra (not required): pip install statspai
 # Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
-# From econpaper/: python -m pip install -e ../dependencies/StatsPAI
+# From econpaper/: python -m pip install -e research/dependencies/StatsPAI
 # A missing install must not 500 identification / direction; nodes degrade.
 
 # --- LangGraph checkpointer（graph.py 使用 PostgresSaver）---

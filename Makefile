@@ -4,14 +4,10 @@
 # Python 版本：项目锁定 3.12（3.14 下 numpy/pydantic 依赖装不上）。
 # 可用 PY=python3.12 覆盖，需机器上存在 python3.12。
 PY ?= python3.12
-# StatsPAI 源码的位置。工作区搬动后布局变了：仓库在 `AI 产品/empirical-paper-workbench`，
-# 而 `dependencies/StatsPAI` 随 `经济学论文` 工作区走，不再与仓库同级。旧默认 `../dependencies`
-# 会指向不存在的路径（verify-deps 报 repo_exists: False）。
-# 注意不要用 $(abspath)：make 把它当「以空白分隔的多个名字」，路径含空格时会被切开。
-# 只给需要的命令传 ECONPAPER_DEPENDENCY_ROOT（见 verify-deps），**不要 export**：
-# agent/upstream.py 的默认值本身就是「未配置时取 workspace/dependencies」，全局导出会改变
-# 模块级 DEPENDENCY_ROOT，直接打挂 agent/tests/test_upstream.py::test_default_dependency_root_is_workspace_dependencies。
-DEPENDENCY_ROOT ?= $(if $(ECONPAPER_DEPENDENCY_ROOT),$(ECONPAPER_DEPENDENCY_ROOT),$(CURDIR)/../经济学论文/dependencies)
+# StatsPAI 默认使用仓库内 research/dependencies；允许环境变量或 make 参数覆盖。
+# 不使用 $(abspath)：它会按空白拆分包含空格的路径。
+# 只在需要的命令中传递 ECONPAPER_DEPENDENCY_ROOT，不全局 export。
+DEPENDENCY_ROOT ?= $(if $(ECONPAPER_DEPENDENCY_ROOT),$(ECONPAPER_DEPENDENCY_ROOT),$(CURDIR)/research/dependencies)
 FRONTEND_URL ?= http://127.0.0.1:5173
 BACKEND_URL ?= http://127.0.0.1:8000
 
@@ -108,8 +104,7 @@ smoke-agent:
 
 # 两个运行环境都必须指向当前工作区的 StatsPAI 源码，不接受旧 editable install 或 PyPI 副本。
 # 同 smoke-agent，agent.upstream / agent.graph 会间接触达后端包，统一带 $(PYPATH)。
-# `ECONPAPER_DEPENDENCY_ROOT` 只在这两条命令里临时传（不可全局 export，理由见文件顶部注释）：
-# agent/upstream.py 的默认值是「workspace/dependencies」，而搬家后 StatsPAI 不在这里。
+# `ECONPAPER_DEPENDENCY_ROOT` 只在这两条命令里临时传，以支持显式覆盖。
 verify-deps:
 	@echo "[verify-deps] agent StatsPAI editable source"; ECONPAPER_DEPENDENCY_ROOT="$(DEPENDENCY_ROOT)" $(PYPATH) agent/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"
 	@echo "[verify-deps] backend StatsPAI editable source"; ECONPAPER_DEPENDENCY_ROOT="$(DEPENDENCY_ROOT)" $(PYPATH) backend/.venv/bin/python -c "from agent.upstream import get_dependency_status as status; item = status()['statspai']; assert item['installed'] and item['source_matches_repo'], item"

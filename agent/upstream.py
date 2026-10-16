@@ -27,7 +27,7 @@ def _resolve_dependency_root(raw: str | None = None) -> Path:
         if not candidate.is_absolute():
             candidate = WORKSPACE_ROOT / candidate
         return candidate.resolve()
-    return (WORKSPACE_ROOT / "dependencies").resolve()
+    return (PRODUCT_ROOT / "research" / "dependencies").resolve()
 
 
 DEPENDENCY_ROOT = _resolve_dependency_root()
@@ -92,7 +92,7 @@ def get_dependency_status() -> dict:
             "diagnostic": (
                 None
                 if source_matches
-                else "Run `python -m pip install -e ../dependencies/StatsPAI` "
+                else "Run `python -m pip install -e research/dependencies/StatsPAI` "
                 "from econpaper with the target virtual environment active."
             ),
         },

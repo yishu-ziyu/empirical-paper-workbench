@@ -11,7 +11,8 @@ import pandas as pd
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
-from config import PRODUCT_ROOT, settings
+from agent.upstream import STATSPAI_REPO_PATH
+from config import settings
 from run_repository import (
     IdempotencyConflict,
     QueueFull,
@@ -51,13 +52,7 @@ def _candidate_wooldridge_paths() -> list[Path]:
         paths.append(root / "papers" / "data_card1995.csv")
     except Exception:
         pass
-    paths.append(
-        PRODUCT_ROOT.parent
-        / "dependencies"
-        / "StatsPAI"
-        / "papers"
-        / "data_card1995.csv"
-    )
+    paths.append(STATSPAI_REPO_PATH / "papers" / "data_card1995.csv")
     return paths
 
 
@@ -67,7 +62,7 @@ def _drop_index_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_card_extract() -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Load Card extract: env/path → 34-col sibling CSV → StatsPAI 9-col subset."""
+    """Load Card extract: env/path → 34-col local CSV → StatsPAI 9-col subset."""
     if not _force_nine_col():
         for path in _candidate_wooldridge_paths():
             if path.is_file():

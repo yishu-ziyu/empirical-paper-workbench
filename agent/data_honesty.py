@@ -46,7 +46,7 @@ def is_toy_filename(name: str | Path | None) -> bool:
 def acquire_source_for_upload(name: str | Path | None) -> str | None:
     """POST /upload of a non-toy file is first-class captain-local-real acquire.
 
-    Interim OK for real Desktop/经济学论文 CSV / Stata .dta. Teaching toys
+    Interim OK for real research/materials CSV / Stata .dta. Teaching toys
     never receive this source. n<200 still cannot claim demo/found success.
     """
     if not filename_of(name) or is_toy_filename(name):

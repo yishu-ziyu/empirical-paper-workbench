@@ -63,6 +63,8 @@ runner 的启动前置条件见 [docs/dev/local-runner.md](docs/dev/local-runner
 | `fixtures/` | 样例数据与研究设定（如 CHARLS DID） |
 | `deploy/` | 部署配置 |
 | `docs/` | 全部项目文档 |
+| `research/` | 本机论文材料与 `dependencies/StatsPAI/` 源码依赖；不进入 Git 或 Docker |
+| `evidence/` | 本机验收证据；不进入 Git 或 Docker |
 | `scripts/` | 检查与运维脚本 |
 | `runtime/`、`agent-learning/` | Agent 任务状态与去敏学习记录（见 AGENTS.md） |
 

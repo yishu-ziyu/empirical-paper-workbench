@@ -41,3 +41,7 @@ backend/runs/
 
 # Local tool traces
 .statamcp/
+
+# Local research materials, dependency checkout and acceptance evidence
+/research/
+/evidence/

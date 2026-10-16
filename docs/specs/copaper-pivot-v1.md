@@ -67,10 +67,11 @@ Agent 生成 outline（HITL 暂停，用户审阅）
 ### Workspace 架构
 
 ```
-workspace/
-├── econpaper/                    ← 唯一产品仓库
-├── dependencies/StatsPAI/       ← 已验证的本地源码依赖
-└── materials/                    ← 不进入产品 Git 的研究材料
+empirical-paper-workbench/        ← 唯一产品仓库与本地入口
+├── research/
+│   ├── dependencies/StatsPAI/    ← 已验证的本地源码依赖
+│   └── materials/               ← 不进入产品 Git 的研究材料
+└── evidence/                    ← 不进入产品 Git 的验收证据
 ```
 
 ## User Stories
@@ -185,7 +186,7 @@ workspace/
    - 上传文件存到本地 disk（开发）或 S3-compatible storage（生产）
 
 6. **StatsPAI 与代码导出**
-   - StatsPAI 作为 Python 库依赖（`python -m pip install -e ../dependencies/StatsPAI`）。
+   - StatsPAI 作为 Python 库依赖（`python -m pip install -e research/dependencies/StatsPAI`）。
    - 识别、稳健性 prompt 和多语言代码导出已由 econpaper 自有实现负责；AERS 和 `stata-code` 不是运行依赖。
 
 ### 模块划分

@@ -1,8 +1,10 @@
 # Local dependency contract
 
-`econpaper/` is the only product. Runtime source dependencies live in the
-workspace's `dependencies/` directory, which can be overridden with
-`ECONPAPER_DEPENDENCY_ROOT`.
+econpaper is the only product, rooted at `empirical-paper-workbench/`.
+Runtime source dependencies live in `research/dependencies/` inside that root.
+`ECONPAPER_DEPENDENCY_ROOT` overrides the default: absolute paths are used as-is;
+relative paths remain relative to the product's parent directory, independently
+of the process working directory. See [workspace.md](workspace.md) for the local layout.
 
 ## Retained dependency
 
@@ -14,7 +16,7 @@ The checkout passed `git fsck --no-dangling` before relocation. Install it
 from the product root into each Python 3.12 environment that imports it:
 
 ```bash
-python -m pip install -e ../dependencies/StatsPAI
+python -m pip install -e research/dependencies/StatsPAI
 ```
 
 The repository-local symbolic links are part of the upstream tree; no external

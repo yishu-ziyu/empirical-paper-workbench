@@ -40,11 +40,11 @@ langgraph-checkpoint-sqlite==3.1.1  # isolated durable Agent spike
 pydantic-ai-slim[openai]==2.35.3
 # Optional extra (not required): pip install statspai
 # Public package: https://pypi.org/project/statspai/  (github.com/brycewang-stanford/StatsPAI)
-# Sibling checkout (same as agent venv):
-# From econpaper/: python -m pip install -e ../dependencies/StatsPAI
+# Local research checkout (same as agent venv):
+# From econpaper/: python -m pip install -e research/dependencies/StatsPAI
 # A missing install must not 500 POST /direction; nodes degrade.
 # --- 私有试点部署（deploy/private-pilot）：可复现的锁定安装 ---
-# 开发机走上面的 sibling checkout（`-e`，`make verify-deps` 要求 statspai
+# 开发机走上面的 research checkout（`-e`，`make verify-deps` 要求 statspai
 # source_matches_repo）；pilot 部署走下面这条挂 sha256 的 sdist 钉版。
 pyfixest==0.60.0  # existing Card OLS uses statspai.feols
 linearmodels==7.0  # existing Card IV estimator

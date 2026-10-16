@@ -17,7 +17,7 @@
 **上游依赖**（从 econpaper 根目录视角）：
 
 ```
-../dependencies/StatsPAI/    — 计量与因果识别主库
+research/dependencies/StatsPAI/    — 计量与因果识别主库
 ```
 
 可用 `ECONPAPER_DEPENDENCY_ROOT` 覆盖依赖根目录。AERS 和 `stata-code`
@@ -41,12 +41,12 @@ cd frontend && npm install
 # 后端
 cd backend && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-cd .. && backend/.venv/bin/python -m pip install -e ../dependencies/StatsPAI
+cd .. && backend/.venv/bin/python -m pip install -e research/dependencies/StatsPAI
 
 # Agent
 cd agent && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-cd .. && agent/.venv/bin/python -m pip install -e ../dependencies/StatsPAI
+cd .. && agent/.venv/bin/python -m pip install -e research/dependencies/StatsPAI
 ```
 
 ### 2. 启动开发服务器

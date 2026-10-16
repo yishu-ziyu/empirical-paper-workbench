@@ -6,7 +6,7 @@
 ## 产品身份
 
 ADR-0010：唯一产品是 `econpaper/` 网页端。StatsPAI 是经过验证的本地源码依赖，
-位于 `../dependencies/StatsPAI/`；识别、稳健性和多语言代码导出均由产品自有实现负责。
+位于 `research/dependencies/StatsPAI/`；识别、稳健性和多语言代码导出均由产品自有实现负责。
 本设计不碰前台排版。
 
 人做的事：定方向、看 0 星、改大纲要点、批章节、点导出。  

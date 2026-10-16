@@ -41,7 +41,7 @@ _VENUES = {
 
 CAPTAIN_LOCAL_HOW = (
     " First-class acquire (source=captain-local-real): upload a real local "
-    "panel (CSV or Stata .dta); interim OK for real Desktop/经济学论文 files. "
+    "panel (CSV or Stata .dta); interim OK for real research/materials files. "
     "Never teaching toys."
 )
 

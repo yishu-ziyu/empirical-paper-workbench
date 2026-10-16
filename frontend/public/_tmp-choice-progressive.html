@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>临时选型 · 渐进研究流接哪一段</title>
+<style>
+/* 与产品同一套字体，免得选型页看起来比产品好看或难看 */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap');
+:root{--ink:#181515;--paper:#f4efe4;--cream:#f1f0ed;--green:#2f6b4f;--muted:#515151;--line:#d8d2c6;--amber:#8a6a12;--white:#fffdf7}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.7 'Instrument Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.serif{font-family:'Instrument Serif','Iowan Old Style','Songti SC',Georgia,serif;font-weight:400}
+.mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+header{position:sticky;top:0;z-index:5;background:#e5e5df;border-bottom:1px solid var(--line);padding:10px 22px;display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+header strong{font-size:13px}
+header span{font-size:12px;color:var(--muted)}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+nav button{border:1px solid #aaa;background:#fff;border-radius:5px;padding:6px 11px;font:inherit;font-size:12px;cursor:pointer}
+nav button.on{border-color:var(--green);color:var(--green)}
+main{max-width:1060px;margin:0 auto;padding:26px 22px 80px}
+.intro{background:var(--paper);border:1px solid var(--line);padding:18px 22px;margin-bottom:24px}
+.intro h1{font-size:26px;margin:0 0 8px}
+.intro p{margin:0;color:var(--muted);font-size:14px}
+.card{background:var(--paper);border:1px solid var(--line);margin:0 0 22px;display:none}
+.card.on{display:block}
+.cardhead{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.tag{font:11px ui-monospace,Menlo,monospace;color:var(--green);letter-spacing:.12em;text-transform:uppercase}
+.cardhead h2{font-size:22px;margin:5px 0 0;flex:1 1 320px}
+.pick{border:0;background:var(--green);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;cursor:pointer}
+.pick.yes{background:var(--ink)}
+.body{padding:22px}
+.note{font-size:13px;color:var(--muted);margin:0 0 18px}
+.note b{color:var(--ink);font-weight:500}
+.screen{border:1px solid var(--line);background:var(--cream);padding:34px 30px;min-height:330px;display:flex;flex-direction:column;justify-content:center}
+.screen .inner{width:min(620px,100%);margin:0 auto}
+.kicker{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--green);margin:0 0 12px}
+h3.big{font-size:34px;line-height:1.2;letter-spacing:-.03em;margin:0}
+.lead{color:var(--muted);font-size:14px;margin:14px 0 0}
+.hr{border-top:1px solid var(--line);margin:26px 0 0;padding-top:12px}
+.entry{font:22px/1.45 'Instrument Serif','Iowan Old Style','Songti SC',Georgia,serif;margin:0;min-height:34px}
+.quiet{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.btnrow{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:8px}
+.primary{border:0;background:var(--green);color:#fff;border-radius:999px;padding:9px 18px;font:inherit;font-size:13px}
+.ghost{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:12.5px}
+.turn{font:20px/1.5 'Instrument Serif','Iowan Old Style','Songti SC',Georgia,serif;margin:0}
+.q{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}
+.q h4{font-size:20px;margin:0 0 14px}
+.choice{width:100%;border:1px solid var(--line);background:rgba(255,253,247,.6);padding:12px 14px;margin:0 0 9px;text-align:left;font:inherit;display:grid;grid-template-columns:24px 1fr;gap:11px;cursor:pointer}
+.choice b{font-weight:500;font-size:13.5px}
+.choice small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.num{width:21px;height:21px;border:1px solid #b9b5aa;border-radius:50%;display:grid;place-items:center;font-size:10.5px;color:var(--muted)}
+.paperblock{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0}
+.paperblock h4{font-size:26px;margin:10px 0 0;line-height:1.4}
+.reflect{color:var(--muted);font-size:12.5px;border-left:2px solid #8eaa9a;padding-left:13px;margin:14px 0 0}
+.line{display:flex;align-items:center;gap:9px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:11px 0;font-size:12.5px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:0 0 auto}
+.steps{border-bottom:1px solid var(--line)}
+.steps summary{cursor:pointer;list-style:none;padding:11px 0;color:var(--green);font-size:12.5px}
+.steps summary::-webkit-details-marker{display:none}
+.step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;color:var(--muted)}
+.step i{width:8px;height:8px;border:1px solid #bbb6aa;border-radius:50%;flex:0 0 auto}
+.step.done i{background:var(--green);border-color:var(--green)}
+.step em{margin-left:auto;font-style:normal;font-size:10px;color:var(--green)}
+.one{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0;margin-top:20px}
+.spec{font:11px ui-monospace,Menlo,monospace;color:var(--muted)}
+.metric{font:46px/1.3 ui-monospace,Menlo,monospace;letter-spacing:-.04em}
+.stat{font:11px ui-monospace,Menlo,monospace;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin:18px 0 0}
+.hint button{border:0;background:transparent;color:var(--green);font:inherit;font-size:13px;cursor:pointer;padding:0 4px}
+.map{display:grid;gap:7px;margin-top:6px}
+.maprow{display:grid;grid-template-columns:34px 1fr;gap:10px;font-size:12.5px;padding:7px 0;border-bottom:1px solid rgba(216,210,198,.6)}
+.maprow span:first-child{font:10.5px ui-monospace,Menlo,monospace;color:var(--muted)}
+.cost{margin:20px 0 0;padding:14px 16px;border-left:2px solid var(--amber);background:rgba(255,253,247,.55);font-size:13px}
+.cost dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px}
+.cost dt{color:var(--muted);white-space:nowrap}
+.cost dd{margin:0}
+.picked{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;z-index:9}
+</style>
+</head>
+<body>
+<header>
+  <strong>临时选型 · 未接入业务 · 挑完即删</strong>
+  <span>视觉底色已定（纸张 / 墨色 / 墨绿），这里只选「产品哪一段换成渐进流」</span>
+  <nav id="nav"></nav>
+</header>
+
+<main>
+  <div class="intro">
+    <h1 class="serif">到底把产品的哪一段换成这套渐进流？</h1>
+    <p>下面是 5 个选项，每个只画「改了之后你会看到什么」+「动了产品的哪一块 / 不动哪一块」。数字都是 Card 1995 的历史运行结果，不是新跑的。选一个，我把其余的连同本文件一起删掉。</p>
+  </div>
+  <div id="cards"></div>
+</main>
+
+<script>
+const CARD = {spec:'A · OLS · ols_region_dummies', metric:'0.0747', stat:'SE 0.0035 · HC1 · statspai.feols · n 3010'}
+
+function optA(){return `
+<div class="screen"><div class="inner">
+  <p class="kicker">先从你的判断开始</p>
+  <h3 class="big serif">先说你想说什么。</h3>
+  <p class="lead">不用先选方法，也不用先读一排文献。先把真正想知道的事放到桌上。</p>
+  <div class="hr"><p class="entry">教育是否提高工资？</p></div>
+  <div class="btnrow"><span class="quiet">＋ 也可以写下你预期看到什么</span><button class="primary">继续</button></div>
+</div></div>`}
+
+function optB(){return `
+<div class="screen"><div class="inner">
+  <p class="kicker" style="text-align:right">你</p>
+  <p class="turn" style="text-align:right">教育是否提高工资？</p>
+  <p class="kicker" style="margin-top:22px">econpaper</p>
+  <p class="turn">我先不替你选方法。先确认一件会改变后面研究设计的事。</p>
+  <div class="q"><h4 class="serif">你最想先回答哪一层？</h4>
+    <button class="choice"><span class="num">1</span><span><b>教育本身是否带来工资提升</b><small>需要尽量区分教育与家庭背景、能力等共同因素。</small></span></button>
+    <button class="choice"><span class="num">2</span><span><b>先看控制一批变量后的相关关系</b><small>更容易起步，但结论边界会更窄。</small></span></button>
+  </div>
+</div></div>`}
+
+function optC(){return `
+<div class="screen"><div class="inner">
+  <div class="paperblock">
+    <span class="kicker">研究问题 · 待你确认</span>
+    <h4 class="serif">教育程度是否提高工资？</h4>
+    <p class="reflect">先把「教育本身是否带来工资提升」作为主问题。方法仍是候选，不在这里提前锁死。</p>
+    <div class="btnrow" style="margin-top:20px"><button class="primary">就是这个问题</button><span class="quiet">我想改一句</span></div>
+  </div>
+</div></div>`}
+
+function optD(){return `
+<div class="screen"><div class="inner">
+  <div class="line"><span class="dot"></span><span>正在核对识别策略</span><span class="mono" style="margin-left:auto;font-size:10.5px;color:var(--green)">真实事件</span></div>
+  <details class="steps" open><summary>＋ 这一步怎样推进</summary>
+    <div class="step done"><i></i><span>接收数据</span><em>已完成</em></div>
+    <div class="step done"><i></i><span>清洗数据</span><em>已完成</em></div>
+    <div class="step"><i></i><span>核对识别策略</span><em>进行中</em></div>
+  </details>
+  <div class="one">
+    <div class="spec">${CARD.spec}</div>
+    <div class="metric">${CARD.metric}</div>
+    <div class="stat">${CARD.stat}</div>
+  </div>
+  <p class="hint">还有一条 IV 估计给了不同答案。<button>展开看差异 →</button></p>
+</div></div>`}
+
+function optE(){return `
+<div class="screen"><div class="inner">
+  <div class="map">
+    <div class="maprow"><span>01</span><span>一个想法：先说你想说什么</span></div>
+    <div class="maprow"><span>02</span><span>一个追问：只问一个会改变设计的决定</span></div>
+    <div class="maprow"><span>03</span><span>确认研究问题（可编辑）</span></div>
+    <div class="maprow"><span>04</span><span>数据进入：先看手上有什么</span></div>
+    <div class="maprow"><span>05</span><span>分析中：一句真实状态 + 折叠的真实路径</span></div>
+    <div class="maprow"><span>06</span><span>候选设计：说明为什么值得试，不说已采用</span></div>
+    <div class="maprow"><span>07</span><span>第一条真实证据 → 主动展开第二条比较</span></div>
+    <div class="maprow"><span>08</span><span>方法风险：只有发现问题才打断</span></div>
+  </div>
+  <p class="lead">八屏连成一条产品路径，从打开到第一条证据。</p>
+</div></div>`}
+
+const OPTIONS = [
+  {id:'A', name:'只换首屏（最小）', screen:optA,
+   where:'替换空桌首屏这一块', keep:'工作台、识别、估计、写作全不动',
+   cost:'一个组件。提交后直接进现在的工作台，中间不新增屏。',
+   risk:'改动最小，但「一次只追问一个决定」目前只体现在文案里，没有真的只问一个。'},
+  {id:'B', name:'首屏 + 一次追问', screen:optB,
+   where:'替换空桌的对话式塑形（DeskPage 里问方向的那一段）', keep:'工作台、识别、估计、写作全不动',
+   cost:'两个屏。需要把两个选项接到真实的因果/相关语义上，否则追问只是装饰。',
+   risk:'审阅稿里这两个选项走的是同一条路。要做就得让它们真的改变下游，否则别做。'},
+  {id:'C', name:'首屏 + 追问 + 确认问题', screen:optC,
+   where:'在 B 之上多一屏：产出可编辑的研究问题再交出去', keep:'同上',
+   cost:'三屏。确认后进工作台，工作台保持不变。',
+   risk:'比 B 多一屏；好处是「你想说什么」这句原话被显式确认过，后面写作有据可依。'},
+  {id:'D', name:'只换「结果与证据」那一段（分析→第一条证据）', screen:optD,
+   where:'替换工作台里结果与证据的首屏', keep:'入口、工作台外壳、写作全不动',
+   cost:'一个组件 + 一个真实事件投影（这部分我已经接好并跑通了）。',
+   risk:'不解决入口问题；好处是改动被限制在工作台内部，风险最低，且已经在跑。'},
+  {id:'E', name:'全流程八屏', screen:optE,
+   where:'从打开到第一条证据整段重做', keep:'识别/估计/写作的后端与账本',
+   cost:'最大：等于把入口到第一条证据整段重做，8 个状态都要接真实数据。',
+   risk:'最容易白做——上一轮六版入口全部没被接受。除非你确定要，否则不建议先做这个。'},
+]
+
+const cards = document.getElementById('cards')
+const nav = document.getElementById('nav')
+let picked = null
+
+OPTIONS.forEach((o, i) => {
+  const el = document.createElement('section')
+  el.className = 'card' + (i === 0 ? ' on' : '')
+  el.dataset.id = o.id
+  el.innerHTML = `
+    <div class="cardhead">
+      <div style="flex:1 1 320px">
+        <span class="tag">选项 ${o.id}</span>
+        <h2 class="serif">${o.name}</h2>
+      </div>
+      <button class="pick" data-pick="${o.id}">选这个</button>
+    </div>
+    <div class="body">
+      ${o.screen()}
+      <div class="cost"><dl>
+        <dt>改哪里</dt><dd>${o.where}</dd>
+        <dt>不动</dt><dd>${o.keep}</dd>
+        <dt>代价</dt><dd>${o.cost}</dd>
+        <dt>风险</dt><dd>${o.risk}</dd>
+      </dl></div>
+    </div>`
+  cards.appendChild(el)
+
+  const b = document.createElement('button')
+  b.textContent = o.id
+  b.onclick = () => show(i)
+  nav.appendChild(b)
+})
+
+function show(i){
+  ;[...cards.children].forEach((c, j) => c.classList.toggle('on', i === j))
+  ;[...nav.children].forEach((b, j) => b.classList.toggle('on', i === j))
+  window.scrollTo({top:0})
+}
+nav.children[0].classList.add('on')
+
+document.addEventListener('click', (e) => {
+  const id = e.target.getAttribute && e.target.getAttribute('data-pick')
+  if (!id) return
+  picked = id
+  document.querySelectorAll('[data-pick]').forEach((b) => {
+    b.classList.toggle('yes', b.getAttribute('data-pick') === id)
+    b.textContent = b.getAttribute('data-pick') === id ? '已选 ✓' : '选这个'
+  })
+  let toast = document.querySelector('.picked')
+  if (!toast) { toast = document.createElement('div'); toast.className = 'picked'; document.body.appendChild(toast) }
+  toast.textContent = `你选了 ${id} —— 回去跟 Agent 说「选 ${id}」，其余的我删掉`
+})
+</script>
+</body>
+</html>

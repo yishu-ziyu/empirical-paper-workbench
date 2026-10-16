@@ -38,7 +38,7 @@ If any of the following hold, **do not** invent a fixture find:
 - HTTP / parse / license refusal
 - Ambiguous HTML landing page with no resolvable file
 
-Then: `source_kind=external_link` (or keep `discovered` with `fetch.status=link_only` when the row is a live catalog hit), show the **URL**, and offer **honest upload** (generic `user_upload` **or** captain-local-real when the file is a real panel from Desktop/经济学论文). Copy must say the product did **not** ingest a live catalog file. Upload of `course-panel.csv` / `minimum_wage.csv` / CFPS `sanitized_sample.csv` (or copies) is **not** a FIND win, **not** captain-local-real, and **not** a demo claim (§3.4–§3.7).
+Then: `source_kind=external_link` (or keep `discovered` with `fetch.status=link_only` when the row is a live catalog hit), show the **URL**, and offer **honest upload** (generic `user_upload` **or** captain-local-real when the file is a real panel from research/materials). Copy must say the product did **not** ingest a live catalog file. Upload of `course-panel.csv` / `minimum_wage.csv` / CFPS `sanitized_sample.csv` (or copies) is **not** a FIND win, **not** captain-local-real, and **not** a demo claim (§3.4–§3.7).
 
 ## 4.3 Fetch must not (frozen)
 
@@ -63,7 +63,7 @@ Captain-authorized **interim** while Research scouts find→acquire→organize�
 |---|---|
 | Path name | **captain-local-real upload** |
 | Label | `source_kind=captain_local_real` and/or `source=captain-local-real` (same meaning) |
-| Bytes | **Real** `.dta` or CSV **panels** from Captain Desktop **经济学论文** (folder class). Not toys. Not synthetic. |
+| Bytes | **Real** `.dta` or CSV **panels** from Captain local **research/materials** (folder class). Not toys. Not synthetic. |
 | Role | First-class **acquire**. Session may ingest these bytes for later confirm-attach. |
 | Not FIND | Must **not** be copied as discovered / found / Dataverse / “we found your data”. |
 | Not toys | DATA-RIGOR §3.4–§3.7 still holds. Banned CSVs cannot be relabeled captain-local-real. |

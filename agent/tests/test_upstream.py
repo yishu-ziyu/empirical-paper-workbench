@@ -7,8 +7,8 @@ import pytest
 from agent import upstream
 
 
-def test_default_dependency_root_is_workspace_dependencies():
-    assert upstream.DEPENDENCY_ROOT == upstream.WORKSPACE_ROOT / "dependencies"
+def test_default_dependency_root_is_product_research_dependencies():
+    assert upstream.DEPENDENCY_ROOT == upstream.PRODUCT_ROOT / "research" / "dependencies"
     assert upstream.STATSPAI_REPO_PATH == upstream.DEPENDENCY_ROOT / "StatsPAI"
 
 
@@ -27,12 +27,12 @@ def test_relative_dependency_root_is_workspace_relative(tmp_path, monkeypatch):
 def test_default_dependency_root_does_not_depend_on_cwd(tmp_path, monkeypatch):
     monkeypatch.delenv("ECONPAPER_DEPENDENCY_ROOT", raising=False)
     monkeypatch.chdir(tmp_path)
-    assert upstream._resolve_dependency_root() == upstream.WORKSPACE_ROOT / "dependencies"
+    assert upstream._resolve_dependency_root() == upstream.PRODUCT_ROOT / "research" / "dependencies"
 
 
 @pytest.mark.skipif(
     not upstream.STATSPAI_REPO_PATH.exists(),
-    reason="CI installs StatsPAI from PyPI; sibling checkout is local-only",
+    reason="CI installs StatsPAI from PyPI; research checkout is local-only",
 )
 def test_dependency_status_reports_actual_editable_source():
     status = upstream.get_dependency_status()

@@ -39,6 +39,7 @@ significant 改动开工前写的验收契约，以及实施者报告、独立�
 | 工作 | 文档 |
 |---|---|
 | runner 日志断管不得误标 FAILED（#30） | [契约](runner-logging-lifecycle.md) |
+| 三个本地目录统一管理 | [契约](workspace-directory-merge.md) |
 | 首个受保护试用环境 | [契约](private-pilot-deployment.md) |
 | 游离分支三分类盘点 | [契约](stray-branch-triage.md) |
 | 游离缺口补齐·批次 A | [契约](stray-gap-closure-batch-a.md) |

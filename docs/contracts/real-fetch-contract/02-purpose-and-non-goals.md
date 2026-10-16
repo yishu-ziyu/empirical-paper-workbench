@@ -12,7 +12,7 @@ Given a formal-path session whose **`session.design.status === "confirmed"`**, t
 3. **Teaching-known only** — Those extracts may appear **only** as `source_kind = teaching_fixture`, on an **optional teaching shelf** with an **explicit** label. Their presence is **not** find success.
 4. **Download into session when the API allows** — For Dataverse, Card zip, WDI, and FRED/IPUMS per existing R-sources routes: if a public API or posted file can be retrieved, write bytes into the **session workspace** (staging). That is **fetch**, not attach.
 5. **Else honest path** — If download is not allowed, fails, or needs login / registration, show a followable **link** plus an **honest upload**. Do not pad with a fixture or a toy CSV.
-6. **Captain-local-real (first-class acquire)** — Captain may upload **real** `.dta`/CSV panels from Desktop/经济学论文, labeled `source_kind=captain_local_real` / `source=captain-local-real`, while Research still scouts find→acquire→organize→clean. This is **not** discovered/found data and **not** a toy.
+6. **Captain-local-real (first-class acquire)** — Captain may upload **real** `.dta`/CSV panels from research/materials, labeled `source_kind=captain_local_real` / `source=captain-local-real`, while Research still scouts find→acquire→organize→clean. This is **not** discovered/found data and **not** a toy.
 7. **DATA-RIGOR** — Keep synthetic / invented / toy samples off the product path (§3.4–§3.7). Tiny fixtures live only under `tests/`, labeled synthetic.
 
 FIND-DATA still lists candidates; it never auto-selects, never confirm-attaches, never writes gold chapter bodies. Fetch-into-session does **not** set `dataAttached`.
@@ -31,7 +31,7 @@ This contract does **not**:
 - Vendor restricted microdata (IPUMS extracts, CHARLS, …) into the git repo
 - Scrape behind login, store user credentials, or treat a teaching shelf as a find
 - Present teaching **toys** (`minimum_wage.csv`, `course-panel.csv`, CFPS `sanitized_sample.csv`, or other n≈4–24 invented CSVs) as found data, suggest hits, `captain_local_real`, or product demos
-- Vendor Captain Desktop/经济学论文 files into git
+- Vendor Captain research/materials files into git
 - Ship Design FIND-1 / `econpaper-ui-temp/flow-sketch` as product chrome
 - Merge DATA-COMPLETE / DID / INF / FIND-LIT / FIND-DATA implementation branches
 - Implement application code, API routes, OpenAPI shapes, or frontend chrome (G0 is markdown only)

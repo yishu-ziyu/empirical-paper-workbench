@@ -31,3 +31,7 @@ agent-learning
 .codex
 .agent
 docs/acceptance/assets
+
+# Keep local research materials and evidence outside image contexts.
+research/
+evidence/

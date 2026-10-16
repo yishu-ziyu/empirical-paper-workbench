@@ -30,7 +30,7 @@
 
 **Captain-authorized interim (frozen).** Encode the following **verbatim**:
 
-**First-class acquire path: captain-local-real upload.** Desktop/经济学论文 **real** `.dta`/CSV panels (not toys) while Research scouts find→acquire→organize→clean.
+**First-class acquire path: captain-local-real upload.** research/materials **real** `.dta`/CSV panels (not toys) while Research scouts find→acquire→organize→clean.
 
 **Label:** `source=captain-local-real` (or `source_kind=captain_local_real`).
 

@@ -8,7 +8,7 @@
 | 修订 | 2026-08-16 r4（`literature_produced_by` / `literature_query` 列入 `TRUTH_KEYS`） |
 | 状态 | Draft |
 | 产品 | `econpaper/` |
-| 范围 | `agent/` + `../dependencies/StatsPAI/` + 产品内置代码导出；FastAPI 只是门；操作台只展示发动机产物 |
+| 范围 | `agent/` + `research/dependencies/StatsPAI/` + 产品内置代码导出；FastAPI 只是门；操作台只展示发动机产物 |
 | 权威 | `docs/product/glossary.md`、`docs/adr/*`、`agent/graph.py`、`backend/facade.py` |
 | 机制目录 | Antonio Gulli《Agentic Design Patterns》中译（本地 `chapters/`）。书是机制清单，不是产品名。 |
 

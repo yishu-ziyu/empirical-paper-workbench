@@ -21,6 +21,6 @@ Also do not reopen: generic spine, localized-first-study, upload-recovery, run-e
 
 Reuse, do not fork: `session.design`, DECIDE-7 candidate fields, `dataAttached`, snapshot `dataset`, PREWRITE-PAUSE flag names, R-sources families. Add `source_kind` (including `captain_local_real`) and optional `source=captain-local-real` — do not replace `session.design` or `dataAttached`, and do not treat catalog id, a toy CSV, or captain-local-real as discovered.
 
-G0 does **not** delete the banned toy files, move them under `tests/`, change `/demos/card`, or copy Desktop/经济学论文 panels into the repo. Later slices own those write-sets against this freeze.
+G0 does **not** delete the banned toy files, move them under `tests/`, change `/demos/card`, or copy research/materials panels into the repo. Later slices own those write-sets against this freeze.
 
 ---

@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [workspace.md](workspace.md) | 唯一本地项目入口、研究材料、证据目录与迁移后的依赖路径 |
 | [local-runner.md](local-runner.md) | runner（durable run worker）与 dev 全家桶的前置条件、安全启动 |
 | [dependencies.md](dependencies.md) | 本地源码依赖（StatsPAI）的来源、固定修订与去留依据 |
 | [eval-top5.md](eval-top5.md) | 可选的离线 top-5 评测；不是产品运行时 |

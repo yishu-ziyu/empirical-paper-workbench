@@ -12,6 +12,8 @@ review_degraded = True
 
 并 `state.degradations` 追加 `{node, reason, fallback, visible: True, timestamp}`。
 
+回落时后端日志记一条 warning（provider/model、异常类型和前 200 字），方便查出为什么回落。结构化输出接受评审模型把 `rubric` 作为 JSON 字符串返回（glm-5.3 会这样返回）：先解码一次，五个维度仍按原规则严格校验。
+
 `facade.record_degradation(..., visible: bool = False)`。`GET /sessions/{id}/degradation` 原样返回 `visible`。
 
 `facade.get_review` 与 `ReviewInfoResponse` **同一批**增加：`review_source`, `review_degraded`, `grounding_failures`。`GET /review` 不再把假审显示成真审。

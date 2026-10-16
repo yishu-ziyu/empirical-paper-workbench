@@ -107,3 +107,33 @@ def test_review_agent_sync_bridge_works_inside_running_event_loop():
 
     result = asyncio.run(invoke())
     assert result.output.feedback == VALID_REVIEW["feedback"]
+
+
+def test_review_result_accepts_rubric_sent_as_json_string():
+    """glm-5.3 returns the nested rubric as a JSON string inside the tool call.
+
+    Regression: every chapter review fell back to mock (review_source=mock_fallback).
+    """
+    payload = dict(VALID_REVIEW, rubric=json.dumps(VALID_REVIEW["rubric"]))
+    result = ReviewResult.model_validate(payload)
+    assert result.rubric.readability == 0.8
+
+
+def test_review_result_string_rubric_still_strict():
+    bad = dict(VALID_REVIEW["rubric"]); bad.pop("readability")
+    with pytest.raises(ValidationError):
+        ReviewResult.model_validate(dict(VALID_REVIEW, rubric=json.dumps(bad)))
+    with pytest.raises(ValidationError):
+        ReviewResult.model_validate(dict(VALID_REVIEW, rubric="not json"))
+
+
+def test_review_agent_accepts_string_rubric_tool_call():
+    from pydantic_ai.messages import ToolCallPart
+
+    def model(messages, info):
+        args = dict(VALID_REVIEW, rubric=json.dumps(VALID_REVIEW["rubric"]))
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, json.dumps(args, ensure_ascii=False))])
+
+    agent = build_review_agent(model=FunctionModel(model), retries=0)
+    out = _run_review_agent_sync(agent, "review").output
+    assert out.rubric.contribution == 0.9

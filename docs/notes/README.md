@@ -12,3 +12,5 @@
 | [pm-position-audit-2026-08-31.md](pm-position-audit-2026-08-31.md) | PM 定位审计：识别迭代还是线性流水线 |
 | [pm2-position-review-2026-08-31.md](pm2-position-review-2026-08-31.md) | 第二位 PM 的独立复核 |
 | [takeaway-math-research-notes.md](takeaway-math-research-notes.md) | 数学研究方法的借鉴笔记 |
+
+- [Deferred consolidation checks](20261017-consolidation-followups.md): two review concerns to reproduce when development resumes.

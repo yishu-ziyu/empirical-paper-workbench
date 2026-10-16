@@ -22,6 +22,7 @@ import logging
 import shutil
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, List, Optional
 
@@ -1113,35 +1114,94 @@ class AgentFacade:
     # Cleaning step calls
     # ------------------------------------------------------------------
     def transform_variables(self, session_id: str, config: dict) -> list:
-        """Run TransformStep.run on the session's datasets; return datasets."""
+        """Run TransformStep.run on the analysis data; the result becomes it."""
         if TransformStepCls is None:
             raise HTTPException(
                 status_code=503,
                 detail="transform step not available (agent module missing)",
             )
-        datasets = self.get_datasets(session_id)
-        step_config = {**config, "workspace": "/tmp", "order": 0}
-        datasets, _report = TransformStepCls().run(datasets, step_config)
-        self.save_datasets(session_id, datasets)
-        self._supersede_sample(session_id, reason="transform")
-        return datasets
+        return self._apply_sample_step(
+            session_id, TransformStepCls(), dict(config), reason="transform"
+        )
 
     def filter_sample(self, session_id: str, conditions: list) -> list:
-        """Run FilterStep.run on the session's datasets; return datasets."""
+        """Run FilterStep.run on the analysis data; the result becomes it."""
         if FilterStepCls is None:
             raise HTTPException(
                 status_code=503,
                 detail="filter step not available (agent module missing)",
             )
-        datasets = self.get_datasets(session_id)
-        step_config = {
-            "conditions": conditions,
-            "workspace": "/tmp",
-            "order": 0,
+        return self._apply_sample_step(
+            session_id, FilterStepCls(), {"conditions": conditions}, reason="filter"
+        )
+
+    def _analysis_csv_path(self, session_id: str) -> str:
+        """The file the next Table 1 / estimate reads (``state.csv_path``)."""
+        state = self.get_state(session_id)
+        return str(state.get("csv_path") or self.get_csv_path(session_id))
+
+    def _apply_sample_step(
+        self, session_id: str, step: Any, config: dict, *, reason: str
+    ) -> list:
+        """Apply a user cleaning/sample step to the data the analysis reads.
+
+        Before: the step wrote ``/tmp/00_<step>_0.csv`` (shared by every
+        session), read the upload file instead of the current analysis file,
+        and never moved ``state.csv_path`` -- so a 200 response changed
+        nothing that Table 1 or the estimate used. Now each call writes a
+        private sidecar under the session's run workspace, chains from the
+        current analysis file, moves ``state.csv_path`` to the result,
+        refreshes dataset metadata and appends a disclosure record.
+        """
+        import pandas as pd
+
+        source = self._analysis_csv_path(session_id)
+        workspace = Path(self._workspace_dir(session_id)) / "sample_ops" / uuid.uuid4().hex
+        workspace.mkdir(parents=True, exist_ok=True)
+        datasets = [{"path": source}]
+        step_config = {**config, "workspace": str(workspace), "order": 0}
+        datasets, report = step.run(datasets, step_config)
+        result_path = str((datasets[0] if datasets else {}).get("path") or source)
+        try:
+            frame = pd.read_csv(result_path, low_memory=False)
+        except (OSError, ValueError):
+            frame = None
+
+        state = self.get_state(session_id)
+        history = list(state.get("sample_operations") or [])
+        record = {
+            "op": reason,
+            "config": {k: v for k, v in config.items() if k not in {"workspace", "order"}},
+            "input_path": source,
+            "output_path": result_path,
+            "rows_before": None,
+            "rows_after": int(len(frame)) if frame is not None else None,
+            "constructed_vars": list(
+                (datasets[0] if datasets else {}).get("constructed_vars") or []
+            ),
+            "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
-        datasets, _report = FilterStepCls().run(datasets, step_config)
-        self.save_datasets(session_id, datasets)
-        self._supersede_sample(session_id, reason="filter")
+        if isinstance(report, dict):
+            before = report.get("n_before")
+            if isinstance(before, list) and before:
+                before = before[0]
+            if isinstance(before, (int, float)):
+                record["rows_before"] = int(before)
+        history.append(record)
+        self._store.update_state(
+            session_id,
+            csv_path=result_path,
+            uploaded_datasets=datasets,
+            sample_operations=history,
+        )
+        if frame is not None:
+            self._store.update_metadata(
+                session_id,
+                rows=int(len(frame)),
+                columns=[str(c) for c in frame.columns],
+                dtypes={str(c): str(t) for c, t in frame.dtypes.items()},
+            )
+        self._supersede_sample(session_id, reason=reason)
         return datasets
 
     def _supersede_sample(self, session_id: str, *, reason: str) -> None:

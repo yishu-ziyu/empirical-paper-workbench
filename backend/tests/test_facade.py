@@ -872,12 +872,15 @@ def test_transform_variables_runs_transform_step(monkeypatch):
     assert result == [{"path": "/tmp/transformed.csv"}]
     assert captured["datasets"] == [{"path": "/tmp/original.csv"}]
     assert captured["config"]["column"] == "income"
-    assert captured["config"]["workspace"] == "/tmp"
+    # Session-private sidecar dir, never the shared /tmp root.
+    assert captured["config"]["workspace"] != "/tmp"
+    assert sid in captured["config"]["workspace"]
     assert captured["config"]["order"] == 0
-    # datasets persisted into state
-    assert facade.get_state(sid)["uploaded_datasets"] == [
-        {"path": "/tmp/transformed.csv"}
-    ]
+    # datasets persisted into state, and the result is now the analysis file
+    state = facade.get_state(sid)
+    assert state["uploaded_datasets"] == [{"path": "/tmp/transformed.csv"}]
+    assert state["csv_path"] == "/tmp/transformed.csv"
+    assert state["sample_operations"][-1]["op"] == "transform"
     facade.drop_session(sid)
 
 

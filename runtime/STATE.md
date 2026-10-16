@@ -4,6 +4,7 @@
 
 | Task ID | State file | Status | Git context | Updated at | Next action |
 |---|---|---|---|---|---|
+| MAIN-CONSOLIDATION-1 | `runtime/tasks/20261017-main-consolidation.md` | active | main | 2026-10-17 | 合入 7 个功能分支；独立评审和真实路径检查后推送、移除多余分支与 worktree |
 | WORKSPACE-DIRECTORY-MERGE-1 | `runtime/tasks/20261006-workspace-directory-merge.md` | complete | main（未提交、未推送） | 2026-10-06 | 唯一入口内 research/evidence；6729 项完整、实际估计不变、独立 ACCEPT |
 | CI-READER-CARD-62 | `runtime/tasks/20261003-ci-reader-card-isolation.md` | active | fix/ci-results-reader-card-isolation from main@db5f5b62 | 2026-10-03 | 实现6627554独立ACCEPT；记录复审后发布PR并跑完整CI |
 | P3-LEFTOVERS-1 | `runtime/tasks/20260926-p3-leftovers.md` | blocked | main（未开分支） | 2026-09-26 | 等用户说开始：key 先记录确认再上传 + SQLite WAL/busy_timeout |

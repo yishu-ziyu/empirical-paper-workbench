@@ -288,3 +288,30 @@ def test_unknown_gate_id_fails_closed(tmp_path):
         gates_dir=tmp_path,
     )
     assert "unknown_gate:invented_skill" in blockers
+
+
+def test_upload_pipeline_outliers_audit_satisfies_winsor_gate():
+    """The real upload pipeline names its winsor step ``outliers``.
+
+    Regression: every formal-path chapter was 409 ``clean_winsor_not_recorded``
+    because only a step literally named ``clean_winsor`` counted.
+    """
+    from agent.norms.loader import _clean_winsor_recorded
+
+    audited = {
+        "name": "outliers",
+        "status": "success",
+        "report": {"columns": [["income"]], "cuts": [1, 99], "winsorized": [True]},
+    }
+    assert _clean_winsor_recorded({"cleaning_report": {"steps": [audited]}})
+    state = _formal_state(cleaning_report={"steps": [audited]})
+    assert "clean_winsor_not_recorded" not in chapter_write_blockers(state, "intro")
+
+
+def test_failed_or_unaudited_outliers_step_does_not_satisfy_winsor_gate():
+    from agent.norms.loader import _clean_winsor_recorded
+
+    failed = {"name": "outliers", "status": "failed", "report": {"error": "boom"}}
+    bare = {"name": "outliers", "status": "success"}
+    for step in (failed, bare):
+        assert not _clean_winsor_recorded({"cleaning_report": {"steps": [step]}})

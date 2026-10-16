@@ -2312,6 +2312,36 @@ export interface components {
             /** Term */
             term: string;
         };
+        /**
+         * DesignOverrides
+         * @description User edits to the draft. Column names must exist in the attached data.
+         */
+        DesignOverrides: {
+            /** Method */
+            method?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Treatment */
+            treatment?: string | null;
+            /** Controls */
+            controls?: string[] | null;
+            /** Heterogeneity Groups */
+            heterogeneity_groups?: string[] | null;
+            /** Instruments */
+            instruments?: string[] | null;
+            /** Group */
+            group?: string | null;
+            /** Treated */
+            treated?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Time Col */
+            time_col?: string | null;
+            /** Id Col */
+            id_col?: string | null;
+            /** Qtype */
+            qType?: string | null;
+        };
         /** DesignSourceResponse */
         DesignSourceResponse: {
             /**
@@ -3546,6 +3576,10 @@ export interface components {
         /**
          * ProposeDesignRequest
          * @description POST /sessions/{id}/design/propose 请求体。
+         *
+         *     With a dataset already on the session, the draft's variable slots are
+         *     mapped to real columns (generate model + schema validation). ``overrides``
+         *     is the user's own edit of the draft and wins over the proposal.
          */
         ProposeDesignRequest: {
             /** Title */
@@ -3555,6 +3589,7 @@ export interface components {
              * @default
              */
             question: string;
+            overrides?: components["schemas"]["DesignOverrides"] | null;
         };
         /** QueueFullResponse */
         QueueFullResponse: {

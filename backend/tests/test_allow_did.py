@@ -250,3 +250,90 @@ def test_snapshot_false_when_confirmed_did_missing_term(client):
     assert _snapshot(client, sid)["allow_did"] is False
     assert confirmed_did_method(facade.get_state(sid)) is True
     assert did_interaction_missing(facade.get_state(sid)) is True
+
+
+def _real_column_design(*, interactions: list) -> dict:
+    return _design(
+        treated="urban_hukou",
+        period="post1999",
+        interactions=interactions,
+    )
+
+
+def test_real_column_did_interaction_allows():
+    state = {
+        "design": _real_column_design(
+            interactions=[
+                {
+                    "kind": "did",
+                    "left": "urban_hukou",
+                    "right": "post1999",
+                    "term": "urban_hukou:post1999",
+                }
+            ]
+        )
+    }
+    assert has_treated_period_interaction(state["design"]) is True
+    assert session_allow_did(state) is True
+    assert did_interaction_missing(state) is False
+
+
+def test_real_column_slots_without_interaction_item_fail_closed():
+    state = {"design": _real_column_design(interactions=[])}
+    assert has_treated_period_interaction(state["design"]) is False
+    assert session_allow_did(state) is False
+    assert did_interaction_missing(state) is True
+
+
+def test_real_column_het_item_does_not_count():
+    state = {
+        "design": _real_column_design(
+            interactions=[
+                {
+                    "kind": "het",
+                    "left": "urban_hukou",
+                    "right": "post1999",
+                    "term": "urban_hukou:post1999",
+                }
+            ]
+        )
+    }
+    assert has_treated_period_interaction(state["design"]) is False
+    assert session_allow_did(state) is False
+    assert did_interaction_missing(state) is True
+
+
+@pytest.mark.parametrize(
+    "interactions",
+    [
+        [],
+        [{"kind": "het", "left": "urban_hukou", "right": "post1999", "term": "urban_hukou:post1999"}],
+        [{"left": "urban_hukou", "right": "post1999", "term": "urban_hukou:post1999"}],
+        [{"kind": "did", "left": "post1999", "right": "urban_hukou", "term": "post1999:urban_hukou"}],
+    ],
+)
+def test_structured_rule_requires_did_item_matching_both_slots(interactions):
+    design = _real_column_design(interactions=interactions)
+    assert has_treated_period_interaction(design) is False
+    assert session_allow_did({"design": design}) is False
+
+
+def test_structured_slots_same_name_fail_closed():
+    design = _real_column_design(
+        interactions=[{"kind": "did", "left": "urban_hukou", "right": "urban_hukou", "term": "x"}]
+    )
+    design["period"] = "urban_hukou"
+    assert has_treated_period_interaction(design) is False
+
+
+def test_structured_rule_keeps_legacy_names_passing(client):
+    # Literal treat/post blobs and constructed dummies still allow on their own.
+    state = {
+        "design": _design(
+            treated="treat",
+            period="post",
+            interactions=[_did_term("treat * post", "treat", "post")],
+        )
+    }
+    assert has_treated_period_interaction(state["design"]) is True
+    assert session_allow_did(state) is True

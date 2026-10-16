@@ -112,6 +112,7 @@ Method-specific extras already used in-repo stay optional on the object and are 
 
 - Explicit interaction: `treated:period`, `treated * period`, `treat × post`, `treat#post`
 - A single constructed dummy that **is** that interaction (`treat_post`, `did`, NJ×after, and the same 2×2 cell)
+- Structured slots: `design.treated` and `design.period` name real user columns (e.g. `urban_hukou` / `post1999`) and a `kind=did` item echoes them (`left == treated`, `right == period`). The slots alone, or a `kind=het` item echoing them, do not count.
 
 **Does not count** (still missing):
 
